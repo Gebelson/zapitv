@@ -36,7 +36,10 @@ struct Uniforms {
   saturationMultiplier: f32,
   contentType: f32, // 0 = live-action/CAS, 1 = anime, 2 = 3d
   isHoldingOriginal: f32, // 1 = bypass instantâneo
-  padding: vec2<f32>,
+  pad0: f32,
+  pad1: f32,
+  pad2: f32,
+  pad3: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
