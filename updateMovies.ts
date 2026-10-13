@@ -1,0 +1,2606 @@
+import { db } from './db';
+import { ContentType, ContentItem } from './types';
+
+const enrichedMovies = [
+  {
+    "id": "movie-13605284",
+    "title": "Frágil",
+    "year": 2024,
+    "type": ContentType.MOVIE,
+    "rating": 5.7,
+    "image": "https://m.media-amazon.com/images/M/MV5BYTM0NTcxNTQtYjgxOC00ODI0LTgyMTQtMTQxNDYxMTIxMWM2XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt13605284/img",
+    "description": "No meio de um novo esquema para divulgar publicamente o desempenho dos cirurgiões, a vida de uma cirurgiã talentosa é desordenada quando seus colegas começam a cerrar fileiras, e até mesmo sua parceira, que é enfermeira no hospital, lhe vira as costas.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt13605284",
+    "imdbId": "tt13605284",
+    "isFeatured": false,
+    "director": "Christine Jeffs",
+    "cast": [
+      "Elizabeth Banks",
+      "Simon McBurney",
+      "Fern Sutherland"
+    ],
+    "genres": [
+      "Drama",
+      "Suspense"
+    ]
+  },
+  {
+    "id": "movie-19724270",
+    "title": "Uma Noite no Jardim de Infância",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.7,
+    "image": "https://m.media-amazon.com/images/M/MV5BYzhkOGQxMjItMGQzNy00OWUwLTlmNzEtODM3Y2NiMGNlYjM4XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt19724270/img",
+    "description": "Um jovem invade o ensaio de uma peça escolar para evitar que um grupo de professores e pais excêntricos expulsem o filho de sua namorada.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt19724270",
+    "imdbId": "tt19724270",
+    "isFeatured": false,
+    "director": "Rafal Skalski",
+    "cast": [
+      "Piotr Witkowski",
+      "Lena Góra",
+      "Zbigniew Zamachowski"
+    ],
+    "genres": [
+      "Comédia"
+    ],
+    "ageRating": "TV-MA"
+  },
+  {
+    "id": "movie-22442442",
+    "title": "Desconectados",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 4.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BOTZmYjUxNGMtZWU1YS00NzFhLTljMzctZjY0NWQ5ODY0NzVhXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt22442442/img",
+    "description": "Victoria é viciada em internet e trabalho e tem um relacionamento ruim com os filhos adolescentes, que moram com o pai. Sua vida muda quando seus filhos a visitam por alguns dias e uma tempestade solar causa um apagão global da Internet.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt22442442",
+    "imdbId": "tt22442442",
+    "isFeatured": false,
+    "director": "Diego Rougier",
+    "cast": [
+      "Chiqui Aguayo",
+      "Renato Albornoz",
+      "Jay Alessandra"
+    ],
+    "genres": [
+      "Comédia"
+    ]
+  },
+  {
+    "id": "movie-24748792",
+    "title": "Varig: A Caixa-Preta do Brasil",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://m.media-amazon.com/images/M/MV5BMzQ4MTgzODctZTNlYS00NDdlLThhYWItMmRhOTI4YzQ0Zjg5XkEyXkFqcGdeQXVyMTYwMTY5NTU1._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt24748792/img",
+    "description": "Sinopse indisponível.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt24748792",
+    "imdbId": "tt24748792",
+    "isFeatured": false,
+    "director": "Henrique Zingano",
+    "genres": [
+      "Documentário"
+    ]
+  },
+  {
+    "id": "movie-23867462",
+    "title": "Feliz Ano Nosso",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.4,
+    "image": "https://m.media-amazon.com/images/M/MV5BOTMyYTA2ZDItY2RhZi00NDlkLTk2ZDEtYWNjNjdlZDRmMjMxXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt23867462/img",
+    "description": "A caminho de uma festa de ano novo, dois estranhos ficam presos em um elevador - e precisam se conhecer.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt23867462",
+    "imdbId": "tt23867462",
+    "isFeatured": false,
+    "director": "Frank Bellocq",
+    "cast": [
+      "Kev Adams",
+      "Camille Lellouche",
+      "Audrey Pirault"
+    ],
+    "genres": [
+      "Comédia",
+      "Romance"
+    ],
+    "ageRating": "TV-MA"
+  },
+  {
+    "id": "movie-18381124",
+    "title": "A Loteria: O Sonho Mexicano",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://m.media-amazon.com/images/M/MV5BOTQ4NDU3MzQtNjNiNi00OGU0LTlhZmQtMzI4NDE5ZGM0MmM0XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt18381124/img",
+    "description": "Um grupo de funcionários de uma loteria planeja a maior fraude da história mexicana usando uma arma poderosa: a magia da televisão.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt18381124",
+    "imdbId": "tt18381124",
+    "isFeatured": false,
+    "director": "J.M Cravioto",
+    "cast": [
+      "Osvaldo Benavides",
+      "Bruno Bichir",
+      "Kristyan Ferrer"
+    ],
+    "genres": [
+      "Comédia",
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-18263854",
+    "title": "Natal (Ao Vivo)",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://m.media-amazon.com/images/M/MV5BYmRlNTVlOWMtMzQxYi00ODI2LThjYjMtZWU0OTVmZDM4NzZjXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt18263854/img",
+    "description": "A competição entre trabalhadores de um programa mexicano pelo cobiçado cargo na equipe de produção em plena época de Natal os deixará ansiosos pela oportunidade que poderá levá-los ao topo de suas carreiras.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt18263854",
+    "imdbId": "tt18263854",
+    "isFeatured": false,
+    "director": "Salvador Suárez Obregón",
+    "cast": [
+      "Regina Pavón",
+      "Jesús Zavala",
+      "Martín Barba"
+    ],
+    "genres": [
+      "Comédia"
+    ]
+  },
+  {
+    "id": "movie-23782662",
+    "title": "Conselheira do Amor",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 4.7,
+    "image": "https://m.media-amazon.com/images/M/MV5BOTMyMWY2OTEtODg1Mi00YzUwLTk0MTMtMGVjYTFmNDFhNTQyXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt23782662/img",
+    "description": "Fazendo-se passar por professor particular, Azra treina secretamente os alunos para que alcancem seus objetivos na vida e no amor - mas não sem alguns obstáculos no caminho.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt23782662",
+    "imdbId": "tt23782662",
+    "isFeatured": false,
+    "director": "Kivanç Baruönü",
+    "cast": [
+      "Bensu Soral",
+      "Halit Özgür Sari",
+      "Helin Kandemir"
+    ],
+    "genres": [
+      "Comédia",
+      "Romance"
+    ],
+    "ageRating": "TV-MA"
+  },
+  {
+    "id": "movie-15553758",
+    "title": "Vale dos Cangurus",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 7.3,
+    "image": "https://m.media-amazon.com/images/M/MV5BYmI4MjJmNzEtNjA0Zi00YjM4LTljYTMtNjViM2RjYmFiMWYyXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt15553758/img",
+    "description": "A história da maioridade de uma jovem canguru chamada Mala, aprendendo o que é preciso para sobreviver ao seu incrível primeiro ano. Apenas um em cada cinco joeys chega ao primeiro aniversário. O maior inimigo de Mala é a matilha de dingos que a persegue...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt15553758",
+    "imdbId": "tt15553758",
+    "isFeatured": false,
+    "director": "Kylie Stott",
+    "cast": [
+      "Sarah Snook"
+    ],
+    "genres": [
+      "Documentário"
+    ],
+    "ageRating": "TV-PG"
+  },
+  {
+    "id": "movie-12878292",
+    "title": "O Sonho de Ontem",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.7,
+    "image": "https://m.media-amazon.com/images/M/MV5BZTc1ZTliZDUtNjI4OC00YjYxLWI2MDctYmEwODNkYjNlZmUxXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt12878292/img",
+    "description": "Dámaso Pérez Prado acorda no metrô da Cidade do México em 2020. Ele precisará encontrar seu propósito e se redimir dos fracassos do passado.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt12878292",
+    "imdbId": "tt12878292",
+    "isFeatured": false,
+    "director": "Emilio Maillé",
+    "cast": [
+      "Blanca Guerra",
+      "Adriana Llabres",
+      "Ofelia Medina"
+    ],
+    "genres": [
+      "Drama",
+      "Musical"
+    ]
+  },
+  {
+    "id": "movie-14147224",
+    "title": "Gaiola Mental",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 4.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BNDIyNTkyMmQtZjMxMi00YjExLTk0NTgtMDFhMWRhYjUxNTRlXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt14147224/img",
+    "description": "Quando um serial killer imitador ataca, dois detetives pedem ajuda a um criminoso condenado.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt14147224",
+    "imdbId": "tt14147224",
+    "isFeatured": false,
+    "director": "Mauro Borrelli",
+    "cast": [
+      "Elisha Bascomb",
+      "Alba Borrelli",
+      "Nikola Chupin"
+    ],
+    "genres": [
+      "Crime",
+      "Drama",
+      "Mistério"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-11433906",
+    "title": "A Informante",
+    "year": 2024,
+    "type": ContentType.MOVIE,
+    "rating": 6.5,
+    "image": "https://m.media-amazon.com/images/M/MV5BZGY1NTZhMDUtMzJhNi00ZWZiLWJkZDMtNmVlMmM2ZTdjYzg1XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt11433906/img",
+    "description": "Winner é uma jovem brilhante e desajustada do Texas que tem sua moral desafiada enquanto servia na Força Aérea dos EUA e trabalhava como contratada pela NSA.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt11433906",
+    "imdbId": "tt11433906",
+    "isFeatured": false,
+    "director": "Susanna Fogel",
+    "cast": [
+      "Emilia Jones",
+      "Connie Britton",
+      "Zach Galifianakis"
+    ],
+    "genres": [
+      "Aventura",
+      "Biografia",
+      "Comédia"
+    ],
+    "ageRating": "PG-13"
+  },
+  {
+    "id": "movie-22899102",
+    "title": "Mickey Salva o Natal",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.8,
+    "image": "https://m.media-amazon.com/images/M/MV5BNmYyZWFkOGEtNWU3OS00MGY0LTkwY2YtMDZiNzlkNzgyNTBjXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt22899102/img",
+    "description": "Mickey, Minnie e seus amigos tentam celebrar o Natal perfeito em sua cabana coberta de neve; quando Plutão faz com que o Papai Noel perca todos os presentes de seu trenó, os amigos viajam para o Pólo Norte em uma missão para salvar o Natal.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt22899102",
+    "imdbId": "tt22899102",
+    "isFeatured": false,
+    "director": "David H. Brooks",
+    "cast": [
+      "Bret Iwan",
+      "Kaitlyn Robrock",
+      "Bill Farmer"
+    ],
+    "genres": [
+      "Animação",
+      "Curta-metragem",
+      "Aventura"
+    ],
+    "ageRating": "TV-G"
+  },
+  {
+    "id": "movie-22656762",
+    "title": "Mergulho",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.9,
+    "image": "https://m.media-amazon.com/images/M/MV5BMzI4ZTc1MzAtMjNkYi00MTZlLThhM2UtOWYxOTA4MWQxMjdhXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt22656762/img",
+    "description": "Mariel é uma mergulhadora de elite veterana que tem uma última chance nos Jogos Olímpicos. No entanto, quando uma terrível verdade vem à tona, Mariel enfrenta sua maior questão pessoal: vencer é o seu verdadeiro sonho?",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt22656762",
+    "imdbId": "tt22656762",
+    "isFeatured": false,
+    "director": "Lucía Puenzo",
+    "cast": [
+      "Karla Souza",
+      "Hernán Mendoza",
+      "Dèja Ebergenyi"
+    ],
+    "genres": [
+      "Drama",
+      "Esporte"
+    ]
+  },
+  {
+    "id": "movie-22309256",
+    "title": "Natal no Paraíso",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 3.7,
+    "image": "https://m.media-amazon.com/images/M/MV5BNmJlNjhkMGEtYjIwMC00YmRkLTkwNWUtNjg3YjEzNjRlMGVhXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt22309256/img",
+    "description": "As férias de Joanna são interrompidas quando suas irmãs lhe contam que seu pai foi abandonado, não atende nenhuma ligação e desapareceu em uma ilha do Caribe. As irmãs decidem salvar o pai e trazê-lo para casa para Ch...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt22309256",
+    "imdbId": "tt22309256",
+    "isFeatured": false,
+    "director": "Philippe Martinez",
+    "cast": [
+      "Kelsey Grammer",
+      "Elizabeth Hurley",
+      "Billy Ray Cyrus"
+    ],
+    "genres": [
+      "Comédia"
+    ],
+    "ageRating": "PG"
+  },
+  {
+    "id": "movie-22527810",
+    "title": "12 Vésperas de Natal",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.2,
+    "image": "https://m.media-amazon.com/images/M/MV5BZjBhY2FhZjktMDkzYi00NDVjLWEyYTgtZjlhY2I2ZTBlZGExXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt22527810/img",
+    "description": "Quando o empresário de sucesso Brian Conway sofre um acidente de carro na véspera de Natal, o Papai Noel lhe dá 12 chances de refazer o dia e reparar os relacionamentos em sua vida para encontrar o verdadeiro significado do Natal.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt22527810",
+    "imdbId": "tt22527810",
+    "isFeatured": false,
+    "director": "Dustin Rikert",
+    "cast": [
+      "Kelsey Grammer",
+      "Spencer Grammer",
+      "Mitch Poulos"
+    ],
+    "genres": [
+      "Comédia"
+    ],
+    "ageRating": "TV-PG"
+  },
+  {
+    "id": "movie-21990918",
+    "title": "Os Suburbanos: O Filme",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://m.media-amazon.com/images/M/MV5BYjZlYzY2NzItOTMwOC00YjNhLTgwMmYtYjIwYjVmMmVlODE3XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt21990918/img",
+    "description": "Sinopse indisponível.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt21990918",
+    "imdbId": "tt21990918",
+    "isFeatured": false,
+    "director": "Luciano Sabino",
+    "cast": [
+      "Carla Cristina Cardoso",
+      "Nando Cunha",
+      "Mariah da Penha"
+    ],
+    "genres": [
+      "Comédia"
+    ]
+  },
+  {
+    "id": "movie-18559720",
+    "title": "The OctoGames",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 3.3,
+    "image": "https://m.media-amazon.com/images/M/MV5BMTM0NjE1ZGEtNGRhNi00YjgxLWFjODAtYmI2ZTY5ZGM5M2VjXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt18559720/img",
+    "description": "8 competidores competem em 8 jogos infantis clássicos e mortais. Eles buscam a fama além de seus sonhos mais loucos, competindo pela chance de assumir o controle do canal do YouTube do famoso, porém esquivo, YouTuber mascarado conhecido apenas como \"JaxPro\".",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt18559720",
+    "imdbId": "tt18559720",
+    "isFeatured": false,
+    "director": "Aaron Mirtes",
+    "cast": [
+      "Lacy Hart",
+      "Cael Wayne Adcock",
+      "Luv Patel"
+    ],
+    "genres": [
+      "Ação",
+      "Terror",
+      "Ficção Científica"
+    ]
+  },
+  {
+    "id": "movie-21994096",
+    "title": "Nada é por Acaso",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6,
+    "image": "https://m.media-amazon.com/images/M/MV5BN2MyODk2YTctNTMxNi00YWQwLTg2ZWEtOTM2N2E1ZDU3YTg4XkEyXkFqcGdeQXVyMTI0NzE0OTgz._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt21994096/img",
+    "description": "Marina volta de viagem com R$ 5 milhões na conta. Agora, ela só quer seguir em frente sem enfrentar o que fez. Porém, os constantes encontros com Maria Eugênia, Henrique e o filho do casal não podem ser mera coincidência.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt21994096",
+    "imdbId": "tt21994096",
+    "isFeatured": false,
+    "director": "Márcio Trigo",
+    "cast": [
+      "Giovanna Lancellotti",
+      "Rafael Cardoso",
+      "Mika Guluzian"
+    ],
+    "genres": [
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-21441396",
+    "title": "Jack Osbourne: Em Busca dos Óvnis",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 4.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BY2Q2YjUxZTQtNzQ3ZS00NGVlLTliZGYtZjJlZmU4NWM5ZDYwXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt21441396/img",
+    "description": "Segue Jack, Jason e Jamie enquanto eles se aventuram em uma jornada em busca de respostas por trás da estranha atividade que cerca a Bacia Uinta, em Utah.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt21441396",
+    "imdbId": "tt21441396",
+    "isFeatured": false,
+    "cast": [
+      "Ben Hansen",
+      "James Keenan",
+      "Jamie Kennedy"
+    ],
+    "genres": [
+      "Documentário"
+    ]
+  },
+  {
+    "id": "movie-21439528",
+    "title": "Vulcão Whakaari: Resgate na Nova Zelândia",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 7.4,
+    "image": "https://m.media-amazon.com/images/M/MV5BOTFlNjU3YzctODIxOS00MTEzLWI5Y2MtMTQyMzQ0YTkzZWNiXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt21439528/img",
+    "description": "Retrata a bravura e a resiliência humanas após um trágico desastre vulcânico na Nova Zelândia.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt21439528",
+    "imdbId": "tt21439528",
+    "isFeatured": false,
+    "director": "Rory Kennedy",
+    "cast": [
+      "Mark Inman",
+      "Hazel Osborne",
+      "Pouroto Ngaropo"
+    ],
+    "genres": [
+      "Documentário"
+    ],
+    "ageRating": "PG-13"
+  },
+  {
+    "id": "movie-15721088",
+    "title": "Calor Mortal",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 4.9,
+    "image": "https://m.media-amazon.com/images/M/MV5BZmU4NWY5NzktZDk1Ni00Mzc4LWJjNDMtYjEwNDAxYWZmZDJhXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt15721088/img",
+    "description": "Quando a máfia local aparece para incendiar o seu restaurante, Ana, uma chef com um passado meticuloso, defende o seu território e prova as suas habilidades com a faca dentro e fora da cozinha.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt15721088",
+    "imdbId": "tt15721088",
+    "isFeatured": false,
+    "director": "Zach Golden",
+    "cast": [
+      "Olga Kurylenko",
+      "Don Johnson",
+      "Dallas Page"
+    ],
+    "genres": [
+      "Ação",
+      "Comédia",
+      "Crime"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-22490660",
+    "title": "Código do Armagedom",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://m.media-amazon.com/images/M/MV5BYTdkMmU1MzQtMzNlMi00NGRjLTlmMDAtODJkMTA1ODY0ZjIxXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt22490660/img",
+    "description": "Uma viagem ao exterior muda a vida de três irmãos que se deparam com um antigo tesouro que pertenceu ao seu avô. Esta descoberta os levará à maior aventura de suas vidas, ao descobrirem a existência de um antigo...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt22490660",
+    "imdbId": "tt22490660",
+    "isFeatured": false,
+    "director": "Daniel Friesen",
+    "cast": [
+      "Sandro Alcantara",
+      "Felipe Folgosi",
+      "Daniel Friesen"
+    ],
+    "genres": [
+      "Ação"
+    ]
+  },
+  {
+    "id": "movie-10418680",
+    "title": "Amor Além do Tempo",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.4,
+    "image": "https://m.media-amazon.com/images/M/MV5BMDVhYjgwNWUtZThiMC00ZDdmLThjNjEtZTZjYjZhZGRhZTRhXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt10418680/img",
+    "description": "Num futuro próximo, um político recém-saído de uma derrota eleitoral foge para a casa de verão de sua família no lago. Suas férias são interrompidas pelo aparecimento de seu primeiro amor, que acaba de retornar de uma viagem espacial de 20 anos e ainda não voltou.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt10418680",
+    "imdbId": "tt10418680",
+    "isFeatured": false,
+    "director": "Erwann Marshall",
+    "cast": [
+      "Todd Grinnell",
+      "Brianna Hildebrand",
+      "KaDee Strickland"
+    ],
+    "genres": [
+      "Drama",
+      "Romance",
+      "Ficção Científica"
+    ]
+  },
+  {
+    "id": "movie-21909950",
+    "title": "Hawa",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.2,
+    "image": "https://m.media-amazon.com/images/M/MV5BMzlkMTJkZDctOThlYy00MTdkLWI2MjctNWFhNDBlMTczMzNiXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt21909950/img",
+    "description": "Hawa, uma jovem que mora sozinha com a avó, que está em estado terminal. Ao saber que Michelle Obama está visitando Paris, Hawa tem a ideia maluca de ser adotada por essa personalidade, que ela admira mais do que tudo...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt21909950",
+    "imdbId": "tt21909950",
+    "isFeatured": false,
+    "director": "Maïmouna Doucouré",
+    "cast": [
+      "Sania Halifa",
+      "Oumou Sangaré",
+      "Yseult"
+    ],
+    "genres": [
+      "Comédia",
+      "Drama",
+      "Família"
+    ]
+  },
+  {
+    "id": "movie-21250176",
+    "title": "Re/Member",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.2,
+    "image": "https://m.media-amazon.com/images/M/MV5BNmRlNWM1Y2MtOTU1Ny00NDBmLTkzNzUtNGQ5ZmQzOWMyYmY1XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt21250176/img",
+    "description": "Uma estudante do ensino médio e seus amigos estão presos em um loop temporal por um fantasma e a única maneira de escapar é encontrar o cadáver da vítima anterior do fantasma.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt21250176",
+    "imdbId": "tt21250176",
+    "isFeatured": false,
+    "director": "Eiichirô Hasumi",
+    "cast": [
+      "Kanna Hashimoto",
+      "Gordon Maeda",
+      "Maika Yamamoto"
+    ],
+    "genres": [
+      "Drama",
+      "Terror",
+      "Mistério"
+    ]
+  },
+  {
+    "id": "movie-12076024",
+    "title": "Abestalhados 2",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://m.media-amazon.com/images/M/MV5BMjYxZDQ2ZTctM2E1Ni00MmE5LWE2YmItY2U4NDBjOGM5MDViXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt12076024/img",
+    "description": "Quatro amigos compartilham o sonho de fazer um grande filme de ação, e nem mesmo o seu extraordinário talento para se meter em encrencas os fará desistir de fazê-lo.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt12076024",
+    "imdbId": "tt12076024",
+    "isFeatured": false,
+    "director": "Marcelo Botta, Marcos Jorge",
+    "cast": [
+      "Paulinho Serra",
+      "Felipe Torres",
+      "Raul Chequer"
+    ],
+    "genres": [
+      "Ação",
+      "Comédia"
+    ]
+  },
+  {
+    "id": "movie-19770238",
+    "title": "Aftersun",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 7.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BZWU5Y2MyZjQtNGVjYi00ZDRkLTk1MGYtYmNlMzI0MTFmNDU2XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt19770238/img",
+    "description": "Sophie reflete sobre a alegria compartilhada e a melancolia privada de umas férias que ela tirou com o pai vinte anos antes. Memórias reais e imaginárias preenchem as lacunas enquanto ela tenta reconciliar o pai que conheceu com o homem que ela conheceu.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt19770238",
+    "imdbId": "tt19770238",
+    "isFeatured": false,
+    "director": "Charlotte Wells",
+    "cast": [
+      "Paul Mescal",
+      "Frankie Corio",
+      "Celia Rowlson-Hall"
+    ],
+    "genres": [
+      "Drama"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-18396866",
+    "title": "Dead Zone: Operação Resgate",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 3.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BOWY5OTI0OTQtMWRhOC00YzFjLWIyZTAtMjcyMzc2ZWMxZTNkXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt18396866/img",
+    "description": "Para impedir o colapso da humanidade, uma equipe de soldados de elite deve descer a uma cidade envenenada por radiação e realizar a missão furtiva definitiva usando armaduras e armas de alta tecnologia.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt18396866",
+    "imdbId": "tt18396866",
+    "isFeatured": false,
+    "director": "Hank Braxtan",
+    "cast": [
+      "Michael Jai White",
+      "Chad Michael Collins",
+      "Tarkan Dospil"
+    ],
+    "genres": [
+      "Ação",
+      "Terror",
+      "Ficção Científica"
+    ],
+    "ageRating": "TV-MA"
+  },
+  {
+    "id": "movie-4471908",
+    "title": "Rei do Ringue: A História de Jem Belcher",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.5,
+    "image": "https://m.media-amazon.com/images/M/MV5BNmQ5Mzc0ZTUtMzQzMC00OWUxLThlOTUtYjQyMzEwYzM0ZGRjXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt4471908/img",
+    "description": "Na virada do século 19, o pugilismo era o esporte dos reis e um jovem boxeador talentoso lutou para se tornar campeão da Inglaterra.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt4471908",
+    "imdbId": "tt4471908",
+    "isFeatured": false,
+    "director": "Daniel Graham",
+    "cast": [
+      "Matt Hookings",
+      "Ray Winstone",
+      "Russell Crowe"
+    ],
+    "genres": [
+      "Biografia",
+      "Drama",
+      "História"
+    ]
+  },
+  {
+    "id": "movie-6805938",
+    "title": "Perseguição nas Alturas",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.2,
+    "image": "https://m.media-amazon.com/images/M/MV5BNTRhNWM0MGMtNzc5My00N2NkLTk0MzgtMDk3NmFkNjY3MGNlXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt6805938/img",
+    "description": "Uma alpinista presa na face de uma montanha lutando contra quatro assassinos estava em uma saliência, seis metros acima dela.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt6805938",
+    "imdbId": "tt6805938",
+    "isFeatured": false,
+    "director": "Howard J. Ford",
+    "cast": [
+      "Brittany Ashworth",
+      "Ben Lamb",
+      "Louis Boyer"
+    ],
+    "genres": [
+      "Ação",
+      "Aventura",
+      "Suspense"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-15538570",
+    "title": "Padre Johnny",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 7.1,
+    "image": "https://m.media-amazon.com/images/M/MV5BMmIwNDMwYmEtZjlkYS00MTg0LTkzZGEtODE0MjhlZmZkMDBhXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt15538570/img",
+    "description": "Amor pelo mundo e pelas outras pessoas e pelo fato de que todos merecem uma segunda chance. Quando Patryk o recebe de um padre, Jan Kaczkowski nem suspeita como isso mudará sua vida.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt15538570",
+    "imdbId": "tt15538570",
+    "isFeatured": false,
+    "director": "Daniel Jaroszek",
+    "cast": [
+      "Dawid Ogrodnik",
+      "Piotr Trojan",
+      "Beata Zygarlicka"
+    ],
+    "genres": [
+      "Biografia",
+      "Drama"
+    ],
+    "ageRating": "TV-MA"
+  },
+  {
+    "id": "movie-17517876",
+    "title": "Tudo Por um Ponto",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.1,
+    "image": "https://m.media-amazon.com/images/M/MV5BZmRhNjUzNTAtNDAwOC00ZjQyLWEwMGMtZDhjYjc2MTgyZmFiXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt17517876/img",
+    "description": "Ambientado numa escola alemã, o filme é centrado em um pai que, numa tarde de sexta-feira, bate à porta da sala dos professores para convencer os seis professores que ainda estão no prédio a permitirem que seu filho faça os exames Abitur.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt17517876",
+    "imdbId": "tt17517876",
+    "isFeatured": false,
+    "director": "Sönke Wortmann",
+    "cast": [
+      "Florian David Fitz",
+      "Anke Engelke",
+      "Justus von Dohnányi"
+    ],
+    "genres": [
+      "Comédia"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-16377816",
+    "title": "Marte Um",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 7.4,
+    "image": "https://m.media-amazon.com/images/M/MV5BNDAxMGNkMWMtYzFiYy00OGI5LWExYWYtNTE5ZDRiMDdhYTU3XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt16377816/img",
+    "description": "Uma família de classe média baixa passa por uma série de mudanças profundas e desafiadoras, reinventando a si mesma e a seus laços familiares ao longo do caminho.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt16377816",
+    "imdbId": "tt16377816",
+    "isFeatured": false,
+    "director": "Gabriel Martins",
+    "cast": [
+      "Cícero Lucas",
+      "Carlos Francisco",
+      "Camilla Damião"
+    ],
+    "genres": [
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-13270424",
+    "title": "Brian e Charles",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.7,
+    "image": "https://m.media-amazon.com/images/M/MV5BYjNlNmVmNjAtNjU2YS00ODBmLWI0OWMtYmEyZjRiMWJjZWVkXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt13270424/img",
+    "description": "Depois de um inverno particularmente rigoroso, Brian entra em profunda depressão; Completamente isolado e sem ninguém com quem conversar, Brian faz o que qualquer pessoa sã faria ao se deparar com uma situação tão melancólica. Ele constrói um robô.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt13270424",
+    "imdbId": "tt13270424",
+    "isFeatured": false,
+    "director": "Jim Archer",
+    "cast": [
+      "David Earl",
+      "Chris Hayward",
+      "Louise Brealey"
+    ],
+    "genres": [
+      "Comédia",
+      "Drama",
+      "Ficção Científica"
+    ],
+    "ageRating": "PG"
+  },
+  {
+    "id": "movie-16183464",
+    "title": "One Piece Film: Red",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.7,
+    "image": "https://m.media-amazon.com/images/M/MV5BNTdjY2YxYTQtNjIzYy00ZDczLThhNTUtNmY2ZWNkZjZiMTYzXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt16183464/img",
+    "description": "Uta, a cantora mais querida do planeta, é conhecida por esconder a própria identidade durante as apresentações. Agora, pela primeira vez, ela se revelará ao mundo. Todos os fãs de Uta, incluindo os Chapéus de Palha liderados por Luffy, aguardam.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt16183464",
+    "imdbId": "tt16183464",
+    "isFeatured": false,
+    "director": "Gorô Taniguchi",
+    "cast": [
+      "Mayumi Tanaka",
+      "Kazuya Nakai",
+      "Akemi Okamura"
+    ],
+    "genres": [
+      "Animação",
+      "Ação",
+      "Aventura"
+    ],
+    "ageRating": "PG-13"
+  },
+  {
+    "id": "movie-15745226",
+    "title": "Darby: A Jovem Sensitiva",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BOTBiZWNmZDAtZTRhYi00YmM0LTliMjYtOWRlMDFiNDY3OWNkXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt15745226/img",
+    "description": "Darby Harper recebeu a habilidade de ver fantasmas depois de sofrer uma experiência de quase morte em sua infância. Ela dirige uma empresa paralela que aconselha bebidas espirituosas locais em seu tempo livre.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt15745226",
+    "imdbId": "tt15745226",
+    "isFeatured": false,
+    "director": "Silas Howard",
+    "cast": [
+      "Riele Downs",
+      "Auli'i Cravalho",
+      "Chosen Jacobs"
+    ],
+    "genres": [
+      "Comédia",
+      "Drama",
+      "Fantasia"
+    ],
+    "ageRating": "PG-13"
+  },
+  {
+    "id": "movie-10530838",
+    "title": "Como Agradar Uma Mulher",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.3,
+    "image": "https://m.media-amazon.com/images/M/MV5BZDBmNDFhZWYtZDU4Zi00YTY4LWExOGItMmZhZmM3NmIxM2E5XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt10530838/img",
+    "description": "Quando o seu negócio de limpeza doméstica exclusivamente masculino fica fora de controle, uma mulher madura deve abraçar sua própria sexualidade, se quiser construir uma nova vida para si mesma.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt10530838",
+    "imdbId": "tt10530838",
+    "isFeatured": false,
+    "director": "Renée Webster",
+    "cast": [
+      "Sally Phillips",
+      "Hayley McElhinney",
+      "Caroline Brazier"
+    ],
+    "genres": [
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-14534796",
+    "title": "A Farsa",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.4,
+    "image": "https://m.media-amazon.com/images/M/MV5BZDc4MmQyMDctNjNiMS00MTU5LTgyNDgtY2I2OTkyNzQyMmE0XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt14534796/img",
+    "description": "Adrien, um dançarino atraente cuja carreira foi destruída por um acidente de moto, desperdiça sua juventude na ociosidade. Sua vida muda quando conhece Margot, que vive de fraudes e manipulações amorosas.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt14534796",
+    "imdbId": "tt14534796",
+    "isFeatured": false,
+    "director": "Nicolas Bedos",
+    "cast": [
+      "Pierre Niney",
+      "Isabelle Adjani",
+      "François Cluzet"
+    ],
+    "genres": [
+      "Crime",
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-11186952",
+    "title": "O Mistério de Ozarks",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 4.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BNjA1NDhkYzctNGUwOS00NzM3LWE4MDItOTQ5NWMyNjcwMmE5XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt11186952/img",
+    "description": "No Arkansas pós-Guerra Civil, um jovem médico é misteriosamente convocado a uma cidade remota em Ozarks, apenas para descobrir que o paraíso utópico está cheio de segredos e cercado por uma presença sobrenatural ameaçadora.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt11186952",
+    "imdbId": "tt11186952",
+    "isFeatured": false,
+    "director": "Matt Glass, Jordan Wayne Long",
+    "cast": [
+      "Thomas Hobson",
+      "Scott Dean",
+      "Ed Lowry"
+    ],
+    "genres": [
+      "Drama",
+      "Terror",
+      "Mistério"
+    ]
+  },
+  {
+    "id": "movie-12283036",
+    "title": "A Maldição do Quarto 203",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 4.3,
+    "image": "https://m.media-amazon.com/images/M/MV5BZWY4ODI5MDctNzFlNi00NTE3LWJlZTgtNWNiYmY4YzAzMDM4XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt12283036/img",
+    "description": "Dois melhores amigos e colegas de quarto ficam aterrorizados com os espíritos vingativos que habitam em seu apartamento. Baseado no romance publicado pela Kobunsha e escrito por Nanami Kamon.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt12283036",
+    "imdbId": "tt12283036",
+    "isFeatured": false,
+    "director": "Ben Jagger",
+    "cast": [
+      "Francesca Xuereb",
+      "Viktoria Vinyarska",
+      "Eric Wiegand"
+    ],
+    "genres": [
+      "Drama",
+      "Terror",
+      "Suspense"
+    ],
+    "ageRating": "Not Rated"
+  },
+  {
+    "id": "movie-9787228",
+    "title": "Maior que o Mundo",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://m.media-amazon.com/images/M/MV5BOWEwZjFiYmMtYTFjMC00NzE1LWIzNjMtOGRhYjg5Yjg0ZDJjXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt9787228/img",
+    "description": "Kbeto (Eriberto Leão), um escritor de cinquenta e poucos anos que sofre de bloqueio criativo há 20 anos, está em busca de inspiração para escrever seu segundo romance e acabar com sua fama de autor de sucesso único. Ele procura...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt9787228",
+    "imdbId": "tt9787228",
+    "isFeatured": false,
+    "director": "Beto Marquez",
+    "cast": [
+      "Maria Flor",
+      "Eriberto Leão",
+      "Gabi Lopes"
+    ],
+    "genres": [
+      "Comédia"
+    ]
+  },
+  {
+    "id": "movie-15977950",
+    "title": "30 Noites com a Minha Ex",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.1,
+    "image": "https://m.media-amazon.com/images/M/MV5BNWNjYjA5ODItNGYzOC00NjA2LTkyNjQtNjY5NWY4ZTI5NzJkXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt15977950/img",
+    "description": "A pedido da filha, um casal separado tem que viver junto por trinta dias após a ex-mulher voltar de uma longa internação psiquiátrica.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt15977950",
+    "imdbId": "tt15977950",
+    "isFeatured": false,
+    "director": "Adrián Suar",
+    "cast": [
+      "Adrián Suar",
+      "Pilar Gamboa",
+      "Rochi Hernández"
+    ],
+    "genres": [
+      "Comédia",
+      "Romance"
+    ]
+  },
+  {
+    "id": "movie-15035506",
+    "title": "Fantasy Football",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.9,
+    "image": "https://m.media-amazon.com/images/M/MV5BOTE5M2E4NDctOTJhYi00Y2IwLThlNGUtMTE2MDMyOTdlNzc1XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt15035506/img",
+    "description": "Uma filha descobre que pode controlar magicamente o desempenho de seu pai jogador de futebol através de seu console de videogame.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt15035506",
+    "imdbId": "tt15035506",
+    "isFeatured": false,
+    "director": "Anton Cropper",
+    "cast": [
+      "Marsai Martin",
+      "Estella Kahiha",
+      "Rudie Bolton"
+    ],
+    "genres": [
+      "Ação",
+      "Comédia",
+      "Família"
+    ],
+    "ageRating": "TV-PG"
+  },
+  {
+    "id": "movie-21637282",
+    "title": "Carvão",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 7.1,
+    "image": "https://m.media-amazon.com/images/M/MV5BOTJjMmRhY2ItZGNkMy00MGQ3LWExYmEtZTVkYjI2M2NlNmZkXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt21637282/img",
+    "description": "Uma família que se esforça para cuidar de seu patriarca acamado recebe um acordo diabólico: colocar o mais velho para descansar e hospedar um chefão do tráfico argentino que precisa de um lugar para se esconder.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt21637282",
+    "imdbId": "tt21637282",
+    "isFeatured": false,
+    "director": "Carolina Markowicz",
+    "cast": [
+      "Maeve Jinkings",
+      "Jean Almeida Da Costa",
+      "Benedito Alves"
+    ],
+    "genres": [
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-15339456",
+    "title": "Marcel, a Concha de Sapatos",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 7.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BMmVhYWEzMGEtZjhkYS00ZWE0LTlhOWQtZTRlODZlMTM0Y2JmXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt15339456/img",
+    "description": "Um documentarista sem dinheiro decide fazer seu mais novo documentário sobre uma concha de molusco que encontra morando em seu Airbnb com seus amigos.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt15339456",
+    "imdbId": "tt15339456",
+    "isFeatured": false,
+    "director": "Dean Fleischer Camp",
+    "cast": [
+      "Jenny Slate",
+      "Dean Fleischer Camp",
+      "Isabella Rossellini"
+    ],
+    "genres": [
+      "Animação",
+      "Comédia",
+      "Drama"
+    ],
+    "ageRating": "PG"
+  },
+  {
+    "id": "movie-10692578",
+    "title": "Carmen",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.3,
+    "image": "https://m.media-amazon.com/images/M/MV5BMWRiYTUyYmEtNTM1NC00NjBlLWJlYjItMWExNzI4ZjAzOWYwXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt10692578/img",
+    "description": "Numa pequena aldeia mediterrânica, Carmen cuidou do seu irmão, o padre local, durante toda a sua vida. Quando a Igreja abandona Carmen, ela é confundida com o novo padre. Carmen começa a ver o mundo, e a si mesma, de uma forma n...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt10692578",
+    "imdbId": "tt10692578",
+    "isFeatured": false,
+    "director": "Valerie Buhagiar",
+    "cast": [
+      "Natascha McElhone",
+      "Steven Love",
+      "Michela Farrugia"
+    ],
+    "genres": [
+      "Comédia",
+      "Drama",
+      "Romance"
+    ]
+  },
+  {
+    "id": "movie-11687104",
+    "title": "Querida Alice",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BODExMmRjYTAtZTI1OS00MjRkLWI4NTQtMTY3NDYyYjY5ZDBhXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt11687104/img",
+    "description": "Uma jovem presa em um relacionamento abusivo torna-se participante involuntária de uma intervenção encenada por seus dois amigos mais próximos.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt11687104",
+    "imdbId": "tt11687104",
+    "isFeatured": false,
+    "director": "Mary Nighy",
+    "cast": [
+      "Anna Kendrick",
+      "Kaniehtiio Horn",
+      "Charlie Carrick"
+    ],
+    "genres": [
+      "Drama",
+      "Mistério",
+      "Romance"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-13918550",
+    "title": "Guerra Oculta",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 4.5,
+    "image": "https://m.media-amazon.com/images/M/MV5BYTA5MDNmZjctNzBjMy00MmJkLWJhZDUtMjk1YjJjMzhiZTFmXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt13918550/img",
+    "description": "Um grupo de policiais em uma prisão ultrassecreta labiríntica deve lutar por suas vidas contra Hatchet, um detido brilhante e infame de alto valor. Quando ele escapa, sua agenda misteriosa e mortal tem consequências terríveis e de longo alcance...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt13918550",
+    "imdbId": "tt13918550",
+    "isFeatured": false,
+    "director": "Sophia Banks",
+    "cast": [
+      "Jason Clarke",
+      "Michelle Monaghan",
+      "Jai Courtney"
+    ],
+    "genres": [
+      "Ação",
+      "Suspense"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-14962428",
+    "title": "Alerta! Temporada de Tubarões",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 4.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BNTY4NjVhMTktZjhmYi00OTcyLTg0ZmQtYzE4MWU5OWZmNGMzXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt14962428/img",
+    "description": "Uma pequena cidade costeira no sudoeste da França está em alerta máximo após o desaparecimento de um surfista. Logo a incrível verdade é revelada: um tubarão está rondando no porto.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt14962428",
+    "imdbId": "tt14962428",
+    "isFeatured": false,
+    "director": "Ludovic Boukherma, Zoran Boukherma",
+    "cast": [
+      "Marina Foïs",
+      "Kad Merad",
+      "Jean-Pascal Zadi"
+    ],
+    "genres": [
+      "Comédia",
+      "Drama",
+      "Terror"
+    ]
+  },
+  {
+    "id": "movie-9797932",
+    "title": "Homens Não Choram",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.7,
+    "image": "https://m.media-amazon.com/images/M/MV5BYTQ1YjhjYWItNjMwNi00YmIxLWJjMTgtNzQ1NzY5NjE2MjVkXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt9797932/img",
+    "description": "Connolly relembra a infância em um orfanato após a polícia investigar o suicídio de um amigo. Ele luta para se conectar com Anthea enquanto confronta aqueles que estão por trás de seu passado conturbado e da morte de seu amigo. Inspirado em eventos reais.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt9797932",
+    "imdbId": "tt9797932",
+    "isFeatured": false,
+    "director": "Steve Crowhurst",
+    "cast": [
+      "Daniel Adegboyega",
+      "Victoria Alcock",
+      "Karanja Augostos"
+    ],
+    "genres": [
+      "Biografia",
+      "Crime",
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-14542254",
+    "title": "Novembro: Paris Atacado",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.7,
+    "image": "https://m.media-amazon.com/images/M/MV5BYmJlNmVmYmItMDU2Yi00OGE3LWE2ZWEtMzk3NjQxNzA4MDM3XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt14542254/img",
+    "description": "5 dias no coração dos serviços antiterroristas franceses durante a caça aos suspeitos após os ataques de 13/11/2015 em Paris.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt14542254",
+    "imdbId": "tt14542254",
+    "isFeatured": false,
+    "director": "Cédric Jimenez",
+    "cast": [
+      "Jean Dujardin",
+      "Anaïs Demoustier",
+      "Sandrine Kiberlain"
+    ],
+    "genres": [
+      "Crime",
+      "Drama",
+      "Suspense"
+    ]
+  },
+  {
+    "id": "movie-8129806",
+    "title": "A Sorte Grande",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 7.1,
+    "image": "https://m.media-amazon.com/images/M/MV5BNzVkMTQ1ZTgtMjY1Yy00NzUwLThjN2UtY2I5MzVkYzJmMzUyXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt8129806/img",
+    "description": "Uma mãe solteira tenta recuperar sua vida e conexão com seu filho depois de ganhar na loteria e gastar todo o seu dinheiro em festas e álcool.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt8129806",
+    "imdbId": "tt8129806",
+    "isFeatured": false,
+    "director": "Michael Morris",
+    "cast": [
+      "Andrea Riseborough",
+      "Drew Youngblood",
+      "Tom Virtue"
+    ],
+    "genres": [
+      "Drama"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-14402146",
+    "title": "Império da Luz",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.7,
+    "image": "https://m.media-amazon.com/images/M/MV5BZjNmYjhkMDgtNGM3Yi00ODNiLTk5NGUtZjFjZTUxYTI0ZjkyXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt14402146/img",
+    "description": "Um drama sobre o poder da conexão humana em tempos turbulentos, ambientado em uma cidade costeira inglesa no início dos anos 1980.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt14402146",
+    "imdbId": "tt14402146",
+    "isFeatured": false,
+    "director": "Sam Mendes",
+    "cast": [
+      "Olivia Colman",
+      "Micheal Ward",
+      "Colin Firth"
+    ],
+    "genres": [
+      "Drama",
+      "Romance"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-12264966",
+    "title": "Notre-Dame: Desastre em Paris",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.4,
+    "image": "https://m.media-amazon.com/images/M/MV5BZTNiZmQ4YjUtOTk2NS00ZDIzLTk0N2UtMTQzYjkxMzZlNTYzXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt12264966/img",
+    "description": "Um filme sobre o interior do incêndio na Notre-Dame de Paris em abril de 2019.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt12264966",
+    "imdbId": "tt12264966",
+    "isFeatured": false,
+    "director": "Jean-Jacques Annaud",
+    "cast": [
+      "Samuel Labarthe",
+      "Jean-Paul Bordes",
+      "Mickaël Chirinian"
+    ],
+    "genres": [
+      "Drama",
+      "Suspense"
+    ]
+  },
+  {
+    "id": "movie-14330236",
+    "title": "De Repente 70",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 4.8,
+    "image": "https://m.media-amazon.com/images/M/MV5BNjdjODZiMDEtZTA5Yi00NDIxLWJiMmEtMzhhMjFhMmQwM2YzXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt14330236/img",
+    "description": "Uma escritora de 30 anos passa um fim de semana agitado em Palm Springs e acorda e descobre que magicamente se transformou em quem era aos 70 anos.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt14330236",
+    "imdbId": "tt14330236",
+    "isFeatured": false,
+    "director": "Katie Aselton",
+    "cast": [
+      "Diane Keaton",
+      "Elizabeth Lail",
+      "Molly Duplass"
+    ],
+    "genres": [
+      "Comédia",
+      "Fantasia"
+    ],
+    "ageRating": "PG-13"
+  },
+  {
+    "id": "movie-13051810",
+    "title": "O Lobo Viking",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.2,
+    "image": "https://m.media-amazon.com/images/M/MV5BZTUxY2FjMDktZDI4Zi00NWY1LWI5Y2EtYjkwMDRlODkzMWU0XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt13051810/img",
+    "description": "Thale, de dezessete anos, acaba de se mudar para uma pequena cidade depois que sua mãe conseguiu um novo emprego na delegacia de polícia local. Depois que uma estudante é brutalmente morta em uma festa a que Thale participa, ela se torna uma testemunha chave. O assassino era um animal? ...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt13051810",
+    "imdbId": "tt13051810",
+    "isFeatured": false,
+    "director": "Stig Svendsen",
+    "cast": [
+      "Elli Rhiannon Müller Osborne",
+      "Liv Mjönes",
+      "Ívar Örn Sverrisson"
+    ],
+    "genres": [
+      "Terror",
+      "Suspense"
+    ],
+    "ageRating": "TV-MA"
+  },
+  {
+    "id": "movie-12715472",
+    "title": "Mentiras Secretas",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.1,
+    "image": "https://m.media-amazon.com/images/M/MV5BZjcyMWU2ZWEtYjFiZC00YTNkLWJhZTgtN2ZjZWUxNzg1YjM4XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt12715472/img",
+    "description": "As vidas de uma rica editora e de seu marido romancista são mudadas pela chegada de uma jovem misteriosa à sua mansão de campo.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt12715472",
+    "imdbId": "tt12715472",
+    "isFeatured": false,
+    "director": "Fabrice du Welz",
+    "cast": [
+      "Benoît Poelvoorde",
+      "Mélanie Doutey",
+      "Alba Gaïa Bellugi"
+    ],
+    "genres": [
+      "Suspense"
+    ]
+  },
+  {
+    "id": "movie-13669038",
+    "title": "Entre Mulheres",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.9,
+    "image": "https://m.media-amazon.com/images/M/MV5BNzM2YzEzOTktNTJiNy00YjAwLWI2N2YtNjBkZWM5Y2U1OTRlXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt13669038/img",
+    "description": "Não faça nada, fique e lute ou vá embora. Em 2010, as mulheres de uma comunidade religiosa isolada lutam para conciliar uma realidade brutal com a sua fé.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt13669038",
+    "imdbId": "tt13669038",
+    "isFeatured": false,
+    "director": "Sarah Polley",
+    "cast": [
+      "Rooney Mara",
+      "Claire Foy",
+      "Jessie Buckley"
+    ],
+    "genres": [
+      "Drama"
+    ],
+    "ageRating": "PG-13"
+  },
+  {
+    "id": "movie-14113574",
+    "title": "Fogaréu",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://m.media-amazon.com/images/M/MV5BMDhiODkzOTEtMjBmNy00ZjM5LThmOGItYzc2ZjUyMDRlODI5XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt14113574/img",
+    "description": "Na fronteira entre o real e o fantástico, entre o passado colonial e a modernidade avassaladora do agronegócio, a cidade de Goiás é palco do encontro entre a jovem Fernanda e suas raízes secretas.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt14113574",
+    "imdbId": "tt14113574",
+    "isFeatured": false,
+    "director": "Flávia Neves",
+    "cast": [
+      "Bárbara Colen",
+      "Nena Inoue",
+      "Eucir de Souza"
+    ],
+    "genres": [
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-8608144",
+    "title": "O Clube dos Anjos",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.5,
+    "image": "https://m.media-amazon.com/images/M/MV5BNzg2MTNkNzEtYjQ3MS00ZjdlLTlkYTktNjM5NWRjYzUwYjAzXkEyXkFqcGdeQXVyMDk2OTQ1Ng@@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt8608144/img",
+    "description": "O entusiasmo por um encontro mensal de um grupo de velhos amigos com gosto por comidas deliciosas está diminuindo depois de muitos anos. Depois de conhecer um chef interessante e misterioso, um deles decide reunir a turma para uma última refeição...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt8608144",
+    "imdbId": "tt8608144",
+    "isFeatured": false,
+    "director": "Angelo Defanti",
+    "cast": [
+      "André Abujamra",
+      "Ângelo Antônio",
+      "Arthur Asson"
+    ],
+    "genres": [
+      "Drama",
+      "Suspense"
+    ]
+  },
+  {
+    "id": "movie-9051908",
+    "title": "Viver",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 7.2,
+    "image": "https://m.media-amazon.com/images/M/MV5BZjI3ZDNlNDAtMmY0OS00ZWU5LThjZTktZGRmMmE3YjllODZhXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt9051908/img",
+    "description": "Na Londres dos anos 1950, um burocrata sem humor decide tirar uma folga do trabalho para experimentar a vida depois de receber um diagnóstico sombrio.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt9051908",
+    "imdbId": "tt9051908",
+    "isFeatured": false,
+    "director": "Oliver Hermanus",
+    "cast": [
+      "Bill Nighy",
+      "Aimee Lou Wood",
+      "Alex Sharp"
+    ],
+    "genres": [
+      "Drama"
+    ],
+    "ageRating": "PG-13"
+  },
+  {
+    "id": "movie-9686790",
+    "title": "Casamento Armado",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.5,
+    "image": "https://m.media-amazon.com/images/M/MV5BZGI5ZGYyMmQtYzVmZC00YWI0LTgwYTUtNjdmZmY5YjQwMDhlXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt9686790/img",
+    "description": "Darcy e Tom reúnem suas famílias para o casamento no destino final, mas quando toda a festa de casamento é feita refém, os noivos devem salvar seus entes queridos – se não se matarem primeiro.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt9686790",
+    "imdbId": "tt9686790",
+    "isFeatured": false,
+    "director": "Jason Moore",
+    "cast": [
+      "Jennifer Lopez",
+      "Josh Duhamel",
+      "Lenny Kravitz"
+    ],
+    "genres": [
+      "Ação",
+      "Comédia",
+      "Romance"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-13774454",
+    "title": "Super Quem? Heróis Por Acidente",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.2,
+    "image": "https://m.media-amazon.com/images/M/MV5BOTllM2Q0MDctMTc2ZS00YzhmLThmODQtOTZiNDNhMzY5YjhhXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt13774454/img",
+    "description": "Um ator esforçado que parece condenado a levar uma vida de perdedor. Quando finalmente consegue o papel principal de um super-herói chamado “Badman”, ele sente que tudo é possível, mas o destino ataca novamente.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt13774454",
+    "imdbId": "tt13774454",
+    "isFeatured": false,
+    "director": "Philippe Lacheau",
+    "cast": [
+      "Philippe Lacheau",
+      "Julien Arruti",
+      "Tarek Boudali"
+    ],
+    "genres": [
+      "Ação",
+      "Comédia"
+    ]
+  },
+  {
+    "id": "movie-12847680",
+    "title": "Um Asilo Fora do Comum",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.9,
+    "image": "https://m.media-amazon.com/images/M/MV5BYThjYzU5MjItYzQ0Zi00ZDJkLWI4ZjktODZiN2I0YzBmYzQ1XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt12847680/img",
+    "description": "Um jovem condenado é sentenciado a serviços comunitários. Ele agora deve trabalhar em uma casa de repouso.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt12847680",
+    "imdbId": "tt12847680",
+    "isFeatured": false,
+    "director": "Thomas Gilou",
+    "cast": [
+      "Kev Adams",
+      "Gérard Depardieu",
+      "Daniel Prévost"
+    ],
+    "genres": [
+      "Comédia"
+    ]
+  },
+  {
+    "id": "movie-12610794",
+    "title": "Lâmina dos 47 Ronins",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 4.7,
+    "image": "https://m.media-amazon.com/images/M/MV5BM2E0YjRiZTEtZjdlYi00MzgyLTkyYTYtYjE3ZGI4N2Q0YzhjXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt12610794/img",
+    "description": "Antigos guerreiros Ronin japoneses ambientados 300 anos depois de 47 Ronin, em um mundo moderno onde os clãs Samurais existem em completo segredo.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt12610794",
+    "imdbId": "tt12610794",
+    "isFeatured": false,
+    "director": "Ron Yuan",
+    "cast": [
+      "Anna Akana",
+      "Mark Dacascos",
+      "Teresa Ting"
+    ],
+    "genres": [
+      "Ação",
+      "Drama",
+      "Fantasia",
+      "Dorama"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-6931658",
+    "title": "Operação Hunt",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.7,
+    "image": "https://m.media-amazon.com/images/M/MV5BNGQzMjQyOGItMjAxNi00OWY5LTg3MzctYjU0NzVmNGE4MWNjXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt6931658/img",
+    "description": "A Unidade Internacional e a Unidade Doméstica da Agência de Espionagem Coreana têm a missão de descobrir um espião norte-coreano conhecido como Donglim, que está profundamente enraizado na sua agência.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt6931658",
+    "imdbId": "tt6931658",
+    "isFeatured": false,
+    "director": "Lee Jung-jae",
+    "cast": [
+      "Lee Jung-jae",
+      "Jung Woo-sung",
+      "Go Youn-jung"
+    ],
+    "genres": [
+      "Ação",
+      "Drama",
+      "Mistério",
+      "Dorama"
+    ],
+    "ageRating": "Not Rated"
+  },
+  {
+    "id": "movie-12477480",
+    "title": "Decisão de Partir",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 7.3,
+    "image": "https://m.media-amazon.com/images/M/MV5BN2NhZjcxYjItNDhlOC00Y2U2LWE4NDktMDJhNTQ1NzNjMmNmXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt12477480/img",
+    "description": "Um detetive que investiga a morte de um homem nas montanhas conhece a misteriosa esposa do morto durante sua obstinada investigação.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt12477480",
+    "imdbId": "tt12477480",
+    "isFeatured": false,
+    "director": "Park Chan-wook",
+    "cast": [
+      "Tang Wei",
+      "Park Hae-il",
+      "Lee Jung-hyun"
+    ],
+    "genres": [
+      "Crime",
+      "Drama",
+      "Mistério"
+    ],
+    "ageRating": "Not Rated"
+  },
+  {
+    "id": "movie-12193804",
+    "title": "I Wanna Dance with Somebody: A História de Whitney Houston",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BNzM0Y2QwOTUtMDg3NS00MDU4LTllNmItYzEwNmVmZGZkMTljXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt12193804/img",
+    "description": "Uma celebração alegre, emocionante e comovente da vida e da música de Whitney Houston, uma das maiores vocalistas femininas de R&B pop de todos os tempos, acompanhando sua jornada da obscuridade ao super estrelato musical.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt12193804",
+    "imdbId": "tt12193804",
+    "isFeatured": false,
+    "director": "Kasi Lemmons",
+    "cast": [
+      "Naomi Ackie",
+      "Stanley Tucci",
+      "Ashton Sanders"
+    ],
+    "genres": [
+      "Biografia",
+      "Drama",
+      "Música"
+    ],
+    "ageRating": "PG-13"
+  },
+  {
+    "id": "movie-10506876",
+    "title": "Invisíveis",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6,
+    "image": "https://m.media-amazon.com/images/M/MV5BZTRmYjQzZTEtMmZlYi00ZGRiLWExMzMtMjMxZTM0YzUyOTcwXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt10506876/img",
+    "description": "Nas profundezas da cidade de Nova York, uma menina de cinco anos e sua mãe vivem em uma comunidade que reivindicou os túneis abandonados do metrô como seu lar.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt10506876",
+    "imdbId": "tt10506876",
+    "isFeatured": false,
+    "director": "Logan George, Celine Held",
+    "cast": [
+      "Zhaila Farmer",
+      "Celine Held",
+      "Jared Abrahamson"
+    ],
+    "genres": [
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-12077826",
+    "title": "A Morte Habita à Noite",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 7.1,
+    "image": "https://m.media-amazon.com/images/M/MV5BZWIzMjcxM2EtOWUwZC00Yjg5LTk3ODctODIzNzhkZWFlNjgxXkEyXkFqcGdeQXVyMTMzODQ4NzQ@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt12077826/img",
+    "description": "Baseado nos escritos de Bukowski, este retrato de um escritor sem um tostão e das mulheres de sua vida está encharcado de álcool e fumaça de cigarro. Uma busca cautelosa por almas gêmeas em um mundo cheio de autodestruição.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt12077826",
+    "imdbId": "tt12077826",
+    "isFeatured": false,
+    "director": "Eduardo Morotó, Renan Brandao",
+    "cast": [
+      "Roney Villela",
+      "Mariana Nunes",
+      "Rita Carelli"
+    ],
+    "genres": [
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-6360426",
+    "title": "O Amor dá Voltas",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://m.media-amazon.com/images/M/MV5BOWZhNDRhYTItY2VhNC00Y2E5LWIyOWMtNWYzY2EzMGQzMTE0XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt6360426/img",
+    "description": "André é um jovem médico que acaba de regressar de cuidar de doentes em África e descobre que tem trocado cartas de amor não com a sua namorada de longa data, mas com a irmã dela.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt6360426",
+    "imdbId": "tt6360426",
+    "isFeatured": false,
+    "director": "Marcos Bernstein",
+    "cast": [
+      "Cleo",
+      "Igor Angelkorte",
+      "Juliana Didone"
+    ],
+    "genres": [
+      "Comédia",
+      "Romance"
+    ]
+  },
+  {
+    "id": "movie-9692040",
+    "title": "O Rei Macaco: A Lenda Começa",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.3,
+    "image": "https://m.media-amazon.com/images/M/MV5BNDY5YmJkZmUtNjRhZi00YWNhLWExMWQtMjAxZDJiMzVhZTdmXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt9692040/img",
+    "description": "The Monkey King: The Legend Begins é a versão reinventada por Hollywood do filme The Monkey King: Havoc in Heavens Palace, origem e local de nascimento de The Monkey King Story.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt9692040",
+    "imdbId": "tt9692040",
+    "isFeatured": false,
+    "director": "Soi Cheang",
+    "cast": [
+      "Donnie Yen",
+      "Chow Yun-Fat",
+      "Aaron Kwok"
+    ],
+    "genres": [
+      "Aventura",
+      "Fantasia"
+    ]
+  },
+  {
+    "id": "movie-9330648",
+    "title": "Você Vai Lembrar Meu Nome",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 7.4,
+    "image": "https://m.media-amazon.com/images/M/MV5BNzIyNjAwOGQtYjIyMC00YWIyLWIyMmItMTYxYzk0ODQwMDVhXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt9330648/img",
+    "description": "A história de uma amizade crescente entre um professor aposentado que está perdendo a memória e sua cuidadora que encontra sentido para sua vida.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt9330648",
+    "imdbId": "tt9330648",
+    "isFeatured": false,
+    "director": "Éric Tessier",
+    "cast": [
+      "Rémy Girard",
+      "Karelle Tremblay",
+      "Julie Le Breton"
+    ],
+    "genres": [
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-9737876",
+    "title": "Narvik",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BYjg4MjkwYzAtYTlmMi00ODk2LThmYWMtNWUzNDcyMzk5ZTNjXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt9737876/img",
+    "description": "Abril de 1940. Os olhos do mundo estão voltados para Narvik, uma pequena cidade no norte da Noruega, fonte do minério de ferro necessário para a maquinaria de guerra de Hitler. Ao longo de dois meses de feroz guerra de inverno, Hitler sofre sua primeira derrota.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt9737876",
+    "imdbId": "tt9737876",
+    "isFeatured": false,
+    "director": "Erik Skjoldbjærg",
+    "cast": [
+      "Kristine Hartgen",
+      "Carl Martin Eggesbø",
+      "Christoph Gelfert Mathiesen"
+    ],
+    "genres": [
+      "Drama",
+      "História",
+      "Guerra"
+    ],
+    "ageRating": "TV-14"
+  },
+  {
+    "id": "movie-10640346",
+    "title": "Babilônia",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 7.1,
+    "image": "https://m.media-amazon.com/images/M/MV5BNGY3M2NkN2QtZTdhOS00YTNjLTgyYmMtMGY3Y2U0OTk2NjA0XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt10640346/img",
+    "description": "Uma história de ambição descomunal e excessos ultrajantes, que traça a ascensão e queda de vários personagens durante uma era de decadência e depravação desenfreada no início de Hollywood.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt10640346",
+    "imdbId": "tt10640346",
+    "isFeatured": false,
+    "director": "Damien Chazelle",
+    "cast": [
+      "Brad Pitt",
+      "Margot Robbie",
+      "Jean Smart"
+    ],
+    "genres": [
+      "Comédia",
+      "Drama"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-8160262",
+    "title": "O Filho Protegido",
+    "year": 2019,
+    "type": ContentType.MOVIE,
+    "rating": 5.5,
+    "image": "https://m.media-amazon.com/images/M/MV5BYTg3ZmY5OTAtNDdmYS00OTg4LTg5YzktOWQ2NjgyOThlYTg5XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt8160262/img",
+    "description": "Lorenzo, um 50 anos. pintor, está tendo um filho com sua nova esposa, Sigrid. Ela fica cada vez mais estranha - ou ele fica. Ele afirma que o bebê foi trocado.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt8160262",
+    "imdbId": "tt8160262",
+    "isFeatured": false,
+    "director": "Sebastián Schindel",
+    "cast": [
+      "Joaquín Furriel",
+      "Martina Gusmán",
+      "Luciano Cáceres"
+    ],
+    "genres": [
+      "Drama",
+      "Mistério",
+      "Suspense"
+    ],
+    "ageRating": "TV-MA"
+  },
+  {
+    "id": "movie-7685600",
+    "title": "Serial Kelly",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://m.media-amazon.com/images/M/MV5BMzA5OWRiMWEtNTAyNy00MDg4LTlmMzgtZjQ5YjhlZGFlMGUwXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt7685600/img",
+    "description": "Ao cumprir uma agenda de shows nas casas noturnas sertanejas, Kelly, cantora de forró eletrônico, também deixará um rastro de mortes pelo caminho. Em seu caminho de consumo compulsivo e violência, ela passa por um novo norte...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt7685600",
+    "imdbId": "tt7685600",
+    "isFeatured": false,
+    "director": "René Guerra",
+    "cast": [
+      "Gaby Amarantos",
+      "Esther Antunes",
+      "Thomás Aquino"
+    ],
+    "genres": [
+      "Comédia",
+      "Drama",
+      "Suspense"
+    ]
+  },
+  {
+    "id": "movie-23651588",
+    "title": "O Faixa Preta",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://m.media-amazon.com/images/M/MV5BZmUwOThhYzctZmEzMS00ZGYyLTk5NmQtYzYxZTZhZTU5YWU3XkEyXkFqcGdeQXVyOTQ5NjMxMDI@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt23651588/img",
+    "description": "Pentacampeão mundial de Jiu-Jitsu, Tererê venceu quase todas as lutas que disputou. Mas foi fora dos tatames que sofreu seu maior revés. Baseado em fatos reais, o filme conta a fantástica história do resgate de Fernando Tererê...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt23651588",
+    "imdbId": "tt23651588",
+    "isFeatured": false,
+    "director": "Caco Souza",
+    "cast": [
+      "Raphael Logam",
+      "Lui Mendes",
+      "Isabel Fillardis"
+    ],
+    "genres": [
+      "Biografia",
+      "Drama",
+      "Esporte"
+    ]
+  },
+  {
+    "id": "movie-22502868",
+    "title": "O Ataque ao Capitólio",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.3,
+    "image": "https://m.media-amazon.com/images/M/MV5BYjk0OWMwYzEtMWI5NC00YmU3LTk5MjItMWVlZjhlZjg5MTAxXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt22502868/img",
+    "description": "Acompanha os acontecimentos do ataque ao Capitólio dos EUA em 6 de janeiro de 2021, contados por quem testemunhou o caos em primeira mão.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt22502868",
+    "imdbId": "tt22502868",
+    "isFeatured": false,
+    "director": "Gédéon Naudet, Jules Naudet",
+    "cast": [
+      "Liz Cheney",
+      "Nancy Pelosi",
+      "Steven Sund"
+    ],
+    "genres": [
+      "Documentário",
+      "Crime",
+      "História"
+    ],
+    "ageRating": "TV-MA"
+  },
+  {
+    "id": "movie-23829618",
+    "title": "Pronto, Falei",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6,
+    "image": "https://m.media-amazon.com/images/M/MV5BZGZiNzgzZTgtOTkyMS00OTdkLWIxZWItNGIzZjg1OTY5ZmNmXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt23829618/img",
+    "description": "Um jovem profundamente tímido só se comunica com parentes, amigos e namorada por meio de cartas e e-mails, demonstrando suas emoções. Normalmente ele não manda esses e-mails, apenas guarda um rascunho para si mesmo, mas um dia ele percebe...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt23829618",
+    "imdbId": "tt23829618",
+    "isFeatured": false,
+    "director": "Michel Tikhomiroff",
+    "cast": [
+      "Nicolas Prattes",
+      "Kéfera Buchmann",
+      "Romulo Arantes Neto"
+    ],
+    "genres": [
+      "Comédia"
+    ]
+  },
+  {
+    "id": "movie-22394694",
+    "title": "Detetive Knight: Redenção",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 4.1,
+    "image": "https://m.media-amazon.com/images/M/MV5BMmQzZGUzY2EtY2JiNS00NGQwLThkZDYtZDM1OGY0YjgxYWE1XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt22394694/img",
+    "description": "O detetive James Knight está no meio de uma fuga liderada pelo Terrorista de Natal. Prometendo devolver seu distintivo em troca de derrubar os terroristas, ele decide dar misericórdia aos justos - e justiça impiedosa aos outros.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt22394694",
+    "imdbId": "tt22394694",
+    "isFeatured": false,
+    "director": "Edward Drake",
+    "cast": [
+      "Bruce Willis",
+      "Lochlyn Munro",
+      "Miranda Edwards"
+    ],
+    "genres": [
+      "Ação",
+      "Crime",
+      "Mistério"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-12726428",
+    "title": "Em Busca de Mim",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6,
+    "image": "https://m.media-amazon.com/images/M/MV5BOGFlY2UwYWUtZmFmMy00NGUzLTlkMjctMDhhOTllNTljNGZiXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt12726428/img",
+    "description": "Segue Sara, que recentemente se divorciou e decidiu inscrever-se num retiro 'From Fear to Love' na ilha vulcânica italiana de Stromboli, mas é confrontada com o passado doloroso que tem tentado esconder.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt12726428",
+    "imdbId": "tt12726428",
+    "isFeatured": false,
+    "director": "Michiel van Erp",
+    "cast": [
+      "Elise Schaap",
+      "Tim McInnerny",
+      "Christian Hillborg"
+    ],
+    "genres": [
+      "Drama"
+    ],
+    "ageRating": "TV-MA"
+  },
+  {
+    "id": "movie-23622516",
+    "title": "Quebrando o Gelo",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 4.2,
+    "image": "https://m.media-amazon.com/images/M/MV5BYjFjOTdkMzktYTEwOS00MjQ0LTk4M2UtNGQ4NDI5ZmJiOThmXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt23622516/img",
+    "description": "Sua família vai se divertir muito com Snow Day, uma releitura musical da adorada comédia clássica que segue um grupo de crianças que descobre que tudo é possível quando você quebra rotinas e corre riscos gigantescos.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt23622516",
+    "imdbId": "tt23622516",
+    "isFeatured": false,
+    "director": "Michael Lembeck",
+    "cast": [
+      "Fabi Aguirre",
+      "Logan Aultman",
+      "Deena Aziz"
+    ],
+    "genres": [
+      "Comédia",
+      "Família",
+      "Musical"
+    ],
+    "ageRating": "TV-G"
+  },
+  {
+    "id": "movie-14661276",
+    "title": "Jack & Jill Nos Passos do Amor",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.5,
+    "image": "https://m.media-amazon.com/images/M/MV5BZGU3Y2Q4Y2QtZGM5YS00YzEzLWJmODMtYzllYWIyYjFkMzc1XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt14661276/img",
+    "description": "Em uma noite estrelada, Jack e Jill conhecem separadamente uma cartomante que prevê que eles encontrarão o amor de suas vidas antes do final do ano, que será daqui a apenas cinco dias.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt14661276",
+    "imdbId": "tt14661276",
+    "isFeatured": false,
+    "director": "Tom Malloy",
+    "cast": [
+      "Briana Evigan",
+      "Tom Malloy",
+      "Mario Cantone"
+    ],
+    "genres": [
+      "Romance"
+    ],
+    "ageRating": "PG-13"
+  },
+  {
+    "id": "movie-13678246",
+    "title": "Cordialmente Teus",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://m.media-amazon.com/images/M/MV5BZjhkZWEwYTItOGVkMC00MjU1LWJmOGEtNTUyMGYxYjcxODk0XkEyXkFqcGdeQXVyMTU2OTI0Njc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt13678246/img",
+    "description": "Sinopse indisponível.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt13678246",
+    "imdbId": "tt13678246",
+    "isFeatured": false,
+    "director": "Aimar Labaki",
+    "cast": [
+      "Diego Avelino",
+      "Anderson Kari Baia",
+      "Daniel Breda"
+    ],
+    "genres": [
+      "Crime",
+      "Drama",
+      "Terror"
+    ]
+  },
+  {
+    "id": "movie-21833464",
+    "title": "Valentes",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.1,
+    "image": "https://m.media-amazon.com/images/M/MV5BYzVmMWY0MjktOWRlZi00MjhjLWFiYTktYmRjYmUzZTg1YjJlXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt21833464/img",
+    "description": "Um garoto de 14 anos recorre a um carismático solitário em busca de ajuda depois de ser espancado, no filme de estreia do diretor Miles Warren sobre pais, famílias e os efeitos das brigas.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt21833464",
+    "imdbId": "tt21833464",
+    "isFeatured": false,
+    "director": "Miles Warren",
+    "cast": [
+      "Jalyn Hall",
+      "Trevante Rhodes",
+      "Shamier Anderson"
+    ],
+    "genres": [
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-21662290",
+    "title": "Um Natal na Suíça",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.4,
+    "image": "https://m.media-amazon.com/images/M/MV5BMDhjNDQ0OWYtNjA4Ni00M2U5LWJjNGItYTY5ZGM1Y2M1YTQ1XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt21662290/img",
+    "description": "Quando Alex volta para casa para passar o Natal com a mãe, ela descobre que seu ex-namorado e sua melhor amiga, que agora estão namorando, também estão de visita.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt21662290",
+    "imdbId": "tt21662290",
+    "isFeatured": false,
+    "director": "John L'Ecuyer",
+    "cast": [
+      "Jodie Sweetin",
+      "Tim Rozon",
+      "Mikaela Lily Davies"
+    ],
+    "genres": [
+      "Comédia",
+      "Drama",
+      "Romance"
+    ],
+    "ageRating": "TV-PG"
+  },
+  {
+    "id": "movie-21149522",
+    "title": "O Preço da Família",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.9,
+    "image": "https://m.media-amazon.com/images/M/MV5BZjdmMmVjNGEtN2ZkNS00MDMyLWI1ZmYtNmQ1ZDFkZWJmZDMwXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt21149522/img",
+    "description": "Alessandra e Emilio mudam-se para a cidade, deixando os pais Carlo e Anna sozinhos. As crianças se esquecem deles, e a gota d'água é saber que não estarão por perto no Natal.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt21149522",
+    "imdbId": "tt21149522",
+    "isFeatured": false,
+    "director": "Giovanni Bognetti",
+    "cast": [
+      "Christian De Sica",
+      "Angela Finocchiaro",
+      "Dharma Mangia Woods"
+    ],
+    "genres": [
+      "Comédia"
+    ],
+    "ageRating": "TV-MA"
+  },
+  {
+    "id": "movie-21298322",
+    "title": "Amor Inesperado",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.7,
+    "image": "https://m.media-amazon.com/images/M/MV5BMTdjMmRjY2EtOTE4ZC00Mzg1LThlNDMtMGIwODc2NzYxMjNiXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt21298322/img",
+    "description": "Tentando seguir em frente após um divórcio complicado, uma mulher retorna para Parable, Montana, e conhece um vizinho bonito que apresenta uma reviravolta inesperada.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt21298322",
+    "imdbId": "tt21298322",
+    "isFeatured": false,
+    "director": "Peter Benson",
+    "cast": [
+      "Emmanuelle Vaugier",
+      "Kavan Smith",
+      "Michelle Harrison"
+    ],
+    "genres": [
+      "Drama",
+      "Romance"
+    ],
+    "ageRating": "TV-G"
+  },
+  {
+    "id": "movie-7175968",
+    "title": "Meu Vizinho Adolf",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BOWU0OTNkMTUtMDBlNy00OTdhLTkyMTEtNTM1OTVjZTUxMjA3XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt7175968/img",
+    "description": "Na América do Sul dos anos 1960, um sobrevivente do Holocausto suspeita que seu vizinho seja Adolf Hitler. Desacreditado, ele investiga e relutantemente faz amizade com o homem para reunir evidências.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt7175968",
+    "imdbId": "tt7175968",
+    "isFeatured": false,
+    "director": "Leon Prudovsky",
+    "cast": [
+      "David Hayman",
+      "Udo Kier",
+      "Olivia Silhavy"
+    ],
+    "genres": [
+      "Comédia",
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-15411160",
+    "title": "O Ano em que Comecei a Vibrar por Mim",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.3,
+    "image": "https://m.media-amazon.com/images/M/MV5BNDI1ZjAyNDYtZDJiOC00NTBkLTk1N2MtNTEyOWNmYjVjNmUzXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt15411160/img",
+    "description": "Hanna, orientada para objetivos, quer outro filho antes que seja tarde demais, mas inesperadamente seu namorado termina com ela e o mundo de Hanna desaba. Hanna começa a perceber que pode estar perseguindo coisas erradas na vida.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt15411160",
+    "imdbId": "tt15411160",
+    "isFeatured": false,
+    "director": "Erika Wasserman",
+    "cast": [
+      "Katia Winter",
+      "Jesper Zuschlag",
+      "Henrik Dorsin"
+    ],
+    "genres": [
+      "Comédia",
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-12440964",
+    "title": "Dias de Desejo",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 3.4,
+    "image": "https://m.media-amazon.com/images/M/MV5BNWFmYjhhYjAtOGI0MS00YmQ0LWI0NTQtZmViNzEwNWYyZWNkXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt12440964/img",
+    "description": "Um romance erótico, dramático e ambientado na Itália.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt12440964",
+    "imdbId": "tt12440964",
+    "isFeatured": false,
+    "director": "Cengiz Dervis",
+    "cast": [
+      "Gena Miller",
+      "Christian Howard",
+      "Maddalena Ischiale"
+    ],
+    "genres": [
+      "Drama",
+      "Romance"
+    ]
+  },
+  {
+    "id": "movie-19499664",
+    "title": "Triângulo de Natal",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.4,
+    "image": "https://m.media-amazon.com/images/M/MV5BYWIwMmQwOWMtY2Y0ZS00ZWVlLTkxNTgtYzk2MGQ3MjQxMjU1XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt19499664/img",
+    "description": "Uma renomada romancista famosa se envolve em um triângulo amoroso entre sua paixão de infância e um repórter.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt19499664",
+    "imdbId": "tt19499664",
+    "isFeatured": false,
+    "director": "Martin Wood",
+    "cast": [
+      "Liza Lapira",
+      "Neal Bledsoe",
+      "Nathan Witte"
+    ],
+    "genres": [
+      "Comédia",
+      "Fantasia",
+      "Romance"
+    ],
+    "ageRating": "PG"
+  },
+  {
+    "id": "movie-13103732",
+    "title": "Oferenda ao Demônio",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 5.3,
+    "image": "https://m.media-amazon.com/images/M/MV5BOGIwNmU2N2ItNDA0Yi00YjdiLWJjYjMtYzNmMDBlODQxMWNmXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt13103732/img",
+    "description": "Uma família que luta contra a perda encontra-se à mercê de um antigo demônio que tenta destruí-los por dentro.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt13103732",
+    "imdbId": "tt13103732",
+    "isFeatured": false,
+    "director": "Oliver Park",
+    "cast": [
+      "Nick Blood",
+      "Emily Wiseman",
+      "Paul Kaye"
+    ],
+    "genres": [
+      "Terror"
+    ],
+    "ageRating": "R"
+  },
+  {
+    "id": "movie-18951472",
+    "title": "O Rei Piu-Piu",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://picsum.photos/seed/tt18951472/400/600",
+    "backdrop": "https://images.metahub.space/background/medium/tt18951472/img",
+    "description": "Sinopse indisponível.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt18951472",
+    "imdbId": "tt18951472",
+    "isFeatured": false,
+    "genres": []
+  },
+  {
+    "id": "movie-19815280",
+    "title": "O Chamado 4: Samara Ressurge",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 3.6,
+    "image": "https://m.media-amazon.com/images/M/MV5BZGMxOGJjZmItMjk0MC00OTljLWI4NjUtYTJiOTI1MmNmOTYxXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt19815280/img",
+    "description": "Pessoas que assistem a um vídeo amaldiçoado morrem repentinamente. Essas mortes ocorrem em todo o Japão. Ayaka Ichijo é uma estudante de pós-graduação extremamente inteligente com um QI de 200. Sua irmã mais nova assiste ao vídeo amaldiçoado para se divertir.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt19815280",
+    "imdbId": "tt19815280",
+    "isFeatured": false,
+    "director": "Hisashi Kimura",
+    "cast": [
+      "Fuka Koshiba",
+      "Kazuma Kawamura",
+      "Mario Kuroba"
+    ],
+    "genres": [
+      "Comédia",
+      "Terror",
+      "Mistério"
+    ],
+    "ageRating": "TV-14"
+  },
+  {
+    "id": "movie-13453138",
+    "title": "Caminho Para a Liberdade",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6.2,
+    "image": "https://m.media-amazon.com/images/M/MV5BOGY4NDQ5ZDItNWEyZi00ZmIwLWJiNjMtZjRiMTE5N2Y3YWIzXkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt13453138/img",
+    "description": "Duas crianças e um cachorro fugindo dos nazistas.",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt13453138",
+    "imdbId": "tt13453138",
+    "isFeatured": false,
+    "director": "Tobias Wiemann",
+    "cast": [
+      "Julius Weckauf",
+      "Nonna Cardoner",
+      "Volker Bruch"
+    ],
+    "genres": [
+      "Drama"
+    ]
+  },
+  {
+    "id": "movie-14456750",
+    "title": "Verão Fantasma",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 6,
+    "image": "https://m.media-amazon.com/images/M/MV5BM2FiMWYzNDUtM2VlNi00NDdkLWE4ZmEtYzA0ZDg5MDk1OWU1XkEyXkFqcGc@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt14456750/img",
+    "description": "Em algum lugar do litoral brasileiro, os adolescentes Lucas e Martin se apaixonam enquanto investigam o desaparecimento de uma criança local. Mas o seu romance florescente é ameaçado por forças sinistras que se escondem sob aquela idílica paisagem de verão...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt14456750",
+    "imdbId": "tt14456750",
+    "isFeatured": false,
+    "director": "Matheus Marchetti",
+    "cast": [
+      "Tuna Dwek",
+      "Bruno Germano",
+      "Tony Germano"
+    ],
+    "genres": [
+      "Terror",
+      "Musical"
+    ]
+  },
+  {
+    "id": "movie-12097234",
+    "title": "Quatro Amigas Numa Fria",
+    "year": 2022,
+    "type": ContentType.MOVIE,
+    "rating": 0,
+    "image": "https://m.media-amazon.com/images/M/MV5BZjVmMTdmMjItNDY3ZS00Y2U0LWFhNmYtMzViM2YyN2I4ZjMxXkEyXkFqcGdeQXVyMTkzODUwNzk@._V1_SX300.jpg",
+    "backdrop": "https://images.metahub.space/background/medium/tt12097234/img",
+    "description": "Daniela é convidada por sua melhor amiga, Karen, para uma viagem a Bariloche junto com mais duas amigas, Ludmila e Josie, para comemorar sua despedida de solteira. Enquanto isso, Guto, noivo de Dani, fica com ciúmes da viagem. Chegando em Arg...",
+    "platform": "Outros",
+    "videoUrl": "https://watchplayer.lat/movie/tt12097234",
+    "imdbId": "tt12097234",
+    "isFeatured": false,
+    "director": "Roberto Santucci",
+    "cast": [
+      "Emanuel Aragão",
+      "Priscila Assum",
+      "Pablo Bellini"
+    ],
+    "genres": [
+      "Comédia"
+    ]
+  }
+];
+
+export async function updateMovies() {
+  // Deduplicate existing content
+  let existingContent = await db.content.toArray();
+  const titlesMap = new Map<string, ContentItem[]>();
+  
+  for (const item of existingContent) {
+    const title = item.title.toLowerCase().trim();
+    if (!titlesMap.has(title)) {
+      titlesMap.set(title, []);
+    }
+    titlesMap.get(title)!.push(item);
+  }
+
+  const idsToDelete: string[] = [];
+
+  for (const [title, items] of titlesMap.entries()) {
+    if (items.length > 1) {
+      // Sort items: those with imdbId come first, then those with description !== 'Sinopse indisponível.', then by rating
+      items.sort((a, b) => {
+        const aHasImdb = a.imdbId ? 1 : 0;
+        const bHasImdb = b.imdbId ? 1 : 0;
+        if (aHasImdb !== bHasImdb) return bHasImdb - aHasImdb;
+        
+        const aHasDesc = a.description && a.description !== "Sinopse indisponível." ? 1 : 0;
+        const bHasDesc = b.description && b.description !== "Sinopse indisponível." ? 1 : 0;
+        if (aHasDesc !== bHasDesc) return bHasDesc - aHasDesc;
+        
+        return (b.rating || 0) - (a.rating || 0);
+      });
+      
+      // Keep the first one, delete the rest
+      for (let i = 1; i < items.length; i++) {
+        idsToDelete.push(items[i].id);
+      }
+    }
+  }
+
+  if (idsToDelete.length > 0) {
+    await db.content.bulkDelete(idsToDelete);
+    console.log(`Deleted ${idsToDelete.length} duplicate movies.`);
+    // Re-fetch existing content after deduplication
+    existingContent = await db.content.toArray();
+  }
+
+  const updates: ContentItem[] = [];
+  const newItems: ContentItem[] = [];
+
+  for (const movie of enrichedMovies) {
+    const existing = existingContent.find(c => c.title === movie.title || c.imdbId === movie.imdbId);
+    
+    // Determine the correct videoUrl
+    let finalVideoUrl = movie.videoUrl;
+    let imdbId = movie.imdbId;
+    if (!imdbId && movie.videoUrl && movie.videoUrl.includes('/movie/tt')) {
+      const match = movie.videoUrl.match(/\/movie\/(tt\d+)/);
+      if (match) imdbId = match[1];
+    }
+    if (imdbId) {
+      finalVideoUrl = `https://embedplayapi.site/embed/${imdbId}`;
+    }
+
+    if (existing) {
+      let changed = false;
+      const updated = { ...existing };
+      
+      // Update all properties if they differ
+      if (finalVideoUrl && existing.videoUrl !== finalVideoUrl) {
+        updated.videoUrl = finalVideoUrl;
+        changed = true;
+      }
+      if (movie.imdbId && existing.imdbId !== movie.imdbId) {
+        updated.imdbId = movie.imdbId;
+        changed = true;
+      }
+      if (movie.image && existing.image !== movie.image) {
+        updated.image = movie.image;
+        changed = true;
+      }
+      if (movie.backdrop && existing.backdrop !== movie.backdrop) {
+        updated.backdrop = movie.backdrop;
+        changed = true;
+      }
+      if (movie.description && existing.description !== movie.description && existing.description === "Sinopse indisponível.") {
+        updated.description = movie.description;
+        changed = true;
+      }
+      if (movie.rating && existing.rating !== movie.rating && existing.rating === 0) {
+        updated.rating = movie.rating;
+        changed = true;
+      }
+      if (movie.director && existing.director !== movie.director) {
+        updated.director = movie.director;
+        changed = true;
+      }
+      if (movie.cast && movie.cast.length > 0 && (!existing.cast || existing.cast.length === 0)) {
+        updated.cast = movie.cast;
+        changed = true;
+      }
+      if (movie.genres && movie.genres.length > 0 && (!existing.genres || existing.genres.length === 0 || existing.genres[0] === "Filme")) {
+        updated.genres = movie.genres;
+        changed = true;
+      }
+      if (movie.ageRating && existing.ageRating !== movie.ageRating) {
+        updated.ageRating = movie.ageRating;
+        changed = true;
+      }
+      
+      if (changed) {
+        updates.push(updated);
+      }
+    } else {
+      newItems.push({
+        id: movie.id || `movie-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        title: movie.title,
+        type: ContentType.MOVIE,
+        rating: movie.rating || 0,
+        year: movie.year,
+        image: movie.image || 'https://picsum.photos/seed/' + encodeURIComponent(movie.title) + '/800/1200',
+        backdrop: movie.backdrop || (movie.imdbId ? `https://images.metahub.space/background/medium/${movie.imdbId}/img` : 'https://picsum.photos/seed/' + encodeURIComponent(movie.title) + '/1920/1080'),
+        description: movie.description || "Sinopse indisponível.",
+        videoUrl: finalVideoUrl,
+        imdbId: movie.imdbId,
+        cast: movie.cast,
+        director: movie.director,
+        genres: movie.genres && movie.genres.length > 0 ? movie.genres : ["Filme"],
+        ageRating: movie.ageRating,
+        platform: movie.platform || "Outros",
+        isFeatured: movie.isFeatured || false
+      });
+    }
+  }
+
+  if (updates.length > 0) {
+    await db.content.bulkPut(updates);
+  }
+  if (newItems.length > 0) {
+    await db.content.bulkPut(newItems);
+  }
+
+  // Also update any other existing movies in the database that might not be in enrichedMovies
+  const allExisting = await db.content.toArray();
+  const extraUpdates: ContentItem[] = [];
+  for (const item of allExisting) {
+    if (item.type === ContentType.MOVIE) {
+      let imdbId = item.imdbId;
+      if (!imdbId && item.videoUrl && item.videoUrl.includes('/movie/tt')) {
+        const match = item.videoUrl.match(/\/movie\/(tt\d+)/);
+        if (match) imdbId = match[1];
+      }
+      if (imdbId) {
+        const newUrl = `https://embedplayapi.site/embed/${imdbId}`;
+        if (item.videoUrl !== newUrl) {
+          extraUpdates.push({ ...item, videoUrl: newUrl, imdbId: imdbId });
+        }
+      }
+    }
+  }
+  if (extraUpdates.length > 0) {
+    await db.content.bulkPut(extraUpdates);
+    console.log(`Updated ${extraUpdates.length} existing movies with new videasy.net URL.`);
+  }
+}

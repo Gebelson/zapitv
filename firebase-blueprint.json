@@ -1,0 +1,115 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the streaming platform",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "password": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "devMode": { "type": "boolean" },
+        "memberSince": { "type": "string" },
+        "plan": { "type": "string" },
+        "status": { "type": "string" },
+        "profiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "avatar": { "type": "string" },
+              "isChild": { "type": "boolean" }
+            }
+          }
+        }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "ContentItem": {
+      "title": "ContentItem",
+      "description": "A movie, series, or anime in the catalog",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["movie", "series", "anime"] },
+        "rating": { "type": "number" },
+        "year": { "type": "number" },
+        "image": { "type": "string" },
+        "backdrop": { "type": "string" },
+        "description": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "imdbId": { "type": "string" },
+        "tmdbId": { "type": "string" },
+        "isFeatured": { "type": "boolean" },
+        "platform": { "type": "string" },
+        "cast": { "type": "array", "items": { "type": "string" } },
+        "director": { "type": "string" },
+        "genres": { "type": "array", "items": { "type": "string" } },
+        "ageRating": { "type": "string" }
+      },
+      "required": ["id", "title", "type"]
+    },
+    "CustomSection": {
+      "title": "CustomSection",
+      "description": "A custom row of content created by the admin",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "title", "items"]
+    },
+    "SiteNotification": {
+      "title": "SiteNotification",
+      "description": "A notification for users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "warning", "success"] },
+        "timestamp": { "type": "number" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["id", "title", "message", "type", "timestamp"]
+    },
+    "KeyValueStore": {
+      "title": "KeyValueStore",
+      "description": "Global settings and user preferences",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "value": { "type": "object" }
+      },
+      "required": ["key"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user accounts"
+    },
+    "content": {
+      "schema": { "$ref": "#/entities/ContentItem" },
+      "description": "Stores the catalog of movies, series, and animes"
+    },
+    "customSections": {
+      "schema": { "$ref": "#/entities/CustomSection" },
+      "description": "Stores custom sections created by admins"
+    },
+    "notifications": {
+      "schema": { "$ref": "#/entities/SiteNotification" },
+      "description": "Stores site-wide notifications"
+    },
+    "keyValueStore": {
+      "schema": { "$ref": "#/entities/KeyValueStore" },
+      "description": "Stores global settings and preferences"
+    }
+  }
+}

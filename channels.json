@@ -1,0 +1,762 @@
+[
+  {
+    "name": "bbb - mosaico",
+    "channel": "bbbmosaico",
+    "image": "https://embedtv.best/assets/images/bbb.png"
+  },
+  {
+    "name": "bbb - 1",
+    "channel": "bbb1",
+    "image": "https://embedtv.best/assets/images/bbb.png"
+  },
+  {
+    "name": "bbb - 2",
+    "channel": "bbb2",
+    "image": "https://embedtv.best/assets/images/bbb.png"
+  },
+  {
+    "name": "bbb - 3",
+    "channel": "bbb3",
+    "image": "https://embedtv.best/assets/images/bbb.png"
+  },
+  {
+    "name": "bbb - 4",
+    "channel": "bbb4",
+    "image": "https://embedtv.best/assets/images/bbb.png"
+  },
+  {
+    "name": "bbb - 5",
+    "channel": "bbb5",
+    "image": "https://embedtv.best/assets/images/bbb.png"
+  },
+  {
+    "name": "bbb - 6",
+    "channel": "bbb6",
+    "image": "https://embedtv.best/assets/images/bbb.png"
+  },
+  {
+    "name": "bbb - 7",
+    "channel": "bbb7",
+    "image": "https://embedtv.best/assets/images/bbb.png"
+  },
+  {
+    "name": "bbb - 8",
+    "channel": "bbb8",
+    "image": "https://embedtv.best/assets/images/bbb.png"
+  },
+  {
+    "name": "bbb - 9",
+    "channel": "bbb9",
+    "image": "https://embedtv.best/assets/images/bbb.png"
+  },
+  {
+    "name": "bbb - 10",
+    "channel": "bbb10",
+    "image": "https://embedtv.best/assets/images/bbb.png"
+  },
+  {
+    "name": "band sports",
+    "channel": "bandsports",
+    "image": "https://embedtv.best/assets/images/bandsports.png"
+  },
+  {
+    "name": "cazetv 1",
+    "channel": "caze1",
+    "image": "https://embedtv.best/assets/images/cazetv.png"
+  },
+  {
+    "name": "cazetv 2",
+    "channel": "caze2",
+    "image": "https://embedtv.best/assets/images/cazetv.png"
+  },
+  {
+    "name": "cazetv 3",
+    "channel": "caze3",
+    "image": "https://embedtv.best/assets/images/cazetv.png"
+  },
+  {
+    "name": "combate",
+    "channel": "combate",
+    "image": "https://embedtv.best/assets/images/combate.png"
+  },
+  {
+    "name": "disney plus 1",
+    "channel": "disneyplus1",
+    "image": "https://embedtv.best/assets/images/disneyplus.png"
+  },
+  {
+    "name": "disney plus 2",
+    "channel": "disneyplus2",
+    "image": "https://embedtv.best/assets/images/disneyplus.png"
+  },
+  {
+    "name": "disney plus 3",
+    "channel": "disneyplus3",
+    "image": "https://embedtv.best/assets/images/disneyplus.png"
+  },
+  {
+    "name": "espn",
+    "channel": "espn",
+    "image": "https://embedtv.best/assets/images/espn.png"
+  },
+  {
+    "name": "espn 2",
+    "channel": "espn2",
+    "image": "https://embedtv.best/assets/images/espn2.png"
+  },
+  {
+    "name": "espn 3",
+    "channel": "espn3",
+    "image": "https://embedtv.best/assets/images/espn3.png"
+  },
+  {
+    "name": "espn 4",
+    "channel": "espn4",
+    "image": "https://embedtv.best/assets/images/espn4.png"
+  },
+  {
+    "name": "espn 5",
+    "channel": "espn5",
+    "image": "https://embedtv.best/assets/images/espn5.png"
+  },
+  {
+    "name": "espn 6",
+    "channel": "espn6",
+    "image": "https://embedtv.best/assets/images/espn6.png"
+  },
+  {
+    "name": "max - 1",
+    "channel": "max1",
+    "image": "https://embedtv.best/assets/images/max.png"
+  },
+  {
+    "name": "max - 2",
+    "channel": "max2",
+    "image": "https://embedtv.best/assets/images/max.png"
+  },
+  {
+    "name": "max - 3",
+    "channel": "max3",
+    "image": "https://embedtv.best/assets/images/max.png"
+  },
+  {
+    "name": "paramount plus",
+    "channel": "paramountplus",
+    "image": "https://embedtv.best/assets/images/paramountplus.png"
+  },
+  {
+    "name": "paramount plus 2",
+    "channel": "paramountplus2",
+    "image": "https://embedtv.best/assets/images/paramountplus.png"
+  },
+  {
+    "name": "premiere 1",
+    "channel": "premiere",
+    "image": "https://embedtv.best/assets/images/premiere.png"
+  },
+  {
+    "name": "premiere 2",
+    "channel": "premiere2",
+    "image": "https://embedtv.best/assets/images/premiere.png"
+  },
+  {
+    "name": "premiere 3",
+    "channel": "premiere3",
+    "image": "https://embedtv.best/assets/images/premiere.png"
+  },
+  {
+    "name": "premiere 4",
+    "channel": "premiere4",
+    "image": "https://embedtv.best/assets/images/premiere.png"
+  },
+  {
+    "name": "premiere 5",
+    "channel": "premiere5",
+    "image": "https://embedtv.best/assets/images/premiere.png"
+  },
+  {
+    "name": "premiere 6",
+    "channel": "premiere6",
+    "image": "https://embedtv.best/assets/images/premiere.png"
+  },
+  {
+    "name": "premiere 7",
+    "channel": "premiere7",
+    "image": "https://embedtv.best/assets/images/premiere.png"
+  },
+  {
+    "name": "premiere 8",
+    "channel": "premiere8",
+    "image": "https://embedtv.best/assets/images/premiere.png"
+  },
+  {
+    "name": "prime video",
+    "channel": "primevideo",
+    "image": "https://embedtv.best/assets/images/primevideo.png"
+  },
+  {
+    "name": "prime video 2",
+    "channel": "primevideo2",
+    "image": "https://embedtv.best/assets/images/primevideo.png"
+  },
+  {
+    "name": "sportv",
+    "channel": "sportv",
+    "image": "https://embedtv.best/assets/images/sportv.png"
+  },
+  {
+    "name": "sportv 2",
+    "channel": "sportv2",
+    "image": "https://embedtv.best/assets/images/sportv2.png"
+  },
+  {
+    "name": "sportv 3",
+    "channel": "sportv3",
+    "image": "https://embedtv.best/assets/images/sportv3.png"
+  },
+  {
+    "name": "sportv 4",
+    "channel": "sportv4",
+    "image": "https://embedtv.best/assets/images/sportv4.png"
+  },
+  {
+    "name": "ufc fight pass",
+    "channel": "ufcfightpass",
+    "image": "https://embedtv.best/assets/images/ufcfightpass.png"
+  },
+  {
+    "name": "pt - eleven 1",
+    "channel": "pt_eleven1",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Eleven_Sports_logo.svg/512px-Eleven_Sports_logo.svg.png"
+  },
+  {
+    "name": "pt - eleven 2",
+    "channel": "pt_eleven2",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Eleven_Sports_logo.svg/512px-Eleven_Sports_logo.svg.png"
+  },
+  {
+    "name": "pt - eleven 3",
+    "channel": "pt_eleven3",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Eleven_Sports_logo.svg/512px-Eleven_Sports_logo.svg.png"
+  },
+  {
+    "name": "pt - sporttv 1",
+    "channel": "pt_sportv1",
+    "image": "https://embedtv.best/assets/images/sportv.png"
+  },
+  {
+    "name": "pt - sporttv 2",
+    "channel": "pt_sportv2",
+    "image": "https://embedtv.best/assets/images/sportv.png"
+  },
+  {
+    "name": "pt - sporttv 3",
+    "channel": "pt_sportv3",
+    "image": "https://embedtv.best/assets/images/sportv.png"
+  },
+  {
+    "name": "pt - sporttv 4",
+    "channel": "pt_sportv4",
+    "image": "https://embedtv.best/assets/images/sportv.png"
+  },
+  {
+    "name": "pt - sporttv 5",
+    "channel": "pt_sportv5",
+    "image": "https://embedtv.best/assets/images/sportv.png"
+  },
+  {
+    "name": "24h dragon ball z",
+    "channel": "24h_dragonball",
+    "image": "https://embedtv.best/assets/images/24h.png"
+  },
+  {
+    "name": "24h todo mundo odeia o cris",
+    "channel": "24h_odeiachris",
+    "image": "https://embedtv.best/assets/images/24h.png"
+  },
+  {
+    "name": "24h os simpsons",
+    "channel": "24h_simpsons",
+    "image": "https://embedtv.best/assets/images/24h.png"
+  },
+  {
+    "name": "cartoonito",
+    "channel": "cartoonito",
+    "image": "https://embedtv.best/assets/images/cartoonito.png"
+  },
+  {
+    "name": "cartoon network",
+    "channel": "cartoonnetwork",
+    "image": "https://embedtv.best/assets/images/cartoonnetwork.png"
+  },
+  {
+    "name": "discovery kids",
+    "channel": "discoverykids",
+    "image": "https://embedtv.best/assets/images/discoverykids.png"
+  },
+  {
+    "name": "gloob",
+    "channel": "gloob",
+    "image": "https://embedtv.best/assets/images/gloob.png"
+  },
+  {
+    "name": "nickelodeon",
+    "channel": "nickelodeon",
+    "image": "https://embedtv.best/assets/images/nickelodeon.png"
+  },
+  {
+    "name": "nick junior",
+    "channel": "nickjunior",
+    "image": "https://embedtv.best/assets/images/nickjr.png"
+  },
+  {
+    "name": "animal planet",
+    "channel": "animalplanet",
+    "image": "https://embedtv.best/assets/images/animalplanet.png"
+  },
+  {
+    "name": "discovery channel",
+    "channel": "discoverychannel",
+    "image": "https://embedtv.best/assets/images/discoverychannel.png"
+  },
+  {
+    "name": "discovery h&h",
+    "channel": "discoveryhh",
+    "image": "https://embedtv.best/assets/images/discoveryhh.png"
+  },
+  {
+    "name": "discovery id",
+    "channel": "discoveryid",
+    "image": "https://embedtv.best/assets/images/discoverychannel.png"
+  },
+  {
+    "name": "discovery science",
+    "channel": "discoveryscience",
+    "image": "https://embedtv.best/assets/images/discoveryscience.png"
+  },
+  {
+    "name": "discovery theater",
+    "channel": "discoverytheather",
+    "image": "https://embedtv.best/assets/images/discoverytheater.png"
+  },
+  {
+    "name": "discovery turbo",
+    "channel": "discoveryturbo",
+    "image": "https://embedtv.best/assets/images/discoveryturbo.png"
+  },
+  {
+    "name": "discovery world",
+    "channel": "discoveryword",
+    "image": "https://embedtv.best/assets/images/discoveryworld.png"
+  },
+  {
+    "name": "fish tv",
+    "channel": "fish",
+    "image": "https://embedtv.best/assets/images/fishtv.png"
+  },
+  {
+    "name": "history",
+    "channel": "history",
+    "image": "https://embedtv.best/assets/images/history.png"
+  },
+  {
+    "name": "history 2",
+    "channel": "history2",
+    "image": "https://embedtv.best/assets/images/history2.png"
+  },
+  {
+    "name": "adult swim",
+    "channel": "adultswim",
+    "image": "https://embedtv.best/assets/images/adultswim.png"
+  },
+  {
+    "name": "ae",
+    "channel": "ae",
+    "image": "https://embedtv.best/assets/images/ae.png"
+  },
+  {
+    "name": "axn",
+    "channel": "axn",
+    "image": "https://embedtv.best/assets/images/axn.png"
+  },
+  {
+    "name": "cinemax",
+    "channel": "cinemax",
+    "image": "https://embedtv.best/assets/images/cinemax.png"
+  },
+  {
+    "name": "comedy central",
+    "channel": "comedycentral",
+    "image": "https://embedtv.best/assets/images/comedycentral.png"
+  },
+  {
+    "name": "gnt",
+    "channel": "gnt",
+    "image": "https://embedtv.best/assets/images/gnt.png"
+  },
+  {
+    "name": "hbo",
+    "channel": "hbo",
+    "image": "https://embedtv.best/assets/images/hbo.png"
+  },
+  {
+    "name": "hbo 2",
+    "channel": "hbo2",
+    "image": "https://embedtv.best/assets/images/hbo2.png"
+  },
+  {
+    "name": "hbo family",
+    "channel": "hbofamily",
+    "image": "https://embedtv.best/assets/images/hbofamily.png"
+  },
+  {
+    "name": "hbo mundi",
+    "channel": "hbomundi",
+    "image": "https://embedtv.best/assets/images/hbomundi.png"
+  },
+  {
+    "name": "hbo plus",
+    "channel": "hboplus",
+    "image": "https://embedtv.best/assets/images/hboplus.png"
+  },
+  {
+    "name": "hbo pop",
+    "channel": "hbopop",
+    "image": "https://embedtv.best/assets/images/hbopop.png"
+  },
+  {
+    "name": "hbo xtreme",
+    "channel": "hboxtreme",
+    "image": "https://embedtv.best/assets/images/hboxtreme.png"
+  },
+  {
+    "name": "hgtv",
+    "channel": "hgtv",
+    "image": "https://embedtv.best/assets/images/hgtv.png"
+  },
+  {
+    "name": "megapix",
+    "channel": "megapix",
+    "image": "https://embedtv.best/assets/images/megapix.png"
+  },
+  {
+    "name": "off",
+    "channel": "off",
+    "image": "https://embedtv.best/assets/images/off.png"
+  },
+  {
+    "name": "paramount",
+    "channel": "paramountchannel",
+    "image": "https://embedtv.best/assets/images/paramountchannel.png"
+  },
+  {
+    "name": "sony channel",
+    "channel": "sonychannel",
+    "image": "https://embedtv.best/assets/images/sonychannel.png"
+  },
+  {
+    "name": "space",
+    "channel": "space",
+    "image": "https://embedtv.best/assets/images/space.png"
+  },
+  {
+    "name": "star channel",
+    "channel": "starchannel",
+    "image": "https://embedtv.best/assets/images/starchannel.png"
+  },
+  {
+    "name": "studio universal",
+    "channel": "studiouniversal",
+    "image": "https://embedtv.best/assets/images/studiouniversal.png"
+  },
+  {
+    "name": "tcm",
+    "channel": "tcm",
+    "image": "https://embedtv.best/assets/images/tcm.png"
+  },
+  {
+    "name": "telecine action",
+    "channel": "telecineaction",
+    "image": "https://embedtv.best/assets/images/telecineaction.png"
+  },
+  {
+    "name": "telecine cult",
+    "channel": "telecinecult",
+    "image": "https://embedtv.best/assets/images/telecinecult.png"
+  },
+  {
+    "name": "telecine fun",
+    "channel": "telecinefun",
+    "image": "https://embedtv.best/assets/images/telecinefun.png"
+  },
+  {
+    "name": "telecine pipoca",
+    "channel": "telecinepipoca",
+    "image": "https://embedtv.best/assets/images/telecinepipoca.png"
+  },
+  {
+    "name": "telecine premium",
+    "channel": "telecinepremium",
+    "image": "https://embedtv.best/assets/images/telecinepremium.png"
+  },
+  {
+    "name": "telecine touch",
+    "channel": "telecinetouch",
+    "image": "https://embedtv.best/assets/images/telecinetouch.png"
+  },
+  {
+    "name": "tlc",
+    "channel": "tlc",
+    "image": "https://embedtv.best/assets/images/tlc.png"
+  },
+  {
+    "name": "tnt",
+    "channel": "tnt",
+    "image": "https://embedtv.best/assets/images/tnt.png"
+  },
+  {
+    "name": "tnt novelas",
+    "channel": "tntnovelas",
+    "image": "https://embedtv.best/assets/images/tntnovelas.png"
+  },
+  {
+    "name": "tnt series",
+    "channel": "tntseries",
+    "image": "https://embedtv.best/assets/images/tntseries.png"
+  },
+  {
+    "name": "universal",
+    "channel": "universaltv",
+    "image": "https://embedtv.best/assets/images/universaltv.png"
+  },
+  {
+    "name": "warnerchannel",
+    "channel": "warnerchannel",
+    "image": "https://embedtv.best/assets/images/warnerchannel.png"
+  },
+  {
+    "name": "band",
+    "channel": "band",
+    "image": "https://embedtv.best/assets/images/band.png"
+  },
+  {
+    "name": "band news",
+    "channel": "bandnews",
+    "image": "https://embedtv.best/assets/images/bandnews.png"
+  },
+  {
+    "name": "band sports",
+    "channel": "bandsports",
+    "image": "https://embedtv.best/assets/images/bandsports.png"
+  },
+  {
+    "name": "cnn brasil",
+    "channel": "cnnbrasil",
+    "image": "https://embedtv.best/assets/images/cnnbrasil.png"
+  },
+  {
+    "name": "globo news",
+    "channel": "globonews",
+    "image": "https://embedtv.best/assets/images/globonews.png"
+  },
+  {
+    "name": "record",
+    "channel": "record",
+    "image": "https://embedtv.best/assets/images/record.png"
+  },
+  {
+    "name": "sbt central",
+    "channel": "sbt",
+    "image": "https://embedtv.best/assets/images/sbt.png"
+  },
+  {
+    "name": "aparecida",
+    "channel": "aparecida",
+    "image": "https://embedtv.best/assets/images/tvaparecida.png"
+  },
+  {
+    "name": "band",
+    "channel": "band",
+    "image": "https://embedtv.best/assets/images/band.png"
+  },
+  {
+    "name": "band news",
+    "channel": "bandnews",
+    "image": "https://embedtv.best/assets/images/bandnews.png"
+  },
+  {
+    "name": "band sports",
+    "channel": "bandsports",
+    "image": "https://embedtv.best/assets/images/bandsports.png"
+  },
+  {
+    "name": "canção nova",
+    "channel": "cancaonova",
+    "image": "https://embedtv.best/assets/images/cancaonova.png"
+  },
+  {
+    "name": "cultura",
+    "channel": "cultura",
+    "image": "https://embedtv.best/assets/images/cultura.png"
+  },
+  {
+    "name": "globo news",
+    "channel": "globonews",
+    "image": "https://embedtv.best/assets/images/globonews.png"
+  },
+  {
+    "name": "globo rj",
+    "channel": "globorj",
+    "image": "https://embedtv.best/assets/images/globorj.png"
+  },
+  {
+    "name": "globo sp",
+    "channel": "globosp",
+    "image": "https://embedtv.best/assets/images/globosp.png"
+  },
+  {
+    "name": "globo mg",
+    "channel": "globomg",
+    "image": "https://embedtv.best/assets/images/globosp.png"
+  },
+  {
+    "name": "globo am",
+    "channel": "globoam",
+    "image": "https://embedtv.best/assets/images/globosp.png"
+  },
+  {
+    "name": "globo rs",
+    "channel": "globors",
+    "image": "https://embedtv.best/assets/images/globosp.png"
+  },
+  {
+    "name": "mtv",
+    "channel": "mtv",
+    "image": "https://embedtv.best/assets/images/mtv.png"
+  },
+  {
+    "name": "multishow",
+    "channel": "multishow",
+    "image": "https://embedtv.best/assets/images/multishow.png"
+  },
+  {
+    "name": "record",
+    "channel": "record",
+    "image": "https://embedtv.best/assets/images/record.png"
+  },
+  {
+    "name": "sbt central",
+    "channel": "sbt",
+    "image": "https://embedtv.best/assets/images/sbt.png"
+  },
+  {
+    "name": "viva",
+    "channel": "viva",
+    "image": "https://embedtv.best/assets/images/viva.png"
+  },
+  {
+    "name": "24h dragon ball z",
+    "channel": "24h_dragonball",
+    "image": "https://embedtv.best/assets/images/24h.png"
+  },
+  {
+    "name": "24h todo mundo odeia o cris",
+    "channel": "24h_odeiachris",
+    "image": "https://embedtv.best/assets/images/24h.png"
+  },
+  {
+    "name": "24h os simpsons",
+    "channel": "24h_simpsons",
+    "image": "https://embedtv.best/assets/images/24h.png"
+  },
+  {
+    "name": "adult swim",
+    "channel": "adultswim",
+    "image": "https://embedtv.best/assets/images/adultswim.png"
+  },
+  {
+    "name": "aparecida",
+    "channel": "aparecida",
+    "image": "https://embedtv.best/assets/images/tvaparecida.png"
+  },
+  {
+    "name": "canção nova",
+    "channel": "cancaonova",
+    "image": "https://embedtv.best/assets/images/cancaonova.png"
+  },
+  {
+    "name": "cnn brasil",
+    "channel": "cnnbrasil",
+    "image": "https://embedtv.best/assets/images/cnnbrasil.png"
+  },
+  {
+    "name": "cultura",
+    "channel": "cultura",
+    "image": "https://embedtv.best/assets/images/cultura.png"
+  },
+  {
+    "name": "discovery science",
+    "channel": "discoveryscience",
+    "image": "https://embedtv.best/assets/images/discoveryscience.png"
+  },
+  {
+    "name": "disney plus 1",
+    "channel": "disneyplus1",
+    "image": "https://embedtv.best/assets/images/disneyplus.png"
+  },
+  {
+    "name": "disney plus 2",
+    "channel": "disneyplus2",
+    "image": "https://embedtv.best/assets/images/disneyplus.png"
+  },
+  {
+    "name": "disney plus 3",
+    "channel": "disneyplus3",
+    "image": "https://embedtv.best/assets/images/disneyplus.png"
+  },
+  {
+    "name": "fish tv",
+    "channel": "fish",
+    "image": "https://embedtv.best/assets/images/fishtv.png"
+  },
+  {
+    "name": "food network",
+    "channel": "foodnetwork",
+    "image": "https://embedtv.best/assets/images/foodnetwork.png"
+  },
+  {
+    "name": "hgtv",
+    "channel": "hgtv",
+    "image": "https://embedtv.best/assets/images/hgtv.png"
+  },
+  {
+    "name": "master chef",
+    "channel": "masterchef",
+    "image": "https://embedtv.best/assets/images/cheftv.png"
+  },
+  {
+    "name": "mtv",
+    "channel": "mtv",
+    "image": "https://embedtv.best/assets/images/mtv.png"
+  },
+  {
+    "name": "multishow",
+    "channel": "multishow",
+    "image": "https://embedtv.best/assets/images/multishow.png"
+  },
+  {
+    "name": "record",
+    "channel": "record",
+    "image": "https://embedtv.best/assets/images/record.png"
+  },
+  {
+    "name": "sbt central",
+    "channel": "sbt",
+    "image": "https://embedtv.best/assets/images/sbt.png"
+  },
+  {
+    "name": "viva",
+    "channel": "viva",
+    "image": "https://embedtv.best/assets/images/viva.png"
+  }
+]

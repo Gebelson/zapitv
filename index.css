@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* Oculta o cursor em toda a árvore do player quando inativo por mais de 2s */
+.hide-cursor,
+.hide-cursor * {
+  cursor: none !important;
+}
+
+/* Transição circular suave de tema (View Transitions API) */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 999999;
+}

@@ -1,0 +1,5 @@
+{
+  "name": "ZapiTV",
+  "description": "A high-fidelity recreation of the ZapiTV streaming platform with dark/light modes, user management, and personalized recommendations.",
+  "requestFramePermissions": []
+}
