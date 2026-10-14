@@ -1,7 +1,6 @@
 import { ContentItem, ContentType } from '../../../types';
 import { tmdbService, MOVIE_GENRE_NAME_TO_ID, TV_GENRE_NAME_TO_ID } from '../tmdb/tmdbClient';
 import { mediaAvailabilityIndex } from './MediaAvailabilityIndex';
-import { catalogAvailabilityQueue } from './CatalogAvailabilityQueue';
 import { diagnosticService } from './DiagnosticService';
 import { theatricalFilterService } from './theatricalFilterService';
 import { catalogEligibilityService } from './CatalogEligibilityService';
@@ -16,6 +15,29 @@ export interface DiscoveryResult {
 
 export class CatalogDiscoveryService {
   private dedupeCache = new Map<string, ContentItem>();
+  private resultCache = new Map<string, { expiresAt: number; result: DiscoveryResult }>();
+  private inFlight = new Map<string, Promise<DiscoveryResult>>();
+  private cacheGeneration = 0;
+
+  private cachedDiscovery(key: string, fetchResult: () => Promise<DiscoveryResult>): Promise<DiscoveryResult> {
+    const cached = this.resultCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return Promise.resolve(cached.result);
+    const pending = this.inFlight.get(key);
+    if (pending) return pending;
+
+    const generation = this.cacheGeneration;
+    const request = fetchResult().then(result => {
+      if (generation === this.cacheGeneration && result.items.length > 0) {
+        if (this.resultCache.size >= 100) this.resultCache.delete(this.resultCache.keys().next().value!);
+        this.resultCache.set(key, { result, expiresAt: Date.now() + 5 * 60 * 1000 });
+      }
+      return result;
+    }).finally(() => {
+      if (this.inFlight.get(key) === request) this.inFlight.delete(key);
+    });
+    this.inFlight.set(key, request);
+    return request;
+  }
 
   /**
    * Totais de títulos disponíveis consolidados do acervo ZapiTV por categoria e gênero.
@@ -114,11 +136,14 @@ export class CatalogDiscoveryService {
    */
   private processAndDedupe(items: ContentItem[], contentType: 'movies' | 'series' | 'animes' | 'all'): ContentItem[] {
     const unique: ContentItem[] = [];
+    const pageKeys = new Set<string>();
 
     for (const item of items) {
       if (!item || !item.id || !item.title) continue;
 
       const key = this.getCanonicalKey(item);
+      if (pageKeys.has(key)) continue;
+      pageKeys.add(key);
       const existing = this.dedupeCache.get(key);
 
       if (existing) {
@@ -127,6 +152,7 @@ export class CatalogDiscoveryService {
         if (!existing.tmdbId && item.tmdbId) existing.tmdbId = item.tmdbId;
         if ((!existing.genres || existing.genres.length === 0) && item.genres) existing.genres = item.genres;
         if (!existing.backdrop && item.backdrop) existing.backdrop = item.backdrop;
+        unique.push(existing);
         continue;
       }
 
@@ -140,10 +166,9 @@ export class CatalogDiscoveryService {
         mediaAvailabilityIndex.recordDiscovery(canonicalId, item.title, item.type);
       }
 
-      // 2. Enfileira na fila de verificação em segundo plano
-      catalogAvailabilityQueue.enqueue(item, 1);
-
-      // 3. Atualiza diagnóstico
+      // A verificação de fontes começa quando o card entra na área visível.
+      // Descoberta e contadores não dependem da posição no scroll.
+      // 2. Atualiza diagnóstico
       const diagType = contentType === 'movies' ? 'movie' : (contentType === 'series' ? 'series' : 'anime');
       diagnosticService.recordDiscovered(canonicalId, diagType);
     }
@@ -155,6 +180,10 @@ export class CatalogDiscoveryService {
    * Descoberta de Filmes com suporte a múltiplas páginas e filtros dinâmicos de gênero
    */
   public async discoverMovies(page = 1, genre?: string): Promise<DiscoveryResult> {
+    return this.cachedDiscovery(`movies:${page}:${genre || 'Todos'}`, () => this.discoverMoviesUncached(page, genre));
+  }
+
+  private async discoverMoviesUncached(page: number, genre?: string): Promise<DiscoveryResult> {
     const rawResults: ContentItem[] = [];
     const genreKey = genre || 'Todos';
 
@@ -207,6 +236,10 @@ export class CatalogDiscoveryService {
    * Descoberta de Séries com suporte a múltiplas páginas e filtros dinâmicos de gênero
    */
   public async discoverSeries(page = 1, genre?: string): Promise<DiscoveryResult> {
+    return this.cachedDiscovery(`series:${page}:${genre || 'Todos'}`, () => this.discoverSeriesUncached(page, genre));
+  }
+
+  private async discoverSeriesUncached(page: number, genre?: string): Promise<DiscoveryResult> {
     const rawResults: ContentItem[] = [];
     const genreKey = genre || 'Todos';
 
@@ -257,6 +290,10 @@ export class CatalogDiscoveryService {
    * Descoberta Unificada de Animes (Séries E Longas-Metragens/Filmes)
    */
   public async discoverAnimes(page = 1, genre?: string): Promise<DiscoveryResult> {
+    return this.cachedDiscovery(`animes:${page}:${genre || 'Todos'}`, () => this.discoverAnimesUncached(page, genre));
+  }
+
+  private async discoverAnimesUncached(page: number, genre?: string): Promise<DiscoveryResult> {
     const rawResults: ContentItem[] = [];
 
     try {
@@ -330,7 +367,10 @@ export class CatalogDiscoveryService {
    * Limpa cache de deduplicação caso necessário
    */
   public clearCache(): void {
+    this.cacheGeneration++;
     this.dedupeCache.clear();
+    this.resultCache.clear();
+    this.inFlight.clear();
   }
 }
 

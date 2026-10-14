@@ -98,8 +98,8 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     type: ContentType.SERIES,
     rating: 8.4,
     year: 2016,
-    image: 'https://upload.wikimedia.org/wikipedia/commons/1/14/Caminandes_gran_dillama.png',
-    backdrop: 'https://upload.wikimedia.org/wikipedia/commons/1/14/Caminandes_gran_dillama.png',
+    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png',
+    backdrop: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png',
     description: 'Série de animação livre produzida pelo Blender Studio. Acompanha a divertida e teimosa lhama Koro em suas aventuras pelos Andes em busca de comida e superação de obstáculos.',
     genres: ['Animação', 'Comédia', 'Infantil / Família'],
     director: 'Pablo Vazquez',
@@ -114,7 +114,7 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
         number: 1,
         title: 'Episódio 1: Llama Drama',
         description: 'Koro tenta desesperadamente atravessar uma estrada deserta na Patagônia enquanto um caminhão se aproxima.',
-        image: 'https://upload.wikimedia.org/wikipedia/commons/1/14/Caminandes_gran_dillama.png',
+        image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png',
         videoUrl: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/d/d0/Caminandes-_Llama_Drama_-_Short_Movie.ogv/Caminandes-_Llama_Drama_-_Short_Movie.ogv.720p.vp9.webm'
       },
       {
@@ -122,7 +122,7 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
         number: 2,
         title: 'Episódio 2: Gran Dillama',
         description: 'Koro encontra uma cerca aparentemente intransponível para alcançar uma saborosa árvore de maçãs.',
-        image: 'https://upload.wikimedia.org/wikipedia/commons/1/14/Caminandes_gran_dillama.png',
+        image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png',
         videoUrl: 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Caminandes_-_Gran_Dillama_-_Blender_Foundation%27s_new_Open_Movie.webm'
       },
       {
@@ -130,7 +130,7 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
         number: 3,
         title: 'Episódio 3: Llamigos',
         description: 'No rigoroso inverno patagônico, Koro conhece um pinguim e compete por uma última fruta congelada.',
-        image: 'https://upload.wikimedia.org/wikipedia/commons/1/14/Caminandes_gran_dillama.png',
+        image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png',
         videoUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Caminandes_3_-_Llamigos_-_Blender_Animated_Short.webm'
       }
     ],

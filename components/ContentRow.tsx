@@ -32,6 +32,24 @@ const ContentRow: React.FC<ContentRowProps> = ({
   onDeleteSection
 }) => {
   const sliderRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const [shouldRenderCards, setShouldRenderCards] = useState(false);
+
+  useEffect(() => {
+    if (shouldRenderCards) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setShouldRenderCards(true);
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setShouldRenderCards(true);
+        observer.disconnect();
+      }
+    }, { rootMargin: '500px' });
+    if (sectionRef.current) observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, [shouldRenderCards]);
   
   // Logic Refs
   const isDown = useRef(false);
@@ -56,8 +74,8 @@ const ContentRow: React.FC<ContentRowProps> = ({
   // O carrossel só é infinito se tiver MAIS DE 8 capas de conteúdos diferentes
   const isInfinite = uniqueItems.length > 8;
 
-  // Multiplicador: se for infinito usa 5 para o loop; caso contrário 1 (sem repetições)
-  const multiplier = isInfinite ? 5 : 1;
+  // Uma cópia de cada lado mantém o loop sem montar cinco vezes todos os cards.
+  const multiplier = isInfinite ? 3 : 1;
   const extendedItems = useMemo(() => {
     if (!isInfinite) return uniqueItems;
     return Array(multiplier).fill(uniqueItems).flat();
@@ -96,7 +114,7 @@ const ContentRow: React.FC<ContentRowProps> = ({
       }
     }, 100);
     return () => clearTimeout(timer);
-  }, [isInfinite, multiplier, getSetWidth]);
+  }, [isInfinite, multiplier, getSetWidth, shouldRenderCards]);
 
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -115,9 +133,8 @@ const ContentRow: React.FC<ContentRowProps> = ({
       
       const currentScroll = container.scrollLeft;
       
-      // Zonas de limite ajustadas para o multiplicador (5)
-      const leftBound = setWidth * 1.5;
-      const rightBound = setWidth * 3.5;
+      const leftBound = setWidth * 0.5;
+      const rightBound = setWidth * 2.2;
 
       if (currentScroll < leftBound || currentScroll > rightBound) {
         const relativeScroll = currentScroll % setWidth;
@@ -190,6 +207,10 @@ const ContentRow: React.FC<ContentRowProps> = ({
     }
   };
 
+  useEffect(() => () => {
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+  }, []);
+
   const scrollByButton = (direction: 'left' | 'right') => {
     if (sliderRef.current) {
       const container = sliderRef.current;
@@ -203,7 +224,7 @@ const ContentRow: React.FC<ContentRowProps> = ({
   if (items.length === 0 || uniqueItems.length === 0) return null;
 
   return (
-    <section className="relative group/section select-none">
+    <section ref={sectionRef} className="relative group/section select-none">
       <div className="flex items-center justify-between mb-3 md:mb-6 px-4 md:px-12">
         <div className="flex items-center gap-3 group/title">
           <h3 className={`text-lg md:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -243,7 +264,8 @@ const ContentRow: React.FC<ContentRowProps> = ({
         )}
       </div>
 
-      <div className="relative overflow-visible">
+      <div className="relative overflow-visible min-h-[230px] md:min-h-[390px]">
+        {shouldRenderCards && (
         <div 
           ref={sliderRef}
           onMouseDown={handleMouseDown}
@@ -280,6 +302,7 @@ const ContentRow: React.FC<ContentRowProps> = ({
             </div>
           ))}
         </div>
+        )}
       </div>
     </section>
   );

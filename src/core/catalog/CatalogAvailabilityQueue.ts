@@ -13,8 +13,9 @@ export interface QueueItem {
 export class CatalogAvailabilityQueue {
   private static instance: CatalogAvailabilityQueue;
   private queue: QueueItem[] = [];
+  private queuedByKey = new Map<string, QueueItem>();
   private inFlight = new Set<string>();
-  private maxConcurrency = 3; // Limite de concorrência simultânea para não sobrecarregar
+  private maxConcurrency = 1; // Verificação oportunista sem saturar os provedores
   private isProcessing = false;
   private listeners = new Set<(completedKey: string) => void>();
 
@@ -56,7 +57,7 @@ export class CatalogAvailabilityQueue {
     }
 
     // Se já está na fila ou em processamento, apenas atualiza prioridade se for maior
-    const existing = this.queue.find(q => mediaAvailabilityIndex.getCanonicalKey(q.item) === key);
+    const existing = this.queuedByKey.get(key);
     if (existing) {
       if (priority > existing.priority) {
         existing.priority = priority;
@@ -69,7 +70,9 @@ export class CatalogAvailabilityQueue {
       return;
     }
 
-    this.queue.push({ item, priority, addedAt: Date.now() });
+    const queued = { item, priority, addedAt: Date.now() };
+    this.queue.push(queued);
+    this.queuedByKey.set(key, queued);
     this.sortQueue();
     this.processNext();
   }
@@ -97,6 +100,7 @@ export class CatalogAvailabilityQueue {
         if (!next) break;
 
         const key = mediaAvailabilityIndex.getCanonicalKey(next.item);
+        this.queuedByKey.delete(key);
         if (this.inFlight.has(key)) continue;
 
         this.inFlight.add(key);

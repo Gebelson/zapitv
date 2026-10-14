@@ -97,8 +97,8 @@ var VERIFIED_OPEN_ITEMS = [
     type: "S\xC9RIE" /* SERIES */,
     rating: 8.4,
     year: 2016,
-    image: "https://upload.wikimedia.org/wikipedia/commons/1/14/Caminandes_gran_dillama.png",
-    backdrop: "https://upload.wikimedia.org/wikipedia/commons/1/14/Caminandes_gran_dillama.png",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png",
+    backdrop: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png",
     description: "S\xE9rie de anima\xE7\xE3o livre produzida pelo Blender Studio. Acompanha a divertida e teimosa lhama Koro em suas aventuras pelos Andes em busca de comida e supera\xE7\xE3o de obst\xE1culos.",
     genres: ["Anima\xE7\xE3o", "Com\xE9dia", "Infantil / Fam\xEDlia"],
     director: "Pablo Vazquez",
@@ -114,7 +114,7 @@ var VERIFIED_OPEN_ITEMS = [
         number: 1,
         title: "Epis\xF3dio 1: Llama Drama",
         description: "Koro tenta desesperadamente atravessar uma estrada deserta na Patag\xF4nia enquanto um caminh\xE3o se aproxima.",
-        image: "https://upload.wikimedia.org/wikipedia/commons/1/14/Caminandes_gran_dillama.png",
+        image: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png",
         videoUrl: "https://upload.wikimedia.org/wikipedia/commons/transcoded/d/d0/Caminandes-_Llama_Drama_-_Short_Movie.ogv/Caminandes-_Llama_Drama_-_Short_Movie.ogv.720p.vp9.webm"
       },
       {
@@ -122,7 +122,7 @@ var VERIFIED_OPEN_ITEMS = [
         number: 2,
         title: "Epis\xF3dio 2: Gran Dillama",
         description: "Koro encontra uma cerca aparentemente intranspon\xEDvel para alcan\xE7ar uma saborosa \xE1rvore de ma\xE7\xE3s.",
-        image: "https://upload.wikimedia.org/wikipedia/commons/1/14/Caminandes_gran_dillama.png",
+        image: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png",
         videoUrl: "https://upload.wikimedia.org/wikipedia/commons/7/7c/Caminandes_-_Gran_Dillama_-_Blender_Foundation%27s_new_Open_Movie.webm"
       },
       {
@@ -130,7 +130,7 @@ var VERIFIED_OPEN_ITEMS = [
         number: 3,
         title: "Epis\xF3dio 3: Llamigos",
         description: "No rigoroso inverno patag\xF4nico, Koro conhece um pinguim e compete por uma \xFAltima fruta congelada.",
-        image: "https://upload.wikimedia.org/wikipedia/commons/1/14/Caminandes_gran_dillama.png",
+        image: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png",
         videoUrl: "https://upload.wikimedia.org/wikipedia/commons/a/ab/Caminandes_3_-_Llamigos_-_Blender_Animated_Short.webm"
       }
     ],
@@ -781,12 +781,13 @@ var TMDBClientService = class {
     const url = `${TMDB_BASE_URL}${endpoint}${endpoint.includes("?") ? "&" : "?"}api_key=${TMDB_API_KEY}&language=pt-BR`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const abortHandler = () => controller.abort();
     if (signal) {
       if (signal.aborted) {
         clearTimeout(timer);
         throw new DOMException("Aborted", "AbortError");
       }
-      signal.addEventListener("abort", () => controller.abort(), { once: true });
+      signal.addEventListener("abort", abortHandler, { once: true });
     }
     try {
       const res = await fetch(url, { signal: controller.signal });
@@ -794,10 +795,18 @@ var TMDBClientService = class {
       if (!res.ok) {
         throw new Error(`Erro TMDB ${res.status}: ${res.statusText}`);
       }
-      return res.json();
+      return await res.json();
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener("abort", abortHandler);
     }
+  }
+  async searchCinemeta(url, signal) {
+    const timeout = AbortSignal.timeout(8e3);
+    const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    const response = await fetch(url, { signal: requestSignal });
+    if (!response.ok) throw new Error(`Cinemeta ${response.status}`);
+    return response.json();
   }
   async getImdbId(id, type) {
     const rawStr = String(id).trim();
@@ -972,8 +981,8 @@ var TMDBClientService = class {
     const normalized = encodeURIComponent(trimmed);
     const [tmdbRes, cineMovieRes, cineSeriesRes] = await Promise.allSettled([
       this.request(`/search/multi?query=${normalized}`),
-      fetch(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`).then((r) => r.json()),
-      fetch(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`).then((r) => r.json())
+      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`),
+      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`)
     ]);
     const results = [];
     const seenIds = /* @__PURE__ */ new Set();
@@ -1046,7 +1055,7 @@ var TMDBClientService = class {
     const normalized = encodeURIComponent(trimmed);
     const [tmdbRes, cineMovieRes] = await Promise.allSettled([
       this.request(`/search/movie?query=${normalized}`, 8e3, signal),
-      fetch(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`, { signal }).then((r) => r.json())
+      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`, signal)
     ]);
     const results = [];
     const seenIds = /* @__PURE__ */ new Set();
@@ -1100,7 +1109,7 @@ var TMDBClientService = class {
     const normalized = encodeURIComponent(trimmed);
     const [tmdbRes, cineSeriesRes] = await Promise.allSettled([
       this.request(`/search/tv?query=${normalized}`, 8e3, signal),
-      fetch(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, { signal }).then((r) => r.json())
+      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal)
     ]);
     const results = [];
     const seenIds = /* @__PURE__ */ new Set();
@@ -1150,7 +1159,7 @@ var TMDBClientService = class {
     const [tmdbTvRes, tmdbMovieRes, cineSeriesRes] = await Promise.allSettled([
       this.request(`/search/tv?query=${normalized}`, 8e3, signal),
       this.request(`/search/movie?query=${normalized}`, 8e3, signal),
-      fetch(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, { signal }).then((r) => r.json())
+      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal)
     ]);
     const results = [];
     const seenIds = /* @__PURE__ */ new Set();
@@ -11468,6 +11477,8 @@ var ProviderRegistryService = class {
   constructor() {
     this.providers = [];
     this.cache = /* @__PURE__ */ new Map();
+    this.pending = /* @__PURE__ */ new Map();
+    this.cacheGeneration = 0;
     this.CACHE_TTL_MS = 10 * 60 * 1e3;
     this.loadProviders();
   }
@@ -11551,12 +11562,21 @@ var ProviderRegistryService = class {
   /**
    * Resolve todos os fluxos de reprodução para um item (filme ou série).
    */
-  async resolveStreams(type, id, episode) {
+  resolveStreams(type, id, episode) {
     const cacheKey = `v4_priority_${type}_${id.tmdbId || id.imdbId || id.id}_${id.imdbId || ""}_${episode?.season || 0}_${episode?.episode || 0}`;
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
-      return cached.streams;
+      return Promise.resolve(cached.streams);
     }
+    const existing = this.pending.get(cacheKey);
+    if (existing) return existing;
+    const request = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration).finally(() => {
+      if (this.pending.get(cacheKey) === request) this.pending.delete(cacheKey);
+    });
+    this.pending.set(cacheKey, request);
+    return request;
+  }
+  async resolveStreamsFresh(type, id, episode, cacheKey, generation) {
     const streams = [];
     const activeProviders = this.providers.filter((p) => p.enabled);
     const rawTargetId = id.id || "";
@@ -11858,14 +11878,18 @@ var ProviderRegistryService = class {
       }).catch(() => {
       });
     }
-    this.cache.set(cacheKey, { streams: sorted, timestamp: Date.now() });
+    if (generation === this.cacheGeneration) {
+      this.cache.set(cacheKey, { streams: sorted, timestamp: Date.now() });
+    }
     return sorted;
   }
   /**
    * Limpa todos os caches de provedores e ranqueamento inteligente.
    */
   clearCache() {
+    this.cacheGeneration++;
     this.cache.clear();
+    this.pending.clear();
     sourceSelectionService.clearRankingCache();
   }
 };

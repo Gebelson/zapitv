@@ -30,7 +30,7 @@ const ContentCard: React.FC<ContentCardProps> = ({
   // Verifica se é visualmente um Anime (por tipo ou gênero)
   const isAnime = item.type === ContentType.ANIME || item.genres?.includes('Anime');
 
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
   const [imgSrc, setImgSrc] = useState(item.image || item.backdrop || '');
   const [hasImageError, setHasImageError] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -93,6 +93,15 @@ const ContentCard: React.FC<ContentCardProps> = ({
       observer.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    let active = true;
+    import('../src/core/catalog/CatalogAvailabilityQueue').then(({ catalogAvailabilityQueue }) => {
+      if (active) catalogAvailabilityQueue.enqueue(item, 1);
+    }).catch(error => console.warn('Falha ao iniciar verificação da fonte:', error));
+    return () => { active = false; };
+  }, [isVisible, item]);
 
   return (
     <div 

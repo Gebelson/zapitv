@@ -2488,9 +2488,11 @@ export async function updateMovies() {
 
   const updates: ContentItem[] = [];
   const newItems: ContentItem[] = [];
+  const existingByTitle = new Map(existingContent.map(item => [item.title, item]));
+  const existingByImdb = new Map(existingContent.filter(item => item.imdbId).map(item => [item.imdbId!, item]));
 
   for (const movie of enrichedMovies) {
-    const existing = existingContent.find(c => c.title === movie.title || c.imdbId === movie.imdbId);
+    const existing = existingByTitle.get(movie.title) || (movie.imdbId ? existingByImdb.get(movie.imdbId) : undefined);
     
     // Determine the correct videoUrl
     let finalVideoUrl = movie.videoUrl;

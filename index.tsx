@@ -5,19 +5,11 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { initializeDatabase, db as localDb } from './db';
 import { updateMovies } from './updateMovies';
-import { MOCK_USERS } from './constants';
-import { db as firestoreDb, auth } from './firebase';
-import { collection, getDocs, setDoc, doc, onSnapshot, getDoc } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
 import './index.css';
 
-const RootComponent = () => {
-  const [isReady, setIsReady] = useState(false);
-  const [initialState, setInitialState] = useState<any>(null);
-  const [initializationError, setInitializationError] = useState(false);
+let bootstrapPromise: Promise<any> | null = null;
 
-  useEffect(() => {
-    async function load() {
+async function loadInitialState() {
       // 1. Initialize local DB first to get the base catalog
       await initializeDatabase();
       await updateMovies();
@@ -63,7 +55,7 @@ const RootComponent = () => {
       const savedFavs = (await localDb.keyValueStore.get('zapitv_local_favorites'))?.value || [];
       const savedList = (await localDb.keyValueStore.get('zapitv_local_mylist'))?.value || [];
 
-      setInitialState({
+      return {
         users: [defaultUser],
         content: localContent,
         notifications: [],
@@ -76,20 +68,37 @@ const RootComponent = () => {
         myList: savedList,
         favorites: savedFavs,
         lastEmail: defaultUser.email
-      });
-      setIsReady(true);
-    }
+      };
+}
+
+const RootComponent = () => {
+  const [isReady, setIsReady] = useState(false);
+  const [initialState, setInitialState] = useState<any>(null);
+  const [initializationError, setInitializationError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    bootstrapPromise ??= loadInitialState();
     
     let timer: ReturnType<typeof setTimeout>;
     Promise.race([
-      load(),
+      bootstrapPromise,
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error('Tempo limite ao abrir o catálogo local')), 20000);
       })
-    ]).catch(err => {
+    ]).then(state => {
+      if (!active) return;
+      setInitialState(state);
+      setIsReady(true);
+    }).catch(err => {
+      if (!active) return;
       console.error("Failed to initialize database", err);
       setInitializationError(true);
     }).finally(() => clearTimeout(timer));
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   if (initializationError && !initialState) {

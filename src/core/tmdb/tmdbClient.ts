@@ -205,12 +205,13 @@ class TMDBClientService {
     const url = `${TMDB_BASE_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}api_key=${TMDB_API_KEY}&language=pt-BR`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const abortHandler = () => controller.abort();
     if (signal) {
       if (signal.aborted) {
         clearTimeout(timer);
         throw new DOMException('Aborted', 'AbortError');
       }
-      signal.addEventListener('abort', () => controller.abort(), { once: true });
+      signal.addEventListener('abort', abortHandler, { once: true });
     }
     try {
       const res = await fetch(url, { signal: controller.signal });
@@ -218,10 +219,19 @@ class TMDBClientService {
       if (!res.ok) {
         throw new Error(`Erro TMDB ${res.status}: ${res.statusText}`);
       }
-      return res.json();
+      return await res.json();
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener('abort', abortHandler);
     }
+  }
+
+  private async searchCinemeta(url: string, signal?: AbortSignal): Promise<any> {
+    const timeout = AbortSignal.timeout(8000);
+    const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    const response = await fetch(url, { signal: requestSignal });
+    if (!response.ok) throw new Error(`Cinemeta ${response.status}`);
+    return response.json();
   }
 
   public async getImdbId(id: string | number, type: ContentType | 'movie' | 'series' | 'anime'): Promise<string | undefined> {
@@ -428,8 +438,8 @@ class TMDBClientService {
     // 2. Busca Híbrida: TMDB (PT-BR) + Cinemeta Filmes + Cinemeta Séries em paralelo
     const [tmdbRes, cineMovieRes, cineSeriesRes] = await Promise.allSettled([
       this.request(`/search/multi?query=${normalized}`),
-      fetch(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`).then(r => r.json()),
-      fetch(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`).then(r => r.json())
+      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`),
+      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`)
     ]);
 
     const results: ContentItem[] = [];
@@ -516,7 +526,7 @@ class TMDBClientService {
     const normalized = encodeURIComponent(trimmed);
     const [tmdbRes, cineMovieRes] = await Promise.allSettled([
       this.request(`/search/movie?query=${normalized}`, 8000, signal),
-      fetch(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`, { signal }).then(r => r.json())
+      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`, signal)
     ]);
 
     const results: ContentItem[] = [];
@@ -579,7 +589,7 @@ class TMDBClientService {
     const normalized = encodeURIComponent(trimmed);
     const [tmdbRes, cineSeriesRes] = await Promise.allSettled([
       this.request(`/search/tv?query=${normalized}`, 8000, signal),
-      fetch(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, { signal }).then(r => r.json())
+      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal)
     ]);
 
     const results: ContentItem[] = [];
@@ -638,7 +648,7 @@ class TMDBClientService {
     const [tmdbTvRes, tmdbMovieRes, cineSeriesRes] = await Promise.allSettled([
       this.request(`/search/tv?query=${normalized}`, 8000, signal),
       this.request(`/search/movie?query=${normalized}`, 8000, signal),
-      fetch(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, { signal }).then(r => r.json())
+      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal)
     ]);
 
     const results: ContentItem[] = [];

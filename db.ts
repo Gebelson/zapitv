@@ -42,6 +42,7 @@ export async function initializeDatabase() {
     // Sincroniza filmes novos que foram adicionados no constants.tsx
     const existingContent = await db.content.toArray();
     const existingIds = new Set(existingContent.map(c => c.id));
+    const seedById = new Map(filmesData.map(item => [item.id, item]));
     const newItems = filmesData.filter(c => !existingIds.has(c.id));
     if (newItems.length > 0) {
       await db.content.bulkPut(newItems);
@@ -50,7 +51,7 @@ export async function initializeDatabase() {
     // Atualiza backdrops e imagens que diferem do constants.tsx
     const updates = [];
     for (const item of existingContent) {
-      const constItem = filmesData.find(c => c.id === item.id);
+      const constItem = seedById.get(item.id);
       if (constItem) {
         let changed = false;
         if (item.backdrop !== constItem.backdrop) {

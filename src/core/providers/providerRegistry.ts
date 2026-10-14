@@ -214,6 +214,8 @@ export const VERIFIED_TEST_STREAMS: Record<string, StremioStream[]> = {
 class ProviderRegistryService {
   private providers: ProviderConfig[] = [];
   private cache: Map<string, { streams: StremioStream[]; timestamp: number }> = new Map();
+  private pending = new Map<string, Promise<StremioStream[]>>();
+  private cacheGeneration = 0;
   private readonly CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos
 
   constructor() {
@@ -311,7 +313,7 @@ class ProviderRegistryService {
   /**
    * Resolve todos os fluxos de reprodução para um item (filme ou série).
    */
-  public async resolveStreams(
+  public resolveStreams(
     type: 'movie' | 'series' | 'anime',
     id: { tmdbId?: string | number; imdbId?: string; id?: string; title?: string },
     episode?: { season: number; episode: number }
@@ -319,9 +321,25 @@ class ProviderRegistryService {
     const cacheKey = `v4_priority_${type}_${id.tmdbId || id.imdbId || id.id}_${id.imdbId || ''}_${episode?.season || 0}_${episode?.episode || 0}`;
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
-      return cached.streams;
+      return Promise.resolve(cached.streams);
     }
+    const existing = this.pending.get(cacheKey);
+    if (existing) return existing;
 
+    const request = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration).finally(() => {
+      if (this.pending.get(cacheKey) === request) this.pending.delete(cacheKey);
+    });
+    this.pending.set(cacheKey, request);
+    return request;
+  }
+
+  private async resolveStreamsFresh(
+    type: 'movie' | 'series' | 'anime',
+    id: { tmdbId?: string | number; imdbId?: string; id?: string; title?: string },
+    episode: { season: number; episode: number } | undefined,
+    cacheKey: string,
+    generation: number
+  ): Promise<StremioStream[]> {
     const streams: StremioStream[] = [];
     const activeProviders = this.providers.filter(p => p.enabled);
 
@@ -686,7 +704,9 @@ class ProviderRegistryService {
     }
 
     // Armazenar no cache
-    this.cache.set(cacheKey, { streams: sorted, timestamp: Date.now() });
+    if (generation === this.cacheGeneration) {
+      this.cache.set(cacheKey, { streams: sorted, timestamp: Date.now() });
+    }
 
     return sorted;
   }
@@ -695,7 +715,9 @@ class ProviderRegistryService {
    * Limpa todos os caches de provedores e ranqueamento inteligente.
    */
   public clearCache(): void {
+    this.cacheGeneration++;
     this.cache.clear();
+    this.pending.clear();
     sourceSelectionService.clearRankingCache();
   }
 }

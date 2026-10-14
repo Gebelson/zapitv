@@ -27,6 +27,15 @@ const TAG_COLORS = [
   { id: 'gray', value: '#4b5563', label: 'Cinza' },
 ];
 
+const tryPosterFallback = (event: React.SyntheticEvent<HTMLImageElement>, poster?: string) => {
+  const image = event.currentTarget;
+  if (poster && image.src !== new URL(poster, document.baseURI).href) {
+    image.src = poster;
+  } else {
+    image.onerror = null;
+  }
+};
+
 const Hero: React.FC<HeroProps> = ({ featuredItems, isDarkMode, onActionClick, isAdmin, onUpdateItem, onAddContent }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPaused, setIsPaused] = useState(false);
@@ -317,7 +326,7 @@ const Hero: React.FC<HeroProps> = ({ featuredItems, isDarkMode, onActionClick, i
                   >
                     <div className="flex gap-3">
                       <div className="w-20 h-12 bg-black rounded-lg overflow-hidden shrink-0">
-                        <img src={item.backdrop || item.image} onError={(e) => { (e.target as HTMLImageElement).src = item.image; }} className="w-full h-full object-cover opacity-70" />
+                        <img src={item.backdrop || item.image} onError={(e) => tryPosterFallback(e, item.image)} className="w-full h-full object-cover opacity-70" />
                       </div>
                       <div className="flex-1 min-w-0 flex flex-col justify-center">
                         <p className={`font-bold text-sm truncate ${idx === selectedLocalIndex ? 'text-white' : 'text-gray-400'}`}>{item.title || "Sem título"}</p>
@@ -344,7 +353,7 @@ const Hero: React.FC<HeroProps> = ({ featuredItems, isDarkMode, onActionClick, i
                 <div className="p-8 pb-32">
                    {/* Preview Area */}
                    <div className="relative w-full h-64 rounded-3xl overflow-hidden border border-white/10 group shadow-2xl flex items-center justify-center bg-black mb-8">
-                    <img src={currentEditItem.backdrop || currentEditItem.image} onError={(e) => { (e.target as HTMLImageElement).src = currentEditItem.image; }} className="absolute inset-0 w-full h-full object-cover opacity-60" />
+                    <img src={currentEditItem.backdrop || currentEditItem.image} onError={(e) => tryPosterFallback(e, currentEditItem.image)} className="absolute inset-0 w-full h-full object-cover opacity-60" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80" />
                     
                     <div className="relative z-10 flex flex-col items-center gap-4 w-full px-8 text-center mt-10">
@@ -567,9 +576,11 @@ const Hero: React.FC<HeroProps> = ({ featuredItems, isDarkMode, onActionClick, i
             <img 
               src={item.backdrop || item.image} 
               alt={item.title}
-              onError={(e) => { (e.target as HTMLImageElement).src = item.image; }}
+              onError={(e) => tryPosterFallback(e, item.image)}
               className="absolute inset-0 w-full h-full object-cover object-center"
-              loading="lazy"
+              loading={idx === totalOriginal ? 'eager' : 'lazy'}
+              fetchPriority={idx === totalOriginal ? 'high' : 'auto'}
+              decoding="async"
               referrerPolicy="no-referrer"
             />
             <div className={`absolute inset-0 bg-gradient-to-t transition-opacity duration-300 ${

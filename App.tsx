@@ -6,20 +6,9 @@ import Header from './components/Header';
 import Hero from './components/Hero';
 import ContentRow from './components/ContentRow';
 import ContentCard from './components/ContentCard';
-import ProfileView from './components/ProfileView';
-import AdminView from './components/AdminView';
-import SettingsView from './components/SettingsView';
-import HelpView from './components/HelpView';
-import ContentDetailModal from './components/ContentDetailModal';
 import AnimatedBackground from './components/AnimatedBackground';
-import AuthView from './components/AuthView';
 import ScrollToTop from './components/ScrollToTop';
 import GenreDropdown from './components/GenreDropdown';
-import ProfileSelectorView from './components/ProfileSelectorView';
-import AddSectionModal from './components/AddSectionModal';
-import ProgramasView from './components/ProgramasView';
-import { NotFoundPage } from './src/pages/NotFoundPage';
-import { DownloadsPage } from './src/pages/DownloadsPage';
 import { getContentRoute, ROUTES } from './src/core/routes/navigationRoutes';
 import { AppView, User, ContentType, ContentItem, SiteNotification, Profile, CustomSection } from './types';
 import { MOCK_USERS, AVATARS, filmesData } from './constants';
@@ -32,13 +21,24 @@ import { VERIFIED_OPEN_ITEMS } from './src/core/catalog/verifiedCatalog';
 import { ZapiLoader } from './src/components/common/ZapiLoader';
 import { catalogDiscoveryService } from './src/core/catalog/CatalogDiscoveryService';
 import { mediaAvailabilityIndex } from './src/core/catalog/MediaAvailabilityIndex';
-import { catalogAvailabilityQueue } from './src/core/catalog/CatalogAvailabilityQueue';
-import { CatalogDiagnosticModal } from './src/components/catalog/CatalogDiagnosticModal';
 import { theatricalFilterService } from './src/core/catalog/theatricalFilterService';
 import { catalogEligibilityService } from './src/core/catalog/CatalogEligibilityService';
 import { searchService } from './src/core/search/searchService';
 import { featuredRankingService } from './src/core/rankings/FeaturedRankingService';
 import { FeaturedSelectionResult } from './src/core/rankings/featuredRankingTypes';
+
+const ProfileView = React.lazy(() => import('./components/ProfileView'));
+const AdminView = React.lazy(() => import('./components/AdminView'));
+const SettingsView = React.lazy(() => import('./components/SettingsView'));
+const HelpView = React.lazy(() => import('./components/HelpView'));
+const ContentDetailModal = React.lazy(() => import('./components/ContentDetailModal'));
+const AuthView = React.lazy(() => import('./components/AuthView'));
+const ProfileSelectorView = React.lazy(() => import('./components/ProfileSelectorView'));
+const AddSectionModal = React.lazy(() => import('./components/AddSectionModal'));
+const ProgramasView = React.lazy(() => import('./components/ProgramasView'));
+const NotFoundPage = React.lazy(() => import('./src/pages/NotFoundPage').then(module => ({ default: module.NotFoundPage })));
+const DownloadsPage = React.lazy(() => import('./src/pages/DownloadsPage').then(module => ({ default: module.DownloadsPage })));
+const CatalogDiagnosticModal = React.lazy(() => import('./src/components/catalog/CatalogDiagnosticModal').then(module => ({ default: module.CatalogDiagnosticModal })));
 
 const GENRES_LIST = [
   'Ação', 'Animação', 'Anime', 'Aventura', 'Biografia', 'Comédia', 
@@ -238,8 +238,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const [selectedGenre, setSelectedGenre] = useState('');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const needsCatalogDiscovery = currentView === 'home' || currentView === 'featured' ||
+    currentView === 'movies' || currentView === 'series' || currentView === 'animes';
 
   useEffect(() => {
+    if (!needsCatalogDiscovery) return;
     let isMounted = true;
     const safetyTimer = setTimeout(() => {
       if (isMounted) {
@@ -350,7 +353,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       isMounted = false;
       clearTimeout(safetyTimer);
     };
-  }, []);
+  }, [needsCatalogDiscovery]);
 
   // Busca sob demanda quando o usuário seleciona um gênero específico
   useEffect(() => {
@@ -571,9 +574,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     if (!isAuthenticated) return;
 
     let unsubscribes: (() => void)[] = [];
+    let cancelled = false;
 
     import('firebase/firestore').then(({ collection, onSnapshot, doc }) => {
       import('./firebase').then(({ db: firestoreDb }) => {
+        if (cancelled) return;
         // Listen to content changes
         unsubscribes.push(onSnapshot(collection(firestoreDb, 'content'), (snapshot) => {
           const newContent = snapshot.docs.map(doc => doc.data() as ContentItem);
@@ -675,10 +680,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             }
           }));
         }
-      });
-    });
+      }).catch(error => console.warn('Falha ao iniciar sincronização remota:', error));
+    }).catch(error => console.warn('Falha ao carregar cliente de sincronização:', error));
 
     return () => {
+      cancelled = true;
       unsubscribes.forEach(unsub => unsub());
     };
   }, [isAuthenticated, currentUser?.id, activeProfile?.id]);
@@ -1734,13 +1740,19 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
   };
 
-  const viewContent = useMemo(() => renderContent(), [currentView, submittedSearchQuery, isDarkMode, favorites, myList, selectedGenre, currentUser, activeProfile, users, content, sectionTitles, customSections]);
+  const viewContent = useMemo(() => renderContent(), [
+    currentView, submittedSearchQuery, isDarkMode, favorites, myList, selectedGenre,
+    currentUser, activeProfile, users, content, sectionTitles, customSections,
+    filteredContent, trendingItems, popularMovies, popularSeries, animeItems,
+    topRatedItems, featuredSelection, continueWatchingList, isLoadingMore,
+    hasMoreMovies, hasMoreSeries, hasMoreAnimes
+  ]);
 
-  if (!isAuthenticated) return <AuthView isDarkMode={isDarkMode} onLogin={handleLogin} onSignup={handleSignup} onResetPassword={handleResetPassword} users={users} initialEmail={initialState.lastEmail} />;
+  if (!isAuthenticated) return <React.Suspense fallback={<ZapiLoader size="xl" />}><AuthView isDarkMode={isDarkMode} onLogin={handleLogin} onSignup={handleSignup} onResetPassword={handleResetPassword} users={users} initialEmail={initialState.lastEmail} /></React.Suspense>;
 
   if (!activeProfile || currentView === 'profile-selector') {
     return (
-      <ProfileSelectorView 
+      <React.Suspense fallback={<ZapiLoader size="xl" />}><ProfileSelectorView
         user={currentUser} 
         onSelectProfile={(p) => { 
           setActiveProfile(p); 
@@ -1748,7 +1760,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         }} 
         onUpdateUser={updateUser} 
         isDarkMode={isDarkMode} 
-      />
+      /></React.Suspense>
     );
   }
 
@@ -1816,7 +1828,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               <ZapiLoader size="xl" />
             </div>
           ) : (
-            viewContent
+            <React.Suspense fallback={<div className="min-h-[75vh] flex items-center justify-center"><ZapiLoader size="xl" /></div>}>{viewContent}</React.Suspense>
           )}
         </div>
       </main>
@@ -1862,24 +1874,24 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       )}
 
       {/* Modal Adicionar Seção Customizada */}
-      <AddSectionModal 
+      {isAddSectionModalOpen && <React.Suspense fallback={null}><AddSectionModal
         isOpen={isAddSectionModalOpen}
         onClose={() => setIsAddSectionModalOpen(false)}
         onSave={handleAddCustomSection}
         allContent={content}
         genres={GENRES_LIST}
         isDarkMode={isDarkMode}
-      />
+      /></React.Suspense>}
 
       {/* Modal de Diagnóstico e Saúde do Catálogo */}
-      <CatalogDiagnosticModal
+      {isDiagnosticModalOpen && <React.Suspense fallback={null}><CatalogDiagnosticModal
         isOpen={isDiagnosticModalOpen}
         onClose={() => setIsDiagnosticModalOpen(false)}
         isDarkMode={isDarkMode}
-      />
+      /></React.Suspense>}
 
       {selectedContent && (
-        <ContentDetailModal 
+        <React.Suspense fallback={<div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center"><ZapiLoader size="xl" /></div>}><ContentDetailModal
           item={selectedContent} 
           onClose={handleCloseDetailModal} 
           isDarkMode={isDarkMode}
@@ -1891,7 +1903,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           initialSeason={initialSeasonNum}
           initialEpisode={initialEpisodeNum}
           autoPlayInitialEpisode={hasDeepLinkEpisode}
-        />
+        /></React.Suspense>
       )}
     </div>
   );

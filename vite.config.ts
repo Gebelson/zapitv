@@ -22,6 +22,8 @@ export default defineConfig(({ mode }) => {
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
+          'fs': path.resolve(__dirname, 'src/core/rankings/browserNodeShim.ts'),
+          'path': path.resolve(__dirname, 'src/core/rankings/browserNodeShim.ts'),
         }
       }
     };
