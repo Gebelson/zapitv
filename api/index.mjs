@@ -11722,6 +11722,15 @@ var ProviderRegistryService = class {
                     providerId: addon.id,
                     sourceType: isHls ? "hls" : "mp4"
                   });
+                  if (typeof window !== "undefined" && window.location.protocol === "https:") {
+                    parsedStreams.push({
+                      ...s,
+                      url: sUrl.replace(/^http:/, "https:"),
+                      providerName: `${addon.name} (HTTPS Direto)`,
+                      providerId: addon.id,
+                      sourceType: isHls ? "hls" : "mp4"
+                    });
+                  }
                 }
                 parsedStreams.push({
                   ...s,

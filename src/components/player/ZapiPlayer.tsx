@@ -2324,7 +2324,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             ref={videoRef}
             className="w-full h-full object-contain"
             playsInline
-            crossOrigin="anonymous"
+            crossOrigin={currentStream?.url?.startsWith('/') || currentStream?.sourceType === 'hls' ? 'anonymous' : undefined}
             onLoadedMetadata={() => {
               markMediaAsReadyRef.current();
               applyTargetResumeTime();
