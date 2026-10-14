@@ -11681,7 +11681,7 @@ var ProviderRegistryService = class {
         }
       }
     }
-    const stremioAddons = activeProviders.filter((p) => p.type === "stremio-addon");
+    const stremioAddons = activeProviders.filter((p) => p.type === "stremio-addon" && !["stremio-cinemeta", "stremio-opensubtitles"].includes(p.id));
     const stremioType = type === "movie" ? "movie" : "series";
     const primaryId = imdbStr || tmdbNum || rawTargetId;
     const stremioId = episode && (type === "series" || type === "anime") ? `${primaryId}:${episode.season}:${episode.episode}` : primaryId;
@@ -11735,6 +11735,16 @@ var ProviderRegistryService = class {
               const isTorrent = Boolean(s.infoHash);
               if (isHls || isDash || isDirectVideo) {
                 if (sUrl.startsWith("http://") && !sUrl.includes("/api/proxy")) {
+                  if (addon.id === "fenixflix-animes" && typeof window !== "undefined" && window.location.protocol === "https:") {
+                    parsedStreams.push({
+                      ...s,
+                      url: sUrl.replace(/^http:/, "https:"),
+                      providerName: `${addon.name} (HTTPS Direto)`,
+                      providerId: addon.id,
+                      sourceType: isHls ? "hls" : "mp4"
+                    });
+                    continue;
+                  }
                   parsedStreams.push({
                     ...s,
                     url: `/api/proxy?url=${encodeURIComponent(sUrl)}`,

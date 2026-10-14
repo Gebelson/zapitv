@@ -466,7 +466,8 @@ class ProviderRegistryService {
     }
 
     // 1. Consultar Provedores Stremio Add-on Habilitados em Paralelo (Protocolo Oficial Stremio v3)
-    const stremioAddons = activeProviders.filter(p => p.type === 'stremio-addon');
+    const stremioAddons = activeProviders.filter(p => p.type === 'stremio-addon' &&
+      !['stremio-cinemeta', 'stremio-opensubtitles'].includes(p.id));
     const stremioType = type === 'movie' ? 'movie' : 'series';
     const primaryId = imdbStr || tmdbNum || rawTargetId;
     const stremioId = episode && (type === 'series' || type === 'anime')
@@ -532,6 +533,18 @@ class ProviderRegistryService {
 
               if (isHls || isDash || isDirectVideo) {
                 if (sUrl.startsWith('http://') && !sUrl.includes('/api/proxy')) {
+                  // O proxy de arquivos FenixFlix é bloqueado na Vercel. A rota
+                  // HTTPS do próprio provedor funciona para fontes compatíveis.
+                  if (addon.id === 'fenixflix-animes' && typeof window !== 'undefined' && window.location.protocol === 'https:') {
+                    parsedStreams.push({
+                      ...s,
+                      url: sUrl.replace(/^http:/, 'https:'),
+                      providerName: `${addon.name} (HTTPS Direto)`,
+                      providerId: addon.id,
+                      sourceType: isHls ? 'hls' : 'mp4'
+                    });
+                    continue;
+                  }
                   parsedStreams.push({
                     ...s,
                     url: `/api/proxy?url=${encodeURIComponent(sUrl)}`,
