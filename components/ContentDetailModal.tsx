@@ -476,7 +476,10 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
           streams={resolvedStreams} 
           isLoadingStreams={isLoadingStreams}
           streamResolutionError={streamResolutionError}
-          onRetrySources={() => startPlayback(currentEpisodeParams?.season, currentEpisodeParams?.episode, 'manual_start')}
+          onRetrySources={() => {
+            providerRegistry.clearCache();
+            startPlayback(currentEpisodeParams?.season, currentEpisodeParams?.episode, 'manual_start');
+          }}
           initialSeason={currentEpisodeParams?.season || (hasEpisodes ? 1 : undefined)}
           initialEpisode={currentEpisodeParams?.episode || (hasEpisodes ? 1 : undefined)}
           nextEpisodeInfo={nextEpisodeInfo}
