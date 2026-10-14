@@ -14,6 +14,7 @@ import './index.css';
 const RootComponent = () => {
   const [isReady, setIsReady] = useState(false);
   const [initialState, setInitialState] = useState<any>(null);
+  const [initializationError, setInitializationError] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -79,12 +80,27 @@ const RootComponent = () => {
       setIsReady(true);
     }
     
-    load().catch(err => {
+    let timer: ReturnType<typeof setTimeout>;
+    Promise.race([
+      load(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Tempo limite ao abrir o catálogo local')), 20000);
+      })
+    ]).catch(err => {
       console.error("Failed to initialize database", err);
-      // Even if local DB fails, we should try to load auth state
-      setIsReady(true);
-    });
+      setInitializationError(true);
+    }).finally(() => clearTimeout(timer));
   }, []);
+
+  if (initializationError && !initialState) {
+    return (
+      <div style={{ background: '#050505', color: '#fff', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, padding: 24, textAlign: 'center' }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800 }}>Não foi possível abrir o ZapiTV agora</h1>
+        <p style={{ color: '#aaa', maxWidth: 440 }}>O catálogo local demorou para responder ou falhou. Seus dados continuam salvos neste navegador.</p>
+        <button onClick={() => window.location.reload()} style={{ background: '#007df7', border: 0, borderRadius: 12, color: '#fff', padding: '12px 24px', fontWeight: 700, cursor: 'pointer' }}>Tentar novamente</button>
+      </div>
+    );
+  }
 
   if (!isReady || !initialState) {
     return (

@@ -35,8 +35,6 @@ import { analyzeStreamSubtitleFormat } from '../../core/subtitles/streamSubtitle
 import { pipService } from '../../core/pip/pipService';
 import { mediaLoadingTracker } from '../../core/tracking/mediaLoadingTracker';
 import { mediaSourceValidationService } from '../../core/providers/mediaSourceValidationService';
-import { mediaAvailabilityIndex } from '../../core/catalog/MediaAvailabilityIndex';
-import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { audioSelectionManager, AudioOption } from '../../core/audio/audioSelectionManager';
 
 export interface NextEpisodeInfo {
@@ -49,6 +47,8 @@ interface ZapiPlayerProps {
   item: ContentItem;
   streams: StremioStream[];
   isLoadingStreams?: boolean;
+  streamResolutionError?: string | null;
+  onRetrySources?: () => void;
   initialSeason?: number;
   initialEpisode?: number;
   nextEpisodeInfo?: NextEpisodeInfo | null;
@@ -114,6 +114,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   item,
   streams,
   isLoadingStreams = false,
+  streamResolutionError,
+  onRetrySources,
   initialSeason,
   initialEpisode,
   nextEpisodeInfo,
@@ -1464,7 +1466,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     } else {
       setAllSourcesFailed(true);
       setHasError(true);
-      setErrorMessage(`Todas as fontes testadas estão indisponíveis no momento.`);
+      setIsLoading(false);
+      setErrorMessage('As fontes testadas falharam agora. Tente buscar novamente.');
       isSwitchingStreamRef.current = false;
       setIsPlayingIntro(false);
       setIsIntroEnded(true);
@@ -1474,18 +1477,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         } catch {}
       }
 
-      // REGRA 1 — SEM FONTE, SEM CATÁLOGO: Marca indisponibilidade confirmada
-      mediaAvailabilityIndex.markUnavailableConfirmed(
-        item.imdbId || item.id,
-        item.type === ContentType.MOVIE ? 'movie' : (item.type === ContentType.ANIME ? 'anime' : 'series'),
-        ['Todos os Provedores Stremio'],
-        item.title
-      );
-      catalogEligibilityService.markUnavailable(
-        item.imdbId || item.id,
-        item.title,
-        ['Todas as fontes testadas falharam na reprodução']
-      );
     }
   }, [selectedStreamIndex, streams, isLoadingStreams, currentStream, item]);
 
@@ -1495,13 +1486,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       setIsLoading(true);
       setAllSourcesFailed(false);
       setHasError(false);
+      setSelectedStreamIndex(0);
+      triedIndicesRef.current.clear();
+      isSwitchingStreamRef.current = false;
       return;
     }
 
     if (streams.length === 0) {
       setAllSourcesFailed(true);
       setHasError(true);
-      setErrorMessage('Não foi possível encontrar uma fonte verificada para este conteúdo.');
+      setErrorMessage(streamResolutionError || 'Não foi possível encontrar uma fonte verificada agora. Tente novamente.');
       setIsLoading(false);
       setIsPlayingIntro(false);
       setIsIntroEnded(true);
@@ -1510,16 +1504,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           introVideoRef.current.pause();
         } catch {}
       }
-      catalogEligibilityService.markUnavailable(
-        item.imdbId || item.id,
-        item.title,
-        ['Nenhuma fonte verificada disponível']
-      );
     } else {
       setAllSourcesFailed(false);
       setHasError(false);
     }
-  }, [isLoadingStreams, streams.length]);
+  }, [isLoadingStreams, streams.length, streamResolutionError]);
 
   // Pre-flight instant probe of candidate stream
   useEffect(() => {
@@ -1578,18 +1567,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Initialize Video Playback (HLS or Native MP4) — Re-executa APENAS quando a URL da fonte mudar
   useEffect(() => {
     if (isLoadingStreams) return;
+    if (!currentStream?.url) return;
     setHasError(false);
     setIsLoading(true);
+    setIsMediaReady(false);
+    isMediaReadyRef.current = false;
 
     const video = videoRef.current;
     if (!video) return;
-
-    if (!currentStream?.url) {
-      if (streams.length > 0) {
-        handleStreamFallbackRef.current('Sem URL direta de vídeo.');
-      }
-      return;
-    }
 
     if (hlsRef.current) {
       hlsRef.current.destroy();
@@ -2655,10 +2640,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               <h3 className="text-white text-xl font-black mb-2">Fonte Indisponível</h3>
               <p className="text-gray-400 text-sm max-w-md mb-6">{errorMessage}</p>
               <button
-                onClick={() => handleStreamFallback('Tentando próxima fonte...')}
+                onClick={() => onRetrySources?.()}
+                disabled={!onRetrySources}
                 className="px-6 py-3 bg-[#007df7] hover:bg-[#0069d9] text-white rounded-full font-black text-sm uppercase tracking-wider transition-all"
               >
-                Tentar Outra Fonte
+                Tentar Novamente
               </button>
             </div>
           )}

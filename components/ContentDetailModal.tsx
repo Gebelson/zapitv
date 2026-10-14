@@ -44,6 +44,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [resolvedStreams, setResolvedStreams] = useState<StremioStream[]>([]);
   const [isLoadingStreams, setIsLoadingStreams] = useState(false);
+  const [streamResolutionError, setStreamResolutionError] = useState<string | null>(null);
   const [progressVersion, setProgressVersion] = useState(0);
 
   // Auto-play episode if directed by URL deep link
@@ -237,26 +238,13 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
             });
             setEpisodes(validEps.length > 0 ? validEps : eps);
           } else {
-            // Fallback dummy episodes
-            setEpisodes(Array.from({ length: 8 }).map((_, i) => ({
-              id: `ep-${item.id}-s${currentSeason}-${i + 1}`,
-              number: i + 1,
-              title: `Episódio ${i + 1}`,
-              description: 'Assista a este episódio para acompanhar os desdobramentos da trama.',
-              image: item.backdrop || item.image
-            })));
+            setEpisodes([]);
           }
         }
       } catch (e) {
         console.warn('Erro ao carregar episódios:', e);
         if (active) {
-          setEpisodes(Array.from({ length: 8 }).map((_, i) => ({
-            id: `ep-${item.id}-s${currentSeason}-${i + 1}`,
-            number: i + 1,
-            title: `Episódio ${i + 1}`,
-            description: 'Assista a este episódio para acompanhar os desdobramentos da trama.',
-            image: item.backdrop || item.image
-          })));
+          setEpisodes([]);
         }
       } finally {
         if (active) {
@@ -315,6 +303,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
 
     setIsPlaying(true);
     setIsLoadingStreams(true);
+    setStreamResolutionError(null);
     setResolvedStreams([]);
 
     // Telemetria do Tracker
@@ -332,11 +321,17 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     });
 
     try {
-      const streams = await providerRegistry.resolveStreams(
-        item.type === ContentType.MOVIE ? 'movie' : (item.type === ContentType.ANIME ? 'anime' : 'series'),
-        { tmdbId: item.tmdbId, imdbId: item.imdbId, id: item.id, title: item.title },
-        epParams
-      );
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const streams = await Promise.race([
+        providerRegistry.resolveStreams(
+          item.type === ContentType.MOVIE ? 'movie' : (item.type === ContentType.ANIME ? 'anime' : 'series'),
+          { tmdbId: item.tmdbId, imdbId: item.imdbId, id: item.id, title: item.title },
+          epParams
+        ),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Tempo limite na busca de fontes. Tente novamente.')), 20000);
+        })
+      ]).finally(() => clearTimeout(timer));
       setResolvedStreams(streams);
       if (streams.length > 0) {
         mediaLoadingTracker.transition(item.id, 'BUFFERING', {
@@ -350,6 +345,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       }
     } catch (err: any) {
       console.error('Erro ao resolver provedores:', err);
+      setStreamResolutionError(err?.message || 'Falha temporária na busca de fontes. Tente novamente.');
       mediaLoadingTracker.transition(item.id, 'ERROR', {
         error: err?.message || 'Falha ao resolver provedores'
       });
@@ -363,10 +359,10 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   };
 
   const handleNextEpisode = () => {
-    if (!hasEpisodes || isLoadingStreams) return;
+    if (!hasEpisodes || isLoadingStreams || episodes.length === 0) return;
     const curSeason = currentEpisodeParams?.season ?? currentSeason ?? 1;
     const curEpisode = currentEpisodeParams?.episode ?? 1;
-    const seasonEpCount = episodes.length > 0 ? episodes.length : 8;
+    const seasonEpCount = episodes.length;
 
     if (curEpisode < seasonEpCount) {
       startPlayback(curSeason, curEpisode + 1, 'continuous_playback');
@@ -381,18 +377,18 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   };
 
   const hasNextEpisode = useMemo(() => {
-    if (!hasEpisodes) return false;
+    if (!hasEpisodes || episodes.length === 0) return false;
     const curSeason = currentEpisodeParams?.season ?? currentSeason ?? 1;
     const curEpisode = currentEpisodeParams?.episode ?? 1;
-    const seasonEpCount = episodes.length > 0 ? episodes.length : 8;
+    const seasonEpCount = episodes.length;
     return curEpisode < seasonEpCount || curSeason < totalSeasons;
   }, [hasEpisodes, currentEpisodeParams, currentSeason, episodes.length, totalSeasons]);
 
   const nextEpisodeInfo = useMemo(() => {
-    if (!hasEpisodes) return null;
+    if (!hasEpisodes || episodes.length === 0) return null;
     const curSeason = currentEpisodeParams?.season ?? currentSeason ?? 1;
     const curEpisode = currentEpisodeParams?.episode ?? 1;
-    const seasonEpCount = episodes.length > 0 ? episodes.length : 8;
+    const seasonEpCount = episodes.length;
 
     if (curEpisode < seasonEpCount) {
       const nextNum = curEpisode + 1;
@@ -479,6 +475,8 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
           item={item} 
           streams={resolvedStreams} 
           isLoadingStreams={isLoadingStreams}
+          streamResolutionError={streamResolutionError}
+          onRetrySources={() => startPlayback(currentEpisodeParams?.season, currentEpisodeParams?.episode, 'manual_start')}
           initialSeason={currentEpisodeParams?.season || (hasEpisodes ? 1 : undefined)}
           initialEpisode={currentEpisodeParams?.episode || (hasEpisodes ? 1 : undefined)}
           nextEpisodeInfo={nextEpisodeInfo}
@@ -639,6 +637,8 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                       <ZapiLoader size="sm" />
                       <span>Carregando episódios da Temporada {currentSeason}...</span>
                     </div>
+                  ) : episodes.length === 0 ? (
+                    <div className="p-8 text-center text-gray-400 text-sm">Não foi possível carregar os episódios agora. Tente novamente mais tarde.</div>
                   ) : (
                     episodes.map((ep) => {
                       const epProgress = getEpisodeProgress(currentSeason, ep.number);

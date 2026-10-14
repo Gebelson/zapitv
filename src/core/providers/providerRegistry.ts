@@ -530,6 +530,8 @@ class ProviderRegistryService {
                 });
               } else if (isTorrent) {
                 const engineOnline = await isLocalStremioEngineOnline();
+                // A Vercel não pode acessar o Stremio Engine instalado no computador do visitante.
+                if (!engineOnline) continue;
                 const engineUrl = `http://127.0.0.1:11470/${s.infoHash}/${s.fileIdx || 0}`;
                 parsedStreams.push({
                   ...s,
@@ -587,6 +589,10 @@ class ProviderRegistryService {
       if (s.ytId) return false;
       const u = (s.url || '').toLowerCase();
       const t = (s.title || '').toLowerCase();
+      if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+        if (u.startsWith('http://')) return false;
+        if (/localhost|127\.0\.0\.1|%5b%3a%3a1%5d|\[::1\]/.test(u)) return false;
+      }
       if (u.includes('youtube.com') || u.includes('youtu.be')) return false;
       if (u.includes('embedplay') || u.includes('playerflix') || u.includes('videasy') || u.includes('superflix')) return false;
 
