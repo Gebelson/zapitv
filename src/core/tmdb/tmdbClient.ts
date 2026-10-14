@@ -434,7 +434,6 @@ class TMDBClientService {
 
     const results: ContentItem[] = [];
     const seenIds = new Set<string>();
-    const seenTitles = new Set<string>();
 
     // Adiciona resultados do TMDB (prioridade para títulos e sinopses em PT-BR)
     if (tmdbRes.status === 'fulfilled' && tmdbRes.value?.results) {
@@ -444,7 +443,6 @@ class TMDBClientService {
         results.push(item);
         seenIds.add(item.id);
         if (item.tmdbId) seenIds.add(item.tmdbId);
-        seenTitles.add(item.title.toLowerCase().trim());
       }
     }
 
@@ -454,16 +452,18 @@ class TMDBClientService {
         const cineItem = formatCinemetaItem(m);
         const normTitle = cineItem.title.toLowerCase().trim();
         const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
-        const hasTmdb = cineItem.tmdbId && seenIds.has(cineItem.tmdbId);
-        const hasTitle = seenTitles.has(normTitle);
+        const existing = results.find(it =>
+          it.type === ContentType.MOVIE &&
+          ((cineItem.tmdbId && it.tmdbId === cineItem.tmdbId) || it.title.toLowerCase().trim() === normTitle)
+        );
+        const hasTmdb = Boolean(existing && cineItem.tmdbId && existing.tmdbId === cineItem.tmdbId);
+        const hasTitle = Boolean(existing && existing.title.toLowerCase().trim() === normTitle);
 
         if (!hasImdb && !hasTmdb && !hasTitle) {
           results.push(cineItem);
           seenIds.add(cineItem.id);
           if (cineItem.imdbId) seenIds.add(cineItem.imdbId);
-          seenTitles.add(normTitle);
         } else if (cineItem.imdbId) {
-          const existing = results.find(it => it.tmdbId === cineItem.tmdbId || it.title.toLowerCase().trim() === normTitle);
           if (existing && !existing.imdbId) {
             existing.imdbId = cineItem.imdbId;
           }
@@ -477,16 +477,18 @@ class TMDBClientService {
         const cineItem = formatCinemetaItem(m);
         const normTitle = cineItem.title.toLowerCase().trim();
         const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
-        const hasTmdb = cineItem.tmdbId && seenIds.has(cineItem.tmdbId);
-        const hasTitle = seenTitles.has(normTitle);
+        const existing = results.find(it =>
+          it.type !== ContentType.MOVIE &&
+          ((cineItem.tmdbId && it.tmdbId === cineItem.tmdbId) || it.title.toLowerCase().trim() === normTitle)
+        );
+        const hasTmdb = Boolean(existing && cineItem.tmdbId && existing.tmdbId === cineItem.tmdbId);
+        const hasTitle = Boolean(existing && existing.title.toLowerCase().trim() === normTitle);
 
         if (!hasImdb && !hasTmdb && !hasTitle) {
           results.push(cineItem);
           seenIds.add(cineItem.id);
           if (cineItem.imdbId) seenIds.add(cineItem.imdbId);
-          seenTitles.add(normTitle);
         } else if (cineItem.imdbId) {
-          const existing = results.find(it => it.tmdbId === cineItem.tmdbId || it.title.toLowerCase().trim() === normTitle);
           if (existing && !existing.imdbId) {
             existing.imdbId = cineItem.imdbId;
           }

@@ -977,7 +977,6 @@ var TMDBClientService = class {
     ]);
     const results = [];
     const seenIds = /* @__PURE__ */ new Set();
-    const seenTitles = /* @__PURE__ */ new Set();
     if (tmdbRes.status === "fulfilled" && tmdbRes.value?.results) {
       const valid = tmdbRes.value.results.filter((r) => r.media_type === "movie" || r.media_type === "tv");
       for (const r of valid) {
@@ -985,7 +984,6 @@ var TMDBClientService = class {
         results.push(item);
         seenIds.add(item.id);
         if (item.tmdbId) seenIds.add(item.tmdbId);
-        seenTitles.add(item.title.toLowerCase().trim());
       }
     }
     if (cineMovieRes.status === "fulfilled" && cineMovieRes.value?.metas) {
@@ -993,15 +991,16 @@ var TMDBClientService = class {
         const cineItem = formatCinemetaItem(m);
         const normTitle = cineItem.title.toLowerCase().trim();
         const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
-        const hasTmdb = cineItem.tmdbId && seenIds.has(cineItem.tmdbId);
-        const hasTitle = seenTitles.has(normTitle);
+        const existing = results.find(
+          (it) => it.type === "FILME" /* MOVIE */ && (cineItem.tmdbId && it.tmdbId === cineItem.tmdbId || it.title.toLowerCase().trim() === normTitle)
+        );
+        const hasTmdb = Boolean(existing && cineItem.tmdbId && existing.tmdbId === cineItem.tmdbId);
+        const hasTitle = Boolean(existing && existing.title.toLowerCase().trim() === normTitle);
         if (!hasImdb && !hasTmdb && !hasTitle) {
           results.push(cineItem);
           seenIds.add(cineItem.id);
           if (cineItem.imdbId) seenIds.add(cineItem.imdbId);
-          seenTitles.add(normTitle);
         } else if (cineItem.imdbId) {
-          const existing = results.find((it) => it.tmdbId === cineItem.tmdbId || it.title.toLowerCase().trim() === normTitle);
           if (existing && !existing.imdbId) {
             existing.imdbId = cineItem.imdbId;
           }
@@ -1013,15 +1012,16 @@ var TMDBClientService = class {
         const cineItem = formatCinemetaItem(m);
         const normTitle = cineItem.title.toLowerCase().trim();
         const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
-        const hasTmdb = cineItem.tmdbId && seenIds.has(cineItem.tmdbId);
-        const hasTitle = seenTitles.has(normTitle);
+        const existing = results.find(
+          (it) => it.type !== "FILME" /* MOVIE */ && (cineItem.tmdbId && it.tmdbId === cineItem.tmdbId || it.title.toLowerCase().trim() === normTitle)
+        );
+        const hasTmdb = Boolean(existing && cineItem.tmdbId && existing.tmdbId === cineItem.tmdbId);
+        const hasTitle = Boolean(existing && existing.title.toLowerCase().trim() === normTitle);
         if (!hasImdb && !hasTmdb && !hasTitle) {
           results.push(cineItem);
           seenIds.add(cineItem.id);
           if (cineItem.imdbId) seenIds.add(cineItem.imdbId);
-          seenTitles.add(normTitle);
         } else if (cineItem.imdbId) {
-          const existing = results.find((it) => it.tmdbId === cineItem.tmdbId || it.title.toLowerCase().trim() === normTitle);
           if (existing && !existing.imdbId) {
             existing.imdbId = cineItem.imdbId;
           }
@@ -11552,7 +11552,7 @@ var ProviderRegistryService = class {
    * Resolve todos os fluxos de reprodução para um item (filme ou série).
    */
   async resolveStreams(type, id, episode) {
-    const cacheKey = `v4_priority_${type}_${id.tmdbId || id.imdbId || id.id}_${episode?.season || 0}_${episode?.episode || 0}`;
+    const cacheKey = `v4_priority_${type}_${id.tmdbId || id.imdbId || id.id}_${id.imdbId || ""}_${episode?.season || 0}_${episode?.episode || 0}`;
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
       return cached.streams;
@@ -11563,7 +11563,7 @@ var ProviderRegistryService = class {
     const cleanId = rawTargetId.replace(/^tmdb-?/i, "");
     const tmdbNum = id.tmdbId ? String(id.tmdbId).replace(/^tmdb-?/i, "") : !rawTargetId.startsWith("tt") ? cleanId : "";
     let imdbStr = id.imdbId ? String(id.imdbId) : "";
-    if (!imdbStr && tmdbNum) {
+    if (tmdbNum) {
       try {
         const resolved = await tmdbService.getImdbId(tmdbNum, type);
         if (resolved) imdbStr = resolved;
@@ -11807,7 +11807,7 @@ var ProviderRegistryService = class {
       year: id.year || openItem?.year || 0,
       image: openItem?.image || "",
       tmdbId: id.tmdbId ? String(id.tmdbId) : void 0,
-      imdbId: id.imdbId,
+      imdbId: imdbStr || id.imdbId,
       genres: openItem?.genres || []
     };
     const identity = canonicalIdentityService.buildIdentity(itemTarget, episode);

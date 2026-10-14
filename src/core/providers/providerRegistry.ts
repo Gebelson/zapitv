@@ -316,7 +316,7 @@ class ProviderRegistryService {
     id: { tmdbId?: string | number; imdbId?: string; id?: string; title?: string },
     episode?: { season: number; episode: number }
   ): Promise<StremioStream[]> {
-    const cacheKey = `v4_priority_${type}_${id.tmdbId || id.imdbId || id.id}_${episode?.season || 0}_${episode?.episode || 0}`;
+    const cacheKey = `v4_priority_${type}_${id.tmdbId || id.imdbId || id.id}_${id.imdbId || ''}_${episode?.season || 0}_${episode?.episode || 0}`;
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
       return cached.streams;
@@ -331,7 +331,7 @@ class ProviderRegistryService {
     const tmdbNum = id.tmdbId ? String(id.tmdbId).replace(/^tmdb-?/i, '') : (!rawTargetId.startsWith('tt') ? cleanId : '');
     let imdbStr = id.imdbId ? String(id.imdbId) : '';
 
-    if (!imdbStr && tmdbNum) {
+    if (tmdbNum) {
       try {
         const resolved = await tmdbService.getImdbId(tmdbNum, type);
         if (resolved) imdbStr = resolved;
@@ -618,7 +618,7 @@ class ProviderRegistryService {
       year: (id as any).year || openItem?.year || 0,
       image: openItem?.image || '',
       tmdbId: id.tmdbId ? String(id.tmdbId) : undefined,
-      imdbId: id.imdbId,
+      imdbId: imdbStr || id.imdbId,
       genres: openItem?.genres || []
     };
 
