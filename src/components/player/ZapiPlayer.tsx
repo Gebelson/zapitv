@@ -2304,13 +2304,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           </p>
           <div className="flex items-center gap-4">
             <button
-              onClick={() => {
-                triedIndicesRef.current.clear();
-                setAllSourcesFailed(false);
-                setHasError(false);
-                setSelectedStreamIndex(0);
-                setIsLoading(true);
-              }}
+              onClick={() => onRetrySources?.()}
+              disabled={!onRetrySources}
               className="px-6 py-3 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-full font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
             >
               Tentar novamente
