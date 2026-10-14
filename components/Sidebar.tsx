@@ -53,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const sidebarClasses = `fixed left-0 top-0 h-screen flex flex-col border-r transition-all duration-300 z-[150] ${
+  const sidebarClasses = `fixed left-0 top-0 h-screen flex flex-col border-r transition-[width,transform] duration-300 z-[150] ${
     isDarkMode 
       ? 'bg-[#05070A] border-gray-800 text-gray-400' 
       : 'bg-[#F8F9FC] border-gray-200 text-gray-600'
@@ -74,9 +74,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         isCollapsed ? 'lg:w-20' : 'lg:w-64'
       }`}>
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className={`absolute inset-0 transition-opacity duration-1000 ${isDarkMode ? 'opacity-40' : 'opacity-70'}`}>
+          <div className={`absolute inset-0 transition-opacity duration-300 ${isDarkMode ? 'opacity-40' : 'opacity-70'}`}>
             <div 
-              className="absolute bottom-[-25%] right-[-10%] w-[110vw] h-[110vh] rounded-full blur-[140px] animate-mesh-vibrant-2 transition-all duration-1000"
+              className="absolute bottom-[-25%] right-[-10%] w-[110vw] h-[110vh] rounded-full blur-[140px] animate-mesh-vibrant-2"
               style={{
                 background: isDarkMode 
                   ? 'radial-gradient(circle at center, rgba(120, 80, 220, 0.2) 0%, rgba(60, 20, 120, 0) 70%)'
@@ -89,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <button 
           onClick={onToggleCollapse}
-          className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 right-0 w-4 h-16 items-center justify-center transition-all z-[60] group/toggle hover:w-6 rounded-l-xl ${
+          className={`hidden lg:flex absolute top-1/2 -translate-y-1/2 right-0 w-4 h-16 items-center justify-center transition-[width,background-color] duration-200 z-[60] group/toggle hover:w-6 rounded-l-xl ${
             isDarkMode 
               ? 'bg-white/5 border-y border-l border-white/10 text-gray-500 hover:text-white hover:bg-white/10' 
               : 'bg-black/5 border-y border-l border-black/5 text-gray-400 hover:text-[#007df7] hover:bg-black/10'
@@ -160,8 +160,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
-        <div className="p-4 mt-auto relative z-10 flex items-center justify-center border-t border-white/5">
-          <div className={`transition-all duration-300 ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>
+        <div className={`p-4 mt-auto relative z-10 flex items-center justify-center border-t ${
+          isDarkMode ? 'border-white/5' : 'border-gray-200'
+        }`}>
+          <div className={`transition-opacity duration-300 ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>
              <p className={`text-[10px] font-black uppercase tracking-[0.25em] whitespace-nowrap ${isDarkMode ? 'text-white/20' : 'text-gray-400/50'}`}>
                 ZapiTV © 2026
              </p>

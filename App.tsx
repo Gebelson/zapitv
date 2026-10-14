@@ -1508,27 +1508,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                     <Flame className="w-8 h-8 md:w-12 md:h-12" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2.5">
-                      <h2 className="text-2xl md:text-5xl font-black tracking-tight text-white">
-                        Em Destaque
-                      </h2>
-                      <span className="text-[10px] md:text-xs font-black uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                        IMDb MOVIEmeter & TVmeter
-                      </span>
-                    </div>
-                    <p className="text-xs md:text-sm text-gray-400 font-medium mt-1">
-                      Top 10 Filmes e 10 Séries mais populares da semana com reprodução confirmada no ZapiTV.
-                    </p>
-                    <div className="text-[11px] md:text-xs text-gray-400 mt-1 flex items-center gap-1.5 font-medium">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                      <span>Atualizado semanalmente</span>
-                      {featuredSelection?.lastUpdatedAt ? (
-                        <>
-                          <span className="text-gray-600">•</span>
-                          <span>{new Date(featuredSelection.lastUpdatedAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                        </>
-                      ) : null}
-                    </div>
+                    <h2 className="text-2xl md:text-5xl font-black tracking-tight text-white">
+                      Em Destaque
+                    </h2>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1538,19 +1520,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
               {/* SEÇÃO 1: FILMES EM DESTAQUE (TOP 10) */}
               <div className="space-y-4 md:space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <Film className="w-5 h-5 md:w-6 md:h-6 text-[#007df7]" />
-                    <h3 className="text-lg md:text-2xl font-black text-white tracking-tight">
-                      Filmes em Destaque
-                    </h3>
-                    <span className="text-[10px] md:text-xs font-black px-2 py-0.5 rounded bg-[#007df7]/20 text-[#007df7] border border-[#007df7]/30">
-                      Top 10 Filmes
-                    </span>
-                  </div>
-                  <span className="text-xs text-gray-400 font-bold">
-                    {displayMovies.length} {displayMovies.length === 1 ? 'título' : 'títulos'}
-                  </span>
+                <div className="flex items-center gap-2.5">
+                  <Film className="w-5 h-5 md:w-6 md:h-6 text-[#007df7]" />
+                  <h3 className="text-lg md:text-2xl font-black text-white tracking-tight">
+                    Filmes em Destaque
+                  </h3>
                 </div>
 
                 {displayMovies.length > 0 ? (
@@ -1578,19 +1552,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
               {/* SEÇÃO 2: SÉRIES EM DESTAQUE (TOP 10) */}
               <div className="space-y-4 md:space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <Tv className="w-5 h-5 md:w-6 md:h-6 text-purple-400" />
-                    <h3 className="text-lg md:text-2xl font-black text-white tracking-tight">
-                      Séries em Destaque
-                    </h3>
-                    <span className="text-[10px] md:text-xs font-black px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                      Top 10 Séries
-                    </span>
-                  </div>
-                  <span className="text-xs text-gray-400 font-bold">
-                    {displaySeries.length} {displaySeries.length === 1 ? 'título' : 'títulos'}
-                  </span>
+                <div className="flex items-center gap-2.5">
+                  <Tv className="w-5 h-5 md:w-6 md:h-6 text-purple-400" />
+                  <h3 className="text-lg md:text-2xl font-black text-white tracking-tight">
+                    Séries em Destaque
+                  </h3>
                 </div>
 
                 {displaySeries.length > 0 ? (
@@ -1614,19 +1580,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                     Nenhuma série em destaque corresponde ao filtro selecionado.
                   </div>
                 )}
-              </div>
-
-              {/* NOTA METODOLÓGICA DE TRANSPARÊNCIA */}
-              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs text-gray-400">
-                <div className="flex items-center gap-2">
-                  <span className="text-amber-400 font-bold">ℹ️ Metodologia:</span>
-                  <span>
-                    Popularidade calculada a partir dos rankings oficiais MOVIEmeter e TVmeter do IMDb com substituição progressiva automática para conteúdos 100% disponíveis e reproduzíveis no ZapiTV.
-                  </span>
-                </div>
-                <span className="text-[10px] font-mono opacity-70 shrink-0">
-                  {featuredSelection.isProvisionalWeekly ? 'Consolidação: Semanal (Provisória)' : 'Consolidação: Mensal'}
-                </span>
               </div>
             </div>
           </ViewWrapper>
@@ -1822,7 +1775,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         activeProfile={activeProfile}
       />
       
-      <main className={`transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} min-h-screen flex flex-col relative z-10`}>
+      <main className={`transition-[margin] duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} min-h-screen flex flex-col relative z-10`}>
         <Header 
           isDarkMode={isDarkMode} 
           setIsDarkMode={setIsDarkMode} 

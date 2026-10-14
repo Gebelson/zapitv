@@ -487,7 +487,11 @@ const Hero: React.FC<HeroProps> = ({ featuredItems, isDarkMode, onActionClick, i
 
   if (totalOriginal === 0) {
     return (
-      <div className="relative h-[65vh] md:h-[520px] lg:h-[650px] w-full rounded-2xl md:rounded-3xl overflow-hidden mb-6 md:mb-12 bg-gradient-to-t from-[#070A0F] via-[#10141e] to-[#0A0E17] flex items-center justify-center border border-white/5 shadow-2xl animate-pulse select-none">
+      <div className={`relative h-[65vh] md:h-[520px] lg:h-[650px] w-full rounded-2xl md:rounded-3xl overflow-hidden mb-6 md:mb-12 flex items-center justify-center select-none ${
+        isDarkMode
+          ? 'bg-gradient-to-t from-[#070A0F] via-[#10141e] to-[#0A0E17] border border-white/5 shadow-2xl animate-pulse'
+          : 'bg-gray-100 border-0 shadow-lg'
+      }`}>
         <ZapiLoader size="xl" />
       </div>
     );
@@ -495,7 +499,9 @@ const Hero: React.FC<HeroProps> = ({ featuredItems, isDarkMode, onActionClick, i
 
   return (
     <div 
-      className="relative h-[65vh] md:h-[520px] lg:h-[650px] w-full rounded-2xl md:rounded-3xl overflow-hidden mb-6 md:mb-12 group select-none"
+      className={`relative h-[65vh] md:h-[520px] lg:h-[650px] w-full rounded-2xl md:rounded-3xl overflow-hidden mb-6 md:mb-12 group select-none ${
+        isDarkMode ? 'border border-white/5' : 'border-0'
+      }`}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >

@@ -9,7 +9,7 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ isDarkMode }) =
   return (
     <div className="fixed inset-0 -z-50 overflow-hidden pointer-events-none transform-gpu translate-z-0">
       {/* Camada Base de Cor */}
-      <div className={`absolute inset-0 transition-colors duration-1000 ${
+      <div className={`absolute inset-0 transition-colors duration-300 ${
         isDarkMode ? 'bg-[#05070A]' : 'bg-[#F8F9FC]'
       }`} />
 

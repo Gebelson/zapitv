@@ -105,9 +105,17 @@ const ContentCard: React.FC<ContentCardProps> = ({
           {/* Brilho Azul no Hover - hardware accelerated */}
           <div className="absolute inset-x-0 inset-y-[35%] rounded-full opacity-0 group-hover/card:opacity-100 transition-all duration-500 blur-2xl pointer-events-none transform-gpu translate-z-0" style={{ backgroundColor: '#007df7', zIndex: -1 }} />
           
-          <div className="relative aspect-[2/3] rounded-xl md:rounded-2xl overflow-hidden shadow-lg border border-transparent group-hover/card:border-white/20 transition-colors duration-300 bg-gray-900">
+          <div className={`relative aspect-[2/3] rounded-xl md:rounded-2xl overflow-hidden transition-all duration-300 ${
+            isDarkMode
+              ? 'bg-gray-900 border border-white/10 group-hover/card:border-white/20 shadow-lg'
+              : 'bg-transparent border-0 border-none shadow-md shadow-black/5 group-hover/card:border-none'
+          }`}>
             {hasImageError || !imgSrc ? (
-              <div className="w-full h-full flex flex-col justify-end p-4 bg-gradient-to-br from-[#1a2232] via-[#0f141d] to-[#070a0f] border border-white/5 relative select-none">
+              <div className={`w-full h-full flex flex-col justify-end p-4 relative select-none ${
+                isDarkMode
+                  ? 'bg-gradient-to-br from-[#1a2232] via-[#0f141d] to-[#070a0f] border border-white/5'
+                  : 'bg-gradient-to-br from-gray-100 via-gray-200 to-gray-300'
+              }`}>
                 <div className="absolute inset-0 flex items-center justify-center opacity-15">
                   <Play className="w-16 h-16 text-[#007df7]" />
                 </div>
@@ -240,7 +248,9 @@ const ContentCard: React.FC<ContentCardProps> = ({
           </div>
         </>
       ) : (
-        <div className="relative aspect-[2/3] rounded-xl md:rounded-2xl overflow-hidden bg-gray-900/20 border border-white/5" />
+        <div className={`relative aspect-[2/3] rounded-xl md:rounded-2xl overflow-hidden ${
+          isDarkMode ? 'bg-gray-900/20 border border-white/5' : 'bg-gray-200/50 border-0'
+        }`} />
       )}
     </div>
   );

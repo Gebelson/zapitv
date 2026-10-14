@@ -286,7 +286,7 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className={`sticky top-0 z-[160] h-20 px-4 md:px-8 flex items-center justify-between transition-all duration-500 ${
+    <header className={`sticky top-0 z-[160] h-20 px-4 md:px-12 flex items-center justify-between transition-colors duration-300 ${
       isDarkMode 
         ? 'bg-[#05070A]/75 border-b border-white/5 shadow-[0_4px_30px_rgba(0,0,0,0.3)]' 
         : 'bg-[#F8F9FC]/75 border-b border-black/5 shadow-[0_4px_30px_rgba(0,0,0,0.05)]'
