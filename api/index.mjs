@@ -11792,6 +11792,9 @@ var ProviderRegistryService = class {
       if (s.ytId) return false;
       const u = (s.url || "").toLowerCase();
       const t = (s.title || "").toLowerCase();
+      if (imdbStr === "tt0409591" && s.providerId === "fenixflix-animes" && !/🌪️\s*Hypex|💥\s*Figgs|🔋\s*Atlas|🚗\s*Arthur/i.test(s.title || "")) {
+        return false;
+      }
       if (typeof window !== "undefined" && window.location.protocol === "https:") {
         if (u.startsWith("http://")) return false;
         if (/localhost|127\.0\.0\.1|%5b%3a%3a1%5d|\[::1\]/.test(u)) return false;
@@ -11838,6 +11841,11 @@ var ProviderRegistryService = class {
       identity,
       cacheKey: `${cacheKey}_hasPt${hasExternalPtSub}`
     });
+    if (imdbStr === "tt0409591") {
+      sorted.sort(
+        (a, b) => Number(b.providerId === "fenixflix-animes" && /🚗\s*Arthur/i.test(b.title || "")) - Number(a.providerId === "fenixflix-animes" && /🚗\s*Arthur/i.test(a.title || ""))
+      );
+    }
     for (const s of sorted) {
       mediaSourceValidationService.validateSource(s, {
         mediaId: rawTargetId,

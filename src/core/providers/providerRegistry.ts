@@ -598,6 +598,13 @@ class ProviderRegistryService {
       if (s.ytId) return false;
       const u = (s.url || '').toLowerCase();
       const t = (s.title || '').toLowerCase();
+      // O catálogo do FenixFlix mistura Naruto clássico com Shippuden (Zeus)
+      // e até outra série (Malfoy) sob o mesmo IMDb. Conferimos os vídeos dos
+      // episódios 1–3; estas são as fontes que entregaram Naruto clássico.
+      if (imdbStr === 'tt0409591' && s.providerId === 'fenixflix-animes' &&
+          !/🌪️\s*Hypex|💥\s*Figgs|🔋\s*Atlas|🚗\s*Arthur/i.test(s.title || '')) {
+        return false;
+      }
       if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
         if (u.startsWith('http://')) return false;
         if (/localhost|127\.0\.0\.1|%5b%3a%3a1%5d|\[::1\]/.test(u)) return false;
@@ -656,6 +663,14 @@ class ProviderRegistryService {
       identity,
       cacheKey: `${cacheKey}_hasPt${hasExternalPtSub}`
     });
+    // Arthur entrega o arquivo HTTPS direto do episódio clássico; Hypex,
+    // Figgs e Atlas servem como alternativas quando esse link expirar.
+    if (imdbStr === 'tt0409591') {
+      sorted.sort((a, b) =>
+        Number(b.providerId === 'fenixflix-animes' && /🚗\s*Arthur/i.test(b.title || '')) -
+        Number(a.providerId === 'fenixflix-animes' && /🚗\s*Arthur/i.test(a.title || ''))
+      );
+    }
     
     // 7. Enriquecer fontes validadas no MediaSourceValidationService (normalização centralizada)
     for (const s of sorted) {
