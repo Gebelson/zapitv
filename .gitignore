@@ -16,6 +16,7 @@ dist-ssr
 !.env.example
 *.local
 vercel_*.png
+.playwright-cli/
 
 # Editor directories and files
 .vscode/*
