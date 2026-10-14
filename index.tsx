@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { initializeDatabase, db as localDb } from './db';
 import { updateMovies } from './updateMovies';
@@ -160,6 +161,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <RootComponent />
+    <BrowserRouter>
+      <RootComponent />
+    </BrowserRouter>
   </React.StrictMode>
 );

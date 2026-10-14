@@ -1,14 +1,14 @@
-
 import React from 'react';
-import { Home, Flame, Film, Tv, List, ChevronLeft, ChevronRight, Sparkles, MonitorPlay } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Home, Flame, Film, Tv, List, ChevronLeft, ChevronRight, Sparkles, MonitorPlay, DownloadCloud } from 'lucide-react';
 import { AppView, Profile } from '../types';
 
 // Ícone de Séries - Refinado para strokeWidth 2.2
 const SeriesIcon = (props: any) => <Tv {...props} strokeWidth={2.2} />;
 
 interface SidebarProps {
-  currentView: AppView;
-  setCurrentView: (view: AppView) => void;
+  currentView?: AppView;
+  setCurrentView?: (view: AppView) => void;
   isDarkMode: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
@@ -17,21 +17,42 @@ interface SidebarProps {
   activeProfile?: Profile | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ 
+export const Sidebar: React.FC<SidebarProps> = ({ 
   currentView, setCurrentView, isDarkMode, isCollapsed, onToggleCollapse,
   isMobileMenuOpen = false, onToggleMobileMenu, activeProfile
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const pathname = location.pathname;
+
   const menuItems = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'featured', label: 'Em Destaque', icon: Flame },
-    { id: 'movies', label: 'Filmes', icon: Film },
-    { id: 'series', label: 'Séries', icon: SeriesIcon },
-    { id: 'animes', label: 'Animes', icon: Sparkles },
-    { id: 'programas', label: 'Programas', icon: MonitorPlay },
-    { id: 'mylist', label: 'Minha Lista', icon: List },
+    { id: 'home', path: '/', label: 'Home', icon: Home },
+    { id: 'featured', path: '/em-destaque', label: 'Em Destaque', icon: Flame },
+    { id: 'movies', path: '/filmes', label: 'Filmes', icon: Film },
+    { id: 'series', path: '/series', label: 'Séries', icon: SeriesIcon },
+    { id: 'animes', path: '/animes', label: 'Animes', icon: Sparkles },
+    { id: 'programas', path: '/programas', label: 'Programas', icon: MonitorPlay },
+    { id: 'downloads', path: '/downloads', label: 'Downloads', icon: DownloadCloud },
+    { id: 'mylist', path: '/minha-lista', label: 'Minha Lista', icon: List },
   ];
 
-  // CORREÇÃO: h-screen em vez de h-full para fixar corretamente na viewport
+  const isItemActive = (item: typeof menuItems[0]) => {
+    if (item.path === '/') {
+      return pathname === '/';
+    }
+    return pathname.startsWith(item.path);
+  };
+
+  const handleNavigate = (path: string, viewId: string) => {
+    navigate(path);
+    if (setCurrentView) {
+      setCurrentView(viewId as AppView);
+    }
+    if (isMobileMenuOpen && onToggleMobileMenu) {
+      onToggleMobileMenu();
+    }
+  };
+
   const sidebarClasses = `fixed left-0 top-0 h-screen flex flex-col border-r transition-all duration-300 z-[150] ${
     isDarkMode 
       ? 'bg-[#05070A] border-gray-800 text-gray-400' 
@@ -84,7 +105,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* Logo clicável que retorna para a Home */}
         <div 
           role="button"
-          onClick={() => setCurrentView('home')}
+          onClick={() => handleNavigate('/', 'home')}
           className={`pt-4 lg:pt-6 px-6 pb-4 flex items-center cursor-pointer hover:opacity-80 active:scale-95 transition-all group/logo ${isCollapsed ? 'lg:justify-center' : 'gap-3'} relative z-10`}
         >
           <div className="w-12 h-10 shrink-0 transition-transform group-hover/logo:scale-110">
@@ -116,22 +137,22 @@ const Sidebar: React.FC<SidebarProps> = ({
         <nav className={`flex-1 px-4 mt-1 lg:mt-4 relative z-10 overflow-y-auto no-scrollbar ${(!isCollapsed || isMobileMenuOpen) ? 'pr-4' : ''}`}>
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = currentView === item.id;
+            const active = isItemActive(item);
             return (
               <button
                 key={item.id}
-                onClick={() => setCurrentView(item.id as AppView)}
+                onClick={() => handleNavigate(item.path, item.id)}
                 title={isCollapsed ? item.label : undefined}
-                className={`w-full flex items-center transition-all duration-200 group rounded-xl mb-2 ${
-                  isCollapsed ? 'lg:justify-center p-3' : 'px-4 py-3 gap-3'
+                className={`w-full flex items-center transition-all duration-200 group rounded-xl mb-1.5 ${
+                  isCollapsed ? 'lg:justify-center p-3' : 'px-4 py-2.5 gap-3'
                 } ${
-                  isActive 
-                    ? 'bg-[#007df7] text-white shadow-lg shadow-[#007df7]/20' 
+                  active 
+                    ? 'bg-[#007df7] text-white shadow-lg shadow-[#007df7]/20 font-bold' 
                     : `hover:bg-black/10 ${isDarkMode ? 'hover:bg-white/5 text-gray-400 hover:text-white' : 'hover:bg-black/5 text-gray-600 hover:text-gray-900'}`
                 }`}
               >
-                <Icon className={`w-5 h-5 shrink-0 transition-opacity ${isActive ? 'text-white opacity-100' : 'group-hover:text-[#007df7] opacity-90'}`} />
-                <span className={`font-medium whitespace-nowrap animate-in fade-in slide-in-from-left-2 duration-300 ${
+                <Icon className={`w-5 h-5 shrink-0 transition-opacity ${active ? 'text-white opacity-100' : 'group-hover:text-[#007df7] opacity-90'}`} />
+                <span className={`text-sm whitespace-nowrap animate-in fade-in slide-in-from-left-2 duration-300 ${
                   isCollapsed ? 'lg:hidden' : 'block'
                 }`}>{item.label}</span>
               </button>
@@ -139,7 +160,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
-        <div className="p-6 mt-auto relative z-10 flex items-center justify-center">
+        <div className="p-4 mt-auto relative z-10 flex items-center justify-center border-t border-white/5">
           <div className={`transition-all duration-300 ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>
              <p className={`text-[10px] font-black uppercase tracking-[0.25em] whitespace-nowrap ${isDarkMode ? 'text-white/20' : 'text-gray-400/50'}`}>
                 ZapiTV © 2026

@@ -6,6 +6,20 @@ export type SubtitleOutline = 'none' | 'thin' | 'medium' | 'thick';
 export type SubtitleShadow = 'none' | 'soft' | 'strong' | 'drop';
 export type SubtitleLineSpacing = 'compact' | 'normal' | 'relaxed' | 'spacious';
 
+export const DEFAULT_VERTICAL_POSITION = 10; // 10% da altura da tela (padrão atual do ZapiTV)
+
+export function normalizeVerticalPosition(val: any): number {
+  if (typeof val !== 'number' || isNaN(val)) {
+    return DEFAULT_VERTICAL_POSITION;
+  }
+  // Converte valores legados em pixels (> 35, ex: 80px) para a escala percentual correspondente (10%)
+  if (val > 35) {
+    const converted = Math.round((val / 800) * 100);
+    return Math.max(4, Math.min(35, converted || DEFAULT_VERTICAL_POSITION));
+  }
+  return Math.max(4, Math.min(35, val));
+}
+
 export interface SubtitleStyle {
   fontSize: SubtitleFontSize;
   color: string;
@@ -14,6 +28,7 @@ export interface SubtitleStyle {
   shadow: SubtitleShadow;
   lineSpacing: SubtitleLineSpacing;
   customLineSpacing?: number;
+  verticalPosition?: number; // Posição vertical relativa a partir da base (4% a 35%, padrão 10%)
 }
 
 export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
@@ -22,44 +37,50 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   bgColor: 'semi',
   outline: 'thin',
   shadow: 'soft',
-  lineSpacing: 'normal'
+  lineSpacing: 'normal',
+  verticalPosition: DEFAULT_VERTICAL_POSITION
 };
 
 export const STORAGE_KEY_SUBTITLE_STYLE = 'zapitv_subtitle_style';
 export const EVENT_SUBTITLE_STYLE_CHANGED = 'zapitv_subtitle_style_changed';
 
 class SubtitleStyleService {
+  private memoryStyle: SubtitleStyle = { ...DEFAULT_SUBTITLE_STYLE };
+
   /**
    * Obtém as preferências salvas de estilo ou retorna os padrões.
    */
   public getSubtitleStyle(): SubtitleStyle {
     if (typeof localStorage === 'undefined') {
-      return { ...DEFAULT_SUBTITLE_STYLE };
+      return { ...this.memoryStyle };
     }
 
     try {
       const saved = localStorage.getItem(STORAGE_KEY_SUBTITLE_STYLE);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return {
+        this.memoryStyle = {
           ...DEFAULT_SUBTITLE_STYLE,
           ...parsed,
           lineSpacing: ['compact', 'normal', 'relaxed', 'spacious'].includes(parsed.lineSpacing)
             ? parsed.lineSpacing
-            : DEFAULT_SUBTITLE_STYLE.lineSpacing
+            : DEFAULT_SUBTITLE_STYLE.lineSpacing,
+          verticalPosition: normalizeVerticalPosition(parsed.verticalPosition)
         };
+        return { ...this.memoryStyle };
       }
     } catch (e) {
       console.warn('[SubtitleStyleService] Erro ao ler estilos do localStorage:', e);
     }
 
-    return { ...DEFAULT_SUBTITLE_STYLE };
+    return { ...this.memoryStyle };
   }
 
   /**
    * Salva o estilo completo e notifica ouvintes.
    */
   public saveSubtitleStyle(style: SubtitleStyle): void {
+    this.memoryStyle = { ...style };
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem(STORAGE_KEY_SUBTITLE_STYLE, JSON.stringify(style));
@@ -92,6 +113,13 @@ class SubtitleStyleService {
   public resetSubtitleStyle(): SubtitleStyle {
     this.saveSubtitleStyle({ ...DEFAULT_SUBTITLE_STYLE });
     return { ...DEFAULT_SUBTITLE_STYLE };
+  }
+
+  /**
+   * Restaura exclusivamente a altura/posição vertical padrão (10%).
+   */
+  public resetVerticalPosition(): SubtitleStyle {
+    return this.updateSubtitleStyle({ verticalPosition: DEFAULT_VERTICAL_POSITION });
   }
 
   /**

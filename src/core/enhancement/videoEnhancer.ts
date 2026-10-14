@@ -215,11 +215,40 @@ export class VideoEnhancer {
     }
   }
 
+  private isRenderingFrame = false;
+  private renderingListeners: Set<(isRendering: boolean) => void> = new Set();
+  private statusListeners: Set<(status: 'off' | 'initializing' | 'active' | 'unavailable') => void> = new Set();
+  private lastStatus: 'off' | 'initializing' | 'active' | 'unavailable' = 'off';
+
+  public isRendering(): boolean {
+    return this.isRenderingFrame;
+  }
+
+  public onRenderingChange(cb: (isRendering: boolean) => void): () => void {
+    this.renderingListeners.add(cb);
+    cb(this.isRenderingFrame);
+    return () => this.renderingListeners.delete(cb);
+  }
+
+  private setRenderingState(rendering: boolean): void {
+    if (this.isRenderingFrame !== rendering) {
+      this.isRenderingFrame = rendering;
+      this.renderingListeners.forEach(fn => fn(rendering));
+      this.notifyStatus();
+    }
+  }
+
   public attach(video: HTMLVideoElement, canvas: HTMLCanvasElement): void {
     this.video = video;
     this.canvas = canvas;
     this.isCorsRestricted = false;
+    this.setRenderingState(false);
     this.notifyStatus();
+
+    if (video.videoWidth > 0 && video.videoHeight > 0) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    }
 
     if (this.settings.enabled && this.settings.videoEnabled) {
       this.initGpuPipeline().then(() => {
@@ -240,6 +269,7 @@ export class VideoEnhancer {
     this.program = null;
     this.texture = null;
     this.activeEngine = 'passthrough';
+    this.setRenderingState(false);
     this.notifyStatus();
   }
 
@@ -274,14 +304,9 @@ export class VideoEnhancer {
     if (this.canvas) {
       if (isHolding) {
         this.canvas.style.opacity = '0';
-        if (this.video) {
-          this.video.style.opacity = '1';
-          this.video.style.filter = 'none';
-        }
       } else {
-        this.canvas.style.opacity = '1';
-        if (this.video && this.activeEngine !== 'css') {
-          this.video.style.opacity = '0';
+        if (this.isRenderingFrame) {
+          this.canvas.style.opacity = '1';
         }
       }
     }
@@ -299,9 +324,6 @@ export class VideoEnhancer {
     this.onTelemetryUpdate = cb;
   }
 
-  private statusListeners: Set<(status: 'off' | 'initializing' | 'active' | 'unavailable') => void> = new Set();
-  private lastStatus: 'off' | 'initializing' | 'active' | 'unavailable' = 'off';
-
   public getStatus(): 'off' | 'initializing' | 'active' | 'unavailable' {
     if (!this.settings.enabled || !this.settings.videoEnabled) {
       return 'off';
@@ -312,7 +334,7 @@ export class VideoEnhancer {
     if (!this.video || this.video.readyState < 2) {
       return 'initializing';
     }
-    if (this.activeEngine === 'webgpu' || this.activeEngine === 'webgl') {
+    if (this.isRenderingFrame) {
       return 'active';
     }
     return 'initializing';
@@ -371,12 +393,20 @@ export class VideoEnhancer {
 
     try {
       const gl = this.canvas.getContext('webgl', {
-        alpha: false,
+        alpha: true,
+        premultipliedAlpha: true,
         depth: false,
         antialias: false,
         preserveDrawingBuffer: false,
         powerPreference: 'high-performance'
-      }) || (this.canvas as any).getContext('experimental-webgl');
+      }) || (this.canvas as any).getContext('experimental-webgl', {
+        alpha: true,
+        premultipliedAlpha: true,
+        depth: false,
+        antialias: false,
+        preserveDrawingBuffer: false,
+        powerPreference: 'high-performance'
+      });
 
       if (!gl) {
         console.warn('[ZapiAiVideo] WebGL não suportado.');
@@ -525,16 +555,12 @@ export class VideoEnhancer {
     // Se segurando para comparar, mostra vídeo original
     if (this.isHoldingComparison) {
       if (this.canvas) this.canvas.style.opacity = '0';
-      if (this.video) {
-        this.video.style.opacity = '1';
-        this.video.style.filter = 'none';
-      }
       processSuccess = true;
+      this.setRenderingState(true);
     } else if (
       this.canvas &&
       !this.isCorsRestricted &&
-      this.video.readyState >= 2 &&
-      !this.video.paused
+      this.video.readyState >= 2
     ) {
       // 1. Tenta WebGPU
       if (this.webgpuInitialized) {
@@ -551,7 +577,7 @@ export class VideoEnhancer {
           this.currentPlan.activeEngine = 'webgpu';
           this.canvas.style.display = 'block';
           this.canvas.style.opacity = '1';
-          this.video.style.opacity = '0';
+          this.setRenderingState(true);
         }
       }
 
@@ -564,15 +590,15 @@ export class VideoEnhancer {
           this.currentPlan.activeEngine = 'webgl';
           this.canvas.style.display = 'block';
           this.canvas.style.opacity = '1';
-          this.video.style.opacity = '0';
+          this.setRenderingState(true);
         }
       }
     }
 
-    // 3. Se houver restrição CORS, avisa e preserva o original
+    // 3. Se houver falha ou restrição CORS, preserva a visão original sem deixar tarjas
     if (!processSuccess && !this.isHoldingComparison) {
+      this.restoreOriginalView();
       if (this.isCorsRestricted) {
-        this.restoreOriginalView();
         this.activeEngine = 'passthrough';
         this.currentPlan.pipeline = 'passthrough';
         this.currentPlan.activeEngine = 'passthrough';

@@ -1,6 +1,8 @@
 import { ContentItem, ContentType } from '../../../types';
 import { tmdbService } from '../tmdb/tmdbClient';
 import { StremioStream } from '../stremio/stremioTypes';
+import { validateSubtitleContentMatch } from './subtitleLanguageDetector';
+import { subtitleTranslationService } from './subtitleTranslationService';
 
 export interface SubtitleTrack {
   id: string;
@@ -13,6 +15,7 @@ export interface SubtitleTrack {
   release?: string;
   isPtBr?: boolean;
   autoSyncBadge?: boolean;
+  isAutoTranslated?: boolean;
 }
 
 const LANGUAGE_INFO: Record<string, { name: string; flag: string; order: number; isPtBr?: boolean }> = {
@@ -407,6 +410,48 @@ export function sanitizeSubtitleText(text: string): string {
   return decodeHtmlEntities(cleaned).trim();
 }
 
+export function parseTimeString(t: string): number {
+  if (!t) return 0;
+  const [hms, ms] = t.split(/[,.]/);
+  const parts = hms.split(':').map(Number);
+  let seconds = 0;
+  if (parts.length === 3) {
+    seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  } else if (parts.length === 2) {
+    seconds = parts[0] * 60 + parts[1];
+  }
+  const milliseconds = ms ? parseInt(ms.padEnd(3, '0').slice(0, 3), 10) : 0;
+  return seconds + milliseconds / 1000;
+}
+
+export function parseSRT(data: string): Array<{ start: number; end: number; text: string }> {
+  const cues: Array<{ start: number; end: number; text: string }> = [];
+  const cleanedData = sanitizeSubtitleText(data);
+  const blocks = cleanedData.replace(/\r\n/g, '\n').split('\n\n');
+  for (const block of blocks) {
+    const lines = block.trim().split('\n');
+    if (lines.length >= 2) {
+      const timeLine = lines.find(l => l.includes('-->'));
+      if (timeLine) {
+        const [startStr, endStr] = timeLine.split('-->').map(s => s.trim());
+        const start = parseTimeString(startStr);
+        const end = parseTimeString(endStr);
+        const timeIndex = lines.indexOf(timeLine);
+        let text = lines.slice(timeIndex + 1).join('\n')
+          .replace(/<[^>]+>/g, '')
+          .replace(/\{[^}]+\}/g, '')
+          .trim();
+        text = sanitizeSubtitleText(text);
+        const isPlaceholder = /suporte a legendas|legenda em portugu[eê]s|\[zapitv|zapitv oficial|zapitv pt-br/i.test(text);
+        if (text && !isPlaceholder && !isNaN(start) && !isNaN(end)) {
+          cues.push({ start, end, text });
+        }
+      }
+    }
+  }
+  return cues;
+}
+
 export class SubtitleService {
   private subtitleCache = new Map<string, { tracks: SubtitleTrack[]; timestamp: number }>();
   private static CACHE_TTL_MS = 60 * 60 * 1000; // 1 hora
@@ -595,19 +640,23 @@ export class SubtitleService {
       const hasPtBrTrack = formattedTracks.some(t => t.isPtBr || /^(pob|pt-br|por-br|bra)$/i.test(t.lang));
 
       if (!hasPtBrTrack) {
-        // Se houver legendas em outros idiomas (ex: inglês ou espanhol), vincula para reprodução com suporte PT-BR
+        // Se houver legendas em outros idiomas (ex: inglês ou espanhol), vincula para tradução automática verificada
         const baseTrack = formattedTracks.find(t => /^(eng|en)$/i.test(t.lang)) || formattedTracks[0];
-        formattedTracks.unshift({
-          id: `pt-guaranteed-${item.id}-${season || 1}-${episode || 1}`,
-          lang: 'pob',
-          languageName: 'Português (Brasil)',
-          label: '🇧🇷 Português (Brasil)',
-          flag: '🇧🇷',
-          url: baseTrack ? `auto-translate:${baseTrack.url}` : `direct-pt:${encodeURIComponent(item.title)}`,
-          order: 1,
-          release: 'ZapiTV Oficial',
-          isPtBr: true
-        });
+        if (baseTrack) {
+          formattedTracks.unshift({
+            id: `pt-translate-${item.id}-${season || 1}-${episode || 1}`,
+            lang: 'pob',
+            languageName: 'Português (Brasil)',
+            label: '🇧🇷 Português (Brasil)',
+            flag: '🇧🇷',
+            url: `auto-translate:${baseTrack.url}`,
+            order: 1,
+            release: 'Tradução IA',
+            isPtBr: true,
+            isAutoTranslated: true,
+            autoSyncBadge: false
+          });
+        }
       }
 
       // 6. Ordenação rigorosa: Português (Brasil) no topo absoluto, seguido por PT, EN, ES, e alfabético
@@ -623,102 +672,138 @@ export class SubtitleService {
       return formattedTracks;
     } catch (err) {
       console.warn('Erro ao carregar legendas:', err);
-      // Mesmo em falha de rede/timeout, GARANTE a opção de legenda em português para o usuário!
-      return [
-        {
-          id: `pt-guaranteed-fallback-${item.id}`,
-          lang: 'pob',
-          languageName: 'Português (Brasil)',
-          label: '🇧🇷 Português (Brasil)',
-          flag: '🇧🇷',
-          url: `direct-pt:${encodeURIComponent(item.title)}`,
-          order: 1,
-          release: 'ZapiTV Oficial',
-          isPtBr: true
-        }
-      ];
+      return [];
     }
   }
 
   /**
    * Fetches SRT content and correctly decodes UTF-8 / UTF-16 / Windows-1252 / ISO-8859-1
    * and repairs any mojibake in Portuguese or other languages.
+   * Valida rigorosamente o idioma do conteúdo para que textos em inglês nunca sejam retornados como PT-BR.
    */
-  public async fetchAndDecodeSRT(url: string, langCode?: string): Promise<string> {
-    if (url.startsWith('direct-pt:')) {
-      return '';
+  public async fetchAndDecodeSRT(url: string, langCode?: string, cacheKey?: string): Promise<string> {
+    if (!url || url.startsWith('direct-pt:')) {
+      throw new Error('Legenda em Português indisponível no momento.');
     }
 
     if (url.startsWith('auto-translate:')) {
       const sourceUrl = url.replace('auto-translate:', '');
-      if (sourceUrl) {
-        try {
-          const rawText = await this.fetchAndDecodeSRT(sourceUrl);
-          return sanitizeSubtitleText(rawText);
-        } catch {}
+      if (!sourceUrl) {
+        throw new Error('Fonte de tradução ausente.');
       }
-      return '';
+
+      // Baixa e decodifica a legenda fonte
+      const rawSource = await this.fetchAndDecodeSRT(sourceUrl);
+      const cues = parseSRT(rawSource);
+      if (cues.length === 0) {
+        throw new Error('Nenhuma fala encontrada na legenda fonte para tradução.');
+      }
+
+      // Executa tradução com validação estrita
+      const transResult = await subtitleTranslationService.translateCuesToPtBr(
+        cues,
+        cacheKey || `auto_${sourceUrl.slice(-40)}`
+      );
+
+      if (!transResult.success || !transResult.translatedSrt) {
+        throw new Error(transResult.error || 'Falha na tradução automática para Português (Brasil).');
+      }
+
+      return transResult.translatedSrt;
     }
 
     const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Falha HTTP ao baixar legenda: ${res.status}`);
+    }
     const buffer = await res.arrayBuffer();
     const bytes = new Uint8Array(buffer);
+
+    let decoded = '';
 
     // 1. Detect UTF-16 BOM
     if (bytes.length >= 2) {
       if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
         try {
           const u16le = new TextDecoder('utf-16le').decode(buffer);
-          return sanitizeSubtitleText(u16le);
+          decoded = sanitizeSubtitleText(u16le);
         } catch {}
       } else if (bytes[0] === 0xFE && bytes[1] === 0xFF) {
         try {
           const u16be = new TextDecoder('utf-16be').decode(buffer);
-          return sanitizeSubtitleText(u16be);
+          decoded = sanitizeSubtitleText(u16be);
         } catch {}
       }
     }
 
-    // 2. Try standard UTF-8 (fatal mode to detect single-byte encodings)
-    try {
-      const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
-      const decoded = utf8Decoder.decode(buffer);
-      return sanitizeSubtitleText(decoded);
-    } catch {
-      // 3. Fallback based on language or regional ANSI code pages
-      const lang = (langCode || '').toLowerCase().trim();
-      const encodingsToTry: string[] = [];
+    if (!decoded) {
+      // 2. Try standard UTF-8 (fatal mode to detect single-byte encodings)
+      try {
+        const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
+        decoded = sanitizeSubtitleText(utf8Decoder.decode(buffer));
+      } catch {
+        // 3. Fallback based on language or regional ANSI code pages
+        const lang = (langCode || '').toLowerCase().trim();
+        const encodingsToTry: string[] = [];
 
-      if (/^(ru|rus|uk|ukr|bg|bul|be|bel|sr|srp)/.test(lang)) {
-        encodingsToTry.push('windows-1251', 'iso-8859-5');
-      } else if (/^(el|ell|gre)/.test(lang)) {
-        encodingsToTry.push('windows-1253', 'iso-8859-7');
-      } else if (/^(tr|tur)/.test(lang)) {
-        encodingsToTry.push('windows-1254', 'iso-8859-9');
-      } else if (/^(pl|pol|cs|cze|sk|slk|hu|hun|ro|ron|hr|hrv)/.test(lang)) {
-        encodingsToTry.push('windows-1250', 'iso-8859-2');
-      } else if (/^(he|heb|iw)/.test(lang)) {
-        encodingsToTry.push('windows-1255', 'iso-8859-8');
-      } else if (/^(ar|ara)/.test(lang)) {
-        encodingsToTry.push('windows-1256', 'iso-8859-6');
+        if (/^(ru|rus|uk|ukr|bg|bul|be|bel|sr|srp)/.test(lang)) {
+          encodingsToTry.push('windows-1251', 'iso-8859-5');
+        } else if (/^(el|ell|gre)/.test(lang)) {
+          encodingsToTry.push('windows-1253', 'iso-8859-7');
+        } else if (/^(tr|tur)/.test(lang)) {
+          encodingsToTry.push('windows-1254', 'iso-8859-9');
+        } else if (/^(pl|pol|cs|cze|sk|slk|hu|hun|ro|ron|hr|hrv)/.test(lang)) {
+          encodingsToTry.push('windows-1250', 'iso-8859-2');
+        } else if (/^(he|heb|iw)/.test(lang)) {
+          encodingsToTry.push('windows-1255', 'iso-8859-8');
+        } else if (/^(ar|ara)/.test(lang)) {
+          encodingsToTry.push('windows-1256', 'iso-8859-6');
+        }
+
+        encodingsToTry.push('windows-1252', 'iso-8859-1');
+
+        for (const enc of encodingsToTry) {
+          try {
+            const dec = new TextDecoder(enc);
+            const text = dec.decode(buffer);
+            if (text) {
+              decoded = sanitizeSubtitleText(text);
+              break;
+            }
+          } catch {}
+        }
+
+        if (!decoded) {
+          const fallbackDecoder = new TextDecoder('utf-8');
+          decoded = sanitizeSubtitleText(fallbackDecoder.decode(buffer));
+        }
       }
+    }
 
-      encodingsToTry.push('windows-1252', 'iso-8859-1');
-
-      for (const enc of encodingsToTry) {
+    // 4. VALIDAÇÃO LINGUÍSTICA DO CONTEÚDO REAL
+    if (langCode && /^(pob|pt-br|bra|por-br|pt|por)$/i.test(langCode)) {
+      const validation = validateSubtitleContentMatch(decoded, langCode);
+      if (!validation.isValid) {
+        console.warn('[ZapiSubtitles] Legenda declarada como PT-BR contém texto em outro idioma:', validation.reason);
+        // Tenta traduzir caso o texto esteja em inglês
         try {
-          const dec = new TextDecoder(enc);
-          const text = dec.decode(buffer);
-          if (text) {
-            return sanitizeSubtitleText(text);
+          const cues = parseSRT(decoded);
+          if (cues.length > 0) {
+            const transResult = await subtitleTranslationService.translateCuesToPtBr(
+              cues,
+              cacheKey || `auto_${url.slice(-40)}`
+            );
+            if (transResult.success && transResult.translatedSrt) {
+              return transResult.translatedSrt;
+            }
           }
         } catch {}
-      }
 
-      // Ultimate fallback
-      const fallbackDecoder = new TextDecoder('utf-8');
-      return sanitizeSubtitleText(fallbackDecoder.decode(buffer));
+        throw new Error(`Inconsistência de idioma: A legenda está em inglês e não em português.`);
+      }
     }
+
+    return decoded;
   }
 }
 

@@ -303,7 +303,6 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h4 className="text-white font-black text-sm uppercase tracking-wider">Guia Rápido de Canais</h4>
-            <span className="text-xs text-gray-400 font-medium">({channels.length} canais disponíveis)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <button

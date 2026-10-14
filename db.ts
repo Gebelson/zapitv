@@ -61,6 +61,26 @@ export async function initializeDatabase() {
           item.image = constItem.image;
           changed = true;
         }
+        if (item.videoUrl !== constItem.videoUrl) {
+          item.videoUrl = constItem.videoUrl;
+          changed = true;
+        }
+        if (JSON.stringify(item.episodes) !== JSON.stringify(constItem.episodes)) {
+          item.episodes = constItem.episodes;
+          changed = true;
+        }
+        if (JSON.stringify(item.verifiedStreams) !== JSON.stringify(constItem.verifiedStreams)) {
+          item.verifiedStreams = constItem.verifiedStreams;
+          changed = true;
+        }
+        if (item.availabilityStatus !== constItem.availabilityStatus) {
+          item.availabilityStatus = constItem.availabilityStatus;
+          changed = true;
+        }
+        if (item.audioStatus !== constItem.audioStatus) {
+          item.audioStatus = constItem.audioStatus;
+          changed = true;
+        }
         if (changed) {
           updates.push(item);
         }

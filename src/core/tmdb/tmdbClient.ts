@@ -10,6 +10,8 @@ export interface TMDBRawItem {
   id: number;
   title?: string;
   name?: string;
+  original_title?: string;
+  original_name?: string;
   overview?: string;
   poster_path?: string;
   backdrop_path?: string;
@@ -168,7 +170,9 @@ export function formatContentItem(raw: TMDBRawItem, forcedType?: ContentType): C
     backdrop,
     description: raw.overview || 'Sinopse oficial em português disponível em breve.',
     genres,
-    isFeatured: (raw.vote_average || 0) > 7.5
+    isFeatured: (raw.vote_average || 0) > 7.5,
+    releaseDate: yearStr ? yearStr.slice(0, 10) : undefined,
+    originalTitle: raw.original_title || raw.original_name
   };
 }
 
@@ -197,13 +201,27 @@ export function formatCinemetaItem(raw: CinemetaMetaItem): ContentItem {
 class TMDBClientService {
   private imdbCache = new Map<string, string>();
 
-  private async request(endpoint: string): Promise<any> {
+  private async request(endpoint: string, timeoutMs = 8000, signal?: AbortSignal): Promise<any> {
     const url = `${TMDB_BASE_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}api_key=${TMDB_API_KEY}&language=pt-BR`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`Erro TMDB ${res.status}: ${res.statusText}`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    if (signal) {
+      if (signal.aborted) {
+        clearTimeout(timer);
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      signal.addEventListener('abort', () => controller.abort(), { once: true });
     }
-    return res.json();
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!res.ok) {
+        throw new Error(`Erro TMDB ${res.status}: ${res.statusText}`);
+      }
+      return res.json();
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   public async getImdbId(id: string | number, type: ContentType | 'movie' | 'series' | 'anime'): Promise<string | undefined> {
@@ -250,9 +268,11 @@ class TMDBClientService {
     return null;
   }
 
-  public async getCinemetaMeta(type: 'movie' | 'series', imdbId: string): Promise<CinemetaMetaItem | null> {
+  public async getCinemetaMeta(type: 'movie' | 'series', imdbId: string, timeoutMs = 8000): Promise<CinemetaMetaItem | null> {
     try {
-      const res = await fetch(`${CINEMETA_BASE_URL}/meta/${type}/${imdbId}.json`);
+      const res = await fetch(`${CINEMETA_BASE_URL}/meta/${type}/${imdbId}.json`, {
+        signal: AbortSignal.timeout(timeoutMs)
+      });
       if (res.ok) {
         const data = await res.json();
         return data.meta || null;
@@ -263,7 +283,7 @@ class TMDBClientService {
     return null;
   }
 
-  public async getCinemetaCatalog(type: 'movie' | 'series', genre?: string, skip?: number): Promise<ContentItem[]> {
+  public async getCinemetaCatalog(type: 'movie' | 'series', genre?: string, skip?: number, timeoutMs = 8000): Promise<ContentItem[]> {
     try {
       let url = `${CINEMETA_BASE_URL}/catalog/${type}/top`;
       const extras: string[] = [];
@@ -272,7 +292,7 @@ class TMDBClientService {
       if (extras.length > 0) url += `/${extras.join('&')}`;
       url += '.json';
 
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
       if (res.ok) {
         const data = await res.json();
         return (data.metas || []).map((m: CinemetaMetaItem) => formatCinemetaItem(m));
@@ -289,13 +309,29 @@ class TMDBClientService {
   }
 
   public async getPopularMovies(page = 1): Promise<ContentItem[]> {
+    const data = await this.getPopularMoviesWithMeta(page);
+    return data.items;
+  }
+
+  public async getPopularMoviesWithMeta(page = 1): Promise<{ items: ContentItem[], total: number }> {
     const data = await this.request(`/movie/popular?page=${page}`);
-    return (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.MOVIE));
+    return {
+      items: (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.MOVIE)),
+      total: data.total_results || 20000
+    };
   }
 
   public async getPopularSeries(page = 1): Promise<ContentItem[]> {
+    const data = await this.getPopularSeriesWithMeta(page);
+    return data.items;
+  }
+
+  public async getPopularSeriesWithMeta(page = 1): Promise<{ items: ContentItem[], total: number }> {
     const data = await this.request(`/tv/popular?page=${page}`);
-    return (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.SERIES));
+    return {
+      items: (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.SERIES)),
+      total: data.total_results || 20000
+    };
   }
 
   public async getTopRatedMovies(page = 1): Promise<ContentItem[]> {
@@ -309,33 +345,65 @@ class TMDBClientService {
   }
 
   public async getAnimes(page = 1): Promise<ContentItem[]> {
+    const data = await this.getAnimesWithMeta(page);
+    return data.items;
+  }
+
+  public async getAnimesWithMeta(page = 1): Promise<{ items: ContentItem[], total: number }> {
     const data = await this.request(
       `/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&page=${page}`
     );
-    return (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.ANIME));
+    return {
+      items: (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.ANIME)),
+      total: data.total_results || 5474
+    };
   }
 
   public async getAnimeMovies(page = 1): Promise<ContentItem[]> {
+    const data = await this.getAnimeMoviesWithMeta(page);
+    return data.items;
+  }
+
+  public async getAnimeMoviesWithMeta(page = 1): Promise<{ items: ContentItem[], total: number }> {
     const data = await this.request(
       `/discover/movie?with_genres=16&with_original_language=ja&sort_by=popularity.desc&page=${page}`
     );
-    return (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.ANIME));
+    return {
+      items: (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.ANIME)),
+      total: data.total_results || 6020
+    };
   }
 
   public async getDiscoverMovies(page = 1, genreId?: number, sortBy = 'popularity.desc'): Promise<ContentItem[]> {
+    const data = await this.getDiscoverMoviesWithMeta(page, genreId, sortBy);
+    return data.items;
+  }
+
+  public async getDiscoverMoviesWithMeta(page = 1, genreId?: number, sortBy = 'popularity.desc'): Promise<{ items: ContentItem[], total: number }> {
     const genreParam = genreId ? `&with_genres=${genreId}` : '';
     const data = await this.request(
       `/discover/movie?sort_by=${sortBy}&page=${page}${genreParam}`
     );
-    return (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.MOVIE));
+    return {
+      items: (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.MOVIE)),
+      total: data.total_results || 20000
+    };
   }
 
   public async getDiscoverSeries(page = 1, genreId?: number, sortBy = 'popularity.desc'): Promise<ContentItem[]> {
+    const data = await this.getDiscoverSeriesWithMeta(page, genreId, sortBy);
+    return data.items;
+  }
+
+  public async getDiscoverSeriesWithMeta(page = 1, genreId?: number, sortBy = 'popularity.desc'): Promise<{ items: ContentItem[], total: number }> {
     const genreParam = genreId ? `&with_genres=${genreId}` : '';
     const data = await this.request(
       `/discover/tv?sort_by=${sortBy}&page=${page}${genreParam}`
     );
-    return (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.SERIES));
+    return {
+      items: (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.SERIES)),
+      total: data.total_results || 20000
+    };
   }
 
   public async searchMulti(query: string): Promise<ContentItem[]> {
@@ -422,6 +490,201 @@ class TMDBClientService {
           if (existing && !existing.imdbId) {
             existing.imdbId = cineItem.imdbId;
           }
+        }
+      }
+    }
+
+    return results;
+  }
+
+  public async searchMovies(query: string, signal?: AbortSignal): Promise<ContentItem[]> {
+    if (!query || !query.trim()) return [];
+    const trimmed = query.trim();
+    if (/^tt\d+$/i.test(trimmed)) {
+      const fromTmdb = await this.findByImdb(trimmed);
+      if (fromTmdb && fromTmdb.type === ContentType.MOVIE && !fromTmdb.genres?.includes('Anime')) return [fromTmdb];
+      const cine = await this.getCinemetaMeta('movie', trimmed);
+      if (cine) {
+        const item = formatCinemetaItem(cine);
+        if (item.type === ContentType.MOVIE && !item.genres?.includes('Anime')) return [item];
+      }
+      return [];
+    }
+
+    const normalized = encodeURIComponent(trimmed);
+    const [tmdbRes, cineMovieRes] = await Promise.allSettled([
+      this.request(`/search/movie?query=${normalized}`, 8000, signal),
+      fetch(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`, { signal }).then(r => r.json())
+    ]);
+
+    const results: ContentItem[] = [];
+    const seenIds = new Set<string>();
+    const seenTitles = new Set<string>();
+
+    if (tmdbRes.status === 'fulfilled' && tmdbRes.value?.results) {
+      for (const r of tmdbRes.value.results) {
+        const isAnime = r.original_language === 'ja' && (r.genre_ids?.includes(16) || r.genres?.some((g: any) => g.id === 16));
+        if (isAnime) continue;
+
+        const item = formatContentItem(r, ContentType.MOVIE);
+        if (item.type === ContentType.ANIME || item.genres?.includes('Anime')) continue;
+
+        item.type = ContentType.MOVIE;
+        const normTitle = item.title.toLowerCase().trim();
+        results.push(item);
+        seenIds.add(item.id);
+        if (item.tmdbId) seenIds.add(item.tmdbId);
+        seenTitles.add(normTitle);
+      }
+    }
+
+    if (cineMovieRes.status === 'fulfilled' && cineMovieRes.value?.metas) {
+      for (const m of cineMovieRes.value.metas) {
+        const cineItem = formatCinemetaItem(m);
+        if (cineItem.type === ContentType.ANIME || cineItem.genres?.includes('Anime')) continue;
+        cineItem.type = ContentType.MOVIE;
+        const normTitle = cineItem.title.toLowerCase().trim();
+        const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
+        const hasTmdb = cineItem.tmdbId && seenIds.has(cineItem.tmdbId);
+        const hasTitle = seenTitles.has(normTitle);
+
+        if (!hasImdb && !hasTmdb && !hasTitle) {
+          results.push(cineItem);
+          seenIds.add(cineItem.id);
+          if (cineItem.imdbId) seenIds.add(cineItem.imdbId);
+          seenTitles.add(normTitle);
+        }
+      }
+    }
+
+    return results;
+  }
+
+  public async searchSeries(query: string, signal?: AbortSignal): Promise<ContentItem[]> {
+    if (!query || !query.trim()) return [];
+    const trimmed = query.trim();
+    if (/^tt\d+$/i.test(trimmed)) {
+      const fromTmdb = await this.findByImdb(trimmed);
+      if (fromTmdb && fromTmdb.type === ContentType.SERIES && !fromTmdb.genres?.includes('Anime')) return [fromTmdb];
+      const cine = await this.getCinemetaMeta('series', trimmed);
+      if (cine) {
+        const item = formatCinemetaItem(cine);
+        if (item.type === ContentType.SERIES && !item.genres?.includes('Anime')) return [item];
+      }
+      return [];
+    }
+
+    const normalized = encodeURIComponent(trimmed);
+    const [tmdbRes, cineSeriesRes] = await Promise.allSettled([
+      this.request(`/search/tv?query=${normalized}`, 8000, signal),
+      fetch(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, { signal }).then(r => r.json())
+    ]);
+
+    const results: ContentItem[] = [];
+    const seenIds = new Set<string>();
+    const seenTitles = new Set<string>();
+
+    if (tmdbRes.status === 'fulfilled' && tmdbRes.value?.results) {
+      for (const r of tmdbRes.value.results) {
+        const isAnime = r.original_language === 'ja' && (r.genre_ids?.includes(16) || r.genres?.some((g: any) => g.id === 16));
+        if (isAnime) continue;
+
+        const item = formatContentItem(r, ContentType.SERIES);
+        if (item.type === ContentType.ANIME || item.genres?.includes('Anime')) continue;
+
+        item.type = ContentType.SERIES;
+        const normTitle = item.title.toLowerCase().trim();
+        results.push(item);
+        seenIds.add(item.id);
+        if (item.tmdbId) seenIds.add(item.tmdbId);
+        seenTitles.add(normTitle);
+      }
+    }
+
+    if (cineSeriesRes.status === 'fulfilled' && cineSeriesRes.value?.metas) {
+      for (const m of cineSeriesRes.value.metas) {
+        const cineItem = formatCinemetaItem(m);
+        if (cineItem.type === ContentType.ANIME || cineItem.genres?.includes('Anime')) continue;
+        cineItem.type = ContentType.SERIES;
+        const normTitle = cineItem.title.toLowerCase().trim();
+        const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
+        const hasTmdb = cineItem.tmdbId && seenIds.has(cineItem.tmdbId);
+        const hasTitle = seenTitles.has(normTitle);
+
+        if (!hasImdb && !hasTmdb && !hasTitle) {
+          results.push(cineItem);
+          seenIds.add(cineItem.id);
+          if (cineItem.imdbId) seenIds.add(cineItem.imdbId);
+          seenTitles.add(normTitle);
+        }
+      }
+    }
+
+    return results;
+  }
+
+  public async searchAnimes(query: string, signal?: AbortSignal): Promise<ContentItem[]> {
+    if (!query || !query.trim()) return [];
+    const trimmed = query.trim();
+    if (/^tt\d+$/i.test(trimmed)) {
+      const fromTmdb = await this.findByImdb(trimmed);
+      if (fromTmdb && (fromTmdb.type === ContentType.ANIME || fromTmdb.genres?.includes('Anime'))) return [fromTmdb];
+      return [];
+    }
+
+    const normalized = encodeURIComponent(trimmed);
+    const [tmdbTvRes, tmdbMovieRes, cineSeriesRes] = await Promise.allSettled([
+      this.request(`/search/tv?query=${normalized}`, 8000, signal),
+      this.request(`/search/movie?query=${normalized}`, 8000, signal),
+      fetch(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, { signal }).then(r => r.json())
+    ]);
+
+    const results: ContentItem[] = [];
+    const seenIds = new Set<string>();
+    const seenTitles = new Set<string>();
+
+    const checkAndAdd = (item: ContentItem, raw?: any) => {
+      const isJa = raw?.original_language === 'ja';
+      const hasAnimationGenre = raw?.genre_ids?.includes(16) || raw?.genres?.some((g: any) => g.id === 16) || item.genres?.includes('Animação') || item.genres?.includes('Animation');
+      const isExplicitAnime = item.type === ContentType.ANIME || item.genres?.includes('Anime');
+
+      const isAnime = isExplicitAnime || (isJa && hasAnimationGenre);
+      if (!isAnime) return;
+
+      const normTitle = item.title.toLowerCase().trim();
+      if (seenIds.has(item.id) || (item.tmdbId && seenIds.has(item.tmdbId)) || seenTitles.has(normTitle)) {
+        return;
+      }
+
+      item.type = ContentType.ANIME;
+      if (!item.genres?.includes('Anime')) {
+        item.genres = ['Anime', ...(item.genres || [])];
+      }
+
+      results.push(item);
+      seenIds.add(item.id);
+      if (item.tmdbId) seenIds.add(item.tmdbId);
+      if (item.imdbId) seenIds.add(item.imdbId);
+      seenTitles.add(normTitle);
+    };
+
+    if (tmdbTvRes.status === 'fulfilled' && tmdbTvRes.value?.results) {
+      for (const r of tmdbTvRes.value.results) {
+        checkAndAdd(formatContentItem(r, ContentType.ANIME), r);
+      }
+    }
+
+    if (tmdbMovieRes.status === 'fulfilled' && tmdbMovieRes.value?.results) {
+      for (const r of tmdbMovieRes.value.results) {
+        checkAndAdd(formatContentItem(r, ContentType.ANIME), r);
+      }
+    }
+
+    if (cineSeriesRes.status === 'fulfilled' && cineSeriesRes.value?.metas) {
+      for (const m of cineSeriesRes.value.metas) {
+        const item = formatCinemetaItem(m);
+        if (item.type === ContentType.ANIME || item.genres?.includes('Anime')) {
+          checkAndAdd(item);
         }
       }
     }

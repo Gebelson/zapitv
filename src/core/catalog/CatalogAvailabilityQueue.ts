@@ -155,9 +155,9 @@ export class CatalogAvailabilityQueue {
         diagnosticService.recordSourceFound(hasPtBr, true);
         this.notify(key);
       } else {
-        // Se todas as consultas retornaram 200/vazio sem erro: UNAVAILABLE_CONFIRMED
-        mediaAvailabilityIndex.markUnavailableConfirmed(key, mediaType, providerNames, item.title);
-        diagnosticService.recordRejection('other');
+        // Falha ou ausência momentânea de streams em add-ons públicos não descarta o item do catálogo.
+        // Registra como TEMPORARY_ERROR para manter a visibilidade do card e permitir nova tentativa quando o usuário clicar.
+        mediaAvailabilityIndex.markTemporaryError(key, mediaType, 'Nenhuma fonte pública imediata retornada', providerNames);
         this.notify(key);
       }
     } catch (err: any) {

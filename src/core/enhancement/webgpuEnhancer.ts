@@ -213,6 +213,7 @@ export class WebGPUEnhancer {
   private textureWidth = 0;
   private textureHeight = 0;
   private bindGroup: any = null;
+  private presentationFormat: any = null;
   private isInitialized = false;
   private isSupported = false;
 
@@ -248,20 +249,14 @@ export class WebGPUEnhancer {
       }
 
       this.device = await adapter.requestDevice();
-      this.context = canvas.getContext('webgpu') as GPUCanvasContext | null;
-
-      if (!this.context || !this.device) {
-        console.warn('[ZapiWebGPU] Não foi possível obter contexto WebGPU.');
+      if (!this.device) {
         return false;
       }
 
       const presentationFormat = gpu.getPreferredCanvasFormat();
-      this.context.configure({
-        device: this.device,
-        format: presentationFormat,
-        alphaMode: 'opaque'
-      });
+      this.presentationFormat = presentationFormat;
 
+      // Compila o shader e pipeline primeiro
       const shaderModule = this.device.createShaderModule({
         label: 'ZapiTV AI Enhancement Shaders',
         code: WGSL_SHADER_SOURCE
@@ -282,6 +277,17 @@ export class WebGPUEnhancer {
         primitive: {
           topology: 'triangle-list'
         }
+      });
+
+      this.context = canvas.getContext('webgpu') as GPUCanvasContext | null;
+      if (!this.context) {
+        return false;
+      }
+
+      this.context.configure({
+        device: this.device,
+        format: presentationFormat,
+        alphaMode: 'premultiplied'
       });
 
       // Uniform buffer para parâmetros dinâmicos (64 bytes)
@@ -321,12 +327,19 @@ export class WebGPUEnhancer {
     try {
       const vWidth = video.videoWidth;
       const vHeight = video.videoHeight;
-      if (!vWidth || !vHeight) return false;
+      if (!vWidth || !vHeight || video.readyState < 2) return false;
 
-      // Sincroniza dimensões do canvas com o vídeo
+      // Sincroniza dimensões do canvas com o vídeo e reconfigura swap chain se necessário
       if (canvas.width !== vWidth || canvas.height !== vHeight) {
         canvas.width = vWidth;
         canvas.height = vHeight;
+        if (this.presentationFormat) {
+          this.context.configure({
+            device: this.device,
+            format: this.presentationFormat,
+            alphaMode: 'premultiplied'
+          });
+        }
       }
 
       // Reutiliza a textura GPU existente sem alocar a cada frame
@@ -360,7 +373,7 @@ export class WebGPUEnhancer {
         [vWidth, vHeight]
       );
 
-      // Atualiza uniforms dinâmicos
+      // Atualiza uniforms dinâmicos (64 bytes = 16 floats)
       const uniformData = new Float32Array([
         vWidth,
         vHeight,
@@ -371,8 +384,8 @@ export class WebGPUEnhancer {
         plan.saturationMultiplier,
         category === 'anime' ? 1.0 : (category === 'animation-3d' ? 2.0 : 0.0),
         isHoldingOriginal ? 1.0 : 0.0,
-        0.0,
-        0.0, 0.0
+        0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0
       ]);
 
       this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
@@ -384,7 +397,7 @@ export class WebGPUEnhancer {
         colorAttachments: [
           {
             view: textureView,
-            clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 0.0 },
             loadOp: 'clear',
             storeOp: 'store'
           }

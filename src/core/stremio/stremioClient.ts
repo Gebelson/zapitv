@@ -24,16 +24,26 @@ export class StremioClient {
   }
 
   private async fetchWithFallback(endpoint: string, timeoutMs = 8000): Promise<any> {
-    const directUrl = `${this.baseUrl}/${endpoint.replace(/^\/+/, '')}`;
+    const isRelative = this.baseUrl.startsWith('/');
+    const directUrl = isRelative
+      ? `${this.baseUrl}/${endpoint.replace(/^\/+/, '')}`
+      : `${this.baseUrl}/${endpoint.replace(/^\/+/, '')}`;
     
-    // First try direct fetch
+    // Se for URL relativa interna (/api/stremio/...), busca diretamente no host local
+    if (isRelative) {
+      const res = await fetch(directUrl, { signal: AbortSignal.timeout(timeoutMs) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    }
+
+    // Provedores externos: tentar direto com timeout de 4s
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      const res = await fetch(directUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
+      const res = await fetch(directUrl, { signal: AbortSignal.timeout(Math.min(timeoutMs, 4000)) });
       if (res.ok) {
-        return await res.json();
+        const text = await res.text();
+        if (text.startsWith('{') || text.startsWith('[')) {
+          return JSON.parse(text);
+        }
       }
     } catch (err) {
       // Direct fetch failed, fallback to local CORS proxy
@@ -41,17 +51,17 @@ export class StremioClient {
 
     // Fallback: proxy via server.ts
     const proxyUrl = `/api/proxy?url=${encodeURIComponent(directUrl)}`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(proxyUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeoutMs) });
       if (!res.ok) {
         throw new Error(`Proxy status: ${res.status}`);
       }
-      return await res.json();
+      const text = await res.text();
+      if (!text.startsWith('{') && !text.startsWith('[')) {
+        throw new Error('Resposta inválida do add-on (não é JSON)');
+      }
+      return JSON.parse(text);
     } catch (err: any) {
-      clearTimeout(timeoutId);
       throw new Error(`Falha ao consultar Stremio Addon [${directUrl}]: ${err.message}`);
     }
   }

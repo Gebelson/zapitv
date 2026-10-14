@@ -1,30 +1,40 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { createPortal, flushSync } from 'react-dom';
 import { Search, Bell, Sun, Moon, User as UserIcon, X, Info, AlertTriangle, Star, Settings, LogOut, Menu, Edit3, HelpCircle, ChevronRight, RefreshCw, Lock, Activity } from 'lucide-react';
-import { AppView, User, SiteNotification, Profile } from '../types';
+import { AppView, User, SiteNotification, Profile, ContentItem, ContentType } from '../types';
+import { searchService } from '../src/core/search/searchService';
 
 interface HeaderProps {
   isDarkMode: boolean;
   setIsDarkMode: (val: boolean) => void;
   currentUser: User;
   activeProfile: Profile | null;
+  currentView?: AppView;
   setCurrentView: (view: AppView) => void;
   onSwitchProfile: () => void;
   onSelectProfile: (profile: Profile) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  onSelectContent?: (item: ContentItem) => void;
+  allContent?: ContentItem[];
   notifications?: SiteNotification[];
   onLogout: () => void;
   onToggleMobileMenu?: () => void;
   onOpenDiagnostics?: () => void;
+  onSearchSubmit?: (query: string) => void;
+  onClearSearch?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
-  isDarkMode, setIsDarkMode, currentUser, activeProfile, setCurrentView, 
-  onSwitchProfile, onSelectProfile, searchQuery, setSearchQuery, notifications = [], onLogout,
-  onToggleMobileMenu, onOpenDiagnostics
+  isDarkMode, setIsDarkMode, currentUser, activeProfile, currentView = 'home', setCurrentView, 
+  onSwitchProfile, onSelectProfile, searchQuery, setSearchQuery, onSelectContent, allContent = [],
+  notifications = [], onLogout, onToggleMobileMenu, onOpenDiagnostics, onSearchSubmit, onClearSearch
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifyPanel, setShowNotifyPanel] = useState(false);
   
@@ -36,6 +46,30 @@ const Header: React.FC<HeaderProps> = ({
   
   const notifyRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Categoria e placeholder contextual de busca baseados na URL e view atual
+  const getEffectiveCategory = (): import('../src/core/search/searchService').SearchCategory => {
+    const path = location.pathname;
+    if (path.startsWith('/filmes')) return 'movies';
+    if (path.startsWith('/series')) return 'series';
+    if (path.startsWith('/animes')) return 'animes';
+    if (path.startsWith('/programas') || path.startsWith('/televisao')) return 'live';
+    return searchService.mapAppViewToCategory(currentView);
+  };
+
+  const searchCategory = getEffectiveCategory();
+  const searchPlaceholder = searchService.getPlaceholder(searchCategory);
+
+  const [suggestions, setSuggestions] = useState<ContentItem[]>([]);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+
+  // Ao mudar de rota ou view: cancela requisições pendentes e fecha dropdown
+  useEffect(() => {
+    setShowSearchDropdown(false);
+    setSuggestions([]);
+    searchService.cancelPending();
+  }, [location.pathname, currentView]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -45,6 +79,9 @@ const Header: React.FC<HeaderProps> = ({
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
       }
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSearchDropdown(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -52,6 +89,34 @@ const Header: React.FC<HeaderProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Busca sugestões com debounce enquanto o usuário digita
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
+      setSuggestions([]);
+      setShowSearchDropdown(false);
+      return;
+    }
+
+    let active = true;
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchService.getSuggestions(trimmed, searchCategory, 5, allContent);
+        if (active) {
+          setSuggestions(results);
+          setShowSearchDropdown(true);
+        }
+      } catch {
+        if (active) setSuggestions([]);
+      }
+    }, 200);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [searchQuery, searchCategory, allContent]);
 
   // Lógica de Troca de Perfil com PIN
   const handleProfileSwitchRequest = (profile: Profile) => {
@@ -237,13 +302,34 @@ const Header: React.FC<HeaderProps> = ({
           <Menu className="w-6 h-6" />
         </button>
 
-        <div className="relative flex-1">
+        <div ref={searchContainerRef} className="relative flex-1">
           <Search className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} pointer-events-none`} />
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar títulos..."
+            onFocus={() => {
+              if (searchQuery.trim().length >= 2 && suggestions.length > 0) {
+                setShowSearchDropdown(true);
+              }
+            }}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSearchQuery(val);
+              if (!val.trim() && onClearSearch) {
+                onClearSearch();
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setShowSearchDropdown(false);
+              } else if (e.key === 'Enter') {
+                setShowSearchDropdown(false);
+                if (onSearchSubmit && searchQuery.trim()) {
+                  onSearchSubmit(searchQuery.trim());
+                }
+              }
+            }}
+            placeholder={searchPlaceholder}
             className={`w-full pl-11 pr-10 py-2.5 rounded-xl border outline-none text-sm transition-all ${
               isDarkMode 
                 ? 'bg-black/40 focus:bg-black/60 text-white placeholder:text-gray-500 border-white/15 hover:border-white/25 focus:border-[#007df7]/60' 
@@ -253,7 +339,14 @@ const Header: React.FC<HeaderProps> = ({
           {searchQuery && (
             <button
               type="button"
-              onClick={() => setSearchQuery('')}
+              onClick={() => {
+                setSearchQuery('');
+                setSuggestions([]);
+                setShowSearchDropdown(false);
+                if (onClearSearch) {
+                  onClearSearch();
+                }
+              }}
               className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors cursor-pointer ${
                 isDarkMode ? 'text-gray-400 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-900 hover:bg-black/5'
               }`}
@@ -261,6 +354,81 @@ const Header: React.FC<HeaderProps> = ({
             >
               <X className="w-3.5 h-3.5" />
             </button>
+          )}
+
+          {/* Dropdown Contextual de Sugestões Rápidas */}
+          {showSearchDropdown && suggestions.length > 0 && (
+            <div className={`absolute top-full left-0 right-0 mt-2 rounded-2xl shadow-2xl border overflow-hidden z-50 backdrop-blur-xl ${
+              isDarkMode 
+                ? 'bg-[#0f131a]/95 border-white/10 text-white shadow-black/80' 
+                : 'bg-white/95 border-black/10 text-gray-900 shadow-xl'
+            }`}>
+              <div className="p-2 space-y-1 max-h-[360px] overflow-y-auto no-scrollbar">
+                {suggestions.map((item) => (
+                  <button
+                    key={`sug-${item.id}`}
+                    type="button"
+                    onClick={() => {
+                      setShowSearchDropdown(false);
+                      if (onSelectContent) {
+                        onSelectContent(item);
+                      }
+                    }}
+                    className={`w-full flex items-center gap-3 p-2 rounded-xl transition-all text-left ${
+                      isDarkMode 
+                        ? 'hover:bg-white/10 text-gray-200 hover:text-white' 
+                        : 'hover:bg-black/5 text-gray-800 hover:text-black'
+                    }`}
+                  >
+                    <img 
+                      src={item.image} 
+                      alt={item.title} 
+                      className="w-10 h-14 object-cover rounded-lg shrink-0 shadow-sm"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=200';
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">{item.title}</p>
+                      <div className="flex items-center gap-2 text-xs opacity-70 mt-0.5">
+                        <span>{item.year || ''}</span>
+                        <span>•</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                          item.type === ContentType.MOVIE ? 'bg-blue-500/20 text-blue-400' :
+                          item.type === ContentType.ANIME ? 'bg-purple-500/20 text-purple-400' :
+                          'bg-emerald-500/20 text-emerald-400'
+                        }`}>
+                          {item.type === ContentType.MOVIE ? 'Filme' :
+                           item.type === ContentType.ANIME ? 'Anime' : 'Série'}
+                        </span>
+                        {item.rating && (
+                          <>
+                            <span>•</span>
+                            <span className="text-yellow-400 font-bold">★ {item.rating.toFixed(1)}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSearchDropdown(false);
+                  if (onSearchSubmit && searchQuery.trim()) {
+                    onSearchSubmit(searchQuery.trim());
+                  }
+                }}
+                className={`w-full p-2.5 border-t text-center text-xs font-semibold cursor-pointer transition-colors ${
+                  isDarkMode 
+                    ? 'border-white/5 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white' 
+                    : 'border-black/5 bg-black/5 hover:bg-black/10 text-gray-700 hover:text-black'
+                }`}
+              >
+                Pressione Enter para ver todos os resultados
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -377,7 +545,7 @@ const Header: React.FC<HeaderProps> = ({
               <div className={`h-[1px] w-full ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`} />
 
               <div className="p-2">
-                <button onClick={() => { onSwitchProfile(); setShowDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold hover:underline opacity-80 hover:opacity-100 transition-all">
+                <button onClick={() => { navigate('/perfil'); onSwitchProfile(); setShowDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold hover:underline opacity-80 hover:opacity-100 transition-all">
                   <Edit3 className="w-4 h-4 shrink-0" />
                   Gerenciar perfis
                 </button>
@@ -386,11 +554,11 @@ const Header: React.FC<HeaderProps> = ({
               <div className={`h-[1px] w-full ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`} />
 
               <div className="p-2 space-y-1">
-                <button onClick={() => { setCurrentView('settings'); setShowDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold hover:underline opacity-80 hover:opacity-100 transition-all">
+                <button onClick={() => { navigate('/configuracoes'); setCurrentView('settings'); setShowDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold hover:underline opacity-80 hover:opacity-100 transition-all">
                   <UserIcon className="w-4 h-4 shrink-0" />
                   Configurações
                 </button>
-                <button onClick={() => { setCurrentView('help'); setShowDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold hover:underline opacity-80 hover:opacity-100 transition-all">
+                <button onClick={() => { navigate('/ajuda'); setCurrentView('help'); setShowDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold hover:underline opacity-80 hover:opacity-100 transition-all">
                   <HelpCircle className="w-4 h-4 shrink-0" />
                   Central de Ajuda
                 </button>

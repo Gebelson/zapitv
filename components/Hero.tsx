@@ -1,9 +1,10 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Play, Info, ChevronLeft, ChevronRight, Edit, X, Save, Image as ImageIcon, Type, Tag, Layout, Plus, Trash2, Layers } from 'lucide-react';
 import { ContentItem, HeroTag, ContentType } from '../types';
 import { ZapiLoader } from '../src/components/common/ZapiLoader';
+import { theatricalFilterService } from '../src/core/catalog/theatricalFilterService';
 
 interface HeroProps {
   featuredItems: ContentItem[];
@@ -44,8 +45,12 @@ const Hero: React.FC<HeroProps> = ({ featuredItems, isDarkMode, onActionClick, i
   const [newTagStyle, setNewTagStyle] = useState<'solid' | 'transparent'>('transparent');
   const [newTagColor, setNewTagColor] = useState('#ea580c');
 
-  const extendedItems = [...featuredItems, ...featuredItems, ...featuredItems];
-  const totalOriginal = featuredItems.length;
+  const sanitizedFeaturedItems = useMemo(() => {
+    return theatricalFilterService.filterAllowedMoviesSync(featuredItems);
+  }, [featuredItems]);
+
+  const extendedItems = [...sanitizedFeaturedItems, ...sanitizedFeaturedItems, ...sanitizedFeaturedItems];
+  const totalOriginal = sanitizedFeaturedItems.length;
 
   const getSlideWidth = () => {
     if (!scrollRef.current) return 0;

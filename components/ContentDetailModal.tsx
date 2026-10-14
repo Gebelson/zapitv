@@ -8,6 +8,10 @@ import { ZapiPlayer } from '../src/components/player/ZapiPlayer';
 import { storageService } from '../src/core/storage/storageService';
 import { ZapiLoader } from '../src/components/common/ZapiLoader';
 import { playbackSessionService, NavigationType } from '../src/core/session/playbackSessionService';
+import { catalogEligibilityService } from '../src/core/catalog/CatalogEligibilityService';
+import { theatricalFilterService } from '../src/core/catalog/theatricalFilterService';
+import { mediaLoadingTracker } from '../src/core/tracking/mediaLoadingTracker';
+import { mediaAvailabilityIndex } from '../src/core/catalog/MediaAvailabilityIndex';
 
 interface ContentDetailModalProps {
   item: ContentItem;
@@ -18,42 +22,44 @@ interface ContentDetailModalProps {
   onToggleList: (e: React.MouseEvent, id: string) => void;
   onToggleFavorite: (e: React.MouseEvent, id: string) => void;
   allContent: ContentItem[];
+  initialSeason?: number;
+  initialEpisode?: number;
+  autoPlayInitialEpisode?: boolean;
 }
 
 export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({ 
-  item: initialItem, onClose, isDarkMode, myList, favorites, onToggleList, onToggleFavorite, allContent 
+  item: initialItem, onClose, isDarkMode, myList, favorites, onToggleList, onToggleFavorite, allContent,
+  initialSeason, initialEpisode, autoPlayInitialEpisode
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const [item, setItem] = useState<ContentItem>(initialItem);
   const [isSimilarExpanded, setIsSimilarExpanded] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
-  const [currentSeason, setCurrentSeason] = useState(1);
+  const initialContinuity = useMemo(() => {
+    return storageService.getPlaybackContinuity(initialItem);
+  }, [initialItem]);
+
+  const [currentSeason, setCurrentSeason] = useState<number>(() => initialSeason || initialContinuity.season || 1);
   const [totalSeasons, setTotalSeasons] = useState(initialItem.seasonsCount || 1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [resolvedStreams, setResolvedStreams] = useState<StremioStream[]>([]);
   const [isLoadingStreams, setIsLoadingStreams] = useState(false);
   const [progressVersion, setProgressVersion] = useState(0);
 
+  // Auto-play episode if directed by URL deep link
+  const autoPlayTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (autoPlayInitialEpisode && initialEpisode && !autoPlayTriggeredRef.current) {
+      autoPlayTriggeredRef.current = true;
+      startPlayback(initialSeason || 1, initialEpisode, 'manual_start');
+    }
+  }, [autoPlayInitialEpisode, initialSeason, initialEpisode]);
+
   // Playback session lifecycle
   const [playbackSessionId, setPlaybackSessionId] = useState<string>('');
   const [navigationType, setNavigationType] = useState<NavigationType>('manual_start');
   const [sessionIntroPlayed, setSessionIntroPlayed] = useState<boolean>(false);
 
-  // Reage imediatamente a atualizações de progresso do player
-  useEffect(() => {
-    const handleProgressUpdate = (e: any) => {
-      if (e.detail?.contentId === item.id) {
-        setProgressVersion(v => v + 1);
-      }
-    };
-    window.addEventListener('zapitv_progress_updated', handleProgressUpdate);
-    return () => window.removeEventListener('zapitv_progress_updated', handleProgressUpdate);
-  }, [item.id]);
-
-  const getEpisodeProgress = useCallback((season: number, episode: number): number => {
-    return storageService.getSyncEpisodeProgress(item.id, season, episode);
-  }, [item.id, progressVersion]);
-  
   // Dynamic episodes from TMDB
   const [episodes, setEpisodes] = useState<{
     id: string;
@@ -70,6 +76,41 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const isFavorite = favorites.includes(item.id);
   const isInList = myList.includes(item.id);
   const hasEpisodes = item.type === ContentType.SERIES || item.type === ContentType.ANIME;
+
+  // Reage imediatamente a atualizações de progresso do player
+  useEffect(() => {
+    const handleProgressUpdate = (e: any) => {
+      const keys = storageService.getCandidateKeys(item);
+      if (keys.includes(e.detail?.contentId)) {
+        setProgressVersion(v => v + 1);
+      }
+    };
+    window.addEventListener('zapitv_progress_updated', handleProgressUpdate);
+    return () => window.removeEventListener('zapitv_progress_updated', handleProgressUpdate);
+  }, [item]);
+
+  // Sincroniza a temporada atual com o progresso do item caso o item mude
+  useEffect(() => {
+    const cont = storageService.getPlaybackContinuity(item);
+    if (cont.hasStarted && cont.season) {
+      setCurrentSeason(cont.season);
+    }
+  }, [item.id]);
+
+  // Abertura segura e estável dos detalhes: não fecha automaticamente o modal nem o player
+  useEffect(() => {
+    // Avalia silenciosamente os metadados sem encerrar a interface do usuário
+    catalogEligibilityService.evaluateItem(item).catch(() => {});
+  }, [item]);
+
+  const getEpisodeProgress = useCallback((season: number, episode: number): number => {
+    return storageService.getSyncEpisodeProgress(item.id, season, episode);
+  }, [item.id, progressVersion]);
+
+  // Continuidade de reprodução baseada no histórico salvo
+  const playbackContinuity = useMemo(() => {
+    return storageService.getPlaybackContinuity(item, totalSeasons, episodes.length);
+  }, [item, totalSeasons, episodes.length, progressVersion]);
 
   const handleClose = useCallback(() => {
     setIsClosing(true);
@@ -116,16 +157,27 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
 
   // Fetch full metadata from TMDB or Cinemeta
   useEffect(() => {
+    let active = true;
     const fetchMetadata = async () => {
       try {
         let details: any = null;
-        if (initialItem.tmdbId) {
-          details = await tmdbService.getDetails(initialItem.tmdbId, initialItem.type);
-        } else if (initialItem.imdbId || initialItem.id.startsWith('tt')) {
-          const targetImdb = initialItem.imdbId || initialItem.id;
-          details = await tmdbService.getDetailsByImdb(targetImdb, initialItem.type);
-        }
-        if (details) {
+        const fetchPromise = (async () => {
+          if (initialItem.tmdbId) {
+            return await tmdbService.getDetails(initialItem.tmdbId, initialItem.type);
+          } else if (initialItem.imdbId || initialItem.id.startsWith('tt')) {
+            const targetImdb = initialItem.imdbId || initialItem.id;
+            return await tmdbService.getDetailsByImdb(targetImdb, initialItem.type);
+          }
+          return null;
+        })();
+
+        // Timeout de 8 segundos para metadados
+        details = await Promise.race([
+          fetchPromise,
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000))
+        ]);
+
+        if (active && details) {
           setItem(prev => ({
             ...prev,
             ...details.item,
@@ -144,6 +196,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       }
     };
     fetchMetadata();
+    return () => { active = false; };
   }, [initialItem.tmdbId, initialItem.imdbId, initialItem.id, initialItem.type]);
 
   // Dynamic episodes from item, TMDB or Cinemeta
@@ -153,20 +206,50 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       setEpisodes(item.episodes);
       return;
     }
+    let active = true;
     const fetchEpisodes = async () => {
       setIsLoadingEpisodes(true);
       try {
-        let eps: any[] = [];
-        if (item.tmdbId) {
-          eps = await tmdbService.getSeasonEpisodes(item.tmdbId, currentSeason);
-        } else if (item.imdbId || item.id.startsWith('tt')) {
-          const targetImdb = item.imdbId || item.id;
-          eps = await tmdbService.getSeasonEpisodesByImdb(targetImdb, currentSeason);
+        const fetchEpPromise = (async () => {
+          if (item.tmdbId) {
+            return await tmdbService.getSeasonEpisodes(item.tmdbId, currentSeason);
+          } else if (item.imdbId || item.id.startsWith('tt')) {
+            const targetImdb = item.imdbId || item.id;
+            return await tmdbService.getSeasonEpisodesByImdb(targetImdb, currentSeason);
+          }
+          return [];
+        })();
+
+        // Timeout de 8 segundos para episódios
+        const eps = await Promise.race([
+          fetchEpPromise,
+          new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 8000))
+        ]);
+
+        if (active) {
+          if (eps && eps.length > 0) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const validEps = eps.filter((ep: any) => {
+              if (ep.releaseDate && typeof ep.releaseDate === 'string' && ep.releaseDate > todayStr) {
+                return false;
+              }
+              return true;
+            });
+            setEpisodes(validEps.length > 0 ? validEps : eps);
+          } else {
+            // Fallback dummy episodes
+            setEpisodes(Array.from({ length: 8 }).map((_, i) => ({
+              id: `ep-${item.id}-s${currentSeason}-${i + 1}`,
+              number: i + 1,
+              title: `Episódio ${i + 1}`,
+              description: 'Assista a este episódio para acompanhar os desdobramentos da trama.',
+              image: item.backdrop || item.image
+            })));
+          }
         }
-        if (eps && eps.length > 0) {
-          setEpisodes(eps);
-        } else {
-          // Fallback dummy episodes
+      } catch (e) {
+        console.warn('Erro ao carregar episódios:', e);
+        if (active) {
           setEpisodes(Array.from({ length: 8 }).map((_, i) => ({
             id: `ep-${item.id}-s${currentSeason}-${i + 1}`,
             number: i + 1,
@@ -175,13 +258,14 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
             image: item.backdrop || item.image
           })));
         }
-      } catch (e) {
-        console.warn('Erro ao carregar episódios:', e);
       } finally {
-        setIsLoadingEpisodes(false);
+        if (active) {
+          setIsLoadingEpisodes(false);
+        }
       }
     };
     fetchEpisodes();
+    return () => { active = false; };
   }, [hasEpisodes, item.tmdbId, item.imdbId, item.id, item.episodes, currentSeason, item.backdrop, item.image]);
 
   // Pre-fetch / Resolve Streams whenever play is triggered
@@ -193,23 +277,20 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     let epParams: { season: number; episode: number } | undefined = undefined;
 
     if (hasEpisodes) {
-      // 1. Determina temporada alvo
-      let targetSeason = season ?? currentEpisodeParams?.season ?? currentSeason ?? 1;
+      const isExplicitEpisodeClick = season !== undefined && episode !== undefined;
+      let targetSeason: number;
+      let targetEpisode: number;
 
-      // 2. Determina episódio alvo
-      let targetEpisode = episode ?? currentEpisodeParams?.episode;
-      if (!targetEpisode) {
-        // Se o usuário não especificou episódio (ex: clicou no botão principal 'Assistir'),
-        // recupera o último episódio salvo no histórico ou inicia no episódio 1
-        const savedProg = storageService.getSyncItemProgressRecord(item.id);
-        if (savedProg && savedProg.episode && (!season || savedProg.season === targetSeason)) {
-          targetEpisode = savedProg.episode;
-          if (savedProg.season && !season) {
-            targetSeason = savedProg.season;
-          }
-        } else {
-          targetEpisode = 1;
-        }
+      if (isExplicitEpisodeClick) {
+        // Seleção manual de episódio na lista é soberana
+        targetSeason = season;
+        targetEpisode = episode;
+      } else {
+        // Clique no botão principal "Assistir" ou "Continuar assistindo":
+        // Consulta a continuidade como fonte única da verdade
+        const cont = storageService.getPlaybackContinuity(item, totalSeasons, episodes.length);
+        targetSeason = cont.season || currentSeason || 1;
+        targetEpisode = cont.episode || 1;
       }
 
       epParams = { season: targetSeason, episode: targetEpisode };
@@ -236,6 +317,20 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     setIsLoadingStreams(true);
     setResolvedStreams([]);
 
+    // Telemetria do Tracker
+    mediaLoadingTracker.startTrace(
+      item.id,
+      item.title,
+      item.type,
+      epParams?.season,
+      epParams?.episode
+    );
+    mediaLoadingTracker.transition(item.id, 'PREPARING_PLAYER', {
+      navType,
+      season: epParams?.season,
+      episode: epParams?.episode
+    });
+
     try {
       const streams = await providerRegistry.resolveStreams(
         item.type === ContentType.MOVIE ? 'movie' : (item.type === ContentType.ANIME ? 'anime' : 'series'),
@@ -243,8 +338,21 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
         epParams
       );
       setResolvedStreams(streams);
-    } catch (err) {
+      if (streams.length > 0) {
+        mediaLoadingTracker.transition(item.id, 'BUFFERING', {
+          streamCount: streams.length,
+          bestStream: streams[0]?.title
+        });
+      } else {
+        mediaLoadingTracker.transition(item.id, 'UNAVAILABLE', {
+          reason: 'Nenhum provedor retornou streams reproduzíveis'
+        });
+      }
+    } catch (err: any) {
       console.error('Erro ao resolver provedores:', err);
+      mediaLoadingTracker.transition(item.id, 'ERROR', {
+        error: err?.message || 'Falha ao resolver provedores'
+      });
     } finally {
       setIsLoadingStreams(false);
     }
@@ -304,9 +412,12 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     return null;
   }, [hasEpisodes, currentEpisodeParams, currentSeason, episodes, totalSeasons]);
 
-  const similarTitles = allContent
-    .filter(c => c.id !== item.id && (c.genres?.some(g => item.genres?.includes(g)) || c.type === item.type))
-    .slice(0, 12);
+  const similarTitles = catalogEligibilityService.filterEligibleItemsSync(
+    allContent.filter(c => 
+      c.id !== item.id && 
+      (c.genres?.some(g => item.genres?.includes(g)) || c.type === item.type)
+    )
+  ).slice(0, 12);
 
   const initialSimilar = similarTitles.slice(0, 6);
   const extraSimilar = similarTitles.slice(6);
@@ -416,6 +527,16 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
               <div className="absolute bottom-0 left-0 w-full px-6 md:px-12 pb-8 md:pb-12 z-20 flex flex-col justify-end h-full">
                 {/* Badges de Disponibilidade e Idioma Real */}
                 <div className="flex flex-wrap items-center gap-2 mb-3">
+                  {typeof item.displayRank === 'number' && (
+                    <span className="px-3 py-1 rounded-full text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-lg flex items-center gap-1.5 border border-amber-300/60">
+                      <span>#{item.displayRank} Em Destaque</span>
+                      {item.imdbRank && (
+                        <span className="text-[10px] font-bold text-black/75 font-mono">
+                          (IMDb #{item.imdbRank})
+                        </span>
+                      )}
+                    </span>
+                  )}
                   {item.audioStatus === 'pt-br-original' && (
                     <span className="px-3 py-1 rounded-full text-xs font-black bg-blue-500/20 text-blue-400 border border-blue-500/40 backdrop-blur-md flex items-center gap-1.5 shadow-lg">
                       🇧🇷 Áudio Original PT-BR Confirmado
@@ -444,11 +565,15 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                 
                 <div className="flex items-center gap-3 md:gap-4">
                   <button 
-                    className="flex items-center gap-2 px-6 md:px-8 py-3 md:py-3.5 bg-[#007df7] text-white rounded-2xl font-black text-sm md:text-lg hover:bg-[#0069d9] transition-all hover:scale-105 shadow-xl shadow-[#007df7]/20"
+                    className="flex items-center gap-2.5 px-6 md:px-8 py-3 md:py-3.5 bg-[#007df7] text-white rounded-2xl font-black text-sm md:text-lg hover:bg-[#0069d9] transition-all hover:scale-105 shadow-xl shadow-[#007df7]/20"
                     onClick={() => startPlayback(undefined, undefined, 'manual_start')}
                   >
                     <Play className="w-5 h-5 md:w-6 md:h-6 fill-current" />
-                    Assistir
+                    <span>
+                      {hasEpisodes && playbackContinuity.hasStarted && !playbackContinuity.isCompleted
+                        ? `Continuar (${playbackContinuity.label})`
+                        : (playbackContinuity.hasStarted && !playbackContinuity.isCompleted ? 'Continuar assistindo' : 'Assistir')}
+                    </span>
                   </button>
                   <button 
                     onClick={(e) => onToggleFavorite(e, item.id)} 

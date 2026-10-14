@@ -151,6 +151,14 @@ export class AiEnhancerService {
   public onStatusChange(callback: (status: 'off' | 'initializing' | 'active' | 'unavailable') => void): () => void {
     return videoEnhancer.onStatusChange(callback);
   }
+
+  public isRendering(): boolean {
+    return videoEnhancer.isRendering();
+  }
+
+  public onRenderingChange(callback: (isRendering: boolean) => void): () => void {
+    return videoEnhancer.onRenderingChange(callback);
+  }
 }
 
 export const aiEnhancerService = new AiEnhancerService();

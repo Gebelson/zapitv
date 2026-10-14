@@ -13,10 +13,18 @@ import { LiveTvPlayer } from '../src/components/livetv/LiveTvPlayer';
 
 interface ProgramasViewProps {
   isDarkMode: boolean;
+  initialMode?: 'televisao' | 'programas';
 }
 
-const ProgramasView: React.FC<ProgramasViewProps> = ({ isDarkMode }) => {
-  const [preferences, setPreferences] = useState(() => liveTvPreferences.getState());
+const ProgramasView: React.FC<ProgramasViewProps> = ({ isDarkMode, initialMode }) => {
+  const [preferences, setPreferences] = useState(() => {
+    const base = liveTvPreferences.getState();
+    if (initialMode && base.activeMode !== initialMode) {
+      liveTvPreferences.setActiveMode(initialMode);
+      return { ...base, activeMode: initialMode };
+    }
+    return base;
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [allChannels, setAllChannels] = useState<LiveChannel[]>(() => channelRegistry.getAllChannels());
   const [activeChannel, setActiveChannel] = useState<LiveChannel>(() => {
@@ -145,11 +153,6 @@ const ProgramasView: React.FC<ProgramasViewProps> = ({ isDarkMode }) => {
                   <span>Televisão</span>
                 </button>
               </div>
-
-              {/* Contagem Real Calculada Dinamicamente pelo Agregador */}
-              <span className="text-xs sm:text-sm font-bold text-gray-400 uppercase tracking-widest mt-1.5 block">
-                {availableCount} canais disponíveis e verificados
-              </span>
             </div>
           </div>
         </div>

@@ -16,6 +16,7 @@ export interface PlaybackSession {
   episode?: number;
   navigationType: NavigationType;
   introPlayed: boolean;
+  nonDubbedConfirmed?: boolean;
   startedAt: number;
   lastActiveAt: number;
 }
@@ -105,6 +106,28 @@ class PlaybackSessionService {
     if (!this.currentSession) return true;
     if (sessionId && this.currentSession.sessionId !== sessionId) return true;
     return this.currentSession.introPlayed;
+  }
+
+  /**
+   * Registra a confirmação de reprodução no idioma original para a sessão atual,
+   * evitando que o mesmo modal reapareça a cada episódio na mesma sessão.
+   */
+  public markNonDubbedConfirmed(sessionId?: string): void {
+    if (!this.currentSession) return;
+    if (sessionId && this.currentSession.sessionId !== sessionId) return;
+
+    this.currentSession.nonDubbedConfirmed = true;
+    this.currentSession.lastActiveAt = Date.now();
+    this.notifyListeners();
+  }
+
+  /**
+   * Retorna se a confirmação no idioma original já foi concedida nesta sessão.
+   */
+  public isNonDubbedConfirmed(sessionId?: string): boolean {
+    if (!this.currentSession) return false;
+    if (sessionId && this.currentSession.sessionId !== sessionId) return false;
+    return Boolean(this.currentSession.nonDubbedConfirmed);
   }
 
   /**

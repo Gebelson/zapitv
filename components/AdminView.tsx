@@ -5,12 +5,16 @@ import {
   Shield, Trash2, Search, Filter, Users, DollarSign, 
   X, Save, LayoutGrid, Plus, Film, Send, Download, Upload,
   Edit3, Trash, Star, Bell, Megaphone, CheckCircle, Info, AlertTriangle, Lock, Mail, Image as ImageIcon, CloudSync, Tv, Sparkles, Key, Play, Activity, Check,
-  ShieldAlert, Ban, AlertOctagon
+  ShieldAlert, Ban, AlertOctagon, Flame, RefreshCw
 } from 'lucide-react';
 import { User, ContentItem, ContentType, SiteNotification } from '../types';
 import { providerRegistry, ProviderConfig } from '../src/core/providers/providerRegistry';
 import { StremioStream } from '../src/core/stremio/stremioTypes';
 import { videoAdBlocker, AdAuditRecord, AdAuditStatus } from '../src/core/security/videoAdBlocker';
+import { catalogEligibilityService, MediaEligibilityRecord } from '../src/core/catalog/CatalogEligibilityService';
+import { featuredRankingService } from '../src/core/rankings/FeaturedRankingService';
+import { FeaturedSelectionResult, FeaturedAuditItem } from '../src/core/rankings/featuredRankingTypes';
+import { imdbWeeklyRankingService, CorrespondenceAuditResult } from '../src/core/rankings/IMDbWeeklyRankingService';
 
 interface AdminViewProps {
   isDarkMode: boolean;
@@ -30,13 +34,70 @@ const AdminView: React.FC<AdminViewProps> = ({
   content, onAddContent, onUpdateContent, onDeleteContent,
   onSendGlobalNotification, onClearNotifications
 }) => {
-  const [activeTab, setActiveTab] = useState<'providers' | 'users' | 'catalog' | 'notifications' | 'database' | 'video_ads'>('providers');
+  const [activeTab, setActiveTab] = useState<'providers' | 'eligibility' | 'video_ads' | 'rankings' | 'users' | 'catalog' | 'notifications' | 'database'>('providers');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingMedia, setEditingMedia] = useState<ContentItem | null>(null);
   const [showAddMedia, setShowAddMedia] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importText, setImportText] = useState('');
   const [importStatus, setImportStatus] = useState('');
+
+  // Diagnóstico e Gestão de Rankings Em Destaque (IMDb)
+  const [featuredData, setFeaturedData] = useState<FeaturedSelectionResult>(() => featuredRankingService.getFeaturedSelectionSync());
+  const [isUpdatingFeatured, setIsUpdatingFeatured] = useState(false);
+  const [featuredAuditCategory, setFeaturedAuditCategory] = useState<'all' | 'movies' | 'series'>('all');
+  const [featuredAuditStatus, setFeaturedAuditStatus] = useState<'all' | 'approved' | 'rejected'>('all');
+  const [featuredSearchTerm, setFeaturedSearchTerm] = useState('');
+
+  // Auditoria de Correspondência Oficial com IMDb
+  const [correspondenceResult, setCorrespondenceResult] = useState<CorrespondenceAuditResult | null>(null);
+  const [showCorrespondenceModal, setShowCorrespondenceModal] = useState(false);
+  const [showImportSnapshotModal, setShowImportSnapshotModal] = useState(false);
+  const [importSnapshotJson, setImportSnapshotJson] = useState('');
+  const [importSnapshotError, setImportSnapshotError] = useState('');
+
+  React.useEffect(() => {
+    return featuredRankingService.subscribe((res) => {
+      setFeaturedData(res);
+    });
+  }, []);
+
+  const handleRefreshFeatured = async () => {
+    setIsUpdatingFeatured(true);
+    try {
+      const res = await featuredRankingService.refreshFeaturedSelection(content);
+      setFeaturedData(res);
+    } finally {
+      setIsUpdatingFeatured(false);
+    }
+  };
+
+  const handleVerifyCorrespondence = () => {
+    const res = imdbWeeklyRankingService.verifyCorrespondence(
+      featuredData.featuredMovies,
+      featuredData.featuredSeries
+    );
+    setCorrespondenceResult(res);
+    setShowCorrespondenceModal(true);
+  };
+
+  const handleImportSnapshotSubmit = () => {
+    try {
+      setImportSnapshotError('');
+      const parsed = JSON.parse(importSnapshotJson);
+      const res = imdbWeeklyRankingService.importAuthorizedSnapshot(parsed);
+      if (!res.success) {
+        setImportSnapshotError(res.message);
+        return;
+      }
+      const updated = featuredRankingService.recomputeFeaturedSelectionSync(content);
+      setFeaturedData(updated);
+      setShowImportSnapshotModal(false);
+      setImportSnapshotJson('');
+    } catch (e: any) {
+      setImportSnapshotError(e?.message || 'JSON inválido');
+    }
+  };
   
   // Stremio Providers State
   const [providers, setProviders] = useState<ProviderConfig[]>(() => providerRegistry.getProviders());
@@ -48,6 +109,21 @@ const AdminView: React.FC<AdminViewProps> = ({
   const [newProvUrl, setNewProvUrl] = useState('');
   const [newProvType, setNewProvType] = useState<ProviderConfig['type']>('stremio-addon');
   
+  // Auditoria de Elegibilidade & Disponibilidade de Fontes
+  const [eligibilityRecords, setEligibilityRecords] = useState<MediaEligibilityRecord[]>(() => catalogEligibilityService.getAllRecords());
+  const [eligibilitySearch, setEligibilitySearch] = useState('');
+  const [eligibilityFilter, setEligibilityFilter] = useState<'all' | 'approved' | 'rejected' | 'not_released' | 'in_theaters'>('all');
+  const [auditQueryInput, setAuditQueryInput] = useState('');
+  const [isAuditingItem, setIsAuditingItem] = useState(false);
+  const [auditResultRecord, setAuditResultRecord] = useState<MediaEligibilityRecord | null>(null);
+
+  // Subscrever às atualizações do CatalogEligibilityService
+  React.useEffect(() => {
+    return catalogEligibilityService.subscribe(() => {
+      setEligibilityRecords(catalogEligibilityService.getAllRecords());
+    });
+  }, []);
+
   // Auditoria de Propaganda Embutida (1xBet / Apostas)
   const [adRecords, setAdRecords] = useState<AdAuditRecord[]>(() => videoAdBlocker.getAuditRecords());
   const [adStatusFilter, setAdStatusFilter] = useState<'todos' | AdAuditStatus>('todos');
@@ -500,7 +576,9 @@ const AdminView: React.FC<AdminViewProps> = ({
         <div className="flex flex-wrap gap-2 p-1.5 rounded-2xl bg-black/10 backdrop-blur-md">
           {[
             { id: 'providers', label: 'PROVEDORES STREMIO', icon: Tv, color: 'bg-orange-600' },
+            { id: 'eligibility', label: 'ELEGIBILIDADE & FONTES', icon: Activity, color: 'bg-indigo-600' },
             { id: 'video_ads', label: 'PROPAGANDA (1XBET)', icon: ShieldAlert, color: 'bg-red-600' },
+            { id: 'rankings', label: 'EM DESTAQUE (IMDb)', icon: Flame, color: 'bg-amber-600' },
             { id: 'users', label: 'ASSINANTES', icon: Users, color: 'bg-blue-600' },
             { id: 'catalog', label: 'CATÁLOGO', icon: Film, color: 'bg-[#007df7]' },
             { id: 'notifications', label: 'COMUNICADOS', icon: Bell, color: 'bg-purple-600' },
@@ -765,6 +843,293 @@ const AdminView: React.FC<AdminViewProps> = ({
               </div>
             </div>
           </div>
+        ) : activeTab === 'eligibility' ? (
+          <div className="space-y-8">
+            {/* Header info e Estatísticas */}
+            <div className={`p-8 rounded-3xl border ${isDarkMode ? 'bg-[#151C26]/40 border-gray-800' : 'bg-white shadow-xl'}`}>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-xl font-black flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-indigo-500" /> Diagnóstico Central de Elegibilidade e Fontes Reais
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Separação estrita de Lançamento vs. Reprodução Real. Títulos futuros, em cartaz ou sem fontes funcionais são excluídos antes da renderização.
+                  </p>
+                </div>
+              </div>
+
+              {/* Grid de Métricas */}
+              {(() => {
+                const stats = catalogEligibilityService.getStats();
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Total Avaliados</p>
+                      <p className="text-2xl font-black text-white mt-1">{stats.totalEvaluated}</p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-green-500/10 border border-green-500/20 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-green-400">Aprovados</p>
+                      <p className="text-2xl font-black text-green-400 mt-1">{stats.approvedCount}</p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-red-400">Não Lançados</p>
+                      <p className="text-2xl font-black text-red-400 mt-1">{stats.notReleasedCount}</p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-amber-400">Em Cartaz (BR)</p>
+                      <p className="text-2xl font-black text-amber-400 mt-1">{stats.inTheatersCount}</p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-rose-400">Sem Fontes</p>
+                      <p className="text-2xl font-black text-rose-400 mt-1">{stats.unavailableSourceCount}</p>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-center">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-purple-400">Erros Temp.</p>
+                      <p className="text-2xl font-black text-purple-400 mt-1">{stats.temporaryErrorCount}</p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Testador / Auditor em Tempo Real */}
+            <div className={`p-8 rounded-3xl border ${isDarkMode ? 'bg-[#151C26]/40 border-gray-800' : 'bg-white shadow-xl'}`}>
+              <h4 className="text-sm font-black uppercase tracking-wider text-indigo-400 mb-4 flex items-center gap-2">
+                <Search className="w-4 h-4" /> Auditar Título ou IMDb ID em Tempo Real
+              </h4>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  placeholder="Ex: VisionQuest, Tyson, Profundezas, O Intruso, tt0111161..."
+                  value={auditQueryInput}
+                  onChange={e => setAuditQueryInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (async () => {
+                    if (!auditQueryInput.trim()) return;
+                    setIsAuditingItem(true);
+                    setAuditResultRecord(null);
+                    try {
+                      const existing = content.find(c => 
+                        c.title.toLowerCase().includes(auditQueryInput.toLowerCase()) || 
+                        c.id === auditQueryInput || 
+                        c.imdbId === auditQueryInput
+                      );
+                      const targetItem: ContentItem = existing || {
+                        id: auditQueryInput.startsWith('tt') ? auditQueryInput : `query-${Date.now()}`,
+                        imdbId: auditQueryInput.startsWith('tt') ? auditQueryInput : undefined,
+                        title: auditQueryInput.trim(),
+                        type: ContentType.MOVIE,
+                        rating: 7.0,
+                        year: 2026,
+                        image: '',
+                        genres: []
+                      };
+                      const res = await catalogEligibilityService.evaluateItem(targetItem);
+                      setAuditResultRecord(res);
+                    } catch (err) {
+                      console.error(err);
+                    } finally {
+                      setIsAuditingItem(false);
+                    }
+                  })()}
+                  className={`flex-1 p-3.5 rounded-2xl border outline-none font-bold text-sm ${
+                    isDarkMode ? 'bg-white/5 border-gray-800 text-white' : 'bg-gray-100 border-gray-200 text-gray-900'
+                  }`}
+                />
+                <button
+                  disabled={isAuditingItem || !auditQueryInput.trim()}
+                  onClick={async () => {
+                    if (!auditQueryInput.trim()) return;
+                    setIsAuditingItem(true);
+                    setAuditResultRecord(null);
+                    try {
+                      const existing = content.find(c => 
+                        c.title.toLowerCase().includes(auditQueryInput.toLowerCase()) || 
+                        c.id === auditQueryInput || 
+                        c.imdbId === auditQueryInput
+                      );
+                      const targetItem: ContentItem = existing || {
+                        id: auditQueryInput.startsWith('tt') ? auditQueryInput : `query-${Date.now()}`,
+                        imdbId: auditQueryInput.startsWith('tt') ? auditQueryInput : undefined,
+                        title: auditQueryInput.trim(),
+                        type: ContentType.MOVIE,
+                        rating: 7.0,
+                        year: 2026,
+                        image: '',
+                        genres: []
+                      };
+                      const res = await catalogEligibilityService.evaluateItem(targetItem);
+                      setAuditResultRecord(res);
+                    } catch (err) {
+                      console.error(err);
+                    } finally {
+                      setIsAuditingItem(false);
+                    }
+                  }}
+                  className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-2xl font-black text-xs tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/20"
+                >
+                  {isAuditingItem ? <Activity className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+                  {isAuditingItem ? 'AUDITANDO...' : 'AUDITAR AGORA'}
+                </button>
+              </div>
+
+              {/* Resultado do Teste em Tempo Real */}
+              {auditResultRecord && (
+                <div className="mt-6 p-6 rounded-2xl bg-black/30 border border-white/10 space-y-4 animate-in fade-in">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-4">
+                    <div>
+                      <h5 className="text-base font-black text-white">{auditResultRecord.title}</h5>
+                      <span className="text-xs text-gray-400 font-mono">ID: {auditResultRecord.canonicalId} • {auditResultRecord.mediaType.toUpperCase()}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-3 py-1 rounded-full text-xs font-black tracking-wider ${
+                        auditResultRecord.isPubliclyPlayable
+                          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                      }`}>
+                        {auditResultRecord.isPubliclyPlayable ? '✓ ELEGÍVEL / REPRODUZÍVEL' : '✕ INELIGÍVEL (OCULTADO)'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+                      <p className="text-gray-400 font-bold mb-1">Status Lançamento</p>
+                      <p className="font-mono font-black text-white">{auditResultRecord.releaseStatus}</p>
+                    </div>
+                    <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+                      <p className="text-gray-400 font-bold mb-1">Status Reprodução</p>
+                      <p className="font-mono font-black text-white">{auditResultRecord.playbackStatus}</p>
+                    </div>
+                    <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+                      <p className="text-gray-400 font-bold mb-1">Fontes Válidas</p>
+                      <p className="font-mono font-black text-white">{auditResultRecord.validSourceCount} / {auditResultRecord.candidateSourceCount}</p>
+                    </div>
+                    <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+                      <p className="text-gray-400 font-bold mb-1">Melhor Qualidade</p>
+                      <p className="font-mono font-black text-white">{auditResultRecord.bestQuality || 'N/A'}</p>
+                    </div>
+                  </div>
+
+                  {auditResultRecord.rejectionReasons.length > 0 && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-300">
+                      <p className="font-bold mb-1">Motivos da Inelegibilidade:</p>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        {auditResultRecord.rejectionReasons.map((r, i) => (
+                          <li key={i}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Tabela de Títulos Auditados */}
+            <div className={`p-8 rounded-3xl border ${isDarkMode ? 'bg-[#151C26]/40 border-gray-800' : 'bg-white shadow-xl'}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <h4 className="text-sm font-black uppercase tracking-wider text-white">
+                  Títulos Avaliados no Índice ({eligibilityRecords.length})
+                </h4>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    placeholder="Filtrar por título..."
+                    value={eligibilitySearch}
+                    onChange={e => setEligibilitySearch(e.target.value)}
+                    className="p-2.5 px-4 rounded-xl text-xs font-bold bg-white/5 border border-white/10 text-white outline-none"
+                  />
+                  <select
+                    value={eligibilityFilter}
+                    onChange={e => setEligibilityFilter(e.target.value as any)}
+                    className="p-2.5 rounded-xl text-xs font-bold bg-white/5 border border-white/10 text-white outline-none"
+                  >
+                    <option value="all" className="bg-[#151C26]">Todos</option>
+                    <option value="approved" className="bg-[#151C26]">Apenas Aprovados</option>
+                    <option value="rejected" className="bg-[#151C26]">Apenas Rejeitados</option>
+                    <option value="not_released" className="bg-[#151C26]">Não Lançados</option>
+                    <option value="in_theaters" className="bg-[#151C26]">Em Cartaz</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-white/10 text-[10px] uppercase font-black text-gray-400 tracking-wider">
+                      <th className="py-3 px-4">Título</th>
+                      <th className="py-3 px-4">Tipo</th>
+                      <th className="py-3 px-4">Lançamento</th>
+                      <th className="py-3 px-4">Reprodução</th>
+                      <th className="py-3 px-4 text-center">Fontes</th>
+                      <th className="py-3 px-4 text-center">Decisão</th>
+                      <th className="py-3 px-4">Motivo / Revalidação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {eligibilityRecords
+                      .filter(r => {
+                        if (eligibilitySearch.trim()) {
+                          const q = eligibilitySearch.toLowerCase();
+                          if (!r.title.toLowerCase().includes(q) && !r.canonicalId.toLowerCase().includes(q)) return false;
+                        }
+                        if (eligibilityFilter === 'approved') return r.isPubliclyPlayable;
+                        if (eligibilityFilter === 'rejected') return !r.isPubliclyPlayable;
+                        if (eligibilityFilter === 'not_released') return r.releaseStatus === 'NOT_RELEASED';
+                        if (eligibilityFilter === 'in_theaters') return r.releaseStatus === 'IN_THEATERS';
+                        return true;
+                      })
+                      .slice(0, 100)
+                      .map((rec) => (
+                        <tr key={rec.canonicalId} className="hover:bg-white/5 transition-colors">
+                          <td className="py-3 px-4 font-bold text-white">
+                            <div>{rec.title}</div>
+                            <span className="text-[10px] font-mono text-gray-500">{rec.canonicalId}</span>
+                          </td>
+                          <td className="py-3 px-4 uppercase text-[10px] font-black text-gray-400">{rec.mediaType}</td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              rec.releaseStatus === 'RELEASED'
+                                ? 'bg-green-500/20 text-green-400'
+                                : rec.releaseStatus === 'IN_THEATERS'
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}>
+                              {rec.releaseStatus}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              rec.playbackStatus === 'AVAILABLE'
+                                ? 'bg-green-500/20 text-green-400'
+                                : rec.playbackStatus === 'TEMPORARY_ERROR'
+                                ? 'bg-purple-500/20 text-purple-400'
+                                : 'bg-rose-500/20 text-rose-400'
+                            }`}>
+                              {rec.playbackStatus}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center font-mono font-bold">
+                            {rec.validSourceCount} / {rec.candidateSourceCount}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                              rec.isPubliclyPlayable
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                            }`}>
+                              {rec.isPubliclyPlayable ? 'APROVADO' : 'OCULTADO'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-gray-400 text-[11px] max-w-xs truncate">
+                            {rec.rejectionReasons.length > 0 ? rec.rejectionReasons.join('; ') : 'Fonte válida autorizada'}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         ) : activeTab === 'video_ads' ? (
           <div className="space-y-8">
             {/* Header info */}
@@ -994,6 +1359,429 @@ const AdminView: React.FC<AdminViewProps> = ({
               </div>
             </div>
           </div>
+        ) : activeTab === 'rankings' ? (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            {/* Header com Diagnóstico e Métricas */}
+            <div className={`p-8 rounded-3xl border ${isDarkMode ? 'bg-[#151C26]/40 border-gray-800' : 'bg-white shadow-xl'}`}>
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-white/10">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                      <Flame className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-white">
+                        Diagnóstico de Rankings Em Destaque (IMDb Semanal)
+                      </h3>
+                      <p className="text-xs text-gray-400">
+                        Classificação semanal automática do IMDb (MOVIEmeter e TVmeter) cruzada com disponibilidade real do ZapiTV.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={handleVerifyCorrespondence}
+                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-blue-500/20 cursor-pointer"
+                    title="Auditar correspondência dos 10 filmes e 10 séries com o snapshot oficial do IMDb"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Verificar correspondência
+                  </button>
+                  <button
+                    onClick={() => setShowImportSnapshotModal(true)}
+                    className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-2 border border-white/10 cursor-pointer"
+                    title="Importar snapshot autorizado do IMDb em JSON"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Importar Snapshot
+                  </button>
+                  <button
+                    onClick={handleRefreshFeatured}
+                    disabled={isUpdatingFeatured}
+                    className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-black font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-amber-500/20 disabled:opacity-50 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isUpdatingFeatured ? 'animate-spin' : ''}`} />
+                    {isUpdatingFeatured ? 'Atualizando...' : 'Atualizar agora'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Banner de Erro/Fallback (se houver tentativa com falha) */}
+              {featuredData.lastErrorReason && (
+                <div className="mt-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span><strong>Aviso de Atualização:</strong> {featuredData.lastErrorReason}. A seleção anterior validada foi mantida atomicamente sem descontinuidade no catálogo.</span>
+                  </div>
+                  <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    Fallback Seguro Ativo
+                  </span>
+                </div>
+              )}
+
+              {/* Cards de Métricas Principais da Semana */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                <div className="p-4 rounded-2xl bg-black/20 border border-white/5">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">Ranking da Semana</p>
+                  <p className="text-base font-black text-white">{featuredData.weekLabel || 'Semana Recente'}</p>
+                  <span className="text-[10px] font-mono text-amber-400 mt-1 block">
+                    Ref: {featuredData.referenceDate || 'IMDb Atual'} • MOVIEmeter & TVmeter
+                  </span>
+                </div>
+                <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-blue-400 mb-1">Última Versão Válida</p>
+                  <p className="text-2xl font-black text-blue-400">
+                    {featuredData.featuredMovies.length} Filmes <span className="text-sm font-normal text-gray-300">• {featuredData.featuredSeries.length} Séries</span>
+                  </p>
+                  <span className="text-[10px] text-gray-400">
+                    Total: {featuredData.totalCandidatesEvaluated.movies + featuredData.totalCandidatesEvaluated.series} candidatos examinados
+                  </span>
+                </div>
+                <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-purple-400 mb-1">Próxima Atualização Prevista</p>
+                  <p className="text-xs font-black text-purple-300 leading-snug">
+                    {featuredData.nextScheduledUpdateFormatted || 'Segunda-feira às 06:00 (BRT)'}
+                  </p>
+                  <span className="text-[10px] text-gray-400 mt-1 block">
+                    Vercel Cron: 0 9 * * 1 (UTC-3)
+                  </span>
+                </div>
+                <div className="p-4 rounded-2xl bg-black/20 border border-white/5">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">Data da Última Atualização</p>
+                  <p className="text-sm font-bold text-gray-200">
+                    {new Date(featuredData.lastUpdatedAt).toLocaleDateString('pt-BR')} às {new Date(featuredData.lastUpdatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  <span className="text-[10px] text-emerald-400 font-mono mt-1 block">
+                    ✓ {featuredData.updateStatus === 'SUCCESS' ? 'Publicação Atômica Concluída' : featuredData.updateStatus === 'UP_TO_DATE' ? 'Sincronizado (Sem novos dados)' : 'Cache Persistente em Disco'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* TABELAS DE APROVADOS (TOP 10 FILMES & TOP 10 SÉRIES) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* TOP 10 FILMES APROVADOS */}
+              <div className={`p-6 rounded-3xl border ${isDarkMode ? 'bg-[#151C26]/40 border-gray-800' : 'bg-white shadow-xl'}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Film className="w-5 h-5 text-[#007df7]" />
+                    <h4 className="font-black text-base text-white">Top 10 Filmes Elegíveis</h4>
+                  </div>
+                  <span className="text-xs font-bold text-[#007df7] bg-[#007df7]/10 px-2 py-0.5 rounded-lg border border-[#007df7]/20">
+                    {featuredData.featuredMovies.length} de 10
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {featuredData.auditTrail.approvedMovies.map((item) => (
+                    <div key={`app-m-${item.imdbId}`} className="p-3 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
+                          #{item.finalPosition}
+                        </span>
+                        <div className="truncate">
+                          <p className="font-bold text-xs text-white truncate">{item.title}</p>
+                          <p className="text-[10px] text-gray-400 font-mono">
+                            IMDb #{item.rankPosition} • {item.imdbId} • {item.year || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {item.hasAudioPtBr ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded">
+                            PT-BR
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-white/10 text-gray-300 rounded">
+                            Original
+                          </span>
+                        )}
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          Elegível
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* TOP 10 SÉRIES APROVADAS */}
+              <div className={`p-6 rounded-3xl border ${isDarkMode ? 'bg-[#151C26]/40 border-gray-800' : 'bg-white shadow-xl'}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Tv className="w-5 h-5 text-purple-400" />
+                    <h4 className="font-black text-base text-white">Top 10 Séries Elegíveis</h4>
+                  </div>
+                  <span className="text-xs font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-lg border border-purple-500/20">
+                    {featuredData.featuredSeries.length} de 10
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {featuredData.auditTrail.approvedSeries.map((item) => (
+                    <div key={`app-s-${item.imdbId}`} className="p-3 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30">
+                          #{item.finalPosition}
+                        </span>
+                        <div className="truncate">
+                          <p className="font-bold text-xs text-white truncate">{item.title}</p>
+                          <p className="text-[10px] text-gray-400 font-mono">
+                            IMDb #{item.rankPosition} • {item.imdbId} • {item.year || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {item.hasAudioPtBr ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-blue-600/20 text-blue-400 rounded">
+                            PT-BR
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-white/10 text-gray-300 rounded">
+                            Original
+                          </span>
+                        )}
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          Elegível
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* PAINEL DE AUDITORIA INTERNO DE CANDIDATOS (SEÇÃO 16) */}
+            <div className={`p-8 rounded-3xl border ${isDarkMode ? 'bg-[#151C26]/40 border-gray-800' : 'bg-white shadow-xl'}`}>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h4 className="text-lg font-black text-white flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-400" />
+                    Painel de Auditoria de Candidatos & Elegibilidade (IMDb)
+                  </h4>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Rastreamento completo de todos os candidatos do MOVIEmeter e TVmeter avaliados na ordem estrita de popularidade.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Filtro de Categoria */}
+                  <div className="flex rounded-xl bg-white/5 p-1 border border-white/10">
+                    <button
+                      onClick={() => setFeaturedAuditCategory('all')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${featuredAuditCategory === 'all' ? 'bg-amber-500 text-black' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Todos
+                    </button>
+                    <button
+                      onClick={() => setFeaturedAuditCategory('movies')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${featuredAuditCategory === 'movies' ? 'bg-[#007df7] text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Filmes
+                    </button>
+                    <button
+                      onClick={() => setFeaturedAuditCategory('series')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${featuredAuditCategory === 'series' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Séries
+                    </button>
+                  </div>
+
+                  {/* Filtro de Status de Elegibilidade */}
+                  <div className="flex rounded-xl bg-white/5 p-1 border border-white/10">
+                    <button
+                      onClick={() => setFeaturedAuditStatus('all')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${featuredAuditStatus === 'all' ? 'bg-white/20 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Todos
+                    </button>
+                    <button
+                      onClick={() => setFeaturedAuditStatus('approved')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${featuredAuditStatus === 'approved' ? 'bg-emerald-500 text-black' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Apenas Aprovados
+                    </button>
+                    <button
+                      onClick={() => setFeaturedAuditStatus('rejected')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${featuredAuditStatus === 'rejected' ? 'bg-red-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Apenas Descartados
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    placeholder="Filtrar por título, ID ou motivo..."
+                    value={featuredSearchTerm}
+                    onChange={(e) => setFeaturedSearchTerm(e.target.value)}
+                    className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-gray-500 outline-none w-56"
+                  />
+                </div>
+              </div>
+
+              {/* Tabela Unificada de 10 Colunas */}
+              {(() => {
+                const allItems: FeaturedAuditItem[] = [
+                  ...featuredData.auditTrail.approvedMovies,
+                  ...featuredData.auditTrail.approvedSeries,
+                  ...featuredData.auditTrail.rejectedMovies,
+                  ...featuredData.auditTrail.rejectedSeries
+                ];
+
+                // Ordenar por tipo e rank do IMDb
+                allItems.sort((a, b) => {
+                  if (a.mediaType !== b.mediaType) {
+                    return a.mediaType === 'movie' ? -1 : 1;
+                  }
+                  return (a.imdbRank || a.rankPosition) - (b.imdbRank || b.rankPosition);
+                });
+
+                const filtered = allItems.filter(item => {
+                  const matchesCat = featuredAuditCategory === 'all' || 
+                    (featuredAuditCategory === 'movies' && item.mediaType === 'movie') ||
+                    (featuredAuditCategory === 'series' && item.mediaType === 'series');
+                  
+                  const matchesStatus = featuredAuditStatus === 'all' ||
+                    (featuredAuditStatus === 'approved' && item.status === 'APPROVED') ||
+                    (featuredAuditStatus === 'rejected' && item.status === 'REJECTED');
+
+                  const term = featuredSearchTerm.toLowerCase().trim();
+                  const matchesSearch = !term ||
+                    item.title.toLowerCase().includes(term) ||
+                    (item.imdbTitle || '').toLowerCase().includes(term) ||
+                    (item.canonicalTitle || '').toLowerCase().includes(term) ||
+                    item.imdbId.toLowerCase().includes(term) ||
+                    (item.canonicalId || '').toLowerCase().includes(term) ||
+                    (item.rejectionReason || '').toLowerCase().includes(term);
+
+                  return matchesCat && matchesStatus && matchesSearch;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-gray-500 text-xs">
+                      Nenhum candidato encontrado com os filtros selecionados.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs whitespace-nowrap">
+                      <thead>
+                        <tr className="border-b border-white/10 text-[9px] uppercase font-black text-gray-400 tracking-wider bg-white/[0.02]">
+                          <th className="py-3 px-3">1. IMDb #</th>
+                          <th className="py-3 px-3">2. Título IMDb</th>
+                          <th className="py-3 px-3">3. IMDb ID</th>
+                          <th className="py-3 px-3">4. Título ZapiTV</th>
+                          <th className="py-3 px-3">5. ID Canônico</th>
+                          <th className="py-3 px-3">6. Disponibilidade</th>
+                          <th className="py-3 px-3">7. Elegibilidade</th>
+                          <th className="py-3 px-3">8. Seleção</th>
+                          <th className="py-3 px-3">9. Motivo do Descarte</th>
+                          <th className="py-3 px-3 text-center">10. Pos. Final</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 font-sans">
+                        {filtered.map((item, i) => {
+                          const isApproved = item.status === 'APPROVED';
+                          const originalRank = item.imdbRank || item.rankPosition;
+                          const finalPos = item.displayRank || item.finalPosition;
+
+                          return (
+                            <tr key={`audit-row-${item.imdbId}-${i}`} className={`hover:bg-white/[0.03] transition-colors ${isApproved ? 'bg-emerald-500/[0.02]' : ''}`}>
+                              {/* 1. Posição original IMDb */}
+                              <td className="py-3 px-3 font-mono font-bold text-amber-400">
+                                #{originalRank}
+                              </td>
+
+                              {/* 2. Título IMDb */}
+                              <td className="py-3 px-3 font-semibold text-white max-w-[200px] truncate" title={item.imdbTitle || item.title}>
+                                {item.imdbTitle || item.title} {item.year ? `(${item.year})` : ''}
+                              </td>
+
+                              {/* 3. IMDb ID */}
+                              <td className="py-3 px-3 font-mono text-[10px] text-gray-400">
+                                <a
+                                  href={`https://www.imdb.com/title/${item.imdbId}/`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hover:underline hover:text-amber-400"
+                                >
+                                  {item.imdbId}
+                                </a>
+                              </td>
+
+                              {/* 4. Título ZapiTV */}
+                              <td className="py-3 px-3 font-medium text-gray-200 max-w-[180px] truncate" title={item.canonicalTitle || item.title}>
+                                {item.canonicalTitle || item.title}
+                              </td>
+
+                              {/* 5. ID Canônico */}
+                              <td className="py-3 px-3 font-mono text-[10px] text-gray-500">
+                                {item.canonicalId || '—'}
+                              </td>
+
+                              {/* 6. Status de Disponibilidade */}
+                              <td className="py-3 px-3">
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${
+                                  isApproved 
+                                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                                    : 'bg-white/5 text-gray-400'
+                                }`}>
+                                  {item.availabilityStatus || (isApproved ? 'Disponível' : 'Indisponível')}
+                                </span>
+                              </td>
+
+                              {/* 7. Resultado da Elegibilidade */}
+                              <td className="py-3 px-3">
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${
+                                  isApproved 
+                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                                    : 'bg-red-500/20 text-red-400 border-red-500/30'
+                                }`}>
+                                  {isApproved ? 'Aprovado' : 'Rejeitado'}
+                                </span>
+                              </td>
+
+                              {/* 8. Incluído ou Descartado */}
+                              <td className="py-3 px-3">
+                                {item.isIncluded ? (
+                                  <span className="text-[9px] font-black px-2 py-0.5 rounded bg-emerald-500 text-black">
+                                    INCLUÍDO
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-black px-2 py-0.5 rounded bg-white/10 text-gray-400">
+                                    DESCARTADO
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* 9. Motivo do Descarte */}
+                              <td className="py-3 px-3 max-w-[280px] truncate text-amber-300/80 text-[11px]" title={item.rejectionReason || 'Atende a todos os critérios de reprodução e elegibilidade'}>
+                                {item.rejectionReason || '—'}
+                              </td>
+
+                              {/* 10. Posição final na seleção (#1 a #10 ou '-') */}
+                              <td className="py-3 px-3 text-center">
+                                {finalPos ? (
+                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 font-black text-xs font-mono">
+                                    #{finalPos}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-600 font-mono">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
         ) : activeTab === 'users' ? (
           <div className={`rounded-3xl border overflow-hidden ${isDarkMode ? 'bg-[#151C26]/40 border-gray-800' : 'bg-white shadow-xl'}`}>
             <table className="w-full text-left">
@@ -1181,6 +1969,180 @@ const AdminView: React.FC<AdminViewProps> = ({
               >
                 PROCESSAR LISTA
               </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* MODAL: VERIFICAR CORRESPONDÊNCIA OFICIAL IMDb */}
+      {showCorrespondenceModal && correspondenceResult && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="w-full max-w-4xl max-h-[90vh] bg-[#0f141c] border border-white/10 rounded-[32px] p-6 md:p-8 shadow-2xl relative flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-5 border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className={`p-2.5 rounded-xl border ${correspondenceResult.isCompliant ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
+                  {correspondenceResult.isCompliant ? <CheckCircle className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-white">Auditoria de Correspondência Oficial (IMDb)</h3>
+                  <p className="text-xs text-gray-400">
+                    Semana: {correspondenceResult.weekKey} • Data de Referência: {correspondenceResult.referenceDate}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowCorrespondenceModal(false)}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Resultado Principal (100% de correspondência ou Divergência) */}
+            <div className="py-4 shrink-0">
+              {correspondenceResult.isCompliant ? (
+                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 flex items-center gap-3">
+                  <CheckCircle className="w-6 h-6 text-emerald-400 shrink-0" />
+                  <div>
+                    <h4 className="font-black text-base text-white">100% de correspondência</h4>
+                    <p className="text-xs text-emerald-300/90 mt-0.5">
+                      Todos os {correspondenceResult.totalMoviesChecked} filmes e {correspondenceResult.totalSeriesChecked} séries publicados pertencem ao ranking oficial do IMDb da semana e respeitam a ordem estrita de popularidade.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-300 space-y-2">
+                  <div className="flex items-center gap-2 font-black text-sm text-red-200">
+                    <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+                    <span>Divergência detectada com o snapshot oficial do IMDb:</span>
+                  </div>
+                  <ul className="text-xs space-y-1 list-disc list-inside">
+                    {correspondenceResult.movieMismatches.map((m, idx) => (
+                      <li key={`mm-${idx}`}>Filme "{m.title}": {m.reason}</li>
+                    ))}
+                    {correspondenceResult.seriesMismatches.map((s, idx) => (
+                      <li key={`ms-${idx}`}>Série "{s.title}": {s.reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Listas Comparativas */}
+            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Filmes Verificados */}
+                <div className="p-4 rounded-2xl bg-black/30 border border-white/5 space-y-3">
+                  <h5 className="font-bold text-xs uppercase tracking-wider text-blue-400 flex items-center gap-2">
+                    <Film className="w-4 h-4" /> 10 Filmes Publicados ({correspondenceResult.verifiedMovies.length}/10)
+                  </h5>
+                  <div className="space-y-1.5 font-mono text-xs">
+                    {correspondenceResult.verifiedMovies.map((vm) => (
+                      <div key={vm.imdbId} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                        <div className="truncate">
+                          <span className="font-bold text-amber-400">#{vm.displayRank}</span>
+                          <span className="text-gray-400 text-[10px] ml-1.5">(IMDb #{vm.imdbRank})</span>
+                          <span className="text-white ml-2">{vm.title}</span>
+                        </div>
+                        <span className="text-[10px] text-gray-400">{vm.imdbId}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Séries Verificadas */}
+                <div className="p-4 rounded-2xl bg-black/30 border border-white/5 space-y-3">
+                  <h5 className="font-bold text-xs uppercase tracking-wider text-purple-400 flex items-center gap-2">
+                    <Tv className="w-4 h-4" /> 10 Séries Publicadas ({correspondenceResult.verifiedSeries.length}/10)
+                  </h5>
+                  <div className="space-y-1.5 font-mono text-xs">
+                    {correspondenceResult.verifiedSeries.map((vs) => (
+                      <div key={vs.imdbId} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                        <div className="truncate">
+                          <span className="font-bold text-amber-400">#{vs.displayRank}</span>
+                          <span className="text-gray-400 text-[10px] ml-1.5">(IMDb #{vs.imdbRank})</span>
+                          <span className="text-white ml-2">{vs.title}</span>
+                        </div>
+                        <span className="text-[10px] text-gray-400">{vs.imdbId}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="pt-4 border-t border-white/10 flex justify-end shrink-0">
+              <button
+                onClick={() => setShowCorrespondenceModal(false)}
+                className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* MODAL: IMPORTAR SNAPSHOT AUTORIZADO DO IMDb */}
+      {showImportSnapshotModal && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="w-full max-w-2xl bg-[#0f141c] border border-white/10 rounded-[32px] p-6 md:p-8 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="flex items-center justify-between pb-5 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Upload className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-white">Importar Snapshot Oficial do IMDb</h3>
+                  <p className="text-xs text-gray-400">Cole a estrutura JSON do snapshot oficial (MOVIEmeter ou TVmeter).</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowImportSnapshotModal(false)}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-4">
+              <p className="text-xs text-gray-400">
+                Formato aceito: Objeto JSON contendo <code className="bg-black/50 px-1 py-0.5 rounded text-amber-400">weekKey</code>, <code className="bg-black/50 px-1 py-0.5 rounded text-amber-400">rankType</code> ("movie" ou "series") e <code className="bg-black/50 px-1 py-0.5 rounded text-amber-400">items</code> (array com <code className="text-white">position</code>, <code className="text-white">imdbId</code> e <code className="text-white">title</code>).
+              </p>
+
+              <textarea
+                rows={10}
+                value={importSnapshotJson}
+                onChange={(e) => setImportSnapshotJson(e.target.value)}
+                placeholder={'{\n  "weekKey": "2026-W42",\n  "rankType": "movie",\n  "referenceDate": "2026-10-19",\n  "items": [\n    { "position": 1, "imdbId": "tt29971038", "title": "Sobrevivência" }\n  ]\n}'}
+                className="w-full p-4 rounded-2xl border border-white/10 bg-black/40 text-white outline-none focus:border-amber-400/50 font-mono text-xs resize-none"
+              />
+
+              {importSnapshotError && (
+                <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-medium">
+                  {importSnapshotError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setShowImportSnapshotModal(false)}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-gray-400 hover:text-white transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleImportSnapshotSubmit}
+                  disabled={!importSnapshotJson.trim()}
+                  className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-black font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50"
+                >
+                  Validar e Salvar Snapshot
+                </button>
+              </div>
             </div>
           </div>
         </div>,

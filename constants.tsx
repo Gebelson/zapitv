@@ -1,4 +1,5 @@
 import { ContentItem, ContentType, User, Profile } from './types';
+import { FEATURED_CATALOG_ITEMS } from './src/core/catalog/featuredCatalogItems';
 
 export const COLORS = {
   primary: '#007df7',
@@ -98,6 +99,7 @@ export const MOCK_USERS: User[] = [
 ];
 
 export const filmesData: ContentItem[] = [
+  ...FEATURED_CATALOG_ITEMS,
   {
   "id": "movie-15340724",
   "title": "Garota do Século 20",

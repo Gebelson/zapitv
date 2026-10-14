@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useLocation, useNavigate, useSearchParams, matchPath } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Hero from './components/Hero';
@@ -17,8 +18,11 @@ import GenreDropdown from './components/GenreDropdown';
 import ProfileSelectorView from './components/ProfileSelectorView';
 import AddSectionModal from './components/AddSectionModal';
 import ProgramasView from './components/ProgramasView';
+import { NotFoundPage } from './src/pages/NotFoundPage';
+import { DownloadsPage } from './src/pages/DownloadsPage';
+import { getContentRoute, ROUTES } from './src/core/routes/navigationRoutes';
 import { AppView, User, ContentType, ContentItem, SiteNotification, Profile, CustomSection } from './types';
-import { MOCK_USERS, AVATARS } from './constants';
+import { MOCK_USERS, AVATARS, filmesData } from './constants';
 import { ShieldCheck, Flame, Film, Tv, List, Search, Sparkles, Plus, RefreshCw, Activity } from 'lucide-react';
 
 import { db } from './db';
@@ -30,6 +34,11 @@ import { catalogDiscoveryService } from './src/core/catalog/CatalogDiscoveryServ
 import { mediaAvailabilityIndex } from './src/core/catalog/MediaAvailabilityIndex';
 import { catalogAvailabilityQueue } from './src/core/catalog/CatalogAvailabilityQueue';
 import { CatalogDiagnosticModal } from './src/components/catalog/CatalogDiagnosticModal';
+import { theatricalFilterService } from './src/core/catalog/theatricalFilterService';
+import { catalogEligibilityService } from './src/core/catalog/CatalogEligibilityService';
+import { searchService } from './src/core/search/searchService';
+import { featuredRankingService } from './src/core/rankings/FeaturedRankingService';
+import { FeaturedSelectionResult } from './src/core/rankings/featuredRankingTypes';
 
 const GENRES_LIST = [
   'Ação', 'Animação', 'Anime', 'Aventura', 'Biografia', 'Comédia', 
@@ -90,8 +99,90 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   });
   const [activeProfile, setActiveProfile] = useState<Profile | null>(() => initialState.activeProfile || currentUser?.profiles?.[0] || null);
 
-  const [currentView, setCurrentView] = useState<AppView>('home');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Matchers para rotas de detalhes e episódios
+  const matchMovieDetail = matchPath('/filmes/:id', location.pathname);
+  const matchSeriesEpisode = matchPath('/series/:id/temporada/:season/episodio/:episode', location.pathname);
+  const matchSeriesDetail = matchPath('/series/:id', location.pathname);
+  const matchAnimeEpisode = matchPath('/animes/:id/temporada/:season/episodio/:episode', location.pathname);
+  const matchAnimeDetail = matchPath('/animes/:id', location.pathname);
+
+  // Derivação automática da view com base no pathname
+  const currentView: AppView = useMemo(() => {
+    const path = location.pathname;
+    if (path === '/') return 'home';
+    if (path.startsWith('/em-destaque')) return 'featured';
+    if (path.startsWith('/filmes')) return 'movies';
+    if (path.startsWith('/series')) return 'series';
+    if (path.startsWith('/animes')) return 'animes';
+    if (path === '/programas' || path.startsWith('/televisao')) return 'programas';
+    if (path.startsWith('/downloads')) return 'downloads';
+    if (path.startsWith('/minha-lista')) return 'mylist';
+    if (path.startsWith('/historico')) return 'profile';
+    if (path.startsWith('/perfil-selector')) return 'profile-selector';
+    if (path.startsWith('/perfil')) return 'profile';
+    if (path.startsWith('/configuracoes')) return 'settings';
+    if (path.startsWith('/ajuda')) return 'help';
+    if (path.startsWith('/admin')) return 'admin';
+    if (path.startsWith('/login') || path.startsWith('/auth')) return 'login';
+    return 'notfound';
+  }, [location.pathname]);
+
   const [previousView, setPreviousView] = useState<AppView>('home');
+  useEffect(() => {
+    if (currentView !== 'admin' && currentView !== 'notfound') {
+      setPreviousView(currentView);
+    }
+  }, [currentView]);
+
+  const activeDetailId = matchSeriesEpisode?.params.id ||
+                         matchSeriesDetail?.params.id ||
+                         matchAnimeEpisode?.params.id ||
+                         matchAnimeDetail?.params.id ||
+                         matchMovieDetail?.params.id;
+
+  const urlSeason = matchSeriesEpisode?.params.season || matchAnimeEpisode?.params.season;
+  const urlEpisode = matchSeriesEpisode?.params.episode || matchAnimeEpisode?.params.episode;
+  const initialSeasonNum = urlSeason ? parseInt(urlSeason, 10) : undefined;
+  const initialEpisodeNum = urlEpisode ? parseInt(urlEpisode, 10) : undefined;
+  const hasDeepLinkEpisode = initialEpisodeNum !== undefined;
+
+  const handleNavigateView = useCallback((view: AppView) => {
+    setSelectedContent(null);
+    searchService.cancelPending();
+    setIsMobileMenuOpen(false);
+    setSelectedGenre('');
+    setSearchQuery('');
+    setSubmittedSearchQuery('');
+    setLiveSearchResults([]);
+
+    switch (view) {
+      case 'home': navigate('/'); break;
+      case 'featured': navigate('/em-destaque'); break;
+      case 'movies': navigate('/filmes'); break;
+      case 'series': navigate('/series'); break;
+      case 'animes': navigate('/animes'); break;
+      case 'programas':
+      case 'television':
+      case 'live': navigate('/programas'); break;
+      case 'downloads': navigate('/downloads'); break;
+      case 'mylist': navigate('/minha-lista'); break;
+      case 'history': navigate('/perfil'); break;
+      case 'profile': navigate('/perfil'); break;
+      case 'settings': navigate('/configuracoes'); break;
+      case 'help': navigate('/ajuda'); break;
+      case 'admin': navigate('/admin'); break;
+      case 'login':
+      case 'signup': navigate('/login'); break;
+      case 'profile-selector': navigate('/perfil-selector'); break;
+      default: navigate('/'); break;
+    }
+  }, [navigate]);
+
+  const setCurrentView = handleNavigateView;
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -125,9 +216,16 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const [popularSeries, setPopularSeries] = useState<ContentItem[]>(() => storageService.getCachedCatalog('series'));
   const [topRatedItems, setTopRatedItems] = useState<ContentItem[]>(() => storageService.getCachedCatalog('top_rated'));
   const [animeItems, setAnimeItems] = useState<ContentItem[]>(() => storageService.getCachedCatalog('animes'));
+  const [featuredSelection, setFeaturedSelection] = useState<FeaturedSelectionResult>(() => featuredRankingService.getFeaturedSelectionSync());
   const [continueWatchingList, setContinueWatchingList] = useState<WatchProgress[]>([]);
   const [liveSearchResults, setLiveSearchResults] = useState<ContentItem[]>([]);
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
+
+  useEffect(() => {
+    return featuredRankingService.subscribe((res) => {
+      setFeaturedSelection(res);
+    });
+  }, []);
 
   const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState(false);
   const [moviesPage, setMoviesPage] = useState(2);
@@ -138,8 +236,17 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const [hasMoreSeries, setHasMoreSeries] = useState(true);
   const [hasMoreAnimes, setHasMoreAnimes] = useState(true);
   const [selectedGenre, setSelectedGenre] = useState('');
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let isMounted = true;
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) {
+        setIsCatalogLoading(false);
+      }
+    }, 3500);
+
     const fetchLiveCatalogs = async () => {
       setIsCatalogLoading(true);
       try {
@@ -161,6 +268,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           storageService.getContinueWatching(),
           storageService.getFavorites()
         ]);
+
+        if (!isMounted) return;
 
         const newItems: ContentItem[] = [];
         const seenIds = new Set<string>();
@@ -228,11 +337,19 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       } catch (err) {
         console.warn('Erro ao carregar catálogo online:', err);
       } finally {
-        setIsCatalogLoading(false);
+        clearTimeout(safetyTimer);
+        if (isMounted) {
+          setIsCatalogLoading(false);
+        }
       }
     };
 
     fetchLiveCatalogs();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
   // Busca sob demanda quando o usuário seleciona um gênero específico
@@ -286,42 +403,89 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
     try {
       if (view === 'movies') {
-        const nextPage = moviesPage + 1;
-        const res = await catalogDiscoveryService.discoverMovies(nextPage, selectedGenre);
+        let nextPage = moviesPage + 1;
+        let res = await catalogDiscoveryService.discoverMovies(nextPage, selectedGenre);
+        
+        // Se a página retornou poucos itens ou vazia após filtragem teatral, tenta a próxima página uma vez
+        if (res.items.length === 0 && res.hasMore && nextPage < 10) {
+          nextPage++;
+          res = await catalogDiscoveryService.discoverMovies(nextPage, selectedGenre);
+        }
+
         if (res.items.length > 0) {
           setPopularMovies(prev => {
             const seen = new Set(prev.map(i => i.id));
             const fresh = res.items.filter(i => !seen.has(i.id));
+            const updated = [...prev, ...fresh];
+            storageService.saveCachedCatalog('movies', updated);
+            return updated;
+          });
+
+          // Sincroniza também a lista global de conteúdo
+          setContent(prev => {
+            const seen = new Set(prev.map(i => i.id));
+            const fresh = res.items.filter(i => !seen.has(i.id));
             return [...prev, ...fresh];
           });
+
           setMoviesPage(nextPage);
           setHasMoreMovies(res.hasMore);
         } else {
           setHasMoreMovies(false);
         }
       } else if (view === 'series') {
-        const nextPage = seriesPage + 1;
-        const res = await catalogDiscoveryService.discoverSeries(nextPage, selectedGenre);
+        let nextPage = seriesPage + 1;
+        let res = await catalogDiscoveryService.discoverSeries(nextPage, selectedGenre);
+
+        if (res.items.length === 0 && res.hasMore && nextPage < 10) {
+          nextPage++;
+          res = await catalogDiscoveryService.discoverSeries(nextPage, selectedGenre);
+        }
+
         if (res.items.length > 0) {
           setPopularSeries(prev => {
             const seen = new Set(prev.map(i => i.id));
             const fresh = res.items.filter(i => !seen.has(i.id));
+            const updated = [...prev, ...fresh];
+            storageService.saveCachedCatalog('series', updated);
+            return updated;
+          });
+
+          setContent(prev => {
+            const seen = new Set(prev.map(i => i.id));
+            const fresh = res.items.filter(i => !seen.has(i.id));
             return [...prev, ...fresh];
           });
+
           setSeriesPage(nextPage);
           setHasMoreSeries(res.hasMore);
         } else {
           setHasMoreSeries(false);
         }
       } else if (view === 'animes') {
-        const nextPage = animesPage + 1;
-        const res = await catalogDiscoveryService.discoverAnimes(nextPage, selectedGenre);
+        let nextPage = animesPage + 1;
+        let res = await catalogDiscoveryService.discoverAnimes(nextPage, selectedGenre);
+
+        if (res.items.length === 0 && res.hasMore && nextPage < 10) {
+          nextPage++;
+          res = await catalogDiscoveryService.discoverAnimes(nextPage, selectedGenre);
+        }
+
         if (res.items.length > 0) {
           setAnimeItems(prev => {
             const seen = new Set(prev.map(i => i.id));
             const fresh = res.items.filter(i => !seen.has(i.id));
+            const updated = [...prev, ...fresh];
+            storageService.saveCachedCatalog('animes', updated);
+            return updated;
+          });
+
+          setContent(prev => {
+            const seen = new Set(prev.map(i => i.id));
+            const fresh = res.items.filter(i => !seen.has(i.id));
             return [...prev, ...fresh];
           });
+
           setAnimesPage(nextPage);
           setHasMoreAnimes(res.hasMore);
         } else {
@@ -334,6 +498,62 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       setIsLoadingMore(false);
     }
   }, [isLoadingMore, moviesPage, seriesPage, animesPage, selectedGenre]);
+
+  // Rolagem Infinita Automática (Infinite Scroll — carrega mais títulos conforme o usuário desce)
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const container = scrollContainerRef.current;
+    const isBrowseView = currentView === 'movies' || currentView === 'series' || currentView === 'animes';
+    const hasMore = currentView === 'movies' ? hasMoreMovies : currentView === 'series' ? hasMoreSeries : currentView === 'animes' ? hasMoreAnimes : false;
+
+    if (!isBrowseView || !hasMore || isLoadingMore) return;
+
+    // 1. IntersectionObserver para detecção prévia e suave com antecedência de 500px
+    let observer: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver !== 'undefined' && sentinel) {
+      observer = new IntersectionObserver((entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && !isLoadingMore) {
+          handleLoadMore(currentView);
+        }
+      }, {
+        root: container || null,
+        rootMargin: '500px',
+        threshold: 0.05
+      });
+      observer.observe(sentinel);
+    }
+
+    // 2. Scroll listener no container como garantia adicional de fluidez
+    const handleScroll = () => {
+      if (!container || isLoadingMore) return;
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      if (scrollTop + clientHeight >= scrollHeight - 600) {
+        handleLoadMore(currentView);
+      }
+    };
+
+    if (container) {
+      container.addEventListener('scroll', handleScroll, { passive: true });
+    }
+
+    // 3. Fallback no objeto window caso a rolagem ocorra na janela principal
+    const handleWindowScroll = () => {
+      if (isLoadingMore) return;
+      const scrollPos = window.innerHeight + window.scrollY;
+      const threshold = document.documentElement.offsetHeight - 600;
+      if (scrollPos >= threshold) {
+        handleLoadMore(currentView);
+      }
+    };
+    window.addEventListener('scroll', handleWindowScroll, { passive: true });
+
+    return () => {
+      if (observer) observer.disconnect();
+      if (container) container.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleWindowScroll);
+    };
+  }, [currentView, hasMoreMovies, hasMoreSeries, hasMoreAnimes, isLoadingMore, handleLoadMore]);
 
   // Atualiza a fileira "Continuar Assistindo" em tempo real sempre que o progresso é salvo
   useEffect(() => {
@@ -484,41 +704,152 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
   }, [isAuthenticated]);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get('busca') || sp.get('q') || '';
+    } catch {
+      return '';
+    }
+  });
+  // Busca confirmada (ativada exclusivamente por Enter ou clique em "Ver todos os resultados")
+  // Enquanto o usuário apenas digita no campo, a página atual permanece 100% inalterada!
+  const [submittedSearchQuery, setSubmittedSearchQuery] = useState<string>(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get('busca') || sp.get('q') || '';
+    } catch {
+      return '';
+    }
+  });
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
 
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Abertura in-loco de detalhes: abre o modal preservando a rota, página atual, scroll e contexto
+  const handleSelectContent = useCallback((item: ContentItem) => {
+    if (!catalogEligibilityService.isItemPubliclyPlayableSync(item)) {
+      return;
+    }
+    setSelectedContent(item);
+  }, []);
+
+  const handleCloseDetailModal = useCallback(() => {
+    setSelectedContent(null);
+    const path = location.pathname;
+    // Apenas limpa a URL se o usuário tiver acessado diretamente por deep link (/filmes/:id, etc.)
+    if (path.startsWith('/filmes/')) {
+      navigate('/filmes', { replace: true });
+    } else if (path.startsWith('/series/')) {
+      navigate('/series', { replace: true });
+    } else if (path.startsWith('/animes/')) {
+      navigate('/animes', { replace: true });
+    }
+    // Para todas as outras páginas (/, /em-destaque, /minha-lista, /downloads, etc.),
+    // NÃO executa navegação nem navigate(-1), mantendo o usuário exatamente onde ele estava!
+  }, [location.pathname, navigate]);
+
+  // Sincronização de conteúdo EXCLUSIVAMENTE para links diretos/profundos na URL (/filmes/:id, /series/:id, /animes/:id, etc.)
+  useEffect(() => {
+    if (!activeDetailId) {
+      return;
+    }
+
+    if (selectedContent && (selectedContent.id === activeDetailId || selectedContent.imdbId === activeDetailId || selectedContent.tmdbId === activeDetailId)) {
+      return;
+    }
+
+    let active = true;
+
+    const resolveItemFromRoute = async () => {
+      // 1. Tenta achar no catálogo local ou itens abertos verificados
+      const localFound = content.find(i => 
+        i.id === activeDetailId || 
+        i.imdbId === activeDetailId || 
+        i.tmdbId === activeDetailId
+      ) || VERIFIED_OPEN_ITEMS.find(i => 
+        i.id === activeDetailId || 
+        i.imdbId === activeDetailId || 
+        i.tmdbId === activeDetailId
+      );
+
+      if (localFound) {
+        if (active) setSelectedContent(localFound);
+        return;
+      }
+
+      // 2. Se não estiver no cache imediato, busca metadados no TMDB/Cinemeta
+      try {
+        const isAnime = location.pathname.startsWith('/animes');
+        const isSeries = location.pathname.startsWith('/series') || isAnime;
+        const mediaType = isAnime ? ContentType.ANIME : (isSeries ? ContentType.SERIES : ContentType.MOVIE);
+
+        let details: ContentItem | null = null;
+        if (activeDetailId.startsWith('tt')) {
+          details = await tmdbService.findByImdb(activeDetailId);
+        } else if (/^\d+$/.test(activeDetailId)) {
+          const res = await tmdbService.getDetails(activeDetailId, mediaType);
+          details = res?.item || null;
+        }
+
+        if (active && details) {
+          setSelectedContent(details);
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar conteúdo da URL profunda:', err);
+      }
+    };
+
+    resolveItemFromRoute();
+
+    return () => {
+      active = false;
+    };
+  }, [activeDetailId, content, location.pathname, selectedContent]);
+
+  // Sincroniza busca se vier por query param (?busca=... ou ?q=...)
+  useEffect(() => {
+    const q = searchParams.get('busca') || searchParams.get('q') || '';
+    if (q && q !== submittedSearchQuery) {
+      setSearchQuery(q);
+      setSubmittedSearchQuery(q);
+    }
+  }, [searchParams]);
+
+  // Filtro centralizado de elegibilidade e reprodução real
+  const allowedContent = useMemo(() => {
+    return catalogEligibilityService.filterEligibleItemsSync(content);
+  }, [content]);
 
   // Memoize row items to prevent filtering 48,000 items on every render
-  const netflixItems = useMemo(() => content.filter(i => i.platform?.includes('Netflix')), [content]);
-  const primeItems = useMemo(() => content.filter(i => i.platform?.includes('Prime Video')), [content]);
-  const hboItems = useMemo(() => content.filter(i => i.platform?.includes('Max') || i.platform?.includes('HBO')), [content]);
-  const recentItems = useMemo(() => content.slice().reverse(), [content]);
-  const premiumItems = useMemo(() => content.slice(0, 12), [content]);
+  const netflixItems = useMemo(() => allowedContent.filter(i => i.platform?.includes('Netflix')), [allowedContent]);
+  const primeItems = useMemo(() => allowedContent.filter(i => i.platform?.includes('Prime Video')), [allowedContent]);
+  const hboItems = useMemo(() => allowedContent.filter(i => i.platform?.includes('Max') || i.platform?.includes('HBO')), [allowedContent]);
+  const recentItems = useMemo(() => allowedContent.slice().reverse(), [allowedContent]);
+  const premiumItems = useMemo(() => allowedContent.slice(0, 12), [allowedContent]);
 
+  // A busca na página só roda quando o usuário submete a busca (Enter ou clicar em Ver todos os resultados)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    if (!debouncedSearchQuery.trim()) {
+    if (!submittedSearchQuery.trim()) {
       setLiveSearchResults([]);
       return;
     }
+    let active = true;
     const runSearch = async () => {
       try {
-        const results = await tmdbService.searchMulti(debouncedSearchQuery);
-        setLiveSearchResults(results);
+        const category = searchService.mapAppViewToCategory(currentView);
+        const results = await searchService.search(submittedSearchQuery, category, content);
+        if (active) {
+          setLiveSearchResults(results);
+        }
       } catch (e) {
-        console.warn('Erro na busca TMDB:', e);
+        if (active) setLiveSearchResults([]);
       }
     };
     runSearch();
-  }, [debouncedSearchQuery]);
+    return () => {
+      active = false;
+      searchService.cancelPending();
+    };
+  }, [submittedSearchQuery, currentView, content]);
 
   useEffect(() => {
     db.keyValueStore.put({ key: 'zapitv_theme', value: isDarkMode });
@@ -938,26 +1269,21 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const filteredContent = useMemo(() => {
     let baseFiltered = content;
     
-    if (debouncedSearchQuery.trim()) {
+    if (submittedSearchQuery.trim()) {
       if (liveSearchResults.length > 0) {
-        return liveSearchResults.filter(item => mediaAvailabilityIndex.isPubliclyPlayable(item.imdbId || item.id));
+        return catalogEligibilityService.filterEligibleItemsSync(liveSearchResults);
       }
-      const normalizedQuery = debouncedSearchQuery.toLowerCase();
-      return baseFiltered.filter(item => 
-        item.title.toLowerCase().includes(normalizedQuery) &&
-        mediaAvailabilityIndex.isPubliclyPlayable(item.imdbId || item.id)
-      );
+      const category = searchService.mapAppViewToCategory(currentView);
+      const localMatches = searchService.filterLocalCatalog(submittedSearchQuery, category, baseFiltered);
+      return catalogEligibilityService.filterEligibleItemsSync(localMatches);
     }
 
     if (currentView === 'movies') {
-      baseFiltered = popularMovies.length > 0 ? popularMovies : baseFiltered.filter(i => i.type === ContentType.MOVIE);
+      baseFiltered = popularMovies.length > 0 ? popularMovies : baseFiltered.filter(i => searchService.isMovieItem(i));
     } else if (currentView === 'series') {
-      baseFiltered = popularSeries.length > 0 ? popularSeries : baseFiltered.filter(i => i.type === ContentType.SERIES);
+      baseFiltered = popularSeries.length > 0 ? popularSeries : baseFiltered.filter(i => searchService.isSeriesItem(i));
     } else if (currentView === 'animes') {
-      baseFiltered = animeItems.length > 0 ? animeItems : baseFiltered.filter(i => 
-        i.type === ContentType.ANIME || 
-        (i.genres && i.genres.includes('Anime'))
-      );
+      baseFiltered = animeItems.length > 0 ? animeItems : baseFiltered.filter(i => searchService.isAnimeItem(i));
     } else if (currentView === 'featured') {
       baseFiltered = trendingItems.length > 0 ? trendingItems : baseFiltered.filter(i => i.isFeatured);
     } else if (currentView === 'mylist') {
@@ -966,9 +1292,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
     if (selectedGenre) baseFiltered = baseFiltered.filter(i => i.genres?.includes(selectedGenre));
 
-    // Camada B (Disponibilidade): Oculta apenas itens com indisponibilidade confirmada
-    return baseFiltered.filter(item => mediaAvailabilityIndex.isPubliclyPlayable(item.imdbId || item.id));
-  }, [content, debouncedSearchQuery, liveSearchResults, currentView, selectedGenre, popularMovies, popularSeries, animeItems, trendingItems, favorites, myList]);
+    // Camada Central de Elegibilidade e Reprodução Real
+    return catalogEligibilityService.filterEligibleItemsSync(baseFiltered);
+  }, [content, submittedSearchQuery, liveSearchResults, currentView, selectedGenre, popularMovies, popularSeries, animeItems, trendingItems, favorites, myList]);
 
   const renderContent = () => {
     const gridClass = "grid grid-cols-3 md:grid-cols-5 gap-x-2 md:gap-x-5 lg:gap-x-6 gap-y-6 md:gap-y-12 px-3 md:px-12 lg:px-24";
@@ -977,7 +1303,10 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     const countClass = "text-xs md:text-sm font-bold opacity-50 uppercase tracking-widest mt-1 md:mt-2 block";
     const iconClass = "w-8 h-8 md:w-14 md:h-14 text-orange-600 shrink-0";
 
-    if (debouncedSearchQuery.trim() && currentView !== 'admin') {
+    if (submittedSearchQuery.trim() && currentView !== 'admin') {
+      const category = searchService.mapAppViewToCategory(currentView);
+      const emptyMsg = searchService.getEmptyMessage(category, submittedSearchQuery);
+
       return (
         <ViewWrapper>
           <div className="p-4 md:p-8 pb-32">
@@ -985,25 +1314,39 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                <div className="flex items-center gap-3 md:gap-5">
                  <Search className={iconClass} />
                  <div>
-                   <h2 className={titleClass}>Busca: "{debouncedSearchQuery}"</h2>
+                   <h2 className={titleClass}>Busca: "{submittedSearchQuery}"</h2>
                    <span className={countClass}>{filteredContent.length} resultados encontrados</span>
                  </div>
                </div>
              </div>
-             <div className={gridClass}>
-                {filteredContent.map(item => (
-                  <ContentCard 
-                    key={item.id}
-                    item={item}
-                    isDarkMode={isDarkMode}
-                    onItemClick={setSelectedContent}
-                    isFavorite={favorites.includes(item.id)}
-                    isInList={myList.includes(item.id)}
-                    onToggleFavorite={toggleFavorite}
-                    onToggleList={toggleMyList}
-                  />
-                ))}
-             </div>
+             {filteredContent.length > 0 ? (
+               <div className={gridClass}>
+                  {filteredContent.map(item => (
+                    <ContentCard 
+                      key={item.id}
+                      item={item}
+                      isDarkMode={isDarkMode}
+                      onItemClick={handleSelectContent}
+                      isFavorite={favorites.includes(item.id)}
+                      isInList={myList.includes(item.id)}
+                      onToggleFavorite={toggleFavorite}
+                      onToggleList={toggleMyList}
+                    />
+                  ))}
+               </div>
+             ) : (
+                <div className="flex flex-col items-center justify-center py-24 text-center px-4">
+                  <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
+                    <Search className="w-8 h-8 text-gray-400 opacity-60" />
+                  </div>
+                  <p className="text-xl md:text-2xl font-bold text-white mb-2">
+                    {emptyMsg.title}
+                  </p>
+                  <p className="text-sm text-gray-400 max-w-md leading-relaxed">
+                    {emptyMsg.subtitle}
+                  </p>
+                </div>
+             )}
           </div>
         </ViewWrapper>
       );
@@ -1016,9 +1359,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             <div className="pb-12">
               <div className="px-4 md:px-12 pt-6">
                 <Hero 
-                  featuredItems={trendingItems.length > 0 ? trendingItems.slice(0, 8) : content.filter(i => i.isFeatured)} 
+                  featuredItems={catalogEligibilityService.filterEligibleItemsSync(trendingItems.length > 0 ? trendingItems.slice(0, 8) : content.filter(i => i.isFeatured))} 
                   isDarkMode={isDarkMode} 
-                  onActionClick={setSelectedContent} 
+                  onActionClick={handleSelectContent} 
                   isAdmin={currentUser.role === 'admin' || currentUser.devMode}
                   onUpdateItem={handleUpdateContent}
                   onAddContent={handleAddContent}
@@ -1028,9 +1371,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 {continueWatchingList.length > 0 && (
                   <ContentRow 
                     title="Continuar Assistindo" 
-                    items={continueWatchingList.map(p => p.item)} 
+                    items={continueWatchingList.map(p => p.item).filter(i => catalogEligibilityService.isItemPubliclyPlayableSync(i))} 
                     isDarkMode={isDarkMode} 
-                    onItemClick={setSelectedContent} 
+                    onItemClick={handleSelectContent} 
                     myList={myList} 
                     favorites={favorites} 
                     onToggleFavorite={toggleFavorite} 
@@ -1040,9 +1383,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
                 <ContentRow 
                   title={sectionTitles.premium} 
-                  items={trendingItems.length > 0 ? trendingItems : premiumItems} 
+                  items={catalogEligibilityService.filterEligibleItemsSync(trendingItems.length > 0 ? trendingItems : premiumItems)} 
                   isDarkMode={isDarkMode} 
-                  onItemClick={setSelectedContent} 
+                  onItemClick={handleSelectContent} 
                   myList={myList} 
                   favorites={favorites} 
                   onToggleFavorite={toggleFavorite} 
@@ -1052,9 +1395,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 />
                 <ContentRow 
                   title={sectionTitles.recent} 
-                  items={popularMovies.length > 0 ? popularMovies : recentItems} 
+                  items={catalogEligibilityService.filterEligibleItemsSync(popularMovies.length > 0 ? popularMovies : recentItems)} 
                   isDarkMode={isDarkMode} 
-                  onItemClick={setSelectedContent} 
+                  onItemClick={handleSelectContent} 
                   myList={myList} 
                   favorites={favorites} 
                   onToggleFavorite={toggleFavorite} 
@@ -1064,9 +1407,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 />
                 <ContentRow 
                   title={sectionTitles.netflix} 
-                  items={popularSeries.length > 0 ? popularSeries : content.filter(i => i.platform?.includes('Netflix'))} 
+                  items={catalogEligibilityService.filterEligibleItemsSync(popularSeries.length > 0 ? popularSeries : content.filter(i => i.platform?.includes('Netflix')))} 
                   isDarkMode={isDarkMode} 
-                  onItemClick={setSelectedContent} 
+                  onItemClick={handleSelectContent} 
                   myList={myList} 
                   favorites={favorites} 
                   onToggleFavorite={toggleFavorite} 
@@ -1076,9 +1419,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 />
                 <ContentRow 
                   title={sectionTitles.prime} 
-                  items={topRatedItems.length > 0 ? topRatedItems : content.filter(i => i.platform?.includes('Prime Video'))} 
+                  items={catalogEligibilityService.filterEligibleItemsSync(topRatedItems.length > 0 ? topRatedItems : content.filter(i => i.platform?.includes('Prime Video')))} 
                   isDarkMode={isDarkMode} 
-                  onItemClick={setSelectedContent} 
+                  onItemClick={handleSelectContent} 
                   myList={myList} 
                   favorites={favorites} 
                   onToggleFavorite={toggleFavorite} 
@@ -1088,9 +1431,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 />
                 <ContentRow 
                   title={sectionTitles.hbo} 
-                  items={animeItems.length > 0 ? animeItems : content.filter(i => i.platform?.includes('Max') || i.platform?.includes('HBO'))} 
+                  items={catalogEligibilityService.filterEligibleItemsSync(animeItems.length > 0 ? animeItems : content.filter(i => i.platform?.includes('Max') || i.platform?.includes('HBO')))} 
                   isDarkMode={isDarkMode} 
-                  onItemClick={setSelectedContent} 
+                  onItemClick={handleSelectContent} 
                   myList={myList} 
                   favorites={favorites} 
                   onToggleFavorite={toggleFavorite} 
@@ -1107,9 +1450,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                     <ContentRow 
                       key={section.id}
                       title={section.title}
-                      items={sectionItems}
+                      items={catalogEligibilityService.filterEligibleItemsSync(sectionItems)}
                       isDarkMode={isDarkMode}
-                      onItemClick={setSelectedContent}
+                      onItemClick={handleSelectContent}
                       myList={myList}
                       favorites={favorites}
                       onToggleFavorite={toggleFavorite}
@@ -1146,7 +1489,149 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             </div>
           </ViewWrapper>
         );
-      case 'featured':
+      case 'featured': {
+        const displayMovies = (featuredSelection?.featuredMovies || [])
+          .filter(it => !selectedGenre || it.genres?.includes(selectedGenre))
+          .filter(it => !submittedSearchQuery || it.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()));
+
+        const displaySeries = (featuredSelection?.featuredSeries || [])
+          .filter(it => !selectedGenre || it.genres?.includes(selectedGenre))
+          .filter(it => !submittedSearchQuery || it.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()));
+
+        return (
+          <ViewWrapper>
+            <div className="px-4 md:px-12 py-8 pb-32 space-y-12 md:space-y-16">
+              {/* Cabeçalho Principal da Página Em Destaque */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-7 pb-4 border-b border-white/10">
+                <div className="flex items-center gap-3 md:gap-5">
+                  <div className="p-2.5 md:p-3.5 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-600/20 border border-amber-500/30 text-amber-400 shadow-lg">
+                    <Flame className="w-8 h-8 md:w-12 md:h-12" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-2xl md:text-5xl font-black tracking-tight text-white">
+                        Em Destaque
+                      </h2>
+                      <span className="text-[10px] md:text-xs font-black uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        IMDb MOVIEmeter & TVmeter
+                      </span>
+                    </div>
+                    <p className="text-xs md:text-sm text-gray-400 font-medium mt-1">
+                      Top 10 Filmes e 10 Séries mais populares da semana com reprodução confirmada no ZapiTV.
+                    </p>
+                    <div className="text-[11px] md:text-xs text-gray-400 mt-1 flex items-center gap-1.5 font-medium">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                      <span>Atualizado semanalmente</span>
+                      {featuredSelection?.lastUpdatedAt ? (
+                        <>
+                          <span className="text-gray-600">•</span>
+                          <span>{new Date(featuredSelection.lastUpdatedAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <GenreDropdown genres={GENRES_LIST} selectedGenre={selectedGenre} onSelect={setSelectedGenre} isDarkMode={isDarkMode} />
+                </div>
+              </div>
+
+              {/* SEÇÃO 1: FILMES EM DESTAQUE (TOP 10) */}
+              <div className="space-y-4 md:space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Film className="w-5 h-5 md:w-6 md:h-6 text-[#007df7]" />
+                    <h3 className="text-lg md:text-2xl font-black text-white tracking-tight">
+                      Filmes em Destaque
+                    </h3>
+                    <span className="text-[10px] md:text-xs font-black px-2 py-0.5 rounded bg-[#007df7]/20 text-[#007df7] border border-[#007df7]/30">
+                      Top 10 Filmes
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-400 font-bold">
+                    {displayMovies.length} {displayMovies.length === 1 ? 'título' : 'títulos'}
+                  </span>
+                </div>
+
+                {displayMovies.length > 0 ? (
+                  <div className="grid grid-cols-3 md:grid-cols-5 gap-x-3 gap-y-6 md:gap-x-6 md:gap-y-12">
+                    {displayMovies.map((item, idx) => (
+                      <ContentCard 
+                        key={`feat-movie-${item.id}`}
+                        item={item}
+                        rankPosition={idx + 1}
+                        isDarkMode={isDarkMode}
+                        onItemClick={handleSelectContent}
+                        isFavorite={favorites.includes(item.id)}
+                        isInList={myList.includes(item.id)}
+                        onToggleFavorite={toggleFavorite}
+                        onToggleList={toggleMyList}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center bg-white/5 rounded-2xl border border-white/10 text-gray-400 text-sm">
+                    Nenhum filme em destaque corresponde ao filtro selecionado.
+                  </div>
+                )}
+              </div>
+
+              {/* SEÇÃO 2: SÉRIES EM DESTAQUE (TOP 10) */}
+              <div className="space-y-4 md:space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Tv className="w-5 h-5 md:w-6 md:h-6 text-purple-400" />
+                    <h3 className="text-lg md:text-2xl font-black text-white tracking-tight">
+                      Séries em Destaque
+                    </h3>
+                    <span className="text-[10px] md:text-xs font-black px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      Top 10 Séries
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-400 font-bold">
+                    {displaySeries.length} {displaySeries.length === 1 ? 'título' : 'títulos'}
+                  </span>
+                </div>
+
+                {displaySeries.length > 0 ? (
+                  <div className="grid grid-cols-3 md:grid-cols-5 gap-x-3 gap-y-6 md:gap-x-6 md:gap-y-12">
+                    {displaySeries.map((item, idx) => (
+                      <ContentCard 
+                        key={`feat-series-${item.id}`}
+                        item={item}
+                        rankPosition={idx + 1}
+                        isDarkMode={isDarkMode}
+                        onItemClick={handleSelectContent}
+                        isFavorite={favorites.includes(item.id)}
+                        isInList={myList.includes(item.id)}
+                        onToggleFavorite={toggleFavorite}
+                        onToggleList={toggleMyList}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center bg-white/5 rounded-2xl border border-white/10 text-gray-400 text-sm">
+                    Nenhuma série em destaque corresponde ao filtro selecionado.
+                  </div>
+                )}
+              </div>
+
+              {/* NOTA METODOLÓGICA DE TRANSPARÊNCIA */}
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs text-gray-400">
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400 font-bold">ℹ️ Metodologia:</span>
+                  <span>
+                    Popularidade calculada a partir dos rankings oficiais MOVIEmeter e TVmeter do IMDb com substituição progressiva automática para conteúdos 100% disponíveis e reproduzíveis no ZapiTV.
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono opacity-70 shrink-0">
+                  {featuredSelection.isProvisionalWeekly ? 'Consolidação: Semanal (Provisória)' : 'Consolidação: Mensal'}
+                </span>
+              </div>
+            </div>
+          </ViewWrapper>
+        );
+      }
       case 'movies':
       case 'series':
       case 'animes':
@@ -1155,17 +1640,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             <div className="px-4 md:px-12 py-8 pb-32">
               <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-7 mb-8 md:mb-14">
                 <div className="flex items-center gap-3 md:gap-5">
-                  {currentView === 'featured' ? <Flame className={iconClass} /> : 
-                   currentView === 'movies' ? <Film className={iconClass} /> : 
+                  {currentView === 'movies' ? <Film className={iconClass} /> : 
                    currentView === 'series' ? <Tv className={iconClass} /> : <Sparkles className={iconClass} />}
-                  <div>
-                    <h2 className={titleClass}>
-                      {currentView === 'featured' ? 'Em Destaque' : 
-                       currentView === 'movies' ? 'Filmes' : 
-                       currentView === 'series' ? 'Séries' : 'Animes'}
-                    </h2>
-                    <span className={countClass}>{filteredContent.length} títulos</span>
-                  </div>
+                  <h2 className={titleClass}>
+                    {currentView === 'movies' ? 'Filmes' : 
+                     currentView === 'series' ? 'Séries' : 'Animes'}
+                  </h2>
                 </div>
                 <GenreDropdown genres={GENRES_LIST} selectedGenre={selectedGenre} onSelect={setSelectedGenre} isDarkMode={isDarkMode} />
               </div>
@@ -1175,7 +1655,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                     key={item.id}
                     item={item}
                     isDarkMode={isDarkMode}
-                    onItemClick={setSelectedContent}
+                    onItemClick={handleSelectContent}
                     isFavorite={favorites.includes(item.id)}
                     isInList={myList.includes(item.id)}
                     onToggleFavorite={toggleFavorite}
@@ -1184,26 +1664,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 ))}
               </div>
 
-              {/* Botão de Paginação / Carregar Mais */}
+              {/* Sentinela de Rolagem Infinita (Carrega mais conteúdos automaticamente conforme o usuário desce) */}
               {(currentView === 'movies' ? hasMoreMovies : currentView === 'series' ? hasMoreSeries : currentView === 'animes' ? hasMoreAnimes : false) && (
-                <div className="flex justify-center mt-12 mb-6">
-                  <button
-                    onClick={() => handleLoadMore(currentView)}
-                    disabled={isLoadingMore}
-                    className="px-8 py-3.5 rounded-2xl bg-orange-600 hover:bg-orange-500 active:scale-95 text-white font-bold text-sm shadow-xl shadow-orange-600/20 transition-all flex items-center gap-3 disabled:opacity-50"
-                  >
-                    {isLoadingMore ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Carregando mais títulos...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4" />
-                        <span>Carregar Mais Conteúdos</span>
-                      </>
-                    )}
-                  </button>
+                <div ref={sentinelRef} className="flex justify-center py-12 min-h-[64px] select-none">
+                  {isLoadingMore && (
+                    <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white/5 border border-white/10 text-gray-300 text-xs font-bold shadow-lg backdrop-blur-md animate-in fade-in duration-200">
+                      <ZapiLoader size="sm" />
+                      <span>Carregando mais conteúdos...</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1222,12 +1691,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 </div>
               </div>
               <div className="grid grid-cols-3 md:grid-cols-5 gap-x-3 gap-y-6 md:gap-x-6 md:gap-y-12">
-                {content.filter(i => myList.includes(i.id)).map(item => (
+                {catalogEligibilityService.filterEligibleItemsSync(content.filter(i => myList.includes(i.id))).map(item => (
                   <ContentCard 
                     key={item.id}
                     item={item}
                     isDarkMode={isDarkMode}
-                    onItemClick={setSelectedContent}
+                    onItemClick={handleSelectContent}
                     isFavorite={favorites.includes(item.id)}
                     isInList={myList.includes(item.id)}
                     onToggleFavorite={toggleFavorite}
@@ -1303,12 +1772,16 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             />
           </ViewWrapper>
         );
+      case 'downloads':
+        return <ViewWrapper><DownloadsPage isDarkMode={isDarkMode} onSelectItem={handleSelectContent} /></ViewWrapper>;
       case 'help': return <ViewWrapper><HelpView isDarkMode={isDarkMode} onNavigate={setCurrentView} /></ViewWrapper>;
-      default: return null;
+      case 'notfound':
+      default:
+        return <ViewWrapper><NotFoundPage isDarkMode={isDarkMode} /></ViewWrapper>;
     }
   };
 
-  const viewContent = useMemo(() => renderContent(), [currentView, debouncedSearchQuery, isDarkMode, favorites, myList, selectedGenre, currentUser, activeProfile, users, content, sectionTitles, customSections]);
+  const viewContent = useMemo(() => renderContent(), [currentView, submittedSearchQuery, isDarkMode, favorites, myList, selectedGenre, currentUser, activeProfile, users, content, sectionTitles, customSections]);
 
   if (!isAuthenticated) return <AuthView isDarkMode={isDarkMode} onLogin={handleLogin} onSignup={handleSignup} onResetPassword={handleResetPassword} users={users} initialEmail={initialState.lastEmail} />;
 
@@ -1333,10 +1806,13 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       <Sidebar 
         currentView={currentView} 
         setCurrentView={(view) => {
+          searchService.cancelPending();
           setCurrentView(view);
           setIsMobileMenuOpen(false);
           setSelectedGenre(''); 
           setSearchQuery('');
+          setSubmittedSearchQuery('');
+          setLiveSearchResults([]);
         }} 
         isDarkMode={isDarkMode} 
         isCollapsed={isSidebarCollapsed}
@@ -1352,18 +1828,34 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           setIsDarkMode={setIsDarkMode} 
           currentUser={currentUser} 
           activeProfile={activeProfile}
-          setCurrentView={setCurrentView} 
+          currentView={currentView}
+          setCurrentView={(view) => {
+            searchService.cancelPending();
+            setCurrentView(view);
+            setSearchQuery('');
+            setSubmittedSearchQuery('');
+            setLiveSearchResults([]);
+          }} 
           onSwitchProfile={() => { setActiveProfile(null); setCurrentView('profile-selector'); }}
           onSelectProfile={(p) => { setActiveProfile(p); setCurrentView('home'); }}
           searchQuery={searchQuery} 
           setSearchQuery={setSearchQuery}
+          onSearchSubmit={(q) => {
+            setSubmittedSearchQuery(q);
+          }}
+          onClearSearch={() => {
+            setSubmittedSearchQuery('');
+            setLiveSearchResults([]);
+          }}
+          onSelectContent={handleSelectContent}
+          allContent={content}
           notifications={siteNotifications}
           onLogout={handleLogout}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
           onOpenDiagnostics={() => setIsDiagnosticModalOpen(true)}
         />
         
-        <ScrollToTop dependency={`${currentView}-${debouncedSearchQuery}`} targetRef={scrollContainerRef} />
+        <ScrollToTop dependency={`${currentView}-${submittedSearchQuery}`} targetRef={scrollContainerRef} />
 
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-20 scroll-smooth transform-gpu">
           {isCatalogLoading && trendingItems.length === 0 ? (
@@ -1379,7 +1871,13 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       {/* Admin Button (Floating) */}
       {currentUser.role === 'admin' && (
         <button 
-          onClick={() => setCurrentView(v => v === 'admin' ? previousView : 'admin')} 
+          onClick={() => {
+            if (currentView === 'admin') {
+              handleNavigateView(previousView === 'admin' ? 'home' : previousView);
+            } else {
+              handleNavigateView('admin');
+            }
+          }} 
           className="fixed bottom-8 right-8 z-50 w-16 h-16 rounded-2xl bg-orange-600 text-white shadow-2xl transition-transform hover:scale-110 active:scale-95 flex items-center justify-center transform-gpu"
         >
           <ShieldCheck className="w-8 h-8" />
@@ -1430,13 +1928,16 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       {selectedContent && (
         <ContentDetailModal 
           item={selectedContent} 
-          onClose={() => setSelectedContent(null)} 
+          onClose={handleCloseDetailModal} 
           isDarkMode={isDarkMode}
           myList={myList}
           favorites={favorites}
           onToggleList={toggleMyList}
           onToggleFavorite={toggleFavorite}
-          allContent={content}
+          allContent={allowedContent}
+          initialSeason={initialSeasonNum}
+          initialEpisode={initialEpisodeNum}
+          autoPlayInitialEpisode={hasDeepLinkEpisode}
         />
       )}
     </div>

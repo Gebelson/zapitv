@@ -103,6 +103,10 @@ export class MediaAvailabilityIndex {
               if (item.expiresAt && item.expiresAt < now) {
                 item.status = 'EXPIRED';
               }
+              // Itens com indisponibilidade confirmada em sessões passadas são resetados para DISCOVERED
+              if (item.status === 'UNAVAILABLE_CONFIRMED') {
+                item.status = 'DISCOVERED';
+              }
               this.index.set(item.canonicalId, item);
             }
           }

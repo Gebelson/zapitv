@@ -63,6 +63,7 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     director: 'Camilo Cavalcante',
     cast: ['Josué de Castro (Acervo)', 'Herbert de Souza (Betinho)', 'Especialistas Brasileiros'],
     tmdbId: '680032',
+    imdbId: 'tt8839088',
     isFeatured: true,
     availabilityStatus: 'verified',
     audioStatus: 'pt-br-original', // Áudio original PT-BR
@@ -199,6 +200,7 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     director: 'Ian Hubert',
     cast: ['Derek de Lint', 'Sergio Hasselbaink', 'Rogier Schippers'],
     tmdbId: '133701',
+    imdbId: 'tt2285752',
     availabilityStatus: 'verified',
     audioStatus: 'other',
     verifiedStreams: [
@@ -227,6 +229,7 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     description: 'A clássica e adorada animação aberta da Blender Foundation. Um coelho gigante e tranquilo decide ensinar uma lição inesquecível a três animais travessos da floresta.',
     genres: ['Animação', 'Comédia', 'Infantil / Família'],
     director: 'Sacha Goedegebure',
+    imdbId: 'tt1285241',
     availabilityStatus: 'verified',
     audioStatus: 'universal',
     verifiedStreams: [
@@ -411,6 +414,34 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
         description: 'Doraemon chega ao passado para mudar o destino de Nobita.',
         image: '',
         videoUrl: 'https://dn720400.ca.archive.org/0/items/doraemon-2005-001-yojigen-043977-e-2.-720/Doraemon%20%282005%29%20-%20001%20%5BYojigen%5D%5B043977E2%5D.720.mp4'
+      }
+    ]
+  },
+
+  // ANIME VERIFICADO - BLEACH (CANÔNICO)
+  {
+    id: 'anime-bleach-tvmeter',
+    title: 'Bleach: Thousand-Year Blood War',
+    type: ContentType.ANIME,
+    rating: 9.0,
+    year: 2022,
+    image: 'https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY9AcHG2uaj.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/m9PHVbC3sC4k9a52lY21P4o2U5.jpg',
+    description: 'A paz é subitamente quebrada quando as sirenes de alerta ecoam pela Sociedade das Almas.',
+    genres: ['Anime', 'Ação', 'Animação', 'Fantasia'],
+    tmdbId: '30984',
+    imdbId: 'tt0434665',
+    seasonsCount: 3,
+    availabilityStatus: 'verified',
+    audioStatus: 'other',
+    episodes: [
+      {
+        id: 'bleach-tybw-ep1',
+        number: 1,
+        title: 'Episódio 1',
+        description: 'O retorno dos Quincies.',
+        image: '',
+        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
       }
     ]
   },

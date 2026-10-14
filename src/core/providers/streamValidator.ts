@@ -140,7 +140,8 @@ class StreamValidator {
   public isUrlBlacklisted(url: string): boolean {
     if (!url) return true;
     try {
-      const parsed = new URL(url.startsWith('/') ? `http://localhost:4000${url}` : url);
+      const base = typeof window !== 'undefined' ? window.location.origin : (process.env.VITE_APP_URL || 'http://localhost:4000');
+      const parsed = new URL(url.startsWith('/') ? `${base}${url}` : url);
       const host = parsed.hostname.toLowerCase();
       for (const domain of this.blacklist) {
         if (host === domain || host.endsWith(`.${domain}`)) {
@@ -385,6 +386,40 @@ class StreamValidator {
           console.warn(`[StreamValidator] Release torrent com título trocado rejeitada: '${sTitle}' para '${targetTitle}'`);
           return false;
         }
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Verifica se o nome/texto do stream corresponde ao título alvo e parâmetros de episódio
+   */
+  public isContentMatchingTarget(
+    streamText: string,
+    targetTitle: string,
+    episodeParams?: { season: number; episode: number }
+  ): boolean {
+    if (!targetTitle || !streamText) return true;
+    const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const cleanStream = normalize(streamText);
+    const cleanTarget = normalize(targetTitle);
+
+    // Se o stream contiver o título ou palavras-chave
+    const targetWords = cleanTarget.split(/\s+/).filter(w => w.length >= 4);
+    if (targetWords.length > 0 && !cleanStream.includes(cleanTarget)) {
+      const matchesAtLeastOne = targetWords.some(w => cleanStream.includes(w));
+      if (!matchesAtLeastOne) {
+        return false;
+      }
+    }
+
+    if (episodeParams) {
+      const s = episodeParams.season;
+      const e = episodeParams.episode;
+      const sPattern = new RegExp(`s0*${s}|temporada\\s*0*${s}`, 'i');
+      if (cleanStream.includes('temporada') && !sPattern.test(cleanStream)) {
+        return false;
       }
     }
 

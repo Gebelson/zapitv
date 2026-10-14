@@ -9,7 +9,10 @@ import { subtitleService } from '../subtitles/subtitleService';
 import { smartRankStreams } from '../subtitles/streamSubtitleDetector';
 import { sourceSelectionService } from '../selection/sourceSelectionService';
 import { canonicalIdentityService } from '../identity/canonicalIdentity';
+import { mediaLoadingTracker } from '../tracking/mediaLoadingTracker';
+import { mediaSourceValidationService } from './mediaSourceValidationService';
 import { ContentItem } from '../../../types';
+import { filmesData } from '../../../constants';
 
 export interface ProviderConfig {
   id: string;
@@ -23,6 +26,28 @@ export interface ProviderConfig {
   latencyMs?: number;
   lastChecked?: string;
   errorMessage?: string;
+}
+
+// Verificação passiva em cache de prontidão do Stremio Engine local (sem spawn de processos)
+let localEngineCache = { active: false, lastCheck: 0 };
+export async function isLocalStremioEngineOnline(): Promise<boolean> {
+  const now = Date.now();
+  if (now - localEngineCache.lastCheck < 15000) {
+    return localEngineCache.active;
+  }
+  // No navegador em HTTPS (ex: Vercel), requisições HTTP para 127.0.0.1 são bloqueadas por Mixed Content
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    localEngineCache = { active: false, lastCheck: now };
+    return false;
+  }
+  try {
+    const res = await fetch("http://127.0.0.1:11470/stats.json", { signal: AbortSignal.timeout(500) });
+    localEngineCache = { active: res.ok, lastCheck: now };
+    return res.ok;
+  } catch {
+    localEngineCache = { active: false, lastCheck: now };
+    return false;
+  }
 }
 
 // Provedores pré-configurados de fábrica via Protocolo Oficial Stremio (Sem publicidade, sem iframes)
@@ -121,11 +146,11 @@ export const DEFAULT_PROVIDERS: ProviderConfig[] = [
     id: 'stremio-public-domain-web',
     name: 'Public Domain Movies (Stremio Community Addon)',
     url: 'https://public-domain-movies.strem.fun',
-    enabled: true,
+    enabled: false,
     type: 'stremio-addon',
     priority: 9,
     isPtBr: false,
-    status: 'online'
+    status: 'offline'
   },
   {
     id: 'stremio-cinemeta',
@@ -320,12 +345,24 @@ class ProviderRegistryService {
 
     const openItem = VERIFIED_OPEN_ITEMS.find(item => 
       item.id === rawTargetId || 
-      (tmdbNum && item.tmdbId === tmdbNum) ||
-      (imdbStr && item.imdbId === imdbStr)
+      item.id === id.id ||
+      (rawTargetId.startsWith('open-') && (
+        (tmdbNum && String(item.tmdbId) === String(tmdbNum)) ||
+        (imdbStr && item.imdbId === imdbStr)
+      )) ||
+      (imdbStr && item.imdbId === imdbStr && item.id.startsWith('anime-'))
     );
 
-    const targetTitle = (id.title || openItem?.title || '').trim();
+    const catalogItem = !openItem ? filmesData.find(item =>
+      item.id === rawTargetId ||
+      item.id === id.id ||
+      (imdbStr && item.imdbId === imdbStr) ||
+      (tmdbNum && String(item.tmdbId) === String(tmdbNum))
+    ) : null;
 
+    const targetTitle = (id.title || catalogItem?.title || openItem?.title || '').trim();
+
+    // 0. Streams legítimos de Domínio Público (exclusivo para itens 'open-')
     if (openItem) {
       if ((type === 'series' || type === 'anime') && openItem.episodes && openItem.episodes.length > 0) {
         const epNum = episode?.episode || 1;
@@ -363,6 +400,53 @@ class ProviderRegistryService {
       }
     }
 
+    // 0.1 Streams de mídias do Acervo ZapiTV com fontes confirmadas
+    if (catalogItem) {
+      if ((type === 'series' || type === 'anime') && catalogItem.episodes && catalogItem.episodes.length > 0) {
+        const epNum = episode?.episode || 1;
+        const epObj = catalogItem.episodes.find(e => e.number === epNum) || catalogItem.episodes[0];
+        if (epObj?.videoUrl && !epObj.videoUrl.includes('Caminandes') && !epObj.videoUrl.includes('Night_of_the_Living_Dead')) {
+          const directUrl = epObj.videoUrl;
+          const proxyUrl = directUrl.startsWith('http') ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
+          const isDubbed = catalogItem.audioStatus === 'pt-br-dubbed';
+          streams.push({
+            name: `${catalogItem.title} - T${episode?.season || 1}E${epObj.number}`,
+            title: `[EPISÓDIO ${epObj.number}] ${epObj.title} (${isDubbed ? 'Dublado PT-BR' : 'Stream HD'})`,
+            url: proxyUrl,
+            sourceType: epObj.videoUrl.includes('.m3u8') ? 'hls' : 'mp4',
+            isPtBr: true,
+            isDubbed,
+            quality: '1080p',
+            providerName: 'Acervo ZapiTV Séries',
+            providerId: 'zapitv-series'
+          });
+        }
+      } else if (catalogItem.verifiedStreams && catalogItem.verifiedStreams.length > 0) {
+        const safeStreams = catalogItem.verifiedStreams.filter(s => 
+          !s.url?.includes('Night_of_the_Living_Dead') && !s.url?.includes('Caminandes')
+        );
+        streams.push(...safeStreams);
+      } else if (catalogItem.videoUrl && !catalogItem.videoUrl.includes('Night_of_the_Living_Dead') && !catalogItem.videoUrl.includes('Caminandes')) {
+        const directUrl = catalogItem.videoUrl;
+        const isHls = directUrl.includes('.m3u8');
+        const isMp4 = directUrl.includes('.mp4');
+        if (isHls || isMp4) {
+          const proxyUrl = directUrl.startsWith('http') ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
+          streams.push({
+            name: `${catalogItem.title} - Stream Oficial`,
+            title: `${catalogItem.title} (Dublado PT-BR 1080p)`,
+            url: proxyUrl,
+            sourceType: isHls ? 'hls' : 'mp4',
+            isPtBr: true,
+            isDubbed: true,
+            quality: '1080p',
+            providerName: 'Acervo ZapiTV Oficial',
+            providerId: 'zapitv-catalog'
+          });
+        }
+      }
+    }
+
     // 1. Consultar Provedores Stremio Add-on Habilitados em Paralelo (Protocolo Oficial Stremio v3)
     const stremioAddons = activeProviders.filter(p => p.type === 'stremio-addon');
     const stremioType = type === 'movie' ? 'movie' : 'series';
@@ -372,32 +456,48 @@ class ProviderRegistryService {
       : primaryId;
 
     if (stremioId) {
+      mediaLoadingTracker.transition(rawTargetId, 'SEARCHING_SOURCES', {
+        stremioId,
+        stremioType,
+        providerCount: stremioAddons.length
+      });
+
       const addonPromises = stremioAddons.map(async (addon) => {
+        const startProviderTime = Date.now();
+        let providerSuccess = false;
+        let providerStreamCount = 0;
+        let providerError: string | undefined;
+
         try {
           const client = new StremioClient(addon.url);
+          // Timeout individual estrito de 8 segundos por add-on
           let res = await Promise.race([
             client.getStreams(stremioType, stremioId),
-            new Promise<any>((_, reject) => setTimeout(() => reject(new Error('timeout')), 7000))
+            new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON')), 8000))
           ]);
 
-          // Fallback para ID secundário (ex: se buscou por tt, tenta por tmdbNum se vazio)
+          // Fallback para ID secundário se o primeiro não retornou nada
           if ((!res || !res.streams || res.streams.length === 0) && tmdbNum && imdbStr) {
             const altBase = stremioId.startsWith('tt') ? tmdbNum : imdbStr;
             const altId = episode && (type === 'series' || type === 'anime')
               ? `${altBase}:${episode.season}:${episode.episode}`
               : altBase;
             try {
-              res = await client.getStreams(stremioType, altId);
+              res = await Promise.race([
+                client.getStreams(stremioType, altId),
+                new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON_ALT')), 5000))
+              ]);
             } catch {}
           }
 
           if ((!res || !res.streams || res.streams.length === 0) && (type === 'anime' || type === 'series')) {
             const altType = stremioType === 'series' ? 'anime' : 'series';
             try {
-              res = await client.getStreams(altType, stremioId);
-            } catch {
-              // ignore
-            }
+              res = await Promise.race([
+                client.getStreams(altType, stremioId),
+                new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON_TYPE')), 5000))
+              ]);
+            } catch {}
           }
 
           if (res && Array.isArray(res.streams)) {
@@ -429,24 +529,38 @@ class ProviderRegistryService {
                   sourceType: isHls ? 'hls' : 'mp4'
                 });
               } else if (isTorrent) {
+                const engineOnline = await isLocalStremioEngineOnline();
                 const engineUrl = `http://127.0.0.1:11470/${s.infoHash}/${s.fileIdx || 0}`;
                 parsedStreams.push({
                   ...s,
                   url: engineUrl,
-                  providerName: addon.name,
+                  providerName: `${addon.name}${engineOnline ? '' : ' (Requer Stremio Engine)'}`,
                   providerId: addon.id,
                   sourceType: 'mp4',
+                  isTorrent: true,
                   behaviorHints: {
                     ...(s.behaviorHints || {}),
-                    notWebReady: false
+                    notWebReady: !engineOnline
                   }
                 });
               }
             }
+            providerSuccess = true;
+            providerStreamCount = parsedStreams.length;
             return parsedStreams;
           }
-        } catch {
-          // ignore
+        } catch (err: any) {
+          providerError = err.message || 'Erro de comunicação';
+        } finally {
+          const duration = Date.now() - startProviderTime;
+          mediaLoadingTracker.recordProviderAttempt(rawTargetId, {
+            providerId: addon.id,
+            providerName: addon.name,
+            durationMs: duration,
+            success: providerSuccess,
+            streamCount: providerStreamCount,
+            error: providerError
+          });
         }
         return [];
       });
@@ -465,11 +579,28 @@ class ProviderRegistryService {
     }
 
     // 3. Filtrar rigorosamente streams de domínios estacionados / ParkLogic / Embeds / YouTube e conteúdos trocados
+    mediaLoadingTracker.transition(rawTargetId, 'VALIDATING_SOURCES', {
+      rawStreamCount: streams.length
+    });
+
     const cleanStreams = streamValidator.filterCleanStreams(streams, targetTitle).filter(s => {
       if (s.ytId) return false;
       const u = (s.url || '').toLowerCase();
+      const t = (s.title || '').toLowerCase();
       if (u.includes('youtube.com') || u.includes('youtu.be')) return false;
-      return !u.includes('embedplay') && !u.includes('playerflix') && !u.includes('videasy') && !u.includes('superflix');
+      if (u.includes('embedplay') || u.includes('playerflix') || u.includes('videasy') || u.includes('superflix')) return false;
+
+      // BLINDAGEM CONTRA SUBSTITUIÇÃO INDEVIDA POR CLÁSSICOS/MOCKS DE DOMÍNIO PÚBLICO OU BLENDER
+      const isNightLivingDead = u.includes('night_of_the_living_dead') || t.includes('night of the living dead') || t.includes('noite dos mortos-vivos');
+      if (isNightLivingDead && rawTargetId !== 'open-night-living-dead-1968' && id.imdbId !== 'tt0063350') {
+        return false;
+      }
+      const isCaminandes = u.includes('caminandes') || t.includes('caminandes');
+      if (isCaminandes && rawTargetId !== 'open-caminandes-s1') {
+        return false;
+      }
+
+      return true;
     });
 
     // 4. Construir identidade canônica para validação estrita de fontes
@@ -478,7 +609,7 @@ class ProviderRegistryService {
       title: targetTitle,
       type: type === 'movie' ? ContentType.MOVIE : (type === 'anime' ? ContentType.ANIME : ContentType.SERIES),
       rating: 7.0,
-      year: openItem?.year || new Date().getFullYear(),
+      year: (id as any).year || openItem?.year || 0,
       image: openItem?.image || '',
       tmdbId: id.tmdbId ? String(id.tmdbId) : undefined,
       imdbId: id.imdbId,
@@ -498,6 +629,11 @@ class ProviderRegistryService {
       // ignore
     }
 
+    mediaLoadingTracker.transition(rawTargetId, 'SELECTING_AUDIO', {
+      cleanStreamsCount: cleanStreams.length,
+      hasExternalPtSub
+    });
+
     // 6. Ordenar rigorosamente pela hierarquia inteligente com prioridade absoluta para PT-BR e descarte de quarentena:
     const sorted = sourceSelectionService.rankStreams(cleanStreams, {
       hasExternalPtSub,
@@ -506,6 +642,19 @@ class ProviderRegistryService {
       cacheKey: `${cacheKey}_hasPt${hasExternalPtSub}`
     });
     
+    // 7. Enriquecer fontes validadas no MediaSourceValidationService (normalização centralizada)
+    for (const s of sorted) {
+      mediaSourceValidationService.validateSource(s, {
+        mediaId: rawTargetId,
+        mediaTitle: targetTitle,
+        mediaType: type,
+        season: episode?.season,
+        episode: episode?.episode,
+        canonicalIdentity: identity,
+        hasExternalPtSub
+      }).catch(() => {});
+    }
+
     // Armazenar no cache
     this.cache.set(cacheKey, { streams: sorted, timestamp: Date.now() });
 

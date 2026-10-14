@@ -70,7 +70,7 @@ const miniCSS = subtitleStyleService.computeSubtitleCSS(
   { ...DEFAULT_SUBTITLE_STYLE, outline: 'thick', shadow: 'strong' },
   true
 );
-assert(miniCSS.fontSize === '15px', 'Mini preview escala a fonte para proporção do preview card (15px para md)');
+assert(miniCSS.fontSize === '14px', 'Mini preview escala a fonte para proporção do preview card (14px para md)');
 assert(miniCSS.WebkitTextStroke === '2.5px #000000', 'Mini preview escala a espessura do contorno');
 
 // Test 6: Reset para os padrões de fábrica

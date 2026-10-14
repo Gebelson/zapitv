@@ -1,37 +1,25 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { spawn } from "child_process";
 import fs from "fs";
 import { VERIFIED_OPEN_ITEMS } from "./src/core/catalog/verifiedCatalog.ts";
 import { classifyStream, checkOpenSubtitlesPtBr, sortStreamsByPtBrPriority } from "./src/core/audio/audioDetector.ts";
 import { OfficialChannelProvider } from "./src/core/livetv/OfficialChannelProvider.ts";
+import { featuredRankingService } from "./src/core/rankings/FeaturedRankingService.ts";
+import { weeklyFeaturedScheduler } from "./src/core/rankings/WeeklyFeaturedScheduler.ts";
+import { imdbWeeklyRankingService } from "./src/core/rankings/IMDbWeeklyRankingService.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function ensureStremioEngine() {
+// Verificação passiva e silenciosa de disponibilidade do Streaming Engine (porta 11470)
+// NUNCA cria subprocessos locais (cmd, powershell, spawn, node) nem abre janelas no sistema operacional
+async function checkStremioEngineStatus(): Promise<boolean> {
   try {
-    const probe = await fetch("http://127.0.0.1:11470/stats.json", { signal: AbortSignal.timeout(1000) });
-    if (probe.ok) {
-      console.log("Stremio Streaming Engine ativo na porta 11470.");
-      return;
-    }
-  } catch {}
-
-  const serverJsPath = "C:\\Users\\gebel\\AppData\\Local\\Programs\\Stremio\\server.js";
-  if (fs.existsSync(serverJsPath)) {
-    console.log("Iniciando motor oficial do Stremio (server.js) na porta 11470...");
-    try {
-      const p = spawn("node", [serverJsPath], {
-        detached: true,
-        stdio: "ignore",
-        cwd: "C:\\Users\\gebel\\AppData\\Local\\Programs\\Stremio"
-      });
-      p.unref();
-    } catch (e: any) {
-      console.warn("Não foi possível iniciar motor do Stremio:", e.message);
-    }
+    const probe = await fetch("http://127.0.0.1:11470/stats.json", { signal: AbortSignal.timeout(800) });
+    return probe.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -53,11 +41,13 @@ function createApp() {
 
     const item = VERIFIED_OPEN_ITEMS.find(it => 
       it.id === cleanId || 
-      (it.tmdbId && String(it.tmdbId) === cleanId) || 
-      (it.imdbId && it.imdbId === cleanId)
+      (cleanId.startsWith('open-') && (
+        (it.tmdbId && String(it.tmdbId) === cleanId) || 
+        (it.imdbId && it.imdbId === cleanId)
+      ))
     );
 
-    if (!item) return [];
+    if (!item || !item.id.startsWith('open-')) return [];
 
     if (item.episodes && item.episodes.length > 0) {
       const ep = item.episodes.find(e => e.number === episodeNum) || item.episodes[0];
@@ -122,6 +112,10 @@ function createApp() {
     ];
     if (adultTerms.some(term => combined.includes(term))) return false;
 
+    // Bloqueio rigoroso de gravações de cinema (CAM, CamRip, Telesync, HDCAM, Telecine)
+    const camRegex = /\b(cam|camrip|cam-rip|telesync|hdcam|hd-ts|hdts|telecine|tc|screener|scr|dvdscr)\b/i;
+    if (camRegex.test(combined)) return false;
+
     return true;
   }
 
@@ -152,7 +146,11 @@ function createApp() {
 
   app.get(["/api/stremio/cinema-aberto/stream/:type/:id.json", "/api/stremio/cinema-aberto/stream/:type/:id"], (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
-    const streams = resolveOpenItemStreams(String(req.params.id));
+    const requestedId = String(req.params.id || '');
+    if (!requestedId.startsWith('open-')) {
+      return res.json({ streams: [] });
+    }
+    const streams = resolveOpenItemStreams(requestedId);
     res.json({ streams });
   });
 
@@ -172,7 +170,11 @@ function createApp() {
 
   app.get(["/api/stremio/blender-open/stream/:type/:id.json", "/api/stremio/blender-open/stream/:type/:id"], (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
-    const streams = resolveOpenItemStreams(String(req.params.id)).filter(s => 
+    const requestedId = String(req.params.id || '');
+    if (!requestedId.startsWith('open-')) {
+      return res.json({ streams: [] });
+    }
+    const streams = resolveOpenItemStreams(requestedId).filter(s => 
       s.title?.toLowerCase().includes('blender') || 
       s.title?.toLowerCase().includes('bunny') || 
       s.title?.toLowerCase().includes('tears') ||
@@ -197,7 +199,11 @@ function createApp() {
 
   app.get(["/api/stremio/public-domain/stream/:type/:id.json", "/api/stremio/public-domain/stream/:type/:id"], (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
-    const streams = resolveOpenItemStreams(String(req.params.id));
+    const requestedId = String(req.params.id || '');
+    if (!requestedId.startsWith('open-')) {
+      return res.json({ streams: [] });
+    }
+    const streams = resolveOpenItemStreams(requestedId);
     res.json({ streams });
   });
 
@@ -741,6 +747,144 @@ function createApp() {
     }
   });
 
+  // =========================================================================
+  // FEATURED RANKINGS API (WEEKLY IMDb POPULARITY + REAL AVAILABILITY)
+  // =========================================================================
+  const FEATURED_CACHE_FILE = path.resolve(process.cwd(), "data", "featured_weekly_selection.json");
+
+  // Configuração de persistência em disco local para ambiente Node.js
+  featuredRankingService.setStorageAdapter({
+    load: () => {
+      try {
+        if (fs.existsSync(FEATURED_CACHE_FILE)) {
+          const raw = fs.readFileSync(FEATURED_CACHE_FILE, "utf-8");
+          if (raw) return JSON.parse(raw);
+        }
+      } catch (e) {
+        console.warn("[Server] Falha ao carregar cache do Em Destaque do disco:", e);
+      }
+      return null;
+    },
+    save: (data) => {
+      try {
+        const dir = path.dirname(FEATURED_CACHE_FILE);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        const tmpFile = `${FEATURED_CACHE_FILE}.${Date.now()}.tmp`;
+        fs.writeFileSync(tmpFile, JSON.stringify(data, null, 2), "utf-8");
+        fs.renameSync(tmpFile, FEATURED_CACHE_FILE);
+      } catch (e) {
+        console.warn("[Server] Falha ao persistir cache do Em Destaque no disco:", e);
+      }
+    }
+  });
+
+  app.get("/api/featured", (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const selection = featuredRankingService.getFeaturedSelectionSync();
+      res.json(selection);
+    } catch (err: any) {
+      res.status(500).json({ error: "Falha ao obter rankings em destaque", details: err?.message });
+    }
+  });
+
+  app.post("/api/featured/refresh", async (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const selection = await featuredRankingService.refreshFeaturedSelection();
+      res.json(selection);
+    } catch (err: any) {
+      res.status(500).json({ error: "Falha ao atualizar rankings em destaque", details: err?.message });
+    }
+  });
+
+  // Endpoint acionado semanalmente pela Vercel Cron ou GitHub Actions
+  const handleFeaturedCron = async (req: express.Request, res: express.Response) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+
+    // Verificação de autorização opcional (CRON_SECRET)
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret) {
+      const authHeader = req.headers["authorization"];
+      const vercelCronHeader = req.headers["x-vercel-cron"];
+      const querySecret = req.query.secret;
+      const isAuthValid = 
+        authHeader === `Bearer ${cronSecret}` || 
+        querySecret === cronSecret || 
+        vercelCronHeader === "1";
+
+      if (!isAuthValid) {
+        return res.status(401).json({ error: "Acesso não autorizado para execução do cron" });
+      }
+    }
+
+    try {
+      console.log("[Server] Acionamento cron semanal de Em Destaque recebido...");
+      const result = await featuredRankingService.runWeeklyScheduledUpdate({ force: false });
+      return res.json({
+        success: true,
+        weekKey: result.weekKey,
+        weekLabel: result.weekLabel,
+        referenceDate: result.referenceDate,
+        lastUpdatedAt: result.lastUpdatedAt,
+        nextScheduledUpdateFormatted: result.nextScheduledUpdateFormatted,
+        moviesCount: result.featuredMovies.length,
+        seriesCount: result.featuredSeries.length,
+        status: result.updateStatus
+      });
+    } catch (err: any) {
+      console.error("[Server] Erro no endpoint cron semanal:", err);
+      return res.status(500).json({ error: "Falha na execução agendada", details: err?.message });
+    }
+  };
+
+  app.get("/api/featured/cron", handleFeaturedCron);
+  app.post("/api/featured/cron", handleFeaturedCron);
+
+  app.get("/api/featured/scheduler-status", (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json(weeklyFeaturedScheduler.getStatus());
+  });
+
+  // Auditoria Oficial de Correspondência IMDb (Seção 16 da Especificação)
+  app.get("/api/featured/verify-correspondence", (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const selection = featuredRankingService.getFeaturedSelectionSync();
+      const audit = imdbWeeklyRankingService.verifyCorrespondence(
+        selection.featuredMovies,
+        selection.featuredSeries
+      );
+      res.json(audit);
+    } catch (err: any) {
+      res.status(500).json({ error: "Falha ao verificar correspondência com IMDb", details: err?.message });
+    }
+  });
+
+  // Importação Administrativa de Snapshot Autorizado (Seção 5 da Especificação)
+  app.post("/api/featured/import-snapshot", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { snapshot } = req.body || {};
+      if (!snapshot) {
+        return res.status(400).json({ error: "Corpo da requisição deve conter o objeto 'snapshot'" });
+      }
+      const result = imdbWeeklyRankingService.importAuthorizedSnapshot(snapshot);
+      if (!result.success) {
+        return res.status(400).json({ error: result.message });
+      }
+      // Recalcula atomicamente a seleção em destaque com o novo snapshot
+      const updated = featuredRankingService.recomputeFeaturedSelectionSync();
+      return res.json({
+        success: true,
+        message: result.message,
+        featuredSelection: updated
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: "Falha ao importar snapshot IMDb", details: err?.message });
+    }
+  });
+
   return app;
 }
 
@@ -749,7 +893,16 @@ export default app;
 
 if (!process.env.VERCEL) {
   (async () => {
-    await ensureStremioEngine();
+    const engineActive = await checkStremioEngineStatus();
+    if (engineActive) {
+      console.log("Stremio Streaming Server detectado na porta 11470.");
+    } else {
+      console.log("Modo Web direto ativo (sem processos externos).");
+    }
+
+    // Inicializa o agendador de tarefas semanais em segundo plano
+    weeklyFeaturedScheduler.start();
+
     if (process.env.NODE_ENV !== "production") {
       const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({

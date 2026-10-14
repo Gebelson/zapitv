@@ -5,6 +5,7 @@
  */
 
 import { ContentItem, ContentType } from '../../../types';
+import { theatricalFilterService } from '../catalog/theatricalFilterService';
 
 export interface CanonicalMediaIdentity {
   id: string;
@@ -52,7 +53,8 @@ export class CanonicalIdentityService {
     // Identifica filmes que estão em cartaz no cinema ou ainda não lançados em digital (sem WEB-DL oficial)
     const currentYear = new Date().getFullYear();
     const isTheatricalUnreleased = (
-      (item.type === ContentType.MOVIE && item.year >= currentYear) ||
+      theatricalFilterService.isKnownUnreleasedOrTheatrical(item) ||
+      Boolean(item.year && item.year > currentYear) ||
       /hope.*primeiro.*impacto|vingadores.*destino|avengers.*doomsday|batman.*part.*ii/i.test(item.title)
     );
 

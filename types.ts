@@ -26,11 +26,14 @@ export interface ContentItem {
   heroTags?: HeroTag[]; // Nova propriedade para tags personalizadas
   tmdbId?: string; // ID numérico do TMDB
   imdbId?: string; // ID do IMDB (ex: tt1234567)
+  imdbRank?: number; // Posição oficial no ranking IMDb (ex: #14)
+  displayRank?: number; // Posição filtrada entre títulos disponíveis no ZapiTV (ex: #1)
   videoUrl?: string; // Custom video URL
   originalTitle?: string;
   duration?: number;
   overview?: string;
   poster?: string;
+  releaseDate?: string;
   
   // Novos metadados detalhados
   director?: string; // Para séries, funciona como "Criador"
@@ -39,9 +42,10 @@ export interface ContentItem {
   traits?: string[]; // ex: "Empolgante", "Sombrio"
   maturityAdvisories?: string[]; // ex: "violência", "nudez"
   ageRating?: string; // Classificação Indicativa
+  inTheaters?: boolean; // Títulos em cartaz nos cinemas
 
   // Disponibilidade e Verificação de Áudio Real
-  availabilityStatus?: 'verified' | 'declared' | 'unavailable'; // 'Disponível e testado' | 'Fonte declarada' | 'Indisponível'
+  availabilityStatus?: 'verified' | 'declared' | 'unavailable' | 'unreleased'; // 'Disponível e testado' | 'Fonte declarada' | 'Indisponível' | 'Não lançado'
   audioStatus?: 'pt-br-dubbed' | 'pt-br-original' | 'pt-br-declared' | 'pt-br-subtitles' | 'other' | 'universal' | 'unknown';
   verifiedStreams?: any[];
   seasonsCount?: number;
@@ -91,4 +95,4 @@ export interface CustomSection {
   items: string[]; // Array de IDs dos conteúdos
 }
 
-export type AppView = 'home' | 'featured' | 'movies' | 'series' | 'animes' | 'programas' | 'mylist' | 'profile' | 'settings' | 'help' | 'admin' | 'login' | 'signup' | 'profile-selector';
+export type AppView = 'home' | 'featured' | 'movies' | 'series' | 'animes' | 'programas' | 'live' | 'mylist' | 'profile' | 'settings' | 'help' | 'admin' | 'login' | 'signup' | 'profile-selector' | 'television' | 'downloads' | 'history' | 'notfound';

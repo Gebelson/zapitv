@@ -3,7 +3,7 @@ import {
   ArrowLeft, Play, Pause, RotateCcw, RotateCw, Volume2, VolumeX,
   Maximize, Minimize, Settings, SkipForward, AlertCircle, RefreshCw,
   Subtitles, Check, Sliders, Search, Globe, Languages, FastForward,
-  Sparkles, X, PictureInPicture2, ShieldAlert
+  Sparkles, X, PictureInPicture2, ShieldAlert, Columns2
 } from 'lucide-react';
 import Hls from 'hls.js';
 import { StremioStream } from '../../core/stremio/stremioTypes';
@@ -11,6 +11,7 @@ import { storageService } from '../../core/storage/storageService';
 import { ContentItem, ContentType } from '../../../types';
 import { streamValidator } from '../../core/providers/streamValidator';
 import { SubtitleTrack, subtitleService, sanitizeSubtitleText } from '../../core/subtitles/subtitleService';
+import { validateSubtitleContentMatch } from '../../core/subtitles/subtitleLanguageDetector';
 import { subtitleAutoSyncService } from '../../core/subtitles/subtitleAutoSyncService';
 import { classifyStream } from '../../core/audio/audioDetector';
 import { skipService, SkipInterval, SkipType } from '../../core/skip/skipService';
@@ -26,10 +27,17 @@ import { autoPlayService } from '../../core/playback/autoPlayService';
 import {
   subtitleStyleService,
   SubtitleStyle,
-  DEFAULT_SUBTITLE_STYLE
+  DEFAULT_SUBTITLE_STYLE,
+  DEFAULT_VERTICAL_POSITION,
+  normalizeVerticalPosition
 } from '../../core/subtitles/subtitleStyleService';
 import { analyzeStreamSubtitleFormat } from '../../core/subtitles/streamSubtitleDetector';
 import { pipService } from '../../core/pip/pipService';
+import { mediaLoadingTracker } from '../../core/tracking/mediaLoadingTracker';
+import { mediaSourceValidationService } from '../../core/providers/mediaSourceValidationService';
+import { mediaAvailabilityIndex } from '../../core/catalog/MediaAvailabilityIndex';
+import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
+import { audioSelectionManager, AudioOption } from '../../core/audio/audioSelectionManager';
 
 export interface NextEpisodeInfo {
   season: number;
@@ -51,6 +59,16 @@ interface ZapiPlayerProps {
   onClose: () => void;
   onNextEpisode?: () => void;
 }
+
+export type PlaybackPhase = 
+  | 'idle' 
+  | 'resolving-source' 
+  | 'intro' 
+  | 'loading-content' 
+  | 'playing-content' 
+  | 'recovering' 
+  | 'error' 
+  | 'closed';
 
 function parseTimeString(t: string): number {
   if (!t) return 0;
@@ -197,8 +215,25 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const showNonDubbedPromptRef = useRef(false);
   const isIntroTransitioningRef = useRef(false);
 
+  // Subtitles state
+  const [subtitlesList, setSubtitlesList] = useState<SubtitleTrack[]>([]);
+  const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(true);
+  const [selectedSubtitleId, setSelectedSubtitleId] = useState<string>('off');
+  const [appliedSubtitleId, setAppliedSubtitleId] = useState<string>('off');
+  const [subtitleStatus, setSubtitleStatus] = useState<'idle' | 'loading' | 'applied' | 'error' | 'unavailable'>('idle');
+  const [subtitleErrorToast, setSubtitleErrorToast] = useState<string | null>(null);
+  const [subtitleSearch, setSubtitleSearch] = useState('');
+  const [cues, setCues] = useState<Array<{ start: number; end: number; text: string }>>([]);
+  const [subDelay, setSubDelay] = useState(0);
+  const [autoSyncToast, setAutoSyncToast] = useState<string | null>(null);
+
   // Confirmação para conteúdos sem dublagem brasileira
-  const [hasUserConfirmedNonDubbed, setHasUserConfirmedNonDubbed] = useState(false);
+  const [hasUserConfirmedNonDubbed, setHasUserConfirmedNonDubbed] = useState<boolean>(() => {
+    if (playbackSessionId && playbackSessionService.isNonDubbedConfirmed(playbackSessionId)) {
+      return true;
+    }
+    return false;
+  });
 
   // Skip Times state (AniSkip & IntroDB)
   const [skipIntervals, setSkipIntervals] = useState<SkipInterval[]>([]);
@@ -277,8 +312,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   }, [duration]);
 
   useEffect(() => {
-    setHasUserConfirmedNonDubbed(false);
-  }, [item.id, initialSeason, initialEpisode]);
+    if (playbackSessionId && playbackSessionService.isNonDubbedConfirmed(playbackSessionId)) {
+      setHasUserConfirmedNonDubbed(true);
+    } else {
+      setHasUserConfirmedNonDubbed(false);
+    }
+  }, [item.id, initialSeason, initialEpisode, playbackSessionId]);
 
   // Verifica se existe dublagem em Português Brasileiro confirmada nas fontes
   const hasPtBrDubbingAvailable = useMemo(() => {
@@ -291,6 +330,23 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       return cls.isDubbed || (cls.isPtBr && !cls.isSubtitled) || cls.badge.includes('🔊');
     });
   }, [streams, item.audioStatus]);
+
+  // Verifica se há legendas em português ou hardsub compatível
+  const hasPtBrSubtitlesAvailable = useMemo(() => {
+    if (currentStream) {
+      const formatAnalysis = analyzeStreamSubtitleFormat(currentStream);
+      if (formatAnalysis.isHardsub) return true;
+    }
+    if (subtitlesList.length > 0) {
+      return subtitlesList.some(s => s.isPtBr || /^(pob|pt-br|bra|por-br|por|pt|pt-pt)$/i.test(s.lang));
+    }
+    return false;
+  }, [currentStream, subtitlesList]);
+
+  // Verifica se há fonte com áudio original disponível
+  const hasOriginalAudioAvailable = useMemo(() => {
+    return Boolean(streams && streams.length > 0);
+  }, [streams]);
 
   // Modal para perguntar se o usuário deseja assistir sem dublagem brasileira
   const showNonDubbedPrompt = useMemo(() => {
@@ -458,7 +514,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
     // 1. Inicia a reprodução do vídeo principal sob a camada da intro
     video.play()
-      .then(() => setIsPlaying(true))
+      .then(() => {
+        setIsPlaying(true);
+        applyTargetResumeTime();
+      })
       .catch(() => setIsPlaying(false));
 
     // 2. Dispara o fade out suave (700ms)
@@ -565,6 +624,17 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const triedIndicesRef = useRef<Set<number>>(new Set());
   const isSwitchingStreamRef = useRef(false);
 
+  // Máquina de estados explícita do ciclo de vida da reprodução
+  const playbackPhase: PlaybackPhase = useMemo(() => {
+    if (allSourcesFailed) return 'error';
+    if (isPlayingIntro) return 'intro';
+    if (isLoadingStreams) return 'resolving-source';
+    if (isSwitchingStreamRef.current) return 'recovering';
+    if (isLoading || !isMediaReady) return 'loading-content';
+    if (isPlaying) return 'playing-content';
+    return 'idle';
+  }, [allSourcesFailed, isPlayingIntro, isLoadingStreams, isLoading, isMediaReady, isPlaying]);
+
   // UI states
   const [showControls, setShowControls] = useState(true);
   const [showAudioMenu, setShowAudioMenu] = useState(false);
@@ -579,10 +649,96 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const aiCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [aiSettings, setAiSettings] = useState(() => aiEnhancerService.getSettings());
   const [enhancerStatus, setEnhancerStatus] = useState<'off' | 'initializing' | 'active' | 'unavailable'>(() => aiEnhancerService.getStatus());
+  const [isEnhancerRendering, setIsEnhancerRendering] = useState(() => aiEnhancerService.isRendering());
   const [isHoldingOriginal, setIsHoldingOriginal] = useState(false);
   const [showActivatedToast, setShowActivatedToast] = useState(false);
+  const [showUnavailableToast, setShowUnavailableToast] = useState(false);
   const holdTimerRef = useRef<any>(null);
   const isHeldLongRef = useRef(false);
+
+  // Split-Screen Image Comparison State (Tela Dividida)
+  const [isSplitComparing, setIsSplitComparing] = useState(false);
+  const [splitPosition, setSplitPosition] = useState(50);
+  const [isDraggingDivider, setIsDraggingDivider] = useState(false);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Status de ativação real da IA (pipeline processando e renderizando)
+  const isAiActive = Boolean(
+    aiSettings.enabled && 
+    aiSettings.videoEnabled && 
+    enhancerStatus === 'active' && 
+    isEnhancerRendering
+  );
+
+  // Regras obrigatórias:
+  // 1. Quando IA estiver desativada ou processamento falhar, encerra comparação em tela dividida
+  useEffect(() => {
+    if (isSplitComparing && !isAiActive) {
+      setIsSplitComparing(false);
+      aiEnhancerService.setComparisonMode('off');
+    }
+  }, [isAiActive, isSplitComparing]);
+
+  const handleToggleSplit = useCallback(() => {
+    if (!isAiActive) {
+      setShowUnavailableToast(true);
+      setTimeout(() => setShowUnavailableToast(false), 2500);
+      return;
+    }
+
+    setIsSplitComparing(prev => {
+      const next = !prev;
+      aiEnhancerService.setComparisonMode(next ? 'split' : 'off');
+      return next;
+    });
+  }, [isAiActive]);
+
+  const handleToggleAiEnhancer = useCallback(() => {
+    if (enhancerStatus === 'unavailable') {
+      setShowUnavailableToast(true);
+      setTimeout(() => setShowUnavailableToast(false), 2500);
+      return;
+    }
+
+    const nextState = aiEnhancerService.toggleEnabled();
+    if (!nextState) {
+      setIsSplitComparing(false);
+      aiEnhancerService.setComparisonMode('off');
+    } else {
+      setShowActivatedToast(true);
+      setTimeout(() => setShowActivatedToast(false), 2500);
+    }
+  }, [enhancerStatus]);
+
+  const updateSplitPosition = useCallback((clientX: number) => {
+    const container = splitContainerRef.current || containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const rawPos = ((clientX - rect.left) / rect.width) * 100;
+    const clamped = Math.max(5, Math.min(95, Math.round(rawPos)));
+    setSplitPosition(clamped);
+    aiEnhancerService.setSplitPosition(clamped);
+  }, []);
+
+  useEffect(() => {
+    if (!isDraggingDivider) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      updateSplitPosition(e.clientX);
+    };
+
+    const handlePointerUp = () => {
+      setIsDraggingDivider(false);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isDraggingDivider, updateSplitPosition]);
 
   useEffect(() => {
     const unsub = aiEnhancerService.subscribe(setAiSettings);
@@ -592,6 +748,22 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   useEffect(() => {
     const unsub = aiEnhancerService.onStatusChange(setEnhancerStatus);
     return unsub;
+  }, []);
+
+  useEffect(() => {
+    const unsub = aiEnhancerService.onRenderingChange(setIsEnhancerRendering);
+    return unsub;
+  }, []);
+
+  const syncCanvasDimensions = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = aiCanvasRef.current;
+    if (video && canvas && video.videoWidth > 0 && video.videoHeight > 0) {
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -624,7 +796,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   };
 
   const handleEnhancerPointerUp = (e: React.PointerEvent) => {
-    if (enhancerStatus === 'unavailable') return;
+    if (enhancerStatus === 'unavailable') {
+      setShowUnavailableToast(true);
+      setTimeout(() => setShowUnavailableToast(false), 2500);
+      return;
+    }
     if (holdTimerRef.current) {
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
@@ -664,19 +840,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const [hlsAudioTracks, setHlsAudioTracks] = useState<Array<{ id: number; name: string; lang: string }>>([]);
   const [selectedHlsAudioTrack, setSelectedHlsAudioTrack] = useState<number>(0);
   const [preferredAudioLang, setPreferredAudioLang] = useState<string>('pt-BR');
+  const [activeAudioId, setActiveAudioId] = useState<string | null>(null);
+  const [isSwitchingAudio, setIsSwitchingAudio] = useState<boolean>(false);
+  const previousStreamIndexRef = useRef<number>(selectedStreamIndex);
+  const previousActiveAudioIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setHlsAudioTracks([]);
     setSelectedHlsAudioTrack(0);
   }, [selectedStreamIndex]);
 
-  // Subtitles state
-  const [subtitlesList, setSubtitlesList] = useState<SubtitleTrack[]>([]);
-  const [selectedSubtitleId, setSelectedSubtitleId] = useState<string>('off');
-  const [subtitleSearch, setSubtitleSearch] = useState('');
-  const [cues, setCues] = useState<Array<{ start: number; end: number; text: string }>>([]);
-  const [subDelay, setSubDelay] = useState(0);
-  const [autoSyncToast, setAutoSyncToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (autoSyncToast) {
@@ -686,6 +859,15 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       return () => clearTimeout(timer);
     }
   }, [autoSyncToast]);
+
+  useEffect(() => {
+    if (subtitleErrorToast) {
+      const timer = setTimeout(() => {
+        setSubtitleErrorToast(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [subtitleErrorToast]);
 
   const [subtitleStyle, setSubtitleStyle] = useState<SubtitleStyle>(() => {
     return subtitleStyleService.getSubtitleStyle();
@@ -779,13 +961,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     let savedTime = 0;
     let dur = 0;
     if (initialSeason !== undefined && initialEpisode !== undefined) {
-      const epProgress = storageService.getSyncEpisodeProgressRecord(item.id, initialSeason, initialEpisode);
+      const epProgress = storageService.resolveEpisodeWatchProgress(item, initialSeason, initialEpisode);
       if (epProgress) {
         savedTime = epProgress.currentTime;
         dur = epProgress.duration;
       }
     } else {
-      const itemProg = storageService.getSyncItemProgressRecord(item.id);
+      const itemProg = storageService.resolveWatchProgress(item);
       if (itemProg) {
         savedTime = itemProg.currentTime;
         dur = itemProg.duration;
@@ -806,7 +988,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     } else {
       targetResumeTimeRef.current = 0;
     }
-  }, [item.id, initialSeason, initialEpisode]);
+  }, [item, initialSeason, initialEpisode]);
 
   // Aplica com precisão a posição salva quando o player carrega ou troca de fonte/qualidade/áudio
   const applyTargetResumeTime = useCallback(() => {
@@ -835,6 +1017,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   }, [currentTime, duration]);
 
   const flushProgress = useCallback(() => {
+    // Protege contra sobrescrever o progresso do usuário caso o seek inicial ainda não tenha sido aplicado
+    if (!isInitialTimeAppliedRef.current && targetResumeTimeRef.current > 0) {
+      return;
+    }
+
     const video = videoRef.current;
     const cur = (video && video.currentTime > 0) 
       ? video.currentTime 
@@ -842,6 +1029,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     const dur = (video && video.duration && !isNaN(video.duration) && video.duration > 0) 
       ? video.duration 
       : latestProgressRef.current.duration;
+
+    // Se o vídeo estiver nos primeiros 2s mas o targetResumeTime era > 5s e o seek ainda não concluiu, não salva 0s
+    if (cur < 2 && targetResumeTimeRef.current > 5 && !isInitialTimeAppliedRef.current) {
+      return;
+    }
+
     if (cur > 0 && dur > 0 && !isNaN(dur)) {
       storageService.saveProgress({
         contentId: item.id,
@@ -961,8 +1154,21 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     onClose();
   }, [flushProgress, playbackSessionId, onClose]);
 
-  const handleConfirmNonDubbed = useCallback(() => {
+  const handleConfirmNonDubbedSubtitled = useCallback(() => {
     setHasUserConfirmedNonDubbed(true);
+    if (playbackSessionId) {
+      playbackSessionService.markNonDubbedConfirmed(playbackSessionId);
+    }
+    if (subtitlesList.length > 0) {
+      const ptSub = subtitlesList.find(s => s.isPtBr) ||
+                    subtitlesList.find(s => /^(pob|pt-br|bra|por-br)$/i.test(s.lang)) ||
+                    subtitlesList.find(s => /^(por|pt|pt-pt)$/i.test(s.lang));
+      if (ptSub) {
+        setSelectedSubtitleId(ptSub.id);
+      } else if (subtitlesList[0]) {
+        setSelectedSubtitleId(subtitlesList[0].id);
+      }
+    }
     if (isPlayingIntro) {
       if (isIntroEnded) {
         if (isMediaReadyRef.current) {
@@ -976,7 +1182,29 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
       }
     }
-  }, [isPlayingIntro, isIntroEnded, handleIntroEnded, transitionFromIntroToMedia]);
+  }, [isPlayingIntro, isIntroEnded, handleIntroEnded, transitionFromIntroToMedia, subtitlesList, playbackSessionId]);
+
+  const handleConfirmNonDubbedOriginal = useCallback(() => {
+    setHasUserConfirmedNonDubbed(true);
+    if (playbackSessionId) {
+      playbackSessionService.markNonDubbedConfirmed(playbackSessionId);
+    }
+    userManuallyChangedSubRef.current = true;
+    setSelectedSubtitleId('off');
+    if (isPlayingIntro) {
+      if (isIntroEnded) {
+        if (isMediaReadyRef.current) {
+          transitionFromIntroToMedia();
+        }
+      } else if (introVideoRef.current) {
+        introVideoRef.current.play().catch(() => handleIntroEnded());
+      }
+    } else {
+      if (videoRef.current) {
+        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      }
+    }
+  }, [isPlayingIntro, isIntroEnded, handleIntroEnded, transitionFromIntroToMedia, playbackSessionId]);
 
   const handleRejectNonDubbed = useCallback(() => {
     handlePlayerClose();
@@ -1009,6 +1237,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   useEffect(() => {
     let active = true;
     userManuallyChangedSubRef.current = false;
+    setIsLoadingSubtitles(true);
 
     const fetchSubs = async () => {
       try {
@@ -1018,6 +1247,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         }
       } catch (err) {
         console.warn('Erro ao carregar legendas:', err);
+      } finally {
+        if (active) {
+          setIsLoadingSubtitles(false);
+        }
       }
     };
     fetchSubs();
@@ -1052,60 +1285,141 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   }, [subtitlesList, hasBrazilianAudio, selectedSubtitleId, currentStream]);
 
   // Desativa faixas de legenda internas nativas do vídeo (softsub) para priorizar o player do ZapiTV
-  useEffect(() => {
+  const disableNativeTextTracks = useCallback(() => {
     const video = videoRef.current;
-    if (video && video.textTracks) {
-      for (let i = 0; i < video.textTracks.length; i++) {
-        video.textTracks[i].mode = 'disabled';
+    if (!video || !video.textTracks) return;
+    for (let i = 0; i < video.textTracks.length; i++) {
+      const track = video.textTracks[i];
+      if (track.label === 'ZapiTV PiP Subtitles' && isPipActive) {
+        continue;
       }
+      try {
+        if (track.mode !== 'disabled') {
+          track.mode = 'disabled';
+        }
+      } catch {}
     }
-  }, [currentStream]);
+  }, [isPipActive]);
 
-  // Download & parse selected subtitle track with UTF-8 / Windows-1252 charset support & Auto-Sync
+  useEffect(() => {
+    disableNativeTextTracks();
+    const video = videoRef.current;
+    if (!video || !video.textTracks) return;
+
+    const onAddTrack = () => {
+      disableNativeTextTracks();
+    };
+
+    video.textTracks.addEventListener('addtrack', onAddTrack);
+    video.textTracks.addEventListener('change', onAddTrack);
+    video.addEventListener('loadedmetadata', onAddTrack);
+    video.addEventListener('loadeddata', onAddTrack);
+
+    return () => {
+      video.textTracks.removeEventListener('addtrack', onAddTrack);
+      video.textTracks.removeEventListener('change', onAddTrack);
+      video.removeEventListener('loadedmetadata', onAddTrack);
+      video.removeEventListener('loadeddata', onAddTrack);
+    };
+  }, [disableNativeTextTracks, currentStream]);
+
+  // Download, validação linguística & aplicação rigorosa da legenda selecionada
   useEffect(() => {
     if (selectedSubtitleId === 'off') {
       setCues([]);
+      setAppliedSubtitleId('off');
+      setSubtitleStatus('idle');
       return;
     }
+
     const track = subtitlesList.find(s => s.id === selectedSubtitleId);
-    if (!track?.url) return;
+    if (!track?.url) {
+      setCues([]);
+      setAppliedSubtitleId('off');
+      setSubtitleStatus('unavailable');
+      return;
+    }
+
     let active = true;
-    subtitleService.fetchAndDecodeSRT(track.url, track.lang)
+    setSubtitleStatus('loading');
+    const cacheKey = `${item.id}_${initialSeason || 0}_${initialEpisode || 0}_${track.id}_${track.lang}`;
+
+    subtitleService.fetchAndDecodeSRT(track.url, track.lang, cacheKey)
       .then(text => {
-        if (active) {
-          const parsed = parseSRT(text);
-          setCues(parsed);
+        if (!active) return;
+        const parsed = parseSRT(text);
+        if (parsed.length === 0) {
+          throw new Error('Nenhuma fala legível identificada no arquivo de legenda');
+        }
 
-          // Calibração automática de sincronia para eliminar qualquer atraso sem ação manual do usuário
-          const autoSync = subtitleAutoSyncService.calculateAutoOffset({
-            contentId: item.id,
-            video: videoRef.current,
-            cues: parsed,
-            stream: currentStream,
-            track,
-            skipInterval: activeSkipInterval
-          });
-
-          setSubDelay(autoSync.offset);
-          if (autoSync.offset !== 0) {
-            setAutoSyncToast(autoSync.explanation);
+        // Validação estrita do idioma textual
+        if (track.isPtBr || /^(pob|pt-br|bra|por-br)$/i.test(track.lang)) {
+          const val = validateSubtitleContentMatch(parsed, 'pob');
+          if (!val.isValid || !val.isConsistent) {
+            throw new Error(val.reason || 'O texto não é em português brasileiro');
           }
+        }
+
+        setCues(parsed);
+        setAppliedSubtitleId(track.id);
+        setSubtitleStatus('applied');
+
+        // Calibração automática de sincronia para eliminar qualquer atraso sem ação manual do usuário
+        const autoSync = subtitleAutoSyncService.calculateAutoOffset({
+          contentId: item.id,
+          video: videoRef.current,
+          cues: parsed,
+          stream: currentStream,
+          track,
+          skipInterval: activeSkipInterval
+        });
+
+        setSubDelay(autoSync.offset);
+        if (autoSync.offset !== 0) {
+          setAutoSyncToast(autoSync.explanation);
         }
       })
       .catch((err) => {
-        console.warn('Falha ao decodificar legenda:', err);
+        if (!active) return;
+        console.warn('[ZapiPlayer] Falha ao validar/aplicar legenda:', err?.message || err);
+        setCues([]);
+        setAppliedSubtitleId('off');
+        setSubtitleStatus('error');
+        setSubtitleErrorToast('Legenda em Português (Brasil) indisponível para este vídeo.');
       });
-    return () => { active = false; };
-  }, [selectedSubtitleId, subtitlesList, currentStream]);
 
-  // Extract available qualities from streams list
+    return () => { active = false; };
+  }, [selectedSubtitleId, subtitlesList, currentStream, item.id, initialSeason, initialEpisode, activeSkipInterval]);
+
+  // Extract available qualities STRICTLY from currentStream and verified resolutions (REGRA 3 e REGRA 6)
   useEffect(() => {
-    const qualitiesFromStreams = streams
-      .map(s => s.quality)
-      .filter(Boolean) as string[];
-    const combined = Array.from(new Set(['auto', ...qualitiesFromStreams]));
-    setAvailableQualities(combined.length > 1 ? combined : ['auto', '1080p', '720p']);
-  }, [streams]);
+    if (!currentStream) {
+      setAvailableQualities(['auto']);
+      return;
+    }
+
+    // Se for HLS e o player já possuir níveis no manifesto:
+    if (currentStream.url?.includes('.m3u8') && hlsRef.current && hlsRef.current.levels.length > 0) {
+      const levels = hlsRef.current.levels.map(l => (l.height >= 2160 ? '4K' : `${l.height}p`));
+      const unique = Array.from(new Set(levels));
+      setAvailableQualities(['auto', ...unique]);
+      return;
+    }
+
+    // Para streams MP4 / WebM: utiliza resoluções verificadas da fonte atual
+    const streamQualities = mediaSourceValidationService.extractStreamResolutions(currentStream);
+    setAvailableQualities(['auto', ...streamQualities]);
+  }, [currentStream, selectedStreamIndex]);
+
+  // Se a qualidade selecionada não existir mais após troca de fonte/idioma, redefine para 'auto'
+  useEffect(() => {
+    if (selectedQuality !== 'auto' && availableQualities.length > 0 && !availableQualities.includes(selectedQuality)) {
+      setSelectedQuality('auto');
+      if (hlsRef.current) {
+        hlsRef.current.currentLevel = -1;
+      }
+    }
+  }, [availableQualities, selectedQuality]);
 
   // Instant Fallback Algorithm (<50ms)
   const handleStreamFallback = useCallback((reason: string) => {
@@ -1113,6 +1427,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (isSwitchingStreamRef.current) return;
     isSwitchingStreamRef.current = true;
     triedIndicesRef.current.add(selectedStreamIndex);
+
+    // Invalida a fonte com falha no serviço centralizado de validação
+    if (currentStream?.url) {
+      mediaSourceValidationService.invalidateSource(item.id, currentStream.url, reason);
+    }
 
     const remaining = streams
       .map((s, idx) => ({ s, idx }))
@@ -1130,6 +1449,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         targetResumeTimeRef.current = lastTime;
       }
 
+      // Se a fonte falhar durante uma tentativa de troca de áudio, reverte o áudio ativo
+      if (previousActiveAudioIdRef.current) {
+        setActiveAudioId(previousActiveAudioIdRef.current);
+        previousActiveAudioIdRef.current = null;
+      }
+      setIsSwitchingAudio(false);
+
       // Troca instantânea para a próxima fonte válida sem travas
       setTimeout(() => {
         setSelectedStreamIndex(nextCandidate.idx);
@@ -1140,8 +1466,28 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       setHasError(true);
       setErrorMessage(`Todas as fontes testadas estão indisponíveis no momento.`);
       isSwitchingStreamRef.current = false;
+      setIsPlayingIntro(false);
+      setIsIntroEnded(true);
+      if (introVideoRef.current) {
+        try {
+          introVideoRef.current.pause();
+        } catch {}
+      }
+
+      // REGRA 1 — SEM FONTE, SEM CATÁLOGO: Marca indisponibilidade confirmada
+      mediaAvailabilityIndex.markUnavailableConfirmed(
+        item.imdbId || item.id,
+        item.type === ContentType.MOVIE ? 'movie' : (item.type === ContentType.ANIME ? 'anime' : 'series'),
+        ['Todos os Provedores Stremio'],
+        item.title
+      );
+      catalogEligibilityService.markUnavailable(
+        item.imdbId || item.id,
+        item.title,
+        ['Todas as fontes testadas falharam na reprodução']
+      );
     }
-  }, [selectedStreamIndex, streams, isLoadingStreams]);
+  }, [selectedStreamIndex, streams, isLoadingStreams, currentStream, item]);
 
   // Monitor loading of streams from parent modal
   useEffect(() => {
@@ -1157,6 +1503,18 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       setHasError(true);
       setErrorMessage('Não foi possível encontrar uma fonte verificada para este conteúdo.');
       setIsLoading(false);
+      setIsPlayingIntro(false);
+      setIsIntroEnded(true);
+      if (introVideoRef.current) {
+        try {
+          introVideoRef.current.pause();
+        } catch {}
+      }
+      catalogEligibilityService.markUnavailable(
+        item.imdbId || item.id,
+        item.title,
+        ['Nenhuma fonte verificada disponível']
+      );
     } else {
       setAllSourcesFailed(false);
       setHasError(false);
@@ -1254,8 +1612,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         markMediaAsReadyRef.current();
         applyTargetResumeTime();
-        const levels = data.levels.map(l => `${l.height}p`);
-        setAvailableQualities(['auto', ...Array.from(new Set(levels))]);
+        const levels = data.levels.map(l => (l.height >= 2160 ? '4K' : `${l.height}p`));
+        const unique = Array.from(new Set(levels));
+        setAvailableQualities(['auto', ...unique]);
         if (hls.audioTracks && hls.audioTracks.length > 0) {
           const tracks = hls.audioTracks.map((t: any) => ({
             id: t.id,
@@ -1273,11 +1632,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             if (ptTrack && hls.audioTrack !== ptTrack.id) {
               hls.audioTrack = ptTrack.id;
               setSelectedHlsAudioTrack(ptTrack.id);
+              setActiveAudioId(`hls-${ptTrack.id}`);
             } else {
               setSelectedHlsAudioTrack(hls.audioTrack);
+              setActiveAudioId(`hls-${hls.audioTrack}`);
             }
           } else {
             setSelectedHlsAudioTrack(hls.audioTrack);
+            setActiveAudioId(`hls-${hls.audioTrack}`);
           }
         }
         if (!isPlayingIntroRef.current && !showNonDubbedPromptRef.current) {
@@ -1306,17 +1668,22 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             if (ptTrack && hls.audioTrack !== ptTrack.id) {
               hls.audioTrack = ptTrack.id;
               setSelectedHlsAudioTrack(ptTrack.id);
+              setActiveAudioId(`hls-${ptTrack.id}`);
             } else {
               setSelectedHlsAudioTrack(hls.audioTrack);
+              setActiveAudioId(`hls-${hls.audioTrack}`);
             }
           } else {
             setSelectedHlsAudioTrack(hls.audioTrack);
+            setActiveAudioId(`hls-${hls.audioTrack}`);
           }
         }
       });
 
       hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_, data) => {
         setSelectedHlsAudioTrack(data.id);
+        setActiveAudioId(`hls-${data.id}`);
+        setIsSwitchingAudio(false);
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -1343,6 +1710,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       video.onloadeddata = () => {
         markMediaAsReadyRef.current();
         applyTargetResumeTime();
+        // Confirma que a nova fonte carregou e desliga transição de áudio
+        setIsSwitchingAudio(false);
+        previousStreamIndexRef.current = selectedStreamIndex;
+        // Inspeciona resolução real a partir dos pixels do contêiner de vídeo
+        if (video.videoHeight > 0) {
+          const actualQ = video.videoHeight >= 2160 ? '4K' : (video.videoHeight >= 1080 ? '1080p' : (video.videoHeight >= 720 ? '720p' : `${video.videoHeight}p`));
+          setAvailableQualities(['auto', actualQ]);
+        }
         if (!isPlayingIntroRef.current && !showNonDubbedPromptRef.current) {
           video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
         }
@@ -1350,19 +1725,77 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       video.oncanplay = () => {
         markMediaAsReadyRef.current();
         applyTargetResumeTime();
+        setIsSwitchingAudio(false);
       };
       video.onerror = () => {
+        setIsSwitchingAudio(false);
         handleStreamFallbackRef.current('Falha ao carregar arquivo de vídeo.');
       };
     }
 
+    // Watchdog de segurança (15 segundos): se a fonte não disparar nenhum evento de reprodução, tenta a próxima fonte
+    const watchdogTimer = setTimeout(() => {
+      if (!isMediaReadyRef.current && !allSourcesFailed) {
+        console.warn(`[ZapiPlayer] Watchdog disparado (15s sem resposta da fonte: ${currentStream?.title})`);
+        mediaLoadingTracker.transition(item.id, 'TIMEOUT', {
+          reason: 'Tempo limite de inicialização do stream esgotado (15s)'
+        });
+        handleStreamFallbackRef.current('Tempo limite de resposta do stream esgotado (15s).');
+      }
+    }, 15000);
+
     return () => {
+      clearTimeout(watchdogTimer);
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
   }, [currentStream?.url, isLoadingStreams]);
+
+  // REGRA 2 — ÁUDIO OBRIGATÓRIO: Monitor contínuo de áudio funcional (bloqueia vídeos sem som)
+  const audioCheckTicksRef = useRef<number>(0);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isPlaying || isMuted || volume <= 0) return;
+
+    audioCheckTicksRef.current = 0;
+    const interval = setInterval(() => {
+      if (video.paused || video.ended || video.currentTime < 3) return;
+
+      // 1. mozHasAudio (Firefox)
+      const mozHasAudio = (video as any).mozHasAudio;
+      if (typeof mozHasAudio === 'boolean' && !mozHasAudio) {
+        console.warn('[ZapiPlayer] Fonte sem faixa de áudio funcional (mozHasAudio = false).');
+        handleStreamFallbackRef.current('Fonte sem faixa de áudio funcional.');
+        return;
+      }
+
+      // 2. audioTracks (HTML5 padrão)
+      const audioTracks = (video as any).audioTracks;
+      if (audioTracks && typeof audioTracks.length === 'number' && audioTracks.length === 0) {
+        console.warn('[ZapiPlayer] Fonte sem trilhas de áudio associadas.');
+        handleStreamFallbackRef.current('Fonte sem faixa de áudio funcional.');
+        return;
+      }
+
+      // 3. webkitAudioDecodedByteCount (Chrome, Edge, Safari)
+      const decodedBytes = (video as any).webkitAudioDecodedByteCount;
+      if (typeof decodedBytes === 'number' && video.currentTime > 6) {
+        if (decodedBytes === 0) {
+          audioCheckTicksRef.current += 1;
+          if (audioCheckTicksRef.current >= 4) { // 4 verificações consecutivas com 0 bytes após 6s
+            console.warn('[ZapiPlayer] Fonte sem sinal de áudio decodificado (0 bytes após 6s).');
+            handleStreamFallbackRef.current('Fonte sem áudio funcional.');
+          }
+        } else {
+          audioCheckTicksRef.current = 0;
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, isMuted, volume]);
 
   // Keyboard navigation shortcuts
   useEffect(() => {
@@ -1375,7 +1808,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           handleRejectNonDubbed();
         } else if (e.key === 'Enter') {
           e.preventDefault();
-          handleConfirmNonDubbed();
+          if (hasPtBrSubtitlesAvailable) {
+            handleConfirmNonDubbedSubtitled();
+          } else if (hasOriginalAudioAvailable) {
+            handleConfirmNonDubbedOriginal();
+          }
         }
         return;
       }
@@ -1446,7 +1883,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [volume, isPlaying, isFullscreen, showNonDubbedPrompt, handleConfirmNonDubbed, handleRejectNonDubbed, activeSkipInterval, handleExecuteSkip, onNextEpisode, isLoadingStreams, handleTogglePip]);
+  }, [volume, isPlaying, isFullscreen, showNonDubbedPrompt, handleConfirmNonDubbedSubtitled, handleRejectNonDubbed, activeSkipInterval, handleExecuteSkip, onNextEpisode, isLoadingStreams, handleTogglePip]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -1509,276 +1946,50 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       if (q === 'auto') {
         hlsRef.current.currentLevel = -1;
       } else {
-        const levelIndex = hlsRef.current.levels.findIndex(l => `${l.height}p` === q);
+        const levelIndex = hlsRef.current.levels.findIndex(l => {
+          const lLabel = l.height >= 2160 ? '4K' : `${l.height}p`;
+          return lLabel.toLowerCase() === q.toLowerCase() || `${l.height}p`.toLowerCase() === q.toLowerCase();
+        });
         if (levelIndex !== -1) hlsRef.current.currentLevel = levelIndex;
-      }
-    } else {
-      if (q !== 'auto') {
-        const matchIdx = streams.findIndex(s => (s.quality || '').toLowerCase().includes(q.toLowerCase()));
-        if (matchIdx !== -1 && matchIdx !== selectedStreamIndex) {
-          const lastTime = (videoRef.current && videoRef.current.currentTime > 0)
-            ? videoRef.current.currentTime
-            : (latestProgressRef.current.currentTime || currentTime);
-          if (lastTime > 0) {
-            targetResumeTimeRef.current = lastTime;
-          }
-          setSelectedStreamIndex(matchIdx);
-        }
       }
     }
   };
 
-  // Opções de idioma de áudio e dublagem disponíveis
-  const availableAudioOptions = useMemo(() => {
-    const isAnime = item.type === ContentType.ANIME || (item.genres && item.genres.includes('Anime'));
-    const isNational = item.audioStatus === 'pt-br-original' || (item.genres && item.genres.includes('Nacional'));
-    const isKorean = Boolean(item.genres && (item.genres.includes('Dorama') || item.genres.includes('K-Drama')));
+  // Opções de idioma de áudio e dublagem disponíveis gerenciadas pelo AudioSelectionManager
+  const availableAudioOptions = useMemo<AudioOption[]>(() => {
+    return audioSelectionManager.buildAudioOptions({
+      item,
+      streams,
+      hlsTracks: hlsAudioTracks,
+      currentStreamIndex: selectedStreamIndex,
+      activeAudioId,
+      selectedHlsTrackId: selectedHlsAudioTrack
+    });
+  }, [item, streams, hlsAudioTracks, selectedStreamIndex, activeAudioId, selectedHlsAudioTrack]);
 
-    // 1. Determinar o idioma original principal da obra
-    let originalLangCode = 'en';
-    let originalLangLabel = 'Inglês';
-    let originalFlag = '🇺🇸';
-
-    if (isNational) {
-      originalLangCode = 'pt-BR';
-      originalLangLabel = 'Português (Brasil)';
-      originalFlag = '🇧🇷';
-    } else if (isAnime) {
-      originalLangCode = 'ja';
-      originalLangLabel = 'Japonês';
-      originalFlag = '🇯🇵';
-    } else if (isKorean) {
-      originalLangCode = 'ko';
-      originalLangLabel = 'Coreano';
-      originalFlag = '🇰🇷';
-    } else if (/espanh|spanish/i.test(item.description || '') || item.genres?.includes('Espanhol')) {
-      originalLangCode = 'es';
-      originalLangLabel = 'Espanhol';
-      originalFlag = '🇪🇸';
-    } else if (/franc|french/i.test(item.description || '') || item.genres?.includes('Francês')) {
-      originalLangCode = 'fr';
-      originalLangLabel = 'Francês';
-      originalFlag = '🇫🇷';
-    }
-
-    interface AudioOptionItem {
-      id: string;
-      langCode: string;
-      label: string;
-      flag: string;
-      badge: string;
-      isCurrent: boolean;
-      type: 'hls' | 'stream' | 'virtual';
-      hlsTrackIndex?: number;
-      streamIndex?: number;
-    }
-
-    const optionsMap = new Map<string, AudioOptionItem>();
-
-    // 2. Extrair Faixas HLS Nativas (se o HLS atual possuir faixas de áudio embutidas no manifesto)
-    if (hlsAudioTracks.length > 1) {
-      hlsAudioTracks.forEach(track => {
-        const lowerName = (track.name || '').toLowerCase();
-        const lowerLang = (track.lang || '').toLowerCase();
-        let langCode = 'other';
-        let flag = '🌐';
-        let badge = 'Dublado';
-        let label = track.name || `Faixa ${track.id + 1}`;
-
-        if (/por|pt|brazil|brasil|dublado/i.test(lowerName) || /por|pt|pob/i.test(lowerLang)) {
-          langCode = 'pt-BR';
-          flag = '🇧🇷';
-          badge = isNational ? 'Original' : 'Dublado';
-          label = 'Português (Brasil)';
-        } else if (/jap|ja|jpn/i.test(lowerName) || /ja|jpn/i.test(lowerLang)) {
-          langCode = 'ja';
-          flag = '🇯🇵';
-          badge = isAnime ? 'Original' : 'Dublado';
-          label = 'Japonês';
-        } else if (/eng|en|ingl/i.test(lowerName) || /en|eng/i.test(lowerLang)) {
-          langCode = 'en';
-          flag = '🇺🇸';
-          badge = (!isAnime && !isNational && !isKorean) ? 'Original' : 'Dublado';
-          label = 'Inglês';
-        } else if (/spa|es|espanhol|castellano/i.test(lowerName) || /es|spa/i.test(lowerLang)) {
-          langCode = 'es';
-          flag = '🇪🇸';
-          badge = (originalLangCode === 'es') ? 'Original' : 'Dublado';
-          label = 'Espanhol';
-        } else if (/fra|fr|franc/i.test(lowerName) || /fr|fra/i.test(lowerLang)) {
-          langCode = 'fr';
-          flag = '🇫🇷';
-          badge = (originalLangCode === 'fr') ? 'Original' : 'Dublado';
-          label = 'Francês';
-        } else if (/ger|de|alem/i.test(lowerName) || /de|ger/i.test(lowerLang)) {
-          langCode = 'de';
-          flag = '🇩🇪';
-          badge = 'Dublado';
-          label = 'Alemão';
-        } else if (/ita|it|italian/i.test(lowerName) || /it|ita/i.test(lowerLang)) {
-          langCode = 'it';
-          flag = '🇮🇹';
-          badge = 'Dublado';
-          label = 'Italiano';
-        } else if (/kor|ko|corean/i.test(lowerName) || /ko|kor/i.test(lowerLang)) {
-          langCode = 'ko';
-          flag = '🇰🇷';
-          badge = isKorean ? 'Original' : 'Dublado';
-          label = 'Coreano';
-        }
-
-        const isCurrent = selectedHlsAudioTrack === track.id;
-        optionsMap.set(langCode, {
-          id: `hls-${track.id}`,
-          langCode,
-          label,
-          flag,
-          badge,
-          isCurrent,
-          type: 'hls',
-          hlsTrackIndex: track.id
-        });
-      });
-    }
-
-    // 3. Mapear e indexar streams disponíveis em `streams`
-    const streamByLang = new Map<string, number>();
-    if (streams && streams.length > 0) {
-      streams.forEach((stream, index) => {
-        const combined = `${stream.name || ''} ${stream.title || ''} ${stream.description || ''}`.toLowerCase();
-        const isDual = /dual[-_]?audio|dual\b/i.test(combined);
-        const isDubbedPt = stream.isDubbed || /dublado|brazuca|\bpt[-_]?br\b/i.test(combined);
-
-        // Detectar streams com áudio em português
-        if ((isDubbedPt || isDual) && !streamByLang.has('pt-BR')) {
-          streamByLang.set('pt-BR', index);
-        }
-
-        // Detectar streams com áudio original (Inglês, Japonês, etc.)
-        if (/jap|ja\b|jpn|japanese|japon[eê]s/i.test(combined) || (isAnime && !isDubbedPt)) {
-          if (!streamByLang.has('ja')) streamByLang.set('ja', index);
-        } else if (/eng|en\b|english|ingl[eê]s/i.test(combined) || (!isAnime && !isNational && !isDubbedPt)) {
-          if (!streamByLang.has('en')) streamByLang.set('en', index);
-        } else if (/esp|es\b|spanish|espanhol/i.test(combined)) {
-          if (!streamByLang.has('es')) streamByLang.set('es', index);
-        }
-
-        // Se for Dual Áudio, também associa ao idioma original da obra
-        if (isDual) {
-          if (isAnime && !streamByLang.has('ja')) streamByLang.set('ja', index);
-          if (!isAnime && !isNational && !streamByLang.has('en')) streamByLang.set('en', index);
-        }
-      });
-    }
-
-    // 4. Adicionar opções estruturadas garantindo múltiplos idiomas:
-    // A) Português (Brasil) [Dublado / Original]
-    if (!optionsMap.has('pt-BR')) {
-      const ptStreamIdx = streamByLang.get('pt-BR');
-      const isCurrentPt = preferredAudioLang === 'pt-BR' || (ptStreamIdx !== undefined && selectedStreamIndex === ptStreamIdx);
-      optionsMap.set('pt-BR', {
-        id: 'opt-pt-br',
-        langCode: 'pt-BR',
-        label: 'Português (Brasil)',
-        flag: '🇧🇷',
-        badge: isNational ? 'Original' : 'Dublado',
-        isCurrent: isCurrentPt,
-        type: ptStreamIdx !== undefined ? 'stream' : 'virtual',
-        streamIndex: ptStreamIdx
-      });
-    }
-
-    // B) Áudio Original (Inglês, Japonês para Animes, Coreano para Doramas, etc.)
-    if (!isNational && !optionsMap.has(originalLangCode)) {
-      const origStreamIdx = streamByLang.get(originalLangCode) ?? streamByLang.get('original');
-      const isCurrentOrig = preferredAudioLang === originalLangCode || (!optionsMap.get('pt-BR')?.isCurrent && origStreamIdx !== undefined && selectedStreamIndex === origStreamIdx);
-      optionsMap.set(originalLangCode, {
-        id: `opt-${originalLangCode}`,
-        langCode: originalLangCode,
-        label: originalLangLabel,
-        flag: originalFlag,
-        badge: 'Original',
-        isCurrent: isCurrentOrig,
-        type: origStreamIdx !== undefined ? 'stream' : 'virtual',
-        streamIndex: origStreamIdx
-      });
-    }
-
-    // C) Inglês (se a obra for Anime ou Internacional e original não for inglês)
-    if (isAnime && !optionsMap.has('en')) {
-      const enStreamIdx = streamByLang.get('en');
-      const isCurrentEn = preferredAudioLang === 'en' || (enStreamIdx !== undefined && selectedStreamIndex === enStreamIdx);
-      optionsMap.set('en', {
-        id: 'opt-en',
-        langCode: 'en',
-        label: 'Inglês',
-        flag: '🇺🇸',
-        badge: 'Dublado',
-        isCurrent: isCurrentEn,
-        type: enStreamIdx !== undefined ? 'stream' : 'virtual',
-        streamIndex: enStreamIdx
-      });
-    }
-
-    // D) Espanhol (se houver stream ou como opção para obras internacionais)
-    if (!optionsMap.has('es') && (streamByLang.has('es') || !isNational)) {
-      const esStreamIdx = streamByLang.get('es');
-      const isCurrentEs = preferredAudioLang === 'es' || (esStreamIdx !== undefined && selectedStreamIndex === esStreamIdx);
-      optionsMap.set('es', {
-        id: 'opt-es',
-        langCode: 'es',
-        label: 'Espanhol',
-        flag: '🇪🇸',
-        badge: originalLangCode === 'es' ? 'Original' : 'Dublado',
-        isCurrent: isCurrentEs,
-        type: esStreamIdx !== undefined ? 'stream' : 'virtual',
-        streamIndex: esStreamIdx
-      });
-    }
-
-    // 5. Garantir que exatamente UMA opção esteja marcada como ativa (isCurrent = true)
-    const list = Array.from(optionsMap.values());
-    const currentCount = list.filter(o => o.isCurrent).length;
-    if (currentCount === 0 && list.length > 0) {
-      const ptOpt = list.find(o => o.langCode === 'pt-BR');
-      if (ptOpt) ptOpt.isCurrent = true;
-      else list[0].isCurrent = true;
-    } else if (currentCount > 1) {
-      let resolved = false;
-      list.forEach(o => {
-        if (!resolved && o.langCode === preferredAudioLang) {
-          o.isCurrent = true;
-          resolved = true;
-        } else if (resolved || o.langCode !== preferredAudioLang) {
-          o.isCurrent = false;
-        }
-      });
-      if (!resolved && list.length > 0) {
-        list[0].isCurrent = true;
-      }
-    }
-
-    return list;
-  }, [hlsAudioTracks, selectedHlsAudioTrack, streams, selectedStreamIndex, item, preferredAudioLang]);
-
-  const handleSelectAudio = (opt: { 
-    type: string; 
-    langCode?: string; 
-    hlsTrackIndex?: number; 
-    streamIndex?: number 
-  }) => {
+  const handleSelectAudio = (opt: AudioOption) => {
     setShowAudioMenu(false);
     if (opt.langCode) {
       setPreferredAudioLang(opt.langCode);
     }
 
-    if (opt.type === 'hls' && opt.hlsTrackIndex !== undefined && hlsRef.current) {
+    // SITUAÇÃO A: Troca de faixa embutida no manifesto HLS (sem trocar de arquivo)
+    if (opt.kind === 'hls-rendition' && opt.hlsTrackIndex !== undefined && hlsRef.current) {
+      setIsSwitchingAudio(true);
       hlsRef.current.audioTrack = opt.hlsTrackIndex;
       setSelectedHlsAudioTrack(opt.hlsTrackIndex);
+      setActiveAudioId(opt.id);
+      setIsSwitchingAudio(false);
       return;
     }
 
-    if (opt.streamIndex !== undefined && opt.streamIndex !== selectedStreamIndex) {
+    // SITUAÇÃO B: Troca de fonte separada (arquivo de vídeo diferente)
+    if (opt.kind === 'separate-source' && opt.streamIndex !== undefined && opt.streamIndex !== selectedStreamIndex) {
+      setIsSwitchingAudio(true);
+      previousStreamIndexRef.current = selectedStreamIndex;
+      previousActiveAudioIdRef.current = activeAudioId;
+
+      // 1. Salvar progresso narrativo atual com máxima precisão
       const lastTime = (videoRef.current && videoRef.current.currentTime > 0)
         ? videoRef.current.currentTime
         : (latestProgressRef.current.currentTime || currentTime);
@@ -1787,6 +1998,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         targetResumeTimeRef.current = lastTime;
       }
 
+      // 2. Comutar stream index e definir o ID da opção solicitada
+      setActiveAudioId(opt.id);
       setSelectedStreamIndex(opt.streamIndex);
       return;
     }
@@ -1853,7 +2066,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         </div>
       )}
 
-      {/* Modal de Confirmação: Conteúdo sem Dublagem Brasileira */}
+      {/* Modal de Confirmação: Conteúdo indisponível no seu idioma (REGRA 5 e Seção 10) */}
       {showNonDubbedPrompt && (
         <div className="absolute inset-0 z-[3500] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 select-none animate-in fade-in duration-200">
           <div className="relative w-full max-w-md bg-[#0f121a]/95 border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center text-center backdrop-blur-2xl">
@@ -1862,26 +2075,39 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             </div>
 
             <h3 className="text-xl sm:text-2xl font-black text-white mb-2 leading-tight">
-              Conteúdo não disponível no seu idioma
+              Conteúdo indisponível no seu idioma
             </h3>
 
             <p className="text-gray-300 text-xs sm:text-sm leading-relaxed mb-6 sm:mb-8 max-w-sm">
-              Este título não possui dublagem brasileira disponível. Assistir mesmo assim com áudio original e legendas em português?
+              Não encontramos uma versão com áudio em português brasileiro para este conteúdo. Você pode assistir em outro idioma disponível.
             </p>
 
-            <div className="flex items-center gap-3 sm:gap-4 w-full">
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 w-full">
               <button
+                type="button"
                 onClick={handleRejectNonDubbed}
-                className="flex-1 py-3.5 px-5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-xl font-bold text-sm uppercase tracking-wider border border-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:flex-1 py-3 px-3 bg-white/10 hover:bg-white/20 active:scale-95 text-gray-300 hover:text-white rounded-xl font-bold text-xs uppercase tracking-wider border border-white/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <ArrowLeft className="w-4 h-4" /> Não
+                Cancelar
               </button>
-              <button
-                onClick={handleConfirmNonDubbed}
-                className="flex-1 py-3.5 px-5 bg-[#007df7] hover:bg-[#0069d9] active:scale-95 text-white rounded-xl font-bold text-sm uppercase tracking-wider transition-all shadow-lg shadow-[#007df7]/30 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Play className="w-4 h-4 fill-current" /> Sim
-              </button>
+              {hasOriginalAudioAvailable && (
+                <button
+                  type="button"
+                  onClick={handleConfirmNonDubbedOriginal}
+                  className="w-full sm:flex-1 py-3 px-3 bg-white/15 hover:bg-white/25 active:scale-95 text-white rounded-xl font-bold text-xs uppercase tracking-wider border border-white/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  Assistir no idioma original
+                </button>
+              )}
+              {hasPtBrSubtitlesAvailable && (
+                <button
+                  type="button"
+                  onClick={handleConfirmNonDubbedSubtitled}
+                  className="w-full sm:flex-1 py-3 px-3 bg-[#007df7] hover:bg-[#0069d9] active:scale-95 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-[#007df7]/30 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  Assistir legendado
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1992,36 +2218,104 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       )}
 
       {/* Top Header Bar */}
-      <div className={`absolute top-0 inset-x-0 p-4 md:p-6 bg-gradient-to-b from-black/90 via-black/40 to-transparent z-50 flex items-center justify-between transition-opacity duration-300 ${(showControls || !isPlaying) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-        <div className="flex items-center gap-4">
+      <div className={`absolute top-0 inset-x-0 p-4 md:p-6 bg-gradient-to-b from-black/90 via-black/40 to-transparent z-50 flex items-center justify-between transition-opacity duration-300 ${(showControls || !isPlaying || isSplitComparing || isDraggingDivider) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <div className="flex items-center gap-3 md:gap-4 max-w-[65%] sm:max-w-[70%]">
           <button
             onClick={handlePlayerClose}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md border border-white/10 transition-all font-bold text-xs uppercase tracking-wider"
+            className="flex items-center gap-1.5 md:gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md border border-white/10 transition-all font-bold text-xs uppercase tracking-wider shrink-0 cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" /> Voltar
+            <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Voltar</span>
           </button>
-          <div className="flex flex-col">
-            <h2 className="text-white text-base md:text-xl font-black drop-shadow line-clamp-1">
+          <div className="flex flex-col min-w-0">
+            <h2 className="text-white text-sm sm:text-base md:text-xl font-black drop-shadow truncate">
               {item.title}
             </h2>
             {initialSeason && initialEpisode && (
-              <span className="text-xs text-orange-400 font-bold tracking-wide">
+              <span className="text-[10px] sm:text-xs text-orange-400 font-bold tracking-wide truncate">
                 Temporada {initialSeason} • Episódio {initialEpisode}
               </span>
             )}
           </div>
         </div>
+
+        {/* Canto Superior Direito: [ Ícone Tela Dividida ] [ Melhoria por IA ] */}
+        <div className="flex items-center gap-2 pointer-events-auto shrink-0">
+          {/* Botão Tela Dividida (Comparar imagem - apenas ícone) */}
+          <button
+            type="button"
+            onClick={handleToggleSplit}
+            disabled={!isAiActive}
+            className={`w-9 h-9 md:w-10 md:h-10 rounded-xl backdrop-blur-md border transition-all duration-200 flex items-center justify-center select-none ${
+              !isAiActive
+                ? 'opacity-40 cursor-not-allowed bg-white/5 border-white/5 text-gray-500'
+                : isSplitComparing
+                ? 'bg-[#007df7] border-[#007df7] text-white shadow-lg shadow-[#007df7]/30 hover:bg-[#006ee0] active:scale-95 cursor-pointer'
+                : 'bg-black/60 hover:bg-white/20 text-white/80 hover:text-white border-white/10 active:scale-95 cursor-pointer'
+            }`}
+            title={
+              !isAiActive
+                ? 'Ative a Melhoria por IA para comparar a imagem'
+                : isSplitComparing
+                ? 'Encerrar comparação de imagem'
+                : 'Comparar imagem'
+            }
+            aria-label="Comparar imagem"
+          >
+            <Columns2 className="w-4 h-4 md:w-5 md:h-5" />
+          </button>
+
+          {/* Botão Melhoria por IA */}
+          <button
+            type="button"
+            onClick={handleToggleAiEnhancer}
+            disabled={enhancerStatus === 'unavailable'}
+            className={`h-9 md:h-10 px-3 md:px-4 rounded-xl backdrop-blur-md border transition-all duration-200 flex items-center gap-1.5 md:gap-2 select-none ${
+              enhancerStatus === 'unavailable'
+                ? 'opacity-40 cursor-not-allowed bg-white/5 border-white/5 text-gray-500'
+                : isAiActive
+                ? 'bg-[#007df7] border-[#007df7] text-white shadow-lg shadow-[#007df7]/30 hover:bg-[#006ee0] active:scale-95 cursor-pointer'
+                : enhancerStatus === 'initializing'
+                ? 'cursor-wait bg-[#007df7]/20 border-[#007df7]/40 text-[#38bdf8]'
+                : 'bg-black/60 hover:bg-white/20 text-white/80 hover:text-white border-white/10 active:scale-95 cursor-pointer'
+            }`}
+            title={
+              enhancerStatus === 'unavailable'
+                ? 'Melhoria indisponível para este vídeo'
+                : isAiActive
+                ? 'Melhoria por IA Ativa (Clique para desativar)'
+                : enhancerStatus === 'initializing'
+                ? 'Melhorando imagem...'
+                : 'Ativar Melhoria por IA'
+            }
+            aria-label="Melhoria por IA"
+          >
+            {enhancerStatus === 'initializing' ? (
+              <RefreshCw className="w-4 h-4 animate-spin text-[#38bdf8]" />
+            ) : (
+              <Sparkles
+                className={`w-4 h-4 ${
+                  isAiActive ? 'fill-current text-white animate-pulse' : 'text-gray-300'
+                }`}
+              />
+            )}
+            <span className="text-xs md:text-sm font-bold whitespace-nowrap">
+              {enhancerStatus === 'initializing'
+                ? 'Processando...'
+                : 'Melhoria por IA'}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Screen when all sources have failed */}
       {allSourcesFailed ? (
-        <div className="absolute inset-0 z-50 bg-[#05070a] flex flex-col items-center justify-center p-6 text-center select-none">
+        <div className="absolute inset-0 z-[3600] bg-[#05070a] flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200">
           <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(239,68,68,0.2)]">
             <AlertCircle className="w-10 h-10 text-red-500" />
           </div>
-          <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Fonte Não Verificada</h2>
+          <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Não foi possível reproduzir este conteúdo.</h2>
           <p className="text-gray-300 text-sm max-w-lg mb-6 leading-relaxed">
-            Não foi possível encontrar uma fonte verificada para este conteúdo.
+            {errorMessage || 'Nenhum provedor retornou uma fonte verificada e reproduzível no momento. Você pode tentar novamente ou voltar aos detalhes do título.'}
           </p>
           <div className="flex items-center gap-4">
             <button
@@ -2030,16 +2324,17 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                 setAllSourcesFailed(false);
                 setHasError(false);
                 setSelectedStreamIndex(0);
+                setIsLoading(true);
               }}
-              className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-full font-bold text-xs uppercase tracking-wider transition-all"
+              className="px-6 py-3 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-full font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
             >
-              Tentar Novamente
+              Tentar novamente
             </button>
             <button
               onClick={handlePlayerClose}
-              className="px-6 py-3 bg-[#007df7] hover:bg-[#0069d9] text-white rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-[#007df7]/30"
+              className="px-6 py-3 bg-[#007df7] hover:bg-[#0069d9] active:scale-95 text-white rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-[#007df7]/30 cursor-pointer"
             >
-              Voltar ao Catálogo
+              Voltar aos detalhes
             </button>
           </div>
         </div>
@@ -2051,9 +2346,17 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             playsInline
             crossOrigin="anonymous"
             onLoadedMetadata={() => {
+              markMediaAsReadyRef.current();
               applyTargetResumeTime();
+              syncCanvasDimensions();
             }}
             onCanPlay={() => {
+              markMediaAsReadyRef.current();
+              applyTargetResumeTime();
+              syncCanvasDimensions();
+            }}
+            onLoadedData={() => {
+              markMediaAsReadyRef.current();
               applyTargetResumeTime();
             }}
             onTimeUpdate={() => {
@@ -2072,6 +2375,19 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             onPlaying={() => {
               setIsLoading(false);
               setIsPlaying(true);
+              syncCanvasDimensions();
+              mediaLoadingTracker.transition(item.id, 'PLAYING', {
+                streamTitle: currentStream?.title,
+                quality: currentStream?.quality
+              });
+            }}
+            onStalled={() => {
+              // Não confunde buffering com erro imediato, mas avisa se persistir
+              console.warn('[ZapiPlayer] Transferência do vídeo estagnada (stalled)');
+            }}
+            onError={(e) => {
+              console.warn('[ZapiPlayer] Erro disparado pelo elemento de vídeo nativo:', e);
+              handleStreamFallbackRef.current('Erro ao decodificar fluxo de vídeo.');
             }}
             onPause={() => setIsPlaying(false)}
             onEnded={() => {
@@ -2095,9 +2411,59 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           {/* Canvas de Aceleração por Shaders WebGPU / WebGL / Anime4K */}
           <canvas
             ref={aiCanvasRef}
-            className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-            style={{ display: aiSettings.enabled && aiSettings.videoEnabled ? 'block' : 'none' }}
+            className="absolute inset-0 w-full h-full object-contain pointer-events-none transition-opacity duration-150"
+            style={{
+              opacity: (aiSettings.enabled && aiSettings.videoEnabled && !isHoldingOriginal && isEnhancerRendering) ? 1 : 0,
+              display: (aiSettings.enabled && aiSettings.videoEnabled && !isHoldingOriginal && isEnhancerRendering) ? 'block' : 'none',
+              clipPath: (isSplitComparing && isAiActive)
+                ? `polygon(${splitPosition}% 0%, 100% 0%, 100% 100%, ${splitPosition}% 100%)`
+                : undefined,
+              WebkitClipPath: (isSplitComparing && isAiActive)
+                ? `polygon(${splitPosition}% 0%, 100% 0%, 100% 100%, ${splitPosition}% 100%)`
+                : undefined
+            }}
           />
+
+          {/* Divisor de Comparação em Tela Dividida (Arraste Interativo) */}
+          {isSplitComparing && isAiActive && (
+            <div
+              ref={splitContainerRef}
+              className="absolute inset-0 pointer-events-auto select-none overflow-hidden z-25"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Linha Divisória Vertical com Handle */}
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-white/90 shadow-[0_0_12px_rgba(0,125,247,0.8)] flex items-center justify-center -translate-x-1/2 cursor-ew-resize group"
+                style={{ left: `${splitPosition}%` }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  setIsDraggingDivider(true);
+                  updateSplitPosition(e.clientX);
+                }}
+              >
+                {/* Handle central com ícone Columns2 */}
+                <div 
+                  className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#0f121a]/95 border border-white/40 text-white shadow-2xl backdrop-blur-md flex items-center justify-center cursor-ew-resize hover:scale-110 active:scale-95 transition-transform hover:border-[#007df7] group-hover:border-[#007df7]"
+                  title="Arraste para comparar"
+                >
+                  <Columns2 className="w-4 h-4 text-white pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Badges sutis de identificação */}
+              <div className="absolute top-20 left-4 md:left-8 pointer-events-none animate-in fade-in duration-300">
+                <span className="px-3 py-1 rounded-full text-[10px] md:text-xs font-black uppercase tracking-wider bg-black/75 border border-white/20 text-gray-300 shadow-xl backdrop-blur-md">
+                  Original
+                </span>
+              </div>
+              <div className="absolute top-20 right-4 md:right-8 pointer-events-none animate-in fade-in duration-300">
+                <span className="px-3 py-1 rounded-full text-[10px] md:text-xs font-black uppercase tracking-wider bg-[#007df7]/85 border border-[#007df7] text-white shadow-xl backdrop-blur-md flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 fill-current" />
+                  Melhoria por IA
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Badge Visual: Original (Segurando) */}
           {isHoldingOriginal && (
@@ -2105,6 +2471,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               <div className="bg-black/90 border border-amber-400 text-white px-5 py-2 rounded-full text-xs font-black tracking-widest uppercase shadow-2xl backdrop-blur-md flex items-center gap-2.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
                 <span>Original (Segurando)</span>
+              </div>
+            </div>
+          )}
+
+          {/* Notificação Discreta: Melhoria por IA Indisponível */}
+          {showUnavailableToast && (
+            <div className="absolute top-16 inset-x-0 flex justify-center pointer-events-none z-50 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="bg-[#0f121a]/95 border border-amber-500/40 text-amber-300 px-5 py-2 rounded-full text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2.5 shadow-amber-500/10">
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Melhoria de imagem indisponível para este vídeo.</span>
               </div>
             </div>
           )}
@@ -2129,9 +2505,24 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             </div>
           )}
 
-          {/* Subtitle Overlay with Custom Styles */}
-          {selectedSubtitleId !== 'off' && activeCue && !/suporte a legendas|legenda em portugu[eê]s|\[zapitv/i.test(activeCue.text) && (
-            <div className="absolute bottom-20 inset-x-0 flex justify-center pointer-events-none z-30 px-6">
+          {/* Notificação Discreta de Erro / Indisponibilidade de Legenda */}
+          {subtitleErrorToast && (
+            <div className="absolute top-16 inset-x-0 flex justify-center pointer-events-none z-40 px-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="bg-[#0f121a]/95 border border-amber-500/40 text-amber-300 px-4 py-1.5 rounded-full text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>{subtitleErrorToast}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Subtitle Overlay with Custom Styles and Configurable Vertical Height */}
+          {appliedSubtitleId !== 'off' && activeCue && !/suporte a legendas|legenda em portugu[eê]s|\[zapitv/i.test(activeCue.text) && (
+            <div
+              className="absolute inset-x-0 flex justify-center pointer-events-none z-30 px-6 transition-all duration-75"
+              style={{
+                bottom: `calc(${normalizeVerticalPosition(subtitleStyle.verticalPosition)}% + env(safe-area-inset-bottom, 0px))`
+              }}
+            >
               <span 
                 className="max-w-4xl text-center font-bold px-4 py-1.5 rounded-lg transition-all whitespace-pre-line"
                 style={subtitleStyleService.computeSubtitleCSS(subtitleStyle, false)}
@@ -2478,24 +2869,38 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                         </div>
                       )}
 
+                      {/* Aviso se a fonte contiver hardsub (legendas gravadas na imagem) */}
+                      {currentStream && analyzeStreamSubtitleFormat(currentStream).format === 'hardsub_foreign' && (
+                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 text-[10px] text-amber-300 flex items-start gap-1.5 leading-tight">
+                          <ShieldAlert className="w-3.5 h-3.5 shrink-0 text-amber-400 mt-0.5" />
+                          <span>Este vídeo possui legendas embutidas nos frames (Hardsub em outro idioma).</span>
+                        </div>
+                      )}
+
                       <div className="max-h-64 overflow-y-auto space-y-1 custom-scrollbar pr-1">
                         <button
                           onClick={() => {
                             userManuallyChangedSubRef.current = true;
                             setSelectedSubtitleId('off');
+                            setAppliedSubtitleId('off');
+                            setCues([]);
                             setShowSubtitlesMenu(false);
                           }}
-                          className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg transition-colors flex items-center justify-between ${selectedSubtitleId === 'off' ? 'bg-[#007df7] text-white shadow-md shadow-[#007df7]/20' : 'text-gray-300 hover:bg-white/10'}`}
+                          className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg transition-colors flex items-center justify-between ${appliedSubtitleId === 'off' ? 'bg-[#007df7] text-white shadow-md shadow-[#007df7]/20' : 'text-gray-300 hover:bg-white/10'}`}
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-sm">🚫</span>
                             <span>Desativada</span>
                           </div>
-                          {selectedSubtitleId === 'off' && <Check className="w-3.5 h-3.5" />}
+                          {appliedSubtitleId === 'off' && <Check className="w-3.5 h-3.5" />}
                         </button>
 
                         {filteredSubtitles.map(sub => {
-                          const isSelected = selectedSubtitleId === sub.id;
+                          const isApplied = appliedSubtitleId === sub.id;
+                          const isRequested = selectedSubtitleId === sub.id;
+                          const isLoadingThis = isRequested && subtitleStatus === 'loading';
+                          const isErrorThis = isRequested && subtitleStatus === 'error';
+
                           return (
                             <button
                               key={sub.id}
@@ -2504,23 +2909,33 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                                 setSelectedSubtitleId(sub.id);
                                 setShowSubtitlesMenu(false);
                               }}
-                              className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg transition-colors flex items-center justify-between ${isSelected ? 'bg-[#007df7] text-white shadow-md shadow-[#007df7]/20' : 'text-gray-300 hover:bg-white/10'} ${sub.isPtBr ? 'border-l-2 border-[#007df7] pl-2.5' : ''}`}
+                              className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg transition-colors flex items-center justify-between ${isApplied ? 'bg-[#007df7] text-white shadow-md shadow-[#007df7]/20' : 'text-gray-300 hover:bg-white/10'} ${sub.isPtBr ? 'border-l-2 border-[#007df7] pl-2.5' : ''}`}
                             >
                               <div className="flex items-center gap-2 truncate pr-2 min-w-0">
                                 <span className="text-sm shrink-0">{sub.flag}</span>
                                 <span className="truncate">{sub.languageName}</span>
-                                {sub.release && (
-                                  <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${isSelected ? 'bg-white/20 text-white' : 'bg-white/10 text-gray-400'}`}>
+                                {sub.isAutoTranslated ? (
+                                  <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
+                                    Tradução IA
+                                  </span>
+                                ) : sub.release ? (
+                                  <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${isApplied ? 'bg-white/20 text-white' : 'bg-white/10 text-gray-400'}`}>
                                     {sub.release}
                                   </span>
-                                )}
+                                ) : null}
                                 {sub.autoSyncBadge && (
                                   <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
                                     Auto-Sync
                                   </span>
                                 )}
                               </div>
-                              {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
+                              {isApplied && <Check className="w-3.5 h-3.5 shrink-0" />}
+                              {isLoadingThis && !isApplied && <RefreshCw className="w-3.5 h-3.5 shrink-0 text-[#007df7] animate-spin" />}
+                              {isErrorThis && !isApplied && (
+                                <span title="Falha ao aplicar legenda" className="shrink-0">
+                                  <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                                </span>
+                              )}
                             </button>
                           );
                         })}
@@ -2530,6 +2945,41 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                             {subtitleSearch ? 'Nenhum idioma encontrado.' : 'Nenhuma legenda disponível.'}
                           </p>
                         )}
+                      </div>
+
+                      {/* Controle Rápido de Posição vertical */}
+                      <div className="pt-2 border-t border-white/10">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] uppercase font-bold text-gray-400">Posição vertical</span>
+                          <div className="flex items-center gap-2">
+                            {normalizeVerticalPosition(subtitleStyle.verticalPosition) !== DEFAULT_VERTICAL_POSITION && (
+                              <button
+                                onClick={() => updateSubtitleStyle({ verticalPosition: DEFAULT_VERTICAL_POSITION })}
+                                className="text-[10px] text-[#007df7] hover:underline flex items-center gap-1 transition-colors"
+                                title="Restaurar altura padrão"
+                              >
+                                <RotateCcw className="w-2.5 h-2.5" />
+                                Restaurar
+                              </button>
+                            )}
+                            <span className="text-[10px] text-gray-400 font-mono">
+                              {normalizeVerticalPosition(subtitleStyle.verticalPosition)}%
+                              {normalizeVerticalPosition(subtitleStyle.verticalPosition) === DEFAULT_VERTICAL_POSITION && ' (Padrão)'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="4"
+                            max="35"
+                            step="0.5"
+                            value={normalizeVerticalPosition(subtitleStyle.verticalPosition)}
+                            onChange={(e) => updateSubtitleStyle({ verticalPosition: parseFloat(e.target.value) })}
+                            className="w-full accent-[#007df7] h-1.5 bg-white/10 rounded-lg cursor-pointer"
+                            title="Posição vertical: arraste para a esquerda para descer ou para a direita para subir"
+                          />
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -2678,6 +3128,41 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                                  subtitleStyle.lineSpacing === 'relaxed' ? 1.6 : 1.95)
                             ).toFixed(2)}x
                           </span>
+                        </div>
+                      </div>
+
+                      {/* Posição vertical */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] uppercase font-bold text-gray-400">Posição vertical</span>
+                          <div className="flex items-center gap-2">
+                            {normalizeVerticalPosition(subtitleStyle.verticalPosition) !== DEFAULT_VERTICAL_POSITION && (
+                              <button
+                                onClick={() => updateSubtitleStyle({ verticalPosition: DEFAULT_VERTICAL_POSITION })}
+                                className="text-[10px] text-[#007df7] hover:underline flex items-center gap-1 transition-colors"
+                                title="Restaurar altura padrão"
+                              >
+                                <RotateCcw className="w-2.5 h-2.5" />
+                                Restaurar
+                              </button>
+                            )}
+                            <span className="text-[10px] text-gray-400 font-mono">
+                              {normalizeVerticalPosition(subtitleStyle.verticalPosition)}%
+                              {normalizeVerticalPosition(subtitleStyle.verticalPosition) === DEFAULT_VERTICAL_POSITION && ' (Padrão)'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="4"
+                            max="35"
+                            step="0.5"
+                            value={normalizeVerticalPosition(subtitleStyle.verticalPosition)}
+                            onChange={(e) => updateSubtitleStyle({ verticalPosition: parseFloat(e.target.value) })}
+                            className="w-full accent-[#007df7] h-1.5 bg-white/10 rounded-lg cursor-pointer"
+                            title="Posição vertical: arraste para a esquerda para descer ou para a direita para subir"
+                          />
                         </div>
                       </div>
 
@@ -2980,56 +3465,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* AI Enhancement One-Click Button with Hold-to-Compare (Melhoria por IA) */}
-            <div className="relative">
-              <button
-                type="button"
-                onPointerDown={handleEnhancerPointerDown}
-                onPointerUp={handleEnhancerPointerUp}
-                onPointerLeave={handleEnhancerPointerLeave}
-                disabled={enhancerStatus === 'unavailable'}
-                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 select-none ${
-                  enhancerStatus === 'unavailable'
-                    ? 'cursor-not-allowed opacity-50 text-gray-500 bg-white/5 border border-white/5'
-                    : enhancerStatus === 'active'
-                    ? 'cursor-pointer bg-[#007df7] text-white shadow-md shadow-[#007df7]/30 border border-[#007df7] hover:bg-[#006ee0] active:scale-95'
-                    : enhancerStatus === 'initializing'
-                    ? 'cursor-wait bg-[#007df7]/20 text-[#38bdf8] border border-[#007df7]/40'
-                    : 'cursor-pointer text-gray-300 hover:text-white hover:bg-white/10 border border-transparent'
-                }`}
-                title={
-                  enhancerStatus === 'unavailable'
-                    ? 'Melhoria indisponível para este vídeo'
-                    : enhancerStatus === 'active'
-                    ? 'Melhoria por IA Ativa (Clique para desligar • Segure para ver original)'
-                    : enhancerStatus === 'initializing'
-                    ? 'Melhorando imagem...'
-                    : 'Ativar Melhoria por IA'
-                }
-              >
-                {enhancerStatus === 'initializing' ? (
-                  <RefreshCw className="w-4 h-4 animate-spin text-[#38bdf8]" />
-                ) : (
-                  <Sparkles
-                    className={`w-4 h-4 ${
-                      enhancerStatus === 'active'
-                        ? 'fill-current text-white animate-pulse'
-                        : 'text-gray-400'
-                    }`}
-                  />
-                )}
-                <span className="text-xs font-bold hidden sm:inline">
-                  {enhancerStatus === 'unavailable'
-                    ? 'Melhoria indisponível'
-                    : enhancerStatus === 'initializing'
-                    ? 'Melhorando imagem...'
-                    : isHoldingOriginal
-                    ? 'Original'
-                    : 'Melhoria por IA'}
-                </span>
-              </button>
             </div>
 
             {/* Picture-in-Picture (Imagem em imagem) Button */}
