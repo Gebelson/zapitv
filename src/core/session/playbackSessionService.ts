@@ -7,7 +7,7 @@
  * contínua, avanço automático ou troca de episódio/qualidade/fonte.
  */
 
-export type NavigationType = 'manual_start' | 'continuous_playback';
+export type NavigationType = 'manual_start' | 'continuous_playback' | 'retry_playback';
 
 export interface PlaybackSession {
   sessionId: string;
@@ -30,6 +30,7 @@ class PlaybackSessionService {
    * Inicia ou continua uma sessão de reprodução.
    * - 'manual_start': Cria um novo sessionId único e define introPlayed = false.
    * - 'continuous_playback': Preserva o sessionId ativo e garante introPlayed = true.
+   * - 'retry_playback': Preserva o sessionId e mantém introPlayed = true (nunca repete a intro no retry).
    */
   public startSession(
     contentId: string,
@@ -39,15 +40,33 @@ class PlaybackSessionService {
   ): PlaybackSession {
     const now = Date.now();
 
-    if (navigationType === 'continuous_playback' && this.currentSession) {
+    if ((navigationType === 'continuous_playback' || navigationType === 'retry_playback') && this.currentSession) {
       // Preserva a sessão atual mantendo o mesmo sessionId e garantindo introPlayed = true
       this.currentSession = {
         ...this.currentSession,
         contentId,
         season,
         episode,
-        navigationType: 'continuous_playback',
+        navigationType,
         introPlayed: true,
+        lastActiveAt: now
+      };
+      this.notifyListeners();
+      return this.currentSession;
+    }
+
+    if (navigationType === 'retry_playback') {
+      this.sessionCounter += 1;
+      const randomSuffix = Math.random().toString(36).substring(2, 9);
+      const sessionId = `sess_${now}_${this.sessionCounter}_${randomSuffix}`;
+      this.currentSession = {
+        sessionId,
+        contentId,
+        season,
+        episode,
+        navigationType,
+        introPlayed: true,
+        startedAt: now,
         lastActiveAt: now
       };
       this.notifyListeners();

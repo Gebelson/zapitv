@@ -5,8 +5,10 @@ import {
   Shield, Trash2, Search, Filter, Users, DollarSign, 
   X, Save, LayoutGrid, Plus, Film, Send, Download, Upload,
   Edit3, Trash, Star, Bell, Megaphone, CheckCircle, Info, AlertTriangle, Lock, Mail, Image as ImageIcon, CloudSync, Tv, Sparkles, Key, Play, Activity, Check,
-  ShieldAlert, Ban, AlertOctagon, Flame, RefreshCw
+  ShieldAlert, Ban, AlertOctagon, Flame, RefreshCw, FastForward, Clock, SkipForward,
+  Bug
 } from 'lucide-react';
+import { FeedbackAdminPanel } from '../src/components/admin/FeedbackAdminPanel';
 import { User, ContentItem, ContentType, SiteNotification } from '../types';
 import { providerRegistry, ProviderConfig } from '../src/core/providers/providerRegistry';
 import { StremioStream } from '../src/core/stremio/stremioTypes';
@@ -15,6 +17,14 @@ import { catalogEligibilityService, MediaEligibilityRecord } from '../src/core/c
 import { featuredRankingService } from '../src/core/rankings/FeaturedRankingService';
 import { FeaturedSelectionResult, FeaturedAuditItem } from '../src/core/rankings/featuredRankingTypes';
 import { imdbWeeklyRankingService, CorrespondenceAuditResult } from '../src/core/rankings/IMDbWeeklyRankingService';
+import { 
+  skipService, 
+  AdminSkipEntry, 
+  SkipType, 
+  parseTimeToSeconds, 
+  formatSecondsToTime, 
+  VERIFIED_SERIES_INTERVALS 
+} from '../src/core/skip/skipService';
 
 interface AdminViewProps {
   isDarkMode: boolean;
@@ -34,7 +44,7 @@ const AdminView: React.FC<AdminViewProps> = ({
   content, onAddContent, onUpdateContent, onDeleteContent,
   onSendGlobalNotification, onClearNotifications
 }) => {
-  const [activeTab, setActiveTab] = useState<'providers' | 'eligibility' | 'video_ads' | 'rankings' | 'users' | 'catalog' | 'notifications' | 'database'>('providers');
+  const [activeTab, setActiveTab] = useState<'providers' | 'eligibility' | 'video_ads' | 'rankings' | 'skip_intervals' | 'users' | 'catalog' | 'notifications' | 'feedbacks' | 'database'>('providers');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingMedia, setEditingMedia] = useState<ContentItem | null>(null);
   const [showAddMedia, setShowAddMedia] = useState(false);
@@ -138,6 +148,145 @@ const AdminView: React.FC<AdminViewProps> = ({
       setAdRecords(videoAdBlocker.getAuditRecords());
     });
   }, []);
+
+  // Gestão de Intervalos de Abertura e Créditos (Pular Abertura / Recapitulação / Créditos)
+  const [adminSkipList, setAdminSkipList] = useState<AdminSkipEntry[]>(() => skipService.getAllAdminIntervals());
+  const [skipSearchTerm, setSkipSearchTerm] = useState('');
+  const [skipTypeFilter, setSkipTypeFilter] = useState<'all' | 'op' | 'recap' | 'ed'>('all');
+  const [skipSelectedMediaId, setSkipSelectedMediaId] = useState('');
+  const [skipCustomTitleInput, setSkipCustomTitleInput] = useState('');
+  const [skipSeasonInput, setSkipSeasonInput] = useState('1');
+  const [skipEpisodeInput, setSkipEpisodeInput] = useState('1');
+  const [skipTypeInput, setSkipTypeInput] = useState<SkipType>('op');
+  const [skipStartInput, setSkipStartInput] = useState('');
+  const [skipEndInput, setSkipEndInput] = useState('');
+  const [skipEditingId, setSkipEditingId] = useState<string | null>(null);
+  const [skipFormError, setSkipFormError] = useState('');
+  const [skipSuccessToast, setSkipSuccessToast] = useState('');
+
+  // Séries e Animes do catálogo disponíveis para seleção rápida
+  const availableSeriesList = useMemo(() => {
+    return content.filter(c => c.type === ContentType.SERIES || c.type === ContentType.ANIME || (c as any).type === 'serie');
+  }, [content]);
+
+  // Handler para Salvar Intervalo
+  const handleSaveSkipInterval = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSkipFormError('');
+
+    const startSec = parseTimeToSeconds(skipStartInput);
+    const endSec = parseTimeToSeconds(skipEndInput);
+
+    if (isNaN(startSec) || isNaN(endSec) || (startSec === 0 && endSec === 0)) {
+      setSkipFormError('Por favor informe tempos válidos (ex: 450 ou 07:30).');
+      return;
+    }
+
+    if (endSec <= startSec) {
+      setSkipFormError('O tempo de término deve ser estritamente posterior ao tempo de início.');
+      return;
+    }
+
+    const seasonNum = parseInt(skipSeasonInput, 10) || 1;
+    const epNum = parseInt(skipEpisodeInput, 10) || 1;
+
+    let targetId = skipSelectedMediaId.trim();
+    let targetTitle = skipCustomTitleInput.trim();
+
+    if (!targetId && targetTitle) {
+      targetId = targetTitle.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').trim();
+    }
+
+    if (!targetId && !targetTitle) {
+      setSkipFormError('Selecione uma série do catálogo ou digite o identificador/título da obra.');
+      return;
+    }
+
+    const foundMedia = availableSeriesList.find(m => m.id === targetId || m.tmdbId === targetId || m.imdbId === targetId);
+    if (foundMedia && !targetTitle) {
+      targetTitle = foundMedia.title;
+    }
+
+    const saved = skipService.saveAdminInterval({
+      id: skipEditingId || undefined,
+      contentId: targetId,
+      contentTitle: targetTitle || targetId,
+      season: seasonNum,
+      episode: epNum,
+      type: skipTypeInput,
+      startTime: startSec,
+      endTime: endSec,
+      label: skipService.getLabelForType(skipTypeInput),
+      source: 'admin'
+    });
+
+    setAdminSkipList(skipService.getAllAdminIntervals());
+    setSkipEditingId(null);
+    setSkipStartInput('');
+    setSkipEndInput('');
+    setSkipSuccessToast(`Intervalo "${saved.label}" salvo com sucesso para ${targetTitle || targetId} S${seasonNum}E${epNum}!`);
+    setTimeout(() => setSkipSuccessToast(''), 4000);
+  };
+
+  const handleDeleteSkipInterval = (id: string) => {
+    skipService.deleteAdminInterval(id);
+    setAdminSkipList(skipService.getAllAdminIntervals());
+  };
+
+  const handleEditSkipInterval = (entry: AdminSkipEntry) => {
+    setSkipEditingId(entry.id);
+    setSkipSelectedMediaId(entry.contentId);
+    setSkipCustomTitleInput(entry.contentTitle || entry.contentId);
+    setSkipSeasonInput(String(entry.season));
+    setSkipEpisodeInput(String(entry.episode));
+    setSkipTypeInput(entry.type);
+    setSkipStartInput(formatSecondsToTime(entry.startTime));
+    setSkipEndInput(formatSecondsToTime(entry.endTime));
+    setSkipFormError('');
+  };
+
+  const handleLoadVerifiedDexter = () => {
+    const dexterConfig = VERIFIED_SERIES_INTERVALS.find(v => v.title.toLowerCase() === 'dexter');
+    if (!dexterConfig) return;
+
+    let count = 0;
+    Object.entries(dexterConfig.seasons).forEach(([seasonStr, episodes]) => {
+      const seasonNum = parseInt(seasonStr, 10);
+      Object.entries(episodes).forEach(([epStr, intervals]) => {
+        const epNum = parseInt(epStr, 10);
+        intervals.forEach(inv => {
+          skipService.saveAdminInterval({
+            contentId: '1405',
+            contentTitle: 'Dexter',
+            season: seasonNum,
+            episode: epNum,
+            type: inv.type,
+            startTime: inv.startTime,
+            endTime: inv.endTime,
+            source: 'verified'
+          });
+          count++;
+        });
+      });
+    });
+
+    setAdminSkipList(skipService.getAllAdminIntervals());
+    setSkipSuccessToast(`${count} intervalos oficiais verificados de Dexter (Season 1) importados para o painel!`);
+    setTimeout(() => setSkipSuccessToast(''), 4000);
+  };
+
+  // Filtro de intervalos da tabela
+  const filteredSkipList = useMemo(() => {
+    return adminSkipList.filter(item => {
+      const matchSearch = !skipSearchTerm.trim() ||
+        (item.contentTitle || '').toLowerCase().includes(skipSearchTerm.toLowerCase()) ||
+        (item.contentId || '').toLowerCase().includes(skipSearchTerm.toLowerCase()) ||
+        `s${item.season}e${item.episode}`.includes(skipSearchTerm.toLowerCase()) ||
+        `s${item.season}`.includes(skipSearchTerm.toLowerCase());
+      const matchType = skipTypeFilter === 'all' || item.type === skipTypeFilter;
+      return matchSearch && matchType;
+    });
+  }, [adminSkipList, skipSearchTerm, skipTypeFilter]);
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -579,9 +728,11 @@ const AdminView: React.FC<AdminViewProps> = ({
             { id: 'eligibility', label: 'ELEGIBILIDADE & FONTES', icon: Activity, color: 'bg-indigo-600' },
             { id: 'video_ads', label: 'PROPAGANDA (1XBET)', icon: ShieldAlert, color: 'bg-red-600' },
             { id: 'rankings', label: 'EM DESTAQUE (IMDb)', icon: Flame, color: 'bg-amber-600' },
+            { id: 'skip_intervals', label: 'INTERVALOS DE SKIP', icon: FastForward, color: 'bg-cyan-600' },
             { id: 'users', label: 'ASSINANTES', icon: Users, color: 'bg-blue-600' },
             { id: 'catalog', label: 'CATÁLOGO', icon: Film, color: 'bg-[#007df7]' },
             { id: 'notifications', label: 'COMUNICADOS', icon: Bell, color: 'bg-purple-600' },
+            { id: 'feedbacks', label: 'FEEDBACKS & ERROS', icon: Bug, color: 'bg-rose-600' },
             { id: 'database', label: 'BANCO', icon: CloudSync, color: 'bg-emerald-600' }
           ].map(tab => (
             <button
@@ -1782,6 +1933,332 @@ const AdminView: React.FC<AdminViewProps> = ({
               })()}
             </div>
           </div>
+        ) : activeTab === 'skip_intervals' ? (
+          <div className="space-y-8">
+            {/* Header info */}
+            <div className={`p-8 rounded-3xl border ${isDarkMode ? 'bg-[#151C26]/40 border-gray-800' : 'bg-white shadow-xl'}`}>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-xl font-black flex items-center gap-2">
+                    <FastForward className="w-5 h-5 text-cyan-400" /> Intervalos de Skip: Pular Abertura, Recapitulação e Créditos
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Cadastre tempos precisos de abertura e créditos para séries e animes. Sobrescreve APIs externas e funciona instantaneamente no player.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={handleLoadVerifiedDexter}
+                    className="px-4 py-2 bg-cyan-600/20 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+                    title="Importa os intervalos oficiais verificados de Dexter (Season 1)"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Carregar Padrões de Dexter S1
+                  </button>
+                  <span className="px-3 py-1.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-full text-xs font-bold flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" /> {adminSkipList.length} Intervalos Cadastrados
+                  </span>
+                </div>
+              </div>
+
+              {/* Feedback Toasts */}
+              {skipSuccessToast && (
+                <div className="mb-6 p-4 rounded-2xl bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-bold flex items-center gap-2 animate-in fade-in duration-300">
+                  <CheckCircle className="w-4 h-4 shrink-0 text-green-400" />
+                  <span>{skipSuccessToast}</span>
+                </div>
+              )}
+
+              {skipFormError && (
+                <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold flex items-center gap-2 animate-in fade-in duration-300">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                  <span>{skipFormError}</span>
+                </div>
+              )}
+
+              {/* Grid: Formulário + Guia */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Form Cadastro */}
+                <form onSubmit={handleSaveSkipInterval} className="lg:col-span-2 p-6 rounded-2xl bg-black/20 border border-white/5 space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                    <h4 className="text-sm font-black text-white flex items-center gap-2">
+                      <Plus className="w-4 h-4 text-cyan-400" />
+                      {skipEditingId ? 'Editar Intervalo de Skip' : 'Cadastrar Novo Intervalo'}
+                    </h4>
+                    {skipEditingId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSkipEditingId(null);
+                          setSkipStartInput('');
+                          setSkipEndInput('');
+                          setSkipFormError('');
+                        }}
+                        className="text-[10px] font-bold text-gray-400 hover:text-white"
+                      >
+                        Cancelar Edição
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Selecionar Série do Catálogo */}
+                    <div>
+                      <label className="block text-[10px] uppercase font-black text-gray-400 mb-1.5">Série do Catálogo</label>
+                      <select
+                        value={skipSelectedMediaId}
+                        onChange={(e) => {
+                          setSkipSelectedMediaId(e.target.value);
+                          const sel = availableSeriesList.find(m => m.id === e.target.value);
+                          if (sel) {
+                            setSkipCustomTitleInput(sel.title);
+                          }
+                        }}
+                        className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white text-xs font-bold outline-none focus:border-cyan-500"
+                      >
+                        <option value="">-- Selecione do Catálogo ou digite abaixo --</option>
+                        {availableSeriesList.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.title} ({s.year || s.type})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Ou Nome Customizado / ID Externo */}
+                    <div>
+                      <label className="block text-[10px] uppercase font-black text-gray-400 mb-1.5">Nome da Série / ID Externo</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Dexter ou 1405 ou tt0773262"
+                        value={skipCustomTitleInput}
+                        onChange={(e) => setSkipCustomTitleInput(e.target.value)}
+                        className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white text-xs font-bold outline-none focus:border-cyan-500"
+                      />
+                    </div>
+
+                    {/* Temporada e Episódio */}
+                    <div>
+                      <label className="block text-[10px] uppercase font-black text-gray-400 mb-1.5">Temporada (Season)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={skipSeasonInput}
+                        onChange={(e) => setSkipSeasonInput(e.target.value)}
+                        className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white text-xs font-bold outline-none focus:border-cyan-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] uppercase font-black text-gray-400 mb-1.5">Episódio (Episode)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={skipEpisodeInput}
+                        onChange={(e) => setSkipEpisodeInput(e.target.value)}
+                        className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white text-xs font-bold outline-none focus:border-cyan-500"
+                        required
+                      />
+                    </div>
+
+                    {/* Tipo de Intervalo */}
+                    <div>
+                      <label className="block text-[10px] uppercase font-black text-gray-400 mb-1.5">Tipo de Pulo (Intervalo)</label>
+                      <select
+                        value={skipTypeInput}
+                        onChange={(e) => setSkipTypeInput(e.target.value as SkipType)}
+                        className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white text-xs font-bold outline-none focus:border-cyan-500"
+                      >
+                        <option value="op">Abertura (Pular Abertura)</option>
+                        <option value="recap">Recapitulação (Pular Recapitulação)</option>
+                        <option value="ed">Créditos Finais (Pular Créditos)</option>
+                      </select>
+                    </div>
+
+                    {/* Início e Término */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-gray-400 mb-1.5">Início (mm:ss ou seg)</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 07:30 ou 450"
+                          value={skipStartInput}
+                          onChange={(e) => setSkipStartInput(e.target.value)}
+                          className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white text-xs font-bold outline-none focus:border-cyan-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase font-black text-gray-400 mb-1.5">Término (mm:ss ou seg)</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 09:15 ou 555"
+                          value={skipEndInput}
+                          onChange={(e) => setSkipEndInput(e.target.value)}
+                          className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white text-xs font-bold outline-none focus:border-cyan-500"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="submit"
+                      className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-cyan-600/30 flex items-center gap-2"
+                    >
+                      <Save className="w-4 h-4" />
+                      {skipEditingId ? 'Atualizar Intervalo' : 'Salvar Intervalo'}
+                    </button>
+                  </div>
+                </form>
+
+                {/* Card Informativo / Guia */}
+                <div className="p-6 rounded-2xl bg-black/20 border border-white/5 space-y-4 flex flex-col justify-between">
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-cyan-400 mb-2 flex items-center gap-2">
+                      <Info className="w-4 h-4" /> Guia de Calibração
+                    </h4>
+                    <ul className="text-[11px] text-gray-300 space-y-2 list-disc list-inside">
+                      <li>
+                        <strong>Formatos aceitos:</strong> <span className="font-mono text-cyan-300">07:30</span> ou <span className="font-mono text-cyan-300">450</span> segundos.
+                      </li>
+                      <li>
+                        <strong>Exemplo Dexter S01E01:</strong> O cold open vai até 07:30; a abertura toca de <span className="font-mono text-cyan-300">07:30</span> a <span className="font-mono text-cyan-300">09:15</span> (450s a 555s) e os créditos de <span className="font-mono text-cyan-300">51:28</span> a <span className="font-mono text-cyan-300">53:10</span>.
+                      </li>
+                      <li>
+                        <strong>Prioridade Máxima:</strong> Intervalos cadastrados no painel têm precedência absoluta sobre APIs de anime e IntroDB.
+                      </li>
+                      <li>
+                        <strong>Dinâmico:</strong> O botão aparece automaticamente no player e reaparece instantaneamente em retrocessos ou avanços na barra.
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-[10px] text-cyan-300">
+                    💡 Pular apenas altera o tempo do vídeo (sem reiniciar o player, trocar fontes ou repetir a intro).
+                  </div>
+                </div>
+              </div>
+
+              {/* Filtros e Tabela de Intervalos */}
+              <div className="mt-8 space-y-4">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="relative flex-1 w-full">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Filtrar por série, temporada ou episódio (ex: Dexter, S1E1)..."
+                      value={skipSearchTerm}
+                      onChange={(e) => setSkipSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-xs outline-none focus:border-cyan-500 font-bold"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <select
+                      value={skipTypeFilter}
+                      onChange={(e) => setSkipTypeFilter(e.target.value as any)}
+                      className="p-2.5 rounded-xl bg-black/40 border border-white/10 text-white text-xs font-bold outline-none focus:border-cyan-500"
+                    >
+                      <option value="all">TODOS OS TIPOS</option>
+                      <option value="op">Aberturas (op)</option>
+                      <option value="recap">Recapitulações (recap)</option>
+                      <option value="ed">Créditos (ed)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Tabela de Intervalos */}
+                <div className="overflow-x-auto rounded-2xl border border-white/5 bg-black/20">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10 text-[9px] uppercase font-black tracking-widest text-gray-400 bg-white/5">
+                        <th className="px-6 py-3.5">Obra / Série</th>
+                        <th className="px-6 py-3.5 text-center">Episódio</th>
+                        <th className="px-6 py-3.5">Tipo</th>
+                        <th className="px-6 py-3.5">Início</th>
+                        <th className="px-6 py-3.5">Término</th>
+                        <th className="px-6 py-3.5 text-center">Duração</th>
+                        <th className="px-6 py-3.5 text-center">Origem</th>
+                        <th className="px-6 py-3.5 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {filteredSkipList.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="px-6 py-8 text-center text-gray-400 text-xs">
+                            Nenhum intervalo cadastrado. Clique em "Carregar Padrões de Dexter S1" ou utilize o formulário acima para cadastrar.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredSkipList.map((entry) => {
+                          const durationSec = Math.max(0, entry.endTime - entry.startTime);
+                          return (
+                            <tr key={entry.id} className="hover:bg-white/5 transition-colors">
+                              <td className="px-6 py-4 font-bold text-white">
+                                <div className="flex flex-col">
+                                  <span>{entry.contentTitle || entry.contentId}</span>
+                                  <span className="text-[10px] text-gray-500 font-mono">{entry.contentId}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-center font-mono font-bold text-cyan-300">
+                                S{entry.season}E{entry.episode}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${
+                                  entry.type === 'op'
+                                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                    : entry.type === 'recap'
+                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                    : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                                }`}>
+                                  {entry.label || skipService.getLabelForType(entry.type)}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 font-mono text-gray-200">
+                                {formatSecondsToTime(entry.startTime)} <span className="text-gray-500 text-[10px]">({entry.startTime}s)</span>
+                              </td>
+                              <td className="px-6 py-4 font-mono text-gray-200">
+                                {formatSecondsToTime(entry.endTime)} <span className="text-gray-500 text-[10px]">({entry.endTime}s)</span>
+                              </td>
+                              <td className="px-6 py-4 text-center font-mono text-cyan-400 font-bold">
+                                {durationSec}s
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                <span className="px-2 py-0.5 rounded text-[8px] font-black bg-white/10 text-gray-300 uppercase">
+                                  {entry.source}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={() => handleEditSkipInterval(entry)}
+                                    className="p-1.5 rounded-lg bg-cyan-600/10 text-cyan-400 hover:bg-cyan-600 hover:text-white transition-all"
+                                    title="Editar intervalo"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteSkipInterval(entry.id)}
+                                    className="p-1.5 rounded-lg bg-red-600/10 text-red-400 hover:bg-red-600 hover:text-white transition-all"
+                                    title="Remover intervalo"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
         ) : activeTab === 'users' ? (
           <div className={`rounded-3xl border overflow-hidden ${isDarkMode ? 'bg-[#151C26]/40 border-gray-800' : 'bg-white shadow-xl'}`}>
             <table className="w-full text-left">
@@ -1908,6 +2385,8 @@ const AdminView: React.FC<AdminViewProps> = ({
               <button onClick={onClearNotifications} className="px-6 py-3 border border-[#007df7]/50 text-[#007df7] rounded-xl font-black text-[10px] tracking-widest hover:bg-[#007df7] hover:text-white transition-all">LIMPAR HISTÓRICO</button>
             </div>
           </div>
+        ) : activeTab === 'feedbacks' ? (
+          <FeedbackAdminPanel isDarkMode={isDarkMode} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className={`p-10 rounded-3xl border flex flex-col items-center text-center ${isDarkMode ? 'bg-[#151C26] border-gray-800' : 'bg-white shadow-xl'}`}>

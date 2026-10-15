@@ -8,6 +8,11 @@ import { OfficialChannelProvider } from "./src/core/livetv/OfficialChannelProvid
 import { featuredRankingService } from "./src/core/rankings/FeaturedRankingService.ts";
 import { weeklyFeaturedScheduler } from "./src/core/rankings/WeeklyFeaturedScheduler.ts";
 import { imdbWeeklyRankingService } from "./src/core/rankings/IMDbWeeklyRankingService.ts";
+import { catalogReleaseScheduler } from "./src/core/catalog/CatalogReleaseScheduler.ts";
+import { catalogReleaseStore } from "./src/core/catalog/CatalogReleaseStore.ts";
+import { collaborativeTrainer } from "./src/core/recommendations/CollaborativeTrainer.ts";
+import { bannedContentRegistry } from "./src/core/catalog/BannedContentRegistry.ts";
+import { feedbackStore } from "./src/core/feedback/FeedbackStore.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,6 +44,8 @@ function createApp() {
       if (parts[2]) episodeNum = parseInt(parts[2], 10) || 1;
     }
 
+    if (bannedContentRegistry.isBannedKeyOrId(cleanId)) return [];
+
     const item = VERIFIED_OPEN_ITEMS.find(it => 
       it.id === cleanId || 
       (cleanId.startsWith('open-') && (
@@ -47,10 +54,11 @@ function createApp() {
       ))
     );
 
-    if (!item || !item.id.startsWith('open-')) return [];
+    if (!item || !item.id.startsWith('open-') || bannedContentRegistry.isBanned(item)) return [];
 
     if (item.episodes && item.episodes.length > 0) {
-      const ep = item.episodes.find(e => e.number === episodeNum) || item.episodes[0];
+      if (seasonNum !== 1) return [];
+      const ep = item.episodes.find(e => e.number === episodeNum);
       if (ep?.videoUrl) {
         const directUrl = ep.videoUrl;
         const proxyUrl = directUrl.startsWith('http') ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
@@ -60,7 +68,7 @@ function createApp() {
             title: `[EPISÓDIO ${ep.number}] ${ep.title} - Servidor Local ZapiTV`,
             url: proxyUrl,
             sourceType: ep.videoUrl.includes('.m3u8') ? 'hls' : 'mp4',
-            isPtBr: item.audioStatus === 'pt-br-original' || item.audioStatus === 'universal',
+            isPtBr: item.audioStatus === 'pt-br-original' || item.audioStatus === 'pt-br-dubbed',
             isDubbed: false,
             quality: '720p',
             behaviorHints: { notWebReady: false }
@@ -70,13 +78,14 @@ function createApp() {
             title: `[EPISÓDIO ${ep.number}] ${ep.title} - CDN Direto`,
             url: directUrl,
             sourceType: ep.videoUrl.includes('.m3u8') ? 'hls' : 'mp4',
-            isPtBr: item.audioStatus === 'pt-br-original' || item.audioStatus === 'universal',
+            isPtBr: item.audioStatus === 'pt-br-original' || item.audioStatus === 'pt-br-dubbed',
             isDubbed: false,
             quality: '720p',
             behaviorHints: { notWebReady: false }
           }
         ];
       }
+      return [];
     }
 
     return item.verifiedStreams || [];
@@ -108,7 +117,7 @@ function createApp() {
       'khalifa', 'mia khalifa', 'brazzers', 'xvideos', 'pornhub', 
       'redtube', 'youporn', 'bangbros', 'naughtyamerica', 'spankbang',
       'xhamster', 'pornstar', 'hardcore xxx', 'creampie', 'blowjob',
-      'playweb', 'ben the men'
+      'ben the men'
     ];
     if (adultTerms.some(term => combined.includes(term))) return false;
 
@@ -171,14 +180,13 @@ function createApp() {
   app.get(["/api/stremio/blender-open/stream/:type/:id.json", "/api/stremio/blender-open/stream/:type/:id"], (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     const requestedId = String(req.params.id || '');
-    if (!requestedId.startsWith('open-')) {
+    if (!requestedId.startsWith('open-') || bannedContentRegistry.isBannedKeyOrId(requestedId)) {
       return res.json({ streams: [] });
     }
     const streams = resolveOpenItemStreams(requestedId).filter(s => 
-      s.title?.toLowerCase().includes('blender') || 
-      s.title?.toLowerCase().includes('bunny') || 
-      s.title?.toLowerCase().includes('tears') ||
-      s.title?.toLowerCase().includes('caminandes')
+      !bannedContentRegistry.isBannedStream(s) &&
+      (s.title?.toLowerCase().includes('blender') || 
+       s.title?.toLowerCase().includes('tears'))
     );
     res.json({ streams });
   });
@@ -305,10 +313,20 @@ function createApp() {
     });
   });
 
+  // Cache interno de streams enriquecidos (TTL: 1 hora) para mitigar rate-limit do upstream
+  const showSubtitleStreamCache = new Map<string, { streams: any[]; timestamp: number }>();
+
   app.get(["/api/stremio/show-subtitle-pt-br/stream/:type/:id.json", "/api/stremio/show-subtitle-pt-br/stream/:type/:id"], async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     const rawId = String(req.params.id).replace(/\.json$/, '');
     const type = String(req.params.type);
+    const cacheKey = `${type}:${rawId}`;
+    const now = Date.now();
+
+    const cached = showSubtitleStreamCache.get(cacheKey);
+    if (cached && (now - cached.timestamp < 60 * 60 * 1000) && cached.streams.length > 0) {
+      return res.json({ streams: cached.streams });
+    }
 
     // 1. Checar legendas PT-BR no OpenSubtitles v3 em paralelo
     const hasPtSubPromise = checkOpenSubtitlesPtBr(type, rawId);
@@ -361,6 +379,17 @@ function createApp() {
 
     // 4. Ordenação prioritária: Áudio Dublado PT-BR em 1º lugar absoluto
     const sorted = sortStreamsByPtBrPriority(enriched, { preferDubbed: true, allowSubtitled: true, excludeYouTube: true });
+
+    if (sorted.length > 0) {
+      showSubtitleStreamCache.set(cacheKey, { streams: sorted, timestamp: now });
+      return res.json({ streams: sorted });
+    }
+
+    // Se upstream falhou temporariamente (429/timeout), verifica se temos cache anterior
+    if (cached && cached.streams.length > 0) {
+      return res.json({ streams: cached.streams });
+    }
+
     res.json({ streams: sorted });
   });
 
@@ -846,6 +875,54 @@ function createApp() {
     res.json(weeklyFeaturedScheduler.getStatus());
   });
 
+  // =========================================================================
+  // SISTEMA AUTOMÁTICO DE DESCOBERTA E ATUALIZAÇÃO DE LANÇAMENTOS DO CATÁLOGO
+  // =========================================================================
+  const handleReleaseCron = async (req: express.Request, res: express.Response) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret) {
+      const authHeader = req.headers["authorization"];
+      const vercelCronHeader = req.headers["x-vercel-cron"];
+      const querySecret = req.query.secret;
+      const isAuthValid = 
+        authHeader === `Bearer ${cronSecret}` || 
+        querySecret === cronSecret || 
+        vercelCronHeader === "1";
+
+      if (!isAuthValid) {
+        return res.status(401).json({ error: "Acesso não autorizado para execução do cron de lançamentos" });
+      }
+    }
+
+    try {
+      console.log("[Server] Acionamento cron diário de lançamentos recebido...");
+      const result = await catalogReleaseScheduler.executeManualSync();
+      return res.json({
+        success: true,
+        executedAt: new Date(result.timestamp).toISOString(),
+        summary: result
+      });
+    } catch (err: any) {
+      console.error("[Server] Erro no endpoint cron diário de lançamentos:", err);
+      return res.status(500).json({ error: "Falha na sincronização de lançamentos", details: err?.message });
+    }
+  };
+
+  app.get("/api/catalog/sync-releases", handleReleaseCron);
+  app.post("/api/catalog/sync-releases", handleReleaseCron);
+
+  app.get("/api/catalog/release-status", (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json(catalogReleaseScheduler.getStatus());
+  });
+
+  app.get("/api/catalog/new-releases", (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json(catalogReleaseStore.getReleases());
+  });
+
   // Auditoria Oficial de Correspondência IMDb (Seção 16 da Especificação)
   app.get("/api/featured/verify-correspondence", (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -885,6 +962,217 @@ function createApp() {
     }
   });
 
+  // =========================================================================
+  // SISTEMA DE RECOMENDAÇÕES COLABORATIVAS E HÍBRIDAS
+  // =========================================================================
+
+  // Ingestão de eventos de consumo consentidos (pseudonimizados, sem PII)
+  app.post("/api/recommendations/events", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { anonymousId, contentId, weight, timestamp } = req.body || {};
+      if (!anonymousId || !contentId) {
+        return res.status(400).json({ error: "anonymousId e contentId são obrigatórios" });
+      }
+      const ok = await collaborativeTrainer.ingestEvent({
+        anonymousId,
+        contentId,
+        weight: Number(weight) || 0.5,
+        timestamp: Number(timestamp) || Date.now()
+      });
+      return res.json({ success: ok });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Erro ao registrar evento colaborativo", details: err?.message });
+    }
+  });
+
+  // Obtenção do modelo colaborativo Item-Item agregado
+  app.get("/api/recommendations/model", (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    return res.json(collaborativeTrainer.getModel());
+  });
+
+  // Treinamento incremental sob demanda ou via scheduler
+  app.post("/api/recommendations/train", async (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const model = await collaborativeTrainer.train();
+      return res.json({ success: true, model });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Falha no treinamento colaborativo", details: err?.message });
+    }
+  });
+
+  // Purga de dados por revogação de consentimento (direito ao esquecimento)
+  app.delete("/api/recommendations/user-data/:anonymousId", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { anonymousId } = req.params;
+      const ok = await collaborativeTrainer.purgeUserData(anonymousId);
+      return res.json({ success: ok, message: "Dados do identificador purgados com sucesso" });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Erro ao purgar dados", details: err?.message });
+    }
+  });
+
+  // =========================================================================
+  // CENTRAL INTELIGENTE DE FEEDBACKS E CORREÇÃO DE PROBLEMAS
+  // =========================================================================
+
+  // Envio de feedback por usuários (anônimo, sem login, com proteção contra spam)
+  app.post("/api/feedback/submit", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    try {
+      const response = await feedbackStore.submitFeedback(req.body);
+      return res.status(200).json(response);
+    } catch (err: any) {
+      console.error("[API Feedback] Erro ao submeter feedback:", err);
+      return res.status(400).json({ error: "Falha ao processar feedback", details: err?.message });
+    }
+  });
+
+  // Estatísticas do Dashboard para o Painel Administrativo
+  app.get("/api/feedback/stats", async (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const stats = feedbackStore.getDashboardStats();
+      return res.json(stats);
+    } catch (err: any) {
+      return res.status(500).json({ error: "Erro ao obter estatísticas", details: err?.message });
+    }
+  });
+
+  // Consulta de clusters de problemas com filtros, busca e paginação
+  app.get("/api/feedback/clusters", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { status, category, priority, search, limit, offset, sortBy } = req.query;
+      const result = feedbackStore.getClusters({
+        status: status as any,
+        category: category as any,
+        priority: priority as any,
+        search: search ? String(search) : undefined,
+        limit: limit ? parseInt(String(limit), 10) : 50,
+        offset: offset ? parseInt(String(offset), 10) : 0,
+        sortBy: sortBy as any
+      });
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(500).json({ error: "Erro ao listar clusters de problemas", details: err?.message });
+    }
+  });
+
+  // Detalhes completos de um cluster com relatos associados e histórico
+  app.get("/api/feedback/clusters/:id", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const details = feedbackStore.getClusterDetails(req.params.id);
+      if (!details) {
+        return res.status(404).json({ error: "Problema não encontrado" });
+      }
+      return res.json(details);
+    } catch (err: any) {
+      return res.status(500).json({ error: "Erro ao buscar detalhes do problema", details: err?.message });
+    }
+  });
+
+  // Atualização administrativa de status e prioridade
+  app.patch("/api/feedback/clusters/:id", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { id } = req.params;
+      const { status, priority, adminNotes, adminName } = req.body;
+      const author = adminName || "Administrador";
+
+      let updated = null;
+      if (status) {
+        updated = feedbackStore.updateClusterStatus(id, status, author, adminNotes);
+      }
+      if (priority) {
+        updated = feedbackStore.updateClusterPriority(id, priority, author);
+      }
+      if (adminNotes && !status) {
+        updated = feedbackStore.updateAdminNotes(id, adminNotes, author);
+      }
+
+      if (!updated) {
+        return res.status(404).json({ error: "Problema não encontrado para atualização" });
+      }
+      return res.json({ success: true, cluster: updated });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Erro ao atualizar problema", details: err?.message });
+    }
+  });
+
+  // Regeneração de prompt técnico (individual ou consolidado)
+  app.post("/api/feedback/clusters/:id/prompt", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { id } = req.params;
+      const { adminName } = req.body;
+      const prompt = feedbackStore.regeneratePrompt(id, adminName || "Administrador");
+      if (!prompt) {
+        return res.status(404).json({ error: "Cluster não encontrado para gerar prompt" });
+      }
+      return res.json({ success: true, prompt });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Erro ao regenerar prompt", details: err?.message });
+    }
+  });
+
+  // Salvamento de edição manual do prompt pelo administrador
+  app.put("/api/feedback/clusters/:id/prompt", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { id } = req.params;
+      const { markdownContent, adminName } = req.body;
+      if (!markdownContent) {
+        return res.status(400).json({ error: "Conteúdo do prompt é obrigatório" });
+      }
+      const prompt = feedbackStore.saveEditedPrompt(id, markdownContent, adminName || "Administrador");
+      if (!prompt) {
+        return res.status(404).json({ error: "Cluster não encontrado para salvar prompt" });
+      }
+      return res.json({ success: true, prompt });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Erro ao salvar prompt editado", details: err?.message });
+    }
+  });
+
+  // Mesclagem manual de clusters
+  app.post("/api/feedback/clusters/:id/merge", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { id } = req.params;
+      const { targetClusterId, adminName } = req.body;
+      if (!targetClusterId) {
+        return res.status(400).json({ error: "targetClusterId é obrigatório" });
+      }
+      const ok = feedbackStore.mergeClustersManually(id, targetClusterId, adminName || "Administrador");
+      return res.json({ success: ok });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Erro ao mesclar clusters", details: err?.message });
+    }
+  });
+
+  // Desmembramento manual de relato para novo cluster
+  app.post("/api/feedback/reports/:id/split", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { id } = req.params;
+      const { adminName } = req.body;
+      const newCluster = feedbackStore.splitReportFromCluster(id, adminName || "Administrador");
+      if (!newCluster) {
+        return res.status(404).json({ error: "Relato não encontrado para desmembrar" });
+      }
+      return res.json({ success: true, newCluster });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Erro ao desmembrar relato", details: err?.message });
+    }
+  });
+
   return app;
 }
 
@@ -902,6 +1190,9 @@ if (!process.env.VERCEL) {
 
     // Inicializa o agendador de tarefas semanais em segundo plano
     weeklyFeaturedScheduler.start();
+
+    // Inicializa o agendador diário de novos lançamentos em segundo plano
+    catalogReleaseScheduler.start();
 
     if (process.env.NODE_ENV !== "production") {
       const { createServer: createViteServer } = await import("vite");

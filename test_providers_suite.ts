@@ -62,12 +62,12 @@ async function runOfficialProviderTests() {
   }
 
   // ====================================================================
-  // TESTE B — Série com Navegação de Episódios
+  // TESTE B — Série/Anime com Navegação de Episódios
   // ====================================================================
-  console.log('\n👉 [TESTE B] Testando Série Aberta e Navegação de Episódios (Caminandes)...');
+  console.log('\n👉 [TESTE B] Testando Série Aberta e Navegação de Episódios...');
   try {
-    const series = VERIFIED_OPEN_ITEMS.find(i => i.id === 'open-caminandes-s1');
-    if (!series) throw new Error('Série Caminandes não encontrada no catálogo.');
+    const series = VERIFIED_OPEN_ITEMS.find(i => i.id === 'tmdb-95897');
+    if (!series) throw new Error('Série verificada não encontrada no catálogo.');
 
     const eps = series.episodes || [];
     if (eps.length < 2) throw new Error(`A série deve ter pelo menos 2 episódios disponíveis. Encontrados: ${eps.length}`);
@@ -76,7 +76,7 @@ async function runOfficialProviderTests() {
     eps.forEach(e => console.log(`   - Ep ${e.number}: "${e.title}"`));
 
     // Reproduzir Episódio 1
-    const ep1Streams = await providerRegistry.resolveStreams('series', { id: series.id }, { season: 1, episode: 1 });
+    const ep1Streams = await providerRegistry.resolveStreams('anime', { id: series.id }, { season: 1, episode: 1 });
     if (!ep1Streams || ep1Streams.length === 0) throw new Error('Fonte do Episódio 1 não resolvida.');
 
     const targetUrl1 = ep1Streams[0].url.startsWith('/') ? `http://localhost:4000${ep1Streams[0].url}` : ep1Streams[0].url;

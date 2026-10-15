@@ -1,6 +1,12 @@
 import { db } from '../../../db';
 import { ContentItem, ContentType } from '../../../types';
 import { theatricalFilterService } from '../catalog/theatricalFilterService';
+import { userPreferenceStore } from '../recommendations/userPreferenceStore';
+import { recommendationEngine } from '../recommendations/recommendationEngine';
+import { collaborativeEngine } from '../recommendations/CollaborativeEngine';
+import { hybridRecommendationEngine } from '../recommendations/hybridRecommendationEngine';
+import { bannedContentRegistry } from '../catalog/BannedContentRegistry';
+import { searchService } from '../search/searchService';
 
 export interface WatchProgress {
   contentId: string;
@@ -93,6 +99,23 @@ class StorageService {
 
     // Sync from IndexedDB in background
     this.syncFromDb().catch(() => {});
+    this.purgeBannedItemsFromStorage();
+  }
+
+  public purgeBannedItemsFromStorage(): void {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      // 1. Purga itens de progresso em memória
+      for (const [key] of this.itemProgressCache.entries()) {
+        if (bannedContentRegistry.isBannedKeyOrId(key)) this.itemProgressCache.delete(key);
+      }
+      for (const [key] of this.episodeProgressCache.entries()) {
+        if (bannedContentRegistry.isBannedKeyOrId(key)) this.episodeProgressCache.delete(key);
+      }
+
+      // 2. Limpa registros globais no localStorage via registro centralizado
+      bannedContentRegistry.purgeStorage();
+    } catch {}
   }
 
   public async syncFromDb(): Promise<void> {
@@ -372,6 +395,8 @@ class StorageService {
     } catch {
       localStorage.setItem(this.FAVORITES_KEY, JSON.stringify(favorites));
     }
+    recommendationEngine.invalidateCache();
+    hybridRecommendationEngine.invalidateCache();
   }
 
   public async toggleFavorite(id: string): Promise<string[]> {
@@ -463,6 +488,21 @@ class StorageService {
           duration: normalizedProgress.duration
         }
       }));
+    }
+
+    // 6. Atualiza o motor de recomendações híbridas com a nova interação do usuário
+    if (normalizedProgress.item) {
+      userPreferenceStore.recordPlayback(
+        normalizedProgress.item,
+        normalizedProgress.currentTime,
+        normalizedProgress.duration
+      ).then(() => {
+        recommendationEngine.invalidateCache();
+        hybridRecommendationEngine.invalidateCache();
+        // Se usuário consentiu voluntariamente, despacha evento pseudonimizado (item adulto é bloqueado automaticamente)
+        const weight = normalizedProgress.percentage >= 85 ? 1.0 : normalizedProgress.percentage >= 50 ? 0.7 : 0.4;
+        collaborativeEngine.dispatchConsentedEvent(normalizedProgress.item, weight).catch(() => {});
+      }).catch(() => {});
     }
   }
 
@@ -559,7 +599,16 @@ class StorageService {
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            return theatricalFilterService.filterAllowedMoviesSync(list);
+            const clean = bannedContentRegistry.filterCleanItems(list);
+            const sanitized = theatricalFilterService.filterAllowedMoviesSync(clean);
+            if (key === 'movies') {
+              return sanitized.filter(i => searchService.isMovieItem(i, false));
+            } else if (key === 'series') {
+              return sanitized.filter(i => searchService.isSeriesItem(i));
+            } else if (key === 'animes') {
+              return sanitized.filter(i => searchService.isAnimeItem(i));
+            }
+            return sanitized;
           }
         }
       }
@@ -570,8 +619,17 @@ class StorageService {
   public saveCachedCatalog(key: string, items: ContentItem[]): void {
     try {
       if (typeof window !== 'undefined' && window.localStorage && Array.isArray(items) && items.length > 0) {
-        const sanitized = theatricalFilterService.filterAllowedMoviesSync(items);
-        localStorage.setItem(`zapitv_catalog_${key}`, JSON.stringify(sanitized.slice(0, 200)));
+        const clean = bannedContentRegistry.filterCleanItems(items);
+        const sanitized = theatricalFilterService.filterAllowedMoviesSync(clean);
+        let strictlyTyped = sanitized;
+        if (key === 'movies') {
+          strictlyTyped = sanitized.filter(i => searchService.isMovieItem(i, false));
+        } else if (key === 'series') {
+          strictlyTyped = sanitized.filter(i => searchService.isSeriesItem(i));
+        } else if (key === 'animes') {
+          strictlyTyped = sanitized.filter(i => searchService.isAnimeItem(i));
+        }
+        localStorage.setItem(`zapitv_catalog_${key}`, JSON.stringify(strictlyTyped.slice(0, 200)));
       }
     } catch {}
   }

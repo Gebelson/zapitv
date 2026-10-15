@@ -168,7 +168,12 @@ class SubtitleStyleService {
 
     const fontSizes: Record<SubtitleFontSize, string> = isMiniPreview
       ? { sm: '12px', md: '14px', lg: '17px', xl: '20px' }
-      : { sm: '18px', md: '24px', lg: '30px', xl: '38px' };
+      : { 
+          sm: 'clamp(13px, 1.8vw, 20px)', 
+          md: 'clamp(15px, 2.3vw, 26px)', 
+          lg: 'clamp(18px, 2.9vw, 34px)', 
+          xl: 'clamp(21px, 3.7vw, 42px)' 
+        };
 
     const bgColors: Record<SubtitleBgColor, string> = {
       none: 'transparent',

@@ -64,7 +64,7 @@ export interface SourceValidationContext {
   hasExternalPtSub?: boolean;
 }
 
-const STORAGE_VALIDATED_SOURCES_KEY = 'zapitv_validated_sources_v2';
+const STORAGE_VALIDATED_SOURCES_KEY = 'zapitv_validated_sources_v3';
 const VALIDATION_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h para fontes válidas
 const REJECTED_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6h para fontes rejeitadas
 
@@ -165,27 +165,49 @@ export class MediaSourceValidationService {
     if (/\b(2160p|4k|uhd)\b/i.test(text)) {
       qualities.push('4K');
     }
+    if (/\b(1440p|2k|qhd)\b/i.test(text)) {
+      qualities.push('1440p');
+    }
     if (/\b(1080p|fhd|full[-_\s]?hd)\b/i.test(text)) {
       qualities.push('1080p');
     }
-    if (/\b(720p|hd)\b/i.test(text)) {
+    if (/\b(720p|hd)\b/i.test(text) && !/\b(full[-_\s]?hd|fhd|uhd)\b/i.test(text)) {
       qualities.push('720p');
     }
     if (/\b(480p|sd)\b/i.test(text)) {
       qualities.push('480p');
     }
+    if (/\b(360p)\b/i.test(text)) {
+      qualities.push('360p');
+    }
 
-    // Se nenhuma resolução foi identificada, atribui com base no stream.quality declarado
+    // Se nenhuma resolução foi identificada no texto, atribui com base no stream.quality declarado
     if (qualities.length === 0 && stream.quality) {
       const q = stream.quality.toLowerCase();
       if (q.includes('4k') || q.includes('2160')) qualities.push('4K');
+      else if (q.includes('1440') || q.includes('2k')) qualities.push('1440p');
       else if (q.includes('1080')) qualities.push('1080p');
       else if (q.includes('720')) qualities.push('720p');
       else if (q.includes('480')) qualities.push('480p');
+      else if (q.includes('360')) qualities.push('360p');
     }
 
     // Padrão conservador se nada for encontrado: 1080p ou 720p (NUNCA 4K inventado!)
     return qualities.length > 0 ? qualities : ['1080p'];
+  }
+
+  /**
+   * Retorna a resolução mais alta confirmada de um stream individual
+   */
+  public getPrimaryResolution(stream: StremioStream): string {
+    const resolutions = this.extractStreamResolutions(stream);
+    if (resolutions.includes('4K')) return '4K';
+    if (resolutions.includes('1440p')) return '1440p';
+    if (resolutions.includes('1080p')) return '1080p';
+    if (resolutions.includes('720p')) return '720p';
+    if (resolutions.includes('480p')) return '480p';
+    if (resolutions.includes('360p')) return '360p';
+    return resolutions[0] || '1080p';
   }
 
   /**
@@ -491,8 +513,8 @@ export class MediaSourceValidationService {
    * Invalida registros de uma fonte quando ocorre erro de reprodução
    */
   public invalidateSource(mediaId: string, streamUrl: string, reason: string): void {
-    for (const [key, record] of this.cache.entries()) {
-      if (record.url === streamUrl || key.includes(mediaId.toLowerCase())) {
+    for (const record of this.cache.values()) {
+      if (record.mediaId === mediaId && record.url === streamUrl) {
         record.availability = 'rejected';
         record.validationState = 'rejected';
         record.rejectionReason = reason;

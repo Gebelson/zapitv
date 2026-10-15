@@ -9,10 +9,11 @@ import ContentCard from './components/ContentCard';
 import AnimatedBackground from './components/AnimatedBackground';
 import ScrollToTop from './components/ScrollToTop';
 import GenreDropdown from './components/GenreDropdown';
+import SortDropdown, { CatalogSortOption } from './components/SortDropdown';
 import { getContentRoute, ROUTES } from './src/core/routes/navigationRoutes';
-import { AppView, User, ContentType, ContentItem, SiteNotification, Profile, CustomSection } from './types';
+import { AppView, User, ContentType, ContentItem, SiteNotification, Profile, CustomSection, ActorPerson } from './types';
 import { MOCK_USERS, AVATARS, filmesData } from './constants';
-import { ShieldCheck, Flame, Film, Tv, List, Search, Sparkles, Plus, RefreshCw, Activity } from 'lucide-react';
+import { ShieldCheck, Flame, Film, Tv, List, Search, Sparkles, Plus, RefreshCw, Activity, User as UserIcon } from 'lucide-react';
 
 import { db } from './db';
 import { tmdbService } from './src/core/tmdb/tmdbClient';
@@ -24,8 +25,17 @@ import { mediaAvailabilityIndex } from './src/core/catalog/MediaAvailabilityInde
 import { theatricalFilterService } from './src/core/catalog/theatricalFilterService';
 import { catalogEligibilityService } from './src/core/catalog/CatalogEligibilityService';
 import { searchService } from './src/core/search/searchService';
+import { searchHistoryService } from './src/core/search/searchHistoryService';
 import { featuredRankingService } from './src/core/rankings/FeaturedRankingService';
 import { FeaturedSelectionResult } from './src/core/rankings/featuredRankingTypes';
+import { deduplicateContentItems } from './src/core/catalog/catalogDeduplication';
+import { adultContentService } from './src/core/adult/AdultContentService';
+import { AgeVerificationModal } from './components/AgeVerificationModal';
+import { recommendationEngine } from './src/core/recommendations/recommendationEngine';
+import { userPreferenceStore } from './src/core/recommendations/userPreferenceStore';
+import { hybridRecommendationEngine } from './src/core/recommendations/hybridRecommendationEngine';
+import { bannedContentRegistry } from './src/core/catalog/BannedContentRegistry';
+import { catalogSnapshotManager } from './src/core/catalog/CatalogSnapshotManager';
 
 const ProfileView = React.lazy(() => import('./components/ProfileView'));
 const AdminView = React.lazy(() => import('./components/AdminView'));
@@ -39,9 +49,10 @@ const ProgramasView = React.lazy(() => import('./components/ProgramasView'));
 const NotFoundPage = React.lazy(() => import('./src/pages/NotFoundPage').then(module => ({ default: module.NotFoundPage })));
 const DownloadsPage = React.lazy(() => import('./src/pages/DownloadsPage').then(module => ({ default: module.DownloadsPage })));
 const CatalogDiagnosticModal = React.lazy(() => import('./src/components/catalog/CatalogDiagnosticModal').then(module => ({ default: module.CatalogDiagnosticModal })));
+const ActorView = React.lazy(() => import('./src/pages/ActorView').then(module => ({ default: module.ActorView })));
 
 const GENRES_LIST = [
-  'Ação', 'Animação', 'Anime', 'Aventura', 'Biografia', 'Comédia', 
+  'Ação', 'Adulto', 'Animação', 'Anime', 'Aventura', 'Biografia', 'Comédia', 
   'Documentários', 'Drama', 'Fantasia', 'Faroeste', 'Ficção Científica', 
   'Guerra', 'Histórico', 'Infantil / Família', 'Mistério', 'Musical', 
   'Policial', 'Premiados', 'Reality Show', 'Religioso', 'Romance', 
@@ -109,6 +120,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const matchSeriesDetail = matchPath('/series/:id', location.pathname);
   const matchAnimeEpisode = matchPath('/animes/:id/temporada/:season/episodio/:episode', location.pathname);
   const matchAnimeDetail = matchPath('/animes/:id', location.pathname);
+  const matchActorDetail = matchPath('/atores/:id', location.pathname);
 
   // Derivação automática da view com base no pathname
   const currentView: AppView = useMemo(() => {
@@ -118,6 +130,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     if (path.startsWith('/filmes')) return 'movies';
     if (path.startsWith('/series')) return 'series';
     if (path.startsWith('/animes')) return 'animes';
+    if (path.startsWith('/atores')) return 'actor';
     if (path === '/programas' || path.startsWith('/televisao')) return 'programas';
     if (path.startsWith('/downloads')) return 'downloads';
     if (path.startsWith('/minha-lista')) return 'mylist';
@@ -144,6 +157,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                          matchAnimeDetail?.params.id ||
                          matchMovieDetail?.params.id;
 
+  const activeActorId = matchActorDetail?.params.id;
+
   const urlSeason = matchSeriesEpisode?.params.season || matchAnimeEpisode?.params.season;
   const urlEpisode = matchSeriesEpisode?.params.episode || matchAnimeEpisode?.params.episode;
   const initialSeasonNum = urlSeason ? parseInt(urlSeason, 10) : undefined;
@@ -158,6 +173,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     setSearchQuery('');
     setSubmittedSearchQuery('');
     setLiveSearchResults([]);
+    setLiveSearchActors([]);
 
     switch (view) {
       case 'home': navigate('/'); break;
@@ -197,28 +213,35 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const [editingSection, setEditingSection] = useState<{ key: keyof typeof sectionTitles, title: string } | null>(null);
   const [isAddSectionModalOpen, setIsAddSectionModalOpen] = useState(false);
 
+  const currentViewRef = useRef<AppView>(currentView);
+  useEffect(() => {
+    currentViewRef.current = currentView;
+  }, [currentView]);
+
   const [content, setContent] = useState<ContentItem[]>(() => {
+    storageService.purgeBannedItemsFromStorage();
+    bannedContentRegistry.purgeStorage();
     const initial = Array.isArray(initialState.content) ? initialState.content : [];
-    const map = new Map<string, ContentItem>();
-    VERIFIED_OPEN_ITEMS.forEach(item => map.set(item.id, item));
-    initial.forEach(item => {
-      if (!map.has(item.id)) map.set(item.id, item);
-    });
-    return Array.from(map.values());
+    const base = Array.isArray(filmesData) ? filmesData : [];
+    const combined = [...VERIFIED_OPEN_ITEMS, ...base, ...initial].filter(it => it && !bannedContentRegistry.isBanned(it));
+    return deduplicateContentItems(combined);
   });
+  const contentRef = useRef(content);
+  contentRef.current = content;
   const [siteNotifications, setSiteNotifications] = useState<SiteNotification[]>(() => initialState.notifications);
-  const [myList, setMyList] = useState<string[]>(() => initialState.myList);
-  const [favorites, setFavorites] = useState<string[]>(() => initialState.favorites);
+  const [myList, setMyList] = useState<string[]>(() => (initialState.myList || []).filter((id: string) => !bannedContentRegistry.isBannedKeyOrId(id)));
+  const [favorites, setFavorites] = useState<string[]>(() => (initialState.favorites || []).filter((id: string) => !bannedContentRegistry.isBannedKeyOrId(id)));
 
   // Catálogos Dinâmicos em PT-BR (TMDB + Local) com Hidratação Instantânea via Cache
-  const [trendingItems, setTrendingItems] = useState<ContentItem[]>(() => storageService.getCachedCatalog('trending'));
-  const [popularMovies, setPopularMovies] = useState<ContentItem[]>(() => storageService.getCachedCatalog('movies'));
-  const [popularSeries, setPopularSeries] = useState<ContentItem[]>(() => storageService.getCachedCatalog('series'));
-  const [topRatedItems, setTopRatedItems] = useState<ContentItem[]>(() => storageService.getCachedCatalog('top_rated'));
-  const [animeItems, setAnimeItems] = useState<ContentItem[]>(() => storageService.getCachedCatalog('animes'));
+  const [trendingItems, setTrendingItems] = useState<ContentItem[]>(() => deduplicateContentItems(storageService.getCachedCatalog('trending')));
+  const [popularMovies, setPopularMovies] = useState<ContentItem[]>(() => deduplicateContentItems(storageService.getCachedCatalog('movies').filter(i => searchService.isMovieItem(i))));
+  const [popularSeries, setPopularSeries] = useState<ContentItem[]>(() => deduplicateContentItems(storageService.getCachedCatalog('series').filter(i => searchService.isSeriesItem(i))));
+  const [topRatedItems, setTopRatedItems] = useState<ContentItem[]>(() => deduplicateContentItems(storageService.getCachedCatalog('top_rated')));
+  const [animeItems, setAnimeItems] = useState<ContentItem[]>(() => deduplicateContentItems(storageService.getCachedCatalog('animes').filter(i => searchService.isAnimeItem(i))));
   const [featuredSelection, setFeaturedSelection] = useState<FeaturedSelectionResult>(() => featuredRankingService.getFeaturedSelectionSync());
   const [continueWatchingList, setContinueWatchingList] = useState<WatchProgress[]>([]);
   const [liveSearchResults, setLiveSearchResults] = useState<ContentItem[]>([]);
+  const [liveSearchActors, setLiveSearchActors] = useState<ActorPerson[]>([]);
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
 
   useEffect(() => {
@@ -226,6 +249,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       setFeaturedSelection(res);
     });
   }, []);
+
+  useEffect(() => {
+    if (activeProfile?.id) {
+      userPreferenceStore.setProfileMetadata(activeProfile.id, { isChild: activeProfile.isChild === true });
+    }
+  }, [activeProfile?.id, activeProfile?.isChild]);
 
   const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState(false);
   const [moviesPage, setMoviesPage] = useState(2);
@@ -236,6 +265,232 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const [hasMoreSeries, setHasMoreSeries] = useState(true);
   const [hasMoreAnimes, setHasMoreAnimes] = useState(true);
   const [selectedGenre, setSelectedGenre] = useState('');
+  
+  // Preferência de ordenação isolada e persistente para cada categoria (Filmes, Séries, Animes)
+  const [categorySorts, setCategorySorts] = useState<Record<'movies' | 'series' | 'animes', CatalogSortOption>>(() => {
+    try {
+      const saved = localStorage.getItem('zapitv_category_sorts');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          movies: parsed.movies || 'recommended',
+          series: parsed.series || 'recommended',
+          animes: parsed.animes || 'recommended'
+        };
+      }
+    } catch (e) {}
+    return {
+      movies: 'recommended',
+      series: 'recommended',
+      animes: 'recommended'
+    };
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('zapitv_category_sorts', JSON.stringify(categorySorts));
+    } catch (e) {}
+  }, [categorySorts]);
+
+  const getCurrentCategorySort = useCallback((view: AppView): CatalogSortOption => {
+    if (view === 'movies') return categorySorts.movies || 'recommended';
+    if (view === 'series') return categorySorts.series || 'recommended';
+    if (view === 'animes') return categorySorts.animes || 'recommended';
+    return 'recommended';
+  }, [categorySorts]);
+
+  const currentCategorySort = useMemo(() => {
+    return getCurrentCategorySort(currentView);
+  }, [currentView, getCurrentCategorySort]);
+
+  const [isAgeVerificationOpen, setIsAgeVerificationOpen] = useState(false);
+  const [pendingAdultGenre, setPendingAdultGenre] = useState<string | null>(null);
+  const [pendingAdultItem, setPendingAdultItem] = useState<ContentItem | null>(null);
+
+  // Snapshot estável de navegação por categoria (isolamento total entre Filmes, Séries e Animes)
+  const [catalogSnapshots, setCatalogSnapshots] = useState<Record<string, ContentItem[]>>({});
+
+  const availableGenres = useMemo(() => {
+    return activeProfile?.isChild ? GENRES_LIST.filter(g => g !== 'Adulto') : GENRES_LIST;
+  }, [activeProfile?.isChild]);
+
+  const handleSelectGenre = useCallback((genre: string) => {
+    if (genre === 'Adulto') {
+      if (activeProfile?.isChild) {
+        setIsAgeVerificationOpen(true);
+        return;
+      }
+      if (!adultContentService.isAgeConfirmed(activeProfile?.id)) {
+        setPendingAdultGenre(genre);
+        setIsAgeVerificationOpen(true);
+        return;
+      }
+    }
+    setSelectedGenre(genre);
+    setMoviesPage(1);
+    setSeriesPage(1);
+    setAnimesPage(1);
+  }, [activeProfile]);
+
+  // Função pura para extrair itens elegíveis da categoria respeitando o filtro de gênero
+  const getEligibleBrowseItems = useCallback((view: 'movies' | 'series' | 'animes', genre: string): ContentItem[] => {
+    let source: ContentItem[] = [];
+    if (view === 'movies') {
+      const catalogMovies = content.filter(i => searchService.isMovieItem(i, false));
+      source = deduplicateContentItems([...popularMovies, ...catalogMovies]).filter(i => searchService.isMovieItem(i, false));
+    } else if (view === 'series') {
+      const catalogSeries = content.filter(i => searchService.isSeriesItem(i));
+      source = deduplicateContentItems([...popularSeries, ...catalogSeries]).filter(i => searchService.isSeriesItem(i));
+    } else if (view === 'animes') {
+      const catalogAnimes = content.filter(i => searchService.isAnimeItem(i));
+      source = deduplicateContentItems([...animeItems, ...catalogAnimes]).filter(i => searchService.isAnimeItem(i));
+    }
+
+    const isAdultGenre = genre === 'Adulto';
+    let genreFiltered = source;
+    if (genre && genre !== 'Todos') {
+      if (isAdultGenre) {
+        genreFiltered = source.filter(i => adultContentService.isAdultContent(i));
+      } else {
+        genreFiltered = source.filter(i => i.genres?.includes(genre) && !adultContentService.isAdultContent(i));
+      }
+    } else {
+      genreFiltered = source.filter(i => !adultContentService.isAdultContent(i));
+    }
+
+    const unique = deduplicateContentItems(genreFiltered);
+    return catalogEligibilityService.filterEligibleItemsSync(unique, { allowAdult: isAdultGenre });
+  }, [content, popularMovies, popularSeries, animeItems]);
+
+  // Função geradora de chave canônica por visualização e filtros
+  const getSnapshotKeyForView = useCallback((view: 'movies' | 'series' | 'animes', genre = selectedGenre, sort?: CatalogSortOption) => {
+    const effectiveSort = sort || categorySorts[view] || 'recommended';
+    return `${view}:${genre || 'all'}:${effectiveSort}:${activeProfile?.id || 'default'}:${activeProfile?.isChild ? 'child' : 'adult'}`;
+  }, [selectedGenre, categorySorts, activeProfile?.id, activeProfile?.isChild]);
+
+  // Chave canônica que define uma nova entrada de página ou mudança explícita de filtros
+  const snapshotKey = useMemo(() => {
+    const isBrowse = currentView === 'movies' || currentView === 'series' || currentView === 'animes';
+    if (!isBrowse) return '';
+    const view = currentView as 'movies' | 'series' | 'animes';
+    return getSnapshotKeyForView(view, selectedGenre, categorySorts[view]);
+  }, [currentView, selectedGenre, categorySorts, getSnapshotKeyForView]);
+
+  // Manipulador central de alteração de ordenação: aplica ao catálogo COMPLETO com isolamento total
+  const handleSelectSort = useCallback((newSort: CatalogSortOption) => {
+    const isBrowse = currentView === 'movies' || currentView === 'series' || currentView === 'animes';
+    if (!isBrowse) return;
+    const view = currentView as 'movies' | 'series' | 'animes';
+
+    // 1. Atualiza a preferência isolada da categoria atual
+    setCategorySorts(prev => ({
+      ...prev,
+      [view]: newSort
+    }));
+
+    // 2. Reseta paginação da categoria
+    if (view === 'movies') setMoviesPage(1);
+    else if (view === 'series') setSeriesPage(1);
+    else if (view === 'animes') setAnimesPage(1);
+
+    // 3. Aplica a ordenação ao catálogo COMPLETO daquela categoria
+    const targetKey = getSnapshotKeyForView(view, selectedGenre, newSort);
+    const baseItems = getEligibleBrowseItems(view, selectedGenre);
+    const sorted = catalogSnapshotManager.createInitialSnapshot(baseItems, newSort, {
+      profileId: activeProfile?.id || 'default',
+      isChild: activeProfile?.isChild === true,
+      category: view,
+      genreFilter: selectedGenre
+    });
+    const strictlyTyped = view === 'movies'
+      ? sorted.filter(i => searchService.isMovieItem(i, false))
+      : view === 'series'
+      ? sorted.filter(i => searchService.isSeriesItem(i))
+      : sorted.filter(i => searchService.isAnimeItem(i));
+
+    setCatalogSnapshots(prev => ({
+      ...prev,
+      [targetKey]: strictlyTyped
+    }));
+  }, [currentView, selectedGenre, activeProfile?.id, activeProfile?.isChild, getSnapshotKeyForView, getEligibleBrowseItems]);
+
+  // Inicializa o snapshot estável ao entrar na página, trocar o gênero ou trocar a ordenação
+  useEffect(() => {
+    if (!snapshotKey) return;
+    const view = currentView as 'movies' | 'series' | 'animes';
+    const cached = catalogSnapshots[snapshotKey];
+    if (cached && cached.length > 0) return;
+
+    const currentSort = categorySorts[view] || 'recommended';
+    const baseItems = getEligibleBrowseItems(view, selectedGenre);
+    const sorted = catalogSnapshotManager.createInitialSnapshot(baseItems, currentSort, {
+      profileId: activeProfile?.id || 'default',
+      isChild: activeProfile?.isChild === true,
+      category: view,
+      genreFilter: selectedGenre
+    });
+    const strictlyTyped = view === 'movies'
+      ? sorted.filter(i => searchService.isMovieItem(i, false))
+      : view === 'series'
+      ? sorted.filter(i => searchService.isSeriesItem(i))
+      : sorted.filter(i => searchService.isAnimeItem(i));
+
+    setCatalogSnapshots(prev => ({
+      ...prev,
+      [snapshotKey]: strictlyTyped
+    }));
+  }, [snapshotKey, currentView, selectedGenre, categorySorts, activeProfile?.id, activeProfile?.isChild, getEligibleBrowseItems]);
+
+  // Atualização manual sob demanda com botão "Atualizar" sem criar reorganizações involuntárias
+  const handleManualRefreshCatalog = useCallback(() => {
+    const isBrowse = currentView === 'movies' || currentView === 'series' || currentView === 'animes';
+    if (!isBrowse) return;
+    const view = currentView as 'movies' | 'series' | 'animes';
+    const currentSort = categorySorts[view] || 'recommended';
+    const targetKey = getSnapshotKeyForView(view, selectedGenre, currentSort);
+    const baseItems = getEligibleBrowseItems(view, selectedGenre);
+    const sorted = catalogSnapshotManager.createInitialSnapshot(baseItems, currentSort, {
+      profileId: activeProfile?.id || 'default',
+      isChild: activeProfile?.isChild === true,
+      category: view,
+      genreFilter: selectedGenre
+    });
+    const strictlyTyped = view === 'movies'
+      ? sorted.filter(i => searchService.isMovieItem(i, false))
+      : view === 'series'
+      ? sorted.filter(i => searchService.isSeriesItem(i))
+      : sorted.filter(i => searchService.isAnimeItem(i));
+
+    setCatalogSnapshots(prev => ({
+      ...prev,
+      [targetKey]: strictlyTyped
+    }));
+  }, [currentView, selectedGenre, categorySorts, activeProfile, getEligibleBrowseItems, getSnapshotKeyForView]);
+
+  const handleConfirmAge = useCallback(() => {
+    if (activeProfile?.isChild) return;
+    adultContentService.confirmAge(activeProfile?.id);
+    setIsAgeVerificationOpen(false);
+
+    if (pendingAdultGenre) {
+      setSelectedGenre(pendingAdultGenre);
+      setPendingAdultGenre(null);
+    }
+    if (pendingAdultItem) {
+      setSelectedContent(pendingAdultItem);
+      setPendingAdultItem(null);
+    }
+  }, [activeProfile, pendingAdultGenre, pendingAdultItem]);
+
+  const handleCancelAge = useCallback(() => {
+    setIsAgeVerificationOpen(false);
+    setPendingAdultGenre(null);
+    setPendingAdultItem(null);
+    if (selectedGenre === 'Adulto') {
+      setSelectedGenre('Todos');
+    }
+  }, [selectedGenre]);
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const needsCatalogDiscovery = currentView === 'home' || currentView === 'featured' ||
@@ -285,25 +540,28 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         };
 
         if (trendingRes.status === 'fulfilled' && trendingRes.value.length > 0) {
-          setTrendingItems(trendingRes.value);
-          storageService.saveCachedCatalog('trending', trendingRes.value);
-          trendingRes.value.forEach(addItem);
+          const validTrending = deduplicateContentItems(trendingRes.value);
+          setTrendingItems(validTrending);
+          storageService.saveCachedCatalog('trending', validTrending);
+          validTrending.forEach(addItem);
         }
 
-        // Combina filmes TMDB + Cinemeta
-        const combinedMovies: ContentItem[] = [];
-        if (moviesP1.status === 'fulfilled') combinedMovies.push(...moviesP1.value.items);
-        if (moviesP2.status === 'fulfilled') combinedMovies.push(...moviesP2.value.items);
+        // Combina filmes TMDB + Cinemeta (apenas filmes reais, não animes nem séries)
+        const rawMovies: ContentItem[] = [];
+        if (moviesP1.status === 'fulfilled') rawMovies.push(...moviesP1.value.items);
+        if (moviesP2.status === 'fulfilled') rawMovies.push(...moviesP2.value.items);
+        const combinedMovies = deduplicateContentItems(rawMovies.filter(i => searchService.isMovieItem(i)));
         if (combinedMovies.length > 0) {
           setPopularMovies(combinedMovies);
           storageService.saveCachedCatalog('movies', combinedMovies);
           combinedMovies.forEach(addItem);
         }
 
-        // Combina séries TMDB + Cinemeta
-        const combinedSeries: ContentItem[] = [];
-        if (seriesP1.status === 'fulfilled') combinedSeries.push(...seriesP1.value.items);
-        if (seriesP2.status === 'fulfilled') combinedSeries.push(...seriesP2.value.items);
+        // Combina séries TMDB + Cinemeta (apenas séries reais de TV, não filmes nem animes)
+        const rawSeries: ContentItem[] = [];
+        if (seriesP1.status === 'fulfilled') rawSeries.push(...seriesP1.value.items);
+        if (seriesP2.status === 'fulfilled') rawSeries.push(...seriesP2.value.items);
+        const combinedSeries = deduplicateContentItems(rawSeries.filter(i => searchService.isSeriesItem(i)));
         if (combinedSeries.length > 0) {
           setPopularSeries(combinedSeries);
           storageService.saveCachedCatalog('series', combinedSeries);
@@ -311,9 +569,10 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         }
 
         // Combina animes (séries + filmes de anime como Shinkai/Ghibli/Mugen Train)
-        const combinedAnimes: ContentItem[] = [];
-        if (animesP1.status === 'fulfilled') combinedAnimes.push(...animesP1.value.items);
-        if (animesP2.status === 'fulfilled') combinedAnimes.push(...animesP2.value.items);
+        const rawAnimes: ContentItem[] = [];
+        if (animesP1.status === 'fulfilled') rawAnimes.push(...animesP1.value.items);
+        if (animesP2.status === 'fulfilled') rawAnimes.push(...animesP2.value.items);
+        const combinedAnimes = deduplicateContentItems(rawAnimes.filter(i => searchService.isAnimeItem(i)));
         if (combinedAnimes.length > 0) {
           setAnimeItems(combinedAnimes);
           storageService.saveCachedCatalog('animes', combinedAnimes);
@@ -322,20 +581,30 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
         if (progressRes.status === 'fulfilled') {
           setContinueWatchingList(progressRes.value);
+          const favs = favsRes.status === 'fulfilled' ? favsRes.value : [];
+          const favItems = content.filter(c => favs.includes(c.id));
+          userPreferenceStore.seedFromExistingContinuity(activeProfile?.id || 'default', progressRes.value, favItems);
         }
         if (favsRes.status === 'fulfilled' && favsRes.value.length > 0) {
           setFavorites(favsRes.value);
         }
 
+        // Sincroniza novos lançamentos validados do backend (AutoReleaseService)
+        try {
+          const relRes = await fetch('/api/catalog/new-releases', { signal: AbortSignal.timeout(2000) });
+          if (relRes.ok) {
+            const relItems: ContentItem[] = await relRes.json();
+            if (Array.isArray(relItems) && relItems.length > 0) {
+              const eligibleRels = catalogEligibilityService.filterEligibleItemsSync(relItems);
+              if (eligibleRels.length > 0) {
+                newItems.push(...eligibleRels);
+              }
+            }
+          }
+        } catch {}
+
         if (newItems.length > 0) {
-          setContent(prev => {
-            const map = new Map<string, ContentItem>();
-            newItems.forEach(item => map.set(item.id, item));
-            prev.forEach(item => {
-              if (!map.has(item.id)) map.set(item.id, item);
-            });
-            return Array.from(map.values());
-          });
+          setContent(prev => deduplicateContentItems([...prev, ...newItems]));
         }
       } catch (err) {
         console.warn('Erro ao carregar catálogo online:', err);
@@ -355,6 +624,86 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     };
   }, [needsCatalogDiscovery]);
 
+  // Descoberta reativa ao navegar para Filmes, Séries ou Animes (garante dados online isolados da categoria)
+  useEffect(() => {
+    let isCancelled = false;
+    const view = currentView;
+
+    if (view === 'series' && popularSeries.length <= 25) {
+      catalogDiscoveryService.discoverSeries(1).then(res => {
+        if (!isCancelled && res.items.length > 0 && currentViewRef.current === 'series') {
+          const onlySeries = res.items.filter(i => searchService.isSeriesItem(i));
+          if (onlySeries.length > 0) {
+            setPopularSeries(prev => {
+              const updated = deduplicateContentItems([...prev, ...onlySeries]).filter(i => searchService.isSeriesItem(i));
+              storageService.saveCachedCatalog('series', updated);
+              return updated;
+            });
+            setContent(prev => deduplicateContentItems([...prev, ...onlySeries]));
+            const targetKey = getSnapshotKeyForView('series');
+            const currentSort = categorySorts.series || 'recommended';
+            setCatalogSnapshots(prev => {
+              const currentList = prev[targetKey] || [];
+              const eligible = catalogEligibilityService.filterEligibleItemsSync(onlySeries);
+              const updated = currentList.length === 0
+                ? catalogSnapshotManager.createInitialSnapshot(eligible, currentSort, {
+                    profileId: activeProfile?.id || 'default',
+                    isChild: activeProfile?.isChild === true,
+                    category: 'series',
+                    genreFilter: selectedGenre
+                  })
+                : catalogSnapshotManager.appendPaginationBatch(currentList, eligible, currentSort, {
+                    profileId: activeProfile?.id || 'default',
+                    isChild: activeProfile?.isChild === true,
+                    category: 'series',
+                    genreFilter: selectedGenre
+                  });
+              return { ...prev, [targetKey]: updated.filter(i => searchService.isSeriesItem(i)) };
+            });
+          }
+        }
+      }).catch(() => {});
+    } else if (view === 'animes' && animeItems.length <= 10) {
+      catalogDiscoveryService.discoverAnimes(1).then(res => {
+        if (!isCancelled && res.items.length > 0 && currentViewRef.current === 'animes') {
+          const onlyAnimes = res.items.filter(i => searchService.isAnimeItem(i));
+          if (onlyAnimes.length > 0) {
+            setAnimeItems(prev => {
+              const updated = deduplicateContentItems([...prev, ...onlyAnimes]).filter(i => searchService.isAnimeItem(i));
+              storageService.saveCachedCatalog('animes', updated);
+              return updated;
+            });
+            setContent(prev => deduplicateContentItems([...prev, ...onlyAnimes]));
+            const targetKey = getSnapshotKeyForView('animes');
+            const currentSort = categorySorts.animes || 'recommended';
+            setCatalogSnapshots(prev => {
+              const currentList = prev[targetKey] || [];
+              const eligible = catalogEligibilityService.filterEligibleItemsSync(onlyAnimes);
+              const updated = currentList.length === 0
+                ? catalogSnapshotManager.createInitialSnapshot(eligible, currentSort, {
+                    profileId: activeProfile?.id || 'default',
+                    isChild: activeProfile?.isChild === true,
+                    category: 'animes',
+                    genreFilter: selectedGenre
+                  })
+                : catalogSnapshotManager.appendPaginationBatch(currentList, eligible, currentSort, {
+                    profileId: activeProfile?.id || 'default',
+                    isChild: activeProfile?.isChild === true,
+                    category: 'animes',
+                    genreFilter: selectedGenre
+                  });
+              return { ...prev, [targetKey]: updated.filter(i => searchService.isAnimeItem(i)) };
+            });
+          }
+        }
+      }).catch(() => {});
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentView, getSnapshotKeyForView, categorySorts, selectedGenre, activeProfile?.id, activeProfile?.isChild]);
+
   // Busca sob demanda quando o usuário seleciona um gênero específico
   useEffect(() => {
     if (!selectedGenre || selectedGenre === 'Todos') return;
@@ -363,29 +712,107 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     const loadGenreCatalog = async () => {
       try {
         if (currentView === 'movies') {
+          const currentSort = categorySorts.movies || 'recommended';
+          const targetKey = getSnapshotKeyForView('movies', selectedGenre, currentSort);
           const res = await catalogDiscoveryService.discoverMovies(1, selectedGenre);
-          if (isMounted && res.items.length > 0) {
-            setPopularMovies(prev => {
-              const ids = new Set(res.items.map(i => i.id));
-              return [...res.items, ...prev.filter(i => !ids.has(i.id))];
+          if (isMounted && res.items.length > 0 && currentViewRef.current === 'movies') {
+            const onlyMovies = res.items.filter(i => searchService.isMovieItem(i, false));
+            setPopularMovies(prev => deduplicateContentItems([...prev, ...onlyMovies]).filter(i => searchService.isMovieItem(i, false)));
+            setContent(prev => deduplicateContentItems([...prev, ...onlyMovies]));
+            setCatalogSnapshots(prev => {
+              const currentList = prev[targetKey] || [];
+              const eligible = catalogEligibilityService.filterEligibleItemsSync(onlyMovies);
+              if (currentList.length === 0) {
+                const sorted = catalogSnapshotManager.createInitialSnapshot(eligible, currentSort, {
+                  profileId: activeProfile?.id || 'default',
+                  isChild: activeProfile?.isChild === true,
+                  category: 'movies',
+                  genreFilter: selectedGenre
+                });
+                return { ...prev, [targetKey]: sorted.filter(i => searchService.isMovieItem(i, false)) };
+              }
+              const updated = catalogSnapshotManager.appendPaginationBatch(
+                currentList,
+                eligible,
+                currentSort,
+                {
+                  profileId: activeProfile?.id || 'default',
+                  isChild: activeProfile?.isChild === true,
+                  category: 'movies',
+                  genreFilter: selectedGenre
+                }
+              );
+              return { ...prev, [targetKey]: updated.filter(i => searchService.isMovieItem(i, false)) };
             });
             setMoviesPage(1);
           }
         } else if (currentView === 'series') {
+          const currentSort = categorySorts.series || 'recommended';
+          const targetKey = getSnapshotKeyForView('series', selectedGenre, currentSort);
           const res = await catalogDiscoveryService.discoverSeries(1, selectedGenre);
-          if (isMounted && res.items.length > 0) {
-            setPopularSeries(prev => {
-              const ids = new Set(res.items.map(i => i.id));
-              return [...res.items, ...prev.filter(i => !ids.has(i.id))];
+          if (isMounted && res.items.length > 0 && currentViewRef.current === 'series') {
+            const onlySeries = res.items.filter(i => searchService.isSeriesItem(i));
+            setPopularSeries(prev => deduplicateContentItems([...prev, ...onlySeries]).filter(i => searchService.isSeriesItem(i)));
+            setContent(prev => deduplicateContentItems([...prev, ...onlySeries]));
+            setCatalogSnapshots(prev => {
+              const currentList = prev[targetKey] || [];
+              const eligible = catalogEligibilityService.filterEligibleItemsSync(onlySeries);
+              if (currentList.length === 0) {
+                const sorted = catalogSnapshotManager.createInitialSnapshot(eligible, currentSort, {
+                  profileId: activeProfile?.id || 'default',
+                  isChild: activeProfile?.isChild === true,
+                  category: 'series',
+                  genreFilter: selectedGenre
+                });
+                return { ...prev, [targetKey]: sorted.filter(i => searchService.isSeriesItem(i)) };
+              }
+              const updated = catalogSnapshotManager.appendPaginationBatch(
+                currentList,
+                eligible,
+                currentSort,
+                {
+                  profileId: activeProfile?.id || 'default',
+                  isChild: activeProfile?.isChild === true,
+                  category: 'series',
+                  genreFilter: selectedGenre
+                }
+              );
+              return { ...prev, [targetKey]: updated.filter(i => searchService.isSeriesItem(i)) };
             });
             setSeriesPage(1);
           }
         } else if (currentView === 'animes') {
+          const currentSort = categorySorts.animes || 'recommended';
+          const targetKey = getSnapshotKeyForView('animes', selectedGenre, currentSort);
           const res = await catalogDiscoveryService.discoverAnimes(1, selectedGenre);
-          if (isMounted && res.items.length > 0) {
-            setAnimeItems(prev => {
-              const ids = new Set(res.items.map(i => i.id));
-              return [...res.items, ...prev.filter(i => !ids.has(i.id))];
+          if (isMounted && res.items.length > 0 && currentViewRef.current === 'animes') {
+            const onlyAnimes = res.items.filter(i => searchService.isAnimeItem(i));
+            setAnimeItems(prev => deduplicateContentItems([...prev, ...onlyAnimes]).filter(i => searchService.isAnimeItem(i)));
+            setContent(prev => deduplicateContentItems([...prev, ...onlyAnimes]));
+            setCatalogSnapshots(prev => {
+              const currentList = prev[targetKey] || [];
+              const eligible = catalogEligibilityService.filterEligibleItemsSync(onlyAnimes);
+              if (currentList.length === 0) {
+                const sorted = catalogSnapshotManager.createInitialSnapshot(eligible, currentSort, {
+                  profileId: activeProfile?.id || 'default',
+                  isChild: activeProfile?.isChild === true,
+                  category: 'animes',
+                  genreFilter: selectedGenre
+                });
+                return { ...prev, [targetKey]: sorted.filter(i => searchService.isAnimeItem(i)) };
+              }
+              const updated = catalogSnapshotManager.appendPaginationBatch(
+                currentList,
+                eligible,
+                currentSort,
+                {
+                  profileId: activeProfile?.id || 'default',
+                  isChild: activeProfile?.isChild === true,
+                  category: 'animes',
+                  genreFilter: selectedGenre
+                }
+              );
+              return { ...prev, [targetKey]: updated.filter(i => searchService.isAnimeItem(i)) };
             });
             setAnimesPage(1);
           }
@@ -397,110 +824,190 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
     loadGenreCatalog();
     return () => { isMounted = false; };
-  }, [selectedGenre, currentView]);
+  }, [selectedGenre, currentView, categorySorts, activeProfile?.id, activeProfile?.isChild, getSnapshotKeyForView]);
 
-  // Paginação e carregamento incremental sob demanda ("Carregar Mais")
+  // Paginação e carregamento incremental sob demanda ("Carregar Mais" / Infinite Scroll sem limites artificiais)
   const handleLoadMore = useCallback(async (view: AppView) => {
     if (isLoadingMore) return;
+    const isBrowse = view === 'movies' || view === 'series' || view === 'animes';
+    if (!isBrowse) return;
+
     setIsLoadingMore(true);
+    const targetKey = getSnapshotKeyForView(view as 'movies' | 'series' | 'animes');
 
     try {
       if (view === 'movies') {
         let nextPage = moviesPage + 1;
-        let res = await catalogDiscoveryService.discoverMovies(nextPage, selectedGenre);
-        
-        // Se a página retornou poucos itens ou vazia após filtragem teatral, tenta a próxima página uma vez
-        if (res.items.length === 0 && res.hasMore && nextPage < 10) {
+        let attempts = 0;
+        const maxAttempts = 3;
+        let newItems: ContentItem[] = [];
+        let hasMore = true;
+
+        while (attempts < maxAttempts) {
+          const res = await catalogDiscoveryService.discoverMovies(nextPage, selectedGenre);
+          hasMore = res.hasMore;
+          const onlyMovies = res.items.filter(i => searchService.isMovieItem(i, false));
+
+          if (onlyMovies.length > 0) {
+            newItems.push(...onlyMovies);
+          }
+
+          if (newItems.length > 0 || !hasMore) {
+            break;
+          }
+
           nextPage++;
-          res = await catalogDiscoveryService.discoverMovies(nextPage, selectedGenre);
+          attempts++;
         }
 
-        if (res.items.length > 0) {
+        if (currentViewRef.current !== 'movies') return;
+
+        if (newItems.length > 0) {
+          const eligibleNew = catalogEligibilityService.filterEligibleItemsSync(newItems);
+          const currentSort = categorySorts.movies || 'recommended';
+          setCatalogSnapshots(prev => {
+            const currentList = prev[targetKey] || [];
+            const updated = catalogSnapshotManager.appendPaginationBatch(
+              currentList,
+              eligibleNew,
+              currentSort,
+              {
+                profileId: activeProfile?.id || 'default',
+                isChild: activeProfile?.isChild === true,
+                category: 'movies',
+                genreFilter: selectedGenre
+              }
+            );
+            return { ...prev, [targetKey]: updated.filter(i => searchService.isMovieItem(i, false)) };
+          });
+
           setPopularMovies(prev => {
-            const seen = new Set(prev.map(i => i.id));
-            const fresh = res.items.filter(i => !seen.has(i.id));
-            const updated = [...prev, ...fresh];
+            const updated = deduplicateContentItems([...prev, ...newItems]).filter(i => searchService.isMovieItem(i, false));
             storageService.saveCachedCatalog('movies', updated);
             return updated;
           });
-
-          // Sincroniza também a lista global de conteúdo
-          setContent(prev => {
-            const seen = new Set(prev.map(i => i.id));
-            const fresh = res.items.filter(i => !seen.has(i.id));
-            return [...prev, ...fresh];
-          });
-
-          setMoviesPage(nextPage);
-          setHasMoreMovies(res.hasMore);
-        } else {
-          setHasMoreMovies(false);
+          setContent(prev => deduplicateContentItems([...prev, ...newItems]));
         }
+
+        setMoviesPage(nextPage);
+        setHasMoreMovies(hasMore);
       } else if (view === 'series') {
         let nextPage = seriesPage + 1;
-        let res = await catalogDiscoveryService.discoverSeries(nextPage, selectedGenre);
+        let attempts = 0;
+        const maxAttempts = 3;
+        let newItems: ContentItem[] = [];
+        let hasMore = true;
 
-        if (res.items.length === 0 && res.hasMore && nextPage < 10) {
+        while (attempts < maxAttempts) {
+          const res = await catalogDiscoveryService.discoverSeries(nextPage, selectedGenre);
+          hasMore = res.hasMore;
+          const onlySeries = res.items.filter(i => searchService.isSeriesItem(i));
+
+          if (onlySeries.length > 0) {
+            newItems.push(...onlySeries);
+          }
+
+          if (newItems.length > 0 || !hasMore) {
+            break;
+          }
+
           nextPage++;
-          res = await catalogDiscoveryService.discoverSeries(nextPage, selectedGenre);
+          attempts++;
         }
 
-        if (res.items.length > 0) {
+        if (currentViewRef.current !== 'series') return;
+
+        if (newItems.length > 0) {
+          const eligibleNew = catalogEligibilityService.filterEligibleItemsSync(newItems);
+          const currentSort = categorySorts.series || 'recommended';
+          setCatalogSnapshots(prev => {
+            const currentList = prev[targetKey] || [];
+            const updated = catalogSnapshotManager.appendPaginationBatch(
+              currentList,
+              eligibleNew,
+              currentSort,
+              {
+                profileId: activeProfile?.id || 'default',
+                isChild: activeProfile?.isChild === true,
+                category: 'series',
+                genreFilter: selectedGenre
+              }
+            );
+            return { ...prev, [targetKey]: updated.filter(i => searchService.isSeriesItem(i)) };
+          });
+
           setPopularSeries(prev => {
-            const seen = new Set(prev.map(i => i.id));
-            const fresh = res.items.filter(i => !seen.has(i.id));
-            const updated = [...prev, ...fresh];
+            const updated = deduplicateContentItems([...prev, ...newItems]).filter(i => searchService.isSeriesItem(i));
             storageService.saveCachedCatalog('series', updated);
             return updated;
           });
-
-          setContent(prev => {
-            const seen = new Set(prev.map(i => i.id));
-            const fresh = res.items.filter(i => !seen.has(i.id));
-            return [...prev, ...fresh];
-          });
-
-          setSeriesPage(nextPage);
-          setHasMoreSeries(res.hasMore);
-        } else {
-          setHasMoreSeries(false);
+          setContent(prev => deduplicateContentItems([...prev, ...newItems]));
         }
+
+        setSeriesPage(nextPage);
+        setHasMoreSeries(hasMore);
       } else if (view === 'animes') {
         let nextPage = animesPage + 1;
-        let res = await catalogDiscoveryService.discoverAnimes(nextPage, selectedGenre);
+        let attempts = 0;
+        const maxAttempts = 3;
+        let newItems: ContentItem[] = [];
+        let hasMore = true;
 
-        if (res.items.length === 0 && res.hasMore && nextPage < 10) {
+        while (attempts < maxAttempts) {
+          const res = await catalogDiscoveryService.discoverAnimes(nextPage, selectedGenre);
+          hasMore = res.hasMore;
+          const onlyAnimes = res.items.filter(i => searchService.isAnimeItem(i));
+
+          if (onlyAnimes.length > 0) {
+            newItems.push(...onlyAnimes);
+          }
+
+          if (newItems.length > 0 || !hasMore) {
+            break;
+          }
+
           nextPage++;
-          res = await catalogDiscoveryService.discoverAnimes(nextPage, selectedGenre);
+          attempts++;
         }
 
-        if (res.items.length > 0) {
+        if (currentViewRef.current !== 'animes') return;
+
+        if (newItems.length > 0) {
+          const eligibleNew = catalogEligibilityService.filterEligibleItemsSync(newItems);
+          const currentSort = categorySorts.animes || 'recommended';
+          setCatalogSnapshots(prev => {
+            const currentList = prev[targetKey] || [];
+            const updated = catalogSnapshotManager.appendPaginationBatch(
+              currentList,
+              eligibleNew,
+              currentSort,
+              {
+                profileId: activeProfile?.id || 'default',
+                isChild: activeProfile?.isChild === true,
+                category: 'animes',
+                genreFilter: selectedGenre
+              }
+            );
+            return { ...prev, [targetKey]: updated.filter(i => searchService.isAnimeItem(i)) };
+          });
+
           setAnimeItems(prev => {
-            const seen = new Set(prev.map(i => i.id));
-            const fresh = res.items.filter(i => !seen.has(i.id));
-            const updated = [...prev, ...fresh];
+            const updated = deduplicateContentItems([...prev, ...newItems]).filter(i => searchService.isAnimeItem(i));
             storageService.saveCachedCatalog('animes', updated);
             return updated;
           });
-
-          setContent(prev => {
-            const seen = new Set(prev.map(i => i.id));
-            const fresh = res.items.filter(i => !seen.has(i.id));
-            return [...prev, ...fresh];
-          });
-
-          setAnimesPage(nextPage);
-          setHasMoreAnimes(res.hasMore);
-        } else {
-          setHasMoreAnimes(false);
+          setContent(prev => deduplicateContentItems([...prev, ...newItems]));
         }
+
+        setAnimesPage(nextPage);
+        setHasMoreAnimes(hasMore);
       }
     } catch (e) {
       console.warn('Erro ao carregar mais itens:', e);
     } finally {
       setIsLoadingMore(false);
     }
-  }, [isLoadingMore, moviesPage, seriesPage, animesPage, selectedGenre]);
+  }, [isLoadingMore, moviesPage, seriesPage, animesPage, selectedGenre, categorySorts, activeProfile?.id, activeProfile?.isChild, getSnapshotKeyForView]);
 
   // Rolagem Infinita Automática (Infinite Scroll — carrega mais títulos conforme o usuário desce)
   useEffect(() => {
@@ -511,25 +1018,26 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
     if (!isBrowseView || !hasMore || isLoadingMore) return;
 
-    // 1. IntersectionObserver para detecção prévia e suave com antecedência de 500px
     let observer: IntersectionObserver | null = null;
-    if (typeof IntersectionObserver !== 'undefined' && sentinel) {
-      observer = new IntersectionObserver((entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting && !isLoadingMore) {
-          handleLoadMore(currentView);
-        }
-      }, {
-        root: container || null,
-        rootMargin: '500px',
-        threshold: 0.05
-      });
-      observer.observe(sentinel);
-    }
+    let mountTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      if (typeof IntersectionObserver !== 'undefined' && sentinel) {
+        observer = new IntersectionObserver((entries) => {
+          const [entry] = entries;
+          if (entry.isIntersecting && !isLoadingMore && currentViewRef.current === currentView) {
+            handleLoadMore(currentView);
+          }
+        }, {
+          root: container || null,
+          rootMargin: '400px',
+          threshold: 0.05
+        });
+        observer.observe(sentinel);
+      }
+    }, 250);
 
     // 2. Scroll listener no container como garantia adicional de fluidez
     const handleScroll = () => {
-      if (!container || isLoadingMore) return;
+      if (!container || isLoadingMore || currentViewRef.current !== currentView) return;
       const { scrollTop, scrollHeight, clientHeight } = container;
       if (scrollTop + clientHeight >= scrollHeight - 600) {
         handleLoadMore(currentView);
@@ -542,7 +1050,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
     // 3. Fallback no objeto window caso a rolagem ocorra na janela principal
     const handleWindowScroll = () => {
-      if (isLoadingMore) return;
+      if (isLoadingMore || currentViewRef.current !== currentView) return;
       const scrollPos = window.innerHeight + window.scrollY;
       const threshold = document.documentElement.offsetHeight - 600;
       if (scrollPos >= threshold) {
@@ -552,6 +1060,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     window.addEventListener('scroll', handleWindowScroll, { passive: true });
 
     return () => {
+      if (mountTimer) clearTimeout(mountTimer);
       if (observer) observer.disconnect();
       if (container) container.removeEventListener('scroll', handleScroll);
       window.removeEventListener('scroll', handleWindowScroll);
@@ -735,8 +1244,19 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     if (!catalogEligibilityService.isItemPubliclyPlayableSync(item)) {
       return;
     }
+    if (adultContentService.isAdultContent(item)) {
+      if (activeProfile?.isChild) {
+        setIsAgeVerificationOpen(true);
+        return;
+      }
+      if (!adultContentService.isAgeConfirmed(activeProfile?.id)) {
+        setPendingAdultItem(item);
+        setIsAgeVerificationOpen(true);
+        return;
+      }
+    }
     setSelectedContent(item);
-  }, []);
+  }, [activeProfile]);
 
   const handleCloseDetailModal = useCallback(() => {
     setSelectedContent(null);
@@ -836,18 +1356,50 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   useEffect(() => {
     if (!submittedSearchQuery.trim()) {
       setLiveSearchResults([]);
+      setLiveSearchActors([]);
       return;
     }
     let active = true;
     const runSearch = async () => {
       try {
         const category = searchService.mapAppViewToCategory(currentView);
-        const results = await searchService.search(submittedSearchQuery, category, content);
+        const [results, foundActors] = await Promise.all([
+          searchService.search(submittedSearchQuery, category, contentRef.current, activeProfile),
+          searchService.searchPersons(submittedSearchQuery)
+        ]);
+
         if (active) {
-          setLiveSearchResults(results);
+          setLiveSearchActors(foundActors || []);
+          const isAdultSearch = adultContentService.isIntentionalAdultSearch(submittedSearchQuery, contentRef.current.map(i => i.title));
+          const allowAdult = isAdultSearch && !activeProfile?.isChild && adultContentService.isAgeConfirmed(activeProfile?.id);
+          const eligibleResults = catalogEligibilityService.filterEligibleItemsSync(results, { allowAdult });
+          setLiveSearchResults(eligibleResults);
+
+          // UNIFICAÇÃO COM O ÍNDICE CENTRAL DO CATÁLOGO:
+          // Registra os itens elegíveis não-adultos no acervo popular geral (isolamento estrito de adulto)
+          const nonAdultResults = eligibleResults.filter(i => !adultContentService.isAdultContent(i));
+          if (nonAdultResults.length > 0) {
+            setContent(prev => deduplicateContentItems([...prev, ...nonAdultResults]));
+
+            const newMovies = nonAdultResults.filter(i => searchService.isMovieItem(i));
+            if (newMovies.length > 0) {
+              setPopularMovies(prev => deduplicateContentItems([...prev, ...newMovies]));
+            }
+            const newSeries = nonAdultResults.filter(i => searchService.isSeriesItem(i));
+            if (newSeries.length > 0) {
+              setPopularSeries(prev => deduplicateContentItems([...prev, ...newSeries]));
+            }
+            const newAnimes = nonAdultResults.filter(i => searchService.isAnimeItem(i));
+            if (newAnimes.length > 0) {
+              setAnimeItems(prev => deduplicateContentItems([...prev, ...newAnimes]));
+            }
+          }
         }
       } catch (e) {
-        if (active) setLiveSearchResults([]);
+        if (active) {
+          setLiveSearchResults([]);
+          setLiveSearchActors([]);
+        }
       }
     };
     runSearch();
@@ -855,7 +1407,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       active = false;
       searchService.cancelPending();
     };
-  }, [submittedSearchQuery, currentView, content]);
+  }, [submittedSearchQuery, currentView]);
 
   useEffect(() => {
     db.keyValueStore.put({ key: 'zapitv_theme', value: isDarkMode });
@@ -1124,8 +1676,17 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const toggleMyList = useCallback(async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (!currentUser) return;
-    const newList = myList.includes(id) ? myList.filter(i => i !== id) : [...myList, id];
+    const isAdding = !myList.includes(id);
+    const newList = isAdding ? [...myList, id] : myList.filter(i => i !== id);
     setMyList(newList);
+
+    const target = content.find(i => i.id === id);
+    if (target) {
+      userPreferenceStore.recordFavorite(target, isAdding, activeProfile?.id || 'default');
+      recommendationEngine.invalidateCache();
+      hybridRecommendationEngine.invalidateCache();
+    }
+
     try {
       const { doc, setDoc } = await import('firebase/firestore');
       const { db: firestoreDb } = await import('./firebase');
@@ -1133,13 +1694,22 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     } catch (error) {
       console.error("Error saving myList:", error);
     }
-  }, [myList, currentUser]);
+  }, [myList, currentUser, content, activeProfile?.id]);
 
   const toggleFavorite = useCallback(async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (!currentUser) return;
-    const newFavorites = favorites.includes(id) ? favorites.filter(i => i !== id) : [...favorites, id];
+    const isAdding = !favorites.includes(id);
+    const newFavorites = isAdding ? [...favorites, id] : favorites.filter(i => i !== id);
     setFavorites(newFavorites);
+
+    const target = content.find(i => i.id === id);
+    if (target) {
+      userPreferenceStore.recordFavorite(target, isAdding, activeProfile?.id || 'default');
+      recommendationEngine.invalidateCache();
+      hybridRecommendationEngine.invalidateCache();
+    }
+
     try {
       const { doc, setDoc } = await import('firebase/firestore');
       const { db: firestoreDb } = await import('./firebase');
@@ -1147,7 +1717,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     } catch (error) {
       console.error("Error saving favorites:", error);
     }
-  }, [favorites, currentUser]);
+  }, [favorites, currentUser, content, activeProfile?.id]);
 
   const updateUser = useCallback(async (updatedUser: User) => {
     try {
@@ -1272,42 +1842,128 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
   };
 
+  const personalizedHomeRows = useMemo(() => {
+    const allAvailable = deduplicateContentItems([
+      ...trendingItems,
+      ...popularMovies,
+      ...popularSeries,
+      ...animeItems,
+      ...content
+    ]);
+    const cwItems = continueWatchingList.map(p => p.item);
+    return hybridRecommendationEngine.getHybridHomeRows(
+      allAvailable,
+      activeProfile?.id || 'default',
+      cwItems,
+      activeProfile?.isChild === true
+    );
+  }, [trendingItems, popularMovies, popularSeries, animeItems, content, continueWatchingList, activeProfile?.id, activeProfile?.isChild]);
+
   const filteredContent = useMemo(() => {
     let baseFiltered = content;
     
     if (submittedSearchQuery.trim()) {
+      const isAdultSearch = adultContentService.isIntentionalAdultSearch(submittedSearchQuery, content.map(i => i.title));
+      const allowAdult = isAdultSearch && !activeProfile?.isChild && adultContentService.isAgeConfirmed(activeProfile?.id);
+
       if (liveSearchResults.length > 0) {
-        return catalogEligibilityService.filterEligibleItemsSync(liveSearchResults);
+        const deduped = deduplicateContentItems(liveSearchResults);
+        return catalogEligibilityService.filterEligibleItemsSync(deduped, { allowAdult });
       }
       const category = searchService.mapAppViewToCategory(currentView);
-      const localMatches = searchService.filterLocalCatalog(submittedSearchQuery, category, baseFiltered);
-      return catalogEligibilityService.filterEligibleItemsSync(localMatches);
+      const localMatches = searchService.filterLocalCatalog(submittedSearchQuery, category, baseFiltered, activeProfile);
+      const deduped = deduplicateContentItems(localMatches);
+      return catalogEligibilityService.filterEligibleItemsSync(deduped, { allowAdult });
     }
 
+    // Para Filmes, Séries e Animes sem busca ativa, utiliza o Snapshot Estável de Navegação com Isolamento Total
     if (currentView === 'movies') {
-      baseFiltered = popularMovies.length > 0 ? popularMovies : baseFiltered.filter(i => searchService.isMovieItem(i));
-    } else if (currentView === 'series') {
-      baseFiltered = popularSeries.length > 0 ? popularSeries : baseFiltered.filter(i => searchService.isSeriesItem(i));
-    } else if (currentView === 'animes') {
-      baseFiltered = animeItems.length > 0 ? animeItems : baseFiltered.filter(i => searchService.isAnimeItem(i));
-    } else if (currentView === 'featured') {
-      baseFiltered = trendingItems.length > 0 ? trendingItems : baseFiltered.filter(i => i.isFeatured);
+      const currentSort = categorySorts.movies || 'recommended';
+      const targetKey = getSnapshotKeyForView('movies', selectedGenre, currentSort);
+      const cached = catalogSnapshots[targetKey];
+      if (cached && cached.length > 0) {
+        return deduplicateContentItems(cached.filter(i => searchService.isMovieItem(i, false)));
+      }
+      const baseItems = getEligibleBrowseItems('movies', selectedGenre);
+      const sorted = catalogSnapshotManager.createInitialSnapshot(baseItems, currentSort, {
+        profileId: activeProfile?.id || 'default',
+        isChild: activeProfile?.isChild === true,
+        category: 'movies',
+        genreFilter: selectedGenre
+      });
+      return deduplicateContentItems(sorted.filter(i => searchService.isMovieItem(i, false)));
+    }
+
+    if (currentView === 'series') {
+      const currentSort = categorySorts.series || 'recommended';
+      const targetKey = getSnapshotKeyForView('series', selectedGenre, currentSort);
+      const cached = catalogSnapshots[targetKey];
+      if (cached && cached.length > 0) {
+        return deduplicateContentItems(cached.filter(i => searchService.isSeriesItem(i)));
+      }
+      const baseItems = getEligibleBrowseItems('series', selectedGenre);
+      const sorted = catalogSnapshotManager.createInitialSnapshot(baseItems, currentSort, {
+        profileId: activeProfile?.id || 'default',
+        isChild: activeProfile?.isChild === true,
+        category: 'series',
+        genreFilter: selectedGenre
+      });
+      return deduplicateContentItems(sorted.filter(i => searchService.isSeriesItem(i)));
+    }
+
+    if (currentView === 'animes') {
+      const currentSort = categorySorts.animes || 'recommended';
+      const targetKey = getSnapshotKeyForView('animes', selectedGenre, currentSort);
+      const cached = catalogSnapshots[targetKey];
+      if (cached && cached.length > 0) {
+        return deduplicateContentItems(cached.filter(i => searchService.isAnimeItem(i)));
+      }
+      const baseItems = getEligibleBrowseItems('animes', selectedGenre);
+      const sorted = catalogSnapshotManager.createInitialSnapshot(baseItems, currentSort, {
+        profileId: activeProfile?.id || 'default',
+        isChild: activeProfile?.isChild === true,
+        category: 'animes',
+        genreFilter: selectedGenre
+      });
+      return deduplicateContentItems(sorted.filter(i => searchService.isAnimeItem(i)));
+    }
+
+    if (currentView === 'featured') {
+      const source = trendingItems.length > 0 ? trendingItems : baseFiltered;
+      baseFiltered = source.filter(i => i.isFeatured);
     } else if (currentView === 'mylist') {
       baseFiltered = baseFiltered.filter(i => favorites.includes(i.id) || myList.includes(i.id));
     }
 
-    if (selectedGenre) baseFiltered = baseFiltered.filter(i => i.genres?.includes(selectedGenre));
+    const isAdultGenre = selectedGenre === 'Adulto';
+    if (selectedGenre && selectedGenre !== 'Todos') {
+      if (isAdultGenre) {
+        baseFiltered = baseFiltered.filter(i => adultContentService.isAdultContent(i));
+      } else {
+        baseFiltered = baseFiltered.filter(i => i.genres?.includes(selectedGenre) && !adultContentService.isAdultContent(i));
+      }
+    } else {
+      // Ocultar por padrão: em 'Todos' ou sem filtro, oculta 100% de conteúdos adultos
+      baseFiltered = baseFiltered.filter(i => !adultContentService.isAdultContent(i));
+    }
 
-    // Camada Central de Elegibilidade e Reprodução Real
-    return catalogEligibilityService.filterEligibleItemsSync(baseFiltered);
-  }, [content, submittedSearchQuery, liveSearchResults, currentView, selectedGenre, popularMovies, popularSeries, animeItems, trendingItems, favorites, myList]);
+    // Camada Central de Deduplicação Canônica e Elegibilidade Real
+    const uniqueBase = deduplicateContentItems(baseFiltered);
+    const eligible = catalogEligibilityService.filterEligibleItemsSync(uniqueBase, { allowAdult: isAdultGenre });
+
+    return eligible;
+  }, [
+    catalogSnapshots, snapshotKey, currentView, categorySorts, selectedGenre,
+    getEligibleBrowseItems, getSnapshotKeyForView, submittedSearchQuery, liveSearchResults, content,
+    trendingItems, favorites, myList, activeProfile?.id, activeProfile?.isChild
+  ]);
 
   const renderContent = () => {
-    const gridClass = "grid grid-cols-3 md:grid-cols-5 gap-x-2 md:gap-x-5 lg:gap-x-6 gap-y-6 md:gap-y-12 px-3 md:px-12 lg:px-24";
-    const headerClass = "flex flex-col md:flex-row md:items-center gap-4 md:gap-7 mb-8 md:mb-14 px-4 md:px-12 lg:px-24";
-    const titleClass = "text-2xl md:text-5xl font-black whitespace-nowrap tracking-tight";
+    const gridClass = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6 px-3 sm:px-6 md:px-12 max-w-[2560px] mx-auto";
+    const headerClass = `flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 md:gap-7 pb-4 mb-6 md:mb-10 px-3 sm:px-6 md:px-12 max-w-[2560px] mx-auto border-b ${isDarkMode ? 'border-white/10' : 'border-black/10'}`;
+    const titleClass = `text-xl sm:text-2xl md:text-5xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`;
     const countClass = "text-xs md:text-sm font-bold opacity-50 uppercase tracking-widest mt-1 md:mt-2 block";
-    const iconClass = "w-8 h-8 md:w-14 md:h-14 text-orange-600 shrink-0";
+    const iconClass = "w-7 h-7 sm:w-10 sm:h-10 md:w-14 md:h-14 text-orange-600 shrink-0";
 
     if (submittedSearchQuery.trim() && currentView !== 'admin') {
       const category = searchService.mapAppViewToCategory(currentView);
@@ -1315,21 +1971,61 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
       return (
         <ViewWrapper>
-          <div className="p-4 md:p-8 pb-32">
+          <div className="py-4 sm:py-6 md:py-8 pb-32">
              <div className={headerClass}>
-               <div className="flex items-center gap-3 md:gap-5">
-                 <Search className={iconClass} />
-                 <div>
-                   <h2 className={titleClass}>Busca: "{submittedSearchQuery}"</h2>
-                   <span className={countClass}>{filteredContent.length} resultados encontrados</span>
-                 </div>
+               <div>
+                 <h2 className={titleClass}>Busca: "{submittedSearchQuery}"</h2>
                </div>
              </div>
+
+             {/* Seção de Artistas / Atores Encontrados (Fotos Circulares Oficiais) */}
+             {liveSearchActors.length > 0 && (
+               <div className="mb-8 sm:mb-10 px-3 sm:px-6 md:px-12 max-w-[2560px] mx-auto">
+                 <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                   <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-[#007df7] px-3 py-1 rounded-full bg-[#007df7]/10 border border-[#007df7]/30 flex items-center gap-1.5">
+                     <UserIcon className="w-3.5 h-3.5" />
+                     Artistas Encontrados ({liveSearchActors.length})
+                   </span>
+                 </div>
+                 <div className="flex items-center gap-4 overflow-x-auto no-scrollbar py-2">
+                   {liveSearchActors.map((actor) => (
+                     <button
+                       key={`search-actor-${actor.id}`}
+                       onClick={() => {
+                         navigate(`/atores/${actor.id}`);
+                       }}
+                       className={`flex flex-col items-center gap-2.5 p-3.5 rounded-2xl border transition-all cursor-pointer shrink-0 w-32 sm:w-36 group ${
+                         isDarkMode 
+                           ? 'bg-white/5 hover:bg-white/10 border-white/10 hover:border-[#007df7]/60 shadow-lg' 
+                           : 'bg-black/5 hover:bg-black/10 border-black/10 hover:border-[#007df7]/60 shadow-md'
+                       }`}
+                     >
+                       {/* Foto oficial circular do ator */}
+                       <img
+                         src={actor.image}
+                         alt={actor.name}
+                         className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-2 border-[#007df7]/40 shadow-md group-hover:scale-105 transition-transform ring-2 ring-white/10"
+                         onError={(e) => {
+                           (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+                         }}
+                       />
+                       <span className="font-bold text-xs text-white text-center line-clamp-1 group-hover:text-[#007df7] transition-colors">
+                         {actor.name}
+                       </span>
+                       <span className="text-[10px] text-gray-400 -mt-1 font-medium truncate max-w-full">
+                         {actor.knownForDepartment || 'Ator'}
+                       </span>
+                     </button>
+                   ))}
+                 </div>
+               </div>
+             )}
+
              {filteredContent.length > 0 ? (
                <div className={gridClass}>
-                  {filteredContent.map(item => (
+                  {filteredContent.map((item, idx) => (
                     <ContentCard 
-                      key={item.id}
+                      key={`search-${item.imdbId || item.id}-${idx}`}
                       item={item}
                       isDarkMode={isDarkMode}
                       onItemClick={handleSelectContent}
@@ -1363,7 +2059,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         return (
           <ViewWrapper>
             <div className="pb-12">
-              <div className="px-4 md:px-12 pt-6">
+              <div className="px-3 sm:px-6 md:px-12 pt-4 sm:pt-6 max-w-[2560px] mx-auto">
                 <Hero 
                   featuredItems={catalogEligibilityService.filterEligibleItemsSync(trendingItems.length > 0 ? trendingItems.slice(0, 8) : content.filter(i => i.isFeatured))} 
                   isDarkMode={isDarkMode} 
@@ -1374,79 +2070,21 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 />
               </div>
               <div className="space-y-4">
-                {continueWatchingList.length > 0 && (
+                {/* Fileiras Personalizadas Ponderadas pelo Motor de Recomendações */}
+                {personalizedHomeRows.map((row) => (
                   <ContentRow 
-                    title="Continuar Assistindo" 
-                    items={continueWatchingList.map(p => p.item).filter(i => catalogEligibilityService.isItemPubliclyPlayableSync(i))} 
-                    isDarkMode={isDarkMode} 
-                    onItemClick={handleSelectContent} 
-                    myList={myList} 
-                    favorites={favorites} 
-                    onToggleFavorite={toggleFavorite} 
-                    onToggleList={toggleMyList} 
+                    key={`rec-row-${row.id}`}
+                    title={row.title}
+                    items={catalogEligibilityService.filterEligibleItemsSync(row.items)}
+                    isDarkMode={isDarkMode}
+                    onItemClick={handleSelectContent}
+                    myList={myList}
+                    favorites={favorites}
+                    onToggleFavorite={toggleFavorite}
+                    onToggleList={toggleMyList}
+                    isAdmin={currentUser.role === 'admin'}
                   />
-                )}
-
-                <ContentRow 
-                  title={sectionTitles.premium} 
-                  items={catalogEligibilityService.filterEligibleItemsSync(trendingItems.length > 0 ? trendingItems : premiumItems)} 
-                  isDarkMode={isDarkMode} 
-                  onItemClick={handleSelectContent} 
-                  myList={myList} 
-                  favorites={favorites} 
-                  onToggleFavorite={toggleFavorite} 
-                  onToggleList={toggleMyList} 
-                  isAdmin={currentUser.role === 'admin'}
-                  onEditTitle={() => handleEditSectionTitle('premium')}
-                />
-                <ContentRow 
-                  title={sectionTitles.recent} 
-                  items={catalogEligibilityService.filterEligibleItemsSync(popularMovies.length > 0 ? popularMovies : recentItems)} 
-                  isDarkMode={isDarkMode} 
-                  onItemClick={handleSelectContent} 
-                  myList={myList} 
-                  favorites={favorites} 
-                  onToggleFavorite={toggleFavorite} 
-                  onToggleList={toggleMyList} 
-                  isAdmin={currentUser.role === 'admin'}
-                  onEditTitle={() => handleEditSectionTitle('recent')}
-                />
-                <ContentRow 
-                  title={sectionTitles.netflix} 
-                  items={catalogEligibilityService.filterEligibleItemsSync(popularSeries.length > 0 ? popularSeries : content.filter(i => i.platform?.includes('Netflix')))} 
-                  isDarkMode={isDarkMode} 
-                  onItemClick={handleSelectContent} 
-                  myList={myList} 
-                  favorites={favorites} 
-                  onToggleFavorite={toggleFavorite} 
-                  onToggleList={toggleMyList} 
-                  isAdmin={currentUser.role === 'admin'}
-                  onEditTitle={() => handleEditSectionTitle('netflix')}
-                />
-                <ContentRow 
-                  title={sectionTitles.prime} 
-                  items={catalogEligibilityService.filterEligibleItemsSync(topRatedItems.length > 0 ? topRatedItems : content.filter(i => i.platform?.includes('Prime Video')))} 
-                  isDarkMode={isDarkMode} 
-                  onItemClick={handleSelectContent} 
-                  myList={myList} 
-                  favorites={favorites} 
-                  onToggleFavorite={toggleFavorite} 
-                  onToggleList={toggleMyList} 
-                  isAdmin={currentUser.role === 'admin'}
-                  onEditTitle={() => handleEditSectionTitle('prime')}
-                />
-                <ContentRow 
-                  title={sectionTitles.hbo} 
-                  items={catalogEligibilityService.filterEligibleItemsSync(animeItems.length > 0 ? animeItems : content.filter(i => i.platform?.includes('Max') || i.platform?.includes('HBO')))} 
-                  isDarkMode={isDarkMode} 
-                  onItemClick={handleSelectContent} 
-                  myList={myList} 
-                  favorites={favorites} 
-                  onToggleFavorite={toggleFavorite} 
-                  onToggleList={toggleMyList} 
-                  isAdmin={currentUser.role === 'admin'}
-                  onEditTitle={() => handleEditSectionTitle('hbo')}
-                />
+                ))}
 
                 {/* Seções Customizadas */}
                 {customSections.map(section => {
@@ -1496,48 +2134,53 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           </ViewWrapper>
         );
       case 'featured': {
-        const displayMovies = (featuredSelection?.featuredMovies || [])
-          .filter(it => !selectedGenre || it.genres?.includes(selectedGenre))
-          .filter(it => !submittedSearchQuery || it.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()));
+        const rawMovies = featuredSelection?.featuredMovies || [];
+        const rawSeries = featuredSelection?.featuredSeries || [];
 
-        const displaySeries = (featuredSelection?.featuredSeries || [])
-          .filter(it => !selectedGenre || it.genres?.includes(selectedGenre))
-          .filter(it => !submittedSearchQuery || it.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()));
+        const eligibleMovies = catalogEligibilityService.filterEligibleItemsSync(
+          deduplicateContentItems(rawMovies.filter(it => searchService.isMovieItem(it)))
+        );
+        const eligibleSeries = catalogEligibilityService.filterEligibleItemsSync(
+          deduplicateContentItems(rawSeries.filter(it => searchService.isSeriesItem(it)))
+        );
+
+        const displayMovies = eligibleMovies
+          .filter(it => !selectedGenre || selectedGenre === 'Todos' || it.genres?.includes(selectedGenre))
+          .filter(it => !submittedSearchQuery || it.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()))
+          .slice(0, 10);
+
+        const displaySeries = eligibleSeries
+          .filter(it => !selectedGenre || selectedGenre === 'Todos' || it.genres?.includes(selectedGenre))
+          .filter(it => !submittedSearchQuery || it.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()))
+          .slice(0, 10);
 
         return (
           <ViewWrapper>
-            <div className="px-4 md:px-12 py-8 pb-32 space-y-12 md:space-y-16">
+            <div className="px-3 sm:px-6 md:px-12 py-6 sm:py-8 pb-32 space-y-8 sm:space-y-12 md:space-y-16 max-w-[2560px] mx-auto">
               {/* Cabeçalho Principal da Página Em Destaque */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-7 pb-4 border-b border-white/10">
-                <div className="flex items-center gap-3 md:gap-5">
-                  <div className="p-2.5 md:p-3.5 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-600/20 border border-amber-500/30 text-amber-400 shadow-lg">
-                    <Flame className="w-8 h-8 md:w-12 md:h-12" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl md:text-5xl font-black tracking-tight text-white">
-                      Em Destaque
-                    </h2>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <GenreDropdown genres={GENRES_LIST} selectedGenre={selectedGenre} onSelect={setSelectedGenre} isDarkMode={isDarkMode} />
+              <div className={`flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 md:gap-7 pb-4 border-b ${isDarkMode ? 'border-white/10' : 'border-black/10'}`}>
+                <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+                  <h2 className={titleClass}>
+                    Em Destaque
+                  </h2>
+                  <GenreDropdown genres={availableGenres} selectedGenre={selectedGenre} onSelect={handleSelectGenre} isDarkMode={isDarkMode} />
                 </div>
               </div>
 
               {/* SEÇÃO 1: FILMES EM DESTAQUE (TOP 10) */}
-              <div className="space-y-4 md:space-y-6">
-                <div className="flex items-center gap-2.5">
-                  <Film className="w-5 h-5 md:w-6 md:h-6 text-[#007df7]" />
-                  <h3 className="text-lg md:text-2xl font-black text-white tracking-tight">
+              <div className="space-y-3 sm:space-y-4 md:space-y-6">
+                <div className="flex items-center gap-2 sm:gap-2.5">
+                  <Film className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-[#007df7]" />
+                  <h3 className="text-base sm:text-lg md:text-2xl font-black text-white tracking-tight">
                     Filmes em Destaque
                   </h3>
                 </div>
 
                 {displayMovies.length > 0 ? (
-                  <div className="grid grid-cols-3 md:grid-cols-5 gap-x-3 gap-y-6 md:gap-x-6 md:gap-y-12">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
                     {displayMovies.map((item, idx) => (
                       <ContentCard 
-                        key={`feat-movie-${item.id}`}
+                        key={`feat-movie-${item.imdbId || item.id}-${idx}`}
                         item={item}
                         rankPosition={idx + 1}
                         isDarkMode={isDarkMode}
@@ -1557,19 +2200,19 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               </div>
 
               {/* SEÇÃO 2: SÉRIES EM DESTAQUE (TOP 10) */}
-              <div className="space-y-4 md:space-y-6">
-                <div className="flex items-center gap-2.5">
-                  <Tv className="w-5 h-5 md:w-6 md:h-6 text-purple-400" />
-                  <h3 className="text-lg md:text-2xl font-black text-white tracking-tight">
+              <div className="space-y-3 sm:space-y-4 md:space-y-6">
+                <div className="flex items-center gap-2 sm:gap-2.5">
+                  <Tv className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-purple-400" />
+                  <h3 className="text-base sm:text-lg md:text-2xl font-black text-white tracking-tight">
                     Séries em Destaque
                   </h3>
                 </div>
 
                 {displaySeries.length > 0 ? (
-                  <div className="grid grid-cols-3 md:grid-cols-5 gap-x-3 gap-y-6 md:gap-x-6 md:gap-y-12">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
                     {displaySeries.map((item, idx) => (
                       <ContentCard 
-                        key={`feat-series-${item.id}`}
+                        key={`feat-series-${item.imdbId || item.id}-${idx}`}
                         item={item}
                         rankPosition={idx + 1}
                         isDarkMode={isDarkMode}
@@ -1595,23 +2238,29 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       case 'series':
       case 'animes':
         return (
-          <ViewWrapper>
-            <div className="px-4 md:px-12 py-8 pb-32">
-              <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-7 mb-8 md:mb-14">
-                <div className="flex items-center gap-3 md:gap-5">
-                  {currentView === 'movies' ? <Film className={iconClass} /> : 
-                   currentView === 'series' ? <Tv className={iconClass} /> : <Sparkles className={iconClass} />}
+          <ViewWrapper key={`view-wrapper-${currentView}`}>
+            <div className="px-3 sm:px-6 md:px-12 py-6 sm:py-8 pb-32 max-w-[2560px] mx-auto">
+              <div className={`flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 md:gap-7 pb-4 mb-6 sm:mb-8 md:mb-12 border-b ${isDarkMode ? 'border-white/10' : 'border-black/10'}`}>
+                <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
                   <h2 className={titleClass}>
                     {currentView === 'movies' ? 'Filmes' : 
                      currentView === 'series' ? 'Séries' : 'Animes'}
                   </h2>
+                  <GenreDropdown genres={availableGenres} selectedGenre={selectedGenre} onSelect={handleSelectGenre} isDarkMode={isDarkMode} />
                 </div>
-                <GenreDropdown genres={GENRES_LIST} selectedGenre={selectedGenre} onSelect={setSelectedGenre} isDarkMode={isDarkMode} />
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <SortDropdown 
+                    selectedSort={currentCategorySort} 
+                    onSelect={handleSelectSort} 
+                    onSelectSort={handleSelectSort} 
+                    isDarkMode={isDarkMode} 
+                  />
+                </div>
               </div>
-              <div className="grid grid-cols-3 md:grid-cols-5 gap-x-3 gap-y-6 md:gap-x-6 md:gap-y-12">
-                {filteredContent.map(item => (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+                {filteredContent.map((item) => (
                   <ContentCard 
-                    key={item.id}
+                    key={`browse-${currentView}-${item.id}`}
                     item={item}
                     isDarkMode={isDarkMode}
                     onItemClick={handleSelectContent}
@@ -1642,14 +2291,13 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       case 'mylist':
         return (
           <ViewWrapper>
-            <div className="px-4 md:px-12 py-8 pb-32">
-              <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-7 mb-8 md:mb-14">
-                <div className="flex items-center gap-3 md:gap-5">
-                  <List className={iconClass} />
+            <div className="px-3 sm:px-6 md:px-12 py-6 sm:py-8 pb-32 max-w-[2560px] mx-auto">
+              <div className={`flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 md:gap-7 pb-4 mb-6 sm:mb-8 md:mb-12 border-b ${isDarkMode ? 'border-white/10' : 'border-black/10'}`}>
+                <div>
                   <h2 className={titleClass}>Minha Lista</h2>
                 </div>
               </div>
-              <div className="grid grid-cols-3 md:grid-cols-5 gap-x-3 gap-y-6 md:gap-x-6 md:gap-y-12">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
                 {catalogEligibilityService.filterEligibleItemsSync(content.filter(i => myList.includes(i.id))).map(item => (
                   <ContentCard 
                     key={item.id}
@@ -1734,6 +2382,22 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       case 'downloads':
         return <ViewWrapper><DownloadsPage isDarkMode={isDarkMode} onSelectItem={handleSelectContent} /></ViewWrapper>;
       case 'help': return <ViewWrapper><HelpView isDarkMode={isDarkMode} onNavigate={setCurrentView} /></ViewWrapper>;
+      case 'actor':
+        return (
+          <ViewWrapper>
+            <ActorView
+              actorId={activeActorId || ''}
+              isDarkMode={isDarkMode}
+              onSelectContent={handleSelectContent}
+              favorites={favorites}
+              myList={myList}
+              toggleFavorite={toggleFavorite}
+              toggleMyList={toggleMyList}
+              activeProfile={activeProfile}
+              onBack={() => navigate(-1)}
+            />
+          </ViewWrapper>
+        );
       case 'notfound':
       default:
         return <ViewWrapper><NotFoundPage isDarkMode={isDarkMode} /></ViewWrapper>;
@@ -1741,7 +2405,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   };
 
   const viewContent = useMemo(() => renderContent(), [
-    currentView, submittedSearchQuery, isDarkMode, favorites, myList, selectedGenre,
+    currentView, submittedSearchQuery, liveSearchActors, activeActorId, isDarkMode, favorites, myList, selectedGenre,
     currentUser, activeProfile, users, content, sectionTitles, customSections,
     filteredContent, trendingItems, popularMovies, popularSeries, animeItems,
     topRatedItems, featuredSelection, continueWatchingList, isLoadingMore,
@@ -1806,6 +2470,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           searchQuery={searchQuery} 
           setSearchQuery={setSearchQuery}
           onSearchSubmit={(q) => {
+            searchHistoryService.addSearch(q);
             setSubmittedSearchQuery(q);
           }}
           onClearSearch={() => {
@@ -1820,7 +2485,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           onOpenDiagnostics={() => setIsDiagnosticModalOpen(true)}
         />
         
-        <ScrollToTop dependency={`${currentView}-${submittedSearchQuery}`} targetRef={scrollContainerRef} />
+        <ScrollToTop 
+          dependency={`${currentView}-${submittedSearchQuery}`} 
+          currentView={currentView}
+          searchQuery={submittedSearchQuery}
+          targetRef={scrollContainerRef} 
+        />
 
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-20 scroll-smooth transform-gpu">
           {isCatalogLoading && trendingItems.length === 0 ? (
@@ -1889,6 +2559,16 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         onClose={() => setIsDiagnosticModalOpen(false)}
         isDarkMode={isDarkMode}
       /></React.Suspense>}
+
+      {/* Modal de Confirmação de Maioridade (+18) e Proteção Parental */}
+      <AgeVerificationModal
+        isOpen={isAgeVerificationOpen}
+        isDarkMode={isDarkMode}
+        profileId={activeProfile?.id}
+        isChild={activeProfile?.isChild}
+        onConfirm={handleConfirmAge}
+        onCancel={handleCancelAge}
+      />
 
       {selectedContent && (
         <React.Suspense fallback={<div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center"><ZapiLoader size="xl" /></div>}><ContentDetailModal

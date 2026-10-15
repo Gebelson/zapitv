@@ -91,64 +91,7 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     ]
   },
 
-  // 3. SÉRIE COMPLETA COM EPISÓDIOS DINÂMICOS
-  {
-    id: 'open-caminandes-s1',
-    title: 'Caminandes (Série de Animação)',
-    type: ContentType.SERIES,
-    rating: 8.4,
-    year: 2016,
-    image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png',
-    backdrop: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png',
-    description: 'Série de animação livre produzida pelo Blender Studio. Acompanha a divertida e teimosa lhama Koro em suas aventuras pelos Andes em busca de comida e superação de obstáculos.',
-    genres: ['Animação', 'Comédia', 'Infantil / Família'],
-    director: 'Pablo Vazquez',
-    cast: ['Koro (A Lhama)', 'Armadillo'],
-    seasonsCount: 1,
-    isFeatured: true,
-    availabilityStatus: 'verified',
-    audioStatus: 'universal', // Trilha sonora universal
-    episodes: [
-      {
-        id: 'caminandes-ep1',
-        number: 1,
-        title: 'Episódio 1: Llama Drama',
-        description: 'Koro tenta desesperadamente atravessar uma estrada deserta na Patagônia enquanto um caminhão se aproxima.',
-        image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png',
-        videoUrl: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/d/d0/Caminandes-_Llama_Drama_-_Short_Movie.ogv/Caminandes-_Llama_Drama_-_Short_Movie.ogv.720p.vp9.webm'
-      },
-      {
-        id: 'caminandes-ep2',
-        number: 2,
-        title: 'Episódio 2: Gran Dillama',
-        description: 'Koro encontra uma cerca aparentemente intransponível para alcançar uma saborosa árvore de maçãs.',
-        image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png',
-        videoUrl: 'https://upload.wikimedia.org/wikipedia/commons/7/7c/Caminandes_-_Gran_Dillama_-_Blender_Foundation%27s_new_Open_Movie.webm'
-      },
-      {
-        id: 'caminandes-ep3',
-        number: 3,
-        title: 'Episódio 3: Llamigos',
-        description: 'No rigoroso inverno patagônico, Koro conhece um pinguim e compete por uma última fruta congelada.',
-        image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png',
-        videoUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/ab/Caminandes_3_-_Llamigos_-_Blender_Animated_Short.webm'
-      }
-    ],
-    verifiedStreams: [
-      {
-        name: 'Episódio 1 (Llama Drama)',
-        title: '[UNIVERSAL] Caminandes - Episódio 1: Llama Drama (720p)',
-        url: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/d/d0/Caminandes-_Llama_Drama_-_Short_Movie.ogv/Caminandes-_Llama_Drama_-_Short_Movie.ogv.720p.vp9.webm',
-        sourceType: 'mp4',
-        isPtBr: true,
-        isDubbed: false,
-        quality: '720p',
-        providerName: 'Blender Open Studio'
-      }
-    ]
-  },
-
-  // 4. PRODUÇÃO NACIONAL HISTÓRICA COM ÁUDIO PT-BR
+  // 3. PRODUÇÃO NACIONAL HISTÓRICA COM ÁUDIO PT-BR
   {
     id: 'open-brasil-hoje',
     title: 'Brasil Hoje: Salvador Histórica',
@@ -217,36 +160,7 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     ]
   },
 
-  // 6. BLENDER OPEN MOVIE 1080p FHD HLS
-  {
-    id: 'open-big-buck-bunny',
-    title: 'Big Buck Bunny (1080p FHD)',
-    type: ContentType.MOVIE,
-    rating: 8.0,
-    year: 2008,
-    image: 'https://upload.wikimedia.org/wikipedia/commons/c/c5/Big_buck_bunny_poster_big.jpg',
-    backdrop: 'https://upload.wikimedia.org/wikipedia/commons/c/c5/Big_buck_bunny_poster_big.jpg',
-    description: 'A clássica e adorada animação aberta da Blender Foundation. Um coelho gigante e tranquilo decide ensinar uma lição inesquecível a três animais travessos da floresta.',
-    genres: ['Animação', 'Comédia', 'Infantil / Família'],
-    director: 'Sacha Goedegebure',
-    imdbId: 'tt1285241',
-    availabilityStatus: 'verified',
-    audioStatus: 'universal',
-    verifiedStreams: [
-      {
-        name: 'Mux HLS 1080p Master',
-        title: '[1080p FHD HLS] Big Buck Bunny - Transmissão Adaptativa Multi-Qualidade',
-        url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-        sourceType: 'hls',
-        isPtBr: true,
-        isDubbed: false,
-        quality: '1080p',
-        providerName: 'Mux Open CDN'
-      }
-    ]
-  },
-
-  // 7. CLÁSSICO DE SUSPENSE EM DOMÍNIO PÚBLICO
+  // 6. CLÁSSICO DE SUSPENSE EM DOMÍNIO PÚBLICO
   {
     id: 'open-charade-1963',
     title: 'Charada (1963)',
@@ -313,8 +227,8 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     type: ContentType.ANIME,
     rating: 7.8,
     year: 2020,
-    image: 'https://image.tmdb.org/t/p/w500/8gVf39h23yW2mQcWJ7rB1N6E2U5.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/original/m8BvQyG1Jm0r4KxG7wY0B9fF7qK.jpg',
+    image: 'https://image.tmdb.org/t/p/w500/ipxOC1C1eFnSlqbB5sTsnA3K38O.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/bzlZwirOq5SDC0bCWAXGBx4XDg9.jpg',
     description: 'Kazushi Sudo é surpreendido por suas amigas de infância, as irmãs Shirakawa, que decidem invadir seu banho. Uma comédia romântica com episódios completos dublados em português brasileiro.',
     genres: ['Animação', 'Comédia', 'Romance'],
     tmdbId: '95897',
@@ -341,8 +255,8 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     type: ContentType.ANIME,
     rating: 7.2,
     year: 2024,
-    image: 'https://image.tmdb.org/t/p/w500/uF5lT7h2R5oK9jZ6vF3mQ8uY2aX.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/original/uF5lT7h2R5oK9jZ6vF3mQ8uY2aX.jpg',
+    image: 'https://image.tmdb.org/t/p/w500/bs70WStsspaiclienWGeMBUDotQ.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/bM4nCynOSA5oCNqLsqb1Fo56sZQ.jpg',
     description: 'Em um mundo onde uma condição misteriosa afeta a humanidade, Kazuki é um dos raros sobreviventes com imunidade especial, tornando-se o centro de todas as atenções na academia.',
     genres: ['Animação', 'Comédia', 'Romance'],
     tmdbId: '241002',
@@ -369,8 +283,8 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     type: ContentType.ANIME,
     rating: 8.2,
     year: 2005,
-    image: 'https://image.tmdb.org/t/p/w500/7I9WvTqW747lC7Z1KqQ0zL2iZ9s.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/original/7I9WvTqW747lC7Z1KqQ0zL2iZ9s.jpg',
+    image: 'https://image.tmdb.org/t/p/w500/jzd80ryL0kTBgvXVLeh01cJdNFv.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/c2oiRa7V3bQzof4wVGzLXtWJ5QU.jpg',
     description: 'Doraemon é um gato robô azul do século XXII enviado de volta no tempo para ajudar Nobita Nobi, um garoto desajeitado e bondoso.',
     genres: ['Animação', 'Comédia', 'Infantil / Família', 'Ficção Científica'],
     tmdbId: '65733',
@@ -397,14 +311,14 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     type: ContentType.ANIME,
     rating: 8.1,
     year: 1979,
-    image: 'https://image.tmdb.org/t/p/w500/7I9WvTqW747lC7Z1KqQ0zL2iZ9s.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/original/7I9WvTqW747lC7Z1KqQ0zL2iZ9s.jpg',
+    image: 'https://image.tmdb.org/t/p/w500/bbn4QLcJfITlAEa0nJDPntsdOgz.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/6oVBODwFvbDJczBFlf4J930jKZg.jpg',
     description: 'A clássica série de animação original de Doraemon que conquistou gerações.',
     genres: ['Animação', 'Comédia', 'Infantil / Família'],
     tmdbId: '57911',
     imdbId: 'tt0069576',
     seasonsCount: 1,
-    availabilityStatus: 'verified',
+    availabilityStatus: 'declared',
     audioStatus: 'other',
     episodes: [
       {
@@ -412,8 +326,7 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
         number: 1,
         title: 'Episódio 1: O Início da Aventura',
         description: 'Doraemon chega ao passado para mudar o destino de Nobita.',
-        image: '',
-        videoUrl: 'https://dn720400.ca.archive.org/0/items/doraemon-2005-001-yojigen-043977-e-2.-720/Doraemon%20%282005%29%20-%20001%20%5BYojigen%5D%5B043977E2%5D.720.mp4'
+        image: ''
       }
     ]
   },
@@ -422,17 +335,18 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
   {
     id: 'anime-bleach-tvmeter',
     title: 'Bleach: Thousand-Year Blood War',
+    originalTitle: 'Bleach: Sennen Kessen-hen',
     type: ContentType.ANIME,
     rating: 9.0,
     year: 2022,
-    image: 'https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY9AcHG2uaj.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/original/m9PHVbC3sC4k9a52lY21P4o2U5.jpg',
+    image: 'https://image.tmdb.org/t/p/w500/dx28DE7EgLy0FatOvnaUg0k9j92.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/o0NsbcIvsllg6CJX0FBFY8wWbsn.jpg',
     description: 'A paz é subitamente quebrada quando as sirenes de alerta ecoam pela Sociedade das Almas.',
     genres: ['Anime', 'Ação', 'Animação', 'Fantasia'],
     tmdbId: '30984',
     imdbId: 'tt0434665',
     seasonsCount: 3,
-    availabilityStatus: 'verified',
+    availabilityStatus: 'declared',
     audioStatus: 'other',
     episodes: [
       {
@@ -440,8 +354,7 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
         number: 1,
         title: 'Episódio 1',
         description: 'O retorno dos Quincies.',
-        image: '',
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+        image: ''
       }
     ]
   },

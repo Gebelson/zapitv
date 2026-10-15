@@ -123,38 +123,15 @@ const ProgramasView: React.FC<ProgramasViewProps> = ({ isDarkMode, initialMode }
   };
 
   return (
-    <div className="px-4 md:px-12 py-8 pb-32 animate-in fade-in duration-500 font-sans">
+    <div className="px-3 sm:px-6 md:px-12 py-6 sm:py-8 pb-32 max-w-[2560px] mx-auto">
       {/* ========================================================================= */}
-      {/* CABEÇALHO OFICIAL COM BOTÃO "TELEVISÃO" E CONTAGEM REAL VALIDADA         */}
+      {/* CABEÇALHO OFICIAL COM LINHA DIVISÓRIA PADRÃO EM DESTAQUE                 */}
       {/* ========================================================================= */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 md:mb-12">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-orange-600/15 border border-orange-600/30 text-orange-500 flex items-center justify-center shrink-0 shadow-lg shadow-orange-600/10">
-              <MonitorPlay className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500" />
-            </div>
-            <div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <h2 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight text-white">
-                  Programas ao Vivo
-                </h2>
-
-                {/* Botão Oficial "Televisão" alinhado verticalmente com o título */}
-                <button
-                  onClick={toggleTelevisionMode}
-                  className={`flex items-center gap-2 px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-black uppercase tracking-wider transition-all duration-300 shadow-xl cursor-pointer ${
-                    preferences.activeMode === 'televisao'
-                      ? 'bg-[#007df7] text-white shadow-[#007df7]/40 ring-2 ring-white/20 scale-105'
-                      : 'bg-white/10 hover:bg-white/20 text-white border border-white/15 hover:border-white/30 hover:scale-105'
-                  }`}
-                  title="Ativar/Desativar Modo Televisão Interativo"
-                >
-                  <Tv className="w-4 h-4 text-white" />
-                  <span>Televisão</span>
-                </button>
-              </div>
-            </div>
-          </div>
+      <div className={`flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 md:gap-7 pb-4 mb-6 sm:mb-8 md:mb-12 border-b ${isDarkMode ? 'border-white/10' : 'border-black/10'}`}>
+        <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+          <h2 className={`text-xl sm:text-2xl md:text-5xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`} style={{ fontFamily: "'Inter', sans-serif" }}>
+            Programas
+          </h2>
         </div>
 
         {/* Barra de Busca de Canais e Programas ao Vivo */}

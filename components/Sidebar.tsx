@@ -69,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       />
 
       <aside className={`${sidebarClasses} ${
-        isMobileMenuOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72 lg:translate-x-0'
+        isMobileMenuOpen ? 'translate-x-0 w-[280px] max-w-[85vw]' : '-translate-x-full w-[280px] max-w-[85vw] lg:translate-x-0'
       } ${
         isCollapsed ? 'lg:w-20' : 'lg:w-64'
       }`}>
@@ -105,10 +105,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Logo clicável que retorna para a Home */}
         <div 
           role="button"
+          tabIndex={0}
           onClick={() => handleNavigate('/', 'home')}
-          className={`pt-4 lg:pt-6 px-6 pb-4 flex items-center cursor-pointer hover:opacity-80 active:scale-95 transition-all group/logo ${isCollapsed ? 'lg:justify-center' : 'gap-3'} relative z-10`}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleNavigate('/', 'home');
+            }
+          }}
+          className={`pt-4 lg:pt-6 px-6 pb-4 flex items-center cursor-pointer select-none group/logo focus-visible:outline-none ${isCollapsed ? 'lg:justify-center' : 'gap-3'} relative z-10`}
         >
-          <div className="w-12 h-10 shrink-0 transition-transform group-hover/logo:scale-110">
+          <div className="w-12 h-10 shrink-0 sidebar-logo-glow flex items-center justify-center">
             <svg id="Camada_1" data-name="Camada 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 374.87 315.93" className="w-full h-full">
               <defs>
                 <linearGradient id="Gradiente_Sidebar_Solid" x1="-657.62" y1="773.63" x2="-322.95" y2="1096.47" gradientTransform="translate(677 -778)" gradientUnits="userSpaceOnUse">
@@ -125,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <div className={`${isCollapsed ? 'lg:hidden' : 'block'} animate-in fade-in slide-in-from-left-2 duration-300`}>
             <h1 
-              className={`text-xl font-bold tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}
+              className={`text-xl font-bold tracking-tight sidebar-text-glow ${isDarkMode ? 'text-white' : 'text-gray-900'}`}
               style={{ fontFamily: "'Sora', sans-serif" }}
             >
               ZAPI<span className="text-blue-500">TV</span>

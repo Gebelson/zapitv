@@ -25,6 +25,7 @@ import { theatricalFilterService } from '../catalog/theatricalFilterService';
 import { catalogEligibilityService } from '../catalog/CatalogEligibilityService';
 import { mediaAvailabilityIndex } from '../catalog/MediaAvailabilityIndex';
 import { VERIFIED_OPEN_ITEMS } from '../catalog/verifiedCatalog';
+import { FEATURED_CATALOG_ITEMS } from '../catalog/featuredCatalogItems';
 import { searchService } from '../search/searchService';
 import { filmesData } from '../../../constants';
 
@@ -437,9 +438,10 @@ class FeaturedRankingService {
         continue;
       }
 
-      // CASO 4: Restrição cinematográfica (Filmes em cartaz nos cinemas brasileiros)
+      // CASO 4: Restrição cinematográfica e obras não lançadas (Filmes em cartaz nos cinemas brasileiros ou sem digital)
       if (rankType === 'movie') {
-        const isTheatricallyAllowed = theatricalFilterService.isMovieAllowedSync(catalogItem);
+        const isSpidermanUnreleased = cand.imdbId.toLowerCase() === 'tt20221436' || (catalogItem.imdbId && catalogItem.imdbId.toLowerCase() === 'tt20221436');
+        const isTheatricallyAllowed = !isSpidermanUnreleased && theatricalFilterService.isMovieAllowedSync(catalogItem);
         if (!isTheatricallyAllowed) {
           audit.push({
             imdbId: cand.imdbId,
@@ -577,7 +579,10 @@ class FeaturedRankingService {
    */
   public recomputeFeaturedSelectionSync(customCatalog?: ContentItem[]): FeaturedSelectionResult {
     const catalogMap = new Map<string, ContentItem>();
-    VERIFIED_OPEN_ITEMS.forEach(it => catalogMap.set(it.id, it));
+    FEATURED_CATALOG_ITEMS.forEach(it => catalogMap.set(it.id, it));
+    VERIFIED_OPEN_ITEMS.forEach(it => {
+      if (!catalogMap.has(it.id)) catalogMap.set(it.id, it);
+    });
     filmesData.forEach(it => {
       if (!catalogMap.has(it.id)) catalogMap.set(it.id, it);
     });

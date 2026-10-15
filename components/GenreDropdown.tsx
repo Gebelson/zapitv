@@ -11,6 +11,7 @@ interface GenreDropdownProps {
 
 const GenreDropdown: React.FC<GenreDropdownProps> = ({ genres, selectedGenre, onSelect, isDarkMode }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,6 +23,18 @@ const GenreDropdown: React.FC<GenreDropdownProps> = ({ genres, selectedGenre, on
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (isOpen && dropdownRef.current) {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      const expectedWidth = typeof window !== 'undefined' && window.innerWidth >= 768 ? 480 : 280;
+      if (rect.left + expectedWidth > window.innerWidth - 16) {
+        setAlignRight(true);
+      } else {
+        setAlignRight(false);
+      }
+    }
+  }, [isOpen]);
 
   return (
     <div className="relative inline-block" ref={dropdownRef}>
@@ -39,7 +52,7 @@ const GenreDropdown: React.FC<GenreDropdownProps> = ({ genres, selectedGenre, on
 
       {isOpen && (
         <div 
-          className={`absolute left-0 mt-2 w-[280px] md:w-[480px] rounded-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-[120] ${
+          className={`absolute ${alignRight ? 'right-0' : 'left-0'} mt-2 w-[280px] md:w-[480px] max-w-[calc(100vw-2rem)] rounded-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-[120] ${
             isDarkMode ? 'bg-black/95 border border-white/10' : 'bg-white/95 border border-black/10'
           } backdrop-blur-2xl`}
         >

@@ -14,9 +14,12 @@
  * - Sugestões rápidas para dropdown com debouncing controlado.
  */
 
-import { ContentItem, ContentType, AppView } from '../../../types';
+import { ContentItem, ContentType, AppView, Profile, ActorPerson } from '../../../types';
 import { tmdbService } from '../tmdb/tmdbClient';
 import { catalogEligibilityService } from '../catalog/CatalogEligibilityService';
+import { catalogReleaseStore } from '../catalog/CatalogReleaseStore';
+import { adultContentService } from '../adult/AdultContentService';
+import { bannedContentRegistry } from '../catalog/BannedContentRegistry';
 
 export type SearchCategory = 'all' | 'movies' | 'series' | 'animes' | 'live';
 
@@ -84,6 +87,7 @@ const LIVE_ACTION_MARKERS = [
 class SearchService {
   private static instance: SearchService;
   private cache = new Map<string, CacheEntry>();
+  private actorCache = new Map<string, { timestamp: number; actors: ActorPerson[] }>();
   private activeAbortController: AbortController | null = null;
 
   private constructor() {}
@@ -166,7 +170,8 @@ class SearchService {
   }
 
   /**
-   * Classificação canônica: item é anime?
+   * Classificação canônica: item é anime (produção de animação japonesa)?
+   * Abrange tanto animes seriados quanto longas-metragens/filmes de anime.
    */
   public isAnimeItem(item: ContentItem): boolean {
     if (!item || !item.title) return false;
@@ -188,21 +193,46 @@ class SearchService {
   }
 
   /**
-   * Classificação canônica: item é filme (não anime)?
+   * Classificação canônica: item é filme de anime (longa-metragem de anime japonês)?
    */
-  public isMovieItem(item: ContentItem): boolean {
+  public isAnimeMovieItem(item: ContentItem): boolean {
+    if (!item || !this.isAnimeItem(item)) return false;
+    return item.mediaFormat === 'movie';
+  }
+
+  /**
+   * Classificação canônica: item é anime seriado (série de TV em anime)?
+   */
+  public isAnimeSeriesItem(item: ContentItem): boolean {
+    if (!item || !this.isAnimeItem(item)) return false;
+    return item.mediaFormat !== 'movie';
+  }
+
+  /**
+   * Classificação canônica: item é filme?
+   * Inclui filmes convencionais e longas-metragens de anime (filmes de anime).
+   * Exclui terminantemente séries de TV e animes seriados.
+   */
+  public isMovieItem(item: ContentItem, includeAnimeMovies = false): boolean {
     if (!item) return false;
-    if (this.isAnimeItem(item)) return false;
-    return item.type === ContentType.MOVIE;
+    const typeStr = String(item.type || '').toUpperCase();
+    if ((item.type === ContentType.SERIES || typeStr === 'SERIES' || typeStr === 'SÉRIE' || typeStr === 'TV') && item.mediaFormat !== 'movie') return false;
+    if (this.isAnimeItem(item)) {
+      return includeAnimeMovies && item.mediaFormat === 'movie';
+    }
+    return item.type === ContentType.MOVIE || typeStr === 'MOVIE' || typeStr === 'FILME' || item.mediaFormat === 'movie';
   }
 
   /**
    * Classificação canônica: item é série de TV convencional (não anime)?
+   * Exclui filmes e qualquer produção de anime.
    */
   public isSeriesItem(item: ContentItem): boolean {
     if (!item) return false;
     if (this.isAnimeItem(item)) return false;
-    return item.type === ContentType.SERIES;
+    if (item.mediaFormat === 'movie') return false;
+    const typeStr = String(item.type || '').toUpperCase();
+    return item.type === ContentType.SERIES || typeStr === 'SERIES' || typeStr === 'SÉRIE' || typeStr === 'TV' || item.mediaFormat === 'series';
   }
 
   /**
@@ -221,7 +251,8 @@ class SearchService {
   public async search(
     query: string, 
     category: SearchCategory, 
-    localCatalog: ContentItem[] = []
+    localCatalog: ContentItem[] = [],
+    userProfile?: Profile | null
   ): Promise<ContentItem[]> {
     const trimmed = query.trim();
     if (!trimmed) {
@@ -229,8 +260,26 @@ class SearchService {
       return [];
     }
 
+    // Bloqueio absoluto para buscas ilegais ou exploração (Regra 5)
+    if (adultContentService.isIllegalOrExploitative(trimmed)) {
+      this.cancelPending();
+      return [];
+    }
+
+    // Bloqueio irrestrito de conteúdos banidos (Big Buck Bunny, Caminandes, etc.)
+    if (bannedContentRegistry.isBannedTitle(trimmed) || bannedContentRegistry.isBannedKeyOrId(trimmed)) {
+      this.cancelPending();
+      return [];
+    }
+
+    const availableTitles = localCatalog ? localCatalog.map(it => it.title) : [];
+    const isIntentionalAdult = adultContentService.isIntentionalAdultSearch(trimmed, availableTitles);
+    const isChildProfile = userProfile ? userProfile.isChild === true : false;
+    // Conteúdos adultos só são liberados com busca intencional direta, sem ser perfil infantil e com maioridade confirmada (+18)
+    const allowAdult = isIntentionalAdult && !isChildProfile && adultContentService.isAgeConfirmed();
+
     const normQuery = trimmed.toLowerCase();
-    const cacheKey = `${category}:${normQuery}`;
+    const cacheKey = `${category}:${normQuery}:${allowAdult ? 'adult' : 'safe'}`;
     const now = Date.now();
 
     // 1. Verifica cache em memória
@@ -282,9 +331,11 @@ class SearchService {
         }
       }
 
-      // 4. Incorpora resultados locais relevantes compatíveis com a categoria
-      if (localCatalog && localCatalog.length > 0) {
-        const localMatches = this.filterLocalCatalog(trimmed, category, localCatalog);
+      // 4. Incorpora resultados locais e lançamentos aprovados compatíveis com a categoria
+      const releases = catalogReleaseStore.getReleases();
+      const combinedLocal = [...(localCatalog || []), ...releases];
+      if (combinedLocal.length > 0) {
+        const localMatches = this.filterLocalCatalog(trimmed, category, combinedLocal, userProfile);
         const existingTitles = new Set(rawResults.map(r => r.title.toLowerCase().trim()));
         for (const loc of localMatches) {
           if (!existingTitles.has(loc.title.toLowerCase().trim())) {
@@ -294,8 +345,16 @@ class SearchService {
         }
       }
 
-      // 5. Filtro central de elegibilidade pública e reprodução real
-      const eligible = catalogEligibilityService.filterEligibleItemsSync(rawResults);
+      // 5. Isolamento e filtragem de conteúdo adulto por padrão
+      if (!allowAdult) {
+        rawResults = rawResults.filter(it => !adultContentService.isAdultContent(it));
+      }
+
+      // 5.5 Eliminação estrita de conteúdos banidos (Big Buck Bunny, Caminandes, etc.)
+      rawResults = bannedContentRegistry.filterCleanItems(rawResults);
+
+      // 6. Filtro central de elegibilidade pública e reprodução real
+      const eligible = catalogEligibilityService.filterEligibleItemsSync(rawResults, { allowAdult });
 
       // Salva no cache contextual
       this.cache.set(cacheKey, {
@@ -310,8 +369,8 @@ class SearchService {
       }
       console.warn(`[SearchService] Erro na busca (${category}):`, e);
       // Fallback local estritamente dentro da categoria
-      const localFallback = this.filterLocalCatalog(trimmed, category, localCatalog);
-      return catalogEligibilityService.filterEligibleItemsSync(localFallback);
+      const localFallback = this.filterLocalCatalog(trimmed, category, localCatalog, userProfile);
+      return catalogEligibilityService.filterEligibleItemsSync(localFallback, { allowAdult });
     } finally {
       if (this.activeAbortController === controller) {
         this.activeAbortController = null;
@@ -320,17 +379,36 @@ class SearchService {
   }
 
   /**
-   * Filtra o acervo local em memória respeitando rigorosamente a categoria
+   * Filtra o acervo local em memória respeitando rigorosamente a categoria e proteção adulta
    */
   public filterLocalCatalog(
     query: string, 
     category: SearchCategory, 
-    items: ContentItem[]
+    items: ContentItem[],
+    userProfile?: Profile | null
   ): ContentItem[] {
     if (!items || items.length === 0) return [];
     const norm = query.toLowerCase().trim();
 
+    if (adultContentService.isIllegalOrExploitative(norm)) {
+      return [];
+    }
+
+    const availableTitles = items.map(it => it.title);
+    const isIntentionalAdult = adultContentService.isIntentionalAdultSearch(norm, availableTitles);
+    const isChildProfile = userProfile ? userProfile.isChild === true : false;
+    const allowAdult = isIntentionalAdult && !isChildProfile && adultContentService.isAgeConfirmed();
+
     return items.filter(item => {
+      // Bloqueio irrestrito de conteúdos banidos
+      if (bannedContentRegistry.isBanned(item)) {
+        return false;
+      }
+
+      // Isolamento por padrão: oculta adultos se não for busca intencional autorizada
+      const isAdult = adultContentService.isAdultContent(item);
+      if (isAdult && !allowAdult) return false;
+
       // 1. Match de texto
       const titleMatch = item.title?.toLowerCase().includes(norm) ||
         (item.originalTitle && item.originalTitle.toLowerCase().includes(norm));
@@ -366,10 +444,56 @@ class SearchService {
   }
 
   /**
+   * Pesquisa atores e atrizes com cache em memória
+   */
+  public async searchPersons(query: string, signal?: AbortSignal): Promise<ActorPerson[]> {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) return [];
+
+    const normKey = trimmed.toLowerCase();
+    const now = Date.now();
+    const cached = this.actorCache.get(normKey);
+    if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
+      return cached.actors;
+    }
+
+    const actors = await tmdbService.searchPersons(trimmed, signal);
+    this.actorCache.set(normKey, { timestamp: now, actors });
+    return actors;
+  }
+
+  /**
+   * Fornece sugestões completas de busca contendo produções (filmes/séries) e pessoas (atores/atrizes)
+   */
+  public async getSearchSuggestionsWithActors(
+    query: string,
+    category: SearchCategory,
+    limit = 6,
+    localCatalog: ContentItem[] = []
+  ): Promise<{ items: ContentItem[]; actors: ActorPerson[] }> {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      return { items: [], actors: [] };
+    }
+
+    const [items, allActors] = await Promise.all([
+      this.getSuggestions(trimmed, category, limit, localCatalog),
+      this.searchPersons(trimmed)
+    ]);
+
+    // Retorna até 3 atores mais relevantes com foto e títulos conhecidos
+    return {
+      items,
+      actors: allActors.slice(0, 3)
+    };
+  }
+
+  /**
    * Limpa o cache de busca
    */
   public clearCache(): void {
     this.cache.clear();
+    this.actorCache.clear();
   }
 }
 

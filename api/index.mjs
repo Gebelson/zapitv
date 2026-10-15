@@ -1,8 +1,8 @@
 // server.ts
 import express from "express";
-import path2 from "path";
+import path4 from "path";
 import { fileURLToPath } from "url";
-import fs2 from "fs";
+import fs4 from "fs";
 
 // src/core/catalog/verifiedCatalog.ts
 var VERIFIED_OPEN_ITEMS = [
@@ -90,64 +90,7 @@ var VERIFIED_OPEN_ITEMS = [
       }
     ]
   },
-  // 3. SÉRIE COMPLETA COM EPISÓDIOS DINÂMICOS
-  {
-    id: "open-caminandes-s1",
-    title: "Caminandes (S\xE9rie de Anima\xE7\xE3o)",
-    type: "S\xC9RIE" /* SERIES */,
-    rating: 8.4,
-    year: 2016,
-    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png",
-    backdrop: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png",
-    description: "S\xE9rie de anima\xE7\xE3o livre produzida pelo Blender Studio. Acompanha a divertida e teimosa lhama Koro em suas aventuras pelos Andes em busca de comida e supera\xE7\xE3o de obst\xE1culos.",
-    genres: ["Anima\xE7\xE3o", "Com\xE9dia", "Infantil / Fam\xEDlia"],
-    director: "Pablo Vazquez",
-    cast: ["Koro (A Lhama)", "Armadillo"],
-    seasonsCount: 1,
-    isFeatured: true,
-    availabilityStatus: "verified",
-    audioStatus: "universal",
-    // Trilha sonora universal
-    episodes: [
-      {
-        id: "caminandes-ep1",
-        number: 1,
-        title: "Epis\xF3dio 1: Llama Drama",
-        description: "Koro tenta desesperadamente atravessar uma estrada deserta na Patag\xF4nia enquanto um caminh\xE3o se aproxima.",
-        image: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png",
-        videoUrl: "https://upload.wikimedia.org/wikipedia/commons/transcoded/d/d0/Caminandes-_Llama_Drama_-_Short_Movie.ogv/Caminandes-_Llama_Drama_-_Short_Movie.ogv.720p.vp9.webm"
-      },
-      {
-        id: "caminandes-ep2",
-        number: 2,
-        title: "Epis\xF3dio 2: Gran Dillama",
-        description: "Koro encontra uma cerca aparentemente intranspon\xEDvel para alcan\xE7ar uma saborosa \xE1rvore de ma\xE7\xE3s.",
-        image: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png",
-        videoUrl: "https://upload.wikimedia.org/wikipedia/commons/7/7c/Caminandes_-_Gran_Dillama_-_Blender_Foundation%27s_new_Open_Movie.webm"
-      },
-      {
-        id: "caminandes-ep3",
-        number: 3,
-        title: "Epis\xF3dio 3: Llamigos",
-        description: "No rigoroso inverno patag\xF4nico, Koro conhece um pinguim e compete por uma \xFAltima fruta congelada.",
-        image: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Caminandes_gran_dillama.png/1280px-Caminandes_gran_dillama.png",
-        videoUrl: "https://upload.wikimedia.org/wikipedia/commons/a/ab/Caminandes_3_-_Llamigos_-_Blender_Animated_Short.webm"
-      }
-    ],
-    verifiedStreams: [
-      {
-        name: "Epis\xF3dio 1 (Llama Drama)",
-        title: "[UNIVERSAL] Caminandes - Epis\xF3dio 1: Llama Drama (720p)",
-        url: "https://upload.wikimedia.org/wikipedia/commons/transcoded/d/d0/Caminandes-_Llama_Drama_-_Short_Movie.ogv/Caminandes-_Llama_Drama_-_Short_Movie.ogv.720p.vp9.webm",
-        sourceType: "mp4",
-        isPtBr: true,
-        isDubbed: false,
-        quality: "720p",
-        providerName: "Blender Open Studio"
-      }
-    ]
-  },
-  // 4. PRODUÇÃO NACIONAL HISTÓRICA COM ÁUDIO PT-BR
+  // 3. PRODUÇÃO NACIONAL HISTÓRICA COM ÁUDIO PT-BR
   {
     id: "open-brasil-hoje",
     title: "Brasil Hoje: Salvador Hist\xF3rica",
@@ -214,35 +157,7 @@ var VERIFIED_OPEN_ITEMS = [
       }
     ]
   },
-  // 6. BLENDER OPEN MOVIE 1080p FHD HLS
-  {
-    id: "open-big-buck-bunny",
-    title: "Big Buck Bunny (1080p FHD)",
-    type: "FILME" /* MOVIE */,
-    rating: 8,
-    year: 2008,
-    image: "https://upload.wikimedia.org/wikipedia/commons/c/c5/Big_buck_bunny_poster_big.jpg",
-    backdrop: "https://upload.wikimedia.org/wikipedia/commons/c/c5/Big_buck_bunny_poster_big.jpg",
-    description: "A cl\xE1ssica e adorada anima\xE7\xE3o aberta da Blender Foundation. Um coelho gigante e tranquilo decide ensinar uma li\xE7\xE3o inesquec\xEDvel a tr\xEAs animais travessos da floresta.",
-    genres: ["Anima\xE7\xE3o", "Com\xE9dia", "Infantil / Fam\xEDlia"],
-    director: "Sacha Goedegebure",
-    imdbId: "tt1285241",
-    availabilityStatus: "verified",
-    audioStatus: "universal",
-    verifiedStreams: [
-      {
-        name: "Mux HLS 1080p Master",
-        title: "[1080p FHD HLS] Big Buck Bunny - Transmiss\xE3o Adaptativa Multi-Qualidade",
-        url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-        sourceType: "hls",
-        isPtBr: true,
-        isDubbed: false,
-        quality: "1080p",
-        providerName: "Mux Open CDN"
-      }
-    ]
-  },
-  // 7. CLÁSSICO DE SUSPENSE EM DOMÍNIO PÚBLICO
+  // 6. CLÁSSICO DE SUSPENSE EM DOMÍNIO PÚBLICO
   {
     id: "open-charade-1963",
     title: "Charada (1963)",
@@ -307,8 +222,8 @@ var VERIFIED_OPEN_ITEMS = [
     type: "ANIME" /* ANIME */,
     rating: 7.8,
     year: 2020,
-    image: "https://image.tmdb.org/t/p/w500/8gVf39h23yW2mQcWJ7rB1N6E2U5.jpg",
-    backdrop: "https://image.tmdb.org/t/p/original/m8BvQyG1Jm0r4KxG7wY0B9fF7qK.jpg",
+    image: "https://image.tmdb.org/t/p/w500/ipxOC1C1eFnSlqbB5sTsnA3K38O.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/bzlZwirOq5SDC0bCWAXGBx4XDg9.jpg",
     description: "Kazushi Sudo \xE9 surpreendido por suas amigas de inf\xE2ncia, as irm\xE3s Shirakawa, que decidem invadir seu banho. Uma com\xE9dia rom\xE2ntica com epis\xF3dios completos dublados em portugu\xEAs brasileiro.",
     genres: ["Anima\xE7\xE3o", "Com\xE9dia", "Romance"],
     tmdbId: "95897",
@@ -334,8 +249,8 @@ var VERIFIED_OPEN_ITEMS = [
     type: "ANIME" /* ANIME */,
     rating: 7.2,
     year: 2024,
-    image: "https://image.tmdb.org/t/p/w500/uF5lT7h2R5oK9jZ6vF3mQ8uY2aX.jpg",
-    backdrop: "https://image.tmdb.org/t/p/original/uF5lT7h2R5oK9jZ6vF3mQ8uY2aX.jpg",
+    image: "https://image.tmdb.org/t/p/w500/bs70WStsspaiclienWGeMBUDotQ.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/bM4nCynOSA5oCNqLsqb1Fo56sZQ.jpg",
     description: "Em um mundo onde uma condi\xE7\xE3o misteriosa afeta a humanidade, Kazuki \xE9 um dos raros sobreviventes com imunidade especial, tornando-se o centro de todas as aten\xE7\xF5es na academia.",
     genres: ["Anima\xE7\xE3o", "Com\xE9dia", "Romance"],
     tmdbId: "241002",
@@ -361,8 +276,8 @@ var VERIFIED_OPEN_ITEMS = [
     type: "ANIME" /* ANIME */,
     rating: 8.2,
     year: 2005,
-    image: "https://image.tmdb.org/t/p/w500/7I9WvTqW747lC7Z1KqQ0zL2iZ9s.jpg",
-    backdrop: "https://image.tmdb.org/t/p/original/7I9WvTqW747lC7Z1KqQ0zL2iZ9s.jpg",
+    image: "https://image.tmdb.org/t/p/w500/jzd80ryL0kTBgvXVLeh01cJdNFv.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/c2oiRa7V3bQzof4wVGzLXtWJ5QU.jpg",
     description: "Doraemon \xE9 um gato rob\xF4 azul do s\xE9culo XXII enviado de volta no tempo para ajudar Nobita Nobi, um garoto desajeitado e bondoso.",
     genres: ["Anima\xE7\xE3o", "Com\xE9dia", "Infantil / Fam\xEDlia", "Fic\xE7\xE3o Cient\xEDfica"],
     tmdbId: "65733",
@@ -388,14 +303,14 @@ var VERIFIED_OPEN_ITEMS = [
     type: "ANIME" /* ANIME */,
     rating: 8.1,
     year: 1979,
-    image: "https://image.tmdb.org/t/p/w500/7I9WvTqW747lC7Z1KqQ0zL2iZ9s.jpg",
-    backdrop: "https://image.tmdb.org/t/p/original/7I9WvTqW747lC7Z1KqQ0zL2iZ9s.jpg",
+    image: "https://image.tmdb.org/t/p/w500/bbn4QLcJfITlAEa0nJDPntsdOgz.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/6oVBODwFvbDJczBFlf4J930jKZg.jpg",
     description: "A cl\xE1ssica s\xE9rie de anima\xE7\xE3o original de Doraemon que conquistou gera\xE7\xF5es.",
     genres: ["Anima\xE7\xE3o", "Com\xE9dia", "Infantil / Fam\xEDlia"],
     tmdbId: "57911",
     imdbId: "tt0069576",
     seasonsCount: 1,
-    availabilityStatus: "verified",
+    availabilityStatus: "declared",
     audioStatus: "other",
     episodes: [
       {
@@ -403,8 +318,7 @@ var VERIFIED_OPEN_ITEMS = [
         number: 1,
         title: "Epis\xF3dio 1: O In\xEDcio da Aventura",
         description: "Doraemon chega ao passado para mudar o destino de Nobita.",
-        image: "",
-        videoUrl: "https://dn720400.ca.archive.org/0/items/doraemon-2005-001-yojigen-043977-e-2.-720/Doraemon%20%282005%29%20-%20001%20%5BYojigen%5D%5B043977E2%5D.720.mp4"
+        image: ""
       }
     ]
   },
@@ -412,17 +326,18 @@ var VERIFIED_OPEN_ITEMS = [
   {
     id: "anime-bleach-tvmeter",
     title: "Bleach: Thousand-Year Blood War",
+    originalTitle: "Bleach: Sennen Kessen-hen",
     type: "ANIME" /* ANIME */,
     rating: 9,
     year: 2022,
-    image: "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY9AcHG2uaj.jpg",
-    backdrop: "https://image.tmdb.org/t/p/original/m9PHVbC3sC4k9a52lY21P4o2U5.jpg",
+    image: "https://image.tmdb.org/t/p/w500/dx28DE7EgLy0FatOvnaUg0k9j92.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/o0NsbcIvsllg6CJX0FBFY8wWbsn.jpg",
     description: "A paz \xE9 subitamente quebrada quando as sirenes de alerta ecoam pela Sociedade das Almas.",
     genres: ["Anime", "A\xE7\xE3o", "Anima\xE7\xE3o", "Fantasia"],
     tmdbId: "30984",
     imdbId: "tt0434665",
     seasonsCount: 3,
-    availabilityStatus: "verified",
+    availabilityStatus: "declared",
     audioStatus: "other",
     episodes: [
       {
@@ -430,8 +345,7 @@ var VERIFIED_OPEN_ITEMS = [
         number: 1,
         title: "Epis\xF3dio 1",
         description: "O retorno dos Quincies.",
-        image: "",
-        videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+        image: ""
       }
     ]
   },
@@ -460,8 +374,8 @@ var VERIFIED_OPEN_ITEMS = [
 
 // src/core/audio/audioPreferenceService.ts
 var DUAL_PATTERNS = [
-  /\b(dual[-_]?audio|dual[-_]?áudio|multi[-_]?audio|multi[-_]?áudio)\b/i,
-  /\[dual[-_]?audio\]/i,
+  /\b(dual[-_\s]?audio|dual[-_\s]?áudio|multi[-_\s]?audio|multi[-_\s]?áudio)\b/i,
+  /\[dual[-_\s]?audio\]/i,
   /\[dual\]/i,
   /\bdual\b(?!\s*[-_]?sub)/i,
   /\bdual\s*latino\b/i
@@ -471,15 +385,16 @@ var DUBBED_PTBR_PATTERNS = [
   /\b(dublado|dublada|dublados|audio\s*pt|áudio\s*pt|audio\s*pt[-_]?br|áudio\s*pt[-_]?br|brazuca|nacional)\b/i,
   /\[dublado\]/i,
   /\[dub\]/i,
-  /\b(dub\b|\/dub\/)/i,
-  /\b(fhd[-_]?dub|hd[-_]?dub|web[-_]?dl[-_]?dub)\b/i,
+  /\b(fhd[-_]?dublado|hd[-_]?dublado|web[-_]?dl[-_]?dublado)\b/i,
   /🇧🇷\s*dublado/i,
-  /\b(comando|bludv|mico[-_]?le[aã]o|lapumia|rede[-_]?canais|redecanais|wolverdon)\b/i
+  /🇧🇷.*?(dublado|dual|áudio|audio)/i,
+  /\b(dublagem\s*brasileira)\b/i
 ];
 var PTBR_GENERAL_PATTERNS = [
   /\b(pt[-_]?br|portugu[eê]s[-_]?br|portugu[eê]s)\b/i,
   /\[pt[-_]?br\]/i,
-  /\b(pob|por)\b/i
+  /\b(pob|por)\b/i,
+  /🇧🇷/
 ];
 var SUBTITLED_ONLY_PATTERNS = [
   /\b(legendado|legendada|leg\b|subs?|softsubs?|hardsubs?|hardcoded|legenda[-_]?fixa|legenda[-_]?embutida|legenda[-_]?gravada)\b/i,
@@ -503,16 +418,12 @@ var AudioPreferenceService = class {
    */
   analyzeAudio(stream) {
     const combinedText = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""}`.toLowerCase();
-    const providerName = (stream.providerName || "").toLowerCase();
-    const providerId = (stream.providerId || "").toLowerCase();
     const isDualAudio = DUAL_PATTERNS.some((p) => p.test(combinedText));
-    const isVerifiedBrazilianProvider = providerId === "zapitv-verified" || providerName.includes("zapitv verificado") || providerName.includes("acervo zapitv") || providerName.includes("cinema aberto") || providerName.includes("mico-le\xE3o") || providerName.includes("micoleao");
     const hasDubbedPattern = DUBBED_PTBR_PATTERNS.some((p) => p.test(combinedText));
     const hasPtBrGeneral = PTBR_GENERAL_PATTERNS.some((p) => p.test(combinedText));
     const isExplicitlySubtitledOnly = SUBTITLED_ONLY_PATTERNS.some((p) => p.test(combinedText)) && !hasDubbedPattern && !isDualAudio;
-    const declaredDubbed = Boolean(stream.isDubbed);
-    const declaredPtBr = Boolean(stream.isPtBr);
-    if (isDualAudio && (hasPtBrGeneral || hasDubbedPattern || declaredPtBr || declaredDubbed || isVerifiedBrazilianProvider || !isExplicitlySubtitledOnly)) {
+    const explicitlyBrazilian = hasDubbedPattern || hasPtBrGeneral || /\b(pt[-_]?br|pob|por[-_]?br|brazilian)\b/i.test(combinedText);
+    if (isDualAudio && explicitlyBrazilian && !isExplicitlySubtitledOnly) {
       return {
         tier: "dual_audio",
         isPtBr: true,
@@ -523,7 +434,7 @@ var AudioPreferenceService = class {
         reason: "Dual \xC1udio com faixa PT-BR detectada"
       };
     }
-    if (declaredDubbed || hasDubbedPattern || isVerifiedBrazilianProvider || declaredPtBr && !isExplicitlySubtitledOnly || hasPtBrGeneral && !isExplicitlySubtitledOnly) {
+    if (!isExplicitlySubtitledOnly && !/\b(latino|espa[nñ]ol|espanhol|castellano|pt[-_]?pt)\b/i.test(combinedText) && (hasDubbedPattern || explicitlyBrazilian && stream.isDubbed === true)) {
       return {
         tier: "dubbed_ptbr",
         isPtBr: true,
@@ -583,6 +494,189 @@ var AudioPreferenceService = class {
   }
 };
 var audioPreferenceService = new AudioPreferenceService();
+
+// src/core/audio/audioCodecService.ts
+var AudioCodecService = class {
+  constructor() {
+    this.cachedCapabilities = null;
+  }
+  /**
+   * Detecta com precisão a capacidade do navegador e dispositivo atual de decodificar codecs de áudio.
+   */
+  getCapabilities() {
+    if (this.cachedCapabilities) {
+      return this.cachedCapabilities;
+    }
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      this.cachedCapabilities = {
+        aac: true,
+        opus: true,
+        mp3: true,
+        ac3: true,
+        eac3: true,
+        dts: true,
+        flac: true,
+        browserName: "other"
+      };
+      return this.cachedCapabilities;
+    }
+    const ua = (navigator.userAgent || "").toLowerCase();
+    let browserName = "other";
+    if (/smart-tv|tizen|webos|viera|bravia/i.test(ua)) browserName = "smart-tv";
+    else if (/edg\//i.test(ua)) browserName = "edge";
+    else if (/chrome|crios/i.test(ua) && !/edg\//i.test(ua)) browserName = "chrome";
+    else if (/firefox|fxios/i.test(ua)) browserName = "firefox";
+    else if (/safari/i.test(ua) && !/chrome|crios/i.test(ua)) browserName = "safari";
+    else if (/mobile|android|iphone|ipad/i.test(ua)) browserName = "mobile";
+    let canPlay = (mimeType) => {
+      try {
+        const v = document.createElement("video");
+        const res = v.canPlayType(mimeType);
+        return res === "probably" || res === "maybe";
+      } catch {
+        return false;
+      }
+    };
+    const aac = canPlay('audio/mp4; codecs="mp4a.40.2"') || canPlay('video/mp4; codecs="mp4a.40.2"') || true;
+    const opus = canPlay('audio/webm; codecs="opus"') || canPlay('audio/mp4; codecs="opus"');
+    const mp3 = canPlay("audio/mpeg") || canPlay('audio/mp4; codecs="mp3"');
+    const ac3 = canPlay('audio/mp4; codecs="ac-3"') || canPlay('audio/mp4; codecs="mp4a.a5"') || canPlay('video/mp4; codecs="ac-3"');
+    const eac3 = canPlay('audio/mp4; codecs="ec-3"') || canPlay('audio/mp4; codecs="mp4a.a6"') || canPlay('video/mp4; codecs="ec-3"');
+    const dts = canPlay('audio/mp4; codecs="dts"') || canPlay('audio/mp4; codecs="dts-"');
+    const flac = canPlay("audio/flac") || canPlay('audio/mp4; codecs="flac"');
+    this.cachedCapabilities = {
+      aac,
+      opus,
+      mp3,
+      ac3,
+      eac3,
+      dts,
+      flac,
+      browserName
+    };
+    return this.cachedCapabilities;
+  }
+  /**
+   * Inspeciona títulos, nomes e tags de um stream para identificar os codecs de áudio presentes.
+   */
+  inspectStreamCodecs(stream) {
+    const text = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""} ${stream.url || ""}`.toLowerCase();
+    const caps = this.getCapabilities();
+    const foundCodecs = [];
+    if (/\b(e-?ac-?3|ddp|dd\+|dolby\s*digital\s*plus|atmos)\b/i.test(text)) {
+      foundCodecs.push("eac3");
+    }
+    if (/\b(ac-?3|dd\s*5\.1|dolby\s*digital)\b/i.test(text)) {
+      foundCodecs.push("ac3");
+    }
+    if (/\b(dts(-?hd)?|truehd)\b/i.test(text)) {
+      foundCodecs.push("dts");
+    }
+    if (/\b(opus|vorbis)\b/i.test(text)) {
+      foundCodecs.push("opus");
+    }
+    if (/\b(aac|aac[-_]?2\.0|aac[-_]?5\.1|mp4a)\b/i.test(text)) {
+      foundCodecs.push("aac");
+    }
+    if (/\b(flac)\b/i.test(text)) {
+      foundCodecs.push("flac");
+    }
+    if (/\b(mp3)\b/i.test(text)) {
+      foundCodecs.push("mp3");
+    }
+    const isHls = stream.url?.includes(".m3u8") || stream.sourceType === "hls";
+    const isDirectMp4 = stream.url?.includes(".mp4") || stream.sourceType === "mp4";
+    if (foundCodecs.length === 0) {
+      if (isHls || isDirectMp4) {
+        foundCodecs.push("aac");
+      } else {
+        foundCodecs.push("unknown");
+      }
+    }
+    const primaryCodec = foundCodecs[0] || "aac";
+    const isUniversal = primaryCodec === "aac" || primaryCodec === "mp3" || primaryCodec === "opus";
+    let isCompatible = true;
+    let reason = "Codec universalmente suportado";
+    if (primaryCodec === "eac3") {
+      isCompatible = caps.eac3;
+      reason = caps.eac3 ? "Dolby Digital Plus (E-AC3) suportado nativamente pelo dispositivo" : "Incompat\xEDvel: Dispositivo/navegador n\xE3o suporta Dolby Digital Plus (E-AC3)";
+    } else if (primaryCodec === "ac3") {
+      isCompatible = caps.ac3;
+      reason = caps.ac3 ? "Dolby Digital (AC3) suportado nativamente pelo dispositivo" : "Incompat\xEDvel: Dispositivo/navegador n\xE3o suporta \xE1udio Dolby Digital (AC3)";
+    } else if (primaryCodec === "dts") {
+      isCompatible = caps.dts;
+      reason = caps.dts ? "DTS suportado nativamente" : "Incompat\xEDvel: Navegador sem decodificador para trilha DTS";
+    } else if (primaryCodec === "opus") {
+      isCompatible = caps.opus;
+      reason = caps.opus ? "Opus suportado" : "Opus incompat\xEDvel";
+    } else if (primaryCodec === "flac") {
+      isCompatible = caps.flac;
+      reason = caps.flac ? "FLAC suportado" : "FLAC incompat\xEDvel";
+    }
+    return {
+      codecs: foundCodecs,
+      primaryCodec,
+      isCompatible,
+      isUniversal,
+      confidence: primaryCodec === "unknown" ? 0.6 : 0.95,
+      reason
+    };
+  }
+  /**
+   * Retorna um modificador de pontuação para o ranqueamento de fontes:
+   * - Bônus para fontes com áudio comprovadamente compatível com este cliente.
+   * - Penalidade severa para codecs que causam vídeo mudo neste navegador específico.
+   */
+  getAudioCodecScore(stream) {
+    const info = this.inspectStreamCodecs(stream);
+    if (!info.isCompatible) {
+      return {
+        bonus: -7e4,
+        explanation: `\u26A0\uFE0F CODEC INCOMPAT\xCDVEL: ${info.reason}`
+      };
+    }
+    if (info.isUniversal) {
+      return {
+        bonus: 4e3,
+        explanation: `\u{1F50A} \xC1udio Universal (${info.primaryCodec.toUpperCase()})`
+      };
+    }
+    return {
+      bonus: 2e3,
+      explanation: `\u{1F50A} \xC1udio Compat\xEDvel (${info.primaryCodec.toUpperCase()})`
+    };
+  }
+  /**
+   * Verifica se um codec específico é suportado pelo dispositivo atual.
+   */
+  isCodecSupported(codec) {
+    const caps = this.getCapabilities();
+    const c = (codec || "").toLowerCase();
+    if (c === "aac" || c === "mp4a") return caps.aac;
+    if (c === "opus") return caps.opus;
+    if (c === "mp3") return caps.mp3;
+    if (c === "ac3" || c === "ac-3") return caps.ac3;
+    if (c === "eac3" || c === "ec-3" || c === "atmos") return caps.eac3;
+    if (c === "dts") return caps.dts;
+    if (c === "flac") return caps.flac;
+    return true;
+  }
+  /**
+   * Determina se existe pelo menos uma fonte com codec de áudio compatível na lista.
+   */
+  hasCompatibleAudio(streams) {
+    if (!streams || streams.length === 0) return false;
+    return streams.some((s) => this.inspectStreamCodecs(s).isCompatible);
+  }
+  /**
+   * Retorna um identificador da capacidade do dispositivo para incluir na chave de cache de seleção.
+   */
+  getDeviceCacheKey() {
+    const caps = this.getCapabilities();
+    return `dev_${caps.browserName}_ac3${caps.ac3 ? 1 : 0}_eac3${caps.eac3 ? 1 : 0}`;
+  }
+};
+var audioCodecService = new AudioCodecService();
 
 // src/core/subtitles/subtitlePreferenceService.ts
 var CLEAN_PATTERNS = [
@@ -718,7 +812,7 @@ var GENRE_MAP = {
   10768: "Guerra e Pol\xEDtica"
 };
 function formatContentItem(raw, forcedType) {
-  const isMovie = forcedType ? forcedType === "FILME" /* MOVIE */ : raw.media_type === "movie" || Boolean(raw.title && !raw.name);
+  const isMovie = forcedType === "FILME" /* MOVIE */ || forcedType !== "S\xC9RIE" /* SERIES */ && (raw.media_type === "movie" || Boolean(raw.title && !raw.name));
   const isAnime = raw.original_language === "ja" && (raw.genre_ids?.includes(16) || raw.genres?.some((g) => g.id === 16));
   const type = isAnime ? "ANIME" /* ANIME */ : isMovie ? "FILME" /* MOVIE */ : "S\xC9RIE" /* SERIES */;
   const title = raw.title || raw.name || "Sem T\xEDtulo";
@@ -735,13 +829,18 @@ function formatContentItem(raw, forcedType) {
   if (isAnime && !genres.includes("Anime")) {
     genres.push("Anime");
   }
-  const poster = raw.poster_path ? `${TMDB_IMAGE_BASE}${raw.poster_path}` : "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500";
-  const backdrop = raw.backdrop_path ? `${TMDB_BACKDROP_BASE}${raw.backdrop_path}` : poster;
+  const isAdult = Boolean(raw.adult === true || genres.some((g) => g.toLowerCase() === "adult" || g.toLowerCase() === "adulto" || g.toLowerCase() === "hentai"));
+  if (isAdult && !genres.includes("Adulto")) {
+    genres.push("Adulto");
+  }
+  const poster = raw.poster_path ? `${TMDB_IMAGE_BASE}${raw.poster_path}` : "";
+  const backdrop = raw.backdrop_path ? `${TMDB_BACKDROP_BASE}${raw.backdrop_path}` : poster || "";
   return {
     id: `tmdb-${raw.id}`,
     tmdbId: String(raw.id),
     title,
     type,
+    mediaFormat: isMovie ? "movie" : "series",
     rating: raw.vote_average ? Number(raw.vote_average.toFixed(1)) : 8,
     year: isNaN(year) ? 2024 : year,
     image: poster,
@@ -750,7 +849,8 @@ function formatContentItem(raw, forcedType) {
     genres,
     isFeatured: (raw.vote_average || 0) > 7.5,
     releaseDate: yearStr ? yearStr.slice(0, 10) : void 0,
-    originalTitle: raw.original_title || raw.original_name
+    originalTitle: raw.original_title || raw.original_name,
+    isAdult
   };
 }
 function formatCinemetaItem(raw) {
@@ -758,20 +858,37 @@ function formatCinemetaItem(raw) {
   const type = isMovie ? "FILME" /* MOVIE */ : "S\xC9RIE" /* SERIES */;
   const yearNum = Number(raw.releaseInfo || raw.year || 2024);
   const ratingNum = raw.imdbRating ? parseFloat(raw.imdbRating) : 8;
+  const rawGenres = raw.genres && raw.genres.length > 0 ? [...raw.genres] : ["Geral"];
+  const isAdult = rawGenres.some((g) => {
+    const norm = g.toLowerCase().trim();
+    return norm === "adult" || norm === "adulto" || norm === "hentai" || norm === "erotica";
+  });
+  if (isAdult && !rawGenres.includes("Adulto")) {
+    rawGenres.push("Adulto");
+  }
   return {
     id: raw.id,
     imdbId: raw.id,
     tmdbId: raw.moviedb_id ? String(raw.moviedb_id) : void 0,
     title: raw.name || "Sem T\xEDtulo",
     type,
+    mediaFormat: isMovie ? "movie" : "series",
     rating: isNaN(ratingNum) ? 8 : ratingNum,
     year: isNaN(yearNum) ? 2024 : yearNum,
-    image: raw.poster || "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500",
-    backdrop: raw.background || raw.poster || "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500",
+    image: raw.poster || "",
+    backdrop: raw.background || raw.poster || "",
     description: raw.description || "Dispon\xEDvel no cat\xE1logo oficial do Stremio / Cinemeta.",
-    genres: raw.genres && raw.genres.length > 0 ? raw.genres : ["Geral"],
-    isFeatured: ratingNum >= 7.5
+    genres: rawGenres,
+    isFeatured: ratingNum >= 7.5,
+    isAdult
   };
+}
+function sameCatalogWork(a, b) {
+  if (a.type !== b.type || a.year && b.year && Math.abs(a.year - b.year) > 1) return false;
+  const normalize = (value) => value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  const titlesA = [a.title, a.originalTitle].filter(Boolean).map((value) => normalize(value));
+  const titlesB = [b.title, b.originalTitle].filter(Boolean).map((value) => normalize(value));
+  return titlesA.some((title) => title.length >= 3 && titlesB.includes(title));
 }
 var TMDBClientService = class {
   constructor() {
@@ -903,6 +1020,24 @@ var TMDBClientService = class {
       total: data.total_results || 2e4
     };
   }
+  async getOnTheAirSeriesWithMeta(page = 1) {
+    const data = await this.request(`/tv/on_the_air?page=${page}`);
+    return {
+      items: (data.results || []).map((r) => formatContentItem(r, "S\xC9RIE" /* SERIES */)),
+      total: data.total_results || 2e4
+    };
+  }
+  async getRecentSeriesWithMeta(page = 1) {
+    const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const lastMonth = new Date(Date.now() - 60 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const data = await this.request(
+      `/discover/tv?sort_by=first_air_date.desc&first_air_date.lte=${today}&first_air_date.gte=${lastMonth}&page=${page}`
+    );
+    return {
+      items: (data.results || []).map((r) => formatContentItem(r, "S\xC9RIE" /* SERIES */)),
+      total: data.total_results || 2e4
+    };
+  }
   async getTopRatedMovies(page = 1) {
     const data = await this.request(`/movie/top_rated?page=${page}`);
     return (data.results || []).map((r) => formatContentItem(r, "FILME" /* MOVIE */));
@@ -1000,9 +1135,7 @@ var TMDBClientService = class {
         const cineItem = formatCinemetaItem(m);
         const normTitle = cineItem.title.toLowerCase().trim();
         const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
-        const existing = results.find(
-          (it) => it.type === "FILME" /* MOVIE */ && (cineItem.tmdbId && it.tmdbId === cineItem.tmdbId || it.title.toLowerCase().trim() === normTitle)
-        );
+        const existing = results.find((it) => sameCatalogWork(it, cineItem));
         const hasTmdb = Boolean(existing && cineItem.tmdbId && existing.tmdbId === cineItem.tmdbId);
         const hasTitle = Boolean(existing && existing.title.toLowerCase().trim() === normTitle);
         if (!hasImdb && !hasTmdb && !hasTitle) {
@@ -1021,9 +1154,7 @@ var TMDBClientService = class {
         const cineItem = formatCinemetaItem(m);
         const normTitle = cineItem.title.toLowerCase().trim();
         const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
-        const existing = results.find(
-          (it) => it.type !== "FILME" /* MOVIE */ && (cineItem.tmdbId && it.tmdbId === cineItem.tmdbId || it.title.toLowerCase().trim() === normTitle)
-        );
+        const existing = results.find((it) => sameCatalogWork(it, cineItem));
         const hasTmdb = Boolean(existing && cineItem.tmdbId && existing.tmdbId === cineItem.tmdbId);
         const hasTitle = Boolean(existing && existing.title.toLowerCase().trim() === normTitle);
         if (!hasImdb && !hasTmdb && !hasTitle) {
@@ -1063,10 +1194,8 @@ var TMDBClientService = class {
     if (tmdbRes.status === "fulfilled" && tmdbRes.value?.results) {
       for (const r of tmdbRes.value.results) {
         const isAnime = r.original_language === "ja" && (r.genre_ids?.includes(16) || r.genres?.some((g) => g.id === 16));
-        if (isAnime) continue;
-        const item = formatContentItem(r, "FILME" /* MOVIE */);
-        if (item.type === "ANIME" /* ANIME */ || item.genres?.includes("Anime")) continue;
-        item.type = "FILME" /* MOVIE */;
+        const item = formatContentItem(r, isAnime ? "ANIME" /* ANIME */ : "FILME" /* MOVIE */);
+        item.mediaFormat = "movie";
         const normTitle = item.title.toLowerCase().trim();
         results.push(item);
         seenIds.add(item.id);
@@ -1077,12 +1206,12 @@ var TMDBClientService = class {
     if (cineMovieRes.status === "fulfilled" && cineMovieRes.value?.metas) {
       for (const m of cineMovieRes.value.metas) {
         const cineItem = formatCinemetaItem(m);
-        if (cineItem.type === "ANIME" /* ANIME */ || cineItem.genres?.includes("Anime")) continue;
-        cineItem.type = "FILME" /* MOVIE */;
+        cineItem.mediaFormat = "movie";
         const normTitle = cineItem.title.toLowerCase().trim();
-        const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
-        const hasTmdb = cineItem.tmdbId && seenIds.has(cineItem.tmdbId);
-        const hasTitle = seenTitles.has(normTitle);
+        const existing = results.find((item) => sameCatalogWork(item, cineItem));
+        const hasImdb = Boolean(existing && cineItem.imdbId && seenIds.has(cineItem.imdbId));
+        const hasTmdb = Boolean(existing && cineItem.tmdbId && seenIds.has(cineItem.tmdbId));
+        const hasTitle = Boolean(existing);
         if (!hasImdb && !hasTmdb && !hasTitle) {
           results.push(cineItem);
           seenIds.add(cineItem.id);
@@ -1134,9 +1263,10 @@ var TMDBClientService = class {
         if (cineItem.type === "ANIME" /* ANIME */ || cineItem.genres?.includes("Anime")) continue;
         cineItem.type = "S\xC9RIE" /* SERIES */;
         const normTitle = cineItem.title.toLowerCase().trim();
-        const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
-        const hasTmdb = cineItem.tmdbId && seenIds.has(cineItem.tmdbId);
-        const hasTitle = seenTitles.has(normTitle);
+        const existing = results.find((item) => sameCatalogWork(item, cineItem));
+        const hasImdb = Boolean(existing && cineItem.imdbId && seenIds.has(cineItem.imdbId));
+        const hasTmdb = Boolean(existing && cineItem.tmdbId && seenIds.has(cineItem.tmdbId));
+        const hasTitle = Boolean(existing);
         if (!hasImdb && !hasTmdb && !hasTitle) {
           results.push(cineItem);
           seenIds.add(cineItem.id);
@@ -1204,10 +1334,10 @@ var TMDBClientService = class {
     }
     return results;
   }
-  async getDetails(id, type) {
-    const isMovie = type === "FILME" /* MOVIE */;
-    const path3 = isMovie ? `/movie/${id}` : `/tv/${id}`;
-    const data = await this.request(`${path3}?append_to_response=credits,external_ids,recommendations,similar`);
+  async getDetails(id, type, mediaFormat) {
+    const isMovie = mediaFormat === "movie" || mediaFormat !== "series" && type === "FILME" /* MOVIE */;
+    const path5 = isMovie ? `/movie/${id}` : `/tv/${id}`;
+    const data = await this.request(`${path5}?append_to_response=credits,external_ids,recommendations,similar`);
     const formatted = formatContentItem(data, type);
     const imdbId = data.external_ids?.imdb_id;
     if (imdbId) {
@@ -1224,33 +1354,41 @@ var TMDBClientService = class {
       if (creators) formatted.director = creators;
     }
     const seasonsCount = data.number_of_seasons || data.seasons?.length || 1;
+    const seasons = Array.isArray(data.seasons) ? data.seasons : void 0;
     const similarRaw = data.recommendations?.results || data.similar?.results || [];
     const similar = similarRaw.slice(0, 9).map((r) => formatContentItem(r, type));
     return {
       item: formatted,
       imdbId,
       seasonsCount,
+      seasons,
       cast,
       director: formatted.director,
       similar
     };
   }
-  async getDetailsByImdb(imdbId, type) {
+  async getDetailsByImdb(imdbId, type, mediaFormat) {
     const fromTmdb = await this.findByImdb(imdbId);
     if (fromTmdb?.tmdbId) {
-      return this.getDetails(fromTmdb.tmdbId, type);
+      return this.getDetails(fromTmdb.tmdbId, type, mediaFormat || fromTmdb.mediaFormat);
     }
-    const stremioType = type === "FILME" /* MOVIE */ ? "movie" : "series";
+    const stremioType = mediaFormat === "movie" || mediaFormat !== "series" && type === "FILME" /* MOVIE */ ? "movie" : "series";
     const cineMeta = await this.getCinemetaMeta(stremioType, imdbId);
     if (cineMeta) {
       const formatted = formatCinemetaItem(cineMeta);
       const cast = Array.isArray(cineMeta.cast) ? cineMeta.cast : cineMeta.cast ? [cineMeta.cast] : [];
       const director = Array.isArray(cineMeta.director) ? cineMeta.director.join(", ") : cineMeta.director;
-      const seasons = cineMeta.videos ? Math.max(...cineMeta.videos.map((v) => v.season || 1), 1) : 1;
+      const seasonsList = cineMeta.videos ? Array.from(new Set(cineMeta.videos.map((v) => v.season || 1))).sort((a, b) => a - b) : [1];
+      const seasons = seasonsList.map((sNum) => ({
+        season_number: sNum,
+        episode_count: cineMeta.videos?.filter((v) => (v.season || 1) === sNum).length || 1
+      }));
+      const seasonsCount = seasonsList.length > 0 ? Math.max(...seasonsList, 1) : 1;
       return {
         item: formatted,
         imdbId,
-        seasonsCount: seasons,
+        seasonsCount,
+        seasons,
         cast,
         director,
         similar: []
@@ -1264,13 +1402,14 @@ var TMDBClientService = class {
         type,
         rating: 8,
         year: 2024,
-        image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500",
-        backdrop: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500",
+        image: "",
+        backdrop: "",
         description: "Detalhes sincronizados com o cat\xE1logo oficial do Stremio.",
         genres: ["Geral"]
       },
       imdbId,
       seasonsCount: 1,
+      seasons: [{ season_number: 1, episode_count: 1 }],
       cast: [],
       similar: []
     };
@@ -1283,9 +1422,10 @@ var TMDBClientService = class {
         number: ep.episode_number,
         title: ep.name || `Epis\xF3dio ${ep.episode_number}`,
         description: ep.overview || "Sinopse oficial deste epis\xF3dio n\xE3o informada.",
-        image: ep.still_path ? `${TMDB_IMAGE_BASE}${ep.still_path}` : "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=500",
+        image: ep.still_path ? `${TMDB_IMAGE_BASE}${ep.still_path}` : "",
         stillPath: ep.still_path,
-        airDate: ep.air_date
+        airDate: ep.air_date,
+        releaseDate: ep.air_date
       }));
     } catch (err) {
       console.warn(`Erro ao carregar epis\xF3dios da T${seasonNumber}:`, err);
@@ -1307,12 +1447,107 @@ var TMDBClientService = class {
           number: v.number,
           title: v.name || v.title || `Epis\xF3dio ${v.number}`,
           description: v.overview || v.description || "Sinopse oficial via cat\xE1logo Stremio Cinemeta.",
-          image: v.thumbnail || "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=500",
-          airDate: v.released
+          image: v.thumbnail || "",
+          airDate: v.released,
+          releaseDate: v.released
         }));
       }
     }
     return [];
+  }
+  /**
+   * Pesquisa atores e atrizes pelo nome no TMDB (search/person)
+   */
+  async searchPersons(query, signal) {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+    try {
+      const data = await this.request(`/search/person?query=${encodeURIComponent(trimmed)}&include_adult=false`, 8e3, signal);
+      const results = data?.results || [];
+      return results.map((r) => {
+        const profileImg = r.profile_path ? `${TMDB_IMAGE_BASE}${r.profile_path}` : "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300";
+        const knownForTitles = (r.known_for || []).map((k) => k.title || k.name).filter(Boolean);
+        return {
+          id: r.id,
+          name: r.name,
+          originalName: r.original_name,
+          image: profileImg,
+          profilePath: r.profile_path,
+          knownForDepartment: r.known_for_department === "Acting" ? "Atua\xE7\xE3o" : r.known_for_department || "Atua\xE7\xE3o",
+          popularity: r.popularity || 0,
+          knownForTitles
+        };
+      }).sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    } catch (err) {
+      if (err?.name === "AbortError" || signal?.aborted) return [];
+      console.warn("[TMDBClient] Erro na busca de atores:", err);
+      return [];
+    }
+  }
+  /**
+   * Obtém detalhes completos de um artista/ator pelo seu ID oficial do TMDB (person/{id})
+   */
+  async getPersonDetails(personId, signal) {
+    const cleanId = String(personId).replace(/^tmdb-actor-?/i, "").trim();
+    if (!cleanId) return null;
+    try {
+      const data = await this.request(`/person/${cleanId}`, 8e3, signal);
+      if (!data || !data.id) return null;
+      const profileImg = data.profile_path ? `${TMDB_IMAGE_BASE}${data.profile_path}` : "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300";
+      return {
+        id: data.id,
+        name: data.name,
+        originalName: data.also_known_as?.[0] || data.name,
+        image: profileImg,
+        profilePath: data.profile_path,
+        knownForDepartment: data.known_for_department === "Acting" ? "Atua\xE7\xE3o" : data.known_for_department || "Atua\xE7\xE3o",
+        popularity: data.popularity || 0,
+        biography: data.biography || "",
+        birthday: data.birthday,
+        deathday: data.deathday,
+        placeOfBirth: data.place_of_birth
+      };
+    } catch (err) {
+      console.warn(`[TMDBClient] Erro ao obter detalhes do artista ${personId}:`, err);
+      return null;
+    }
+  }
+  /**
+   * Obtém os créditos completos de filmes e séries em que o artista atuou (person/{id}/combined_credits)
+   */
+  async getPersonCombinedCredits(personId, signal) {
+    const cleanId = String(personId).replace(/^tmdb-actor-?/i, "").trim();
+    if (!cleanId) return { movies: [], series: [], all: [] };
+    try {
+      const data = await this.request(`/person/${cleanId}/combined_credits`, 1e4, signal);
+      const castRaw = data?.cast || [];
+      const seenIds = /* @__PURE__ */ new Set();
+      const all = [];
+      const movies = [];
+      const series = [];
+      for (const r of castRaw) {
+        if (!r.id || !r.title && !r.name) continue;
+        const item = formatContentItem(r);
+        if (seenIds.has(item.id)) continue;
+        seenIds.add(item.id);
+        all.push(item);
+        if (item.mediaFormat === "movie" || item.type === "FILME" /* MOVIE */) {
+          movies.push(item);
+        } else {
+          series.push(item);
+        }
+      }
+      const sortByRelevance = (arr) => [...arr].sort((a, b) => (b.rating || 0) * 10 + (b.year || 0) * 0.01 - ((a.rating || 0) * 10 + (a.year || 0) * 0.01));
+      return {
+        all: sortByRelevance(all),
+        movies: sortByRelevance(movies),
+        series: sortByRelevance(series)
+      };
+    } catch (err) {
+      if (err?.name === "AbortError" || signal?.aborted) return { movies: [], series: [], all: [] };
+      console.warn(`[TMDBClient] Erro ao obter filmografia do artista ${personId}:`, err);
+      return { movies: [], series: [], all: [] };
+    }
   }
 };
 var tmdbService = new TMDBClientService();
@@ -1348,16 +1583,18 @@ var KNOWN_UNRELEASED_OR_THEATRICAL_IDS = /* @__PURE__ */ new Set([
   // Venom: A Última Rodada / Venom: The Last Dance
   "1184918",
   // O Robô Selvagem / The Wild Robot
-  "823219"
+  "823219",
   // Flow
+  "tt20221436"
+  // Homem-Aranha: Um Novo Dia / Spider-Man: Brand New Day (2026 unreleased)
 ]);
 var KNOWN_UNRELEASED_PATTERNS = [
   /vingadores.*(doutor destino|guerras secretas|doomsday|secret wars)/i,
   /avengers.*(doomsday|secret wars)/i,
   /avatar.*(fogo e cinzas|fire and ash)/i,
   /the batman.*(parte ii|part ii)/i,
-  /spider-man.*beyond the spider-verse/i,
-  /homem-aranha.*al[eé]m do aranhaverso/i,
+  /spider-man.*(brand new day|um novo dia|beyond the spider-verse)/i,
+  /homem-aranha.*(um novo dia|brand new day|al[eé]m do aranhaverso)/i,
   /mandalorian.*grogu/i,
   /toy story 5/i,
   /shrek 5/i
@@ -1488,8 +1725,14 @@ var TheatricalFilterService = class {
     if (item.tmdbId && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(String(item.tmdbId))) {
       return true;
     }
+    if (item.imdbId && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(item.imdbId.trim().toLowerCase())) {
+      return true;
+    }
     const rawTmdbId = item.id?.startsWith("tmdb-") ? item.id.replace("tmdb-", "") : null;
     if (rawTmdbId && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(rawTmdbId)) {
+      return true;
+    }
+    if (item.id && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(item.id.trim().toLowerCase())) {
       return true;
     }
     const titlesToCheck = [item.title, item.originalTitle].filter(Boolean);
@@ -1505,6 +1748,7 @@ var TheatricalFilterService = class {
    */
   isKnownInTheaters(item) {
     if (!item) return false;
+    if (item.inTheaters === true) return true;
     if (item.tmdbId && this.nowPlayingIds.has(String(item.tmdbId))) return true;
     const rawTmdbId = item.id?.startsWith("tmdb-") ? item.id.replace("tmdb-", "") : null;
     if (rawTmdbId && this.nowPlayingIds.has(rawTmdbId)) return true;
@@ -1873,6 +2117,7 @@ var TheatricalFilterService = class {
    */
   isMovieAllowedSync(item) {
     if (!item) return false;
+    if (item.inTheaters === true) return false;
     if (item.type === "S\xC9RIE" /* SERIES */) return true;
     const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
@@ -1965,6 +2210,13 @@ var STOP_WORDS = /* @__PURE__ */ new Set([
   "with"
 ]);
 var CanonicalIdentityService = class {
+  isSameWork(expected, candidate) {
+    if (expected.type !== candidate.type) return false;
+    if (expected.year && candidate.year && Math.abs(expected.year - candidate.year) > 1) return false;
+    const titles = [expected.title, expected.originalTitle].filter(Boolean).map((value) => this.normalizeTitle(value));
+    const candidates = [candidate.title, candidate.originalTitle].filter(Boolean).map((value) => this.normalizeTitle(value));
+    return titles.some((title) => title.length >= 3 && candidates.includes(title));
+  }
   /**
    * Constrói a identidade canônica a partir de um ContentItem e parâmetros de episódio
    */
@@ -1995,6 +2247,9 @@ var CanonicalIdentityService = class {
     }
     if (/hope.*primeiro.*impacto/i.test(item.title)) {
       aliases.push("hope", "hopeu", "\uD638\uD504");
+    }
+    if (/bleach.*thousand|bleach.*sennen/i.test(item.title) || /bleach.*thousand|bleach.*sennen/i.test(item.originalTitle || "")) {
+      aliases.push("bleach sennen kessen hen", "bleach sennen kessen-hen", "bleach thousand-year blood war", "bleach: sennen kessen-hen", "bleach: thousand-year blood war");
     }
     return {
       id: item.id,
@@ -2055,7 +2310,6 @@ var ADULT_ACTORS_AND_TERMS = [
   "creampie",
   "blowjob",
   "ben the men",
-  "playweb",
   "mature porn",
   "erotic xxx"
 ];
@@ -2065,6 +2319,15 @@ var StreamQuarantineService = class {
     this.listeners = /* @__PURE__ */ new Set();
     this.initDefaultQuarantine();
     this.loadFromStorage();
+    this.purgePlaywebFalsePositives();
+  }
+  purgePlaywebFalsePositives() {
+    for (const [key, item] of this.quarantinedMap.entries()) {
+      if (item.reason?.toLowerCase().includes("playweb")) {
+        this.quarantinedMap.delete(key);
+      }
+    }
+    this.saveToStorage();
   }
   initDefaultQuarantine() {
     for (const item of KNOWN_MALICIOUS_HASHES) {
@@ -2227,7 +2490,32 @@ var SourceConfidenceEngine = class {
         };
       }
     }
-    const isAcervoOficial = stream.providerId === "zapitv-verified" || stream.providerName?.includes("Acervo") || stream.providerName?.includes("ZapiTV") || streamUrl.includes("archive.org") || streamUrl.includes("/api/stremio/cinema-aberto") || streamUrl.includes("/api/stremio/blender-open") || streamUrl.includes("/api/stremio/public-domain");
+    const isAcervoOficial = stream.providerId === "zapitv-verified";
+    const episodeTag = streamTitle.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b)/i);
+    if (episodeTag && identity.type === "FILME" /* MOVIE */) {
+      reasons.push("Fonte epis\xF3dica oferecida para um filme");
+      return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+    }
+    if (episodeTag && identity.season && identity.episode && (Number(episodeTag[1] || episodeTag[3]) !== identity.season || Number(episodeTag[2] || episodeTag[4]) !== identity.episode)) {
+      reasons.push("Temporada ou epis\xF3dio diferente do solicitado");
+      return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+    }
+    if (identity.type === "FILME" /* MOVIE */ && identity.year) {
+      const releaseYear = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
+      if (releaseYear && Math.abs(Number(releaseYear[1]) - identity.year) > 1) {
+        reasons.push("Ano da fonte diferente do filme solicitado");
+        return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+      }
+    }
+    const declaredTitle = streamTitle.match(/🐦‍🔥\s*([^\n⏸️]+)/)?.[1]?.trim();
+    if (declaredTitle) {
+      const normalizedDeclared = canonicalIdentityService.normalizeTitle(declaredTitle);
+      const aliases = [identity.title, identity.originalTitle, ...identity.knownAliases || []].filter(Boolean).map((alias) => canonicalIdentityService.normalizeTitle(alias));
+      if (!aliases.includes(normalizedDeclared)) {
+        reasons.push("T\xEDtulo declarado pelo addon difere da obra solicitada");
+        return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+      }
+    }
     if (isAcervoOficial) {
       reasons.push("Fonte can\xF4nica verificada pelo acervo oficial ZapiTV");
       return {
@@ -2271,16 +2559,18 @@ var SourceConfidenceEngine = class {
     }
     const targetTokens = canonicalIdentityService.extractSignificantTokens(identity.title);
     const cleanStreamTitle = canonicalIdentityService.normalizeTitle(streamTitle);
+    const titleWords = new Set(canonicalIdentityService.extractSignificantTokens(`${streamName} ${streamTitle}`));
     let aliasMatched = false;
     for (const alias of identity.knownAliases) {
-      if (cleanStreamTitle.includes(alias) || combined.includes(alias)) {
+      const cleanAlias = canonicalIdentityService.normalizeTitle(alias);
+      if (cleanAlias.length >= 3 && new RegExp(`(^|\\s)${cleanAlias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`).test(streamTitleToCheck)) {
         aliasMatched = true;
         break;
       }
     }
-    const matchingTokens = targetTokens.filter((token) => cleanStreamTitle.includes(token) || combined.includes(token));
+    const matchingTokens = targetTokens.filter((token) => titleWords.has(token));
     const tokenOverlapRatio = targetTokens.length > 0 ? matchingTokens.length / targetTokens.length : 0;
-    if (!aliasMatched && tokenOverlapRatio === 0) {
+    if (!aliasMatched && tokenOverlapRatio < 0.75) {
       reasons.push(`T\xEDtulo do stream n\xE3o possui correspond\xEAncia com "${identity.title}"`);
       return {
         stream,
@@ -2337,6 +2627,407 @@ var SourceConfidenceEngine = class {
   }
 };
 var sourceConfidenceEngine = new SourceConfidenceEngine();
+
+// src/core/playback/PlaybackOptimizerService.ts
+var PlaybackOptimizerService = class _PlaybackOptimizerService {
+  constructor() {
+    // Histórico de desempenho e latência dos provedores de fontes
+    this.providerStats = /* @__PURE__ */ new Map();
+    // Telemetria ativa
+    this.telemetry = {
+      ttffMs: null,
+      bufferingCount: 0,
+      totalBufferingDurationMs: 0,
+      currentBitrateKbps: null,
+      currentResolution: "auto",
+      bufferAheadSeconds: 0,
+      droppedFrames: 0,
+      totalFrames: 0,
+      stallsRecovered: 0,
+      activeAbrMode: "auto",
+      effectiveNetworkType: "unknown",
+      streamSourceType: "unknown"
+    };
+    // Medição de largura de banda em tempo real (EWMA)
+    this.estimatedBandwidthBps = 5e6;
+    // Padrão inicial: 5 Mbps
+    this.loadStartTime = 0;
+    this.bufferStartTime = null;
+    this.stallTimeoutTimer = null;
+    this.healthCheckInterval = null;
+    // Listeners de telemetria
+    this.telemetryListeners = /* @__PURE__ */ new Set();
+    this.initNetworkMonitoring();
+  }
+  static getInstance() {
+    if (!_PlaybackOptimizerService.instance) {
+      _PlaybackOptimizerService.instance = new _PlaybackOptimizerService();
+    }
+    return _PlaybackOptimizerService.instance;
+  }
+  /**
+   * Monitoramento de mudanças na rede (online/offline e Network Information API)
+   */
+  initNetworkMonitoring() {
+    if (typeof window === "undefined") return;
+    const nav = navigator;
+    const conn = nav.connection || nav.mozConnection || nav.webkitConnection;
+    if (conn) {
+      const updateNetwork = () => {
+        const net = this.getNetworkProfile();
+        this.telemetry.effectiveNetworkType = net.effectiveType;
+        this.notifyTelemetry();
+      };
+      try {
+        conn.addEventListener("change", updateNetwork);
+      } catch {
+      }
+    }
+  }
+  /**
+   * Identifica o perfil de rede atual com detecção inteligente de conexões lentas e instáveis
+   */
+  getNetworkProfile() {
+    const nav = typeof navigator !== "undefined" ? navigator : globalThis?.navigator;
+    if (!nav) {
+      return {
+        effectiveType: "unknown",
+        downlinkMbps: 10,
+        rttMs: 50,
+        saveData: false,
+        isSlowConnection: false,
+        isUnstable: false
+      };
+    }
+    const conn = nav.connection || nav.mozConnection || nav.webkitConnection;
+    const effectiveType = conn?.effectiveType || (nav.onLine ? "4g" : "slow-2g");
+    const downlinkMbps = conn?.downlink ?? this.estimatedBandwidthBps / 1e6;
+    const rttMs = conn?.rtt ?? 60;
+    const saveData = Boolean(conn?.saveData);
+    const isSlowConnection = saveData || effectiveType === "slow-2g" || effectiveType === "2g" || effectiveType === "3g" || downlinkMbps < 2.5 || rttMs > 350;
+    const isUnstable = rttMs > 400 || this.telemetry.bufferingCount > 3 && this.telemetry.totalBufferingDurationMs > 5e3;
+    return {
+      effectiveType,
+      downlinkMbps,
+      rttMs,
+      saveData,
+      isSlowConnection,
+      isUnstable
+    };
+  }
+  /**
+   * Perfil detalhado de capacidades do dispositivo e tela
+   */
+  getDeviceProfile() {
+    const nav = typeof navigator !== "undefined" ? navigator : globalThis?.navigator;
+    if (!nav) {
+      return {
+        deviceType: "desktop",
+        isLowEnd: false,
+        screenResolution: { width: 1920, height: 1080 },
+        maxOptimalResolution: "1080p",
+        recommendedInitialQuality: "1080p",
+        memoryLimitMB: 512,
+        hardwareConcurrency: 4
+      };
+    }
+    const ua = (nav.userAgent || "").toLowerCase();
+    const hwConcurrency = nav.hardwareConcurrency || 4;
+    const deviceMemory = nav.deviceMemory || 4;
+    const isSmartTv = /smart-tv|tizen|webos|viera|bravia|netcast|crkey|aft|googletv/i.test(ua);
+    const isMobile = !isSmartTv && /mobile|android|iphone|ipod/i.test(ua);
+    const winScreen = typeof window !== "undefined" ? window.screen : null;
+    const isTablet = !isSmartTv && (/ipad/i.test(ua) || isMobile && winScreen && Math.min(winScreen.width, winScreen.height) >= 600);
+    const isDesktop = !isSmartTv && !isMobile && !isTablet;
+    const deviceType = isSmartTv ? "smart-tv" : isMobile ? "mobile" : isTablet ? "tablet" : "desktop";
+    const isLowEnd = hwConcurrency <= 2 || deviceMemory <= 2 || isSmartTv;
+    const screenWidth = typeof window !== "undefined" ? window.screen?.width || 1920 : 1920;
+    const screenHeight = typeof window !== "undefined" ? window.screen?.height || 1080 : 1080;
+    const maxDimension = Math.max(screenWidth, screenHeight);
+    let maxOptimalResolution = "1080p";
+    if (maxDimension >= 3840 && !isLowEnd) {
+      maxOptimalResolution = "4K";
+    } else if (maxDimension >= 2560 && !isLowEnd) {
+      maxOptimalResolution = "1440p";
+    } else if (maxDimension <= 854 || isMobile && isLowEnd) {
+      maxOptimalResolution = "720p";
+    }
+    const net = this.getNetworkProfile();
+    let recommendedInitialQuality = "1080p";
+    if (net.isSlowConnection) {
+      recommendedInitialQuality = net.effectiveType === "slow-2g" || net.effectiveType === "2g" ? "360p" : "480p";
+    } else if (net.downlinkMbps < 5 || isLowEnd) {
+      recommendedInitialQuality = "720p";
+    }
+    const memoryLimitMB = isSmartTv ? 64 : isLowEnd ? 128 : 512;
+    return {
+      deviceType,
+      isLowEnd,
+      screenResolution: { width: screenWidth, height: screenHeight },
+      maxOptimalResolution,
+      recommendedInitialQuality,
+      memoryLimitMB,
+      hardwareConcurrency: hwConcurrency
+    };
+  }
+  /**
+   * Constrói configuração HLS.js customizada de alta performance para a conexão e dispositivo
+   */
+  buildOptimalHlsConfig() {
+    const net = this.getNetworkProfile();
+    const dev = this.getDeviceProfile();
+    let maxBufferLength = 30;
+    let maxMaxBufferLength = 60;
+    let maxBufferSize = 30 * 1024 * 1024;
+    if (net.isSlowConnection || dev.isLowEnd) {
+      maxBufferLength = 15;
+      maxMaxBufferLength = 30;
+      maxBufferSize = 15 * 1024 * 1024;
+    } else if (net.downlinkMbps >= 15 && !dev.isLowEnd) {
+      maxBufferLength = 45;
+      maxMaxBufferLength = 90;
+      maxBufferSize = 60 * 1024 * 1024;
+    }
+    return {
+      enableWorker: true,
+      lowLatencyMode: false,
+      // Desativa baixa latência em VoD para garantir buffer contínuo sem micro-travas
+      backBufferLength: dev.isLowEnd ? 30 : 60,
+      maxBufferLength,
+      maxMaxBufferLength,
+      maxBufferSize,
+      capLevelToPlayerSize: true,
+      // Nunca baixa 4K se o player for menor que 1080p
+      autoStartLoad: true,
+      startFragPrefetch: true,
+      // Carrega antecipadamente o próximo segmento
+      fragLoadingTimeOut: net.isSlowConnection ? 2e4 : 12e3,
+      manifestLoadingTimeOut: 1e4,
+      fragLoadingMaxRetry: 4,
+      fragLoadingRetryDelay: 800,
+      levelLoadingTimeOut: 1e4,
+      levelLoadingMaxRetry: 4,
+      // Fatores ABR balanceados: conservador para evitar oscilações bruscas
+      abrBandWidthFactor: net.isSlowConnection ? 0.8 : 0.9,
+      abrBandWidthUpFactor: 0.7,
+      // Cauteloso ao subir de qualidade
+      abrEwmaDefaultEstimate: net.isSlowConnection ? 8e5 : 35e5,
+      abrEwmaFastVoD: 2,
+      abrEwmaSlowVoD: 6,
+      startLevel: net.isSlowConnection ? 0 : -1
+      // Força menor resolução de início em 3G/2G para TTFF < 500ms
+    };
+  }
+  /**
+   * Notifica início do carregamento de uma mídia para contagem de TTFF
+   */
+  notifyLoadStart(sourceType) {
+    this.loadStartTime = performance.now();
+    this.telemetry.ttffMs = null;
+    this.telemetry.streamSourceType = sourceType;
+    this.telemetry.bufferingCount = 0;
+    this.telemetry.totalBufferingDurationMs = 0;
+    this.telemetry.stallsRecovered = 0;
+    this.bufferStartTime = null;
+  }
+  /**
+   * Registra primeiro frame renderizado (TTFF medido)
+   */
+  notifyFirstFrame() {
+    if (this.loadStartTime > 0 && this.telemetry.ttffMs === null) {
+      this.telemetry.ttffMs = Math.round(performance.now() - this.loadStartTime);
+      this.notifyTelemetry();
+    }
+  }
+  /**
+   * Registra evento de início de buffering (vídeo esperando dados)
+   */
+  notifyBufferingStart() {
+    if (this.bufferStartTime === null) {
+      this.bufferStartTime = performance.now();
+      this.telemetry.bufferingCount++;
+      this.notifyTelemetry();
+    }
+  }
+  /**
+   * Registra encerramento de buffering e contabiliza tempo acumulado
+   */
+  notifyBufferingEnd() {
+    if (this.bufferStartTime !== null) {
+      const duration = performance.now() - this.bufferStartTime;
+      this.telemetry.totalBufferingDurationMs += Math.round(duration);
+      this.bufferStartTime = null;
+      this.notifyTelemetry();
+    }
+  }
+  /**
+   * Atualiza métricas ao vivo do elemento de vídeo HTML5
+   */
+  updateVideoMetrics(video, activeQuality) {
+    if (!video) return;
+    const currentTime = video.currentTime;
+    let bufferAhead = 0;
+    if (video.buffered && video.buffered.length > 0) {
+      for (let i = 0; i < video.buffered.length; i++) {
+        const start = video.buffered.start(i);
+        const end = video.buffered.end(i);
+        if (currentTime >= start && currentTime <= end) {
+          bufferAhead = Math.max(0, end - currentTime);
+          break;
+        }
+      }
+    }
+    this.telemetry.bufferAheadSeconds = Math.round(bufferAhead * 10) / 10;
+    this.telemetry.currentResolution = activeQuality;
+    if (typeof video.getVideoPlaybackQuality === "function") {
+      try {
+        const qual = video.getVideoPlaybackQuality();
+        this.telemetry.droppedFrames = qual.droppedVideoFrames || 0;
+        this.telemetry.totalFrames = qual.totalVideoFrames || 0;
+      } catch {
+      }
+    }
+    this.notifyTelemetry();
+  }
+  /**
+   * Registra a taxa de transferência real medida após o download de um segmento
+   */
+  recordSampleThroughput(bytes, durationMs) {
+    if (durationMs <= 0 || bytes <= 0) return;
+    const bps = bytes * 8 / (durationMs / 1e3);
+    this.estimatedBandwidthBps = Math.round(this.estimatedBandwidthBps * 0.8 + bps * 0.2);
+    this.telemetry.currentBitrateKbps = Math.round(this.estimatedBandwidthBps / 1e3);
+    this.notifyTelemetry();
+  }
+  /**
+   * Avalia e decide a qualidade ABR ótima para fontes MP4 nativas (Multi-Source ABR)
+   */
+  evaluateMultiSourceAbr(params) {
+    const { availableQualities, currentQuality, bufferAheadSeconds, isStalling } = params;
+    const qualities = availableQualities.filter((q) => q !== "auto");
+    if (qualities.length <= 1) {
+      return { shouldChange: false, targetQuality: currentQuality, reason: "Apenas uma resolu\xE7\xE3o dispon\xEDvel" };
+    }
+    const net = this.getNetworkProfile();
+    const ORDER = {
+      "360p": 1,
+      "480p": 2,
+      "720p": 3,
+      "1080p": 4,
+      "1440p": 5,
+      "4K": 6
+    };
+    const sorted = [...qualities].sort((a, b) => (ORDER[a] || 0) - (ORDER[b] || 0));
+    const currentIndex = sorted.findIndex((q) => q.toLowerCase() === currentQuality.toLowerCase());
+    if ((isStalling || bufferAheadSeconds < 2.5) && currentIndex > 0) {
+      const lowerQuality = sorted[Math.max(0, currentIndex - 1)];
+      return {
+        shouldChange: true,
+        targetQuality: lowerQuality,
+        reason: `Buffer cr\xEDtico (${bufferAheadSeconds.toFixed(1)}s) ou travamento. Reduzindo para ${lowerQuality} para garantir reprodu\xE7\xE3o cont\xEDnua.`
+      };
+    }
+    if (bufferAheadSeconds > 25 && !net.isSlowConnection && !net.isUnstable && currentIndex < sorted.length - 1) {
+      const higherQuality = sorted[currentIndex + 1];
+      const dev = this.getDeviceProfile();
+      if (higherQuality === "4K" && dev.isLowEnd) {
+        return { shouldChange: false, targetQuality: currentQuality, reason: "4K evitado por restri\xE7\xE3o de hardware do dispositivo" };
+      }
+      return {
+        shouldChange: true,
+        targetQuality: higherQuality,
+        reason: `Conex\xE3o est\xE1vel e buffer saud\xE1vel (${bufferAheadSeconds.toFixed(1)}s). Aumentando para ${higherQuality}.`
+      };
+    }
+    return { shouldChange: false, targetQuality: currentQuality, reason: "Qualidade \xF3tima mantida" };
+  }
+  /**
+   * Limpa ou reinicia os contadores de telemetria
+   */
+  resetTelemetry() {
+    this.telemetry = {
+      ttffMs: null,
+      bufferingCount: 0,
+      totalBufferingDurationMs: 0,
+      currentBitrateKbps: null,
+      currentResolution: "auto",
+      bufferAheadSeconds: 0,
+      droppedFrames: 0,
+      totalFrames: 0,
+      stallsRecovered: 0,
+      activeAbrMode: "auto",
+      effectiveNetworkType: this.getNetworkProfile().effectiveType,
+      streamSourceType: "unknown"
+    };
+    this.notifyTelemetry();
+  }
+  /**
+   * Notifica que um travamento foi recuperado com sucesso
+   */
+  recordStallRecovered() {
+    this.telemetry.stallsRecovered++;
+    this.notifyTelemetry();
+  }
+  /**
+   * Obtém snapshot imutável da telemetria
+   */
+  getTelemetry() {
+    return { ...this.telemetry };
+  }
+  /**
+   * Assina atualizações de telemetria
+   */
+  subscribeTelemetry(listener) {
+    this.telemetryListeners.add(listener);
+    listener(this.getTelemetry());
+    return () => this.telemetryListeners.delete(listener);
+  }
+  /**
+   * Registra resultado de consulta a um provedor para orientar ordenação e concorrência
+   */
+  recordProviderResult(providerId, latencyMs, success) {
+    const existing = this.providerStats.get(providerId) || {
+      providerId,
+      totalAttempts: 0,
+      successfulAttempts: 0,
+      averageLatencyMs: latencyMs,
+      lastAttemptTime: Date.now()
+    };
+    existing.totalAttempts++;
+    if (success) {
+      existing.successfulAttempts++;
+      existing.averageLatencyMs = Math.round(existing.averageLatencyMs * 0.7 + latencyMs * 0.3);
+    }
+    existing.lastAttemptTime = Date.now();
+    this.providerStats.set(providerId, existing);
+  }
+  /**
+   * Calcula pontuação dinâmica para o provedor com base em histórico real de velocidade e disponibilidade
+   */
+  getProviderScore(providerId) {
+    const stats = this.providerStats.get(providerId);
+    if (!stats || stats.totalAttempts === 0) return 0;
+    let score = 0;
+    const successRate = stats.successfulAttempts / stats.totalAttempts;
+    if (successRate >= 0.85) score += 3e3;
+    else if (successRate < 0.4) score -= 6e3;
+    if (stats.averageLatencyMs < 400) score += 4e3;
+    else if (stats.averageLatencyMs < 800) score += 2e3;
+    else if (stats.averageLatencyMs > 4e3) score -= 5e3;
+    return score;
+  }
+  getProviderStats(providerId) {
+    return this.providerStats.get(providerId);
+  }
+  getAllProviderStats() {
+    return Array.from(this.providerStats.values());
+  }
+  notifyTelemetry() {
+    const data = this.getTelemetry();
+    this.telemetryListeners.forEach((fn) => fn(data));
+  }
+};
+var playbackOptimizerService = PlaybackOptimizerService.getInstance();
 
 // src/core/selection/sourceSelectionService.ts
 var QUALITY_SCORES = {
@@ -2408,6 +3099,21 @@ var SourceSelectionService = class {
     }
     const audio = audioPreferenceService.analyzeAudio(stream);
     const sub = subtitlePreferenceService.analyzeSubtitles(stream, options.hasExternalPtSub);
+    const codecInfo = audioCodecService.inspectStreamCodecs(stream);
+    const codecEval = audioCodecService.getAudioCodecScore(stream);
+    const codecBonus = codecEval.bonus;
+    const codecExplanation = ` \u2022 ${codecEval.explanation}`;
+    const providerId = stream.providerId;
+    let providerBonus = 0;
+    let providerExplanation = "";
+    if (providerId) {
+      providerBonus = playbackOptimizerService.getProviderScore(providerId);
+      if (providerBonus > 0) providerExplanation = " \u2022 Provedor R\xE1pido";
+      else if (providerBonus < 0) providerExplanation = " \u2022 Provedor Inst\xE1vel";
+    }
+    const netProfile = playbackOptimizerService.getNetworkProfile();
+    let networkBonus = 0;
+    let networkExplanation = "";
     const combined = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""}`.toLowerCase();
     let qualityBonus = 20;
     for (const [qKey, qScore] of Object.entries(QUALITY_SCORES)) {
@@ -2416,9 +3122,22 @@ var SourceSelectionService = class {
         break;
       }
     }
+    if (netProfile.isSlowConnection) {
+      if (qualityBonus >= 50) {
+        networkBonus -= 25e3;
+        networkExplanation = " \u2022 4K evitado em rede lenta";
+      }
+      if (stream.sourceType === "hls" || stream.url && stream.url.includes(".m3u8")) {
+        networkBonus += 8e3;
+        networkExplanation = " \u2022 HLS ABR Priorizado";
+      } else if (qualityBonus <= 30) {
+        networkBonus += 4e3;
+      }
+    }
     const isNotWebReady = stream.behaviorHints?.notWebReady === true;
-    const webReadyPenalty = isNotWebReady ? -8e4 : 0;
+    const webReadyPenalty = isNotWebReady ? -15e3 : 0;
     const webReadyExplanation = isNotWebReady ? " (Requer motor externo)" : "";
+    const performanceModifiers = providerBonus + networkBonus;
     if (audio.tier === "dubbed_ptbr") {
       let subTierBonus = 2e3;
       let subExplanation = "estado de legendas desconhecido";
@@ -2435,7 +3154,7 @@ var SourceSelectionService = class {
         subTierBonus = 500;
         subExplanation = "placas em outro idioma";
       }
-      const score2 = 1e5 + subTierBonus + qualityBonus + confidenceBonus + webReadyPenalty;
+      const score2 = 1e5 + subTierBonus + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
       return {
         score: score2,
         priority: 1,
@@ -2444,7 +3163,8 @@ var SourceSelectionService = class {
         subtitleFormat: sub.format,
         audioAnalysis: audio,
         subtitleAnalysis: sub,
-        explanation: `Prioridade 1: \xC1udio Dublado PT-BR (${subExplanation}, score: ${score2})${confidenceExplanation}${webReadyExplanation}`
+        codecInfo,
+        explanation: `Prioridade 1: \xC1udio Dublado PT-BR (${subExplanation}, score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
       };
     }
     if (audio.tier === "dual_audio") {
@@ -2453,7 +3173,7 @@ var SourceSelectionService = class {
       else if (sub.format === "softsub") subTierBonus = 3e3;
       else if (sub.format === "hardsub_ptbr") subTierBonus = 1e3;
       else if (sub.format === "hardsub_foreign") subTierBonus = 500;
-      const score2 = 9e4 + subTierBonus + qualityBonus + confidenceBonus + webReadyPenalty;
+      const score2 = 9e4 + subTierBonus + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
       return {
         score: score2,
         priority: 2,
@@ -2462,14 +3182,15 @@ var SourceSelectionService = class {
         subtitleFormat: sub.format,
         audioAnalysis: audio,
         subtitleAnalysis: sub,
-        explanation: `Prioridade 2: Dual \xC1udio PT-BR (score: ${score2})${confidenceExplanation}${webReadyExplanation}`
+        codecInfo,
+        explanation: `Prioridade 2: Dual \xC1udio PT-BR (score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
       };
     }
     if (options.hasExternalPtSub && (sub.format === "clean_confirmed" || sub.format === "softsub" || sub.format === "unknown")) {
       let subBonus = 1e3;
       if (sub.format === "clean_confirmed") subBonus = 4e3;
       else if (sub.format === "softsub") subBonus = 3e3;
-      const score2 = 5e4 + subBonus + qualityBonus + confidenceBonus + webReadyPenalty;
+      const score2 = 5e4 + subBonus + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
       return {
         score: score2,
         priority: 3,
@@ -2478,11 +3199,12 @@ var SourceSelectionService = class {
         subtitleFormat: sub.format,
         audioAnalysis: audio,
         subtitleAnalysis: sub,
-        explanation: `Prioridade 3: \xC1udio Original + V\xEDdeo Limpo + Legenda PT-BR externa (score: ${score2})${confidenceExplanation}${webReadyExplanation}`
+        codecInfo,
+        explanation: `Prioridade 3: \xC1udio Original + V\xEDdeo Limpo + Legenda PT-BR externa (score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
       };
     }
     if (sub.format === "softsub" && sub.hasPtSubtitle) {
-      const score2 = 4e4 + 3e3 + qualityBonus + confidenceBonus + webReadyPenalty;
+      const score2 = 4e4 + 3e3 + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
       return {
         score: score2,
         priority: 4,
@@ -2491,12 +3213,13 @@ var SourceSelectionService = class {
         subtitleFormat: sub.format,
         audioAnalysis: audio,
         subtitleAnalysis: sub,
-        explanation: `Prioridade 4: \xC1udio Original + Softsub PT-BR interno (score: ${score2})${confidenceExplanation}${webReadyExplanation}`
+        codecInfo,
+        explanation: `Prioridade 4: \xC1udio Original + Softsub PT-BR interno (score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
       };
     }
     if (sub.format === "hardsub_ptbr") {
       const base = options.hasExternalPtSub ? 2e4 : 3e4;
-      const score2 = base + qualityBonus + confidenceBonus + webReadyPenalty;
+      const score2 = base + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
       return {
         score: score2,
         priority: 5,
@@ -2505,12 +3228,14 @@ var SourceSelectionService = class {
         subtitleFormat: sub.format,
         audioAnalysis: audio,
         subtitleAnalysis: sub,
-        explanation: `Prioridade 5: \xC1udio Original + Hardsub PT-BR (score: ${score2})${confidenceExplanation}${webReadyExplanation}`
+        codecInfo,
+        explanation: `Prioridade 5: \xC1udio Original + Hardsub PT-BR (score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
       };
     }
     const isForeignHardsub = sub.format === "hardsub_foreign";
-    const baseScore = isForeignHardsub ? -5e3 : 5e3;
-    const score = baseScore + qualityBonus + confidenceBonus + webReadyPenalty;
+    const baseScore = isForeignHardsub ? 1e3 : 5e3;
+    const rawScore = baseScore + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
+    const score = Math.max(100, rawScore);
     return {
       score,
       priority: 6,
@@ -2519,7 +3244,8 @@ var SourceSelectionService = class {
       subtitleFormat: sub.format,
       audioAnalysis: audio,
       subtitleAnalysis: sub,
-      explanation: `Prioridade 6: Idioma estrangeiro / Hardsub estrangeiro (score: ${score})${confidenceExplanation}${webReadyExplanation}`
+      codecInfo,
+      explanation: `Prioridade 6: Idioma estrangeiro / Hardsub estrangeiro (score: ${score})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
     };
   }
   /**
@@ -2534,9 +3260,11 @@ var SourceSelectionService = class {
    */
   rankStreams(streams, options) {
     if (!streams || streams.length === 0) return [];
-    if (options.cacheKey) {
-      const cached = selectionCache.get(options.cacheKey);
-      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    const deviceKey = audioCodecService.getDeviceCacheKey();
+    const effectiveCacheKey = options.cacheKey ? `${options.cacheKey}_${deviceKey}` : void 0;
+    if (effectiveCacheKey) {
+      const cached = selectionCache.get(effectiveCacheKey);
+      if (cached && cached.streams.length > 0 && Date.now() - cached.timestamp < CACHE_TTL_MS) {
         return cached.streams;
       }
     }
@@ -2559,10 +3287,11 @@ var SourceSelectionService = class {
       _confidence: item.evaluation.confidence,
       _audioTier: item.evaluation.audioTier,
       _subtitleFormat: item.evaluation.subtitleFormat,
+      _codecInfo: item.evaluation.codecInfo,
       _scoreExplanation: item.evaluation.explanation
     }));
-    if (options.cacheKey) {
-      selectionCache.set(options.cacheKey, {
+    if (effectiveCacheKey && rankedStreams.length > 0) {
+      selectionCache.set(effectiveCacheKey, {
         streams: rankedStreams,
         timestamp: Date.now()
       });
@@ -4010,18 +4739,6 @@ var IMDbWeeklyRankingService = class _IMDbWeeklyRankingService {
         year: 2010
       },
       {
-        imdbId: "tt1285241",
-        title: "Big Buck Bunny",
-        originalTitle: "Big Buck Bunny",
-        mediaType: "movie",
-        position: 20,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2008
-      },
-      {
         imdbId: "tt2285752",
         title: "Tears of Steel",
         originalTitle: "Tears of Steel",
@@ -4539,8 +5256,131 @@ var IMDbWeeklyRankingService = class _IMDbWeeklyRankingService {
 };
 var imdbWeeklyRankingService = IMDbWeeklyRankingService.getInstance();
 
+// src/core/catalog/BannedContentRegistry.ts
+var BANNED_PATTERNS = [
+  // 1. Big Buck Bunny (todas as variações, versões e formatos)
+  /\bbig[-_ ]?buck[-_ ]?bunny\b/i,
+  /\bbuck[-_ ]?bunny\b/i,
+  /^open-big-buck-bunny$/i,
+  /^tt1285241$/i,
+  // 2. Caminandes (todas as variações e temporadas)
+  /\bcaminandes\b/i,
+  /^open-caminandes/i,
+  // 3. URLs e streams de demonstração conhecidos
+  /x36xhzz\.m3u8/i,
+  /big_buck_bunny/i
+];
+var BannedContentRegistry = class _BannedContentRegistry {
+  constructor() {
+  }
+  static getInstance() {
+    if (!_BannedContentRegistry.instance) {
+      _BannedContentRegistry.instance = new _BannedContentRegistry();
+    }
+    return _BannedContentRegistry.instance;
+  }
+  /**
+   * Verifica se um conteúdo (objeto ou parcial) pertence à lista de banidos
+   */
+  isBanned(item) {
+    if (!item) return false;
+    if (item.id && this.isBannedKeyOrId(item.id)) return true;
+    if (item.imdbId && this.isBannedKeyOrId(item.imdbId)) return true;
+    if (item.title && this.isBannedTitle(item.title)) return true;
+    if (item.originalTitle && this.isBannedTitle(item.originalTitle)) return true;
+    if (item.videoUrl && this.isBannedUrl(item.videoUrl)) return true;
+    return false;
+  }
+  /**
+   * Verifica se uma chave ou ID está banido
+   */
+  isBannedKeyOrId(keyOrId) {
+    if (!keyOrId) return false;
+    const clean = String(keyOrId).trim().toLowerCase();
+    return BANNED_PATTERNS.some((pat) => pat.test(clean));
+  }
+  /**
+   * Verifica se um título está banido
+   */
+  isBannedTitle(title) {
+    if (!title) return false;
+    const clean = String(title).trim().toLowerCase();
+    return BANNED_PATTERNS.some((pat) => pat.test(clean));
+  }
+  /**
+   * Verifica se uma URL de stream ou arquivo está banida
+   */
+  isBannedUrl(url) {
+    if (!url) return false;
+    const clean = String(url).trim().toLowerCase();
+    return BANNED_PATTERNS.some((pat) => pat.test(clean));
+  }
+  /**
+   * Verifica se um stream do Stremio ou player é de demonstração banida
+   */
+  isBannedStream(stream) {
+    if (!stream) return false;
+    if (stream.url && this.isBannedUrl(stream.url)) return true;
+    if (stream.title && this.isBannedTitle(stream.title)) return true;
+    if (stream.name && this.isBannedTitle(stream.name)) return true;
+    return false;
+  }
+  /**
+   * Filtra uma lista de itens removendo qualquer conteúdo banido
+   */
+  filterCleanItems(items) {
+    if (!Array.isArray(items) || items.length === 0) return [];
+    return items.filter((it) => !this.isBanned(it));
+  }
+  /**
+   * Purga itens banidos de todos os armazenamentos persistentes do navegador
+   */
+  purgeStorage() {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      const keysToCheck = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k) keysToCheck.push(k);
+      }
+      for (const k of keysToCheck) {
+        if (this.isBannedKeyOrId(k)) {
+          localStorage.removeItem(k);
+          continue;
+        }
+        const raw = localStorage.getItem(k);
+        if (!raw) continue;
+        if (/big[-_ ]?buck[-_ ]?bunny|caminandes|x36xhzz/i.test(raw)) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              const clean = parsed.filter((it) => {
+                if (typeof it === "string") return !this.isBannedKeyOrId(it) && !this.isBannedTitle(it);
+                if (it && typeof it === "object") return !this.isBanned(it);
+                return true;
+              });
+              localStorage.setItem(k, JSON.stringify(clean));
+            } else if (parsed && typeof parsed === "object") {
+              if (this.isBanned(parsed)) {
+                localStorage.removeItem(k);
+              }
+            }
+          } catch {
+            if (this.isBannedTitle(raw) || this.isBannedKeyOrId(raw)) {
+              localStorage.removeItem(k);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Erro ao purgar itens banidos do localStorage:", e);
+    }
+  }
+};
+var bannedContentRegistry = BannedContentRegistry.getInstance();
+
 // src/core/catalog/MediaAvailabilityIndex.ts
-var STORAGE_INDEX_KEY = "zapitv_media_availability_index_v3";
+var STORAGE_INDEX_KEY = "zapitv_media_availability_index_v4";
 var CACHE_TTL_AVAILABLE_MS = 24 * 60 * 60 * 1e3;
 var CACHE_TTL_UNAVAILABLE_MS = 6 * 60 * 60 * 1e3;
 var CACHE_TTL_ERROR_MS = 15 * 60 * 1e3;
@@ -4572,6 +5412,11 @@ var MediaAvailabilityIndex = class _MediaAvailabilityIndex {
     }
     const now = Date.now();
     for (const [key, record] of this.index.entries()) {
+      if (bannedContentRegistry.isBannedKeyOrId(key) || bannedContentRegistry.isBannedTitle(record.title)) {
+        this.index.delete(key);
+        cleanedCount++;
+        continue;
+      }
       if (record.status === "TEMPORARY_ERROR" || record.status === "UNAVAILABLE_CONFIRMED" && record.expiresAt && record.expiresAt < now) {
         record.status = "DISCOVERED";
         record.checkedAt = null;
@@ -4592,8 +5437,13 @@ var MediaAvailabilityIndex = class _MediaAvailabilityIndex {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           const now = Date.now();
+          let purged = false;
           for (const item of parsed) {
             if (item && item.canonicalId) {
+              if (bannedContentRegistry.isBannedKeyOrId(item.canonicalId) || bannedContentRegistry.isBannedTitle(item.title)) {
+                purged = true;
+                continue;
+              }
               if (item.expiresAt && item.expiresAt < now) {
                 item.status = "EXPIRED";
               }
@@ -4602,6 +5452,9 @@ var MediaAvailabilityIndex = class _MediaAvailabilityIndex {
               }
               this.index.set(item.canonicalId, item);
             }
+          }
+          if (purged) {
+            this.saveToStorage();
           }
         }
       }
@@ -4619,6 +5472,7 @@ var MediaAvailabilityIndex = class _MediaAvailabilityIndex {
     }
   }
   getCanonicalKey(item) {
+    if (item.id) return item.id.toLowerCase();
     if (item.imdbId && item.imdbId.startsWith("tt")) {
       return item.imdbId.toLowerCase();
     }
@@ -4653,6 +5507,7 @@ var MediaAvailabilityIndex = class _MediaAvailabilityIndex {
    * Novos itens e checagens em segundo plano permanecem visíveis.
    */
   isPubliclyPlayable(key) {
+    if (bannedContentRegistry.isBannedKeyOrId(key)) return false;
     const record = this.getRecord(key);
     if (!record) return true;
     if (record.status === "UNAVAILABLE_CONFIRMED") return false;
@@ -4714,11 +5569,11 @@ var MediaAvailabilityIndex = class _MediaAvailabilityIndex {
     this.saveToStorage();
     this.notify();
   }
-  markTemporaryError(canonicalId, mediaType, error, providersChecked = []) {
+  markTemporaryError(canonicalId, mediaType, error, providersChecked = [], force = false) {
     const key = canonicalId.toLowerCase();
     const existing = this.index.get(key);
     const now = Date.now();
-    if (existing?.status === "AVAILABLE") {
+    if (!force && existing?.status === "AVAILABLE") {
       return;
     }
     this.index.set(key, {
@@ -4832,6 +5687,13 @@ var MediaAvailabilityIndex = class _MediaAvailabilityIndex {
 var mediaAvailabilityIndex = MediaAvailabilityIndex.getInstance();
 
 // src/core/stremio/stremioClient.ts
+function resolveStremioUrl(url) {
+  if (url.startsWith("/")) {
+    const origin = typeof window !== "undefined" ? window.location.origin : process.env.VITE_APP_URL || `http://127.0.0.1:${process.env.PORT || 4e3}`;
+    return `${origin}${url}`;
+  }
+  return url;
+}
 var StremioClient = class {
   constructor(url) {
     let clean = url.trim();
@@ -4848,7 +5710,8 @@ var StremioClient = class {
   }
   async fetchWithFallback(endpoint, timeoutMs = 8e3) {
     const isRelative = this.baseUrl.startsWith("/");
-    const directUrl = isRelative ? `${this.baseUrl}/${endpoint.replace(/^\/+/, "")}` : `${this.baseUrl}/${endpoint.replace(/^\/+/, "")}`;
+    const rawPath = `${this.baseUrl}/${endpoint.replace(/^\/+/, "")}`;
+    const directUrl = resolveStremioUrl(rawPath);
     if (isRelative) {
       const res = await fetch(directUrl, { signal: AbortSignal.timeout(timeoutMs) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -4864,7 +5727,7 @@ var StremioClient = class {
       }
     } catch (err) {
     }
-    const proxyUrl = `/api/proxy?url=${encodeURIComponent(directUrl)}`;
+    const proxyUrl = resolveStremioUrl(`/api/proxy?url=${encodeURIComponent(directUrl)}`);
     try {
       const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeoutMs) });
       if (!res.ok) {
@@ -4883,21 +5746,21 @@ var StremioClient = class {
     return this.fetchWithFallback("manifest.json");
   }
   async getCatalog(type, id, extra) {
-    let path3 = `catalog/${type}/${id}`;
+    let path5 = `catalog/${type}/${id}`;
     if (extra && Object.keys(extra).length > 0) {
       const queryParts = Object.entries(extra).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
-      path3 += `/${queryParts}`;
+      path5 += `/${queryParts}`;
     }
-    path3 += ".json";
-    return this.fetchWithFallback(path3);
+    path5 += ".json";
+    return this.fetchWithFallback(path5);
   }
   async getMeta(type, id) {
-    const path3 = `meta/${type}/${encodeURIComponent(id)}.json`;
-    return this.fetchWithFallback(path3);
+    const path5 = `meta/${type}/${encodeURIComponent(id)}.json`;
+    return this.fetchWithFallback(path5);
   }
   async getStreams(type, id) {
-    const path3 = `stream/${type}/${encodeURIComponent(id)}.json`;
-    return this.fetchWithFallback(path3);
+    const path5 = `stream/${type}/${encodeURIComponent(id)}.json`;
+    return this.fetchWithFallback(path5);
   }
 };
 
@@ -5369,6 +6232,100 @@ var VideoAdBlockerService = class {
 };
 var videoAdBlocker = new VideoAdBlockerService();
 
+// src/core/catalog/CamBlockerEngine.ts
+var CamBlockerEngine = class {
+  static {
+    // Padrões canônicos de gravações de sala de cinema
+    this.CAM_PATTERNS = [
+      /\bcam\b/i,
+      /\bhd-?cam\b/i,
+      /\bcam-?rip\b/i,
+      /\bcamrip\b/i,
+      /\btelesync\b/i,
+      /\btele-?sync\b/i,
+      /\bhd-?ts\b/i,
+      /\bhdts\b/i,
+      /\btele-?cine\b/i,
+      /\btelecine\b/i,
+      /\b\d+p\s*tc\b/i,
+      /\b\d+p\s*ts\b/i,
+      /\bdvdscr\b/i,
+      /\bscreener\b/i,
+      /\bdvd-?screener\b/i,
+      /\bcinema-?rip\b/i,
+      /\btheater-?rip\b/i,
+      /\btheatre-?rip\b/i,
+      /\bline-?audio\b/i,
+      /\bmic-?audio\b/i,
+      /\bdirect-?mic\b/i,
+      /\bworkprint\b/i,
+      /\bcinemax-?cam\b/i,
+      /\bc1nem4\b/i,
+      /\bhive-?cm8\b/i,
+      /\bcam-?latino\b/i,
+      /\bcam-?legendado\b/i,
+      /\bcam-?dublado\b/i,
+      /\bgravado-?no-?cinema\b/i,
+      /\bfilme-?de-?cinema\b/i,
+      /\bcinema\s*hd\b/i,
+      /\bqualidade\s*cinema\b/i
+    ];
+  }
+  /**
+   * Avalia uma fonte de vídeo contra evidências de gravação de cinema.
+   */
+  static evaluateStream(stream, targetItem) {
+    const sName = stream.name || "";
+    const sTitle = stream.title || "";
+    const sUrl = stream.url || "";
+    const combined = `${sName} ${sTitle} ${sUrl}`.toLowerCase();
+    const matchedSignatures = [];
+    for (const pattern of this.CAM_PATTERNS) {
+      if (pattern.test(combined)) {
+        matchedSignatures.push(pattern.source);
+      }
+    }
+    if (matchedSignatures.length > 0) {
+      return {
+        isCam: true,
+        confidence: "DEFINITIVE",
+        reason: `Rejeitado: assinatura de grava\xE7\xE3o de cinema detectada (${matchedSignatures[0]})`,
+        matchedSignatures
+      };
+    }
+    if (/\b(mic|line\s*in|audio\s*de\s*cinema|gravado\s*em\s*sala)\b/i.test(`${sTitle} ${sName}`)) {
+      return {
+        isCam: true,
+        confidence: "HIGH",
+        reason: "Rejeitado: \xE1udio de microfone de cinema detectado",
+        matchedSignatures: ["mic_audio"]
+      };
+    }
+    if (targetItem) {
+      const isRestricted = theatricalFilterService.isKnownUnreleasedOrTheatrical(targetItem) || !theatricalFilterService.isMovieAllowedSync(targetItem);
+      if (isRestricted) {
+        return {
+          isCam: true,
+          confidence: "DEFINITIVE",
+          reason: "Rejeitado: filme em exibi\xE7\xE3o exclusiva nos cinemas ou n\xE3o lan\xE7ado (qualquer fonte atual \xE9 grava\xE7\xE3o de sala)",
+          matchedSignatures: ["theatrical_window_active"]
+        };
+      }
+    }
+    return {
+      isCam: false,
+      confidence: "CLEAN",
+      matchedSignatures: []
+    };
+  }
+  /**
+   * Atalho booleano rápido para verificar se uma fonte é CAM.
+   */
+  static isCamStream(stream, targetItem) {
+    return this.evaluateStream(stream, targetItem).isCam;
+  }
+};
+
 // src/core/providers/streamValidator.ts
 var KNOWN_PARKED_DOMAINS = [
   "superflixapi.top",
@@ -5557,6 +6514,15 @@ var StreamValidator = class {
     const sName = (stream.name || "").trim();
     const sUrl = (stream.url || "").trim();
     const combined = `${sName} ${sTitle} ${sUrl}`.toLowerCase();
+    if (/\b(trailer|teaser|sample|demo)\b/i.test(`${sName} ${sTitle}`)) {
+      return false;
+    }
+    const camEval = CamBlockerEngine.evaluateStream(stream);
+    if (camEval.isCam) {
+      console.warn(`[StreamValidator] Stream rejeitado por CAM / grava\xE7\xE3o de cinema: ${sTitle || sUrl} (Motivo: ${camEval.reason})`);
+      return false;
+    }
+    if (/🐉\s*Malfoy/i.test(`${sName} ${sTitle}`)) return false;
     const quarantine = streamQuarantineService.evaluateQuarantine(stream, targetTitle);
     if (quarantine.isQuarantined) {
       console.warn(`[StreamValidator] Stream bloqueado em quarentena: ${sTitle || sUrl} (Motivo: ${quarantine.reason})`);
@@ -6162,6 +7128,16 @@ function validateSubtitleContentMatch(contentOrCues, expectedLanguageCode) {
       confidence: detection.confidence,
       reason: "Amostra de texto muito curta para valida\xE7\xE3o estrita",
       isConsistent: true
+    };
+  }
+  const expectedGroup = /^(pob|pt-br|bra|por-br|pt|por|pt-pt)$/i.test(normExpected) ? "pt-BR" : /^(eng|en)$/i.test(normExpected) ? "en" : /^(spa|es)$/i.test(normExpected) ? "es" : /^(fre|fra|fr)$/i.test(normExpected) ? "fr" : null;
+  if (expectedGroup && detection.confidence >= 0.7 && detection.detectedLang !== expectedGroup) {
+    return {
+      isValid: false,
+      detectedLang: detection.detectedLang,
+      confidence: detection.confidence,
+      reason: `Idioma detectado (${detection.detectedLang}) difere da legenda selecionada (${expectedLanguageCode})`,
+      isConsistent: false
     };
   }
   if (isExpectingPtBr) {
@@ -7282,7 +8258,7 @@ var MediaLoadingTracker = class _MediaLoadingTracker {
 var mediaLoadingTracker = MediaLoadingTracker.getInstance();
 
 // src/core/providers/mediaSourceValidationService.ts
-var STORAGE_VALIDATED_SOURCES_KEY = "zapitv_validated_sources_v2";
+var STORAGE_VALIDATED_SOURCES_KEY = "zapitv_validated_sources_v3";
 var VALIDATION_CACHE_TTL_MS = 24 * 60 * 60 * 1e3;
 var REJECTED_CACHE_TTL_MS = 6 * 60 * 60 * 1e3;
 var MediaSourceValidationService = class _MediaSourceValidationService {
@@ -7368,23 +8344,44 @@ var MediaSourceValidationService = class _MediaSourceValidationService {
     if (/\b(2160p|4k|uhd)\b/i.test(text)) {
       qualities.push("4K");
     }
+    if (/\b(1440p|2k|qhd)\b/i.test(text)) {
+      qualities.push("1440p");
+    }
     if (/\b(1080p|fhd|full[-_\s]?hd)\b/i.test(text)) {
       qualities.push("1080p");
     }
-    if (/\b(720p|hd)\b/i.test(text)) {
+    if (/\b(720p|hd)\b/i.test(text) && !/\b(full[-_\s]?hd|fhd|uhd)\b/i.test(text)) {
       qualities.push("720p");
     }
     if (/\b(480p|sd)\b/i.test(text)) {
       qualities.push("480p");
     }
+    if (/\b(360p)\b/i.test(text)) {
+      qualities.push("360p");
+    }
     if (qualities.length === 0 && stream.quality) {
       const q = stream.quality.toLowerCase();
       if (q.includes("4k") || q.includes("2160")) qualities.push("4K");
+      else if (q.includes("1440") || q.includes("2k")) qualities.push("1440p");
       else if (q.includes("1080")) qualities.push("1080p");
       else if (q.includes("720")) qualities.push("720p");
       else if (q.includes("480")) qualities.push("480p");
+      else if (q.includes("360")) qualities.push("360p");
     }
     return qualities.length > 0 ? qualities : ["1080p"];
+  }
+  /**
+   * Retorna a resolução mais alta confirmada de um stream individual
+   */
+  getPrimaryResolution(stream) {
+    const resolutions = this.extractStreamResolutions(stream);
+    if (resolutions.includes("4K")) return "4K";
+    if (resolutions.includes("1440p")) return "1440p";
+    if (resolutions.includes("1080p")) return "1080p";
+    if (resolutions.includes("720p")) return "720p";
+    if (resolutions.includes("480p")) return "480p";
+    if (resolutions.includes("360p")) return "360p";
+    return resolutions[0] || "1080p";
   }
   /**
    * Validação técnica profunda e centralizada de uma fonte Stremio
@@ -7641,8 +8638,8 @@ var MediaSourceValidationService = class _MediaSourceValidationService {
    * Invalida registros de uma fonte quando ocorre erro de reprodução
    */
   invalidateSource(mediaId, streamUrl, reason) {
-    for (const [key, record] of this.cache.entries()) {
-      if (record.url === streamUrl || key.includes(mediaId.toLowerCase())) {
+    for (const record of this.cache.values()) {
+      if (record.mediaId === mediaId && record.url === streamUrl) {
         record.availability = "rejected";
         record.validationState = "rejected";
         record.rejectionReason = reason;
@@ -7720,8 +8717,8 @@ var FEATURED_CATALOG_ITEMS = [
     type: "FILME" /* MOVIE */,
     rating: 8.1,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt15888806/img",
-    backdrop: "https://images.metahub.space/background/medium/tt15888806/img",
+    image: "https://image.tmdb.org/t/p/w500/6Qf3sylInJeyK0fFTfjprnGIXCF.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/6Qf3sylInJeyK0fFTfjprnGIXCF.jpg",
     description: "Uma escritora em dificuldades financeiras aceita a proposta de concluir a s\xE9rie de sucesso de uma famosa autora incapacitada, descobrindo segredos aterrorizantes em seus manuscritos.",
     genres: ["Romance", "Mist\xE9rio", "Drama"],
     imdbId: "tt15888806",
@@ -7771,16 +8768,17 @@ var FEATURED_CATALOG_ITEMS = [
     type: "FILME" /* MOVIE */,
     rating: 7.6,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt13000574/img",
-    backdrop: "https://images.metahub.space/background/medium/tt13000574/img",
+    image: "https://image.tmdb.org/t/p/w500/gQ76UL64RQe3oHwiwHwODTC23g4.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/3icyRAqgakNcQn6aDVz9libFmBA.jpg",
     description: "Nova adapta\xE7\xE3o cinematogr\xE1fica da ic\xF4nica franquia de terror e sobreviv\xEAncia da Capcom com fidelidade m\xE1xima \xE0 atmosfera sombria.",
     genres: ["A\xE7\xE3o", "Terror", "Fic\xE7\xE3o Cient\xEDfica"],
+    tmdbId: "1423191",
     imdbId: "tt13000574",
     isFeatured: true,
     availabilityStatus: "verified",
     audioStatus: "pt-br-dubbed"
   },
-  // 8. HOMEM-ARANHA: UM NOVO DIA (2026 - tt20221436) — Disponível
+  // 8. HOMEM-ARANHA: UM NOVO DIA (2026 - tt20221436) — Indisponível / Não lançado
   {
     id: "movie-spiderman-new-day-2026",
     title: "Homem-Aranha: Um Novo Dia",
@@ -7793,9 +8791,8 @@ var FEATURED_CATALOG_ITEMS = [
     description: "Peter Parker tenta reconstruir sua vida an\xF4nima nas ruas de Nova York enquanto novos vigilantes e amea\xE7as emergem.",
     genres: ["A\xE7\xE3o", "Aventura", "Fic\xE7\xE3o Cient\xEDfica"],
     imdbId: "tt20221436",
-    isFeatured: true,
-    availabilityStatus: "verified",
-    audioStatus: "pt-br-dubbed"
+    isFeatured: false,
+    availabilityStatus: "unavailable"
   },
   // 9. CORAÇÃO SELVAGEM (1990 - tt0100935) — Disponível
   {
@@ -7856,8 +8853,8 @@ var FEATURED_CATALOG_ITEMS = [
     type: "FILME" /* MOVIE */,
     rating: 7.5,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt11576182/img",
-    backdrop: "https://images.metahub.space/background/medium/tt11576182/img",
+    image: "https://image.tmdb.org/t/p/w500/2EjUTEnnoC0sK5j5FS7dC3vOZcl.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/2EjUTEnnoC0sK5j5FS7dC3vOZcl.jpg",
     description: "A reconstitui\xE7\xE3o cinematogr\xE1fica da Opera\xE7\xE3o Overlord e o desembarque dos aliados na Normandia durante a Segunda Guerra Mundial.",
     genres: ["Guerra", "Hist\xF3ria", "Drama"],
     imdbId: "tt11576182",
@@ -7873,8 +8870,8 @@ var FEATURED_CATALOG_ITEMS = [
     type: "FILME" /* MOVIE */,
     rating: 8,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt2788314/img",
-    backdrop: "https://images.metahub.space/background/medium/tt2788314/img",
+    image: "https://image.tmdb.org/t/p/w500/muMwJAiMtReEHLKpKMWt2rMkYF7.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/muMwJAiMtReEHLKpKMWt2rMkYF7.jpg",
     description: "A \xE9pica jornada de Ulisses narrada em uma superprodu\xE7\xE3o visual, enfrentando monstros mitol\xF3gicos e a ira dos deuses gregos para retornar a \xCDtaca.",
     genres: ["Aventura", "Fantasia", "Drama"],
     imdbId: "tt2788314",
@@ -8352,8 +9349,8 @@ var FEATURED_CATALOG_ITEMS = [
     type: "S\xC9RIE" /* SERIES */,
     rating: 7.7,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt31854290/img",
-    backdrop: "https://images.metahub.space/background/medium/tt31854290/img",
+    image: "https://image.tmdb.org/t/p/w500/hazWZ75ml5Er3MQsFetIzoeWs99.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/hazWZ75ml5Er3MQsFetIzoeWs99.jpg",
     description: "Uma comunidade costeira \xE9 abalada pelo ressurgimento de lendas sombrias e corpos na praia ap\xF3s uma tempestade.",
     genres: ["Mist\xE9rio", "Drama", "Suspense"],
     imdbId: "tt31854290",
@@ -11437,41 +12434,6 @@ var DEFAULT_PROVIDERS = [
     status: "online"
   }
 ];
-var VERIFIED_TEST_STREAMS = {
-  // Sintel / Tears of Steel / Big Buck Bunny / Matrix test id
-  "sample-stream": [
-    {
-      name: "ZapiTV HLS Master",
-      title: "[DUBLADO PT-BR] Big Buck Bunny - 1080p FHD HLS",
-      url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-      sourceType: "hls",
-      isPtBr: true,
-      isDubbed: true,
-      quality: "1080p",
-      providerName: "ZapiTV Test Stream"
-    },
-    {
-      name: "Tears of Steel HLS",
-      title: "[\xC1UDIO ORIGINAL INGL\xCAS / MULTI-\xC1UDIO] Tears of Steel - 4K UHD HLS",
-      url: "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8",
-      sourceType: "hls",
-      isPtBr: false,
-      isDubbed: false,
-      quality: "4K",
-      providerName: "Unified Streaming"
-    },
-    {
-      name: "Sintel Direct MP4",
-      title: "[DUBLADO PT-BR] Sintel - 1080p MP4",
-      url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-      sourceType: "mp4",
-      isPtBr: true,
-      isDubbed: true,
-      quality: "1080p",
-      providerName: "Google Open CDN"
-    }
-  ]
-};
 var ProviderRegistryService = class {
   // 10 minutos
   constructor() {
@@ -11499,6 +12461,7 @@ var ProviderRegistryService = class {
     this.providers = [...DEFAULT_PROVIDERS];
   }
   saveProviders() {
+    if (typeof localStorage === "undefined") return;
     try {
       localStorage.setItem("zapitv_providers_config", JSON.stringify(this.providers));
     } catch (e) {
@@ -11563,9 +12526,9 @@ var ProviderRegistryService = class {
    * Resolve todos os fluxos de reprodução para um item (filme ou série).
    */
   resolveStreams(type, id, episode) {
-    const cacheKey = `v4_priority_${type}_${id.tmdbId || id.imdbId || id.id}_${id.imdbId || ""}_${episode?.season || 0}_${episode?.episode || 0}`;
+    const cacheKey = JSON.stringify(["v5_identity", type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
     const cached = this.cache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+    if (cached && cached.streams.length > 0 && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
       return Promise.resolve(cached.streams);
     }
     const existing = this.pending.get(cacheKey);
@@ -11577,37 +12540,90 @@ var ProviderRegistryService = class {
     return request;
   }
   async resolveStreamsFresh(type, id, episode, cacheKey, generation) {
+    if (bannedContentRegistry.isBanned(id)) {
+      return [];
+    }
     const streams = [];
     const activeProviders = this.providers.filter((p) => p.enabled);
     const rawTargetId = id.id || "";
     const cleanId = rawTargetId.replace(/^tmdb-?/i, "");
-    const tmdbNum = id.tmdbId ? String(id.tmdbId).replace(/^tmdb-?/i, "") : !rawTargetId.startsWith("tt") ? cleanId : "";
+    let tmdbNum = id.tmdbId && /^\d+$/.test(String(id.tmdbId).replace(/^tmdb-?/i, "")) ? String(id.tmdbId).replace(/^tmdb-?/i, "") : /^(?:tmdb-?)?\d+$/i.test(rawTargetId) ? cleanId : "";
     let imdbStr = id.imdbId ? String(id.imdbId) : "";
+    const openItem = VERIFIED_OPEN_ITEMS.find((item) => item.id === rawTargetId && (type === "movie" ? item.type === "FILME" /* MOVIE */ : item.type !== "FILME" /* MOVIE */));
+    const catalogItem = !openItem ? filmesData.find((item) => item.id === rawTargetId && (type === "movie" ? item.type === "FILME" /* MOVIE */ : item.type !== "FILME" /* MOVIE */)) : null;
+    if (!tmdbNum && (openItem?.tmdbId || catalogItem?.tmdbId)) {
+      const candidateTmdb = String(openItem?.tmdbId || catalogItem?.tmdbId || "").replace(/^tmdb-?/i, "");
+      if (/^\d+$/.test(candidateTmdb)) tmdbNum = candidateTmdb;
+    }
+    if (!imdbStr && (openItem?.imdbId || catalogItem?.imdbId)) {
+      imdbStr = String(openItem?.imdbId || catalogItem?.imdbId || "");
+    }
+    const altIds = [];
+    if (openItem?.imdbId && openItem.imdbId !== imdbStr && !altIds.includes(openItem.imdbId)) {
+      altIds.push(openItem.imdbId);
+    }
+    if (catalogItem?.imdbId && catalogItem.imdbId !== imdbStr && !altIds.includes(catalogItem.imdbId)) {
+      altIds.push(catalogItem.imdbId);
+    }
     if (tmdbNum) {
       try {
         const resolved = await tmdbService.getImdbId(tmdbNum, type);
-        if (resolved) imdbStr = resolved;
+        if (resolved) {
+          if (!imdbStr) {
+            imdbStr = resolved;
+          } else if (resolved !== imdbStr && !altIds.includes(resolved)) {
+            altIds.push(resolved);
+          }
+        }
       } catch {
       }
     }
     if (!imdbStr && rawTargetId.startsWith("tt")) {
       imdbStr = rawTargetId;
     }
-    const openItem = VERIFIED_OPEN_ITEMS.find(
-      (item) => item.id === rawTargetId || item.id === id.id || rawTargetId.startsWith("open-") && (tmdbNum && String(item.tmdbId) === String(tmdbNum) || imdbStr && item.imdbId === imdbStr) || imdbStr && item.imdbId === imdbStr && item.id.startsWith("anime-")
-    );
-    const catalogItem = !openItem ? filmesData.find(
-      (item) => item.id === rawTargetId || item.id === id.id || imdbStr && item.imdbId === imdbStr || tmdbNum && String(item.tmdbId) === String(tmdbNum)
-    ) : null;
+    if (tmdbNum && !altIds.includes(tmdbNum)) {
+      altIds.push(tmdbNum);
+    }
     const targetTitle = (id.title || catalogItem?.title || openItem?.title || "").trim();
+    if (!tmdbNum && !imdbStr && targetTitle) {
+      try {
+        const searchResults = await Promise.race([
+          tmdbService.searchMulti(targetTitle),
+          new Promise((resolve) => setTimeout(() => resolve([]), 2500))
+        ]);
+        if (searchResults && searchResults.length > 0) {
+          const match = searchResults.find((r) => r.imdbId || r.tmdbId) || searchResults[0];
+          if (match.tmdbId) {
+            tmdbNum = String(match.tmdbId);
+            if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
+          } else if (match.id && !match.id.startsWith("open-") && !match.id.startsWith("local-")) {
+            if (/^\d+$/.test(match.id)) {
+              tmdbNum = match.id;
+              if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
+            }
+          }
+          if (match.imdbId) {
+            imdbStr = match.imdbId;
+            if (!altIds.includes(match.imdbId)) altIds.push(match.imdbId);
+          } else if (tmdbNum) {
+            const resolved = await tmdbService.getImdbId(tmdbNum, type);
+            if (resolved) {
+              imdbStr = resolved;
+              if (!altIds.includes(resolved)) altIds.push(resolved);
+            }
+          }
+        }
+      } catch {
+      }
+    }
     if (openItem) {
       if ((type === "series" || type === "anime") && openItem.episodes && openItem.episodes.length > 0) {
         const epNum = episode?.episode || 1;
-        const epObj = openItem.episodes.find((e) => e.number === epNum) || openItem.episodes[0];
+        const epObj = (episode?.season || 1) === 1 ? openItem.episodes.find((e) => e.number === epNum) : void 0;
         if (epObj?.videoUrl) {
           const directUrl = epObj.videoUrl;
           const proxyUrl = directUrl.startsWith("http") ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
-          const isPtBr = openItem.audioStatus === "pt-br-original" || openItem.audioStatus === "universal" || openItem.audioStatus === "pt-br-dubbed";
+          const isPtBr = openItem.audioStatus === "pt-br-original" || openItem.audioStatus === "pt-br-dubbed";
           const isDubbed = openItem.audioStatus === "pt-br-dubbed";
           streams.push({
             name: `${openItem.title} - Ep ${epObj.number}`,
@@ -11639,7 +12655,7 @@ var ProviderRegistryService = class {
     if (catalogItem) {
       if ((type === "series" || type === "anime") && catalogItem.episodes && catalogItem.episodes.length > 0) {
         const epNum = episode?.episode || 1;
-        const epObj = catalogItem.episodes.find((e) => e.number === epNum) || catalogItem.episodes[0];
+        const epObj = (episode?.season || 1) === 1 ? catalogItem.episodes.find((e) => e.number === epNum) : void 0;
         if (epObj?.videoUrl && !epObj.videoUrl.includes("Caminandes") && !epObj.videoUrl.includes("Night_of_the_Living_Dead")) {
           const directUrl = epObj.videoUrl;
           const proxyUrl = directUrl.startsWith("http") ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
@@ -11649,7 +12665,7 @@ var ProviderRegistryService = class {
             title: `[EPIS\xD3DIO ${epObj.number}] ${epObj.title} (${isDubbed ? "Dublado PT-BR" : "Stream HD"})`,
             url: proxyUrl,
             sourceType: epObj.videoUrl.includes(".m3u8") ? "hls" : "mp4",
-            isPtBr: true,
+            isPtBr: catalogItem.audioStatus === "pt-br-original" || isDubbed,
             isDubbed,
             quality: "1080p",
             providerName: "Acervo ZapiTV S\xE9ries",
@@ -11669,11 +12685,11 @@ var ProviderRegistryService = class {
           const proxyUrl = directUrl.startsWith("http") ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
           streams.push({
             name: `${catalogItem.title} - Stream Oficial`,
-            title: `${catalogItem.title} (Dublado PT-BR 1080p)`,
+            title: `${catalogItem.title} (Stream Oficial)`,
             url: proxyUrl,
             sourceType: isHls ? "hls" : "mp4",
-            isPtBr: true,
-            isDubbed: true,
+            isPtBr: catalogItem.audioStatus === "pt-br-original" || catalogItem.audioStatus === "pt-br-dubbed",
+            isDubbed: catalogItem.audioStatus === "pt-br-dubbed",
             quality: "1080p",
             providerName: "Acervo ZapiTV Oficial",
             providerId: "zapitv-catalog"
@@ -11686,12 +12702,19 @@ var ProviderRegistryService = class {
     const primaryId = imdbStr || tmdbNum || rawTargetId;
     const stremioId = episode && (type === "series" || type === "anime") ? `${primaryId}:${episode.season}:${episode.episode}` : primaryId;
     if (stremioId) {
+      const sortedAddons = [...stremioAddons].sort((a, b) => {
+        const scoreA = playbackOptimizerService.getProviderScore(a.id);
+        const scoreB = playbackOptimizerService.getProviderScore(b.id);
+        if (a.isPtBr !== b.isPtBr) return a.isPtBr ? -1 : 1;
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return (a.priority || 99) - (b.priority || 99);
+      });
       mediaLoadingTracker.transition(rawTargetId, "SEARCHING_SOURCES", {
         stremioId,
         stremioType,
-        providerCount: stremioAddons.length
+        providerCount: sortedAddons.length
       });
-      const addonPromises = stremioAddons.map(async (addon) => {
+      const executeAddon = async (addon) => {
         const startProviderTime = Date.now();
         let providerSuccess = false;
         let providerStreamCount = 0;
@@ -11700,17 +12723,22 @@ var ProviderRegistryService = class {
           const client = new StremioClient(addon.url);
           let res = await Promise.race([
             client.getStreams(stremioType, stremioId),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON")), 8e3))
+            new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON")), 1e4))
           ]);
-          if ((!res || !res.streams || res.streams.length === 0) && tmdbNum && imdbStr) {
-            const altBase = stremioId.startsWith("tt") ? tmdbNum : imdbStr;
-            const altId = episode && (type === "series" || type === "anime") ? `${altBase}:${episode.season}:${episode.episode}` : altBase;
-            try {
-              res = await Promise.race([
-                client.getStreams(stremioType, altId),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON_ALT")), 5e3))
-              ]);
-            } catch {
+          if ((!res || !res.streams || res.streams.length === 0) && altIds.length > 0) {
+            for (const altBase of altIds) {
+              const altId = episode && (type === "series" || type === "anime") ? `${altBase}:${episode.season}:${episode.episode}` : altBase;
+              try {
+                const altRes = await Promise.race([
+                  client.getStreams(stremioType, altId),
+                  new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON_ALT")), 5e3))
+                ]);
+                if (altRes && Array.isArray(altRes.streams) && altRes.streams.length > 0) {
+                  res = altRes;
+                  break;
+                }
+              } catch {
+              }
             }
           }
           if ((!res || !res.streams || res.streams.length === 0) && (type === "anime" || type === "series")) {
@@ -11727,12 +12755,15 @@ var ProviderRegistryService = class {
             const parsedStreams = [];
             for (const s of res.streams) {
               const sUrl = s.url || "";
+              if (addon.id === "fenixflix-animes" && /🐉\s*Malfoy/i.test(s.title || "")) continue;
               if (s.ytId || sUrl.includes("youtube.com") || sUrl.includes("youtu.be")) continue;
               if (sUrl.includes("embed") || sUrl.includes("iframe") || s.sourceType === "embed") continue;
               const isHls = sUrl.includes(".m3u8") || s.sourceType === "hls";
               const isDash = sUrl.includes(".mpd");
-              const isDirectVideo = sUrl.includes(".mp4") || sUrl.includes(".webm") || sUrl.includes(".ogv") || sUrl.includes("/api/proxy") || s.sourceType === "mp4";
+              const isDirectVideo = sUrl.includes(".mp4") || sUrl.includes(".webm") || sUrl.includes(".ogv") || sUrl.includes("/api/proxy") || s.sourceType === "mp4" || Boolean(sUrl && !s.infoHash && !sUrl.includes(".torrent"));
               const isTorrent = Boolean(s.infoHash);
+              const isDubbed = Boolean(s.isDubbed) || /dublado|dub\b/i.test(s.title || "") || /🇧🇷/i.test(s.title || "") && /dual|áudio|audio/i.test(s.title || "");
+              const isPtBr = Boolean(s.isPtBr) || /pt[-_]?br|dublado|🇧🇷/i.test(s.title || "");
               if (isHls || isDash || isDirectVideo) {
                 if (sUrl.startsWith("http://") && !sUrl.includes("/api/proxy")) {
                   if (addon.id === "fenixflix-animes" && typeof window !== "undefined" && window.location.protocol === "https:") {
@@ -11741,7 +12772,9 @@ var ProviderRegistryService = class {
                       url: sUrl.replace(/^http:/, "https:"),
                       providerName: `${addon.name} (HTTPS Direto)`,
                       providerId: addon.id,
-                      sourceType: isHls ? "hls" : "mp4"
+                      sourceType: isHls ? "hls" : "mp4",
+                      ...isDubbed ? { isDubbed: true } : {},
+                      ...isPtBr ? { isPtBr: true } : {}
                     });
                     continue;
                   }
@@ -11750,7 +12783,9 @@ var ProviderRegistryService = class {
                     url: `/api/proxy?url=${encodeURIComponent(sUrl)}`,
                     providerName: `${addon.name} (Proxy)`,
                     providerId: addon.id,
-                    sourceType: isHls ? "hls" : "mp4"
+                    sourceType: isHls ? "hls" : "mp4",
+                    ...isDubbed ? { isDubbed: true } : {},
+                    ...isPtBr ? { isPtBr: true } : {}
                   });
                   if (typeof window !== "undefined" && window.location.protocol === "https:") {
                     parsedStreams.push({
@@ -11758,7 +12793,9 @@ var ProviderRegistryService = class {
                       url: sUrl.replace(/^http:/, "https:"),
                       providerName: `${addon.name} (HTTPS Direto)`,
                       providerId: addon.id,
-                      sourceType: isHls ? "hls" : "mp4"
+                      sourceType: isHls ? "hls" : "mp4",
+                      ...isDubbed ? { isDubbed: true } : {},
+                      ...isPtBr ? { isPtBr: true } : {}
                     });
                   }
                 }
@@ -11766,19 +12803,31 @@ var ProviderRegistryService = class {
                   ...s,
                   providerName: addon.name,
                   providerId: addon.id,
-                  sourceType: isHls ? "hls" : "mp4"
+                  sourceType: isHls ? "hls" : "mp4",
+                  ...isDubbed ? { isDubbed: true } : {},
+                  ...isPtBr ? { isPtBr: true } : {}
                 });
               } else if (isTorrent) {
                 const engineOnline = await isLocalStremioEngineOnline();
-                if (!engineOnline) continue;
+                let streamQuality = s.quality;
+                if (!streamQuality) {
+                  const combinedText = `${s.name || ""} ${s.title || ""}`.toLowerCase();
+                  if (combinedText.includes("2160p") || combinedText.includes("4k")) streamQuality = "2160p";
+                  else if (combinedText.includes("1080p")) streamQuality = "1080p";
+                  else if (combinedText.includes("720p")) streamQuality = "720p";
+                  else if (combinedText.includes("480p")) streamQuality = "480p";
+                }
                 const engineUrl = `http://127.0.0.1:11470/${s.infoHash}/${s.fileIdx || 0}`;
                 parsedStreams.push({
                   ...s,
                   url: engineUrl,
-                  providerName: `${addon.name}${engineOnline ? "" : " (Requer Stremio Engine)"}`,
+                  providerName: `${addon.name}${engineOnline ? "" : " (Stremio)"}`,
                   providerId: addon.id,
                   sourceType: "mp4",
                   isTorrent: true,
+                  quality: streamQuality || "1080p",
+                  ...isDubbed ? { isDubbed: true } : {},
+                  ...isPtBr ? { isPtBr: true } : {},
                   behaviorHints: {
                     ...s.behaviorHints || {},
                     notWebReady: !engineOnline
@@ -11794,6 +12843,7 @@ var ProviderRegistryService = class {
           providerError = err.message || "Erro de comunica\xE7\xE3o";
         } finally {
           const duration = Date.now() - startProviderTime;
+          playbackOptimizerService.recordProviderResult(addon.id, duration, providerSuccess);
           mediaLoadingTracker.recordProviderAttempt(rawTargetId, {
             providerId: addon.id,
             providerName: addon.name,
@@ -11804,16 +12854,46 @@ var ProviderRegistryService = class {
           });
         }
         return [];
-      });
-      const results = await Promise.allSettled(addonPromises);
-      for (const r of results) {
-        if (r.status === "fulfilled" && Array.isArray(r.value)) {
-          streams.push(...r.value);
+      };
+      const CONCURRENCY_LIMIT = 4;
+      const collectedFromAddons = [];
+      let activeIndex = 0;
+      let stopSpawning = false;
+      const runWorker = async () => {
+        while (activeIndex < sortedAddons.length && !stopSpawning) {
+          const currentIndex = activeIndex++;
+          const addon = sortedAddons[currentIndex];
+          const result = await executeAddon(addon);
+          if (Array.isArray(result) && result.length > 0) {
+            collectedFromAddons.push(...result);
+            const hasPtBr = collectedFromAddons.some((s) => s.isPtBr || s.isDubbed);
+            if (collectedFromAddons.length >= 2 && hasPtBr) {
+              stopSpawning = true;
+            }
+          }
         }
-      }
-    }
-    if (id.id === "sample-stream" || id.tmdbId === "sample-stream") {
-      streams.push(...VERIFIED_TEST_STREAMS["sample-stream"]);
+      };
+      const workers = Array.from(
+        { length: Math.min(CONCURRENCY_LIMIT, sortedAddons.length) },
+        () => runWorker()
+      );
+      let timer = null;
+      let interval = null;
+      await Promise.race([
+        Promise.all(workers),
+        new Promise((resolve) => {
+          interval = setInterval(() => {
+            const hasPtBr = collectedFromAddons.some((s) => s.isPtBr || s.isDubbed);
+            if (collectedFromAddons.length >= 2 && hasPtBr) {
+              if (interval) clearInterval(interval);
+              timer = setTimeout(resolve, 600);
+            }
+          }, 80);
+        })
+      ]);
+      if (interval) clearInterval(interval);
+      if (timer) clearTimeout(timer);
+      streams.push(...collectedFromAddons);
     }
     mediaLoadingTracker.transition(rawTargetId, "VALIDATING_SOURCES", {
       rawStreamCount: streams.length
@@ -11829,14 +12909,12 @@ var ProviderRegistryService = class {
         if (u.startsWith("http://")) return false;
         if (/localhost|127\.0\.0\.1|%5b%3a%3a1%5d|\[::1\]/.test(u)) return false;
       }
-      if (u.includes("youtube.com") || u.includes("youtu.be")) return false;
-      if (u.includes("embedplay") || u.includes("playerflix") || u.includes("videasy") || u.includes("superflix")) return false;
+      if (!u.includes(".m3u8") && !u.includes(".mp4") && (u.includes("embedplay") || u.includes("playerflix") || u.includes("videasy") || u.includes("superflix"))) return false;
       const isNightLivingDead = u.includes("night_of_the_living_dead") || t.includes("night of the living dead") || t.includes("noite dos mortos-vivos");
       if (isNightLivingDead && rawTargetId !== "open-night-living-dead-1968" && id.imdbId !== "tt0063350") {
         return false;
       }
-      const isCaminandes = u.includes("caminandes") || t.includes("caminandes");
-      if (isCaminandes && rawTargetId !== "open-caminandes-s1") {
+      if (bannedContentRegistry.isBannedStream(s)) {
         return false;
       }
       return true;
@@ -11846,7 +12924,8 @@ var ProviderRegistryService = class {
       title: targetTitle,
       type: type === "movie" ? "FILME" /* MOVIE */ : type === "anime" ? "ANIME" /* ANIME */ : "S\xC9RIE" /* SERIES */,
       rating: 7,
-      year: id.year || openItem?.year || 0,
+      year: id.year || openItem?.year || catalogItem?.year || 0,
+      originalTitle: id.originalTitle || openItem?.originalTitle || catalogItem?.originalTitle,
       image: openItem?.image || "",
       tmdbId: id.tmdbId ? String(id.tmdbId) : void 0,
       imdbId: imdbStr || id.imdbId,
@@ -11888,7 +12967,7 @@ var ProviderRegistryService = class {
       }).catch(() => {
       });
     }
-    if (generation === this.cacheGeneration) {
+    if (generation === this.cacheGeneration && sorted.length > 0) {
       this.cache.set(cacheKey, { streams: sorted, timestamp: Date.now() });
     }
     return sorted;
@@ -11905,14 +12984,255 @@ var ProviderRegistryService = class {
 };
 var providerRegistry = new ProviderRegistryService();
 
+// src/core/adult/AdultContentService.ts
+var STORAGE_AGE_CONFIRMED_PREFIX = "zapitv_age_confirmed_";
+var ADULT_GENRE_NAMES = /* @__PURE__ */ new Set([
+  "adult",
+  "adulto",
+  "porn",
+  "porno",
+  "porn\xF4",
+  "pornography",
+  "hentai",
+  "erotica"
+]);
+var ILLEGAL_EXPLOITATIVE_PATTERNS = [
+  /\bcp\b/i,
+  /\bcsam\b/i,
+  /\bchild\b.*\b(porn|sex|erotic)\b/i,
+  /\bpedophil|\bpaedophil/i,
+  /\blolita\b|\bloli\b.*\b(porn|sex|hentai)\b/i,
+  /\bshota\b.*\b(porn|sex|hentai)\b/i,
+  /\bunderage\b.*\b(porn|sex)\b/i,
+  /\bmenor\b.*\b(porn|sexo)\b/i,
+  /\binfantil\b.*\b(porn|sexo|erot)\b/i,
+  /\bestupro\b|\brape\b/i
+];
+var KNOWN_MAINSTREAM_MATURE_TITLES = /* @__PURE__ */ new Set([
+  "dexter",
+  "dexter: new blood",
+  "game of thrones",
+  "a casa do drag\xE3o",
+  "house of the dragon",
+  "the boys",
+  "breaking bad",
+  "better call saul",
+  "pulp fiction",
+  "euphoria",
+  "clube da luta",
+  "fight club",
+  "laranja mec\xE2nica",
+  "a clockwork orange",
+  "coraline",
+  "attack on titan",
+  "shingeki no kyojin",
+  "berserk",
+  "mindhunter",
+  "voc\xEA",
+  "you",
+  "narcos",
+  "peaky blinders",
+  "true detective"
+]);
+var AdultContentService = class _AdultContentService {
+  constructor() {
+    this.memoryAgeConfirmed = /* @__PURE__ */ new Set();
+  }
+  static getInstance() {
+    if (!_AdultContentService.instance) {
+      _AdultContentService.instance = new _AdultContentService();
+    }
+    return _AdultContentService.instance;
+  }
+  /**
+   * Identifica se um conteúdo é estritamente adulto/pornográfico.
+   * Não confunde obras para maiores de 18 anos com pornografia (Regra 4).
+   */
+  isAdultContent(item) {
+    if (!item) return false;
+    const title = String(item.title || item.name || "").toLowerCase().trim();
+    if (KNOWN_MAINSTREAM_MATURE_TITLES.has(title)) {
+      return false;
+    }
+    if (item.isAdult === true) return true;
+    if (item.adult === true) return true;
+    if (Array.isArray(item.genres)) {
+      const hasAdultGenre = item.genres.some((g) => {
+        if (!g) return false;
+        const norm = String(g).toLowerCase().trim();
+        return ADULT_GENRE_NAMES.has(norm);
+      });
+      if (hasAdultGenre) return true;
+    }
+    if (Array.isArray(item.tags)) {
+      const hasAdultTag = item.tags.some((t) => {
+        const norm = String(t).toLowerCase().trim();
+        return norm === "adult" || norm === "xxx" || norm === "hentai";
+      });
+      if (hasAdultTag) return true;
+    }
+    return false;
+  }
+  /**
+   * Verifica se um termo ou título envolve exploração ilegal de menores ou conteúdo proibido.
+   * Tolerância zero com bloqueio imediato (Regra 5).
+   */
+  isIllegalOrExploitative(text) {
+    if (!text || !text.trim()) return false;
+    const norm = text.toLowerCase().trim();
+    return ILLEGAL_EXPLOITATIVE_PATTERNS.some((pattern) => pattern.test(norm));
+  }
+  /**
+   * Determina se a busca digitada é intencionalmente direcionada a conteúdos adultos.
+   * Evita exibir conteúdos adultos em buscas genéricas como "ação", "drama", "filme", etc. (Regra 2).
+   */
+  isIntentionalAdultSearch(query, availableAdultTitles = []) {
+    if (!query || !query.trim()) return false;
+    const clean = query.toLowerCase().trim();
+    if (this.isIllegalOrExploitative(clean)) return false;
+    const genericTerms = /* @__PURE__ */ new Set([
+      "a",
+      "o",
+      "os",
+      "as",
+      "de",
+      "do",
+      "da",
+      "e",
+      "em",
+      "um",
+      "uma",
+      "filme",
+      "filmes",
+      "serie",
+      "series",
+      "s\xE9rie",
+      "s\xE9ries",
+      "anime",
+      "animes",
+      "novo",
+      "novos",
+      "top",
+      "melhor",
+      "melhores",
+      "acao",
+      "a\xE7\xE3o",
+      "comedia",
+      "com\xE9dia",
+      "drama",
+      "terror",
+      "aventura",
+      "ficcao",
+      "fic\xE7\xE3o",
+      "romance",
+      "suspense",
+      "animacao",
+      "anima\xE7\xE3o"
+    ]);
+    if (genericTerms.has(clean) || clean.length < 3) {
+      return false;
+    }
+    const explicitAdultSearchTerms = [
+      "adulto",
+      "adultos",
+      "porn",
+      "porno",
+      "porn\xF4",
+      "xxx",
+      "hentai",
+      "erotico",
+      "er\xF3tico",
+      "erotica",
+      "er\xF3tica",
+      "sexo"
+    ];
+    if (explicitAdultSearchTerms.some((term) => clean === term || clean.startsWith(`${term} `) || clean.endsWith(` ${term}`))) {
+      return true;
+    }
+    if (availableAdultTitles.length > 0) {
+      const match = availableAdultTitles.some((t) => {
+        const normTitle = t.toLowerCase().trim();
+        return normTitle === clean || clean.length >= 4 && normTitle.includes(clean);
+      });
+      if (match) return true;
+    }
+    return false;
+  }
+  /**
+   * Verifica se o perfil tem permissão de acesso a conteúdos adultos.
+   * Bloqueia completamente perfis infantis (Regra 5).
+   */
+  canAccessAdult(profile) {
+    if (!profile) return true;
+    if (profile.isChild === true) return false;
+    return true;
+  }
+  /**
+   * Verifica se a maioridade (+18) foi confirmada para o perfil atual.
+   */
+  isAgeConfirmed(profileId = "global") {
+    if (this.memoryAgeConfirmed.has(profileId)) return true;
+    if (typeof window === "undefined" || !window.localStorage) return false;
+    try {
+      const key = `${STORAGE_AGE_CONFIRMED_PREFIX}${profileId}`;
+      const val = localStorage.getItem(key);
+      if (val === "confirmed" || val === "true") {
+        this.memoryAgeConfirmed.add(profileId);
+        return true;
+      }
+    } catch {
+    }
+    return false;
+  }
+  /**
+   * Registra a confirmação de maioridade (+18) do usuário.
+   */
+  confirmAge(profileId = "global") {
+    this.memoryAgeConfirmed.add(profileId);
+    if (typeof window !== "undefined" && window.localStorage) {
+      try {
+        const key = `${STORAGE_AGE_CONFIRMED_PREFIX}${profileId}`;
+        localStorage.setItem(key, "confirmed");
+      } catch {
+      }
+    }
+  }
+  /**
+   * Revoga a confirmação de maioridade (logout, bloqueio ou troca de perfil).
+   */
+  revokeAgeConfirmation(profileId = "global") {
+    this.memoryAgeConfirmed.delete(profileId);
+    if (typeof window !== "undefined" && window.localStorage) {
+      try {
+        const key = `${STORAGE_AGE_CONFIRMED_PREFIX}${profileId}`;
+        localStorage.removeItem(key);
+      } catch {
+      }
+    }
+  }
+  /**
+   * Filtra uma lista de conteúdos removendo qualquer título adulto (Ocultar por padrão).
+   */
+  filterOutAdult(items) {
+    if (!Array.isArray(items)) return [];
+    return items.filter((it) => !this.isAdultContent(it));
+  }
+  /**
+   * Filtra uma lista mantendo apenas os títulos adultos válidos (Gênero Adulto).
+   */
+  filterOnlyAdult(items) {
+    if (!Array.isArray(items)) return [];
+    return items.filter((it) => this.isAdultContent(it));
+  }
+};
+var adultContentService = AdultContentService.getInstance();
+
 // src/core/catalog/CatalogEligibilityService.ts
-var STORAGE_ELIGIBILITY_KEY = "zapitv_catalog_eligibility_v1";
+var STORAGE_ELIGIBILITY_KEY = "zapitv_catalog_eligibility_v2";
 var TTL_AVAILABLE_MS = 24 * 60 * 60 * 1e3;
 var TTL_UNAVAILABLE_MS = 12 * 60 * 60 * 1e3;
 var TTL_ERROR_MS = 15 * 60 * 1e3;
 var KNOWN_EXCLUDED_PATTERNS = [
-  /visionquest/i,
-  // Marvel TV 2026 - Futuro / Sem fonte
   /^tyson$/i,
   // Série Tyson 2026 - Apenas fontes de filme trocado
   /o intruso.*incomer/i,
@@ -11925,10 +13245,12 @@ var KNOWN_EXCLUDED_PATTERNS = [
   /avengers.*(doomsday|secret wars)/i,
   /avatar.*(fogo e cinzas|fire and ash)/i,
   /the batman.*(parte ii|part ii)/i,
-  /spider-man.*beyond the spider-verse/i,
+  /spider-man.*(brand new day|um novo dia|beyond the spider-verse)/i,
+  /homem-aranha.*(um novo dia|brand new day|al[eé]m do aranhaverso)/i,
   /mandalorian.*grogu/i,
   /toy story 5/i,
-  /shrek 5/i
+  /shrek 5/i,
+  /caminandes/i
 ];
 var CatalogEligibilityService = class _CatalogEligibilityService {
   constructor() {
@@ -11945,6 +13267,7 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
     return _CatalogEligibilityService.instance;
   }
   getCanonicalKey(item) {
+    if (item.id) return item.id.toLowerCase();
     if (item.imdbId && item.imdbId.startsWith("tt")) {
       return item.imdbId.toLowerCase();
     }
@@ -11967,13 +13290,21 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           const now = Date.now();
+          let purged = false;
           for (const rec of parsed) {
             if (rec && rec.canonicalId) {
+              if (bannedContentRegistry.isBannedKeyOrId(rec.canonicalId) || bannedContentRegistry.isBannedTitle(rec.title)) {
+                purged = true;
+                continue;
+              }
               if (rec.expiresAt && rec.expiresAt < now) {
                 rec.playbackStatus = "EXPIRED";
               }
               this.records.set(rec.canonicalId, rec);
             }
+          }
+          if (purged) {
+            this.saveToStorage();
           }
         }
       }
@@ -12008,7 +13339,7 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
         playbackStatus: "AVAILABLE",
         hasPlayableSource: Boolean(ep.videoUrl),
         sourceCount: ep.videoUrl ? 1 : 0,
-        hasPtBrAudio: item.audioStatus === "pt-br-original" || item.audioStatus === "universal",
+        hasPtBrAudio: item.audioStatus === "pt-br-original",
         bestQuality: "1080p"
       }));
       this.records.set(key, {
@@ -12029,7 +13360,7 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
         providersFailed: [],
         episodes,
         availableEpisodeCount: episodes.length || 1,
-        hasPtBrAudio: item.audioStatus === "pt-br-original" || item.audioStatus === "universal",
+        hasPtBrAudio: item.audioStatus === "pt-br-original",
         hasOriginalAudio: true,
         bestQuality: "1080p",
         checkedAt: now,
@@ -12044,13 +13375,25 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
    */
   isItemPubliclyPlayableSync(item) {
     if (!item || !item.id || !item.title) return false;
-    if (item.id.startsWith("open-") || item.availabilityStatus === "verified") {
-      return true;
+    if (adultContentService.isIllegalOrExploitative(item.title) || item.originalTitle && adultContentService.isIllegalOrExploitative(item.originalTitle)) {
+      return false;
+    }
+    if (bannedContentRegistry.isBanned(item)) {
+      return false;
+    }
+    if (item.availabilityStatus === "unavailable") {
+      return false;
     }
     const titleLower = item.title.trim().toLowerCase();
     const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
     const itemYear = Number(item.year) || currentYear;
+    if (item.imdbId && item.imdbId.trim().toLowerCase() === "tt20221436") {
+      return false;
+    }
+    if (item.id && item.id.trim().toLowerCase() === "movie-spiderman-new-day-2026") {
+      return false;
+    }
     for (const pat of KNOWN_EXCLUDED_PATTERNS) {
       if (pat.test(titleLower) || item.originalTitle && pat.test(item.originalTitle)) {
         return false;
@@ -12058,6 +13401,9 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
     }
     if (!theatricalFilterService.isMovieAllowedSync(item)) {
       return false;
+    }
+    if (item.id.startsWith("open-") || item.availabilityStatus === "verified") {
+      return true;
     }
     if (itemYear > currentYear) return false;
     if (item.releaseDate && item.releaseDate > todayStr) return false;
@@ -12073,7 +13419,7 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
       if (availRecord.status === "UNAVAILABLE_CONFIRMED") return false;
       if (availRecord.status === "AVAILABLE" && availRecord.validatedSourceCount > 0) return true;
     }
-    if (item.verifiedStreams && item.verifiedStreams.length > 0) {
+    if (item.verifiedStreams && item.verifiedStreams.length > 0 || item.episodes && item.episodes.length > 0) {
       return true;
     }
     if (itemYear <= currentYear) {
@@ -12085,11 +13431,18 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
     return false;
   }
   /**
-   * Filtra uma lista de itens mantendo apenas os títulos comprovadamente elegíveis
+   * Filtra uma lista de itens mantendo apenas os títulos comprovadamente elegíveis.
+   * Regra 1: Conteúdos adultos são ocultados por padrão, exceto com permissão explícita (allowAdult: true).
    */
-  filterEligibleItemsSync(items) {
+  filterEligibleItemsSync(items, options) {
     if (!items || items.length === 0) return [];
-    return items.filter((it) => this.isItemPubliclyPlayableSync(it));
+    return items.filter((it) => {
+      if (!this.isItemPubliclyPlayableSync(it)) return false;
+      if (!options?.allowAdult && adultContentService.isAdultContent(it)) {
+        return false;
+      }
+      return true;
+    });
   }
   /**
    * Avaliação profunda assíncrona de um item (Lançamento + Reprodução Real)
@@ -12441,6 +13794,179 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
 };
 var catalogEligibilityService = CatalogEligibilityService.getInstance();
 
+// src/core/catalog/catalogDeduplication.ts
+function normalizeCatalogText(text) {
+  if (!text) return "";
+  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "").trim();
+}
+function getCanonicalKeysForItem(item) {
+  if (!item) return [];
+  const keys = /* @__PURE__ */ new Set();
+  if (item.imdbId && /^tt\d+$/i.test(item.imdbId.trim())) {
+    keys.add(`imdb:${item.imdbId.trim().toLowerCase()}`);
+  }
+  if (item.id && /^tt\d+$/i.test(item.id.trim())) {
+    keys.add(`imdb:${item.id.trim().toLowerCase()}`);
+  }
+  const mediaType = item.mediaFormat === "movie" || item.type === "movie" ? "movie" : "tv";
+  if (item.tmdbId) {
+    keys.add(`tmdb:${mediaType}:${String(item.tmdbId).trim().toLowerCase()}`);
+  }
+  if (item.id && item.id.startsWith("tmdb-")) {
+    keys.add(`tmdb:${mediaType}:${item.id.replace(/^tmdb-(movie-|tv-|anime-)?/, "").toLowerCase()}`);
+  }
+  if (item.id) {
+    keys.add(`id:${item.id.trim().toLowerCase()}`);
+  }
+  const normTitle = normalizeCatalogText(item.title);
+  if (normTitle) {
+    const rawType = String(item.type || "unknown").toLowerCase();
+    const year = Number(item.year) || 0;
+    keys.add(`title:${rawType}:${normTitle}:${year}`);
+    keys.add(`title_only:${rawType}:${normTitle}`);
+  }
+  if (item.originalTitle) {
+    const normOrig = normalizeCatalogText(item.originalTitle);
+    if (normOrig && normOrig !== normTitle) {
+      const rawType = String(item.type || "unknown").toLowerCase();
+      const year = Number(item.year) || 0;
+      keys.add(`title:${rawType}:${normOrig}:${year}`);
+      keys.add(`title_only:${rawType}:${normOrig}`);
+    }
+  }
+  return Array.from(keys);
+}
+function deduplicateContentItems(items) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const result = [];
+  const seenCanonicalKeys = /* @__PURE__ */ new Set();
+  for (const item of items) {
+    if (!item || !item.id && !item.title) continue;
+    const keys = getCanonicalKeysForItem(item);
+    const hasDuplicateKey = keys.some((key) => seenCanonicalKeys.has(key));
+    if (hasDuplicateKey) {
+      continue;
+    }
+    for (const key of keys) {
+      seenCanonicalKeys.add(key);
+    }
+    result.push(item);
+  }
+  return result;
+}
+
+// src/core/catalog/CatalogReleaseStore.ts
+var CatalogReleaseStore = class _CatalogReleaseStore {
+  constructor() {
+    this.releases = [];
+    this.pendingQueue = /* @__PURE__ */ new Map();
+    this.listeners = /* @__PURE__ */ new Set();
+  }
+  static getInstance() {
+    if (!_CatalogReleaseStore.instance) {
+      _CatalogReleaseStore.instance = new _CatalogReleaseStore();
+    }
+    return _CatalogReleaseStore.instance;
+  }
+  /**
+   * Retorna todos os novos lançamentos validados e prontos para exibição no catálogo
+   */
+  getReleases() {
+    return [...this.releases];
+  }
+  /**
+   * Adiciona um novo lançamento ao catálogo com deduplicação canônica
+   */
+  addRelease(item) {
+    if (!item || !item.id || !item.title) return false;
+    const exists = this.releases.some(
+      (r) => r.id === item.id || r.imdbId && item.imdbId && r.imdbId.toLowerCase() === item.imdbId.toLowerCase() || r.tmdbId && item.tmdbId && String(r.tmdbId) === String(item.tmdbId)
+    );
+    if (exists) {
+      return false;
+    }
+    this.releases = deduplicateContentItems([item, ...this.releases]);
+    const key = item.imdbId || item.id;
+    this.pendingQueue.delete(key);
+    this.notifyListeners();
+    return true;
+  }
+  /**
+   * Adiciona um novo episódio a uma série ou anime existente no catálogo
+   */
+  addEpisodeToWork(workId, episode) {
+    const target = this.releases.find((r) => r.id === workId || r.imdbId === workId || r.tmdbId === workId);
+    if (!target) return false;
+    if (!target.episodes) {
+      target.episodes = [];
+    }
+    const epExists = target.episodes.some(
+      (e) => e.number === episode.number && (e.season ?? 1) === (episode.season ?? 1)
+    );
+    if (epExists) return false;
+    target.episodes.push(episode);
+    target.episodes.sort((a, b) => {
+      const sA = a.season ?? 1;
+      const sB = b.season ?? 1;
+      if (sA !== sB) return sA - sB;
+      return a.number - b.number;
+    });
+    this.notifyListeners();
+    return true;
+  }
+  /**
+   * Registra uma obra que não possui fontes válidas no momento na fila de verificação periódica
+   */
+  recordPending(candidate) {
+    const key = candidate.imdbId || candidate.id;
+    const existing = this.pendingQueue.get(key);
+    const now = Date.now();
+    const attempts = existing ? existing.attempts + 1 : 1;
+    const delayHours = Math.min(72, attempts * 12);
+    const recheckAfter = now + delayHours * 60 * 60 * 1e3;
+    this.pendingQueue.set(key, {
+      id: candidate.id,
+      imdbId: candidate.imdbId,
+      tmdbId: candidate.tmdbId,
+      title: candidate.title,
+      type: candidate.type,
+      year: candidate.year,
+      seasonNumber: candidate.seasonNumber,
+      episodeNumber: candidate.episodeNumber,
+      firstDiscoveredAt: existing ? existing.firstDiscoveredAt : now,
+      lastCheckedAt: now,
+      recheckAfter,
+      attempts,
+      reasonUnavailable: candidate.reason
+    });
+  }
+  /**
+   * Retorna os itens pendentes que estão prontos para reavaliação periódica
+   */
+  getDuePendings() {
+    const now = Date.now();
+    const due = [];
+    for (const pending of this.pendingQueue.values()) {
+      if (now >= pending.recheckAfter) {
+        due.push(pending);
+      }
+    }
+    return due;
+  }
+  getPendingCount() {
+    return this.pendingQueue.size;
+  }
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  notifyListeners() {
+    const current = [...this.releases];
+    this.listeners.forEach((fn) => fn(current));
+  }
+};
+var catalogReleaseStore = CatalogReleaseStore.getInstance();
+
 // src/core/search/searchService.ts
 var CACHE_TTL_MS2 = 10 * 60 * 1e3;
 var KNOWN_ANIME_FRANCHISES = [
@@ -12498,6 +14024,7 @@ var LIVE_ACTION_MARKERS = [
 var SearchService = class _SearchService {
   constructor() {
     this.cache = /* @__PURE__ */ new Map();
+    this.actorCache = /* @__PURE__ */ new Map();
     this.activeAbortController = null;
   }
   static getInstance() {
@@ -12574,7 +14101,8 @@ var SearchService = class _SearchService {
     }
   }
   /**
-   * Classificação canônica: item é anime?
+   * Classificação canônica: item é anime (produção de animação japonesa)?
+   * Abrange tanto animes seriados quanto longas-metragens/filmes de anime.
    */
   isAnimeItem(item) {
     if (!item || !item.title) return false;
@@ -12589,20 +14117,43 @@ var SearchService = class _SearchService {
     return false;
   }
   /**
-   * Classificação canônica: item é filme (não anime)?
+   * Classificação canônica: item é filme de anime (longa-metragem de anime japonês)?
    */
-  isMovieItem(item) {
+  isAnimeMovieItem(item) {
+    if (!item || !this.isAnimeItem(item)) return false;
+    return item.mediaFormat === "movie";
+  }
+  /**
+   * Classificação canônica: item é anime seriado (série de TV em anime)?
+   */
+  isAnimeSeriesItem(item) {
+    if (!item || !this.isAnimeItem(item)) return false;
+    return item.mediaFormat !== "movie";
+  }
+  /**
+   * Classificação canônica: item é filme?
+   * Inclui filmes convencionais e longas-metragens de anime (filmes de anime).
+   * Exclui terminantemente séries de TV e animes seriados.
+   */
+  isMovieItem(item, includeAnimeMovies = false) {
     if (!item) return false;
-    if (this.isAnimeItem(item)) return false;
-    return item.type === "FILME" /* MOVIE */;
+    const typeStr = String(item.type || "").toUpperCase();
+    if ((item.type === "S\xC9RIE" /* SERIES */ || typeStr === "SERIES" || typeStr === "S\xC9RIE" || typeStr === "TV") && item.mediaFormat !== "movie") return false;
+    if (this.isAnimeItem(item)) {
+      return includeAnimeMovies && item.mediaFormat === "movie";
+    }
+    return item.type === "FILME" /* MOVIE */ || typeStr === "MOVIE" || typeStr === "FILME" || item.mediaFormat === "movie";
   }
   /**
    * Classificação canônica: item é série de TV convencional (não anime)?
+   * Exclui filmes e qualquer produção de anime.
    */
   isSeriesItem(item) {
     if (!item) return false;
     if (this.isAnimeItem(item)) return false;
-    return item.type === "S\xC9RIE" /* SERIES */;
+    if (item.mediaFormat === "movie") return false;
+    const typeStr = String(item.type || "").toUpperCase();
+    return item.type === "S\xC9RIE" /* SERIES */ || typeStr === "SERIES" || typeStr === "S\xC9RIE" || typeStr === "TV" || item.mediaFormat === "series";
   }
   /**
    * Cancela quaisquer requisições de pesquisa pendentes
@@ -12616,14 +14167,26 @@ var SearchService = class _SearchService {
   /**
    * Executa a pesquisa contextual direcionada na origem (TMDB + Cinemeta)
    */
-  async search(query, category, localCatalog = []) {
+  async search(query, category, localCatalog = [], userProfile) {
     const trimmed = query.trim();
     if (!trimmed) {
       this.cancelPending();
       return [];
     }
+    if (adultContentService.isIllegalOrExploitative(trimmed)) {
+      this.cancelPending();
+      return [];
+    }
+    if (bannedContentRegistry.isBannedTitle(trimmed) || bannedContentRegistry.isBannedKeyOrId(trimmed)) {
+      this.cancelPending();
+      return [];
+    }
+    const availableTitles = localCatalog ? localCatalog.map((it) => it.title) : [];
+    const isIntentionalAdult = adultContentService.isIntentionalAdultSearch(trimmed, availableTitles);
+    const isChildProfile = userProfile ? userProfile.isChild === true : false;
+    const allowAdult = isIntentionalAdult && !isChildProfile && adultContentService.isAgeConfirmed();
     const normQuery = trimmed.toLowerCase();
-    const cacheKey = `${category}:${normQuery}`;
+    const cacheKey = `${category}:${normQuery}:${allowAdult ? "adult" : "safe"}`;
     const now = Date.now();
     const cached = this.cache.get(cacheKey);
     if (cached && now - cached.timestamp < CACHE_TTL_MS2) {
@@ -12661,8 +14224,10 @@ var SearchService = class _SearchService {
           break;
         }
       }
-      if (localCatalog && localCatalog.length > 0) {
-        const localMatches = this.filterLocalCatalog(trimmed, category, localCatalog);
+      const releases = catalogReleaseStore.getReleases();
+      const combinedLocal = [...localCatalog || [], ...releases];
+      if (combinedLocal.length > 0) {
+        const localMatches = this.filterLocalCatalog(trimmed, category, combinedLocal, userProfile);
         const existingTitles = new Set(rawResults.map((r) => r.title.toLowerCase().trim()));
         for (const loc of localMatches) {
           if (!existingTitles.has(loc.title.toLowerCase().trim())) {
@@ -12671,7 +14236,11 @@ var SearchService = class _SearchService {
           }
         }
       }
-      const eligible = catalogEligibilityService.filterEligibleItemsSync(rawResults);
+      if (!allowAdult) {
+        rawResults = rawResults.filter((it) => !adultContentService.isAdultContent(it));
+      }
+      rawResults = bannedContentRegistry.filterCleanItems(rawResults);
+      const eligible = catalogEligibilityService.filterEligibleItemsSync(rawResults, { allowAdult });
       this.cache.set(cacheKey, {
         timestamp: now,
         items: eligible
@@ -12682,8 +14251,8 @@ var SearchService = class _SearchService {
         return [];
       }
       console.warn(`[SearchService] Erro na busca (${category}):`, e);
-      const localFallback = this.filterLocalCatalog(trimmed, category, localCatalog);
-      return catalogEligibilityService.filterEligibleItemsSync(localFallback);
+      const localFallback = this.filterLocalCatalog(trimmed, category, localCatalog, userProfile);
+      return catalogEligibilityService.filterEligibleItemsSync(localFallback, { allowAdult });
     } finally {
       if (this.activeAbortController === controller) {
         this.activeAbortController = null;
@@ -12691,12 +14260,24 @@ var SearchService = class _SearchService {
     }
   }
   /**
-   * Filtra o acervo local em memória respeitando rigorosamente a categoria
+   * Filtra o acervo local em memória respeitando rigorosamente a categoria e proteção adulta
    */
-  filterLocalCatalog(query, category, items) {
+  filterLocalCatalog(query, category, items, userProfile) {
     if (!items || items.length === 0) return [];
     const norm = query.toLowerCase().trim();
+    if (adultContentService.isIllegalOrExploitative(norm)) {
+      return [];
+    }
+    const availableTitles = items.map((it) => it.title);
+    const isIntentionalAdult = adultContentService.isIntentionalAdultSearch(norm, availableTitles);
+    const isChildProfile = userProfile ? userProfile.isChild === true : false;
+    const allowAdult = isIntentionalAdult && !isChildProfile && adultContentService.isAgeConfirmed();
     return items.filter((item) => {
+      if (bannedContentRegistry.isBanned(item)) {
+        return false;
+      }
+      const isAdult = adultContentService.isAdultContent(item);
+      if (isAdult && !allowAdult) return false;
       const titleMatch = item.title?.toLowerCase().includes(norm) || item.originalTitle && item.originalTitle.toLowerCase().includes(norm);
       if (!titleMatch) return false;
       switch (category) {
@@ -12721,10 +14302,44 @@ var SearchService = class _SearchService {
     return results.slice(0, limit);
   }
   /**
+   * Pesquisa atores e atrizes com cache em memória
+   */
+  async searchPersons(query, signal) {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) return [];
+    const normKey = trimmed.toLowerCase();
+    const now = Date.now();
+    const cached = this.actorCache.get(normKey);
+    if (cached && now - cached.timestamp < CACHE_TTL_MS2) {
+      return cached.actors;
+    }
+    const actors = await tmdbService.searchPersons(trimmed, signal);
+    this.actorCache.set(normKey, { timestamp: now, actors });
+    return actors;
+  }
+  /**
+   * Fornece sugestões completas de busca contendo produções (filmes/séries) e pessoas (atores/atrizes)
+   */
+  async getSearchSuggestionsWithActors(query, category, limit = 6, localCatalog = []) {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      return { items: [], actors: [] };
+    }
+    const [items, allActors] = await Promise.all([
+      this.getSuggestions(trimmed, category, limit, localCatalog),
+      this.searchPersons(trimmed)
+    ]);
+    return {
+      items,
+      actors: allActors.slice(0, 3)
+    };
+  }
+  /**
    * Limpa o cache de busca
    */
   clearCache() {
     this.cache.clear();
+    this.actorCache.clear();
   }
 };
 var searchService = SearchService.getInstance();
@@ -13071,7 +14686,8 @@ var FeaturedRankingService = class _FeaturedRankingService {
         continue;
       }
       if (rankType === "movie") {
-        const isTheatricallyAllowed = theatricalFilterService.isMovieAllowedSync(catalogItem);
+        const isSpidermanUnreleased = cand.imdbId.toLowerCase() === "tt20221436" || catalogItem.imdbId && catalogItem.imdbId.toLowerCase() === "tt20221436";
+        const isTheatricallyAllowed = !isSpidermanUnreleased && theatricalFilterService.isMovieAllowedSync(catalogItem);
         if (!isTheatricallyAllowed) {
           audit.push({
             imdbId: cand.imdbId,
@@ -13186,7 +14802,10 @@ var FeaturedRankingService = class _FeaturedRankingService {
    */
   recomputeFeaturedSelectionSync(customCatalog) {
     const catalogMap = /* @__PURE__ */ new Map();
-    VERIFIED_OPEN_ITEMS.forEach((it) => catalogMap.set(it.id, it));
+    FEATURED_CATALOG_ITEMS.forEach((it) => catalogMap.set(it.id, it));
+    VERIFIED_OPEN_ITEMS.forEach((it) => {
+      if (!catalogMap.has(it.id)) catalogMap.set(it.id, it);
+    });
     filmesData.forEach((it) => {
       if (!catalogMap.has(it.id)) catalogMap.set(it.id, it);
     });
@@ -13557,9 +15176,2147 @@ var WeeklyFeaturedScheduler = class _WeeklyFeaturedScheduler {
 };
 var weeklyFeaturedScheduler = WeeklyFeaturedScheduler.getInstance();
 
+// src/core/catalog/AutoReleaseService.ts
+var AutoReleaseService = class _AutoReleaseService {
+  constructor() {
+    this.isSyncing = false;
+  }
+  static getInstance() {
+    if (!_AutoReleaseService.instance) {
+      _AutoReleaseService.instance = new _AutoReleaseService();
+    }
+    return _AutoReleaseService.instance;
+  }
+  /**
+   * Executa a rotina diária incremental de descoberta e atualização de lançamentos
+   */
+  async runDailyReleaseSync() {
+    if (this.isSyncing) {
+      console.log("[AutoReleaseService] Sincroniza\xE7\xE3o j\xE1 em andamento. Aguardando...");
+      return {
+        timestamp: Date.now(),
+        newMoviesAdded: 0,
+        newSeriesAdded: 0,
+        newAnimesAdded: 0,
+        newEpisodesAdded: 0,
+        camSourcesBlocked: 0,
+        theatricalBlocked: 0,
+        pendingUnavailables: 0,
+        errors: ["Sync already in progress"]
+      };
+    }
+    this.isSyncing = true;
+    console.log("[AutoReleaseService] Iniciando varredura di\xE1ria de lan\xE7amentos...");
+    const result = {
+      timestamp: Date.now(),
+      newMoviesAdded: 0,
+      newSeriesAdded: 0,
+      newAnimesAdded: 0,
+      newEpisodesAdded: 0,
+      camSourcesBlocked: 0,
+      theatricalBlocked: 0,
+      pendingUnavailables: 0,
+      errors: []
+    };
+    try {
+      await this.discoverNewMovies(result);
+      await this.discoverNewSeries(result);
+      await this.discoverNewAnimes(result);
+      await this.checkNewEpisodes(result);
+      await this.recheckPendingQueue(result);
+      console.log("[AutoReleaseService] Varredura di\xE1ria conclu\xEDda com sucesso:", result);
+    } catch (err) {
+      console.error("[AutoReleaseService] Erro durante a varredura de lan\xE7amentos:", err);
+      result.errors.push(err.message || String(err));
+    } finally {
+      this.isSyncing = false;
+    }
+    return result;
+  }
+  /**
+   * Descobre filmes recentemente disponibilizados em digital e verifica fontes válidas
+   */
+  async discoverNewMovies(result) {
+    try {
+      const moviesData = await tmdbService.getPopularMoviesWithMeta(1);
+      const candidates = moviesData.items.slice(0, 15);
+      for (const candidate of candidates) {
+        const isTheatrical = theatricalFilterService.isKnownUnreleasedOrTheatrical(candidate) || !theatricalFilterService.isMovieAllowedSync(candidate);
+        if (isTheatrical) {
+          result.theatricalBlocked++;
+          continue;
+        }
+        const streams = await providerRegistry.resolveStreams("movie", {
+          id: candidate.id,
+          imdbId: candidate.imdbId,
+          tmdbId: candidate.tmdbId,
+          title: candidate.title,
+          originalTitle: candidate.originalTitle,
+          year: candidate.year
+        });
+        const cleanStreams = streams.filter((s) => {
+          const camEval = CamBlockerEngine.evaluateStream(s, candidate);
+          if (camEval.isCam) {
+            result.camSourcesBlocked++;
+            return false;
+          }
+          return true;
+        });
+        if (cleanStreams.length > 0) {
+          const hasPtBr = cleanStreams.some((s) => audioPreferenceService.analyzeAudio(s).isPtBr || s.isPtBr);
+          if (hasPtBr) {
+            candidate.audioStatus = "pt-br-dubbed";
+          }
+          const added = catalogReleaseStore.addRelease(candidate);
+          if (added) {
+            result.newMoviesAdded++;
+            mediaAvailabilityIndex.markAvailable(candidate.imdbId || candidate.id, "movie", {
+              title: candidate.title,
+              sourceCount: cleanStreams.length,
+              providersChecked: ["ZapiTV AutoRelease"],
+              hasPtBrAudio: hasPtBr,
+              bestQuality: cleanStreams[0].quality || "1080p"
+            });
+          }
+        } else {
+          catalogReleaseStore.recordPending({
+            id: candidate.id,
+            imdbId: candidate.imdbId,
+            tmdbId: candidate.tmdbId,
+            title: candidate.title,
+            type: "FILME" /* MOVIE */,
+            year: candidate.year,
+            reason: "Aguardando libera\xE7\xE3o de fontes limpas sem CAM"
+          });
+          result.pendingUnavailables++;
+        }
+      }
+    } catch (e) {
+      result.errors.push(`Erro ao descobrir filmes: ${e.message}`);
+    }
+  }
+  /**
+   * Processa uma candidata a série: enriquece IDs, identifica episódios lançados,
+   * valida streams (sem CAM) e adiciona ao catálogo apenas com episódios reais e comprovados.
+   */
+  async processSeriesCandidate(candidate) {
+    if (!searchService.isSeriesItem(candidate)) {
+      return { added: false, episodesAdded: 0, reason: "Item n\xE3o \xE9 s\xE9rie de TV" };
+    }
+    if (!candidate.imdbId && candidate.tmdbId) {
+      const resolved = await tmdbService.getImdbId(String(candidate.tmdbId), "series");
+      if (resolved) candidate.imdbId = resolved;
+    }
+    if (!candidate.imdbId && candidate.id.startsWith("tt")) {
+      candidate.imdbId = candidate.id;
+    }
+    if (!candidate.imdbId && candidate.title) {
+      try {
+        const cineSearchUrl = `https://v3-cinemeta.strem.io/catalog/series/top/search=${encodeURIComponent(candidate.title)}.json`;
+        const cRes = await fetch(cineSearchUrl, { signal: AbortSignal.timeout(3e3) });
+        if (cRes.ok) {
+          const cData = await cRes.json();
+          const match = cData.metas?.find((m) => m.name?.toLowerCase() === candidate.title.toLowerCase()) || cData.metas?.[0];
+          if (match?.id?.startsWith("tt")) {
+            candidate.imdbId = match.id;
+          }
+        }
+      } catch {
+      }
+    }
+    let cinemetaVideos = [];
+    if (candidate.imdbId) {
+      try {
+        const metaUrl = `https://v3-cinemeta.strem.io/meta/series/${candidate.imdbId}.json`;
+        const metaRes = await fetch(metaUrl, { signal: AbortSignal.timeout(1e4) });
+        if (metaRes.ok) {
+          const metaJson = await metaRes.json();
+          if (Array.isArray(metaJson.meta?.videos)) {
+            cinemetaVideos = metaJson.meta.videos;
+          }
+        }
+      } catch {
+      }
+    }
+    const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const releasedVideos = cinemetaVideos.filter((v) => {
+      const airDate = (v.released || v.firstAired || "").slice(0, 10);
+      return airDate && airDate <= todayStr;
+    });
+    const epNumbersToCheck = releasedVideos.length > 0 ? releasedVideos.map((v) => v.number || v.episode || 1) : [1];
+    const validEpisodes = [];
+    let hasPtBrAudio = false;
+    for (const epNum of epNumbersToCheck) {
+      const vInfo = releasedVideos.find((v) => (v.number || v.episode) === epNum);
+      const streams = await providerRegistry.resolveStreams("series", {
+        id: candidate.id,
+        imdbId: candidate.imdbId,
+        tmdbId: candidate.tmdbId,
+        title: candidate.title,
+        originalTitle: candidate.originalTitle,
+        year: candidate.year
+      }, { season: 1, episode: epNum });
+      const cleanStreams = streams.filter((s) => !CamBlockerEngine.isCamStream(s, candidate));
+      if (cleanStreams.length > 0) {
+        if (!hasPtBrAudio && cleanStreams.some((s) => audioPreferenceService.analyzeAudio(s).isPtBr || s.isPtBr)) {
+          hasPtBrAudio = true;
+        }
+        validEpisodes.push({
+          id: `${candidate.id}-s1-e${epNum}`,
+          season: 1,
+          number: epNum,
+          title: vInfo?.name || vInfo?.title || `Epis\xF3dio ${epNum}`,
+          description: vInfo?.overview || vInfo?.description || `Epis\xF3dio ${epNum} da s\xE9rie ${candidate.title}`,
+          image: vInfo?.thumbnail || candidate.backdrop || candidate.image,
+          videoUrl: cleanStreams[0].url,
+          releaseDate: (vInfo?.released || vInfo?.firstAired || "").slice(0, 10) || todayStr
+        });
+      }
+    }
+    if (validEpisodes.length > 0) {
+      if (hasPtBrAudio) candidate.audioStatus = "pt-br-dubbed";
+      candidate.episodes = validEpisodes;
+      const added = catalogReleaseStore.addRelease(candidate);
+      if (added) {
+        mediaAvailabilityIndex.markAvailable(candidate.imdbId || candidate.id, "series", {
+          title: candidate.title,
+          sourceCount: validEpisodes.length,
+          providersChecked: ["ZapiTV AutoRelease"],
+          hasPtBrAudio,
+          episodeCount: validEpisodes.length
+        });
+        catalogEligibilityService.evaluateItem(candidate).catch(() => {
+        });
+      }
+      return { added, episodesAdded: validEpisodes.length };
+    } else {
+      catalogReleaseStore.recordPending({
+        id: candidate.id,
+        imdbId: candidate.imdbId,
+        tmdbId: candidate.tmdbId,
+        title: candidate.title,
+        type: "S\xC9RIE" /* SERIES */,
+        year: candidate.year,
+        seasonNumber: 1,
+        episodeNumber: 1,
+        reason: "Epis\xF3dios estreados ainda sem fontes limpas e autorizadas nos provedores"
+      });
+      return { added: false, episodesAdded: 0, reason: "Sem fontes v\xE1lidas" };
+    }
+  }
+  /**
+   * Descobre novas séries de TV recentemente lançadas consultando estreias recentes e séries no ar
+   */
+  async discoverNewSeries(result) {
+    try {
+      const [recentData, onAirData, popularData] = await Promise.allSettled([
+        tmdbService.getRecentSeriesWithMeta(1),
+        tmdbService.getOnTheAirSeriesWithMeta(1),
+        tmdbService.getPopularSeriesWithMeta(1)
+      ]);
+      const candidateMap = /* @__PURE__ */ new Map();
+      const addCandidate = (item) => {
+        if (!item || !item.title) return;
+        const key = (item.imdbId || item.id || item.title).toLowerCase();
+        if (!candidateMap.has(key)) candidateMap.set(key, item);
+      };
+      if (recentData.status === "fulfilled") recentData.value.items.forEach(addCandidate);
+      if (onAirData.status === "fulfilled") onAirData.value.items.forEach(addCandidate);
+      if (popularData.status === "fulfilled") popularData.value.items.slice(0, 10).forEach(addCandidate);
+      const candidates = Array.from(candidateMap.values()).slice(0, 15);
+      for (const candidate of candidates) {
+        const res = await this.processSeriesCandidate(candidate);
+        if (res.added) {
+          result.newSeriesAdded++;
+          result.newEpisodesAdded += res.episodesAdded;
+        } else if (res.reason === "Sem fontes v\xE1lidas") {
+          result.pendingUnavailables++;
+        }
+      }
+    } catch (e) {
+      result.errors.push(`Erro ao descobrir s\xE9ries: ${e.message}`);
+    }
+  }
+  /**
+   * Avalia e adiciona uma obra específica pelo título ou IMDb ID.
+   * Usado para reavaliações manuais, testes de homologação ou buscas diretas.
+   */
+  async evaluateAndAddSeries(titleOrImdb) {
+    const isImdb = titleOrImdb.startsWith("tt");
+    let candidate = null;
+    if (isImdb) {
+      const fromTmdb = await tmdbService.findByImdb(titleOrImdb);
+      if (fromTmdb) candidate = fromTmdb;
+      if (!candidate) {
+        const cineMeta = await tmdbService.getCinemetaMeta("series", titleOrImdb);
+        if (cineMeta) candidate = formatCinemetaItem(cineMeta);
+      }
+    }
+    if (!candidate) {
+      const searchRes = await tmdbService.searchSeries(titleOrImdb);
+      if (searchRes && searchRes.length > 0) {
+        candidate = searchRes[0];
+      }
+    }
+    if (!candidate) {
+      return { success: false, reason: `Obra n\xE3o encontrada: ${titleOrImdb}` };
+    }
+    const res = await this.processSeriesCandidate(candidate);
+    return {
+      success: res.added,
+      item: candidate,
+      reason: res.reason
+    };
+  }
+  /**
+   * Descobre novos animes da temporada atual via AniList GraphQL
+   */
+  async discoverNewAnimes(result) {
+    try {
+      const query = `
+        query {
+          Page(page: 1, perPage: 8) {
+            media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC) {
+              id
+              title { romaji english userPreferred native }
+              format
+              episodes
+              genres
+              description
+              coverImage { extraLarge }
+              bannerImage
+              startDate { year }
+            }
+          }
+        }
+      `;
+      const res = await fetch("https://graphql.anilist.co", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ query }),
+        signal: AbortSignal.timeout(5e3)
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      const animeNodes = json.data?.Page?.media || [];
+      for (const node of animeNodes) {
+        const title = node.title?.userPreferred || node.title?.english || node.title?.romaji || "Anime";
+        const candidate = {
+          id: `anilist-${node.id}`,
+          title,
+          originalTitle: node.title?.romaji || node.title?.native,
+          type: "ANIME" /* ANIME */,
+          mediaFormat: node.format === "MOVIE" ? "movie" : "series",
+          year: node.startDate?.year || 2024,
+          image: node.coverImage?.extraLarge || "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500",
+          backdrop: node.bannerImage || node.coverImage?.extraLarge,
+          genres: [...node.genres || [], "Anime"],
+          description: (node.description || "").replace(/<[^>]*>?/gm, "")
+        };
+        const streams = await providerRegistry.resolveStreams("anime", {
+          id: candidate.id,
+          title: candidate.title,
+          originalTitle: candidate.originalTitle,
+          year: candidate.year
+        }, { season: 1, episode: 1 });
+        const cleanStreams = streams.filter((s) => !CamBlockerEngine.isCamStream(s, candidate));
+        if (cleanStreams.length > 0) {
+          const added = catalogReleaseStore.addRelease(candidate);
+          if (added) {
+            result.newAnimesAdded++;
+            mediaAvailabilityIndex.markAvailable(candidate.id, "anime", {
+              title: candidate.title,
+              sourceCount: cleanStreams.length,
+              providersChecked: ["AniList + ZapiStream"]
+            });
+          }
+        } else {
+          catalogReleaseStore.recordPending({
+            id: candidate.id,
+            title: candidate.title,
+            type: "ANIME" /* ANIME */,
+            year: candidate.year,
+            reason: "Anime da temporada aguardando disponibiliza\xE7\xE3o de streams"
+          });
+          result.pendingUnavailables++;
+        }
+      }
+    } catch (e) {
+      result.errors.push(`Erro ao descobrir animes: ${e.message}`);
+    }
+  }
+  /**
+   * Verifica e atualiza novos episódios de séries e animes já catalogados
+   */
+  async checkNewEpisodes(result) {
+    try {
+      const activeWorks = catalogReleaseStore.getReleases().filter(
+        (r) => r.type === "S\xC9RIE" /* SERIES */ || r.type === "ANIME" /* ANIME */ && r.mediaFormat === "series"
+      );
+      const batch = activeWorks.slice(0, 5);
+      for (const work of batch) {
+        const lastEpNum = work.episodes && work.episodes.length > 0 ? Math.max(...work.episodes.map((e) => e.number)) : 0;
+        const nextEpNum = lastEpNum + 1;
+        const streams = await providerRegistry.resolveStreams(
+          work.type === "ANIME" /* ANIME */ ? "anime" : "series",
+          { id: work.id, imdbId: work.imdbId, tmdbId: work.tmdbId, title: work.title },
+          { season: 1, episode: nextEpNum }
+        );
+        const cleanStreams = streams.filter((s) => !CamBlockerEngine.isCamStream(s, work));
+        if (cleanStreams.length > 0) {
+          const added = catalogReleaseStore.addEpisodeToWork(work.id, {
+            id: `${work.id}-s1-e${nextEpNum}`,
+            number: nextEpNum,
+            season: 1,
+            title: `Epis\xF3dio ${nextEpNum}`,
+            videoUrl: cleanStreams[0].url
+          });
+          if (added) {
+            result.newEpisodesAdded++;
+          }
+        }
+      }
+    } catch (e) {
+      result.errors.push(`Erro ao checar novos epis\xF3dios: ${e.message}`);
+    }
+  }
+  /**
+   * Reavalia títulos pendentes da fila cujo tempo de espera expirou
+   */
+  async recheckPendingQueue(result) {
+    const duePendings = catalogReleaseStore.getDuePendings().slice(0, 5);
+    for (const pending of duePendings) {
+      const streams = await providerRegistry.resolveStreams(
+        pending.type === "FILME" /* MOVIE */ ? "movie" : pending.type === "ANIME" /* ANIME */ ? "anime" : "series",
+        { id: pending.id, imdbId: pending.imdbId, tmdbId: pending.tmdbId, title: pending.title }
+      );
+      const cleanStreams = streams.filter((s) => !CamBlockerEngine.isCamStream(s));
+      if (cleanStreams.length > 0) {
+        const item = {
+          id: pending.id,
+          imdbId: pending.imdbId,
+          tmdbId: pending.tmdbId,
+          title: pending.title,
+          type: pending.type,
+          year: pending.year || 2024
+        };
+        const added = catalogReleaseStore.addRelease(item);
+        if (added) {
+          if (pending.type === "FILME" /* MOVIE */) result.newMoviesAdded++;
+          else if (pending.type === "S\xC9RIE" /* SERIES */) result.newSeriesAdded++;
+          else result.newAnimesAdded++;
+          mediaAvailabilityIndex.markAvailable(pending.imdbId || pending.id, pending.type === "FILME" /* MOVIE */ ? "movie" : "series", {
+            title: pending.title,
+            sourceCount: cleanStreams.length,
+            providersChecked: ["Recheck Pending"]
+          });
+        }
+      } else {
+        catalogReleaseStore.recordPending({
+          id: pending.id,
+          imdbId: pending.imdbId,
+          tmdbId: pending.tmdbId,
+          title: pending.title,
+          type: pending.type,
+          year: pending.year,
+          reason: "Ainda sem fontes autorizadas ap\xF3s rechecagem"
+        });
+      }
+    }
+  }
+};
+var autoReleaseService = AutoReleaseService.getInstance();
+
+// src/core/catalog/CatalogReleaseScheduler.ts
+var CatalogReleaseScheduler = class _CatalogReleaseScheduler {
+  constructor() {
+    this.timer = null;
+    this.isRunning = false;
+    this.targetHourUTC = 6;
+    // 06:00 UTC (03:00 BRT)
+    this.lastRunTimestamp = null;
+    this.lastRunResult = null;
+    if (process.env.RELEASE_SCHEDULE_HOUR_UTC) {
+      const parsed = parseInt(process.env.RELEASE_SCHEDULE_HOUR_UTC, 10);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 23) {
+        this.targetHourUTC = parsed;
+      }
+    }
+  }
+  static getInstance() {
+    if (!_CatalogReleaseScheduler.instance) {
+      _CatalogReleaseScheduler.instance = new _CatalogReleaseScheduler();
+    }
+    return _CatalogReleaseScheduler.instance;
+  }
+  /**
+   * Inicia o agendador diário em segundo plano
+   */
+  start() {
+    if (this.isRunning) return;
+    this.isRunning = true;
+    console.log(`[CatalogReleaseScheduler] Agendador di\xE1rio ativado. Hor\xE1rio padr\xE3o: ${this.targetHourUTC}:00 UTC.`);
+    this.timer = setInterval(() => {
+      this.checkAndExecuteScheduledRun();
+    }, 30 * 60 * 1e3);
+    this.checkAndExecuteScheduledRun();
+  }
+  stop() {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+    this.isRunning = false;
+  }
+  getNextRunDate(from = /* @__PURE__ */ new Date()) {
+    const d = new Date(from.getTime());
+    const currentHour = d.getUTCHours();
+    const currentMin = d.getUTCMinutes();
+    const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), this.targetHourUTC, 0, 0, 0));
+    if (currentHour > this.targetHourUTC || currentHour === this.targetHourUTC && currentMin > 0) {
+      next.setUTCDate(next.getUTCDate() + 1);
+    }
+    return next;
+  }
+  async checkAndExecuteScheduledRun() {
+    const now = Date.now();
+    const TWENTY_HOURS_MS = 20 * 60 * 60 * 1e3;
+    if (this.lastRunTimestamp && now - this.lastRunTimestamp < TWENTY_HOURS_MS) {
+      return;
+    }
+    const currentUtcHour = (/* @__PURE__ */ new Date()).getUTCHours();
+    if (currentUtcHour === this.targetHourUTC) {
+      await this.executeManualSync();
+    }
+  }
+  async executeManualSync() {
+    console.log("[CatalogReleaseScheduler] Executando sincroniza\xE7\xE3o de lan\xE7amentos...");
+    const result = await autoReleaseService.runDailyReleaseSync();
+    this.lastRunTimestamp = Date.now();
+    this.lastRunResult = result;
+    return result;
+  }
+  getStatus() {
+    const nextDate = this.getNextRunDate();
+    return {
+      isRunning: this.isRunning,
+      targetHourUTC: this.targetHourUTC,
+      nextRunDate: nextDate.toISOString(),
+      nextRunTimestamp: nextDate.getTime(),
+      lastRunTimestamp: this.lastRunTimestamp,
+      lastRunResult: this.lastRunResult
+    };
+  }
+};
+var catalogReleaseScheduler = CatalogReleaseScheduler.getInstance();
+
+// src/core/recommendations/CollaborativeTrainer.ts
+import fs2 from "fs";
+import path2 from "path";
+
+// src/core/recommendations/collaborativeTypes.ts
+var DEFAULT_ACTIVATION_CRITERIA = {
+  minUniqueUsers: 5,
+  minInteractions: 20,
+  minCatalogCoverage: 0.05,
+  maxCollaborativeWeight: 0.35
+};
+
+// src/core/recommendations/CollaborativeTrainer.ts
+var CollaborativeTrainer = class {
+  constructor(dataDir, criteria = DEFAULT_ACTIVATION_CRITERIA) {
+    this.activeModel = null;
+    const baseDir = dataDir || path2.resolve(process.cwd(), "data");
+    if (!fs2.existsSync(baseDir)) {
+      try {
+        fs2.mkdirSync(baseDir, { recursive: true });
+      } catch {
+      }
+    }
+    this.eventsPath = path2.join(baseDir, "collaborative_events.jsonl");
+    this.modelPath = path2.join(baseDir, "collaborative_model.json");
+    this.criteria = criteria;
+    this.loadModelSync();
+  }
+  /**
+   * Carrega o modelo persistido do disco se existir.
+   */
+  loadModelSync() {
+    try {
+      if (fs2.existsSync(this.modelPath)) {
+        const raw = fs2.readFileSync(this.modelPath, "utf8");
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          this.activeModel = parsed;
+        }
+      }
+    } catch (e) {
+      console.warn("Erro ao carregar modelo colaborativo existente:", e);
+    }
+  }
+  /**
+   * Retorna o modelo ativo ou um modelo vazio de cold-start.
+   */
+  getModel() {
+    if (this.activeModel) return this.activeModel;
+    return {
+      version: 1,
+      trainedAt: (/* @__PURE__ */ new Date(0)).toISOString(),
+      totalInteractions: 0,
+      uniqueUsersCount: 0,
+      catalogCoverage: 0,
+      isActivated: false,
+      confidenceScore: 0,
+      itemSimilarities: {}
+    };
+  }
+  /**
+   * Registra um novo evento pseudonimizado no log persistente.
+   */
+  async ingestEvent(event) {
+    if (!event || !event.anonymousId || !event.contentId || event.weight <= 0) {
+      return false;
+    }
+    const line = JSON.stringify({
+      anonymousId: String(event.anonymousId).trim(),
+      contentId: String(event.contentId).trim(),
+      weight: Math.min(1, Math.max(0.1, Number(event.weight) || 0.5)),
+      timestamp: Number(event.timestamp) || Date.now()
+    }) + "\n";
+    try {
+      await fs2.promises.appendFile(this.eventsPath, line, "utf8");
+      return true;
+    } catch (e) {
+      console.error("Falha ao registrar evento colaborativo:", e);
+      return false;
+    }
+  }
+  /**
+   * Carrega e deduplica todos os eventos do arquivo JSONL.
+   * Mantém o maior peso registrado por (usuário, conteúdo).
+   */
+  async loadAllDeduplicatedEvents() {
+    const userItemMatrix = /* @__PURE__ */ new Map();
+    if (!fs2.existsSync(this.eventsPath)) {
+      return userItemMatrix;
+    }
+    try {
+      const content = await fs2.promises.readFile(this.eventsPath, "utf8");
+      const lines = content.split("\n");
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const ev = JSON.parse(trimmed);
+          if (ev.anonymousId && ev.contentId) {
+            let userRatings = userItemMatrix.get(ev.anonymousId);
+            if (!userRatings) {
+              userRatings = /* @__PURE__ */ new Map();
+              userItemMatrix.set(ev.anonymousId, userRatings);
+            }
+            const currentWeight = userRatings.get(ev.contentId) || 0;
+            if (ev.weight > currentWeight) {
+              userRatings.set(ev.contentId, ev.weight);
+            }
+          }
+        } catch {
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao ler eventos colaborativos para treinamento:", e);
+    }
+    return userItemMatrix;
+  }
+  /**
+   * Treina a matriz de similaridade Item-Item com base nos dados agregados.
+   * Utiliza Cosine Similarity com Fator de Encolhimento (Shrinkage Damping):
+   * sim(i, j) = sum(r_ui * r_uj) / (sqrt(sum(r_ui^2)) * sqrt(sum(r_uj^2)) + shrinkage)
+   */
+  async train(totalCatalogItemCount = 200) {
+    const userItemMatrix = await this.loadAllDeduplicatedEvents();
+    const uniqueUsersCount = userItemMatrix.size;
+    const itemUserMatrix = /* @__PURE__ */ new Map();
+    const itemNorms = /* @__PURE__ */ new Map();
+    let totalInteractions = 0;
+    userItemMatrix.forEach((items2, userId) => {
+      items2.forEach((rating, itemId) => {
+        totalInteractions++;
+        let users = itemUserMatrix.get(itemId);
+        if (!users) {
+          users = /* @__PURE__ */ new Map();
+          itemUserMatrix.set(itemId, users);
+        }
+        users.set(userId, rating);
+      });
+    });
+    itemUserMatrix.forEach((users, itemId) => {
+      let sumSq = 0;
+      users.forEach((r) => {
+        sumSq += r * r;
+      });
+      itemNorms.set(itemId, Math.sqrt(sumSq));
+    });
+    const items = Array.from(itemUserMatrix.keys());
+    const itemSimilarities = {};
+    const shrinkage = 2;
+    for (let i = 0; i < items.length; i++) {
+      const itemA = items[i];
+      const usersA = itemUserMatrix.get(itemA);
+      const normA = itemNorms.get(itemA);
+      const similarities = [];
+      for (let j = 0; j < items.length; j++) {
+        if (i === j) continue;
+        const itemB = items[j];
+        const usersB = itemUserMatrix.get(itemB);
+        const normB = itemNorms.get(itemB);
+        let dotProduct = 0;
+        let coOccurrenceCount = 0;
+        usersA.forEach((ratingA, userId) => {
+          const ratingB = usersB.get(userId);
+          if (ratingB !== void 0) {
+            dotProduct += ratingA * ratingB;
+            coOccurrenceCount++;
+          }
+        });
+        if (coOccurrenceCount > 0 && dotProduct > 0) {
+          const rawCosine = dotProduct / (normA * normB + shrinkage);
+          const score = Math.min(1, Math.max(0.01, Math.round(rawCosine * 1e3) / 1e3));
+          if (score >= 0.05) {
+            similarities.push({
+              targetId: itemB,
+              score,
+              coOccurrenceCount
+            });
+          }
+        }
+      }
+      similarities.sort((a, b) => b.score - a.score);
+      if (similarities.length > 0) {
+        itemSimilarities[itemA] = similarities.slice(0, 15);
+      }
+    }
+    const connectedItemsCount = Object.keys(itemSimilarities).length;
+    const catalogCoverage = totalCatalogItemCount > 0 ? Math.min(1, Math.round(connectedItemsCount / totalCatalogItemCount * 100) / 100) : 0;
+    const meetsUsers = uniqueUsersCount >= this.criteria.minUniqueUsers;
+    const meetsInteractions = totalInteractions >= this.criteria.minInteractions;
+    const meetsCoverage = catalogCoverage >= this.criteria.minCatalogCoverage;
+    const isActivated = meetsUsers && meetsInteractions && meetsCoverage;
+    let confidenceScore = 0;
+    if (isActivated) {
+      const userFactor = Math.min(1, uniqueUsersCount / (this.criteria.minUniqueUsers * 5));
+      const interactionFactor = Math.min(1, totalInteractions / (this.criteria.minInteractions * 4));
+      const coverageFactor = Math.min(1, catalogCoverage / 0.2);
+      confidenceScore = Math.round((userFactor * 0.4 + interactionFactor * 0.4 + coverageFactor * 0.2) * 100) / 100;
+    }
+    const model = {
+      version: (this.activeModel?.version || 0) + 1,
+      trainedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      totalInteractions,
+      uniqueUsersCount,
+      catalogCoverage,
+      isActivated,
+      confidenceScore,
+      itemSimilarities
+    };
+    this.activeModel = model;
+    try {
+      await fs2.promises.writeFile(this.modelPath, JSON.stringify(model, null, 2), "utf8");
+    } catch (e) {
+      console.error("Erro ao persistir modelo colaborativo:", e);
+    }
+    return model;
+  }
+  /**
+   * Purga todos os eventos pertencentes ao identificador anônimo especificado
+   * (direito ao esquecimento / revogação de consentimento).
+   */
+  async purgeUserData(anonymousId) {
+    if (!anonymousId || !fs2.existsSync(this.eventsPath)) return false;
+    try {
+      const content = await fs2.promises.readFile(this.eventsPath, "utf8");
+      const lines = content.split("\n");
+      const keptLines = [];
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const ev = JSON.parse(trimmed);
+          if (ev.anonymousId !== anonymousId) {
+            keptLines.push(line);
+          }
+        } catch {
+          keptLines.push(line);
+        }
+      }
+      await fs2.promises.writeFile(this.eventsPath, keptLines.join("\n") + (keptLines.length > 0 ? "\n" : ""), "utf8");
+      this.train().catch(() => {
+      });
+      return true;
+    } catch (e) {
+      console.error("Erro ao purgar dados do usu\xE1rio:", e);
+      return false;
+    }
+  }
+};
+var collaborativeTrainer = new CollaborativeTrainer();
+
+// src/core/feedback/FeedbackStore.ts
+import * as fs3 from "fs";
+import path3 from "path";
+
+// src/core/feedback/feedbackTypes.ts
+var FEEDBACK_CATEGORY_LABELS = {
+  video_not_loading: "V\xEDdeo n\xE3o carrega",
+  infinite_loading: "Carregamento infinito",
+  video_stuttering: "V\xEDdeo travando",
+  wrong_movie_series: "Filme ou s\xE9rie incorreta",
+  wrong_episode: "Epis\xF3dio incorreto",
+  wrong_dubbing: "Dublagem incorreta",
+  missing_dubbing_ptbr: "Dublagem brasileira indispon\xEDvel",
+  subtitles_wrong_language: "Legenda em outro idioma",
+  subtitles_out_of_sync: "Legenda fora de sincronia",
+  no_sound: "V\xEDdeo sem som",
+  unstable_volume: "Volume inst\xE1vel",
+  wrong_quality: "Qualidade de v\xEDdeo incorreta",
+  ai_enhancer_not_working: "Melhoria por IA n\xE3o funciona",
+  split_screen_not_working: "Tela Dividida n\xE3o funciona",
+  search_problem: "Problema na busca",
+  catalog_problem: "Problema no cat\xE1logo",
+  live_channel_unavailable: "Canal ao vivo indispon\xEDvel",
+  broken_interface: "Interface com defeito",
+  other_problem: "Outro problema"
+};
+
+// src/core/feedback/FeedbackClusteringEngine.ts
+var FeedbackClusteringEngine = class {
+  /**
+   * Gera a assinatura técnica normalizada de um relato (Fingerprint)
+   */
+  static generateFingerprint(category, context) {
+    const mediaId = (context.canonicalMediaId || context.tmdbId || context.imdbId || "global").toLowerCase().trim();
+    const season = context.season || 0;
+    const episode = context.episode || 0;
+    const provider = (context.providerId || "unknown").toLowerCase().trim();
+    const failureStage = context.failureStage || "none";
+    const errorCode = context.errorCode ? context.errorCode.toUpperCase().trim() : "NONE";
+    let sourceHost = "unknown";
+    if (context.streamUrlHost) {
+      sourceHost = context.streamUrlHost.toLowerCase();
+    } else if (context.sourceId) {
+      sourceHost = context.sourceId.toLowerCase();
+    }
+    const isEpisodeSpecific = season > 0 || episode > 0;
+    const epKey = isEpisodeSpecific ? `S${season}E${episode}` : "ALL";
+    const errKey = errorCode !== "NONE" ? errorCode : failureStage;
+    const rawKey = `${category}|${mediaId}|${epKey}|${provider}|${errKey}`;
+    const cleanHash = this.hashString(rawKey);
+    const fingerprint = `fp_l1_${cleanHash}`;
+    const data = {
+      category,
+      canonicalMediaId: mediaId !== "global" ? mediaId : void 0,
+      season: season > 0 ? season : void 0,
+      episode: episode > 0 ? episode : void 0,
+      providerId: provider !== "unknown" ? provider : void 0,
+      sourceHost: sourceHost !== "unknown" ? sourceHost : void 0,
+      errorCode: errorCode !== "NONE" ? errorCode : void 0,
+      failureStage: failureStage !== "none" ? failureStage : void 0,
+      level: 1
+    };
+    return { fingerprint, data };
+  }
+  /**
+   * Gera título normalizado e profissional para o cluster
+   */
+  static generateClusterTitle(category, context) {
+    const categoryName = FEEDBACK_CATEGORY_LABELS[category] || "Problema de Reprodu\xE7\xE3o";
+    const mediaName = context.mediaTitle ? context.mediaTitle.trim() : null;
+    const isEpisode = (context.season || 0) > 0 && (context.episode || 0) > 0;
+    if (mediaName) {
+      if (isEpisode) {
+        return `${mediaName} (T${context.season}:E${context.episode}) \u2014 ${categoryName}`;
+      }
+      return `${mediaName} \u2014 ${categoryName}`;
+    }
+    if (context.providerId && context.providerId !== "unknown") {
+      return `Provedor ${context.providerId.toUpperCase()} \u2014 ${categoryName}`;
+    }
+    if (category === "live_channel_unavailable") {
+      return `TV ao Vivo \u2014 ${context.mediaTitle || "Canal"} Indispon\xEDvel`;
+    }
+    if (category === "search_problem") {
+      return `Busca e Cat\xE1logo \u2014 Inconsist\xEAncia nos Resultados`;
+    }
+    return `Sistema \u2014 ${categoryName}`;
+  }
+  /**
+   * Extrai dados normalizados de fingerprint de forma descritiva
+   */
+  static extractFingerprint(category, context) {
+    const canonicalMediaId = context.canonicalMediaId ? context.canonicalMediaId.toLowerCase().trim() : void 0;
+    const mediaTitle = context.mediaTitle ? context.mediaTitle.trim() : void 0;
+    const providerId = context.providerId ? context.providerId.toLowerCase().trim() : void 0;
+    const errorCode = context.errorCode ? context.errorCode.toUpperCase().trim() : void 0;
+    return {
+      canonicalMediaId,
+      mediaTitle,
+      mediaType: context.mediaType,
+      season: context.season,
+      episode: context.episode,
+      providerId,
+      errorCode,
+      category,
+      component: this.getComponentByCategory(category),
+      failureStage: context.failureStage
+    };
+  }
+  /**
+   * Mapeia categoria para o componente técnico responsável
+   */
+  static getComponentByCategory(category) {
+    switch (category) {
+      case "video_not_loading":
+      case "infinite_loading":
+      case "video_stuttering":
+      case "wrong_quality":
+        return "playback";
+      case "wrong_dubbing":
+      case "missing_dubbing_ptbr":
+      case "no_sound":
+      case "unstable_volume":
+        return "audio";
+      case "subtitles_wrong_language":
+      case "subtitles_out_of_sync":
+        return "subtitles";
+      case "ai_enhancer_not_working":
+      case "split_screen_not_working":
+        return "enhancer";
+      case "search_problem":
+      case "catalog_problem":
+        return "catalog";
+      case "live_channel_unavailable":
+        return "livetv";
+      default:
+        return "general";
+    }
+  }
+  /**
+   * Alias de conveniência para matchCluster
+   */
+  static findMatchingCluster(existingClusters, report) {
+    return this.matchCluster(existingClusters, report);
+  }
+  /**
+   * Avalia a prioridade de um cluster com base em severidade, impacto e frequência
+   */
+  static calculatePriority(category, totalReports, affectedMediaCountOrErrorCode, isRegression) {
+    const isReg = typeof isRegression === "boolean" ? isRegression : false;
+    const mediaCount = typeof affectedMediaCountOrErrorCode === "number" ? affectedMediaCountOrErrorCode : 1;
+    if (category === "live_channel_unavailable" && totalReports >= 5) {
+      return "critical";
+    }
+    if ((category === "video_not_loading" || category === "infinite_loading" || category === "no_sound") && (totalReports >= 10 || isReg)) {
+      return "critical";
+    }
+    const highCategories = [
+      "video_not_loading",
+      "infinite_loading",
+      "wrong_movie_series",
+      "wrong_episode",
+      "wrong_dubbing",
+      "no_sound"
+    ];
+    if (highCategories.includes(category)) {
+      if (totalReports >= 10 || isReg) {
+        return "critical";
+      }
+      return "high";
+    }
+    const mediumCategories = [
+      "missing_dubbing_ptbr",
+      "subtitles_wrong_language",
+      "subtitles_out_of_sync",
+      "video_stuttering",
+      "unstable_volume",
+      "wrong_quality",
+      "ai_enhancer_not_working",
+      "split_screen_not_working",
+      "search_problem",
+      "catalog_problem",
+      "live_channel_unavailable"
+    ];
+    if (mediumCategories.includes(category)) {
+      if (totalReports === 1 && category === "catalog_problem") {
+        return "low";
+      }
+      if (totalReports >= 10 || mediaCount >= 5) {
+        return "high";
+      }
+      return "medium";
+    }
+    if (totalReports >= 15) {
+      return "medium";
+    }
+    return "low";
+  }
+  /**
+   * Calcula a tendência do problema (Aumentando, Estável, Diminuindo, Reapareceu)
+   */
+  static calculateTrend(recentCountOrReports, totalCountOrStatus, isRegression) {
+    if (Array.isArray(recentCountOrReports)) {
+      const reports = recentCountOrReports;
+      const status = typeof totalCountOrStatus === "string" ? totalCountOrStatus : "new";
+      if (status === "reopened" || isRegression) {
+        return "reappeared";
+      }
+      if (reports.length >= 4) {
+        return "increasing";
+      }
+      return "stable";
+    }
+    const recentCount = typeof recentCountOrReports === "number" ? recentCountOrReports : 0;
+    const totalCount = typeof totalCountOrStatus === "number" ? totalCountOrStatus : 1;
+    if (isRegression) {
+      return "reappeared";
+    }
+    if (recentCount >= 3 && recentCount / Math.max(1, totalCount) >= 0.5) {
+      return "increasing";
+    }
+    if (recentCount === 0 && totalCount >= 5) {
+      return "decreasing";
+    }
+    return "stable";
+  }
+  /**
+   * Verifica se a submissão é uma duplicação rápida acidental ou abusiva do mesmo navegador
+   */
+  static isDuplicateSubmission(recentReports, newToken, newFingerprint, windowSeconds = 60) {
+    const now = Date.now();
+    const threshold = now - windowSeconds * 1e3;
+    return recentReports.some((r) => {
+      if (r.submissionTimestamp < threshold) return false;
+      const isSameToken = r.clientSubmissionToken === newToken;
+      const isSameFingerprint = r.fingerprint === newFingerprint;
+      return isSameToken && isSameFingerprint;
+    });
+  }
+  /**
+   * Encontra o melhor cluster existente para associar o novo relato
+   */
+  static matchCluster(existingClusters, report) {
+    const repFp = report.fingerprint || report.fingerprintHash;
+    const repFpData = report.fingerprintData || report.technicalFingerprint || {};
+    const category = report.category;
+    const exactMatch = existingClusters.find(
+      (c) => c.fingerprint && c.fingerprint === repFp || c.fingerprintHash && c.fingerprintHash === repFp
+    );
+    if (exactMatch) {
+      return { matchedCluster: exactMatch, matchLevel: 1 };
+    }
+    const repMediaId = repFpData.canonicalMediaId || report.technicalContext?.canonicalMediaId;
+    if (repMediaId) {
+      const mediaMatch = existingClusters.find((c) => {
+        const cMediaId = c.fingerprintData?.canonicalMediaId || c.technicalFingerprint?.canonicalMediaId;
+        return c.category === category && cMediaId === repMediaId && c.status !== "resolved";
+      });
+      if (mediaMatch) {
+        return { matchedCluster: mediaMatch, matchLevel: 2 };
+      }
+    }
+    const repProvider = repFpData.providerId || report.technicalContext?.providerId;
+    if (repProvider && repProvider !== "unknown") {
+      const providerSystemic = existingClusters.find((c) => {
+        const cProvider = c.fingerprintData?.providerId || c.technicalFingerprint?.providerId;
+        const total = c.totalReports || c.reportCount || 0;
+        return c.category === category && cProvider === repProvider && total >= 5 && c.status !== "resolved";
+      });
+      if (providerSystemic) {
+        return { matchedCluster: providerSystemic, matchLevel: 3 };
+      }
+    }
+    return { matchedCluster: null, matchLevel: 1 };
+  }
+  /**
+   * Cria um novo IssueCluster a partir do primeiro relato
+   */
+  static createClusterFromReport(report) {
+    const { technicalContext, category, fingerprint, fingerprintData } = report;
+    const title = this.generateClusterTitle(category, technicalContext);
+    const priority = this.calculatePriority(category, 1, technicalContext.canonicalMediaId ? 1 : 0, false);
+    const affectedMedia = [];
+    if (technicalContext.canonicalMediaId) {
+      affectedMedia.push({
+        id: technicalContext.canonicalMediaId,
+        title: technicalContext.mediaTitle || technicalContext.canonicalMediaId,
+        type: technicalContext.mediaType || "movie"
+      });
+    }
+    const affectedEpisodes = [];
+    if (technicalContext.season && technicalContext.episode) {
+      affectedEpisodes.push({
+        season: technicalContext.season,
+        episode: technicalContext.episode
+      });
+    }
+    const now = Date.now();
+    const clusterId = `cluster_${this.hashString(`${fingerprint}_${now}`)}`;
+    return {
+      id: clusterId,
+      title,
+      category,
+      categoryLabel: FEEDBACK_CATEGORY_LABELS[category] || "Outro",
+      priority,
+      status: "new",
+      trend: "increasing",
+      fingerprint,
+      fingerprintData,
+      totalReports: 1,
+      estimatedDistinctUsers: 1,
+      recentReportsCount: 1,
+      firstOccurrenceAt: report.submissionTimestamp || now,
+      lastOccurrenceAt: report.submissionTimestamp || now,
+      affectedMedia,
+      affectedEpisodes,
+      affectedSources: technicalContext.sourceId ? [technicalContext.sourceId] : [],
+      affectedProviders: technicalContext.providerId ? [technicalContext.providerId] : [],
+      affectedVersions: [technicalContext.appVersion || "0.0.0"],
+      errorCodes: technicalContext.errorCode ? [technicalContext.errorCode] : [],
+      languagesInvolved: technicalContext.requestedLanguage ? [technicalContext.requestedLanguage] : [],
+      promptVersion: 1,
+      isPromptOutdated: false,
+      relatedClusterIds: [],
+      isRegression: false,
+      history: [
+        {
+          id: `hist_${now}_init`,
+          timestamp: now,
+          action: "created",
+          performedBy: "Sistema (FeedbackClusteringEngine)",
+          details: `Cluster inicializado a partir do relato #${report.id}`
+        }
+      ]
+    };
+  }
+  /**
+   * Atualiza um IssueCluster existente ao receber novo relato
+   */
+  static mergeReportIntoCluster(cluster, report) {
+    const { technicalContext } = report;
+    const now = Date.now();
+    let isRegression = false;
+    let newStatus = cluster.status;
+    let regressionDetails = cluster.regressionDetails;
+    const history = [...cluster.history];
+    if (cluster.status === "resolved") {
+      isRegression = true;
+      newStatus = "reopened";
+      regressionDetails = {
+        previousResolvedAt: cluster.lastOccurrenceAt,
+        resolvedInVersion: cluster.affectedVersions[cluster.affectedVersions.length - 1],
+        reopenedAt: now
+      };
+      history.push({
+        id: `hist_${now}_regression`,
+        timestamp: now,
+        action: "regression_detected",
+        performedBy: "Sistema (Detec\xE7\xE3o de Regress\xE3o)",
+        details: `Problema reapareceu ap\xF3s resolu\xE7\xE3o anterior. Nova ocorr\xEAncia registrada no app v${technicalContext.appVersion || "desconhecida"}.`
+      });
+    }
+    const affectedMedia = [...cluster.affectedMedia];
+    if (technicalContext.canonicalMediaId && !affectedMedia.some((m) => m.id === technicalContext.canonicalMediaId)) {
+      affectedMedia.push({
+        id: technicalContext.canonicalMediaId,
+        title: technicalContext.mediaTitle || technicalContext.canonicalMediaId,
+        type: technicalContext.mediaType || "movie"
+      });
+    }
+    const affectedEpisodes = [...cluster.affectedEpisodes];
+    if (technicalContext.season && technicalContext.episode) {
+      const epExists = affectedEpisodes.some(
+        (e) => e.season === technicalContext.season && e.episode === technicalContext.episode
+      );
+      if (!epExists) {
+        affectedEpisodes.push({
+          season: technicalContext.season,
+          episode: technicalContext.episode
+        });
+      }
+    }
+    const affectedSources = Array.from(/* @__PURE__ */ new Set([
+      ...cluster.affectedSources,
+      ...technicalContext.sourceId ? [technicalContext.sourceId] : []
+    ]));
+    const affectedProviders = Array.from(/* @__PURE__ */ new Set([
+      ...cluster.affectedProviders,
+      ...technicalContext.providerId ? [technicalContext.providerId] : []
+    ]));
+    const affectedVersions = Array.from(/* @__PURE__ */ new Set([
+      ...cluster.affectedVersions,
+      ...technicalContext.appVersion ? [technicalContext.appVersion] : []
+    ]));
+    const errorCodes = Array.from(/* @__PURE__ */ new Set([
+      ...cluster.errorCodes,
+      ...technicalContext.errorCode ? [technicalContext.errorCode] : []
+    ]));
+    const languagesInvolved = Array.from(/* @__PURE__ */ new Set([
+      ...cluster.languagesInvolved,
+      ...technicalContext.requestedLanguage ? [technicalContext.requestedLanguage] : [],
+      ...technicalContext.declaredLanguage ? [technicalContext.declaredLanguage] : []
+    ]));
+    const totalReports = cluster.totalReports + 1;
+    const recentReportsCount = cluster.recentReportsCount + 1;
+    const priority = this.calculatePriority(cluster.category, totalReports, affectedMedia.length, isRegression);
+    const trend = this.calculateTrend(recentReportsCount, totalReports, isRegression);
+    history.push({
+      id: `hist_${now}_add`,
+      timestamp: now,
+      action: "report_added",
+      performedBy: "Sistema (Novo Relato)",
+      details: `Relato #${report.id} associado ao cluster. Total de relatos: ${totalReports}.`
+    });
+    const updatedCluster = {
+      ...cluster,
+      totalReports,
+      recentReportsCount,
+      lastOccurrenceAt: now,
+      priority,
+      status: newStatus,
+      trend,
+      affectedMedia,
+      affectedEpisodes,
+      affectedSources,
+      affectedProviders,
+      affectedVersions,
+      errorCodes,
+      languagesInvolved,
+      isPromptOutdated: true,
+      // Marca que o prompt precisa ser atualizado com as novas evidências
+      isRegression: isRegression || cluster.isRegression,
+      regressionDetails,
+      history
+    };
+    return { updatedCluster, isRegressionDetected: isRegression };
+  }
+  static hashString(str) {
+    let hash = 5381;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash << 5) + hash + str.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(36);
+  }
+};
+
+// src/core/feedback/FeedbackPromptGenerator.ts
+var FeedbackPromptGenerator = class {
+  /**
+   * Sanitiza a descrição enviada pelo usuário para impedir Prompt Injection
+   */
+  static sanitizeUserDescription(rawText) {
+    return this.sanitizeUserComment(rawText);
+  }
+  /**
+   * Sanitiza o comentário enviado pelo usuário neutralizando tentativas de jailbreak e prompt injection
+   */
+  static sanitizeUserComment(rawText) {
+    if (!rawText) return "Nenhuma descri\xE7\xE3o textual fornecida pelo usu\xE1rio.";
+    let cleaned = rawText.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").replace(/```/g, "'''");
+    cleaned = cleaned.replace(/ignore\s+all\s+(previous|prior)\s+instructions/gi, "[instru\xE7\xE3o desconsiderada]").replace(/system\s+prompt\s+override/gi, "[instru\xE7\xE3o desconsiderada]").replace(/you\s+are\s+now\s+/gi, "[tentativa de redefini\xE7\xE3o de persona desconsiderada]").trim();
+    if (!cleaned) return "Nenhuma descri\xE7\xE3o textual fornecida pelo usu\xE1rio.";
+    return cleaned.slice(0, 1500);
+  }
+  /**
+   * Gera um prompt técnico individual a partir de um único relato
+   */
+  static generateIndividualPrompt(report) {
+    const { category, technicalContext, userDescription, id } = report;
+    const categoryLabel = FEEDBACK_CATEGORY_LABELS[category] || "Problema Geral";
+    const mediaTitle = technicalContext.mediaTitle || "Aplica\xE7\xE3o ZapiTV";
+    const safeUserText = this.sanitizeUserDescription(userDescription);
+    const now = Date.now();
+    const isEpisode = (technicalContext.season || 0) > 0 && (technicalContext.episode || 0) > 0;
+    const epString = isEpisode ? ` (Temporada ${technicalContext.season}, Epis\xF3dio ${technicalContext.episode})` : "";
+    const markdown = `# ZAPITV \u2014 INVESTIGA\xC7\xC3O E CORRE\xC7\xC3O: ${categoryLabel.toUpperCase()} EM ${mediaTitle.toUpperCase()}${epString.toUpperCase()}
+
+## 1. PROBLEMA RELATADO
+Um usu\xE1rio relatou uma falha de **${categoryLabel}** durante o uso do ZapiTV.
+
+> [!NOTE] Relato do Usu\xE1rio (Dado N\xE3o Confi\xE1vel)
+> "${safeUserText}"
+
+---
+
+## 2. CONTEXTO T\xC9CNICO CAPTURADO
+As seguintes evid\xEAncias t\xE9cnicas foram registradas automaticamente pelo aplicativo:
+- **Relato ID:** \`${id}\`
+- **M\xEDdia:** ${mediaTitle} (ID Can\xF4nico: \`${technicalContext.canonicalMediaId || "N/A"}\`)
+- **Tipo:** ${technicalContext.mediaType || "N/A"} | **Ano:** ${technicalContext.year || "N/A"}
+- **Identificadores:** IMDb: \`${technicalContext.imdbId || "N/A"}\` | TMDB: \`${technicalContext.tmdbId || "N/A"}\`
+${isEpisode ? `- **Epis\xF3dio:** Temporada ${technicalContext.season}, Epis\xF3dio ${technicalContext.episode}` : ""}
+- **Provedor de Streaming:** \`${technicalContext.providerId || "N/A"}\` | **Nome do Stream:** \`${technicalContext.streamName || "N/A"}\`
+- **Tipo de Stream:** \`${technicalContext.streamType || "N/A"}\` | **Host:** \`${technicalContext.streamUrlHost || "N/A"}\`
+- **Idiomas:** Solicitado: \`${technicalContext.requestedLanguage || "N/A"}\` | Declarado: \`${technicalContext.declaredLanguage || "N/A"}\` | Faixa Ativa: \`${technicalContext.activeAudioTrack || "N/A"}\`
+- **Legenda Ativa:** \`${technicalContext.selectedSubtitleId || "off"}\`
+- **Resolu\xE7\xE3o / Qualidade:** Selecionada: \`${technicalContext.selectedQuality || "auto"}\` | Detectada: \`${technicalContext.detectedResolution || "N/A"}\`
+- **Estado do Player:** \`${technicalContext.playerState || "N/A"}\` (Posi\xE7\xE3o: ${Math.round(technicalContext.currentTimeSeconds || 0)}s de ${Math.round(technicalContext.durationSeconds || 0)}s)
+- **Diagn\xF3stico de Falha:** \`${technicalContext.failureStage || "none"}\` | C\xF3digo: \`${technicalContext.errorCode || "N/A"}\`
+- **Mensagem de Erro do Player:** ${technicalContext.lastErrorMessage ? `\`${technicalContext.lastErrorMessage}\`` : "Nenhuma"}
+- **Ambiente:** ZapiTV v${technicalContext.appVersion} | Navegador: ${technicalContext.browser} | SO: ${technicalContext.os} (${technicalContext.deviceType})
+- **Rota:** \`${technicalContext.currentRoute}\`
+
+---
+
+## 3. COMPORTAMENTO ESPERADO
+${this.getExpectedBehaviorByCategory(category, mediaTitle)}
+
+---
+
+## 4. HIP\xD3TESES T\xC9CNICAS INICIAIS
+${this.getHypothesesByCategory(category, technicalContext)}
+
+---
+
+## 5. ROTEIRO DE INVESTIGA\xC7\xC3O
+Inspecione os seguintes arquivos e subsistemas pertinentes:
+${this.getInvestigationFilesByCategory(category)}
+
+Verifique:
+1. Se a fonte ou manifesto retornado pelo provedor \xE9 v\xE1lido e reproduz\xEDvel.
+2. Se h\xE1 diverg\xEAncia entre os metadados do stream e a m\xEDdia real.
+3. Se o player tratou corretamente o estado de carregamento ou comuta\xE7\xE3o de faixa.
+4. Se o erro ocorre apenas em conex\xF5es ou navegadores espec\xEDficos (ex: restri\xE7\xE3o de CORS ou codec).
+
+---
+
+## 6. CORRE\xC7\xD5ES SOLICITADAS
+- Corrija a causa raiz no c\xF3digo do ZapiTV ou na resolu\xE7\xE3o de fontes.
+- N\xE3o aplique solu\xE7\xF5es cosm\xE9ticas ou paliativas.
+- Garanta que caso a fonte prim\xE1ria falhe, o sistema execute fallback autom\xE1tico e limpo para uma fonte leg\xEDtima compat\xEDvel.
+
+---
+
+## 7. TESTES DE REGRESS\xC3O
+Execute testes para validar a resolu\xE7\xE3o do problema:
+- Teste de reprodu\xE7\xE3o direta da obra e do epis\xF3dio indicado.
+- Teste de comuta\xE7\xE3o entre idiomas de \xE1udio e legendas.
+- Teste de resili\xEAncia e fallback caso o provedor apresente lentid\xE3o ou indisponibilidade.
+
+---
+
+## 8. FUNCIONALIDADES A PRESERVAR
+- Inicializa\xE7\xE3o r\xE1pida e pr\xE9-buffer do player.
+- Melhoria por IA e compara\xE7\xE3o em tela dividida.
+- Pular abertura e encerramento.
+- Preserva\xE7\xE3o da numera\xE7\xE3o oficial e metadados can\xF4nicos.
+- Compatibilidade estrita com a Vercel e o servidor local.
+
+---
+
+## 9. CRIT\xC9RIOS DE ACEITA\xC7\xC3O
+1. O problema relatado n\xE3o ocorre mais no cen\xE1rio indicado.
+2. Todas as su\xEDtes de teste do Vitest passam com 100% de aprova\xE7\xE3o (\`npx vitest run\`).
+3. O build de produ\xE7\xE3o \xE9 conclu\xEDdo sem erros (\`npm run build\`).
+
+---
+
+## 10. RELAT\xD3RIO FINAL
+Ao concluir a tarefa, apresente:
+- Causa raiz identificada.
+- Arquivos modificados e resumo das altera\xE7\xF5es.
+- Testes executados e evid\xEAncias de valida\xE7\xE3o.
+`;
+    return {
+      id: `prompt_ind_${now}`,
+      clusterId: report.clusterId || "unassigned",
+      type: "individual",
+      version: 1,
+      markdownContent: markdown.trim(),
+      generatedAt: now,
+      isAiRefined: false,
+      isManuallyEdited: false,
+      feedbackIds: [report.id],
+      variablesUsed: {
+        category,
+        mediaTitle,
+        canonicalMediaId: technicalContext.canonicalMediaId
+      }
+    };
+  }
+  /**
+   * Gera um prompt técnico consolidado e sintético a partir de um cluster com múltiplos relatos
+   */
+  static generateConsolidatedPrompt(cluster, associatedReports) {
+    const { category, title, totalReports } = cluster;
+    const categoryLabel = FEEDBACK_CATEGORY_LABELS[category] || "Problema Recorrente";
+    const now = Date.now();
+    const uniqueUserQuotes = [];
+    const seenTexts = /* @__PURE__ */ new Set();
+    for (const rep of associatedReports) {
+      if (rep.userDescription && rep.userDescription.trim()) {
+        const text = this.sanitizeUserDescription(rep.userDescription);
+        const norm = text.toLowerCase().slice(0, 60);
+        if (!seenTexts.has(norm)) {
+          seenTexts.add(norm);
+          uniqueUserQuotes.push(text);
+          if (uniqueUserQuotes.length >= 6) break;
+        }
+      }
+    }
+    const affectedMedia = cluster.affectedMedia || [];
+    const affectedEpisodes = cluster.affectedEpisodes || [];
+    const affectedProviders = cluster.affectedProviders || [];
+    const affectedSources = cluster.affectedSources || [];
+    const affectedVersions = cluster.affectedVersions || [];
+    const errorCodes = cluster.errorCodes || [];
+    const isRegression = Boolean(cluster.isRegression);
+    const regressionDetails = cluster.regressionDetails;
+    const mediaListStr = affectedMedia.length > 0 ? affectedMedia.map((m) => `- **${m.title}** (\`${m.id}\`, tipo: ${m.type})`).join("\n") : cluster.technicalFingerprint?.mediaTitle ? `- **${cluster.technicalFingerprint.mediaTitle}**` : "- M\xEDdia gen\xE9rica ou n\xE3o identificada.";
+    const episodesStr = affectedEpisodes.length > 0 ? affectedEpisodes.slice(0, 8).map((e) => `T${e.season}:E${e.episode}`).join(", ") : cluster.technicalFingerprint?.season ? `T${cluster.technicalFingerprint.season}:E${cluster.technicalFingerprint.episode}` : "Todos / N\xE3o aplic\xE1vel";
+    const providersStr = affectedProviders.length > 0 ? affectedProviders.join(", ") : cluster.technicalFingerprint?.providerId || "Desconhecido";
+    const sourcesStr = affectedSources.length > 0 ? affectedSources.slice(0, 6).join(", ") : "V\xE1rias";
+    const versionsStr = affectedVersions.length > 0 ? affectedVersions.join(", ") : "Recente";
+    const errorCodesStr = errorCodes.length > 0 ? errorCodes.join(", ") : cluster.technicalFingerprint?.errorCode || "Nenhum c\xF3digo expl\xEDcito";
+    const regressionAlert = isRegression ? `
+> [!CAUTION] POSS\xCDVEL REGRESS\xC3O DETECTADA
+> Este problema j\xE1 havia sido marcado como **Resolvido** anteriormente (${new Date(regressionDetails?.previousResolvedAt || 0).toLocaleDateString("pt-BR")}), mas novos relatos continuam surgindo no app v${versionsStr}.
+> Investigue se um deployment recente reverteu as altera\xE7\xF5es ou se o provedor voltou a fornecer streams problem\xE1ticos.
+` : "";
+    const quotesSection = uniqueUserQuotes.length > 0 ? `### Amostra Representativa dos Relatos dos Usu\xE1rios:
+${uniqueUserQuotes.map((q) => `> - "${q}"`).join("\n")}
+` : "_Os usu\xE1rios relataram a falha diretamente pela categoria selecionada, sem texto adicional._\n";
+    const markdown = `# ZAPITV \u2014 CORRE\xC7\xC3O T\xC9CNICA: ${title.toUpperCase()} (${totalReports} RELATOS RELACIONADOS)
+${regressionAlert}
+## 1. IDENTIFICA\xC7\xC3O DO PROBLEMA
+Foram registrados **${totalReports} relatos associados** \xE0 categoria **"${categoryLabel}"** no ZapiTV.
+
+---
+
+## 2. SEVERIDADE E IMPACTO
+- **Prioridade:** ${cluster.priority.toUpperCase()}
+- **Classifica\xE7\xE3o:** ${categoryLabel}
+- **Impacto no Usu\xE1rio:** Interrup\xE7\xE3o ou degrada\xE7\xE3o na experi\xEAncia de consumo do conte\xFAdo.
+
+---
+
+## 3. ARQUIVOS E COMPONENTES ENVOLVIDOS
+${this.getInvestigationFilesByCategory(category)}
+
+---
+
+## 4. CONTEXTO T\xC9CNICO DE REPRODU\xC7\xC3O
+- **T\xEDtulos Afetados:**
+${mediaListStr}
+- **Epis\xF3dios Afetados:** ${episodesStr}
+- **Provedores Envolvidos:** \`${providersStr}\`
+- **Fontes / Hosts Envolvidos:** \`${sourcesStr}\`
+- **C\xF3digos de Erro Registrados:** \`${errorCodesStr}\`
+- **Vers\xF5es do ZapiTV Detectadas:** \`${versionsStr}\`
+
+---
+
+## 5. S\xCDNTESE DOS RELATOS DOS USU\xC1RIOS
+${quotesSection}
+
+---
+
+## 6. ROTEIRO DE INVESTIGA\xC7\xC3O RECOMENDADO
+1. **Verifica\xE7\xE3o de Metadados e \xCDndices:** Examine se o provedor (\`${providersStr}\`) est\xE1 retornando faixas de \xE1udio ou v\xEDdeo trocadas ou desatualizadas.
+2. **Auditoria de Resolu\xE7\xE3o e Fallback:** Avalie por que o \`SourceSelectionService\` ou \`StreamValidator\` aceitou essa fonte sem disparar quarentena imediata.
+3. **Reprodu\xE7\xE3o do Erro em Ambiente de Teste:** Configure uma simula\xE7\xE3o com os par\xE2metros exatos dos epis\xF3dios (${episodesStr}).
+4. **Isolamento de Cache:** Verifique se o cache persistente de fontes est\xE1 reutilizando uma resposta defeituosa.
+
+---
+
+## 7. CRIT\xC9RIOS DE ACEITA\xC7\xC3O
+1. Os ${totalReports} relatos do cluster s\xE3o resolvidos pela corre\xE7\xE3o sist\xEAmica.
+2. A causa raiz no provedor ou player foi neutralizada por valida\xE7\xE3o ou fallback.
+3. N\xE3o h\xE1 impacto de desempenho na inicializa\xE7\xE3o dos v\xEDdeos.
+4. O administrador pode marcar o cluster como resolvido com garantia de cobertura.
+5. Su\xEDte de testes aprovada com c\xF3digo 0.
+
+---
+
+## 9. RELAT\xD3RIO DE CONCLUS\xC3O
+Ao finalizar, reporte:
+- Causa sist\xEAmica identificada.
+- Arquivos modificados.
+- Testes executados e resultados obtidos.
+- Confirma\xE7\xE3o de que todas as obras do cluster foram tratadas.
+`;
+    const suggestedFiles = this.getSuggestedFilesArray(category);
+    return {
+      id: `prompt_cons_${now}`,
+      clusterId: cluster.id,
+      type: "consolidated",
+      version: cluster.promptVersion + 1,
+      markdownContent: markdown.trim(),
+      consolidatedPrompt: markdown.trim(),
+      suggestedFiles,
+      generatedAt: now,
+      isAiRefined: false,
+      isManuallyEdited: false,
+      feedbackIds: associatedReports.map((r) => r.id),
+      variablesUsed: {
+        category,
+        totalReports,
+        affectedMediaCount: affectedMedia.length,
+        providersStr
+      }
+    };
+  }
+  /**
+   * Alias de conveniência para generateConsolidatedPrompt
+   */
+  static generateConsolidatedClusterPrompt(cluster, associatedReports) {
+    return this.generateConsolidatedPrompt(cluster, associatedReports);
+  }
+  /**
+   * Retorna os arquivos sugeridos para investigação em formato de array de caminhos
+   */
+  static getSuggestedFilesArray(category) {
+    switch (category) {
+      case "wrong_dubbing":
+      case "missing_dubbing_ptbr":
+        return [
+          "src/core/audio/audioSelectionManager.ts",
+          "src/core/audio/audioDetector.ts",
+          "src/components/player/ZapiPlayer.tsx",
+          "src/core/providers/mediaSourceValidationService.ts"
+        ];
+      case "video_not_loading":
+      case "infinite_loading":
+      case "video_stuttering":
+        return [
+          "src/core/playback/PlaybackOptimizerService.ts",
+          "src/core/providers/providerRegistry.ts",
+          "src/core/providers/streamValidator.ts",
+          "src/components/player/ZapiPlayer.tsx",
+          "server.ts"
+        ];
+      case "wrong_movie_series":
+      case "wrong_episode":
+        return [
+          "src/core/identity/canonicalIdentity.ts",
+          "src/core/episodes/EpisodeAvailabilityService.ts",
+          "src/core/identity/sourceConfidenceEngine.ts"
+        ];
+      case "subtitles_wrong_language":
+      case "subtitles_out_of_sync":
+        return [
+          "src/core/subtitles/subtitleLanguageDetector.ts",
+          "src/core/subtitles/subtitleStyleService.ts"
+        ];
+      default:
+        return [
+          "src/components/player/ZapiPlayer.tsx",
+          "components/ContentDetailModal.tsx",
+          "server.ts"
+        ];
+    }
+  }
+  // =========================================================================
+  // HELPERS DE TEMPLATES TÉCNICOS POR CATEGORIA
+  // =========================================================================
+  static getExpectedBehaviorByCategory(category, mediaName) {
+    switch (category) {
+      case "wrong_dubbing":
+        return `Ao selecionar \xE1udio dublado em Portugu\xEAs Brasileiro (PT-BR) para ${mediaName}, a reprodu\xE7\xE3o deve ser executada estritamente com \xE1udio em portugu\xEAs. Se n\xE3o houver dublagem leg\xEDtima verificada, o sistema deve apresentar aviso claro ou \xE1udio original com legendas em PT-BR, nunca reproduzindo espanhol, ingl\xEAs ou outro idioma como se fosse dublado.`;
+      case "missing_dubbing_ptbr":
+        return `O cat\xE1logo deve indicar com precis\xE3o quando h\xE1 dublagem PT-BR dispon\xEDvel. Caso existam fontes dubladas nos provedores integrados, o ZapiTV deve prioriz\xE1-las e exibi-las na listagem de \xE1udio.`;
+      case "video_not_loading":
+      case "infinite_loading":
+        return `O v\xEDdeo deve iniciar a reprodu\xE7\xE3o em menos de 3 a 5 segundos ap\xF3s o clique. Se uma fonte falhar ou demorar, o fallback autom\xE1tico deve alternar silenciosamente para a pr\xF3xima fonte verificada sem travar o player em carregamento infinito.`;
+      case "video_stuttering":
+        return `A reprodu\xE7\xE3o deve fluir sem travamentos constantes. O buffer adaptativo (ABR) e o Stall Watchdog devem rebaixar a qualidade dinamicamente ou alternar para fonte de menor lat\xEAncia se a taxa de transfer\xEAncia for insuficiente.`;
+      case "wrong_movie_series":
+      case "wrong_episode":
+        return `A reprodu\xE7\xE3o deve corresponder exatamente \xE0 obra, temporada e epis\xF3dio anunciados no card. Nenhuma obra diferente ou epis\xF3dio trocado pode ser vinculado aos metadados de ${mediaName}.`;
+      case "no_sound":
+      case "unstable_volume":
+        return `O \xE1udio deve reproduzir com clareza, sincronizado com o v\xEDdeo, respeitando o controle de volume manual do usu\xE1rio e mantendo nivelamento confort\xE1vel sem oscila\xE7\xF5es artificiais ou silenciamento por codecs incompat\xEDveis.`;
+      case "subtitles_wrong_language":
+      case "subtitles_out_of_sync":
+        return `As legendas em portugu\xEAs devem ser apresentadas no idioma correto (PT-BR), sincronizadas perfeitamente com os di\xE1logos dos personagens, com formata\xE7\xE3o limpa e sem atrasos acumulativos.`;
+      case "wrong_quality":
+        return `A resolu\xE7\xE3o informada (ex: 1080p, 4K) deve corresponder \xE0 resolu\xE7\xE3o real dos quadros. Grava\xE7\xF5es de cinema (CAM, TS) devem ser estritamente bloqueadas pelo CamBlockerEngine.`;
+      case "ai_enhancer_not_working":
+      case "split_screen_not_working":
+        return `A Melhoria por IA e a compara\xE7\xE3o em tela dividida devem processar e renderizar em tempo real sobre o canvas de v\xEDdeo sem distor\xE7\xE3o, sem tela preta e sem desativar inesperadamente.`;
+      case "live_channel_unavailable":
+        return `O canal ao vivo deve reproduzir o sinal oficial est\xE1vel da emissora. Se o sinal prim\xE1rio cair, o agregador de TV ao vivo deve tentar o stream reserva ou sinalizar indisponibilidade tempor\xE1ria.`;
+      default:
+        return `O aplicativo deve funcionar de maneira consistente, est\xE1vel e fluida, respondendo prontamente \xE0s intera\xE7\xF5es do usu\xE1rio.`;
+    }
+  }
+  static getHypothesesByCategory(category, ctx) {
+    switch (category) {
+      case "wrong_dubbing":
+        return `1. O stream retornado pelo provedor possui m\xFAltiplas faixas de \xE1udio e o \xEDndice selecionado (\`${ctx.activeAudioTrack || "0"}\`) aponta para faixa secund\xE1ria (espanhol/ingl\xEAs) em vez de PT-BR.
+2. O arquivo de v\xEDdeo foi identificado incorretamente nos metadados do provedor (falso positivo na busca por "Dublado").
+3. Condi\xE7\xE3o de corrida entre a detec\xE7\xE3o do manifesto HLS e a sele\xE7\xE3o de \xE1udio no player.`;
+      case "video_not_loading":
+      case "infinite_loading":
+        return `1. A URL da fonte est\xE1 offline, protegida por CORS ou bloqueada por timeout (\`${ctx.streamUrlHost || "host desconhecido"}\`).
+2. Falha de handshake ou decodifica\xE7\xE3o de codec de v\xEDdeo no elemento HTML5.
+3. O proxy de stream retornou erro HTTP 403/404/502 e o player n\xE3o executou fallback para as fontes secund\xE1rias.`;
+      case "wrong_movie_series":
+      case "wrong_episode":
+        return `1. Inconsist\xEAncia entre os IDs can\xF4nicos (IMDb / TMDB) e a busca do provedor Stremio.
+2. Numera\xE7\xE3o de epis\xF3dios absoluta (ex: padr\xE3o anime de 1 a 500) mapeada incorretamente para temporadas (S1 a S4).
+3. T\xEDtulo hom\xF4nimo de remake ou filme lan\xE7ado no mesmo ano confundido no resolvedor de fontes.`;
+      case "subtitles_wrong_language":
+      case "subtitles_out_of_sync":
+        return `1. A legenda baixada do OpenSubtitles/Stremio possui timing baseado em release de 23.976 fps enquanto o v\xEDdeo est\xE1 em 25.000 fps ou vice-versa.
+2. C\xF3digo de idioma "pt" apontou para portugu\xEAs de Portugal com variantes desincronizadas.
+3. Legenda externa n\xE3o respeitou o atraso inicial ou corte de intro.`;
+      default:
+        return `1. Falha intermitente na comunica\xE7\xE3o entre o cliente e o provedor de m\xEDdia.
+2. Incompatibilidade com recursos espec\xEDficos do navegador ou dispositivo do usu\xE1rio.`;
+    }
+  }
+  static getConsolidatedHypotheses(cluster) {
+    const { category, affectedProviders, errorCodes } = cluster;
+    const provider = affectedProviders[0] || "provedores";
+    if (category === "wrong_dubbing") {
+      return `A an\xE1lise das m\xFAltiplas ocorr\xEAncias indica uma falha recorrente na identifica\xE7\xE3o de faixas de \xE1udio no provedor \`${provider}\`. \xC9 altamente prov\xE1vel que arquivos de v\xEDdeo multi-\xE1udio (Dual Audio / Multi-Lang) estejam com o mapeamento de faixas invertido ou que o classificador de streams (\`audioDetector.ts\` ou \`audioSelectionManager.ts\`) esteja priorizando a faixa de \xE1udio padr\xE3o do container MP4/MKV em vez da faixa especificada com metadado PT-BR.`;
+    }
+    if (category === "video_not_loading" || category === "infinite_loading") {
+      return `M\xFAltiplos usu\xE1rios reportaram falha de carregamento envolvendo o provedor \`${provider}\` e c\xF3digos de erro \`${errorCodes.join(", ") || "STALL"}\`. Isso aponta para instabilidade na CDN do provedor, bloqueio de requisi\xE7\xF5es de origem cruzada (CORS) ou esgotamento de conex\xF5es ativas no endpoint proxy.`;
+    }
+    return `Os dados consolidados revelam um padr\xE3o t\xE9cnico convergente entre as ocorr\xEAncias relatadas. O problema n\xE3o \xE9 pontual de um \xFAnico usu\xE1rio ou dispositivo, mas decorre de uma diverg\xEAncia estrutural no pipeline de processamento ou nas fontes de m\xEDdia associadas.`;
+  }
+  static getInvestigationFilesByCategory(category) {
+    switch (category) {
+      case "wrong_dubbing":
+      case "missing_dubbing_ptbr":
+        return `- \`src/core/audio/audioSelectionManager.ts\` (Sele\xE7\xE3o e mapeamento de faixas de \xE1udio)
+- \`src/core/audio/audioDetector.ts\` (Classifica\xE7\xE3o de streams e detec\xE7\xE3o de dublagem)
+- \`src/components/player/ZapiPlayer.tsx\` (Menu de \xE1udio e comuta\xE7\xE3o de faixas)
+- \`src/core/providers/mediaSourceValidationService.ts\` (Extra\xE7\xE3o de metadados de \xE1udio das fontes)`;
+      case "video_not_loading":
+      case "infinite_loading":
+      case "video_stuttering":
+        return `- \`src/core/playback/PlaybackOptimizerService.ts\` (Telemetria, ABR e Stall Watchdog)
+- \`src/core/providers/providerRegistry.ts\` (Resolu\xE7\xE3o e timeout de fontes)
+- \`src/core/providers/streamValidator.ts\` (Valida\xE7\xE3o e quarentena de streams)
+- \`src/components/player/ZapiPlayer.tsx\` (Inicializa\xE7\xE3o, HLS.js e fallback de fontes)
+- \`server.ts\` (Endpoint \`/api/proxy\` e tratamento de erros de streaming)`;
+      case "wrong_movie_series":
+      case "wrong_episode":
+        return `- \`src/core/identity/canonicalIdentity.ts\` (Mapeamento de IDs TMDB, IMDb e AniList)
+- \`src/core/episodes/EpisodeAvailabilityService.ts\` (Numera\xE7\xE3o e disponibilidade de epis\xF3dios)
+- \`src/core/identity/sourceConfidenceEngine.ts\` (Correspond\xEAncia de t\xEDtulos e rejei\xE7\xE3o de hom\xF4nimos)`;
+      case "subtitles_wrong_language":
+      case "subtitles_out_of_sync":
+        return `- \`src/core/subtitles/subtitleLanguageDetector.ts\` (Detec\xE7\xE3o de idioma de legendas)
+- \`src/core/subtitles/subtitleStyleService.ts\` (Sincroniza\xE7\xE3o e ajuste de delay)`;
+      case "ai_enhancer_not_working":
+      case "split_screen_not_working":
+        return `- \`src/core/enhancement/aiEnhancerService.ts\` (Gerenciamento do motor de IA)
+- \`src/core/enhancement/videoEnhancer.ts\` (WebGPU, WebGL e shaders Anime4K)
+- \`src/core/enhancement/audioEnhancer.ts\` (DSP e Web Audio)`;
+      case "live_channel_unavailable":
+        return `- \`src/core/livetv/OfficialChannelProvider.ts\` (Fontes de canais ao vivo)
+- \`src/core/livetv/channelHealthService.ts\` (Monitoramento de sa\xFAde e uptime dos canais)`;
+      default:
+        return `- \`src/components/player/ZapiPlayer.tsx\`
+- \`components/ContentDetailModal.tsx\`
+- \`server.ts\``;
+    }
+  }
+};
+
+// src/core/feedback/FeedbackStore.ts
+var FeedbackStore = class _FeedbackStore {
+  constructor(shouldPersist = true) {
+    this.reports = [];
+    this.clusters = [];
+    this.prompts = [];
+    this.isLoaded = false;
+    this.shouldPersist = true;
+    this.shouldPersist = shouldPersist;
+    this.storageFilePath = path3.resolve(process.cwd(), "data", "feedback_store.json");
+    if (this.shouldPersist) {
+      this.loadFromStorage();
+    } else {
+      this.isLoaded = true;
+      this.reports = [];
+      this.clusters = [];
+      this.prompts = [];
+    }
+  }
+  static getInstance() {
+    if (!_FeedbackStore.instance) {
+      _FeedbackStore.instance = new _FeedbackStore(true);
+    }
+    return _FeedbackStore.instance;
+  }
+  /**
+   * Carrega dados do arquivo persistente ou inicializa vazio
+   */
+  loadFromStorage() {
+    if (this.isLoaded) return;
+    try {
+      const fsModule = fs3;
+      if (fsModule && typeof fsModule.existsSync === "function") {
+        if (fsModule.existsSync(this.storageFilePath)) {
+          const raw = fsModule.readFileSync(this.storageFilePath, "utf8");
+          const data = JSON.parse(raw);
+          this.reports = Array.isArray(data.reports) ? data.reports : [];
+          this.clusters = Array.isArray(data.clusters) ? data.clusters : [];
+          this.prompts = Array.isArray(data.prompts) ? data.prompts : [];
+        } else {
+          const dataDir = path3.dirname(this.storageFilePath);
+          if (typeof fsModule.mkdirSync === "function" && !fsModule.existsSync(dataDir)) {
+            fsModule.mkdirSync(dataDir, { recursive: true });
+          }
+          this.saveToStorage();
+        }
+      }
+      this.isLoaded = true;
+    } catch (e) {
+      this.reports = [];
+      this.clusters = [];
+      this.prompts = [];
+      this.isLoaded = true;
+    }
+  }
+  /**
+   * Salva os dados no arquivo persistente de forma atômica
+   */
+  saveToStorage() {
+    if (!this.shouldPersist) return;
+    try {
+      const fsModule = fs3;
+      if (!fsModule || typeof fsModule.writeFileSync !== "function") return;
+      const dataDir = path3.dirname(this.storageFilePath);
+      if (typeof fsModule.mkdirSync === "function" && !fsModule.existsSync(dataDir)) {
+        fsModule.mkdirSync(dataDir, { recursive: true });
+      }
+      const data = {
+        reports: this.reports,
+        clusters: this.clusters,
+        prompts: this.prompts,
+        lastUpdated: Date.now()
+      };
+      fsModule.writeFileSync(this.storageFilePath, JSON.stringify(data, null, 2), "utf8");
+    } catch (e) {
+      console.warn("[FeedbackStore] Erro ao salvar dados no disco:", e);
+    }
+  }
+  /**
+   * Submete um feedback anônimo com contexto técnico, deduplicação e agrupamento automático
+   */
+  async submitFeedback(request) {
+    this.loadFromStorage();
+    const now = Date.now();
+    const { category, userDescription, technicalContext, clientSubmissionToken } = request;
+    if (!category) {
+      throw new Error("Categoria do feedback \xE9 obrigat\xF3ria.");
+    }
+    const fullContext = {
+      appVersion: "1.0.0",
+      browser: "Desconhecido",
+      os: "Desconhecido",
+      deviceType: "desktop",
+      currentRoute: "/",
+      timestamp: now,
+      ...technicalContext
+    };
+    const { fingerprint, data: fpData } = FeedbackClusteringEngine.generateFingerprint(category, fullContext);
+    const token = clientSubmissionToken || `anon_${now}`;
+    const isDupe = FeedbackClusteringEngine.isDuplicateSubmission(
+      this.reports,
+      token,
+      fingerprint,
+      60
+    );
+    if (isDupe) {
+      const existingCluster = this.clusters.find((c) => c.fingerprint === fingerprint);
+      return {
+        success: true,
+        reportId: "duplicate_suppressed",
+        clusterId: existingCluster?.id || "",
+        message: "Feedback recebido com sucesso (ocorr\xEAncia j\xE1 contabilizada recentemente).",
+        isNewCluster: false,
+        isDuplicate: true,
+        isDuplicateIgnored: true
+      };
+    }
+    const reportId = `fb_${now}_${Math.random().toString(36).substring(2, 7)}`;
+    const newReport = {
+      id: reportId,
+      category,
+      categoryLabel: FEEDBACK_CATEGORY_LABELS[category] || "Outro",
+      userDescription: userDescription ? userDescription.trim() : "",
+      technicalContext: fullContext,
+      fingerprint,
+      fingerprintData: fpData,
+      submissionTimestamp: now,
+      clientSubmissionToken: token,
+      status: "active"
+    };
+    const { matchedCluster } = FeedbackClusteringEngine.matchCluster(this.clusters, newReport);
+    let targetClusterId;
+    let isNewCluster = false;
+    if (matchedCluster) {
+      targetClusterId = matchedCluster.id;
+      newReport.clusterId = targetClusterId;
+      const { updatedCluster } = FeedbackClusteringEngine.mergeReportIntoCluster(matchedCluster, newReport);
+      const idx = this.clusters.findIndex((c) => c.id === targetClusterId);
+      if (idx !== -1) {
+        this.clusters[idx] = updatedCluster;
+      }
+      const clusterReports = this.reports.filter((r) => r.clusterId === targetClusterId).concat(newReport);
+      const newPrompt = FeedbackPromptGenerator.generateConsolidatedPrompt(updatedCluster, clusterReports);
+      this.prompts.push(newPrompt);
+      updatedCluster.activePromptId = newPrompt.id;
+      updatedCluster.activePromptMarkdown = newPrompt.markdownContent;
+      updatedCluster.promptVersion = newPrompt.version;
+      updatedCluster.isPromptOutdated = false;
+    } else {
+      isNewCluster = true;
+      const newCluster = FeedbackClusteringEngine.createClusterFromReport(newReport);
+      targetClusterId = newCluster.id;
+      newReport.clusterId = targetClusterId;
+      const initialPrompt = FeedbackPromptGenerator.generateIndividualPrompt(newReport);
+      initialPrompt.clusterId = targetClusterId;
+      this.prompts.push(initialPrompt);
+      newCluster.activePromptId = initialPrompt.id;
+      newCluster.activePromptMarkdown = initialPrompt.markdownContent;
+      this.clusters.unshift(newCluster);
+    }
+    this.reports.unshift(newReport);
+    this.saveToStorage();
+    return {
+      success: true,
+      reportId: newReport.id,
+      clusterId: targetClusterId,
+      message: "Obrigado! Recebemos seu relato.",
+      isNewCluster,
+      isDuplicate: false,
+      isDuplicateIgnored: false
+    };
+  }
+  /**
+   * Consulta clusters de problemas com filtros, busca e paginação
+   */
+  getClusters(options = {}) {
+    this.loadFromStorage();
+    let filtered = [...this.clusters];
+    if (options.status && options.status !== "all") {
+      filtered = filtered.filter((c) => c.status === options.status);
+    }
+    if (options.category && options.category !== "all") {
+      filtered = filtered.filter((c) => c.category === options.category);
+    }
+    if (options.priority && options.priority !== "all") {
+      filtered = filtered.filter((c) => c.priority === options.priority);
+    }
+    if (options.search && options.search.trim()) {
+      const q = options.search.toLowerCase().trim();
+      filtered = filtered.filter(
+        (c) => c.title.toLowerCase().includes(q) || c.categoryLabel.toLowerCase().includes(q) || c.affectedMedia.some((m) => m.title.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)) || c.affectedProviders.some((p) => p.toLowerCase().includes(q)) || c.adminNotes && c.adminNotes.toLowerCase().includes(q)
+      );
+    }
+    const sortBy = options.sortBy || "reports";
+    if (sortBy === "reports") {
+      filtered.sort((a, b) => b.totalReports - a.totalReports || b.lastOccurrenceAt - a.lastOccurrenceAt);
+    } else if (sortBy === "priority") {
+      const pWeights = { critical: 4, high: 3, medium: 2, low: 1 };
+      filtered.sort((a, b) => pWeights[b.priority] - pWeights[a.priority] || b.totalReports - a.totalReports);
+    } else if (sortBy === "recent") {
+      filtered.sort((a, b) => b.lastOccurrenceAt - a.lastOccurrenceAt);
+    } else if (sortBy === "first") {
+      filtered.sort((a, b) => a.firstOccurrenceAt - b.firstOccurrenceAt);
+    }
+    const total = filtered.length;
+    const offset = options.offset || 0;
+    const limit = options.limit || 50;
+    const sliced = filtered.slice(offset, offset + limit);
+    const result = sliced;
+    result.clusters = sliced;
+    result.total = total;
+    return result;
+  }
+  /**
+   * Obtém detalhes completos de um cluster com relatos associados e histórico
+   */
+  getClusterDetails(clusterId) {
+    this.loadFromStorage();
+    const cluster = this.clusters.find((c) => c.id === clusterId);
+    if (!cluster) return null;
+    const reports = this.reports.filter((r) => r.clusterId === clusterId);
+    const prompts = this.prompts.filter((p) => p.clusterId === clusterId);
+    return {
+      cluster: {
+        ...cluster,
+        reportCount: cluster.totalReports,
+        clusterLevel: cluster.clusterLevel || 1,
+        technicalFingerprint: cluster.technicalFingerprint || cluster.fingerprintData
+      },
+      reports,
+      prompts: prompts.sort((a, b) => b.version - a.version)
+    };
+  }
+  /**
+   * Atualiza status do cluster (Ex: novo -> em investigação -> corrigido)
+   */
+  updateClusterStatus(clusterId, status, adminName = "Administrador", notes) {
+    this.loadFromStorage();
+    const cluster = this.clusters.find((c) => c.id === clusterId);
+    if (!cluster) return null;
+    const prevStatus = cluster.status;
+    cluster.status = status;
+    if (status === "resolved") {
+      cluster.isRegression = false;
+    }
+    const now = Date.now();
+    cluster.history.push({
+      id: `hist_${now}_status`,
+      timestamp: now,
+      action: "status_changed",
+      performedBy: adminName,
+      details: `Status alterado de "${prevStatus}" para "${status}". ${notes ? `Obs: ${notes}` : ""}`,
+      metadata: { prevStatus, newStatus: status, notes }
+    });
+    if (notes) {
+      cluster.adminNotes = notes;
+    }
+    this.saveToStorage();
+    return cluster;
+  }
+  /**
+   * Atualiza a prioridade de um cluster manualmente
+   */
+  updateClusterPriority(clusterId, priority, adminName = "Administrador") {
+    this.loadFromStorage();
+    const cluster = this.clusters.find((c) => c.id === clusterId);
+    if (!cluster) return null;
+    const prevPriority = cluster.priority;
+    cluster.priority = priority;
+    const now = Date.now();
+    cluster.history.push({
+      id: `hist_${now}_prio`,
+      timestamp: now,
+      action: "priority_changed",
+      performedBy: adminName,
+      details: `Prioridade alterada manualmente de "${prevPriority}" para "${priority}".`,
+      metadata: { prevPriority, newPriority: priority }
+    });
+    this.saveToStorage();
+    return cluster;
+  }
+  /**
+   * Salva notas administrativas do problema
+   */
+  updateAdminNotes(clusterId, notes, adminName = "Administrador") {
+    this.loadFromStorage();
+    const cluster = this.clusters.find((c) => c.id === clusterId);
+    if (!cluster) return null;
+    cluster.adminNotes = notes;
+    const now = Date.now();
+    cluster.history.push({
+      id: `hist_${now}_notes`,
+      timestamp: now,
+      action: "admin_note",
+      performedBy: adminName,
+      details: `Notas administrativas atualizadas.`
+    });
+    this.saveToStorage();
+    return cluster;
+  }
+  /**
+   * Regenera o prompt técnico do cluster (individual ou consolidado)
+   */
+  regeneratePrompt(clusterId, adminName = "Administrador") {
+    this.loadFromStorage();
+    const cluster = this.clusters.find((c) => c.id === clusterId);
+    if (!cluster) return null;
+    const reports = this.reports.filter((r) => r.clusterId === clusterId);
+    let prompt;
+    if (reports.length > 1) {
+      prompt = FeedbackPromptGenerator.generateConsolidatedPrompt(cluster, reports);
+    } else if (reports.length === 1) {
+      prompt = FeedbackPromptGenerator.generateIndividualPrompt(reports[0]);
+      prompt.clusterId = cluster.id;
+      prompt.version = cluster.promptVersion + 1;
+    } else {
+      prompt = FeedbackPromptGenerator.generateConsolidatedPrompt(cluster, []);
+    }
+    this.prompts.push(prompt);
+    cluster.activePromptId = prompt.id;
+    cluster.activePromptMarkdown = prompt.markdownContent;
+    cluster.promptVersion = prompt.version;
+    cluster.isPromptOutdated = false;
+    const now = Date.now();
+    cluster.history.push({
+      id: `hist_${now}_prompt`,
+      timestamp: now,
+      action: "prompt_generated",
+      performedBy: adminName,
+      details: `Prompt t\xE9cnico v${prompt.version} regenerado com sucesso.`
+    });
+    this.saveToStorage();
+    return prompt;
+  }
+  /**
+   * Salva uma edição manual no prompt técnico do cluster
+   */
+  saveEditedPrompt(clusterId, markdownContent, adminName = "Administrador") {
+    this.loadFromStorage();
+    const cluster = this.clusters.find((c) => c.id === clusterId);
+    if (!cluster) return null;
+    const now = Date.now();
+    const newVersion = cluster.promptVersion + 1;
+    const editedPrompt = {
+      id: `prompt_manual_${now}`,
+      clusterId,
+      type: "consolidated",
+      version: newVersion,
+      markdownContent: markdownContent.trim(),
+      generatedAt: now,
+      isAiRefined: false,
+      isManuallyEdited: true,
+      feedbackIds: this.reports.filter((r) => r.clusterId === clusterId).map((r) => r.id),
+      variablesUsed: {}
+    };
+    this.prompts.push(editedPrompt);
+    cluster.activePromptId = editedPrompt.id;
+    cluster.activePromptMarkdown = editedPrompt.markdownContent;
+    cluster.promptVersion = newVersion;
+    cluster.isPromptOutdated = false;
+    cluster.history.push({
+      id: `hist_${now}_editprompt`,
+      timestamp: now,
+      action: "prompt_edited",
+      performedBy: adminName,
+      details: `Prompt t\xE9cnico editado manualmente por ${adminName} (vers\xE3o ${newVersion}).`
+    });
+    this.saveToStorage();
+    return editedPrompt;
+  }
+  /**
+   * Agrupa manualmente clusters de origem em um cluster de destino
+   */
+  mergeClustersManually(targetOrSourceId, sourceOrTargetIds, adminName = "Administrador") {
+    this.loadFromStorage();
+    let target = this.clusters.find((c) => c.id === targetOrSourceId);
+    let sourcesToMerge = [];
+    if (Array.isArray(sourceOrTargetIds)) {
+      sourcesToMerge = sourceOrTargetIds;
+    } else {
+      const altTarget = this.clusters.find((c) => c.id === sourceOrTargetIds);
+      if (altTarget && (!target || sourceOrTargetIds.includes(altTarget.id))) {
+        target = altTarget;
+        sourcesToMerge = [targetOrSourceId];
+      } else {
+        sourcesToMerge = [sourceOrTargetIds];
+      }
+    }
+    if (!target) return null;
+    for (const sourceId of sourcesToMerge) {
+      const source = this.clusters.find((c) => c.id === sourceId);
+      if (!source || source.id === target.id) continue;
+      this.reports.forEach((r) => {
+        if (r.clusterId === sourceId) {
+          r.clusterId = target.id;
+        }
+      });
+      target.totalReports += source.totalReports;
+      target.recentReportsCount += source.recentReportsCount;
+      target.lastOccurrenceAt = Math.max(target.lastOccurrenceAt, source.lastOccurrenceAt);
+      source.affectedMedia.forEach((m) => {
+        if (!target.affectedMedia.some((tm) => tm.id === m.id)) {
+          target.affectedMedia.push(m);
+        }
+      });
+      source.affectedEpisodes.forEach((e) => {
+        if (!target.affectedEpisodes.some((te) => te.season === e.season && te.episode === e.episode)) {
+          target.affectedEpisodes.push(e);
+        }
+      });
+      target.affectedProviders = Array.from(/* @__PURE__ */ new Set([...target.affectedProviders, ...source.affectedProviders]));
+      target.affectedSources = Array.from(/* @__PURE__ */ new Set([...target.affectedSources, ...source.affectedSources]));
+      target.affectedVersions = Array.from(/* @__PURE__ */ new Set([...target.affectedVersions, ...source.affectedVersions]));
+      target.errorCodes = Array.from(/* @__PURE__ */ new Set([...target.errorCodes, ...source.errorCodes]));
+      const now = Date.now();
+      target.history.push({
+        id: `hist_${now}_merge`,
+        timestamp: now,
+        action: "manual_merge",
+        performedBy: adminName,
+        details: `Cluster "${source.title}" (${source.id}) mesclado manualmente neste cluster.`
+      });
+      this.clusters = this.clusters.filter((c) => c.id !== sourceId);
+    }
+    target.isPromptOutdated = true;
+    target.reportCount = target.totalReports;
+    this.saveToStorage();
+    return target;
+  }
+  /**
+   * Separa um relato de um cluster para criar um novo cluster independente
+   */
+  splitReportFromCluster(reportId, adminName = "Administrador") {
+    this.loadFromStorage();
+    const report = this.reports.find((r) => r.id === reportId);
+    if (!report || !report.clusterId) return null;
+    const oldClusterId = report.clusterId;
+    const oldCluster = this.clusters.find((c) => c.id === oldClusterId);
+    const newCluster = FeedbackClusteringEngine.createClusterFromReport(report);
+    this.clusters.unshift(newCluster);
+    report.clusterId = newCluster.id;
+    if (oldCluster) {
+      oldCluster.totalReports = Math.max(0, oldCluster.totalReports - 1);
+      const now = Date.now();
+      oldCluster.history.push({
+        id: `hist_${now}_split`,
+        timestamp: now,
+        action: "manual_split",
+        performedBy: adminName,
+        details: `Relato #${reportId} desmembrado para um novo cluster independente.`
+      });
+      oldCluster.isPromptOutdated = true;
+    }
+    this.saveToStorage();
+    return newCluster;
+  }
+  /**
+   * Calcula as estatísticas completas para o Dashboard Administrativo
+   */
+  getDashboardStats() {
+    this.loadFromStorage();
+    const newIssuesCount = this.clusters.filter((c) => c.status === "new").length;
+    const criticalIssuesCount = this.clusters.filter((c) => c.priority === "critical" && c.status !== "resolved").length;
+    const recurrentIssuesCount = this.clusters.filter((c) => c.totalReports >= 3 && c.status !== "resolved").length;
+    const investigatingCount = this.clusters.filter((c) => c.status === "investigating").length;
+    const fixingCount = this.clusters.filter((c) => c.status === "fixing").length;
+    const resolvedCount = this.clusters.filter((c) => c.status === "resolved").length;
+    const reopenedCount = this.clusters.filter((c) => c.status === "reopened").length;
+    const topReportedClusters = [...this.clusters].sort((a, b) => b.totalReports - a.totalReports || b.lastOccurrenceAt - a.lastOccurrenceAt).slice(0, 10);
+    const pWeights = { critical: 4, high: 3, medium: 2, low: 1 };
+    const priorityRankedClusters = [...this.clusters].filter((c) => c.status !== "resolved").sort((a, b) => pWeights[b.priority] - pWeights[a.priority] || b.totalReports - a.totalReports).slice(0, 10);
+    return {
+      newIssuesCount,
+      criticalIssuesCount,
+      recurrentIssuesCount,
+      investigatingCount,
+      fixingCount,
+      resolvedCount,
+      reopenedCount,
+      totalFeedbacksReceived: this.reports.length,
+      totalUniqueClusters: this.clusters.length,
+      topReportedClusters,
+      priorityRankedClusters
+    };
+  }
+};
+var feedbackStore = FeedbackStore.getInstance();
+
 // server.ts
 var __filename = fileURLToPath(import.meta.url);
-var __dirname = path2.dirname(__filename);
+var __dirname = path4.dirname(__filename);
 async function checkStremioEngineStatus() {
   try {
     const probe = await fetch("http://127.0.0.1:11470/stats.json", { signal: AbortSignal.timeout(800) });
@@ -13579,12 +17336,14 @@ function createApp() {
       if (parts[1]) seasonNum = parseInt(parts[1], 10) || 1;
       if (parts[2]) episodeNum = parseInt(parts[2], 10) || 1;
     }
+    if (bannedContentRegistry.isBannedKeyOrId(cleanId)) return [];
     const item = VERIFIED_OPEN_ITEMS.find(
       (it) => it.id === cleanId || cleanId.startsWith("open-") && (it.tmdbId && String(it.tmdbId) === cleanId || it.imdbId && it.imdbId === cleanId)
     );
-    if (!item || !item.id.startsWith("open-")) return [];
+    if (!item || !item.id.startsWith("open-") || bannedContentRegistry.isBanned(item)) return [];
     if (item.episodes && item.episodes.length > 0) {
-      const ep = item.episodes.find((e) => e.number === episodeNum) || item.episodes[0];
+      if (seasonNum !== 1) return [];
+      const ep = item.episodes.find((e) => e.number === episodeNum);
       if (ep?.videoUrl) {
         const directUrl = ep.videoUrl;
         const proxyUrl = directUrl.startsWith("http") ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
@@ -13594,7 +17353,7 @@ function createApp() {
             title: `[EPIS\xD3DIO ${ep.number}] ${ep.title} - Servidor Local ZapiTV`,
             url: proxyUrl,
             sourceType: ep.videoUrl.includes(".m3u8") ? "hls" : "mp4",
-            isPtBr: item.audioStatus === "pt-br-original" || item.audioStatus === "universal",
+            isPtBr: item.audioStatus === "pt-br-original" || item.audioStatus === "pt-br-dubbed",
             isDubbed: false,
             quality: "720p",
             behaviorHints: { notWebReady: false }
@@ -13604,13 +17363,14 @@ function createApp() {
             title: `[EPIS\xD3DIO ${ep.number}] ${ep.title} - CDN Direto`,
             url: directUrl,
             sourceType: ep.videoUrl.includes(".m3u8") ? "hls" : "mp4",
-            isPtBr: item.audioStatus === "pt-br-original" || item.audioStatus === "universal",
+            isPtBr: item.audioStatus === "pt-br-original" || item.audioStatus === "pt-br-dubbed",
             isDubbed: false,
             quality: "720p",
             behaviorHints: { notWebReady: false }
           }
         ];
       }
+      return [];
     }
     return item.verifiedStreams || [];
   }
@@ -13645,7 +17405,6 @@ function createApp() {
       "hardcore xxx",
       "creampie",
       "blowjob",
-      "playweb",
       "ben the men"
     ];
     if (adultTerms.some((term) => combined.includes(term))) return false;
@@ -13700,11 +17459,11 @@ function createApp() {
   app2.get(["/api/stremio/blender-open/stream/:type/:id.json", "/api/stremio/blender-open/stream/:type/:id"], (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     const requestedId = String(req.params.id || "");
-    if (!requestedId.startsWith("open-")) {
+    if (!requestedId.startsWith("open-") || bannedContentRegistry.isBannedKeyOrId(requestedId)) {
       return res.json({ streams: [] });
     }
     const streams = resolveOpenItemStreams(requestedId).filter(
-      (s) => s.title?.toLowerCase().includes("blender") || s.title?.toLowerCase().includes("bunny") || s.title?.toLowerCase().includes("tears") || s.title?.toLowerCase().includes("caminandes")
+      (s) => !bannedContentRegistry.isBannedStream(s) && (s.title?.toLowerCase().includes("blender") || s.title?.toLowerCase().includes("tears"))
     );
     res.json({ streams });
   });
@@ -13812,10 +17571,17 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       idPrefixes: ["tt", "open"]
     });
   });
+  const showSubtitleStreamCache = /* @__PURE__ */ new Map();
   app2.get(["/api/stremio/show-subtitle-pt-br/stream/:type/:id.json", "/api/stremio/show-subtitle-pt-br/stream/:type/:id"], async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     const rawId = String(req.params.id).replace(/\.json$/, "");
     const type = String(req.params.type);
+    const cacheKey = `${type}:${rawId}`;
+    const now = Date.now();
+    const cached = showSubtitleStreamCache.get(cacheKey);
+    if (cached && now - cached.timestamp < 60 * 60 * 1e3 && cached.streams.length > 0) {
+      return res.json({ streams: cached.streams });
+    }
     const hasPtSubPromise = checkOpenSubtitlesPtBr(type, rawId);
     const fetchUpstreamPromise = (async () => {
       let results = [];
@@ -13859,6 +17625,13 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       };
     });
     const sorted = sortStreamsByPtBrPriority(enriched, { preferDubbed: true, allowSubtitled: true, excludeYouTube: true });
+    if (sorted.length > 0) {
+      showSubtitleStreamCache.set(cacheKey, { streams: sorted, timestamp: now });
+      return res.json({ streams: sorted });
+    }
+    if (cached && cached.streams.length > 0) {
+      return res.json({ streams: cached.streams });
+    }
     res.json({ streams: sorted });
   });
   app2.get("/api/stremio/live/manifest.json", (req, res) => {
@@ -14190,12 +17963,12 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       });
     }
   });
-  const FEATURED_CACHE_FILE = path2.resolve(process.cwd(), "data", "featured_weekly_selection.json");
+  const FEATURED_CACHE_FILE = path4.resolve(process.cwd(), "data", "featured_weekly_selection.json");
   featuredRankingService.setStorageAdapter({
     load: () => {
       try {
-        if (fs2.existsSync(FEATURED_CACHE_FILE)) {
-          const raw = fs2.readFileSync(FEATURED_CACHE_FILE, "utf-8");
+        if (fs4.existsSync(FEATURED_CACHE_FILE)) {
+          const raw = fs4.readFileSync(FEATURED_CACHE_FILE, "utf-8");
           if (raw) return JSON.parse(raw);
         }
       } catch (e) {
@@ -14205,11 +17978,11 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     },
     save: (data) => {
       try {
-        const dir = path2.dirname(FEATURED_CACHE_FILE);
-        if (!fs2.existsSync(dir)) fs2.mkdirSync(dir, { recursive: true });
+        const dir = path4.dirname(FEATURED_CACHE_FILE);
+        if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
         const tmpFile = `${FEATURED_CACHE_FILE}.${Date.now()}.tmp`;
-        fs2.writeFileSync(tmpFile, JSON.stringify(data, null, 2), "utf-8");
-        fs2.renameSync(tmpFile, FEATURED_CACHE_FILE);
+        fs4.writeFileSync(tmpFile, JSON.stringify(data, null, 2), "utf-8");
+        fs4.renameSync(tmpFile, FEATURED_CACHE_FILE);
       } catch (e) {
         console.warn("[Server] Falha ao persistir cache do Em Destaque no disco:", e);
       }
@@ -14270,6 +18043,41 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.json(weeklyFeaturedScheduler.getStatus());
   });
+  const handleReleaseCron = async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret) {
+      const authHeader = req.headers["authorization"];
+      const vercelCronHeader = req.headers["x-vercel-cron"];
+      const querySecret = req.query.secret;
+      const isAuthValid = authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret || vercelCronHeader === "1";
+      if (!isAuthValid) {
+        return res.status(401).json({ error: "Acesso n\xE3o autorizado para execu\xE7\xE3o do cron de lan\xE7amentos" });
+      }
+    }
+    try {
+      console.log("[Server] Acionamento cron di\xE1rio de lan\xE7amentos recebido...");
+      const result = await catalogReleaseScheduler.executeManualSync();
+      return res.json({
+        success: true,
+        executedAt: new Date(result.timestamp).toISOString(),
+        summary: result
+      });
+    } catch (err) {
+      console.error("[Server] Erro no endpoint cron di\xE1rio de lan\xE7amentos:", err);
+      return res.status(500).json({ error: "Falha na sincroniza\xE7\xE3o de lan\xE7amentos", details: err?.message });
+    }
+  };
+  app2.get("/api/catalog/sync-releases", handleReleaseCron);
+  app2.post("/api/catalog/sync-releases", handleReleaseCron);
+  app2.get("/api/catalog/release-status", (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json(catalogReleaseScheduler.getStatus());
+  });
+  app2.get("/api/catalog/new-releases", (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json(catalogReleaseStore.getReleases());
+  });
   app2.get("/api/featured/verify-correspondence", (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
@@ -14304,6 +18112,181 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       res.status(500).json({ error: "Falha ao importar snapshot IMDb", details: err?.message });
     }
   });
+  app2.post("/api/recommendations/events", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { anonymousId, contentId, weight, timestamp } = req.body || {};
+      if (!anonymousId || !contentId) {
+        return res.status(400).json({ error: "anonymousId e contentId s\xE3o obrigat\xF3rios" });
+      }
+      const ok = await collaborativeTrainer.ingestEvent({
+        anonymousId,
+        contentId,
+        weight: Number(weight) || 0.5,
+        timestamp: Number(timestamp) || Date.now()
+      });
+      return res.json({ success: ok });
+    } catch (err) {
+      return res.status(500).json({ error: "Erro ao registrar evento colaborativo", details: err?.message });
+    }
+  });
+  app2.get("/api/recommendations/model", (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    return res.json(collaborativeTrainer.getModel());
+  });
+  app2.post("/api/recommendations/train", async (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const model = await collaborativeTrainer.train();
+      return res.json({ success: true, model });
+    } catch (err) {
+      return res.status(500).json({ error: "Falha no treinamento colaborativo", details: err?.message });
+    }
+  });
+  app2.delete("/api/recommendations/user-data/:anonymousId", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { anonymousId } = req.params;
+      const ok = await collaborativeTrainer.purgeUserData(anonymousId);
+      return res.json({ success: ok, message: "Dados do identificador purgados com sucesso" });
+    } catch (err) {
+      return res.status(500).json({ error: "Erro ao purgar dados", details: err?.message });
+    }
+  });
+  app2.post("/api/feedback/submit", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    try {
+      const response = await feedbackStore.submitFeedback(req.body);
+      return res.status(200).json(response);
+    } catch (err) {
+      console.error("[API Feedback] Erro ao submeter feedback:", err);
+      return res.status(400).json({ error: "Falha ao processar feedback", details: err?.message });
+    }
+  });
+  app2.get("/api/feedback/stats", async (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const stats = feedbackStore.getDashboardStats();
+      return res.json(stats);
+    } catch (err) {
+      return res.status(500).json({ error: "Erro ao obter estat\xEDsticas", details: err?.message });
+    }
+  });
+  app2.get("/api/feedback/clusters", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { status, category, priority, search, limit, offset, sortBy } = req.query;
+      const result = feedbackStore.getClusters({
+        status,
+        category,
+        priority,
+        search: search ? String(search) : void 0,
+        limit: limit ? parseInt(String(limit), 10) : 50,
+        offset: offset ? parseInt(String(offset), 10) : 0,
+        sortBy
+      });
+      return res.json(result);
+    } catch (err) {
+      return res.status(500).json({ error: "Erro ao listar clusters de problemas", details: err?.message });
+    }
+  });
+  app2.get("/api/feedback/clusters/:id", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const details = feedbackStore.getClusterDetails(req.params.id);
+      if (!details) {
+        return res.status(404).json({ error: "Problema n\xE3o encontrado" });
+      }
+      return res.json(details);
+    } catch (err) {
+      return res.status(500).json({ error: "Erro ao buscar detalhes do problema", details: err?.message });
+    }
+  });
+  app2.patch("/api/feedback/clusters/:id", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { id } = req.params;
+      const { status, priority, adminNotes, adminName } = req.body;
+      const author = adminName || "Administrador";
+      let updated = null;
+      if (status) {
+        updated = feedbackStore.updateClusterStatus(id, status, author, adminNotes);
+      }
+      if (priority) {
+        updated = feedbackStore.updateClusterPriority(id, priority, author);
+      }
+      if (adminNotes && !status) {
+        updated = feedbackStore.updateAdminNotes(id, adminNotes, author);
+      }
+      if (!updated) {
+        return res.status(404).json({ error: "Problema n\xE3o encontrado para atualiza\xE7\xE3o" });
+      }
+      return res.json({ success: true, cluster: updated });
+    } catch (err) {
+      return res.status(500).json({ error: "Erro ao atualizar problema", details: err?.message });
+    }
+  });
+  app2.post("/api/feedback/clusters/:id/prompt", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { id } = req.params;
+      const { adminName } = req.body;
+      const prompt = feedbackStore.regeneratePrompt(id, adminName || "Administrador");
+      if (!prompt) {
+        return res.status(404).json({ error: "Cluster n\xE3o encontrado para gerar prompt" });
+      }
+      return res.json({ success: true, prompt });
+    } catch (err) {
+      return res.status(500).json({ error: "Erro ao regenerar prompt", details: err?.message });
+    }
+  });
+  app2.put("/api/feedback/clusters/:id/prompt", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { id } = req.params;
+      const { markdownContent, adminName } = req.body;
+      if (!markdownContent) {
+        return res.status(400).json({ error: "Conte\xFAdo do prompt \xE9 obrigat\xF3rio" });
+      }
+      const prompt = feedbackStore.saveEditedPrompt(id, markdownContent, adminName || "Administrador");
+      if (!prompt) {
+        return res.status(404).json({ error: "Cluster n\xE3o encontrado para salvar prompt" });
+      }
+      return res.json({ success: true, prompt });
+    } catch (err) {
+      return res.status(500).json({ error: "Erro ao salvar prompt editado", details: err?.message });
+    }
+  });
+  app2.post("/api/feedback/clusters/:id/merge", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { id } = req.params;
+      const { targetClusterId, adminName } = req.body;
+      if (!targetClusterId) {
+        return res.status(400).json({ error: "targetClusterId \xE9 obrigat\xF3rio" });
+      }
+      const ok = feedbackStore.mergeClustersManually(id, targetClusterId, adminName || "Administrador");
+      return res.json({ success: ok });
+    } catch (err) {
+      return res.status(500).json({ error: "Erro ao mesclar clusters", details: err?.message });
+    }
+  });
+  app2.post("/api/feedback/reports/:id/split", async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const { id } = req.params;
+      const { adminName } = req.body;
+      const newCluster = feedbackStore.splitReportFromCluster(id, adminName || "Administrador");
+      if (!newCluster) {
+        return res.status(404).json({ error: "Relato n\xE3o encontrado para desmembrar" });
+      }
+      return res.json({ success: true, newCluster });
+    } catch (err) {
+      return res.status(500).json({ error: "Erro ao desmembrar relato", details: err?.message });
+    }
+  });
   return app2;
 }
 var app = createApp();
@@ -14317,6 +18300,7 @@ if (!process.env.VERCEL) {
       console.log("Modo Web direto ativo (sem processos externos).");
     }
     weeklyFeaturedScheduler.start();
+    catalogReleaseScheduler.start();
     if (process.env.NODE_ENV !== "production") {
       const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
@@ -14325,10 +18309,10 @@ if (!process.env.VERCEL) {
       });
       app.use(vite.middlewares);
     } else {
-      const distPath = path2.join(process.cwd(), "dist");
+      const distPath = path4.join(process.cwd(), "dist");
       app.use(express.static(distPath));
       app.get("/{*path}", (_req, res) => {
-        res.sendFile(path2.join(distPath, "index.html"));
+        res.sendFile(path4.join(distPath, "index.html"));
       });
     }
     const port = parseInt(process.env.PORT || "4000", 10);

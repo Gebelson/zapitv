@@ -20,3 +20,63 @@
 ::view-transition-new(root) {
   z-index: 999999;
 }
+
+/* =========================================================================
+   ZAPITV — SIDEBAR LOGO HOVER GLOW ANIMATION (2.5s LOOP, DROP-SHADOW FILTER)
+   ========================================================================= */
+
+@keyframes zapitv-logo-glow-loop {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px rgba(0, 125, 247, 0.45)) drop-shadow(0 0 10px rgba(178, 115, 216, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(0, 125, 247, 0.85)) drop-shadow(0 0 20px rgba(178, 115, 216, 0.7)) drop-shadow(0 0 30px rgba(0, 125, 247, 0.4));
+  }
+}
+
+@keyframes zapitv-text-glow-loop {
+  0%, 100% {
+    text-shadow: 0 0 5px rgba(0, 125, 247, 0.25);
+  }
+  50% {
+    text-shadow: 0 0 10px rgba(0, 125, 247, 0.55), 0 0 16px rgba(178, 115, 216, 0.35);
+  }
+}
+
+/* Estado de repouso: sem brilho adicional e com transição suave na saída do cursor */
+.sidebar-logo-glow {
+  filter: drop-shadow(0 0 0 rgba(0, 125, 247, 0));
+  transition: filter 0.4s ease-out;
+  will-change: filter;
+}
+
+/* Estado de hover ou foco por teclado: inicia o ciclo contínuo de 2.5s */
+.group\/logo:hover .sidebar-logo-glow,
+.group\/logo:focus-visible .sidebar-logo-glow {
+  animation: zapitv-logo-glow-loop 2.5s ease-in-out infinite;
+}
+
+/* Glow textual suave para a tipografia ZAPITV */
+.sidebar-text-glow {
+  text-shadow: 0 0 0 rgba(0, 125, 247, 0);
+  transition: text-shadow 0.4s ease-out;
+}
+
+.group\/logo:hover .sidebar-text-glow,
+.group\/logo:focus-visible .sidebar-text-glow {
+  animation: zapitv-text-glow-loop 2.5s ease-in-out infinite;
+}
+
+/* Suporte a usuários com preferência por movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+  .group\/logo:hover .sidebar-logo-glow,
+  .group\/logo:focus-visible .sidebar-logo-glow {
+    animation: none;
+    filter: drop-shadow(0 0 8px rgba(0, 125, 247, 0.65)) drop-shadow(0 0 16px rgba(178, 115, 216, 0.5));
+  }
+  .group\/logo:hover .sidebar-text-glow,
+  .group\/logo:focus-visible .sidebar-text-glow {
+    animation: none;
+    text-shadow: 0 0 8px rgba(0, 125, 247, 0.4);
+  }
+}

@@ -207,17 +207,17 @@ async function runAddonsIntegrationTests() {
   // -------------------------------------------------------------------------
   console.log('\n👉 [TESTE 7] Validando Série e Episódios Reais com Navegação Contínua...');
   try {
-    const series = VERIFIED_OPEN_ITEMS.find(i => i.id === 'open-caminandes-s1');
+    const series = VERIFIED_OPEN_ITEMS.find(i => i.id === 'tmdb-95897');
     if (!series || !series.episodes) throw new Error('Série não encontrada.');
 
     // Validar Episódio 1
-    const ep1Streams = await providerRegistry.resolveStreams('series', { id: series.id }, { season: 1, episode: 1 });
+    const ep1Streams = await providerRegistry.resolveStreams('anime', { id: series.id }, { season: 1, episode: 1 });
     const ep1Url = ep1Streams[0].url.startsWith('/') ? `http://localhost:4000${ep1Streams[0].url}` : ep1Streams[0].url;
     const res1 = await fetch(ep1Url, { headers: { Range: 'bytes=0-500' }, signal: AbortSignal.timeout(8000) });
     if (res1.status !== 200 && res1.status !== 206) throw new Error(`Falha no Episódio 1: ${res1.status}`);
 
     // Validar Episódio 2
-    const ep2Streams = await providerRegistry.resolveStreams('series', { id: series.id }, { season: 1, episode: 2 });
+    const ep2Streams = await providerRegistry.resolveStreams('anime', { id: series.id }, { season: 1, episode: 2 });
     const ep2Url = ep2Streams[0].url.startsWith('/') ? `http://localhost:4000${ep2Streams[0].url}` : ep2Streams[0].url;
     const res2 = await fetch(ep2Url, { headers: { Range: 'bytes=0-500' }, signal: AbortSignal.timeout(8000) });
     if (res2.status !== 200 && res2.status !== 206) throw new Error(`Falha no Episódio 2: ${res2.status}`);

@@ -4,6 +4,9 @@ import { mediaAvailabilityIndex } from './MediaAvailabilityIndex';
 import { diagnosticService } from './DiagnosticService';
 import { theatricalFilterService } from './theatricalFilterService';
 import { catalogEligibilityService } from './CatalogEligibilityService';
+import { catalogReleaseStore } from './CatalogReleaseStore';
+import { adultContentService } from '../adult/AdultContentService';
+import { getCanonicalKeysForItem, deduplicateContentItems } from './catalogDeduplication';
 
 export interface DiscoveryResult {
   items: ContentItem[];
@@ -70,6 +73,7 @@ export class CatalogDiscoveryService {
     'movies_Suspense': 20000,
     'movies_Guerra': 7240,
     'movies_Faroeste': 6850,
+    'movies_Adulto': 1250,
     // Séries
     'series_Ação': 10294,
     'series_Ação e Aventura': 10294,
@@ -91,6 +95,7 @@ export class CatalogDiscoveryService {
     'series_Guerra': 3120,
     'series_Guerra e Política': 3120,
     'series_Faroeste': 1120,
+    'series_Adulto': 320,
     // Animes
     'animes_Ação': 4860,
     'animes_Aventura': 3920,
@@ -101,7 +106,8 @@ export class CatalogDiscoveryService {
     'animes_Romance': 1940,
     'animes_Sobrenatural': 1820,
     'animes_Terror': 1150,
-    'animes_Mistério': 1420
+    'animes_Mistério': 1420,
+    'animes_Adulto': 850
   };
 
   /**
@@ -119,16 +125,22 @@ export class CatalogDiscoveryService {
    * Chave canônica para deduplicação precisa de itens vindos de múltiplas fontes
    */
   public getCanonicalKey(item: ContentItem): string {
-    if (item.imdbId && item.imdbId.startsWith('tt')) {
-      return item.imdbId.toLowerCase();
+    if (!item) return 'unknown';
+    const mediaType = (item.mediaFormat === 'movie' || item.type === ContentType.MOVIE) ? 'movie' : 'tv';
+    if (item.imdbId && /^tt\d+$/i.test(item.imdbId.trim())) {
+      return item.imdbId.trim().toLowerCase();
+    }
+    if (item.id && /^tt\d+$/i.test(item.id.trim())) {
+      return item.id.trim().toLowerCase();
     }
     if (item.tmdbId) {
-      return `tmdb-${item.tmdbId}`;
+      return `tmdb-${mediaType}-${item.tmdbId}`;
     }
-    if (item.id && (item.id.startsWith('tt') || item.id.startsWith('tmdb-'))) {
-      return item.id.toLowerCase();
+    if (item.id && item.id.startsWith('tmdb-')) {
+      return `tmdb-${mediaType}-${item.id.replace(/^tmdb-(movie-|tv-|anime-)?/, '').toLowerCase()}`;
     }
-    return `title-${item.title.trim().toLowerCase()}-${item.type || 'unknown'}-${item.year || 0}`;
+    if (item.id) return `${mediaType}-${item.id.toLowerCase()}`;
+    return `title-${mediaType}-${(item.title || '').trim().toLowerCase()}-${item.year || 0}`;
   }
 
   /**
@@ -136,15 +148,27 @@ export class CatalogDiscoveryService {
    */
   private processAndDedupe(items: ContentItem[], contentType: 'movies' | 'series' | 'animes' | 'all'): ContentItem[] {
     const unique: ContentItem[] = [];
-    const pageKeys = new Set<string>();
+    const seenBatchKeys = new Set<string>();
 
     for (const item of items) {
-      if (!item || !item.id || !item.title) continue;
+      if (!item || (!item.id && !item.title)) continue;
 
-      const key = this.getCanonicalKey(item);
-      if (pageKeys.has(key)) continue;
-      pageKeys.add(key);
-      const existing = this.dedupeCache.get(key);
+      const keys = getCanonicalKeysForItem(item);
+      const isBatchDuplicate = keys.some(k => seenBatchKeys.has(k));
+      if (isBatchDuplicate) continue;
+
+      for (const k of keys) {
+        seenBatchKeys.add(k);
+      }
+
+      // Verifica se já existia no cache de itens descobertos
+      let existing: ContentItem | undefined;
+      for (const k of keys) {
+        if (this.dedupeCache.has(k)) {
+          existing = this.dedupeCache.get(k);
+          break;
+        }
+      }
 
       if (existing) {
         // Enriquecimento de metadados se o novo item trouxer dados faltantes
@@ -152,11 +176,14 @@ export class CatalogDiscoveryService {
         if (!existing.tmdbId && item.tmdbId) existing.tmdbId = item.tmdbId;
         if ((!existing.genres || existing.genres.length === 0) && item.genres) existing.genres = item.genres;
         if (!existing.backdrop && item.backdrop) existing.backdrop = item.backdrop;
-        unique.push(existing);
+        if (!existing.image && item.image) existing.image = item.image;
+        // Se já foi descoberto anteriormente, NÃO re-adiciona para evitar cards duplicados na paginação
         continue;
       }
 
-      this.dedupeCache.set(key, item);
+      for (const k of keys) {
+        this.dedupeCache.set(k, item);
+      }
       unique.push(item);
 
       // 1. Registra no MediaAvailabilityIndex como DISCOVERED (caso ainda não esteja catalogado)
@@ -166,8 +193,6 @@ export class CatalogDiscoveryService {
         mediaAvailabilityIndex.recordDiscovery(canonicalId, item.title, item.type);
       }
 
-      // A verificação de fontes começa quando o card entra na área visível.
-      // Descoberta e contadores não dependem da posição no scroll.
       // 2. Atualiza diagnóstico
       const diagType = contentType === 'movies' ? 'movie' : (contentType === 'series' ? 'series' : 'anime');
       diagnosticService.recordDiscovered(canonicalId, diagType);
@@ -186,33 +211,42 @@ export class CatalogDiscoveryService {
   private async discoverMoviesUncached(page: number, genre?: string): Promise<DiscoveryResult> {
     const rawResults: ContentItem[] = [];
     const genreKey = genre || 'Todos';
+    const isAdultGenre = genre === 'Adulto';
 
     try {
-      if (genre && genre !== 'Todos') {
+      if (isAdultGenre) {
+        const skip = (page - 1) * 20;
+        const cineRes = await tmdbService.getCinemetaCatalog('movie', 'Adult', skip);
+        for (const it of cineRes) {
+          it.isAdult = true;
+          if (!it.genres?.includes('Adulto')) it.genres = ['Adulto', ...(it.genres || [])];
+          rawResults.push(it);
+        }
+      } else if (genre && genre !== 'Todos') {
         const genreId = MOVIE_GENRE_NAME_TO_ID[genre];
-        const discoverPromise = tmdbService.getDiscoverMoviesWithMeta(page, genreId);
-        const cinemetaPromise = page === 1 ? tmdbService.getCinemetaCatalog('movie', genre) : Promise.resolve([]);
+        const discoverPromise = page <= 500 ? tmdbService.getDiscoverMoviesWithMeta(page, genreId) : Promise.resolve({ items: [], total: 0 });
+        const cinemetaPromise = page <= 500
+          ? (page === 1 ? tmdbService.getCinemetaCatalog('movie', genre) : Promise.resolve([]))
+          : tmdbService.getCinemetaCatalog('movie', genre, (page - 501) * 20);
 
         const [discoverRes, cineRes] = await Promise.allSettled([discoverPromise, cinemetaPromise]);
         if (discoverRes.status === 'fulfilled') {
           rawResults.push(...discoverRes.value.items);
-          if (discoverRes.value.total > 0) {
+          if (discoverRes.value.total > 0 && !this.knownTotals[`movies_${genreKey}`]) {
             this.knownTotals[`movies_${genreKey}`] = discoverRes.value.total;
           }
         }
         if (cineRes.status === 'fulfilled') rawResults.push(...cineRes.value);
       } else {
-        const popularPromise = tmdbService.getPopularMoviesWithMeta(page);
+        const popularPromise = page <= 500 ? tmdbService.getPopularMoviesWithMeta(page) : Promise.resolve({ items: [], total: 0 });
         const topRatedPromise = page <= 3 ? tmdbService.getTopRatedMovies(page) : Promise.resolve([]);
-        const cinemetaPromise = page === 1 ? tmdbService.getCinemetaCatalog('movie', undefined, 0) : Promise.resolve([]);
+        const cinemetaPromise = page <= 500
+          ? (page === 1 ? tmdbService.getCinemetaCatalog('movie', undefined, 0) : Promise.resolve([]))
+          : tmdbService.getCinemetaCatalog('movie', undefined, (page - 501) * 20);
 
         const [popRes, topRes, cineRes] = await Promise.allSettled([popularPromise, topRatedPromise, cinemetaPromise]);
         if (popRes.status === 'fulfilled') {
           rawResults.push(...popRes.value.items);
-          if (popRes.value.total > 0) {
-            this.knownTotals['movies_Todos'] = popRes.value.total;
-            this.knownTotals['movies'] = popRes.value.total;
-          }
         }
         if (topRes.status === 'fulfilled') rawResults.push(...topRes.value);
         if (cineRes.status === 'fulfilled') rawResults.push(...cineRes.value);
@@ -221,12 +255,26 @@ export class CatalogDiscoveryService {
       console.warn(`[CatalogDiscoveryService] Erro ao descobrir filmes (pág ${page}):`, err);
     }
 
-    const allowed = catalogEligibilityService.filterEligibleItemsSync(rawResults);
-    const items = this.processAndDedupe(allowed, 'movies');
+    if (page === 1 && !isAdultGenre) {
+      const releases = catalogReleaseStore.getReleases().filter(it => 
+        (it.type === ContentType.MOVIE || it.mediaFormat === 'movie') &&
+        (it.type !== ContentType.ANIME && !it.genres?.includes('Anime')) &&
+        (!genre || genre === 'Todos' || it.genres?.includes(genre))
+      );
+      rawResults.unshift(...releases);
+    }
+
+    const allowed = catalogEligibilityService.filterEligibleItemsSync(rawResults, { allowAdult: isAdultGenre });
+    const filtered = allowed.filter(it => {
+      if (it.type === ContentType.ANIME || it.genres?.includes('Anime') || it.type === ContentType.SERIES || it.mediaFormat === 'series') return false;
+      const isAdult = adultContentService.isAdultContent(it);
+      return isAdultGenre ? isAdult : !isAdult;
+    });
+    const items = this.processAndDedupe(filtered, 'movies');
     return {
       items,
       page,
-      hasMore: (rawResults.length > 0 || items.length > 0) && page < 50,
+      hasMore: rawResults.length > 0 || items.length > 0,
       totalDiscovered: this.dedupeCache.size,
       totalAvailable: this.getTotalAvailable('movies', genre)
     };
@@ -242,32 +290,41 @@ export class CatalogDiscoveryService {
   private async discoverSeriesUncached(page: number, genre?: string): Promise<DiscoveryResult> {
     const rawResults: ContentItem[] = [];
     const genreKey = genre || 'Todos';
+    const isAdultGenre = genre === 'Adulto';
 
     try {
-      if (genre && genre !== 'Todos') {
+      if (isAdultGenre) {
+        const skip = (page - 1) * 20;
+        const cineRes = await tmdbService.getCinemetaCatalog('series', 'Adult', skip);
+        for (const it of cineRes) {
+          it.isAdult = true;
+          if (!it.genres?.includes('Adulto')) it.genres = ['Adulto', ...(it.genres || [])];
+          rawResults.push(it);
+        }
+      } else if (genre && genre !== 'Todos') {
         const genreId = TV_GENRE_NAME_TO_ID[genre];
-        const discoverPromise = tmdbService.getDiscoverSeriesWithMeta(page, genreId);
-        const cinemetaPromise = page === 1 ? tmdbService.getCinemetaCatalog('series', genre) : Promise.resolve([]);
+        const discoverPromise = page <= 500 ? tmdbService.getDiscoverSeriesWithMeta(page, genreId) : Promise.resolve({ items: [], total: 0 });
+        const cinemetaPromise = page <= 500
+          ? (page === 1 ? tmdbService.getCinemetaCatalog('series', genre) : Promise.resolve([]))
+          : tmdbService.getCinemetaCatalog('series', genre, (page - 501) * 20);
 
         const [discoverRes, cineRes] = await Promise.allSettled([discoverPromise, cinemetaPromise]);
         if (discoverRes.status === 'fulfilled') {
           rawResults.push(...discoverRes.value.items);
-          if (discoverRes.value.total > 0) {
+          if (discoverRes.value.total > 0 && !this.knownTotals[`series_${genreKey}`]) {
             this.knownTotals[`series_${genreKey}`] = discoverRes.value.total;
           }
         }
         if (cineRes.status === 'fulfilled') rawResults.push(...cineRes.value);
       } else {
-        const popularPromise = tmdbService.getPopularSeriesWithMeta(page);
-        const cinemetaPromise = page === 1 ? tmdbService.getCinemetaCatalog('series', undefined, 0) : Promise.resolve([]);
+        const popularPromise = page <= 500 ? tmdbService.getPopularSeriesWithMeta(page) : Promise.resolve({ items: [], total: 0 });
+        const cinemetaPromise = page <= 500
+          ? (page === 1 ? tmdbService.getCinemetaCatalog('series', undefined, 0) : Promise.resolve([]))
+          : tmdbService.getCinemetaCatalog('series', undefined, (page - 501) * 20);
 
         const [popRes, cineRes] = await Promise.allSettled([popularPromise, cinemetaPromise]);
         if (popRes.status === 'fulfilled') {
           rawResults.push(...popRes.value.items);
-          if (popRes.value.total > 0) {
-            this.knownTotals['series_Todos'] = popRes.value.total;
-            this.knownTotals['series'] = popRes.value.total;
-          }
         }
         if (cineRes.status === 'fulfilled') rawResults.push(...cineRes.value);
       }
@@ -275,12 +332,26 @@ export class CatalogDiscoveryService {
       console.warn(`[CatalogDiscoveryService] Erro ao descobrir séries (pág ${page}):`, err);
     }
 
-    const allowed = catalogEligibilityService.filterEligibleItemsSync(rawResults);
-    const items = this.processAndDedupe(allowed, 'series');
+    if (page === 1 && !isAdultGenre) {
+      const releases = catalogReleaseStore.getReleases().filter(it => 
+        (it.type === ContentType.SERIES || it.mediaFormat === 'series') &&
+        (it.type !== ContentType.ANIME && !it.genres?.includes('Anime')) &&
+        (!genre || genre === 'Todos' || it.genres?.includes(genre))
+      );
+      rawResults.unshift(...releases);
+    }
+
+    const allowed = catalogEligibilityService.filterEligibleItemsSync(rawResults, { allowAdult: isAdultGenre });
+    const filtered = allowed.filter(it => {
+      if (it.type === ContentType.ANIME || it.genres?.includes('Anime') || it.type === ContentType.MOVIE || it.mediaFormat === 'movie') return false;
+      const isAdult = adultContentService.isAdultContent(it);
+      return isAdultGenre ? isAdult : !isAdult;
+    });
+    const items = this.processAndDedupe(filtered, 'series');
     return {
       items,
       page,
-      hasMore: (rawResults.length > 0 || items.length > 0) && page < 50,
+      hasMore: rawResults.length > 0 || items.length > 0,
       totalDiscovered: this.dedupeCache.size,
       totalAvailable: this.getTotalAvailable('series', genre)
     };
@@ -295,41 +366,56 @@ export class CatalogDiscoveryService {
 
   private async discoverAnimesUncached(page: number, genre?: string): Promise<DiscoveryResult> {
     const rawResults: ContentItem[] = [];
+    const isAdultGenre = genre === 'Adulto';
 
     try {
-      // 1. Busca Séries de Anime
-      const tvAnimePromise = tmdbService.getAnimesWithMeta(page);
-      // 2. Busca Filmes de Anime (Ghibli, Makoto Shinkai, Mugen Train, etc.)
-      const movieAnimePromise = tmdbService.getAnimeMoviesWithMeta(page);
+      if (isAdultGenre) {
+        const skip = (page - 1) * 20;
+        const cineRes = await tmdbService.getCinemetaCatalog('series', 'Hentai', skip);
+        for (const it of cineRes) {
+          it.isAdult = true;
+          it.type = ContentType.ANIME;
+          if (!it.genres?.includes('Anime')) it.genres = ['Anime', ...(it.genres || [])];
+          if (!it.genres?.includes('Adulto')) it.genres = ['Adulto', ...(it.genres || [])];
+          rawResults.push(it);
+        }
+      } else {
+        // 1. Busca Séries de Anime convencionais
+        const tvAnimePromise = page <= 500 ? tmdbService.getAnimesWithMeta(page) : Promise.resolve({ items: [], total: 0 });
+        // 2. Busca Filmes de Anime convencionais
+        const movieAnimePromise = page <= 500 ? tmdbService.getAnimeMoviesWithMeta(page) : Promise.resolve({ items: [], total: 0 });
+        // 3. Suporte contínuo via Cinemeta além da página 500
+        const cinemetaPromise = page > 500 ? tmdbService.getCinemetaCatalog('series', 'Animation', (page - 501) * 20) : Promise.resolve([]);
 
-      const [tvRes, movieRes] = await Promise.allSettled([tvAnimePromise, movieAnimePromise]);
-      let tvTotal = 0;
-      let movieTotal = 0;
+        const [tvRes, movieRes, cineRes] = await Promise.allSettled([tvAnimePromise, movieAnimePromise, cinemetaPromise]);
 
-      if (tvRes.status === 'fulfilled') {
-        rawResults.push(...tvRes.value.items);
-        tvTotal = tvRes.value.total;
-      }
-      if (movieRes.status === 'fulfilled') {
-        rawResults.push(...movieRes.value.items);
-        movieTotal = movieRes.value.total;
-      }
-
-      const combinedTotal = (tvTotal || 5474) + (movieTotal || 6020);
-      if (combinedTotal > 0 && (!genre || genre === 'Todos' || genre === 'Anime')) {
-        this.knownTotals['animes_Todos'] = combinedTotal;
-        this.knownTotals['animes'] = combinedTotal;
+        if (tvRes.status === 'fulfilled') {
+          rawResults.push(...tvRes.value.items);
+        }
+        if (movieRes.status === 'fulfilled') {
+          rawResults.push(...movieRes.value.items);
+        }
+        if (cineRes.status === 'fulfilled') {
+          rawResults.push(...cineRes.value);
+        }
       }
 
       // Filtro por sub-gênero caso o usuário selecione na dropdown
-      if (genre && genre !== 'Todos' && genre !== 'Anime') {
+      if (genre && genre !== 'Todos' && genre !== 'Anime' && genre !== 'Adulto') {
         const filtered = rawResults.filter(it => it.genres?.includes(genre));
-        const allowed = catalogEligibilityService.filterEligibleItemsSync(filtered);
-        const items = this.processAndDedupe(allowed, 'animes');
+        const allowed = catalogEligibilityService.filterEligibleItemsSync(filtered, { allowAdult: false });
+        const onlyAnimes = allowed
+          .filter(it => !adultContentService.isAdultContent(it))
+          .map(it => {
+            if (it.type !== ContentType.ANIME) it.type = ContentType.ANIME;
+            if (!it.genres?.includes('Anime')) it.genres = ['Anime', ...(it.genres || [])];
+            return it;
+          });
+        const items = this.processAndDedupe(onlyAnimes, 'animes');
         return {
           items,
           page,
-          hasMore: (rawResults.length > 0 || items.length > 0) && page < 50,
+          hasMore: rawResults.length > 0 || items.length > 0,
           totalDiscovered: this.dedupeCache.size,
           totalAvailable: this.getTotalAvailable('animes', genre)
         };
@@ -338,12 +424,32 @@ export class CatalogDiscoveryService {
       console.warn(`[CatalogDiscoveryService] Erro ao descobrir animes (pág ${page}):`, err);
     }
 
-    const allowed = catalogEligibilityService.filterEligibleItemsSync(rawResults);
-    const items = this.processAndDedupe(allowed, 'animes');
+    if (page === 1 && !isAdultGenre) {
+      const releases = catalogReleaseStore.getReleases().filter(it => 
+        (it.type === ContentType.ANIME || it.genres?.includes('Anime')) &&
+        (!genre || genre === 'Todos' || it.genres?.includes(genre))
+      );
+      rawResults.unshift(...releases);
+    }
+
+    const allowed = catalogEligibilityService.filterEligibleItemsSync(rawResults, { allowAdult: isAdultGenre });
+    const onlyAnimes = allowed
+      .filter(it => {
+        const isAdult = adultContentService.isAdultContent(it);
+        const matchesAdult = isAdultGenre ? isAdult : !isAdult;
+        if (!matchesAdult) return false;
+        return it.type === ContentType.ANIME || it.genres?.includes('Anime');
+      })
+      .map(it => {
+        if (it.type !== ContentType.ANIME) it.type = ContentType.ANIME;
+        if (!it.genres?.includes('Anime')) it.genres = ['Anime', ...(it.genres || [])];
+        return it;
+      });
+    const items = this.processAndDedupe(onlyAnimes, 'animes');
     return {
       items,
       page,
-      hasMore: (rawResults.length > 0 || items.length > 0) && page < 50,
+      hasMore: rawResults.length > 0 || items.length > 0,
       totalDiscovered: this.dedupeCache.size,
       totalAvailable: this.getTotalAvailable('animes', genre)
     };
@@ -354,8 +460,10 @@ export class CatalogDiscoveryService {
    */
   public async discoverTrending(): Promise<ContentItem[]> {
     try {
+      const releases = catalogReleaseStore.getReleases();
       const trending = await tmdbService.getTrending();
-      const allowed = catalogEligibilityService.filterEligibleItemsSync(trending);
+      const combined = [...releases, ...trending];
+      const allowed = catalogEligibilityService.filterEligibleItemsSync(combined);
       return this.processAndDedupe(allowed, 'all');
     } catch (err) {
       console.warn('[CatalogDiscoveryService] Erro ao descobrir trending:', err);

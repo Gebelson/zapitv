@@ -249,9 +249,9 @@ async function runTestSuite() {
   // TESTE 14 (Teste B): Série com Listagem e Navegação de Episódios
   try {
     console.log('\n👉 [TESTE 14 / Teste B] Validando Série Aberta e Navegação de Episódios...');
-    const series = VERIFIED_OPEN_ITEMS.find(i => i.id === 'open-caminandes-s1')!;
-    const ep1Streams = await providerRegistry.resolveStreams('series', { id: series.id }, { season: 1, episode: 1 });
-    const ep2Streams = await providerRegistry.resolveStreams('series', { id: series.id }, { season: 1, episode: 2 });
+    const series = VERIFIED_OPEN_ITEMS.find(i => i.id === 'tmdb-95897')!;
+    const ep1Streams = await providerRegistry.resolveStreams('anime', { id: series.id }, { season: 1, episode: 1 });
+    const ep2Streams = await providerRegistry.resolveStreams('anime', { id: series.id }, { season: 1, episode: 2 });
 
     const url1 = ep1Streams[0].url.startsWith('/') ? `http://localhost:4000${ep1Streams[0].url}` : ep1Streams[0].url;
     const url2 = ep2Streams[0].url.startsWith('/') ? `http://localhost:4000${ep2Streams[0].url}` : ep2Streams[0].url;

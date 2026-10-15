@@ -4,14 +4,15 @@
  * motivos de seleção/rejeição e quarentena de segurança.
  */
 
-import React, { useState } from 'react';
-import { ShieldCheck, ShieldAlert, AlertTriangle, X, RefreshCw, CheckCircle2, Ban } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShieldCheck, ShieldAlert, AlertTriangle, X, RefreshCw, CheckCircle2, Ban, Activity, Wifi, Cpu, Layers, Gauge } from 'lucide-react';
 import { ContentItem } from '../../../types';
 import { StremioStream } from '../../core/stremio/stremioTypes';
 import { canonicalIdentityService } from '../../core/identity/canonicalIdentity';
 import { sourceConfidenceEngine, SourceConfidence } from '../../core/identity/sourceConfidenceEngine';
 import { streamQuarantineService } from '../../core/security/streamQuarantineService';
 import { providerRegistry } from '../../core/providers/providerRegistry';
+import { playbackOptimizerService, PlaybackTelemetry, NetworkProfile, DeviceProfile } from '../../core/playback/PlaybackOptimizerService';
 
 interface ZapiStreamDiagnosticsModalProps {
   item: ContentItem;
@@ -30,8 +31,20 @@ export const ZapiStreamDiagnosticsModal: React.FC<ZapiStreamDiagnosticsModalProp
   episode,
   onClose
 }) => {
-  const [activeTab, setActiveTab] = useState<'streams' | 'quarantine'>('streams');
+  const [activeTab, setActiveTab] = useState<'streams' | 'quarantine' | 'telemetry'>('streams');
   const [cacheCleared, setCacheCleared] = useState(false);
+  const [telemetry, setTelemetry] = useState<PlaybackTelemetry>(playbackOptimizerService.getTelemetry());
+  const [netProfile, setNetProfile] = useState<NetworkProfile>(playbackOptimizerService.getNetworkProfile());
+  const [devProfile, setDevProfile] = useState<DeviceProfile>(playbackOptimizerService.getDeviceProfile());
+
+  useEffect(() => {
+    const unsub = playbackOptimizerService.subscribeTelemetry((t) => {
+      setTelemetry(t);
+      setNetProfile(playbackOptimizerService.getNetworkProfile());
+      setDevProfile(playbackOptimizerService.getDeviceProfile());
+    });
+    return () => unsub();
+  }, []);
 
   const identity = canonicalIdentityService.buildIdentity(item, season && episode ? { season, episode } : null);
   const evaluations = sourceConfidenceEngine.evaluateBatch(streams, identity);
@@ -124,6 +137,14 @@ export const ZapiStreamDiagnosticsModal: React.FC<ZapiStreamDiagnosticsModalProp
             Streams Avaliados ({evaluations.length})
           </button>
           <button
+            onClick={() => setActiveTab('telemetry')}
+            className={`pb-2.5 font-bold cursor-pointer transition-colors border-b-2 flex items-center gap-1.5 ${
+              activeTab === 'telemetry' ? 'text-emerald-400 border-emerald-400' : 'text-gray-400 border-transparent hover:text-white'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" /> Métricas & ABR
+          </button>
+          <button
             onClick={() => setActiveTab('quarantine')}
             className={`pb-2.5 font-bold cursor-pointer transition-colors border-b-2 flex items-center gap-1.5 ${
               activeTab === 'quarantine' ? 'text-purple-400 border-purple-400' : 'text-gray-400 border-transparent hover:text-white'
@@ -186,6 +207,199 @@ export const ZapiStreamDiagnosticsModal: React.FC<ZapiStreamDiagnosticsModalProp
                   );
                 })
               )}
+            </div>
+          )}
+
+          {activeTab === 'telemetry' && (
+            <div className="space-y-4">
+              {/* Header de Ações */}
+              <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                <div className="text-[11px] text-gray-400">
+                  Métricas em tempo real coletadas pelo <strong className="text-white">PlaybackOptimizerService</strong>.
+                </div>
+                <button
+                  onClick={() => playbackOptimizerService.resetTelemetry()}
+                  className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
+                >
+                  Zerar Contadores
+                </button>
+              </div>
+
+              {/* Grid 1: Desempenho de Inicialização e Buffer */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* TTFF */}
+                <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-gray-400 mb-1">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Gauge className="w-3.5 h-3.5 text-emerald-400" /> TTFF (Time to 1st Frame)
+                    </span>
+                    <span className="text-[10px] text-gray-500">Meta: &lt; 500ms</span>
+                  </div>
+                  <div className="text-2xl font-black font-mono text-white mt-1">
+                    {telemetry.ttffMs !== null ? (
+                      <span className={telemetry.ttffMs < 500 ? 'text-emerald-400' : telemetry.ttffMs < 1500 ? 'text-blue-400' : 'text-amber-400'}>
+                        {telemetry.ttffMs} <span className="text-xs font-normal">ms</span>
+                      </span>
+                    ) : (
+                      <span className="text-gray-500 text-base">Iniciando...</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Tempo entre o clique no play e a renderização do primeiro frame visual.
+                  </p>
+                </div>
+
+                {/* Buffer à frente */}
+                <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-gray-400 mb-1">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-sky-400" /> Buffer à Frente
+                    </span>
+                    <span className="text-[10px] font-mono text-sky-400 font-bold">
+                      {telemetry.bufferAheadSeconds.toFixed(1)}s
+                    </span>
+                  </div>
+                  {/* Barra Gráfica de Buffer */}
+                  <div className="w-full bg-black/60 rounded-full h-3 overflow-hidden border border-white/10 my-2">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        telemetry.bufferAheadSeconds < 3
+                          ? 'bg-red-500'
+                          : telemetry.bufferAheadSeconds < 10
+                          ? 'bg-amber-500'
+                          : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(100, (telemetry.bufferAheadSeconds / 30) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[9px] text-gray-500 font-mono">
+                    <span>0s (Crítico)</span>
+                    <span>15s</span>
+                    <span>30s (Ideal)</span>
+                  </div>
+                </div>
+
+                {/* Bitrate & Resolução Atual */}
+                <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-gray-400 mb-1">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-purple-400" /> Bitrate & Resolução
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#007df7]/20 text-[#007df7] uppercase">
+                      ABR: {telemetry.activeAbrMode}
+                    </span>
+                  </div>
+                  <div className="text-xl font-black font-mono text-white mt-1">
+                    {telemetry.currentResolution.toUpperCase()}
+                    {telemetry.currentBitrateKbps ? (
+                      <span className="text-gray-400 text-xs font-normal ml-2">
+                        @ {(telemetry.currentBitrateKbps / 1000).toFixed(1)} Mbps
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Tipo de Fonte: <strong className="text-gray-200 uppercase">{telemetry.streamSourceType}</strong>
+                  </p>
+                </div>
+              </div>
+
+              {/* Grid 2: Estabilidade e Resiliência Anti-Travamento */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                  <span className="text-gray-400 block text-[10px] uppercase font-bold">Pausas p/ Buffer</span>
+                  <span className="text-lg font-black font-mono text-white mt-0.5 block">
+                    {telemetry.bufferingCount} <span className="text-xs text-gray-400 font-normal">vezes</span>
+                  </span>
+                  <span className="text-[10px] text-gray-500">
+                    {(telemetry.totalBufferingDurationMs / 1000).toFixed(1)}s total
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                  <span className="text-gray-400 block text-[10px] uppercase font-bold">Stalls Recuperados</span>
+                  <span className="text-lg font-black font-mono text-emerald-400 mt-0.5 block">
+                    {telemetry.stallsRecovered}
+                  </span>
+                  <span className="text-[10px] text-gray-500">Recuperações automáticas</span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                  <span className="text-gray-400 block text-[10px] uppercase font-bold">Frames Perdidos</span>
+                  <span className="text-lg font-black font-mono text-amber-400 mt-0.5 block">
+                    {telemetry.droppedFrames}
+                  </span>
+                  <span className="text-[10px] text-gray-500">
+                    {telemetry.totalFrames > 0
+                      ? `${((telemetry.droppedFrames / telemetry.totalFrames) * 100).toFixed(2)}% drop rate`
+                      : '0% drop rate'}
+                  </span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                  <span className="text-gray-400 block text-[10px] uppercase font-bold">Conexão Lenta?</span>
+                  <span className="text-lg font-black mt-0.5 block">
+                    {netProfile.isSlowConnection ? (
+                      <span className="text-amber-400 text-sm font-bold">Sim (Otimizada)</span>
+                    ) : (
+                      <span className="text-emerald-400 text-sm font-bold">Não (Normal)</span>
+                    )}
+                  </span>
+                  <span className="text-[10px] text-gray-500">
+                    {netProfile.isUnstable ? 'Rede Instável' : 'Rede Estável'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Grid 3: Diagnóstico de Rede & Dispositivo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                {/* Perfil de Rede */}
+                <div className="p-3 rounded-xl bg-[#131722] border border-white/10 space-y-1.5">
+                  <div className="flex items-center gap-2 text-white font-bold mb-1">
+                    <Wifi className="w-4 h-4 text-[#007df7]" /> Perfil de Conexão Detectado
+                  </div>
+                  <div className="flex justify-between text-gray-300">
+                    <span className="text-gray-400">Tipo de Rede Efetivo:</span>
+                    <span className="font-mono font-bold text-white uppercase">{netProfile.effectiveType}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-300">
+                    <span className="text-gray-400">Largura de Banda (Downlink):</span>
+                    <span className="font-mono text-emerald-400 font-bold">{netProfile.downlinkMbps.toFixed(2)} Mbps</span>
+                  </div>
+                  <div className="flex justify-between text-gray-300">
+                    <span className="text-gray-400">Latência de Ida e Volta (RTT):</span>
+                    <span className="font-mono text-white">{netProfile.rttMs} ms</span>
+                  </div>
+                  <div className="flex justify-between text-gray-300">
+                    <span className="text-gray-400">Modo Economia de Dados:</span>
+                    <span className="font-mono text-white">{netProfile.saveData ? 'Ativado' : 'Desativado'}</span>
+                  </div>
+                </div>
+
+                {/* Perfil do Dispositivo */}
+                <div className="p-3 rounded-xl bg-[#131722] border border-white/10 space-y-1.5">
+                  <div className="flex items-center gap-2 text-white font-bold mb-1">
+                    <Cpu className="w-4 h-4 text-emerald-400" /> Perfil do Dispositivo & Hardware
+                  </div>
+                  <div className="flex justify-between text-gray-300">
+                    <span className="text-gray-400">Categoria do Aparelho:</span>
+                    <span className="font-mono font-bold text-white uppercase">{devProfile.deviceType}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-300">
+                    <span className="text-gray-400">Hardware / Limitação:</span>
+                    <span className="font-mono text-white">
+                      {devProfile.isLowEnd ? 'Dispositivo Leve (Economia Ativa)' : 'Hardware Padrão / Alto'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-300">
+                    <span className="text-gray-400">Limite de Buffer Seguro:</span>
+                    <span className="font-mono text-sky-400 font-bold">{devProfile.memoryLimitMB} MB</span>
+                  </div>
+                  <div className="flex justify-between text-gray-300">
+                    <span className="text-gray-400">Qualidade Inicial Recomendada:</span>
+                    <span className="font-mono text-emerald-400 font-bold">{devProfile.recommendedInitialQuality}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

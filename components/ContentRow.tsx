@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, Edit2, Trash2 } from 'lucide-react';
 import { ContentItem } from '../types';
 import ContentCard from './ContentCard';
+import { deduplicateContentItems } from '../src/core/catalog/catalogDeduplication';
 
 interface ContentRowProps {
   title: string;
@@ -62,13 +63,7 @@ const ContentRow: React.FC<ContentRowProps> = ({
 
   // Filtra itens únicos para garantir que não haja duplicatas na lista base
   const uniqueItems = useMemo(() => {
-    const seen = new Set<string>();
-    return items.filter(item => {
-      const key = item.id || item.imdbId || item.title;
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    return deduplicateContentItems(items);
   }, [items]);
 
   // O carrossel só é infinito se tiver MAIS DE 8 capas de conteúdos diferentes
@@ -225,9 +220,9 @@ const ContentRow: React.FC<ContentRowProps> = ({
 
   return (
     <section ref={sectionRef} className="relative group/section select-none">
-      <div className="flex items-center justify-between mb-3 md:mb-6 px-4 md:px-12">
+      <div className="flex items-center justify-between mb-3 md:mb-6 px-3 sm:px-6 md:px-12">
         <div className="flex items-center gap-3 group/title">
-          <h3 className={`text-lg md:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+          <h3 className={`text-base sm:text-xl md:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
             {title}
           </h3>
           {isAdmin && (
@@ -254,17 +249,17 @@ const ContentRow: React.FC<ContentRowProps> = ({
         
         {(isInfinite || uniqueItems.length > 5) && (
           <div className="hidden md:flex gap-3 opacity-0 group-hover/section:opacity-100 transition-all duration-300 z-30">
-            <button onClick={() => scrollByButton('left')} className={`p-3 rounded-2xl border transition-all hover:scale-110 active:scale-90 shadow-2xl ${isDarkMode ? 'border-gray-800 bg-gray-900/50 hover:bg-gray-800 text-white' : 'border-gray-200 bg-white hover:bg-gray-100'}`}>
+            <button onClick={() => scrollByButton('left')} className={`p-3 rounded-2xl border transition-all hover:scale-110 active:scale-90 shadow-2xl ${isDarkMode ? 'border-gray-800 bg-gray-900/50 hover:bg-gray-800 text-white' : 'border-gray-200 bg-white hover:bg-gray-100'}`} aria-label="Rolar para a esquerda">
               <ChevronLeft className="w-6 h-6" />
             </button>
-            <button onClick={() => scrollByButton('right')} className={`p-3 rounded-2xl border transition-all hover:scale-110 active:scale-90 shadow-2xl ${isDarkMode ? 'border-gray-800 bg-gray-900/50 hover:bg-gray-800 text-white' : 'border-gray-200 bg-white hover:bg-gray-100'}`}>
+            <button onClick={() => scrollByButton('right')} className={`p-3 rounded-2xl border transition-all hover:scale-110 active:scale-90 shadow-2xl ${isDarkMode ? 'border-gray-800 bg-gray-900/50 hover:bg-gray-800 text-white' : 'border-gray-200 bg-white hover:bg-gray-100'}`} aria-label="Rolar para a direita">
               <ChevronRight className="w-6 h-6" />
             </button>
           </div>
         )}
       </div>
 
-      <div className="relative overflow-visible min-h-[230px] md:min-h-[390px]">
+      <div className="relative overflow-visible min-h-[190px] sm:min-h-[250px] md:min-h-[350px]">
         {shouldRenderCards && (
         <div 
           ref={sliderRef}
@@ -275,7 +270,7 @@ const ContentRow: React.FC<ContentRowProps> = ({
           onScroll={handleInfiniteScroll}
           onClickCapture={handleCaptureClick}
           className={`
-            flex gap-2.5 md:gap-5 lg:gap-6 overflow-x-auto no-scrollbar pb-6 md:pb-12 pt-2 md:pt-4 px-4 md:px-12 
+            flex gap-2.5 sm:gap-3.5 md:gap-5 lg:gap-6 overflow-x-auto no-scrollbar pb-4 sm:pb-8 md:pb-12 pt-2 md:pt-4 px-3 sm:px-6 md:px-12 
             will-change-scroll transform-gpu 
             ${isActive ? 'cursor-grabbing' : 'cursor-grab'} 
           `}
@@ -288,7 +283,7 @@ const ContentRow: React.FC<ContentRowProps> = ({
           {extendedItems.map((item, index) => (
             <div 
               key={`${item.id}-${index}`} 
-              className={`flex-none w-[110px] md:w-[220px]`}
+              className={`flex-none w-[115px] sm:w-[150px] md:w-[185px] lg:w-[215px] 2xl:w-[245px]`}
             >
               <ContentCard 
                 item={item}

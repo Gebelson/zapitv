@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Tv, Play, Maximize, ChevronLeft, ChevronRight, Volume2, VolumeX, 
-  Heart, Calendar, Radio, Sparkles, SlidersHorizontal, ExternalLink, ShieldCheck
+  Heart, Calendar, Radio, Sparkles, SlidersHorizontal, ExternalLink, ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 import { LiveChannel, CurrentEpgState } from '../../core/livetv/types';
 import { epgService } from '../../core/livetv/epgService';
 import { liveTvPreferences } from '../../core/livetv/liveTvPreferences';
 import { LiveTvPlayer } from './LiveTvPlayer';
 import { ProgramGuideModal } from './ProgramGuideModal';
+import { ReportFeedbackModal } from '../feedback/ReportFeedbackModal';
 
 interface TelevisionModeProps {
   channels: LiveChannel[];
@@ -29,6 +31,7 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
   const [epg, setEpg] = useState<CurrentEpgState>(() => epgService.getCurrentEpgState(activeChannel));
   const [isFav, setIsFav] = useState(() => liveTvPreferences.isFavorite(activeChannel.id));
   const [isFullPlaybackActive, setIsFullPlaybackActive] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -278,6 +281,15 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
                 <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
               </button>
 
+              <button
+                onClick={() => setShowFeedbackModal(true)}
+                className="p-2.5 rounded-xl border border-white/10 bg-white/10 text-gray-300 hover:text-amber-400 hover:border-amber-400/40 hover:bg-amber-500/10 transition-all cursor-pointer"
+                title="Reportar problema neste canal"
+                aria-label="Reportar problema"
+              >
+                <AlertCircle className="w-4 h-4" />
+              </button>
+
               {activeChannel.requiresExternalAccess ? (
                 <button
                   onClick={handleWatchFullscreen}
@@ -362,6 +374,18 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
         isOpen={isEpgModalOpen}
         onClose={() => setIsEpgModalOpen(false)}
         onWatchChannel={handleWatchFullscreen}
+      />
+
+      {/* Modal Inteligente de Feedback */}
+      <ReportFeedbackModal
+        isOpen={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        defaultCategory="live_channel_unavailable"
+        playbackContext={{
+          sourceId: activeChannel.id,
+          streamName: activeChannel.name,
+          streamType: 'hls'
+        }}
       />
     </div>
   );

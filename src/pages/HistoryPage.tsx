@@ -63,19 +63,11 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ isDarkMode = true, onS
   return (
     <div className="px-4 md:px-12 py-8 pb-32 space-y-8 animate-in fade-in duration-500">
       {/* Cabeçalho */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
-        <div className="flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-600/20 border border-indigo-500/30 text-indigo-400 shadow-lg">
-            <History className="w-8 h-8 md:w-10 md:h-10" />
-          </div>
-          <div>
-            <h2 className={`text-2xl md:text-4xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-              Histórico de Visualização
-            </h2>
-            <p className="text-xs md:text-sm text-gray-400 font-medium mt-1">
-              Retome seus filmes, séries e episódios exatamente do ponto onde parou.
-            </p>
-          </div>
+      <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b ${isDarkMode ? 'border-white/10' : 'border-black/10'}`}>
+        <div>
+          <h2 className={`text-xl sm:text-2xl md:text-5xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            Histórico de Visualização
+          </h2>
         </div>
 
         {historyList.length > 0 && (

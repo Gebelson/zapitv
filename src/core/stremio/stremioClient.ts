@@ -5,6 +5,16 @@ import {
   StremioStreamResponse
 } from './stremioTypes';
 
+function resolveStremioUrl(url: string): string {
+  if (url.startsWith('/')) {
+    const origin = typeof window !== 'undefined'
+      ? window.location.origin
+      : (process.env.VITE_APP_URL || `http://127.0.0.1:${process.env.PORT || 4000}`);
+    return `${origin}${url}`;
+  }
+  return url;
+}
+
 export class StremioClient {
   private baseUrl: string;
 
@@ -25,9 +35,8 @@ export class StremioClient {
 
   private async fetchWithFallback(endpoint: string, timeoutMs = 8000): Promise<any> {
     const isRelative = this.baseUrl.startsWith('/');
-    const directUrl = isRelative
-      ? `${this.baseUrl}/${endpoint.replace(/^\/+/, '')}`
-      : `${this.baseUrl}/${endpoint.replace(/^\/+/, '')}`;
+    const rawPath = `${this.baseUrl}/${endpoint.replace(/^\/+/, '')}`;
+    const directUrl = resolveStremioUrl(rawPath);
     
     // Se for URL relativa interna (/api/stremio/...), busca diretamente no host local
     if (isRelative) {
@@ -50,7 +59,7 @@ export class StremioClient {
     }
 
     // Fallback: proxy via server.ts
-    const proxyUrl = `/api/proxy?url=${encodeURIComponent(directUrl)}`;
+    const proxyUrl = resolveStremioUrl(`/api/proxy?url=${encodeURIComponent(directUrl)}`);
     try {
       const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeoutMs) });
       if (!res.ok) {

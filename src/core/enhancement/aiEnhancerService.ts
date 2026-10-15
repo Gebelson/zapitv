@@ -65,9 +65,18 @@ export class AiEnhancerService {
     return () => this.listeners.delete(listener);
   }
 
+  private boundVideo: HTMLVideoElement | null = null;
+
   private notify(): void {
     this.saveSettings();
     videoEnhancer.updateSettings(this.settings);
+    if (this.boundVideo && this.settings.enabled && this.settings.audioEnabled) {
+      try {
+        audioEnhancer.attach(this.boundVideo);
+      } catch (e) {
+        console.warn('[ZapiAiService] Falha ao conectar Web Audio:', e);
+      }
+    }
     audioEnhancer.updateSettings(this.settings);
     this.listeners.forEach(fn => fn(this.getSettings()));
   }
@@ -125,13 +134,19 @@ export class AiEnhancerService {
   }
 
   public attachPlayer(video: HTMLVideoElement, canvas: HTMLCanvasElement): void {
+    this.boundVideo = video;
     videoEnhancer.attach(video, canvas);
-    audioEnhancer.attach(video);
+    try {
+      audioEnhancer.attach(video);
+    } catch (e) {
+      console.warn('[ZapiAiService] Falha ao conectar Web Audio inicial:', e);
+    }
     videoEnhancer.updateSettings(this.settings);
     audioEnhancer.updateSettings(this.settings);
   }
 
   public detachPlayer(): void {
+    this.boundVideo = null;
     videoEnhancer.detach();
     audioEnhancer.detach();
   }
@@ -142,6 +157,10 @@ export class AiEnhancerService {
 
   public getAudioPlan(): AudioProcessingPlan {
     return audioEnhancer.getCurrentPlan();
+  }
+
+  public unlockAudioContext(): void {
+    audioEnhancer.unlockAudioContext();
   }
 
   public getStatus(): 'off' | 'initializing' | 'active' | 'unavailable' {

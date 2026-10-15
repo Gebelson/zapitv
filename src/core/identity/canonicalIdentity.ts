@@ -35,6 +35,16 @@ const STOP_WORDS = new Set([
 ]);
 
 export class CanonicalIdentityService {
+  public isSameWork(
+    expected: Pick<ContentItem, 'title' | 'originalTitle' | 'year' | 'type'>,
+    candidate: Pick<ContentItem, 'title' | 'originalTitle' | 'year' | 'type'>
+  ): boolean {
+    if (expected.type !== candidate.type) return false;
+    if (expected.year && candidate.year && Math.abs(expected.year - candidate.year) > 1) return false;
+    const titles = [expected.title, expected.originalTitle].filter(Boolean).map(value => this.normalizeTitle(value!));
+    const candidates = [candidate.title, candidate.originalTitle].filter(Boolean).map(value => this.normalizeTitle(value!));
+    return titles.some(title => title.length >= 3 && candidates.includes(title));
+  }
   /**
    * Constrói a identidade canônica a partir de um ContentItem e parâmetros de episódio
    */
@@ -82,6 +92,9 @@ export class CanonicalIdentityService {
     }
     if (/hope.*primeiro.*impacto/i.test(item.title)) {
       aliases.push('hope', 'hopeu', '호프');
+    }
+    if (/bleach.*thousand|bleach.*sennen/i.test(item.title) || /bleach.*thousand|bleach.*sennen/i.test(item.originalTitle || '')) {
+      aliases.push('bleach sennen kessen hen', 'bleach sennen kessen-hen', 'bleach thousand-year blood war', 'bleach: sennen kessen-hen', 'bleach: thousand-year blood war');
     }
 
     return {

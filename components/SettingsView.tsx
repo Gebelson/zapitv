@@ -9,6 +9,9 @@ import { User as UserType, AppView, SiteNotification } from '../types';
 import { skipService } from '../src/core/skip/skipService';
 import { autoPlayService } from '../src/core/playback/autoPlayService';
 import { subtitleStyleService, SubtitleStyle } from '../src/core/subtitles/subtitleStyleService';
+import { userPreferenceStore } from '../src/core/recommendations/userPreferenceStore';
+import { recommendationEngine } from '../src/core/recommendations/recommendationEngine';
+import { consentManager } from '../src/core/recommendations/consentManager';
 
 interface SettingsViewProps {
   isDarkMode: boolean;
@@ -71,6 +74,29 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     const reset = subtitleStyleService.resetSubtitleStyle();
     setSubtitleStyle(reset);
     showToast("Estilo das legendas restaurado para o padrão.");
+  };
+
+  const handleClearRecommendationPreferences = async () => {
+    try {
+      await userPreferenceStore.clearPreferences(user?.id || 'default');
+      recommendationEngine.invalidateCache();
+      showToast("Preferências de recomendação redefinidas com sucesso.");
+    } catch {
+      showToast("Não foi possível limpar as preferências.");
+    }
+  };
+
+  const [collabOptIn, setCollabOptIn] = useState<boolean>(() => consentManager.isCollaborativeOptedIn());
+  const handleToggleCollabOptIn = async () => {
+    const next = !collabOptIn;
+    setCollabOptIn(next);
+    consentManager.setCollaborativeOptIn(next);
+    if (!next) {
+      await consentManager.revokeConsentAndPurge();
+      showToast("Participação colaborativa revogada e dados purgados.");
+    } else {
+      showToast("Participação voluntária em recomendações coletivas ativada!");
+    }
   };
 
   // Estados para modais específicos
@@ -486,6 +512,54 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                 <span className="text-xs font-bold text-[#007df7] uppercase bg-[#007df7]/10 px-3 py-1 rounded-full shrink-0 ml-4">
                   Ativado
                 </span>
+              </div>
+
+              {/* Preferências Personalizadas de Recomendação */}
+              <div className="p-6 md:p-8 flex items-center justify-between border-t border-white/5">
+                <div className="max-w-md">
+                  <h3 className={`text-[16px] font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Recomendações Personalizadas
+                  </h3>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    O motor inteligente ajusta as fileiras da Home e catálogos ao seu estilo sem enviar seus dados para servidores externos. Você pode redefinir o aprendizado a qualquer momento.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClearRecommendationPreferences}
+                  className="px-4 py-2 text-xs font-bold rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors shrink-0 ml-4 cursor-pointer"
+                >
+                  Limpar Preferências
+                </button>
+              </div>
+
+              {/* Participação em Recomendações Coletivas (Filtragem Colaborativa) */}
+              <div className="p-6 md:p-8 flex items-center justify-between border-t border-white/5">
+                <div className="max-w-md">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className={`text-[16px] font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      Recomendações Coletivas Anônimas
+                    </h3>
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      Privacidade 100%
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    Ajude o ZapiTV a descobrir conteúdos similares compartilhando padrões implícitos totalmente anônimos (sem contas, sem cookies de rastreamento e com exclusão rigorosa de conteúdos adultos).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleCollabOptIn}
+                  className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors cursor-pointer shrink-0 ml-4 ${
+                    collabOptIn ? 'bg-[#007df7]' : 'bg-gray-600/40'
+                  }`}
+                  title={collabOptIn ? 'Desativar participação' : 'Ativar participação voluntária'}
+                >
+                  <div className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform ${
+                    collabOptIn ? 'translate-x-6' : 'translate-x-0'
+                  }`} />
+                </button>
               </div>
             </div>
 

@@ -43,6 +43,7 @@ const KNOWN_UNRELEASED_OR_THEATRICAL_IDS = new Set<string>([
   '912649',  // Venom: A Última Rodada / Venom: The Last Dance
   '1184918', // O Robô Selvagem / The Wild Robot
   '823219',  // Flow
+  'tt20221436', // Homem-Aranha: Um Novo Dia / Spider-Man: Brand New Day (2026 unreleased)
 ]);
 
 // Padrões de títulos não lançados ou em cartaz
@@ -51,8 +52,8 @@ const KNOWN_UNRELEASED_PATTERNS = [
   /avengers.*(doomsday|secret wars)/i,
   /avatar.*(fogo e cinzas|fire and ash)/i,
   /the batman.*(parte ii|part ii)/i,
-  /spider-man.*beyond the spider-verse/i,
-  /homem-aranha.*al[eé]m do aranhaverso/i,
+  /spider-man.*(brand new day|um novo dia|beyond the spider-verse)/i,
+  /homem-aranha.*(um novo dia|brand new day|al[eé]m do aranhaverso)/i,
   /mandalorian.*grogu/i,
   /toy story 5/i,
   /shrek 5/i,
@@ -211,12 +212,18 @@ class TheatricalFilterService {
   public isKnownUnreleasedOrTheatrical(item: ContentItem): boolean {
     if (!item) return false;
     
-    // 1. Por ID do TMDB
+    // 1. Por ID do TMDB ou IMDb
     if (item.tmdbId && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(String(item.tmdbId))) {
+      return true;
+    }
+    if (item.imdbId && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(item.imdbId.trim().toLowerCase())) {
       return true;
     }
     const rawTmdbId = item.id?.startsWith('tmdb-') ? item.id.replace('tmdb-', '') : null;
     if (rawTmdbId && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(rawTmdbId)) {
+      return true;
+    }
+    if (item.id && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(item.id.trim().toLowerCase())) {
       return true;
     }
 
@@ -236,6 +243,7 @@ class TheatricalFilterService {
    */
   public isKnownInTheaters(item: ContentItem): boolean {
     if (!item) return false;
+    if (item.inTheaters === true) return true;
     if (item.tmdbId && this.nowPlayingIds.has(String(item.tmdbId))) return true;
     const rawTmdbId = item.id?.startsWith('tmdb-') ? item.id.replace('tmdb-', '') : null;
     if (rawTmdbId && this.nowPlayingIds.has(rawTmdbId)) return true;
@@ -650,6 +658,7 @@ class TheatricalFilterService {
    */
   public isMovieAllowedSync(item: ContentItem): boolean {
     if (!item) return false;
+    if (item.inTheaters === true) return false;
     if (item.type === ContentType.SERIES) return true;
 
     const todayStr = new Date().toISOString().slice(0, 10);

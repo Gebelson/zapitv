@@ -248,6 +248,20 @@ export function validateSubtitleContentMatch(
     };
   }
 
+  const expectedGroup = /^(pob|pt-br|bra|por-br|pt|por|pt-pt)$/i.test(normExpected) ? 'pt-BR'
+    : /^(eng|en)$/i.test(normExpected) ? 'en'
+    : /^(spa|es)$/i.test(normExpected) ? 'es'
+    : /^(fre|fra|fr)$/i.test(normExpected) ? 'fr' : null;
+  if (expectedGroup && detection.confidence >= 0.7 && detection.detectedLang !== expectedGroup) {
+    return {
+      isValid: false,
+      detectedLang: detection.detectedLang,
+      confidence: detection.confidence,
+      reason: `Idioma detectado (${detection.detectedLang}) difere da legenda selecionada (${expectedLanguageCode})`,
+      isConsistent: false
+    };
+  }
+
   // Caso 1: Esperava Português (Brasil), mas o texto é comprovadamente em Inglês
   if (isExpectingPtBr) {
     if (detection.isEnglish && !detection.isPortuguese && detection.confidence >= 0.4) {

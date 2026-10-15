@@ -15,6 +15,7 @@ export interface ContentItem {
   id: string;
   title: string;
   type: ContentType;
+  mediaFormat?: 'movie' | 'series'; // formato da obra, independente da categoria Anime
   rating: number;
   year: number;
   image: string;
@@ -43,6 +44,7 @@ export interface ContentItem {
   maturityAdvisories?: string[]; // ex: "violência", "nudez"
   ageRating?: string; // Classificação Indicativa
   inTheaters?: boolean; // Títulos em cartaz nos cinemas
+  isAdult?: boolean; // Conteúdo adulto / pornográfico explícito (restrito +18)
 
   // Disponibilidade e Verificação de Áudio Real
   availabilityStatus?: 'verified' | 'declared' | 'unavailable' | 'unreleased'; // 'Disponível e testado' | 'Fonte declarada' | 'Indisponível' | 'Não lançado'
@@ -95,4 +97,19 @@ export interface CustomSection {
   items: string[]; // Array de IDs dos conteúdos
 }
 
-export type AppView = 'home' | 'featured' | 'movies' | 'series' | 'animes' | 'programas' | 'live' | 'mylist' | 'profile' | 'settings' | 'help' | 'admin' | 'login' | 'signup' | 'profile-selector' | 'television' | 'downloads' | 'history' | 'notfound';
+export interface ActorPerson {
+  id: number | string; // TMDB Person ID
+  name: string;
+  originalName?: string;
+  image: string; // URL da foto oficial do ator em alta qualidade
+  profilePath?: string;
+  knownForDepartment?: string; // ex: "Atuação" / "Acting"
+  popularity?: number;
+  knownForTitles?: string[]; // Títulos mais notáveis
+  biography?: string;
+  birthday?: string;
+  deathday?: string;
+  placeOfBirth?: string;
+}
+
+export type AppView = 'home' | 'featured' | 'movies' | 'series' | 'animes' | 'programas' | 'live' | 'mylist' | 'profile' | 'settings' | 'help' | 'admin' | 'login' | 'signup' | 'profile-selector' | 'television' | 'downloads' | 'history' | 'notfound' | 'actor';

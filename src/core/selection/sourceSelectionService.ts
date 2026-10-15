@@ -1,8 +1,10 @@
 import { StremioStream } from '../stremio/stremioTypes';
 import { audioPreferenceService, AudioTier, AudioAnalysisResult } from '../audio/audioPreferenceService';
+import { audioCodecService, StreamCodecInfo } from '../audio/audioCodecService';
 import { subtitlePreferenceService, SubtitleFormat, SubtitleAnalysisResult } from '../subtitles/subtitlePreferenceService';
 import { CanonicalMediaIdentity } from '../identity/canonicalIdentity';
 import { sourceConfidenceEngine, SourceConfidence } from '../identity/sourceConfidenceEngine';
+import { playbackOptimizerService } from '../playback/PlaybackOptimizerService';
 
 export interface SourceScoringResult {
   score: number;
@@ -12,6 +14,7 @@ export interface SourceScoringResult {
   subtitleFormat: SubtitleFormat;
   audioAnalysis: AudioAnalysisResult;
   subtitleAnalysis: SubtitleAnalysisResult;
+  codecInfo?: StreamCodecInfo;
   explanation: string;
 }
 
@@ -106,6 +109,25 @@ export class SourceSelectionService {
 
     const audio = audioPreferenceService.analyzeAudio(stream);
     const sub = subtitlePreferenceService.analyzeSubtitles(stream, options.hasExternalPtSub);
+    const codecInfo = audioCodecService.inspectStreamCodecs(stream);
+    const codecEval = audioCodecService.getAudioCodecScore(stream);
+    const codecBonus = codecEval.bonus;
+    const codecExplanation = ` • ${codecEval.explanation}`;
+
+    // 0.1 Desempenho e velocidade histórica do provedor da fonte
+    const providerId = stream.providerId;
+    let providerBonus = 0;
+    let providerExplanation = '';
+    if (providerId) {
+      providerBonus = playbackOptimizerService.getProviderScore(providerId);
+      if (providerBonus > 0) providerExplanation = ' • Provedor Rápido';
+      else if (providerBonus < 0) providerExplanation = ' • Provedor Instável';
+    }
+
+    // 0.2 Adaptação inteligente à velocidade da conexão (3G / 2G / Slow Wi-Fi vs Alta Velocidade)
+    const netProfile = playbackOptimizerService.getNetworkProfile();
+    let networkBonus = 0;
+    let networkExplanation = '';
 
     const combined = `${stream.name || ''} ${stream.title || ''} ${stream.description || ''}`.toLowerCase();
 
@@ -121,10 +143,28 @@ export class SourceSelectionService {
       }
     }
 
-    // Penalidade para transmissões não prontas para reprodução direta no navegador (ex: torrents sem motor local ativo)
+    if (netProfile.isSlowConnection) {
+      // Conexão lenta: penaliza 4K/2160p (bitrate elevado que inevitavelmente causará buffering contínuo)
+      if (qualityBonus >= 50) {
+        networkBonus -= 25000;
+        networkExplanation = ' • 4K evitado em rede lenta';
+      }
+      // Favorece fontes HLS (com ABR nativo) e resoluções leves (720p/480p)
+      if (stream.sourceType === 'hls' || (stream.url && stream.url.includes('.m3u8'))) {
+        networkBonus += 8000;
+        networkExplanation = ' • HLS ABR Priorizado';
+      } else if (qualityBonus <= 30) {
+        networkBonus += 4000;
+      }
+    }
+
+    // Penalidade para transmissões que requerem motor externo (ex: torrents sem motor local ativo)
+    // Mantém a transmissão abaixo de transmissões web diretas, mas sem descartá-la indevidamente
     const isNotWebReady = stream.behaviorHints?.notWebReady === true;
-    const webReadyPenalty = isNotWebReady ? -80000 : 0;
+    const webReadyPenalty = isNotWebReady ? -15000 : 0;
     const webReadyExplanation = isNotWebReady ? ' (Requer motor externo)' : '';
+
+    const performanceModifiers = providerBonus + networkBonus;
 
     // =========================================================================
     // PRIORIDADE 1: ÁUDIO DUBLADO PT-BR (Base: 100.000 pontos)
@@ -149,7 +189,7 @@ export class SourceSelectionService {
         subExplanation = 'placas em outro idioma';
       }
 
-      const score = 100000 + subTierBonus + qualityBonus + confidenceBonus + webReadyPenalty;
+      const score = 100000 + subTierBonus + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
       return {
         score,
         priority: 1,
@@ -158,7 +198,8 @@ export class SourceSelectionService {
         subtitleFormat: sub.format,
         audioAnalysis: audio,
         subtitleAnalysis: sub,
-        explanation: `Prioridade 1: Áudio Dublado PT-BR (${subExplanation}, score: ${score})${confidenceExplanation}${webReadyExplanation}`
+        codecInfo,
+        explanation: `Prioridade 1: Áudio Dublado PT-BR (${subExplanation}, score: ${score})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
       };
     }
 
@@ -173,7 +214,7 @@ export class SourceSelectionService {
       else if (sub.format === 'hardsub_ptbr') subTierBonus = 1000;
       else if (sub.format === 'hardsub_foreign') subTierBonus = 500;
 
-      const score = 90000 + subTierBonus + qualityBonus + confidenceBonus + webReadyPenalty;
+      const score = 90000 + subTierBonus + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
       return {
         score,
         priority: 2,
@@ -182,7 +223,8 @@ export class SourceSelectionService {
         subtitleFormat: sub.format,
         audioAnalysis: audio,
         subtitleAnalysis: sub,
-        explanation: `Prioridade 2: Dual Áudio PT-BR (score: ${score})${confidenceExplanation}${webReadyExplanation}`
+        codecInfo,
+        explanation: `Prioridade 2: Dual Áudio PT-BR (score: ${score})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
       };
     }
 
@@ -195,7 +237,7 @@ export class SourceSelectionService {
       if (sub.format === 'clean_confirmed') subBonus = 4000;
       else if (sub.format === 'softsub') subBonus = 3000;
 
-      const score = 50000 + subBonus + qualityBonus + confidenceBonus + webReadyPenalty;
+      const score = 50000 + subBonus + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
       return {
         score,
         priority: 3,
@@ -204,7 +246,8 @@ export class SourceSelectionService {
         subtitleFormat: sub.format,
         audioAnalysis: audio,
         subtitleAnalysis: sub,
-        explanation: `Prioridade 3: Áudio Original + Vídeo Limpo + Legenda PT-BR externa (score: ${score})${confidenceExplanation}${webReadyExplanation}`
+        codecInfo,
+        explanation: `Prioridade 3: Áudio Original + Vídeo Limpo + Legenda PT-BR externa (score: ${score})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
       };
     }
 
@@ -212,7 +255,7 @@ export class SourceSelectionService {
     // PRIORIDADE 4: ÁUDIO ORIGINAL + SOFTSUB PT-BR (Base: 40.000 pontos)
     // =========================================================================
     if (sub.format === 'softsub' && sub.hasPtSubtitle) {
-      const score = 40000 + 3000 + qualityBonus + confidenceBonus + webReadyPenalty;
+      const score = 40000 + 3000 + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
       return {
         score,
         priority: 4,
@@ -221,7 +264,8 @@ export class SourceSelectionService {
         subtitleFormat: sub.format,
         audioAnalysis: audio,
         subtitleAnalysis: sub,
-        explanation: `Prioridade 4: Áudio Original + Softsub PT-BR interno (score: ${score})${confidenceExplanation}${webReadyExplanation}`
+        codecInfo,
+        explanation: `Prioridade 4: Áudio Original + Softsub PT-BR interno (score: ${score})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
       };
     }
 
@@ -231,7 +275,7 @@ export class SourceSelectionService {
     // =========================================================================
     if (sub.format === 'hardsub_ptbr') {
       const base = options.hasExternalPtSub ? 20000 : 30000;
-      const score = base + qualityBonus + confidenceBonus + webReadyPenalty;
+      const score = base + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
       return {
         score,
         priority: 5,
@@ -240,7 +284,8 @@ export class SourceSelectionService {
         subtitleFormat: sub.format,
         audioAnalysis: audio,
         subtitleAnalysis: sub,
-        explanation: `Prioridade 5: Áudio Original + Hardsub PT-BR (score: ${score})${confidenceExplanation}${webReadyExplanation}`
+        codecInfo,
+        explanation: `Prioridade 5: Áudio Original + Hardsub PT-BR (score: ${score})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
       };
     }
 
@@ -249,8 +294,9 @@ export class SourceSelectionService {
     // Penalizado para nunca ser escolhido quando houver opção em português.
     // =========================================================================
     const isForeignHardsub = sub.format === 'hardsub_foreign';
-    const baseScore = isForeignHardsub ? -5000 : 5000;
-    const score = baseScore + qualityBonus + confidenceBonus + webReadyPenalty;
+    const baseScore = isForeignHardsub ? 1000 : 5000;
+    const rawScore = baseScore + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
+    const score = Math.max(100, rawScore);
 
     return {
       score,
@@ -260,7 +306,8 @@ export class SourceSelectionService {
       subtitleFormat: sub.format,
       audioAnalysis: audio,
       subtitleAnalysis: sub,
-      explanation: `Prioridade 6: Idioma estrangeiro / Hardsub estrangeiro (score: ${score})${confidenceExplanation}${webReadyExplanation}`
+      codecInfo,
+      explanation: `Prioridade 6: Idioma estrangeiro / Hardsub estrangeiro (score: ${score})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
     };
   }
 
@@ -280,10 +327,14 @@ export class SourceSelectionService {
   ): StremioStream[] {
     if (!streams || streams.length === 0) return [];
 
-    // Cache hit
-    if (options.cacheKey) {
-      const cached = selectionCache.get(options.cacheKey);
-      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    // Isolamento de cache por dispositivo/codec para evitar que navegadores sem Dolby recebam fontes mudas de outro dispositivo
+    const deviceKey = audioCodecService.getDeviceCacheKey();
+    const effectiveCacheKey = options.cacheKey ? `${options.cacheKey}_${deviceKey}` : undefined;
+
+    // Cache hit (apenas se contiver streams válidos)
+    if (effectiveCacheKey) {
+      const cached = selectionCache.get(effectiveCacheKey);
+      if (cached && cached.streams.length > 0 && Date.now() - cached.timestamp < CACHE_TTL_MS) {
         return cached.streams;
       }
     }
@@ -313,11 +364,12 @@ export class SourceSelectionService {
       _confidence: item.evaluation.confidence,
       _audioTier: item.evaluation.audioTier,
       _subtitleFormat: item.evaluation.subtitleFormat,
+      _codecInfo: item.evaluation.codecInfo,
       _scoreExplanation: item.evaluation.explanation
     }));
 
-    if (options.cacheKey) {
-      selectionCache.set(options.cacheKey, {
+    if (effectiveCacheKey && rankedStreams.length > 0) {
+      selectionCache.set(effectiveCacheKey, {
         streams: rankedStreams,
         timestamp: Date.now()
       });

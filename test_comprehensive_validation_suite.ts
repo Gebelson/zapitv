@@ -29,8 +29,8 @@ async function runTestSuite() {
   console.log('--- GRUPO 1: Validação de Fontes e Resoluções Reais ---');
   const validStream: StremioStream = {
     name: 'ZapiTV FHD',
-    title: '[DUBLADO PT-BR] Big Buck Bunny - 1080p FHD HLS',
-    url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    title: '[DUBLADO PT-BR] Sintel - 1080p FHD HLS',
+    url: 'https://bitmovin-a.akamaihd.net/content/sintel/hls/playlist.m3u8',
     sourceType: 'hls',
     isPtBr: true,
     isDubbed: true,
@@ -39,8 +39,8 @@ async function runTestSuite() {
   };
 
   const validated1 = await mediaSourceValidationService.validateSource(validStream, {
-    mediaId: 'test-bunny',
-    mediaTitle: 'Big Buck Bunny',
+    mediaId: 'open-sintel',
+    mediaTitle: 'Sintel',
     mediaType: 'movie'
   });
 

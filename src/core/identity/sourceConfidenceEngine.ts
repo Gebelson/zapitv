@@ -13,6 +13,7 @@
 import { StremioStream } from '../stremio/stremioTypes';
 import { CanonicalMediaIdentity, canonicalIdentityService } from './canonicalIdentity';
 import { streamQuarantineService } from '../security/streamQuarantineService';
+import { ContentType } from '../../../types';
 
 export type SourceConfidence = 'VERIFIED' | 'PROVISIONAL' | 'SUSPICIOUS' | 'REJECTED' | 'QUARANTINED';
 
@@ -89,15 +90,41 @@ export class SourceConfidenceEngine {
     }
 
     // 3. FONTES VERIFICADAS DO ACERVO OFICIAL ZAPITV / CDN DIRETO
-    const isAcervoOficial = (
-      stream.providerId === 'zapitv-verified' ||
-      stream.providerName?.includes('Acervo') ||
-      stream.providerName?.includes('ZapiTV') ||
-      streamUrl.includes('archive.org') ||
-      streamUrl.includes('/api/stremio/cinema-aberto') ||
-      streamUrl.includes('/api/stremio/blender-open') ||
-      streamUrl.includes('/api/stremio/public-domain')
-    );
+    // Apenas a entrada local associada por ID exato pode ser considerada verificada.
+    // Nome do provedor e domínio de hospedagem não provam qual vídeo foi servido.
+    const isAcervoOficial = stream.providerId === 'zapitv-verified';
+
+    const episodeTag = streamTitle.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b)/i);
+    if (episodeTag && identity.type === ContentType.MOVIE) {
+      reasons.push('Fonte episódica oferecida para um filme');
+      return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+    }
+    if (episodeTag && identity.season && identity.episode &&
+        (Number(episodeTag[1] || episodeTag[3]) !== identity.season || Number(episodeTag[2] || episodeTag[4]) !== identity.episode)) {
+      reasons.push('Temporada ou episódio diferente do solicitado');
+      return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+    }
+
+    if (identity.type === ContentType.MOVIE && identity.year) {
+      const releaseYear = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
+      if (releaseYear && Math.abs(Number(releaseYear[1]) - identity.year) > 1) {
+        reasons.push('Ano da fonte diferente do filme solicitado');
+        return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+      }
+    }
+
+    // Addons que separam explicitamente o título da obra na primeira linha
+    // precisam corresponder ao título canônico inteiro, não a uma palavra comum.
+    const declaredTitle = streamTitle.match(/🐦‍🔥\s*([^\n⏸️]+)/)?.[1]?.trim();
+    if (declaredTitle) {
+      const normalizedDeclared = canonicalIdentityService.normalizeTitle(declaredTitle);
+      const aliases = [identity.title, identity.originalTitle, ...(identity.knownAliases || [])].filter(Boolean)
+        .map(alias => canonicalIdentityService.normalizeTitle(alias!));
+      if (!aliases.includes(normalizedDeclared)) {
+        reasons.push('Título declarado pelo addon difere da obra solicitada');
+        return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+      }
+    }
 
     if (isAcervoOficial) {
       reasons.push('Fonte canônica verificada pelo acervo oficial ZapiTV');
@@ -149,21 +176,23 @@ export class SourceConfidenceEngine {
     // 5. VALIDAÇÃO DE SOBREPOSIÇÃO DE TÍTULO (Positive Title Overlap)
     const targetTokens = canonicalIdentityService.extractSignificantTokens(identity.title);
     const cleanStreamTitle = canonicalIdentityService.normalizeTitle(streamTitle);
+    const titleWords = new Set(canonicalIdentityService.extractSignificantTokens(`${streamName} ${streamTitle}`));
 
     // Verifica se algum alias canônico coincide
     let aliasMatched = false;
     for (const alias of identity.knownAliases) {
-      if (cleanStreamTitle.includes(alias) || combined.includes(alias)) {
+      const cleanAlias = canonicalIdentityService.normalizeTitle(alias);
+      if (cleanAlias.length >= 3 && new RegExp(`(^|\\s)${cleanAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(streamTitleToCheck)) {
         aliasMatched = true;
         break;
       }
     }
 
     // Verifica sobreposição de tokens
-    const matchingTokens = targetTokens.filter(token => cleanStreamTitle.includes(token) || combined.includes(token));
+    const matchingTokens = targetTokens.filter(token => titleWords.has(token));
     const tokenOverlapRatio = targetTokens.length > 0 ? (matchingTokens.length / targetTokens.length) : 0;
 
-    if (!aliasMatched && tokenOverlapRatio === 0) {
+    if (!aliasMatched && tokenOverlapRatio < 0.75) {
       reasons.push(`Título do stream não possui correspondência com "${identity.title}"`);
       return {
         stream,

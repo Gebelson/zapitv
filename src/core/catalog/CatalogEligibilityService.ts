@@ -21,6 +21,8 @@ import { mediaAvailabilityIndex } from './MediaAvailabilityIndex';
 import { providerRegistry } from '../providers/providerRegistry';
 import { streamValidator } from '../providers/streamValidator';
 import { canonicalIdentityService } from '../identity/canonicalIdentity';
+import { adultContentService } from '../adult/AdultContentService';
+import { bannedContentRegistry } from './BannedContentRegistry';
 
 export type ReleaseStatus = 
   | 'NOT_RELEASED'      // Ainda não lançado oficialmente (data futura)
@@ -99,14 +101,13 @@ export interface EligibilityStats {
   animesApproved: number;
 }
 
-const STORAGE_ELIGIBILITY_KEY = 'zapitv_catalog_eligibility_v1';
+const STORAGE_ELIGIBILITY_KEY = 'zapitv_catalog_eligibility_v2';
 const TTL_AVAILABLE_MS = 24 * 60 * 60 * 1000; // 24h
 const TTL_UNAVAILABLE_MS = 12 * 60 * 60 * 1000; // 12h
 const TTL_ERROR_MS = 15 * 60 * 1000; // 15 minutos
 
 // Lista de bloqueio estrito para títulos com indisponibilidade confirmada
 const KNOWN_EXCLUDED_PATTERNS = [
-  /visionquest/i,             // Marvel TV 2026 - Futuro / Sem fonte
   /^tyson$/i,                 // Série Tyson 2026 - Apenas fontes de filme trocado
   /o intruso.*incomer/i,      // O Intruso (The Incomer) 2026 - Theatrical sem fonte digital
   /^o intruso$/i,             // O Intruso - Sem fontes válidas
@@ -115,10 +116,12 @@ const KNOWN_EXCLUDED_PATTERNS = [
   /avengers.*(doomsday|secret wars)/i,
   /avatar.*(fogo e cinzas|fire and ash)/i,
   /the batman.*(parte ii|part ii)/i,
-  /spider-man.*beyond the spider-verse/i,
+  /spider-man.*(brand new day|um novo dia|beyond the spider-verse)/i,
+  /homem-aranha.*(um novo dia|brand new day|al[eé]m do aranhaverso)/i,
   /mandalorian.*grogu/i,
   /toy story 5/i,
-  /shrek 5/i
+  /shrek 5/i,
+  /caminandes/i
 ];
 
 class CatalogEligibilityService {
@@ -140,6 +143,7 @@ class CatalogEligibilityService {
   }
 
   public getCanonicalKey(item: { id?: string; imdbId?: string; tmdbId?: string | number; title?: string }): string {
+    if (item.id) return item.id.toLowerCase();
     if (item.imdbId && item.imdbId.startsWith('tt')) {
       return item.imdbId.toLowerCase();
     }
@@ -167,13 +171,21 @@ class CatalogEligibilityService {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           const now = Date.now();
+          let purged = false;
           for (const rec of parsed) {
             if (rec && rec.canonicalId) {
+              if (bannedContentRegistry.isBannedKeyOrId(rec.canonicalId) || bannedContentRegistry.isBannedTitle(rec.title)) {
+                purged = true;
+                continue;
+              }
               if (rec.expiresAt && rec.expiresAt < now) {
                 rec.playbackStatus = 'EXPIRED';
               }
               this.records.set(rec.canonicalId, rec);
             }
+          }
+          if (purged) {
+            this.saveToStorage();
           }
         }
       }
@@ -213,7 +225,7 @@ class CatalogEligibilityService {
         playbackStatus: 'AVAILABLE',
         hasPlayableSource: Boolean(ep.videoUrl),
         sourceCount: ep.videoUrl ? 1 : 0,
-        hasPtBrAudio: item.audioStatus === 'pt-br-original' || item.audioStatus === 'universal',
+        hasPtBrAudio: item.audioStatus === 'pt-br-original',
         bestQuality: '1080p'
       }));
 
@@ -235,7 +247,7 @@ class CatalogEligibilityService {
         providersFailed: [],
         episodes,
         availableEpisodeCount: episodes.length || 1,
-        hasPtBrAudio: item.audioStatus === 'pt-br-original' || item.audioStatus === 'universal',
+        hasPtBrAudio: item.audioStatus === 'pt-br-original',
         hasOriginalAudio: true,
         bestQuality: '1080p',
         checkedAt: now,
@@ -251,9 +263,19 @@ class CatalogEligibilityService {
   public isItemPubliclyPlayableSync(item: ContentItem): boolean {
     if (!item || !item.id || !item.title) return false;
 
-    // 1. Acervo verificado oficial: sempre permitido
-    if (item.id.startsWith('open-') || item.availabilityStatus === 'verified') {
-      return true;
+    // 0. Bloqueio absoluto de conteúdos ilegais ou de exploração sexual
+    if (adultContentService.isIllegalOrExploitative(item.title) || (item.originalTitle && adultContentService.isIllegalOrExploitative(item.originalTitle))) {
+      return false;
+    }
+
+    // 0.05 Bloqueio absoluto e irrestrito de conteúdos banidos (Big Buck Bunny, Caminandes, etc.)
+    if (bannedContentRegistry.isBanned(item)) {
+      return false;
+    }
+
+    // 0.1 Bloqueio explícito de itens marcados como indisponíveis
+    if (item.availabilityStatus === 'unavailable') {
+      return false;
     }
 
     const titleLower = item.title.trim().toLowerCase();
@@ -261,16 +283,27 @@ class CatalogEligibilityService {
     const currentYear = new Date().getFullYear();
     const itemYear = Number(item.year) || currentYear;
 
-    // 2. Bloqueio estrito de padrões não lançados ou em cartaz
+    // 1. Bloqueio estrito de padrões não lançados ou obras futuras conhecidas
+    if (item.imdbId && item.imdbId.trim().toLowerCase() === 'tt20221436') {
+      return false;
+    }
+    if (item.id && item.id.trim().toLowerCase() === 'movie-spiderman-new-day-2026') {
+      return false;
+    }
     for (const pat of KNOWN_EXCLUDED_PATTERNS) {
       if (pat.test(titleLower) || (item.originalTitle && pat.test(item.originalTitle))) {
         return false;
       }
     }
 
-    // 3. Regra Teatral Estrita (Filmes em cartaz ou sem digital no Brasil)
+    // 2. Regra Teatral Estrita (Filmes em cartaz ou sem digital no Brasil)
     if (!theatricalFilterService.isMovieAllowedSync(item)) {
       return false;
+    }
+
+    // 3. Acervo verificado oficial: permitido se não bloqueado por regras de cinema/lançamento
+    if (item.id.startsWith('open-') || item.availabilityStatus === 'verified') {
+      return true;
     }
 
     // 4. Bloqueia anos futuros e datas de estreia futuras
@@ -294,8 +327,8 @@ class CatalogEligibilityService {
       if (availRecord.status === 'AVAILABLE' && availRecord.validatedSourceCount > 0) return true;
     }
 
-    // 7. Se o item possui streams verificados diretos
-    if (item.verifiedStreams && item.verifiedStreams.length > 0) {
+    // 7. Se o item possui streams verificados diretos ou episódios validados
+    if ((item.verifiedStreams && item.verifiedStreams.length > 0) || (item.episodes && item.episodes.length > 0)) {
       return true;
     }
 
@@ -311,11 +344,18 @@ class CatalogEligibilityService {
   }
 
   /**
-   * Filtra uma lista de itens mantendo apenas os títulos comprovadamente elegíveis
+   * Filtra uma lista de itens mantendo apenas os títulos comprovadamente elegíveis.
+   * Regra 1: Conteúdos adultos são ocultados por padrão, exceto com permissão explícita (allowAdult: true).
    */
-  public filterEligibleItemsSync(items: ContentItem[]): ContentItem[] {
+  public filterEligibleItemsSync(items: ContentItem[], options?: { allowAdult?: boolean }): ContentItem[] {
     if (!items || items.length === 0) return [];
-    return items.filter(it => this.isItemPubliclyPlayableSync(it));
+    return items.filter(it => {
+      if (!this.isItemPubliclyPlayableSync(it)) return false;
+      if (!options?.allowAdult && adultContentService.isAdultContent(it)) {
+        return false;
+      }
+      return true;
+    });
   }
 
   /**

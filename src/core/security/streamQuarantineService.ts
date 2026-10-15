@@ -45,7 +45,6 @@ export const ADULT_ACTORS_AND_TERMS: string[] = [
   'creampie',
   'blowjob',
   'ben the men',
-  'playweb',
   'mature porn',
   'erotic xxx'
 ];
@@ -57,6 +56,16 @@ export class StreamQuarantineService {
   constructor() {
     this.initDefaultQuarantine();
     this.loadFromStorage();
+    this.purgePlaywebFalsePositives();
+  }
+
+  public purgePlaywebFalsePositives(): void {
+    for (const [key, item] of this.quarantinedMap.entries()) {
+      if (item.reason?.toLowerCase().includes('playweb')) {
+        this.quarantinedMap.delete(key);
+      }
+    }
+    this.saveToStorage();
   }
 
   private initDefaultQuarantine(): void {

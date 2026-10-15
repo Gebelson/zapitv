@@ -496,7 +496,7 @@ const Hero: React.FC<HeroProps> = ({ featuredItems, isDarkMode, onActionClick, i
 
   if (totalOriginal === 0) {
     return (
-      <div className={`relative h-[65vh] md:h-[520px] lg:h-[650px] w-full rounded-2xl md:rounded-3xl overflow-hidden mb-6 md:mb-12 flex items-center justify-center select-none ${
+      <div className={`relative min-h-[380px] max-h-[720px] h-[55vh] sm:h-[60vh] md:h-[520px] lg:h-[650px] 2xl:h-[750px] w-full rounded-2xl md:rounded-3xl overflow-hidden mb-6 md:mb-12 flex items-center justify-center select-none ${
         isDarkMode
           ? 'bg-gradient-to-t from-[#070A0F] via-[#10141e] to-[#0A0E17] border border-white/5 shadow-2xl animate-pulse'
           : 'bg-gray-100 border-0 shadow-lg'
@@ -508,7 +508,7 @@ const Hero: React.FC<HeroProps> = ({ featuredItems, isDarkMode, onActionClick, i
 
   return (
     <div 
-      className={`relative h-[65vh] md:h-[520px] lg:h-[650px] w-full rounded-2xl md:rounded-3xl overflow-hidden mb-6 md:mb-12 group select-none ${
+      className={`relative min-h-[380px] max-h-[720px] h-[55vh] sm:h-[60vh] md:h-[520px] lg:h-[650px] 2xl:h-[750px] w-full rounded-2xl md:rounded-3xl overflow-hidden mb-6 md:mb-12 group select-none ${
         isDarkMode ? 'border border-white/5' : 'border-0'
       }`}
       onMouseEnter={() => setIsPaused(true)}
@@ -591,45 +591,45 @@ const Hero: React.FC<HeroProps> = ({ featuredItems, isDarkMode, onActionClick, i
             
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent opacity-60"></div>
 
-            <div className="absolute bottom-0 left-0 px-5 md:pl-28 md:pr-12 pb-10 md:pb-16 w-full max-w-4xl z-10 flex flex-col items-center md:items-start text-center md:text-left">
+            <div className="absolute bottom-0 left-0 px-4 sm:px-8 md:pl-20 lg:pl-28 md:pr-12 pb-8 sm:pb-10 md:pb-16 w-full max-w-4xl z-10 flex flex-col items-center md:items-start text-center md:text-left">
               
               {/* RENDERIZAÇÃO DAS TAGS */}
-              <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-3 md:mb-5">
+              <div className="flex flex-wrap justify-center md:justify-start gap-1.5 sm:gap-2 mb-2 sm:mb-4">
                 {(item.heroTags && item.heroTags.length > 0) ? (
                   item.heroTags.map(tag => renderTag(tag))
                 ) : (
                   // Fallback para a propriedade 'platform' legada
                   item.platform && (
-                    <span className="px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-widest bg-white/10 text-white border border-white/20 backdrop-blur-md">
+                    <span className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[9px] sm:text-[10px] md:text-xs font-black uppercase tracking-widest bg-white/10 text-white border border-white/20 backdrop-blur-md">
                       {item.platform}
                     </span>
                   )
                 )}
               </div>
 
-              <h2 className="text-2xl md:text-6xl font-black text-white mb-3 md:mb-6 drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)] leading-normal pt-2 pb-1 line-clamp-2 max-w-[90%] md:max-w-none">
+              <h2 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-black text-white mb-2 sm:mb-3 md:mb-6 drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)] leading-tight pt-1 pb-1 line-clamp-2 max-w-[95%] md:max-w-none">
                 {item.title}
               </h2>
               
-              <p className="text-white/80 text-xs md:text-lg mb-6 md:mb-10 line-clamp-2 md:line-clamp-3 max-w-sm md:max-w-xl drop-shadow-md font-medium">
+              <p className="text-white/80 text-xs sm:text-sm md:text-base lg:text-lg mb-4 sm:mb-6 md:mb-10 line-clamp-2 md:line-clamp-3 max-w-sm sm:max-w-md md:max-w-xl drop-shadow-md font-medium">
                 {item.description || "Assista agora a este título exclusivo selecionado especialmente para você na ZapiTV Premium."}
               </p>
 
-              <div className="flex flex-row items-center gap-3 w-full sm:w-auto">
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:gap-3 w-full sm:w-auto justify-center md:justify-start">
                 <button 
                   onClick={() => onActionClick?.(item)}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 md:gap-3 px-6 md:px-10 py-3.5 md:py-4 bg-[#007df7] hover:bg-[#0069d9] text-white rounded-xl md:rounded-2xl font-black transition-all hover:scale-105 active:scale-95 shadow-xl shadow-[#007df7]/30 text-sm md:text-base"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 md:gap-3 px-5 sm:px-6 md:px-10 py-3 sm:py-3.5 md:py-4 bg-[#007df7] hover:bg-[#0069d9] text-white rounded-xl md:rounded-2xl font-black transition-all hover:scale-105 active:scale-95 shadow-xl shadow-[#007df7]/30 text-xs sm:text-sm md:text-base min-h-[44px]"
                 >
                   <Play className="w-4 h-4 md:w-5 md:h-5 fill-current" />
                   Assistir
                 </button>
                 <button 
                   onClick={() => onActionClick?.(item)}
-                  className="flex-none sm:flex-none flex items-center justify-center gap-2 md:gap-3 px-4 md:px-10 py-3.5 md:py-4 bg-white/10 hover:bg-white/20 backdrop-blur-xl text-white rounded-xl md:rounded-2xl font-black transition-all border border-white/10 text-sm md:text-base"
+                  className="flex-none sm:flex-none flex items-center justify-center gap-2 md:gap-3 px-4 sm:px-6 md:px-10 py-3 sm:py-3.5 md:py-4 bg-white/10 hover:bg-white/20 backdrop-blur-xl text-white rounded-xl md:rounded-2xl font-black transition-all border border-white/10 text-xs sm:text-sm md:text-base min-h-[44px]"
                   title="Saiba Mais"
                 >
-                  <Info className="w-5 h-5 md:w-5 md:h-5" />
-                  <span className="hidden md:inline">Saiba Mais</span>
+                  <Info className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="hidden sm:inline">Saiba Mais</span>
                 </button>
               </div>
             </div>

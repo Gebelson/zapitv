@@ -1,6 +1,7 @@
 import Dexie, { Table } from 'dexie';
 import { User, ContentItem, SiteNotification, CustomSection } from './types';
 import { MOCK_USERS, filmesData } from './constants';
+import { bannedContentRegistry } from './src/core/catalog/BannedContentRegistry';
 
 export class ZapiTVDatabase extends Dexie {
   users!: Table<User, string>;
@@ -34,16 +35,28 @@ export async function initializeDatabase() {
     await db.users.bulkAdd(MOCK_USERS);
   }
 
+  // Purga de segurança para itens banidos persistidos em sessões anteriores
+  try {
+    const existingDbItems = await db.content.toArray();
+    const bannedIds = existingDbItems.filter(c => bannedContentRegistry.isBanned(c)).map(c => c.id);
+    if (bannedIds.length > 0) {
+      await db.content.bulkDelete(bannedIds);
+    }
+  } catch (e) {
+    console.warn('Erro ao purgar itens banidos do Dexie:', e);
+  }
+
   const contentCount = await db.content.count();
+  const cleanFilmesData = bannedContentRegistry.filterCleanItems(filmesData);
   
   if (contentCount === 0) {
-    await db.content.bulkPut(filmesData);
+    await db.content.bulkPut(cleanFilmesData);
   } else {
     // Sincroniza filmes novos que foram adicionados no constants.tsx
     const existingContent = await db.content.toArray();
     const existingIds = new Set(existingContent.map(c => c.id));
-    const seedById = new Map(filmesData.map(item => [item.id, item]));
-    const newItems = filmesData.filter(c => !existingIds.has(c.id));
+    const seedById = new Map(cleanFilmesData.map(item => [item.id, item]));
+    const newItems = cleanFilmesData.filter(c => !existingIds.has(c.id));
     if (newItems.length > 0) {
       await db.content.bulkPut(newItems);
     }

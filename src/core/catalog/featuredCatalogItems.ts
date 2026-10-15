@@ -78,8 +78,8 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     type: ContentType.MOVIE,
     rating: 8.1,
     year: 2026,
-    image: 'https://images.metahub.space/poster/medium/tt15888806/img',
-    backdrop: 'https://images.metahub.space/background/medium/tt15888806/img',
+    image: 'https://image.tmdb.org/t/p/w500/6Qf3sylInJeyK0fFTfjprnGIXCF.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/6Qf3sylInJeyK0fFTfjprnGIXCF.jpg',
     description: 'Uma escritora em dificuldades financeiras aceita a proposta de concluir a série de sucesso de uma famosa autora incapacitada, descobrindo segredos aterrorizantes em seus manuscritos.',
     genres: ['Romance', 'Mistério', 'Drama'],
     imdbId: 'tt15888806',
@@ -132,17 +132,18 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     type: ContentType.MOVIE,
     rating: 7.6,
     year: 2026,
-    image: 'https://images.metahub.space/poster/medium/tt13000574/img',
-    backdrop: 'https://images.metahub.space/background/medium/tt13000574/img',
+    image: 'https://image.tmdb.org/t/p/w500/gQ76UL64RQe3oHwiwHwODTC23g4.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/3icyRAqgakNcQn6aDVz9libFmBA.jpg',
     description: 'Nova adaptação cinematográfica da icônica franquia de terror e sobrevivência da Capcom com fidelidade máxima à atmosfera sombria.',
     genres: ['Ação', 'Terror', 'Ficção Científica'],
+    tmdbId: '1423191',
     imdbId: 'tt13000574',
     isFeatured: true,
     availabilityStatus: 'verified',
     audioStatus: 'pt-br-dubbed'
   },
 
-  // 8. HOMEM-ARANHA: UM NOVO DIA (2026 - tt20221436) — Disponível
+  // 8. HOMEM-ARANHA: UM NOVO DIA (2026 - tt20221436) — Indisponível / Não lançado
   {
     id: 'movie-spiderman-new-day-2026',
     title: 'Homem-Aranha: Um Novo Dia',
@@ -155,9 +156,8 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     description: 'Peter Parker tenta reconstruir sua vida anônima nas ruas de Nova York enquanto novos vigilantes e ameaças emergem.',
     genres: ['Ação', 'Aventura', 'Ficção Científica'],
     imdbId: 'tt20221436',
-    isFeatured: true,
-    availabilityStatus: 'verified',
-    audioStatus: 'pt-br-dubbed'
+    isFeatured: false,
+    availabilityStatus: 'unavailable'
   },
 
   // 9. CORAÇÃO SELVAGEM (1990 - tt0100935) — Disponível
@@ -222,8 +222,8 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     type: ContentType.MOVIE,
     rating: 7.5,
     year: 2026,
-    image: 'https://images.metahub.space/poster/medium/tt11576182/img',
-    backdrop: 'https://images.metahub.space/background/medium/tt11576182/img',
+    image: 'https://image.tmdb.org/t/p/w500/2EjUTEnnoC0sK5j5FS7dC3vOZcl.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/2EjUTEnnoC0sK5j5FS7dC3vOZcl.jpg',
     description: 'A reconstituição cinematográfica da Operação Overlord e o desembarque dos aliados na Normandia durante a Segunda Guerra Mundial.',
     genres: ['Guerra', 'História', 'Drama'],
     imdbId: 'tt11576182',
@@ -240,8 +240,8 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     type: ContentType.MOVIE,
     rating: 8.0,
     year: 2026,
-    image: 'https://images.metahub.space/poster/medium/tt2788314/img',
-    backdrop: 'https://images.metahub.space/background/medium/tt2788314/img',
+    image: 'https://image.tmdb.org/t/p/w500/muMwJAiMtReEHLKpKMWt2rMkYF7.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/muMwJAiMtReEHLKpKMWt2rMkYF7.jpg',
     description: 'A épica jornada de Ulisses narrada em uma superprodução visual, enfrentando monstros mitológicos e a ira dos deuses gregos para retornar a Ítaca.',
     genres: ['Aventura', 'Fantasia', 'Drama'],
     imdbId: 'tt2788314',
@@ -742,8 +742,8 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     type: ContentType.SERIES,
     rating: 7.7,
     year: 2026,
-    image: 'https://images.metahub.space/poster/medium/tt31854290/img',
-    backdrop: 'https://images.metahub.space/background/medium/tt31854290/img',
+    image: 'https://image.tmdb.org/t/p/w500/hazWZ75ml5Er3MQsFetIzoeWs99.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/hazWZ75ml5Er3MQsFetIzoeWs99.jpg',
     description: 'Uma comunidade costeira é abalada pelo ressurgimento de lendas sombrias e corpos na praia após uma tempestade.',
     genres: ['Mistério', 'Drama', 'Suspense'],
     imdbId: 'tt31854290',

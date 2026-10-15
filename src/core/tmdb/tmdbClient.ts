@@ -1,4 +1,4 @@
-import { ContentItem, ContentType } from '../../../types';
+import { ContentItem, ContentType, ActorPerson } from '../../../types';
 
 export const TMDB_API_KEY = '468925ac3759d7adeb05b540cfd71cb8';
 export const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
@@ -22,6 +22,7 @@ export interface TMDBRawItem {
   genres?: { id: number; name: string }[];
   media_type?: 'movie' | 'tv';
   original_language?: string;
+  adult?: boolean;
 }
 
 export interface CinemetaMetaItem {
@@ -124,9 +125,8 @@ export const TV_GENRE_NAME_TO_ID: Record<string, number> = {
 };
 
 export function formatContentItem(raw: TMDBRawItem, forcedType?: ContentType): ContentItem {
-  const isMovie = forcedType 
-    ? forcedType === ContentType.MOVIE 
-    : (raw.media_type === 'movie' || Boolean(raw.title && !raw.name));
+  const isMovie = forcedType === ContentType.MOVIE ||
+    (forcedType !== ContentType.SERIES && (raw.media_type === 'movie' || Boolean(raw.title && !raw.name)));
 
   const isAnime = raw.original_language === 'ja' && (raw.genre_ids?.includes(16) || raw.genres?.some(g => g.id === 16));
 
@@ -151,19 +151,25 @@ export function formatContentItem(raw: TMDBRawItem, forcedType?: ContentType): C
     genres.push('Anime');
   }
 
+  const isAdult = Boolean(raw.adult === true || genres.some(g => g.toLowerCase() === 'adult' || g.toLowerCase() === 'adulto' || g.toLowerCase() === 'hentai'));
+  if (isAdult && !genres.includes('Adulto')) {
+    genres.push('Adulto');
+  }
+
   const poster = raw.poster_path 
     ? `${TMDB_IMAGE_BASE}${raw.poster_path}` 
-    : 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500';
+    : '';
 
   const backdrop = raw.backdrop_path 
     ? `${TMDB_BACKDROP_BASE}${raw.backdrop_path}` 
-    : poster;
+    : (poster || '');
 
   return {
     id: `tmdb-${raw.id}`,
     tmdbId: String(raw.id),
     title,
     type,
+    mediaFormat: isMovie ? 'movie' : 'series',
     rating: raw.vote_average ? Number(raw.vote_average.toFixed(1)) : 8.0,
     year: isNaN(year) ? 2024 : year,
     image: poster,
@@ -172,7 +178,8 @@ export function formatContentItem(raw: TMDBRawItem, forcedType?: ContentType): C
     genres,
     isFeatured: (raw.vote_average || 0) > 7.5,
     releaseDate: yearStr ? yearStr.slice(0, 10) : undefined,
-    originalTitle: raw.original_title || raw.original_name
+    originalTitle: raw.original_title || raw.original_name,
+    isAdult
   };
 }
 
@@ -182,20 +189,40 @@ export function formatCinemetaItem(raw: CinemetaMetaItem): ContentItem {
   const yearNum = Number(raw.releaseInfo || raw.year || 2024);
   const ratingNum = raw.imdbRating ? parseFloat(raw.imdbRating) : 8.0;
 
+  const rawGenres = raw.genres && raw.genres.length > 0 ? [...raw.genres] : ['Geral'];
+  const isAdult = rawGenres.some(g => {
+    const norm = g.toLowerCase().trim();
+    return norm === 'adult' || norm === 'adulto' || norm === 'hentai' || norm === 'erotica';
+  });
+  if (isAdult && !rawGenres.includes('Adulto')) {
+    rawGenres.push('Adulto');
+  }
+
   return {
     id: raw.id,
     imdbId: raw.id,
     tmdbId: raw.moviedb_id ? String(raw.moviedb_id) : undefined,
     title: raw.name || 'Sem Título',
     type,
+    mediaFormat: isMovie ? 'movie' : 'series',
     rating: isNaN(ratingNum) ? 8.0 : ratingNum,
     year: isNaN(yearNum) ? 2024 : yearNum,
-    image: raw.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500',
-    backdrop: raw.background || raw.poster || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500',
+    image: raw.poster || '',
+    backdrop: raw.background || raw.poster || '',
     description: raw.description || 'Disponível no catálogo oficial do Stremio / Cinemeta.',
-    genres: raw.genres && raw.genres.length > 0 ? raw.genres : ['Geral'],
-    isFeatured: ratingNum >= 7.5
+    genres: rawGenres,
+    isFeatured: ratingNum >= 7.5,
+    isAdult
   };
+}
+
+export function sameCatalogWork(a: ContentItem, b: ContentItem): boolean {
+  if (a.type !== b.type || (a.year && b.year && Math.abs(a.year - b.year) > 1)) return false;
+  const normalize = (value: string) => value.toLowerCase().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const titlesA = [a.title, a.originalTitle].filter(Boolean).map(value => normalize(value!));
+  const titlesB = [b.title, b.originalTitle].filter(Boolean).map(value => normalize(value!));
+  return titlesA.some(title => title.length >= 3 && titlesB.includes(title));
 }
 
 class TMDBClientService {
@@ -344,6 +371,26 @@ class TMDBClientService {
     };
   }
 
+  public async getOnTheAirSeriesWithMeta(page = 1): Promise<{ items: ContentItem[], total: number }> {
+    const data = await this.request(`/tv/on_the_air?page=${page}`);
+    return {
+      items: (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.SERIES)),
+      total: data.total_results || 20000
+    };
+  }
+
+  public async getRecentSeriesWithMeta(page = 1): Promise<{ items: ContentItem[], total: number }> {
+    const today = new Date().toISOString().slice(0, 10);
+    const lastMonth = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const data = await this.request(
+      `/discover/tv?sort_by=first_air_date.desc&first_air_date.lte=${today}&first_air_date.gte=${lastMonth}&page=${page}`
+    );
+    return {
+      items: (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.SERIES)),
+      total: data.total_results || 20000
+    };
+  }
+
   public async getTopRatedMovies(page = 1): Promise<ContentItem[]> {
     const data = await this.request(`/movie/top_rated?page=${page}`);
     return (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.MOVIE));
@@ -462,10 +509,7 @@ class TMDBClientService {
         const cineItem = formatCinemetaItem(m);
         const normTitle = cineItem.title.toLowerCase().trim();
         const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
-        const existing = results.find(it =>
-          it.type === ContentType.MOVIE &&
-          ((cineItem.tmdbId && it.tmdbId === cineItem.tmdbId) || it.title.toLowerCase().trim() === normTitle)
-        );
+        const existing = results.find(it => sameCatalogWork(it, cineItem));
         const hasTmdb = Boolean(existing && cineItem.tmdbId && existing.tmdbId === cineItem.tmdbId);
         const hasTitle = Boolean(existing && existing.title.toLowerCase().trim() === normTitle);
 
@@ -487,10 +531,7 @@ class TMDBClientService {
         const cineItem = formatCinemetaItem(m);
         const normTitle = cineItem.title.toLowerCase().trim();
         const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
-        const existing = results.find(it =>
-          it.type !== ContentType.MOVIE &&
-          ((cineItem.tmdbId && it.tmdbId === cineItem.tmdbId) || it.title.toLowerCase().trim() === normTitle)
-        );
+        const existing = results.find(it => sameCatalogWork(it, cineItem));
         const hasTmdb = Boolean(existing && cineItem.tmdbId && existing.tmdbId === cineItem.tmdbId);
         const hasTitle = Boolean(existing && existing.title.toLowerCase().trim() === normTitle);
 
@@ -536,12 +577,9 @@ class TMDBClientService {
     if (tmdbRes.status === 'fulfilled' && tmdbRes.value?.results) {
       for (const r of tmdbRes.value.results) {
         const isAnime = r.original_language === 'ja' && (r.genre_ids?.includes(16) || r.genres?.some((g: any) => g.id === 16));
-        if (isAnime) continue;
+        const item = formatContentItem(r, isAnime ? ContentType.ANIME : ContentType.MOVIE);
+        item.mediaFormat = 'movie';
 
-        const item = formatContentItem(r, ContentType.MOVIE);
-        if (item.type === ContentType.ANIME || item.genres?.includes('Anime')) continue;
-
-        item.type = ContentType.MOVIE;
         const normTitle = item.title.toLowerCase().trim();
         results.push(item);
         seenIds.add(item.id);
@@ -553,12 +591,12 @@ class TMDBClientService {
     if (cineMovieRes.status === 'fulfilled' && cineMovieRes.value?.metas) {
       for (const m of cineMovieRes.value.metas) {
         const cineItem = formatCinemetaItem(m);
-        if (cineItem.type === ContentType.ANIME || cineItem.genres?.includes('Anime')) continue;
-        cineItem.type = ContentType.MOVIE;
+        cineItem.mediaFormat = 'movie';
         const normTitle = cineItem.title.toLowerCase().trim();
-        const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
-        const hasTmdb = cineItem.tmdbId && seenIds.has(cineItem.tmdbId);
-        const hasTitle = seenTitles.has(normTitle);
+        const existing = results.find(item => sameCatalogWork(item, cineItem));
+        const hasImdb = Boolean(existing && cineItem.imdbId && seenIds.has(cineItem.imdbId));
+        const hasTmdb = Boolean(existing && cineItem.tmdbId && seenIds.has(cineItem.tmdbId));
+        const hasTitle = Boolean(existing);
 
         if (!hasImdb && !hasTmdb && !hasTitle) {
           results.push(cineItem);
@@ -619,9 +657,10 @@ class TMDBClientService {
         if (cineItem.type === ContentType.ANIME || cineItem.genres?.includes('Anime')) continue;
         cineItem.type = ContentType.SERIES;
         const normTitle = cineItem.title.toLowerCase().trim();
-        const hasImdb = cineItem.imdbId && seenIds.has(cineItem.imdbId);
-        const hasTmdb = cineItem.tmdbId && seenIds.has(cineItem.tmdbId);
-        const hasTitle = seenTitles.has(normTitle);
+        const existing = results.find(item => sameCatalogWork(item, cineItem));
+        const hasImdb = Boolean(existing && cineItem.imdbId && seenIds.has(cineItem.imdbId));
+        const hasTmdb = Boolean(existing && cineItem.tmdbId && seenIds.has(cineItem.tmdbId));
+        const hasTitle = Boolean(existing);
 
         if (!hasImdb && !hasTmdb && !hasTitle) {
           results.push(cineItem);
@@ -704,7 +743,7 @@ class TMDBClientService {
     return results;
   }
 
-  public async getDetails(id: string | number, type: ContentType): Promise<{
+  public async getDetails(id: string | number, type: ContentType, mediaFormat?: 'movie' | 'series'): Promise<{
     item: ContentItem;
     imdbId?: string;
     seasonsCount?: number;
@@ -712,7 +751,7 @@ class TMDBClientService {
     director?: string;
     similar?: ContentItem[];
   }> {
-    const isMovie = type === ContentType.MOVIE;
+    const isMovie = mediaFormat === 'movie' || (mediaFormat !== 'series' && type === ContentType.MOVIE);
     const path = isMovie ? `/movie/${id}` : `/tv/${id}`;
     const data = await this.request(`${path}?append_to_response=credits,external_ids,recommendations,similar`);
 
@@ -735,6 +774,7 @@ class TMDBClientService {
     }
 
     const seasonsCount = data.number_of_seasons || data.seasons?.length || 1;
+    const seasons = Array.isArray(data.seasons) ? data.seasons : undefined;
     const similarRaw = data.recommendations?.results || data.similar?.results || [];
     const similar = similarRaw.slice(0, 9).map((r: TMDBRawItem) => formatContentItem(r, type));
 
@@ -742,16 +782,18 @@ class TMDBClientService {
       item: formatted,
       imdbId,
       seasonsCount,
+      seasons,
       cast,
       director: formatted.director,
       similar
     };
   }
 
-  public async getDetailsByImdb(imdbId: string, type: ContentType): Promise<{
+  public async getDetailsByImdb(imdbId: string, type: ContentType, mediaFormat?: 'movie' | 'series'): Promise<{
     item: ContentItem;
     imdbId?: string;
     seasonsCount?: number;
+    seasons?: Array<{ season_number: number; air_date?: string; episode_count?: number }>;
     cast?: string[];
     director?: string;
     similar?: ContentItem[];
@@ -759,21 +801,27 @@ class TMDBClientService {
     // 1. Tentar encontrar no TMDB para obter metadados em português
     const fromTmdb = await this.findByImdb(imdbId);
     if (fromTmdb?.tmdbId) {
-      return this.getDetails(fromTmdb.tmdbId, type);
+      return this.getDetails(fromTmdb.tmdbId, type, mediaFormat || fromTmdb.mediaFormat);
     }
 
     // 2. Fallback completo para o Cinemeta Stremio Oficial
-    const stremioType = type === ContentType.MOVIE ? 'movie' : 'series';
+    const stremioType = mediaFormat === 'movie' || (mediaFormat !== 'series' && type === ContentType.MOVIE) ? 'movie' : 'series';
     const cineMeta = await this.getCinemetaMeta(stremioType, imdbId);
     if (cineMeta) {
       const formatted = formatCinemetaItem(cineMeta);
       const cast = Array.isArray(cineMeta.cast) ? cineMeta.cast : (cineMeta.cast ? [cineMeta.cast] : []);
       const director = Array.isArray(cineMeta.director) ? cineMeta.director.join(', ') : cineMeta.director;
-      const seasons = cineMeta.videos ? Math.max(...cineMeta.videos.map(v => v.season || 1), 1) : 1;
+      const seasonsList = cineMeta.videos ? Array.from(new Set(cineMeta.videos.map(v => v.season || 1))).sort((a, b) => a - b) : [1];
+      const seasons = seasonsList.map(sNum => ({
+        season_number: sNum,
+        episode_count: cineMeta.videos?.filter(v => (v.season || 1) === sNum).length || 1
+      }));
+      const seasonsCount = seasonsList.length > 0 ? Math.max(...seasonsList, 1) : 1;
       return {
         item: formatted,
         imdbId,
-        seasonsCount: seasons,
+        seasonsCount,
+        seasons,
         cast,
         director,
         similar: []
@@ -788,13 +836,14 @@ class TMDBClientService {
         type,
         rating: 8.0,
         year: 2024,
-        image: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500',
-        backdrop: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500',
+        image: '',
+        backdrop: '',
         description: 'Detalhes sincronizados com o catálogo oficial do Stremio.',
         genres: ['Geral']
       },
       imdbId,
       seasonsCount: 1,
+      seasons: [{ season_number: 1, episode_count: 1 }],
       cast: [],
       similar: []
     };
@@ -808,6 +857,7 @@ class TMDBClientService {
     image: string;
     stillPath?: string;
     airDate?: string;
+    releaseDate?: string;
   }[]> {
     try {
       const data = await this.request(`/tv/${tvId}/season/${seasonNumber}`);
@@ -816,9 +866,10 @@ class TMDBClientService {
         number: ep.episode_number,
         title: ep.name || `Episódio ${ep.episode_number}`,
         description: ep.overview || 'Sinopse oficial deste episódio não informada.',
-        image: ep.still_path ? `${TMDB_IMAGE_BASE}${ep.still_path}` : 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=500',
+        image: ep.still_path ? `${TMDB_IMAGE_BASE}${ep.still_path}` : '',
         stillPath: ep.still_path,
-        airDate: ep.air_date
+        airDate: ep.air_date,
+        releaseDate: ep.air_date
       }));
     } catch (err) {
       console.warn(`Erro ao carregar episódios da T${seasonNumber}:`, err);
@@ -834,6 +885,7 @@ class TMDBClientService {
     image: string;
     stillPath?: string;
     airDate?: string;
+    releaseDate?: string;
   }[]> {
     // 1. Tenta achar ID TMDB correspondente
     const fromTmdb = await this.findByImdb(imdbId);
@@ -852,13 +904,136 @@ class TMDBClientService {
           number: v.number,
           title: v.name || v.title || `Episódio ${v.number}`,
           description: v.overview || v.description || 'Sinopse oficial via catálogo Stremio Cinemeta.',
-          image: v.thumbnail || 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=500',
-          airDate: v.released
+          image: v.thumbnail || '',
+          airDate: v.released,
+          releaseDate: v.released
         }));
       }
     }
 
     return [];
+  }
+
+  /**
+   * Pesquisa atores e atrizes pelo nome no TMDB (search/person)
+   */
+  public async searchPersons(query: string, signal?: AbortSignal): Promise<ActorPerson[]> {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    try {
+      const data = await this.request(`/search/person?query=${encodeURIComponent(trimmed)}&include_adult=false`, 8000, signal);
+      const results: any[] = data?.results || [];
+
+      return results
+        .map((r: any): ActorPerson => {
+          const profileImg = r.profile_path
+            ? `${TMDB_IMAGE_BASE}${r.profile_path}`
+            : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300';
+
+          const knownForTitles = (r.known_for || [])
+            .map((k: any) => k.title || k.name)
+            .filter(Boolean);
+
+          return {
+            id: r.id,
+            name: r.name,
+            originalName: r.original_name,
+            image: profileImg,
+            profilePath: r.profile_path,
+            knownForDepartment: r.known_for_department === 'Acting' ? 'Atuação' : (r.known_for_department || 'Atuação'),
+            popularity: r.popularity || 0,
+            knownForTitles
+          };
+        })
+        .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || signal?.aborted) return [];
+      console.warn('[TMDBClient] Erro na busca de atores:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Obtém detalhes completos de um artista/ator pelo seu ID oficial do TMDB (person/{id})
+   */
+  public async getPersonDetails(personId: string | number, signal?: AbortSignal): Promise<ActorPerson | null> {
+    const cleanId = String(personId).replace(/^tmdb-actor-?/i, '').trim();
+    if (!cleanId) return null;
+
+    try {
+      const data = await this.request(`/person/${cleanId}`, 8000, signal);
+      if (!data || !data.id) return null;
+
+      const profileImg = data.profile_path
+        ? `${TMDB_IMAGE_BASE}${data.profile_path}`
+        : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300';
+
+      return {
+        id: data.id,
+        name: data.name,
+        originalName: data.also_known_as?.[0] || data.name,
+        image: profileImg,
+        profilePath: data.profile_path,
+        knownForDepartment: data.known_for_department === 'Acting' ? 'Atuação' : (data.known_for_department || 'Atuação'),
+        popularity: data.popularity || 0,
+        biography: data.biography || '',
+        birthday: data.birthday,
+        deathday: data.deathday,
+        placeOfBirth: data.place_of_birth
+      };
+    } catch (err) {
+      console.warn(`[TMDBClient] Erro ao obter detalhes do artista ${personId}:`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Obtém os créditos completos de filmes e séries em que o artista atuou (person/{id}/combined_credits)
+   */
+  public async getPersonCombinedCredits(personId: string | number, signal?: AbortSignal): Promise<{ movies: ContentItem[]; series: ContentItem[]; all: ContentItem[] }> {
+    const cleanId = String(personId).replace(/^tmdb-actor-?/i, '').trim();
+    if (!cleanId) return { movies: [], series: [], all: [] };
+
+    try {
+      const data = await this.request(`/person/${cleanId}/combined_credits`, 10000, signal);
+      const castRaw: any[] = data?.cast || [];
+
+      const seenIds = new Set<string>();
+      const all: ContentItem[] = [];
+      const movies: ContentItem[] = [];
+      const series: ContentItem[] = [];
+
+      for (const r of castRaw) {
+        if (!r.id || (!r.title && !r.name)) continue;
+        const item = formatContentItem(r);
+        
+        // Evita duplicações dentro da filmografia
+        if (seenIds.has(item.id)) continue;
+        seenIds.add(item.id);
+
+        all.push(item);
+        if (item.mediaFormat === 'movie' || item.type === ContentType.MOVIE) {
+          movies.push(item);
+        } else {
+          series.push(item);
+        }
+      }
+
+      // Ordenação padrão inicial por relevância (vote_count / popularidade)
+      const sortByRelevance = (arr: ContentItem[]) =>
+        [...arr].sort((a, b) => ((b.rating || 0) * 10 + (b.year || 0) * 0.01) - ((a.rating || 0) * 10 + (a.year || 0) * 0.01));
+
+      return {
+        all: sortByRelevance(all),
+        movies: sortByRelevance(movies),
+        series: sortByRelevance(series)
+      };
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || signal?.aborted) return { movies: [], series: [], all: [] };
+      console.warn(`[TMDBClient] Erro ao obter filmografia do artista ${personId}:`, err);
+      return { movies: [], series: [], all: [] };
+    }
   }
 }
 

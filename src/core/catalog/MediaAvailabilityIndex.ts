@@ -1,3 +1,5 @@
+import { bannedContentRegistry } from './BannedContentRegistry';
+
 export type AvailabilityStatus =
   | 'DISCOVERED'
   | 'CHECKING'
@@ -37,7 +39,7 @@ export interface AvailabilityStats {
   originalAudioCount: number;
 }
 
-const STORAGE_INDEX_KEY = 'zapitv_media_availability_index_v3';
+const STORAGE_INDEX_KEY = 'zapitv_media_availability_index_v4';
 const CACHE_TTL_AVAILABLE_MS = 24 * 60 * 60 * 1000; // 24 horas para itens confirmados disponíveis
 const CACHE_TTL_UNAVAILABLE_MS = 6 * 60 * 60 * 1000; // 6 horas para revalidar itens sem fonte
 const CACHE_TTL_ERROR_MS = 15 * 60 * 1000; // 15 minutos para erros temporários (reavaliação rápida)
@@ -73,9 +75,14 @@ export class MediaAvailabilityIndex {
       } catch {}
     }
 
-    // Reseta entradas com falha temporária ou sem fonte que já expiraram
+    // Reseta entradas com falha temporária ou sem fonte que já expiraram, e purga itens banidos
     const now = Date.now();
     for (const [key, record] of this.index.entries()) {
+      if (bannedContentRegistry.isBannedKeyOrId(key) || bannedContentRegistry.isBannedTitle(record.title)) {
+        this.index.delete(key);
+        cleanedCount++;
+        continue;
+      }
       if (record.status === 'TEMPORARY_ERROR' || (record.status === 'UNAVAILABLE_CONFIRMED' && record.expiresAt && record.expiresAt < now)) {
         record.status = 'DISCOVERED';
         record.checkedAt = null;
@@ -97,8 +104,13 @@ export class MediaAvailabilityIndex {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           const now = Date.now();
+          let purged = false;
           for (const item of parsed) {
             if (item && item.canonicalId) {
+              if (bannedContentRegistry.isBannedKeyOrId(item.canonicalId) || bannedContentRegistry.isBannedTitle(item.title)) {
+                purged = true;
+                continue;
+              }
               // Verifica expiração
               if (item.expiresAt && item.expiresAt < now) {
                 item.status = 'EXPIRED';
@@ -109,6 +121,9 @@ export class MediaAvailabilityIndex {
               }
               this.index.set(item.canonicalId, item);
             }
+          }
+          if (purged) {
+            this.saveToStorage();
           }
         }
       }
@@ -131,6 +146,7 @@ export class MediaAvailabilityIndex {
   }
 
   public getCanonicalKey(item: { id?: string; imdbId?: string; tmdbId?: string | number; title?: string }): string {
+    if (item.id) return item.id.toLowerCase();
     if (item.imdbId && item.imdbId.startsWith('tt')) {
       return item.imdbId.toLowerCase();
     }
@@ -173,6 +189,7 @@ export class MediaAvailabilityIndex {
    * Novos itens e checagens em segundo plano permanecem visíveis.
    */
   public isPubliclyPlayable(key: string): boolean {
+    if (bannedContentRegistry.isBannedKeyOrId(key)) return false;
     const record = this.getRecord(key);
     if (!record) return true;
     if (record.status === 'UNAVAILABLE_CONFIRMED') return false;
@@ -254,14 +271,15 @@ export class MediaAvailabilityIndex {
     canonicalId: string,
     mediaType: 'movie' | 'series' | 'anime',
     error: string,
-    providersChecked: string[] = []
+    providersChecked: string[] = [],
+    force = false
   ): void {
     const key = canonicalId.toLowerCase();
     const existing = this.index.get(key);
     const now = Date.now();
 
     // Se já estava confirmado como AVAILABLE antes, não rebaixa para erro temporário por uma falha de conexão efêmera
-    if (existing?.status === 'AVAILABLE') {
+    if (!force && existing?.status === 'AVAILABLE') {
       return;
     }
 

@@ -376,18 +376,6 @@ export class IMDbWeeklyRankingService {
         year: 2010
       },
       {
-        imdbId: 'tt1285241',
-        title: 'Big Buck Bunny',
-        originalTitle: 'Big Buck Bunny',
-        mediaType: 'movie',
-        position: 20,
-        weekKey: '2026-W41',
-        referenceDate: '2026-10-12',
-        capturedAt: 1791859200000,
-        source: 'imdb-moviemeter',
-        year: 2008
-      },
-      {
         imdbId: 'tt2285752',
         title: 'Tears of Steel',
         originalTitle: 'Tears of Steel',

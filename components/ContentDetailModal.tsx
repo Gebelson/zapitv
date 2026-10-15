@@ -1,10 +1,11 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { X, Play, Bookmark, Heart, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Play, Bookmark, Heart, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { ContentItem, ContentType } from '../types';
 import { tmdbService } from '../src/core/tmdb/tmdbClient';
 import { providerRegistry } from '../src/core/providers/providerRegistry';
 import { StremioStream } from '../src/core/stremio/stremioTypes';
 import { ZapiPlayer } from '../src/components/player/ZapiPlayer';
+import { ReportFeedbackModal } from '../src/components/feedback/ReportFeedbackModal';
 import { storageService } from '../src/core/storage/storageService';
 import { ZapiLoader } from '../src/components/common/ZapiLoader';
 import { playbackSessionService, NavigationType } from '../src/core/session/playbackSessionService';
@@ -12,6 +13,13 @@ import { catalogEligibilityService } from '../src/core/catalog/CatalogEligibilit
 import { theatricalFilterService } from '../src/core/catalog/theatricalFilterService';
 import { mediaLoadingTracker } from '../src/core/tracking/mediaLoadingTracker';
 import { mediaAvailabilityIndex } from '../src/core/catalog/MediaAvailabilityIndex';
+import { canonicalIdentityService } from '../src/core/identity/canonicalIdentity';
+import { audioPreferenceService } from '../src/core/audio/audioPreferenceService';
+import { streamValidator } from '../src/core/providers/streamValidator';
+import { audioEnhancer } from '../src/core/enhancement/audioEnhancer';
+import { similarTitlesService } from '../src/core/recommendations/similarTitlesService';
+import { userPreferenceStore } from '../src/core/recommendations/userPreferenceStore';
+import { episodeAvailabilityService } from '../src/core/episodes/episodeAvailabilityService';
 
 interface ContentDetailModalProps {
   item: ContentItem;
@@ -27,6 +35,15 @@ interface ContentDetailModalProps {
   autoPlayInitialEpisode?: boolean;
 }
 
+function uniqueEpisodes<T extends { number: number }>(episodes: T[]): T[] {
+  const seen = new Set<number>();
+  return episodes.filter(ep => {
+    if (!Number.isInteger(ep.number) || ep.number < 1 || seen.has(ep.number)) return false;
+    seen.add(ep.number);
+    return true;
+  }).sort((a, b) => a.number - b.number);
+}
+
 export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({ 
   item: initialItem, onClose, isDarkMode, myList, favorites, onToggleList, onToggleFavorite, allContent,
   initialSeason, initialEpisode, autoPlayInitialEpisode
@@ -34,6 +51,9 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const modalRef = useRef<HTMLDivElement>(null);
   const [item, setItem] = useState<ContentItem>(initialItem);
   const [isSimilarExpanded, setIsSimilarExpanded] = useState(false);
+  const [similarTitles, setSimilarTitles] = useState<ContentItem[]>(() => 
+    similarTitlesService.getImmediateSimilar(initialItem, allContent)
+  );
   const [isClosing, setIsClosing] = useState(false);
   const initialContinuity = useMemo(() => {
     return storageService.getPlaybackContinuity(initialItem);
@@ -41,25 +61,40 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
 
   const [currentSeason, setCurrentSeason] = useState<number>(() => initialSeason || initialContinuity.season || 1);
   const [totalSeasons, setTotalSeasons] = useState(initialItem.seasonsCount || 1);
+  const [availableSeasons, setAvailableSeasons] = useState<number[]>(() => {
+    return Array.from({ length: Math.max(1, initialItem.seasonsCount || 1) }, (_, i) => i + 1);
+  });
   const [isPlaying, setIsPlaying] = useState(false);
   const [resolvedStreams, setResolvedStreams] = useState<StremioStream[]>([]);
   const [isLoadingStreams, setIsLoadingStreams] = useState(false);
   const [streamResolutionError, setStreamResolutionError] = useState<string | null>(null);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [progressVersion, setProgressVersion] = useState(0);
 
   // Auto-play episode if directed by URL deep link
   const autoPlayTriggeredRef = useRef(false);
+
+  // Registro de interesse exploratório no motor de recomendações
   useEffect(() => {
-    if (autoPlayInitialEpisode && initialEpisode && !autoPlayTriggeredRef.current) {
-      autoPlayTriggeredRef.current = true;
-      startPlayback(initialSeason || 1, initialEpisode, 'manual_start');
+    if (initialItem && initialItem.id) {
+      userPreferenceStore.recordDetailView(initialItem).catch(() => {});
     }
-  }, [autoPlayInitialEpisode, initialSeason, initialEpisode]);
+  }, [initialItem?.id]);
 
   // Playback session lifecycle
+  const playbackRequestIdRef = useRef<number>(0);
   const [playbackSessionId, setPlaybackSessionId] = useState<string>('');
   const [navigationType, setNavigationType] = useState<NavigationType>('manual_start');
   const [sessionIntroPlayed, setSessionIntroPlayed] = useState<boolean>(false);
+
+  // ETAPA 1: Prefetch de fontes em segundo plano ao abrir o modal
+  const prefetchedSourcesRef = useRef<{
+    targetKey: string;
+    promise: Promise<StremioStream[]>;
+    streams: StremioStream[];
+    status: 'idle' | 'pending' | 'resolved' | 'error';
+  } | null>(null);
+  const prefetchGenerationRef = useRef<number>(0);
 
   // Dynamic episodes from TMDB
   const [episodes, setEpisodes] = useState<{
@@ -76,7 +111,98 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
 
   const isFavorite = favorites.includes(item.id);
   const isInList = myList.includes(item.id);
-  const hasEpisodes = item.type === ContentType.SERIES || item.type === ContentType.ANIME;
+  const hasEpisodes = item.mediaFormat !== 'movie' && (item.type === ContentType.SERIES || item.type === ContentType.ANIME);
+
+  // ETAPA 1: Busca e validação leve em segundo plano das fontes, priorizando PT-BR sem baixar o vídeo
+  const prefetchSources = useCallback((targetItem: ContentItem, targetSeason?: number, targetEpisode?: number) => {
+    if (isPlaying) return;
+    const isMovie = targetItem.mediaFormat === 'movie' || targetItem.type === ContentType.MOVIE;
+    const epParams = (!isMovie && targetSeason && targetEpisode)
+      ? { season: targetSeason, episode: targetEpisode }
+      : undefined;
+    const targetKey = isMovie 
+      ? `${targetItem.id}:movie` 
+      : `${targetItem.id}:s${targetSeason || 1}:e${targetEpisode || 1}`;
+
+    if (prefetchedSourcesRef.current?.targetKey === targetKey) {
+      return;
+    }
+
+    const gen = ++prefetchGenerationRef.current;
+    const targetType = isMovie ? 'movie' : (targetItem.type === ContentType.ANIME ? 'anime' : 'series');
+    const targetId = {
+      tmdbId: targetItem.tmdbId,
+      imdbId: targetItem.imdbId,
+      id: targetItem.id,
+      title: targetItem.title,
+      originalTitle: targetItem.originalTitle,
+      year: targetItem.year
+    };
+
+    const promise = (async () => {
+      try {
+        const streams = await providerRegistry.resolveStreams(
+          targetType,
+          targetId,
+          epParams
+        );
+        if (prefetchGenerationRef.current !== gen) return [];
+
+        // Validação leve em segundo plano das 3 primeiras fontes sem baixar vídeo
+        if (streams && streams.length > 0) {
+          const topCandidates = streams.slice(0, 3);
+          for (const cand of topCandidates) {
+            if (cand?.url) {
+              streamValidator.validateStream(cand, 2500).catch(() => {});
+            }
+          }
+        }
+        return streams;
+      } catch {
+        return [];
+      }
+    })();
+
+    prefetchedSourcesRef.current = {
+      targetKey,
+      promise,
+      streams: [],
+      status: 'pending'
+    };
+
+    promise.then((streams) => {
+      if (prefetchGenerationRef.current === gen && prefetchedSourcesRef.current?.targetKey === targetKey) {
+        prefetchedSourcesRef.current.streams = streams;
+        prefetchedSourcesRef.current.status = 'resolved';
+      }
+    }).catch(() => {
+      if (prefetchGenerationRef.current === gen && prefetchedSourcesRef.current?.targetKey === targetKey) {
+        prefetchedSourcesRef.current.status = 'error';
+      }
+    });
+  }, [isPlaying]);
+
+  // Dispara a Etapa 1 automaticamente ao abrir o modal ou alternar temporada
+  useEffect(() => {
+    if (isPlaying) return;
+    const isMovie = item.mediaFormat === 'movie' || item.type === ContentType.MOVIE;
+    if (isMovie) {
+      prefetchSources(item);
+    } else {
+      const cont = storageService.getPlaybackContinuity(item, totalSeasons, episodes.length);
+      const s = cont.season || currentSeason || 1;
+      const e = cont.episode || 1;
+      prefetchSources(item, s, e);
+    }
+  }, [item.id, item.tmdbId, item.imdbId, currentSeason, totalSeasons, episodes.length, isPlaying, prefetchSources]);
+
+  // Limpeza de tarefas de prefetch obsoletas ao desmontar
+  useEffect(() => {
+    return () => {
+      prefetchGenerationRef.current++;
+      prefetchedSourcesRef.current = null;
+    };
+  }, []);
 
   // Reage imediatamente a atualizações de progresso do player
   useEffect(() => {
@@ -114,6 +240,9 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   }, [item, totalSeasons, episodes.length, progressVersion]);
 
   const handleClose = useCallback(() => {
+    playbackRequestIdRef.current++;
+    prefetchGenerationRef.current++;
+    prefetchedSourcesRef.current = null;
     setIsClosing(true);
     if (playbackSessionId) {
       playbackSessionService.endSession(playbackSessionId);
@@ -128,7 +257,11 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   }, [onClose, playbackSessionId]);
 
   const handleClosePlayer = useCallback(() => {
+    playbackRequestIdRef.current++;
+    prefetchGenerationRef.current++;
+    prefetchedSourcesRef.current = null;
     setIsPlaying(false);
+    setResolvedStreams([]);
     if (playbackSessionId) {
       playbackSessionService.endSession(playbackSessionId);
     } else {
@@ -156,18 +289,21 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     };
   }, []);
 
-  // Fetch full metadata from TMDB or Cinemeta
+  // Fetch full metadata from TMDB or Cinemeta para o item atual exibido no modal
   useEffect(() => {
     let active = true;
+    const currentItem = item;
     const fetchMetadata = async () => {
       try {
         let details: any = null;
         const fetchPromise = (async () => {
-          if (initialItem.tmdbId) {
-            return await tmdbService.getDetails(initialItem.tmdbId, initialItem.type);
-          } else if (initialItem.imdbId || initialItem.id.startsWith('tt')) {
-            const targetImdb = initialItem.imdbId || initialItem.id;
-            return await tmdbService.getDetailsByImdb(targetImdb, initialItem.type);
+          const rawId = currentItem.tmdbId || currentItem.id;
+          const cleanTmdbId = typeof rawId === 'string' ? rawId.replace(/^tmdb-?/i, '') : String(rawId);
+          if (cleanTmdbId && /^\d+$/.test(cleanTmdbId)) {
+            return await tmdbService.getDetails(cleanTmdbId, currentItem.type, currentItem.mediaFormat);
+          } else if (currentItem.imdbId || currentItem.id.startsWith('tt')) {
+            const targetImdb = currentItem.imdbId || currentItem.id;
+            return await tmdbService.getDetailsByImdb(targetImdb, currentItem.type, currentItem.mediaFormat);
           }
           return null;
         })();
@@ -178,7 +314,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000))
         ]);
 
-        if (active && details) {
+        if (active && details && details.item && canonicalIdentityService.isSameWork(currentItem, details.item)) {
           setItem(prev => ({
             ...prev,
             ...details.item,
@@ -188,8 +324,16 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
             director: details.director || prev.director,
             cast: details.cast && details.cast.length > 0 ? details.cast : prev.cast
           }));
-          if (details.seasonsCount && details.seasonsCount > 1) {
+          if (details.seasons && details.seasons.length > 0) {
+            const validSeasons = episodeAvailabilityService.getAvailableSeasons(details.seasons, details.seasonsCount);
+            setAvailableSeasons(validSeasons);
+            setTotalSeasons(validSeasons.length);
+            if (!validSeasons.includes(currentSeason)) {
+              setCurrentSeason(validSeasons[0] || 1);
+            }
+          } else if (details.seasonsCount && details.seasonsCount > 1) {
             setTotalSeasons(details.seasonsCount);
+            setAvailableSeasons(Array.from({ length: details.seasonsCount }, (_, i) => i + 1));
           }
         }
       } catch (err) {
@@ -198,48 +342,96 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     };
     fetchMetadata();
     return () => { active = false; };
-  }, [initialItem.tmdbId, initialItem.imdbId, initialItem.id, initialItem.type]);
+  }, [item.tmdbId, item.imdbId, item.id, item.type]);
+
+  // Carrega e refina títulos semelhantes via SimilarTitlesService (TMDB, AniList e Relevância Semântica)
+  useEffect(() => {
+    let active = true;
+    // Cálculo imediato sem latência (cache ou semântico local rigoroso)
+    const immediate = similarTitlesService.getImmediateSimilar(item, allContent);
+    setSimilarTitles(immediate);
+
+    similarTitlesService.getSimilarTitles(item, allContent)
+      .then(results => {
+        if (active) {
+          setSimilarTitles(results);
+        }
+      })
+      .catch(err => {
+        console.warn('Erro ao carregar títulos semelhantes:', err);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [item.id, item.imdbId, item.tmdbId, item.title, allContent]);
 
   // Dynamic episodes from item, TMDB or Cinemeta
   useEffect(() => {
     if (!hasEpisodes) return;
-    if (item.episodes && item.episodes.length > 0) {
-      setEpisodes(item.episodes);
-      return;
-    }
     let active = true;
     const fetchEpisodes = async () => {
       setIsLoadingEpisodes(true);
       try {
         const fetchEpPromise = (async () => {
-          if (item.tmdbId) {
-            return await tmdbService.getSeasonEpisodes(item.tmdbId, currentSeason);
-          } else if (item.imdbId || item.id.startsWith('tt')) {
-            const targetImdb = item.imdbId || item.id;
-            return await tmdbService.getSeasonEpisodesByImdb(targetImdb, currentSeason);
+          const rawId = item.tmdbId || item.id;
+          const cleanTmdbId = typeof rawId === 'string' ? rawId.replace(/^tmdb-?/i, '') : String(rawId);
+          if (cleanTmdbId && /^\d+$/.test(cleanTmdbId)) {
+            const eps = await tmdbService.getSeasonEpisodes(cleanTmdbId, currentSeason);
+            if (eps && eps.length > 0) return eps;
+          }
+          const targetImdb = item.imdbId || (item.id.startsWith('tt') ? item.id : null);
+          if (targetImdb) {
+            const eps = await tmdbService.getSeasonEpisodesByImdb(targetImdb, currentSeason);
+            if (eps && eps.length > 0) return eps;
+          }
+          if (item.episodes && item.episodes.length > 0) {
+            const seasonEps = item.episodes.filter((e: any) => (e.season ?? 1) === currentSeason);
+            if (seasonEps.length > 0) return seasonEps;
           }
           return [];
         })();
 
-        // Timeout de 8 segundos para episódios
-        const eps = await Promise.race([
+        // Timeout de 8 segundos para metadados dos episódios
+        const rawEps = await Promise.race([
           fetchEpPromise,
           new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 8000))
         ]);
 
         if (active) {
-          if (eps && eps.length > 0) {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const validEps = eps.filter((ep: any) => {
-              if (ep.releaseDate && typeof ep.releaseDate === 'string' && ep.releaseDate > todayStr) {
-                return false;
+          // 1. Filtragem rigorosa por Data de Estreia Oficial (Oculta episódios futuros e fictícios)
+          const airedEps = episodeAvailabilityService.filterAiredEpisodes(rawEps);
+
+          // 2. Filtragem imediata por cache de fontes verificadas (Abertura instantânea do modal)
+          const initialDisplayEps = airedEps.filter(ep => {
+            const cached = episodeAvailabilityService.getCachedAvailability(item.id, currentSeason, ep.number);
+            return !cached.checked || cached.hasSource || cached.isTemporaryError;
+          });
+
+          setEpisodes(uniqueEpisodes(initialDisplayEps));
+          setIsLoadingEpisodes(false);
+
+          // 3. Auditoria em segundo plano das fontes para episódios ainda não verificados
+          (async () => {
+            for (const ep of initialDisplayEps) {
+              if (!active) break;
+              const cached = episodeAvailabilityService.getCachedAvailability(item.id, currentSeason, ep.number);
+              if (cached.checked) continue;
+
+              const hasSource = await episodeAvailabilityService.verifyEpisodeAvailability(
+                item,
+                currentSeason,
+                ep.number,
+                (ep as any).airDate || (ep as any).releaseDate
+              );
+
+              if (!active) break;
+              if (!hasSource) {
+                // Remove da lista se confirmado sem fontes, preservando a numeração dos outros
+                setEpisodes(prev => prev.filter(e => e.number !== ep.number));
               }
-              return true;
-            });
-            setEpisodes(validEps.length > 0 ? validEps : eps);
-          } else {
-            setEpisodes([]);
-          }
+            }
+          })().catch(() => {});
         }
       } catch (e) {
         console.warn('Erro ao carregar episódios:', e);
@@ -260,8 +452,15 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const startPlayback = async (
     season?: number, 
     episode?: number, 
-    navType: NavigationType = 'manual_start'
+    navType: NavigationType = 'manual_start',
+    isAutoRetry = false
   ) => {
+    // PREVENÇÃO DE FALHA DE ÁUDIO: Desbloqueia o AudioContext e o pipeline de mídia
+    // síncronamente durante o gesto direto do usuário (trusted ClickEvent)
+    audioEnhancer.unlockAudioContext();
+
+    const currentRequestId = ++playbackRequestIdRef.current;
+    const currentTargetItem = item;
     let epParams: { season: number; episode: number } | undefined = undefined;
 
     if (hasEpisodes) {
@@ -276,7 +475,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       } else {
         // Clique no botão principal "Assistir" ou "Continuar assistindo":
         // Consulta a continuidade como fonte única da verdade
-        const cont = storageService.getPlaybackContinuity(item, totalSeasons, episodes.length);
+        const cont = storageService.getPlaybackContinuity(currentTargetItem, totalSeasons, episodes.length);
         targetSeason = cont.season || currentSeason || 1;
         targetEpisode = cont.episode || 1;
       }
@@ -290,9 +489,13 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       setCurrentEpisodeParams(null);
     }
 
+    const requestedKey = (currentTargetItem.mediaFormat === 'movie' || currentTargetItem.type === ContentType.MOVIE)
+      ? `${currentTargetItem.id}:movie`
+      : `${currentTargetItem.id}:s${epParams?.season || 1}:e${epParams?.episode || 1}`;
+
     // Inicia ou continua a sessão de reprodução rastreando a intro
     const session = playbackSessionService.startSession(
-      item.id,
+      currentTargetItem.id,
       navType,
       epParams?.season,
       epParams?.episode
@@ -302,118 +505,181 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     setSessionIntroPlayed(session.introPlayed);
 
     setIsPlaying(true);
-    setIsLoadingStreams(true);
     setStreamResolutionError(null);
+
+    // ETAPA 2: Verifica se já temos fontes pré-resolvidas em cache da etapa 1
+    const prefetched = prefetchedSourcesRef.current;
+    const hasReadyPrefetch = prefetched && 
+      prefetched.targetKey === requestedKey && 
+      prefetched.status === 'resolved' && 
+      prefetched.streams.length > 0 &&
+      !isAutoRetry;
+
+    if (hasReadyPrefetch) {
+      // Fontes já prontas: passa imediatamente ao ZapiPlayer para pré-buffer durante a intro
+      setResolvedStreams(prefetched.streams);
+      setIsLoadingStreams(false);
+      mediaLoadingTracker.transition(currentTargetItem.id, 'BUFFERING', {
+        streamCount: prefetched.streams.length,
+        bestStream: prefetched.streams[0]?.title,
+        prefetched: true
+      });
+      return;
+    }
+
+    const hasPendingPrefetch = prefetched &&
+      prefetched.targetKey === requestedKey &&
+      prefetched.status === 'pending' &&
+      !isAutoRetry;
+
+    setIsLoadingStreams(true);
     setResolvedStreams([]);
 
     // Telemetria do Tracker
     mediaLoadingTracker.startTrace(
-      item.id,
-      item.title,
-      item.type,
+      currentTargetItem.id,
+      currentTargetItem.title,
+      currentTargetItem.type,
       epParams?.season,
       epParams?.episode
     );
-    mediaLoadingTracker.transition(item.id, 'PREPARING_PLAYER', {
+    mediaLoadingTracker.transition(currentTargetItem.id, 'PREPARING_PLAYER', {
       navType,
       season: epParams?.season,
       episode: epParams?.episode
     });
 
     try {
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const streams = await Promise.race([
-        providerRegistry.resolveStreams(
-          item.type === ContentType.MOVIE ? 'movie' : (item.type === ContentType.ANIME ? 'anime' : 'series'),
-          { tmdbId: item.tmdbId, imdbId: item.imdbId, id: item.id, title: item.title },
-          epParams
-        ),
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error('Tempo limite na busca de fontes. Tente novamente.')), 20000);
-        })
-      ]).finally(() => clearTimeout(timer));
+      let streams: StremioStream[] = [];
+      if (hasPendingPrefetch) {
+        // Reutiliza a promessa já em voo sem criar requisições duplicadas
+        streams = await Promise.race([
+          prefetched.promise,
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Tempo limite na busca de fontes. Tente novamente.')), 18000))
+        ]);
+      } else {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        streams = await Promise.race([
+          providerRegistry.resolveStreams(
+            currentTargetItem.mediaFormat === 'movie' || currentTargetItem.type === ContentType.MOVIE ? 'movie' : (currentTargetItem.type === ContentType.ANIME ? 'anime' : 'series'),
+            { tmdbId: currentTargetItem.tmdbId, imdbId: currentTargetItem.imdbId, id: currentTargetItem.id, title: currentTargetItem.title, originalTitle: currentTargetItem.originalTitle, year: currentTargetItem.year },
+            epParams
+          ),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error('Tempo limite na busca de fontes. Tente novamente.')), 18000);
+          })
+        ]).finally(() => clearTimeout(timer));
+      }
+
+      // Se a primeira consulta retornar vazia, realiza uma recuperação automática e silenciosa
+      if (streams.length === 0 && !isAutoRetry) {
+        console.log(`[ContentDetailModal] 0 fontes na primeira tentativa de "${currentTargetItem.title}". Tentando recuperação automática silenciosa...`);
+        await new Promise(r => setTimeout(r, 600));
+        if (currentRequestId !== playbackRequestIdRef.current) return;
+        return startPlayback(epParams?.season, epParams?.episode, 'retry_playback', true);
+      }
+
+      if (currentRequestId !== playbackRequestIdRef.current) {
+        // Ignora respostas assíncronas antigas se o usuário já mudou de obra ou solicitou outra ação!
+        return;
+      }
+
+      // Atualiza o cache de prefetch com o resultado obtido
+      prefetchedSourcesRef.current = {
+        targetKey: requestedKey,
+        promise: Promise.resolve(streams),
+        streams,
+        status: 'resolved'
+      };
+
       setResolvedStreams(streams);
       if (streams.length > 0) {
-        mediaLoadingTracker.transition(item.id, 'BUFFERING', {
+        if (hasEpisodes && epParams) {
+          episodeAvailabilityService.recordEpisodeSourceFound(
+            currentTargetItem.id,
+            epParams.season,
+            epParams.episode,
+            streams.length
+          );
+        }
+        mediaLoadingTracker.transition(currentTargetItem.id, 'BUFFERING', {
           streamCount: streams.length,
           bestStream: streams[0]?.title
         });
       } else {
-        mediaLoadingTracker.transition(item.id, 'UNAVAILABLE', {
+        if (hasEpisodes && epParams) {
+          episodeAvailabilityService.recordEpisodeSourceFailed(
+            currentTargetItem.id,
+            epParams.season,
+            epParams.episode,
+            false
+          );
+        }
+        mediaLoadingTracker.transition(currentTargetItem.id, 'UNAVAILABLE', {
           reason: 'Nenhum provedor retornou streams reproduzíveis'
         });
       }
     } catch (err: any) {
+      if (currentRequestId !== playbackRequestIdRef.current) return;
+      if (!isAutoRetry) {
+        console.log(`[ContentDetailModal] Erro temporário na primeira tentativa de "${currentTargetItem.title}". Tentando recuperação automática silenciosa...`);
+        await new Promise(r => setTimeout(r, 600));
+        if (currentRequestId !== playbackRequestIdRef.current) return;
+        return startPlayback(epParams?.season, epParams?.episode, 'retry_playback', true);
+      }
+      if (hasEpisodes && epParams) {
+        episodeAvailabilityService.recordEpisodeSourceFailed(
+          currentTargetItem.id,
+          epParams.season,
+          epParams.episode,
+          true
+        );
+      }
       console.error('Erro ao resolver provedores:', err);
       setStreamResolutionError(err?.message || 'Falha temporária na busca de fontes. Tente novamente.');
-      mediaLoadingTracker.transition(item.id, 'ERROR', {
+      mediaLoadingTracker.transition(currentTargetItem.id, 'ERROR', {
         error: err?.message || 'Falha ao resolver provedores'
       });
     } finally {
-      setIsLoadingStreams(false);
+      if (currentRequestId === playbackRequestIdRef.current) {
+        setIsLoadingStreams(false);
+      }
     }
   };
+  
+  // Auto-play episode if directed by URL deep link
+  useEffect(() => {
+    if (autoPlayInitialEpisode && initialEpisode && !autoPlayTriggeredRef.current) {
+      autoPlayTriggeredRef.current = true;
+      startPlayback(initialSeason || 1, initialEpisode, 'manual_start');
+    }
+  }, [autoPlayInitialEpisode, initialSeason, initialEpisode]);
 
   const handleEpisodeClick = (season: number, episode: number) => {
     startPlayback(season, episode, 'manual_start');
   };
 
-  const handleNextEpisode = () => {
-    if (!hasEpisodes || isLoadingStreams || episodes.length === 0) return;
-    const curSeason = currentEpisodeParams?.season ?? currentSeason ?? 1;
-    const curEpisode = currentEpisodeParams?.episode ?? 1;
-    const seasonEpCount = episodes.length;
-
-    if (curEpisode < seasonEpCount) {
-      startPlayback(curSeason, curEpisode + 1, 'continuous_playback');
-    } else if (curSeason < totalSeasons) {
-      // Avança para a próxima temporada, episódio 1
-      const nextSeason = curSeason + 1;
-      setCurrentSeason(nextSeason);
-      startPlayback(nextSeason, 1, 'continuous_playback');
-    } else {
-      console.log('Último episódio da série alcançado.');
-    }
-  };
-
-  const hasNextEpisode = useMemo(() => {
-    if (!hasEpisodes || episodes.length === 0) return false;
-    const curSeason = currentEpisodeParams?.season ?? currentSeason ?? 1;
-    const curEpisode = currentEpisodeParams?.episode ?? 1;
-    const seasonEpCount = episodes.length;
-    return curEpisode < seasonEpCount || curSeason < totalSeasons;
-  }, [hasEpisodes, currentEpisodeParams, currentSeason, episodes.length, totalSeasons]);
-
   const nextEpisodeInfo = useMemo(() => {
-    if (!hasEpisodes || episodes.length === 0) return null;
+    if (!hasEpisodes) return null;
     const curSeason = currentEpisodeParams?.season ?? currentSeason ?? 1;
     const curEpisode = currentEpisodeParams?.episode ?? 1;
-    const seasonEpCount = episodes.length;
+    return episodeAvailabilityService.getNextAvailableEpisode(
+      curSeason,
+      curEpisode,
+      episodes,
+      availableSeasons
+    );
+  }, [hasEpisodes, currentEpisodeParams, currentSeason, episodes, availableSeasons]);
 
-    if (curEpisode < seasonEpCount) {
-      const nextNum = curEpisode + 1;
-      const found = episodes.find(e => e.number === nextNum);
-      return {
-        season: curSeason,
-        episode: nextNum,
-        title: found?.title || `Episódio ${nextNum}`
-      };
-    } else if (curSeason < totalSeasons) {
-      return {
-        season: curSeason + 1,
-        episode: 1,
-        title: `Temporada ${curSeason + 1} • Episódio 1`
-      };
+  const hasNextEpisode = Boolean(nextEpisodeInfo);
+
+  const handleNextEpisode = () => {
+    if (!hasEpisodes || isLoadingStreams || !nextEpisodeInfo) return;
+    if (nextEpisodeInfo.season !== currentSeason) {
+      setCurrentSeason(nextEpisodeInfo.season);
     }
-    return null;
-  }, [hasEpisodes, currentEpisodeParams, currentSeason, episodes, totalSeasons]);
-
-  const similarTitles = catalogEligibilityService.filterEligibleItemsSync(
-    allContent.filter(c => 
-      c.id !== item.id && 
-      (c.genres?.some(g => item.genres?.includes(g)) || c.type === item.type)
-    )
-  ).slice(0, 12);
+    startPlayback(nextEpisodeInfo.season, nextEpisodeInfo.episode, 'continuous_playback');
+  };
 
   const initialSimilar = similarTitles.slice(0, 6);
   const extraSimilar = similarTitles.slice(6);
@@ -424,6 +690,12 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       <div 
         key={similar.id} 
         onClick={() => {
+          playbackRequestIdRef.current++;
+          prefetchGenerationRef.current++;
+          prefetchedSourcesRef.current = null;
+          setIsPlaying(false);
+          setResolvedStreams([]);
+          setCurrentEpisodeParams(null);
           if (playbackSessionId) {
             playbackSessionService.endSession(playbackSessionId);
           } else {
@@ -431,6 +703,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
           }
           setPlaybackSessionId('');
           setSessionIntroPlayed(false);
+          setIsSimilarExpanded(false);
           setItem(similar);
         }}
         className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden hover:bg-white/10 hover:border-white/10 transition-all group cursor-pointer"
@@ -477,8 +750,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
           isLoadingStreams={isLoadingStreams}
           streamResolutionError={streamResolutionError}
           onRetrySources={() => {
-            providerRegistry.clearCache();
-            startPlayback(currentEpisodeParams?.season, currentEpisodeParams?.episode, 'manual_start');
+            startPlayback(currentEpisodeParams?.season, currentEpisodeParams?.episode, 'retry_playback');
           }}
           initialSeason={currentEpisodeParams?.season || (hasEpisodes ? 1 : undefined)}
           initialEpisode={currentEpisodeParams?.episode || (hasEpisodes ? 1 : undefined)}
@@ -500,15 +772,15 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       )}
       
       {!isPlaying && (
-        <div className="min-h-full w-full flex items-start justify-center py-8 md:py-12 px-4">
-          <div ref={modalRef} className={`relative w-full max-w-[850px] bg-[#0f1115] rounded-[32px] shadow-2xl overflow-hidden border border-white/10 ${
+        <div className="min-h-full w-full flex items-start justify-center py-3 sm:py-8 md:py-12 px-2 sm:px-4 md:px-6">
+          <div ref={modalRef} className={`relative w-full max-w-[850px] bg-[#0f1115] rounded-2xl sm:rounded-3xl md:rounded-[32px] shadow-2xl overflow-hidden border border-white/10 ${
               isClosing ? 'animate-out zoom-out-95 slide-out-to-bottom-[5%] duration-300' : 'animate-in zoom-in-95 slide-in-from-bottom-[5%] duration-300'
             }`}>
-            <button onClick={handleClose} className="absolute top-4 right-4 z-50 w-10 h-10 bg-black/40 backdrop-blur-md border border-white/10 text-white rounded-full flex items-center justify-center hover:bg-white hover:text-black transition-all">
+            <button onClick={handleClose} className="absolute top-3 right-3 sm:top-4 sm:right-4 z-50 w-9 h-9 sm:w-10 sm:h-10 bg-black/50 backdrop-blur-md border border-white/10 text-white rounded-full flex items-center justify-center hover:bg-white hover:text-black transition-all cursor-pointer" aria-label="Fechar">
               <X className="w-5 h-5" />
             </button>
 
-            <div className="relative aspect-[4/5] md:aspect-video w-full">
+            <div className="relative aspect-[16/10] sm:aspect-[16/9] md:aspect-video w-full min-h-[220px] max-h-[50vh] sm:max-h-none">
               <div className="absolute inset-0">
                 <img 
                   src={item.backdrop || item.image} 
@@ -525,51 +797,51 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0f1115] via-[#0f1115]/40 to-transparent" />
               </div>
 
-              <div className="absolute bottom-0 left-0 w-full px-6 md:px-12 pb-8 md:pb-12 z-20 flex flex-col justify-end h-full">
+              <div className="absolute bottom-0 left-0 w-full px-4 sm:px-8 md:px-12 pb-4 sm:pb-8 md:pb-12 z-20 flex flex-col justify-end h-full">
                 {/* Badges de Disponibilidade e Idioma Real */}
-                <div className="flex flex-wrap items-center gap-2 mb-3">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
                   {typeof item.displayRank === 'number' && (
-                    <span className="px-3 py-1 rounded-full text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-lg flex items-center gap-1.5 border border-amber-300/60">
+                    <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-lg flex items-center gap-1.5 border border-amber-300/60">
                       <span>#{item.displayRank} Em Destaque</span>
                       {item.imdbRank && (
-                        <span className="text-[10px] font-bold text-black/75 font-mono">
+                        <span className="text-[9px] sm:text-[10px] font-bold text-black/75 font-mono">
                           (IMDb #{item.imdbRank})
                         </span>
                       )}
                     </span>
                   )}
                   {item.audioStatus === 'pt-br-original' && (
-                    <span className="px-3 py-1 rounded-full text-xs font-black bg-blue-500/20 text-blue-400 border border-blue-500/40 backdrop-blur-md flex items-center gap-1.5 shadow-lg">
-                      🇧🇷 Áudio Original PT-BR Confirmado
+                    <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-blue-500/20 text-blue-400 border border-blue-500/40 backdrop-blur-md flex items-center gap-1.5 shadow-lg">
+                      🇧🇷 Áudio Original PT-BR Informado
                     </span>
                   )}
-                  {item.audioStatus === 'pt-br-dubbed' && (
-                    <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 backdrop-blur-md flex items-center gap-1.5 shadow-lg">
-                      🇧🇷 Dublagem PT-BR Confirmada
+                  {resolvedStreams.some(stream => audioPreferenceService.analyzeAudio(stream).isDubbed) && (
+                    <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 backdrop-blur-md flex items-center gap-1.5 shadow-lg">
+                      🇧🇷 Dublagem PT-BR Informada pela Fonte
                     </span>
                   )}
                   {item.audioStatus === 'other' && (
-                    <span className="px-3 py-1 rounded-full text-xs font-black bg-purple-500/20 text-purple-300 border border-purple-500/40 backdrop-blur-md flex items-center gap-1.5 shadow-lg">
-                      🌐 Áudio Original (Com Legendas PT-BR)
+                    <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-purple-500/20 text-purple-300 border border-purple-500/40 backdrop-blur-md flex items-center gap-1.5 shadow-lg">
+                      🌐 Áudio Original (Legendas conforme a fonte)
                     </span>
                   )}
                   {item.audioStatus === 'universal' && (
-                    <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 backdrop-blur-md flex items-center gap-1.5 shadow-lg">
+                    <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 backdrop-blur-md flex items-center gap-1.5 shadow-lg">
                       🎵 Trilha Sonora Universal / Sem Diálogos
                     </span>
                   )}
                 </div>
 
-                <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-white mb-4 md:mb-6 drop-shadow-xl max-w-2xl leading-tight" style={{ fontFamily: "'Sora', sans-serif" }}>
+                <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-black text-white mb-3 md:mb-6 drop-shadow-xl max-w-2xl leading-tight" style={{ fontFamily: "'Sora', sans-serif" }}>
                   {item.title}
                 </h1>
                 
-                <div className="flex items-center gap-3 md:gap-4">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-4">
                   <button 
-                    className="flex items-center gap-2.5 px-6 md:px-8 py-3 md:py-3.5 bg-[#007df7] text-white rounded-2xl font-black text-sm md:text-lg hover:bg-[#0069d9] transition-all hover:scale-105 shadow-xl shadow-[#007df7]/20"
+                    className="flex items-center gap-2 px-4 sm:px-6 md:px-8 py-2.5 sm:py-3 md:py-3.5 bg-[#007df7] text-white rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm md:text-lg hover:bg-[#0069d9] transition-all hover:scale-105 shadow-xl shadow-[#007df7]/20 min-h-[44px]"
                     onClick={() => startPlayback(undefined, undefined, 'manual_start')}
                   >
-                    <Play className="w-5 h-5 md:w-6 md:h-6 fill-current" />
+                    <Play className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 fill-current" />
                     <span>
                       {hasEpisodes && playbackContinuity.hasStarted && !playbackContinuity.isCompleted
                         ? `Continuar (${playbackContinuity.label})`
@@ -578,38 +850,48 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                   </button>
                   <button 
                     onClick={(e) => onToggleFavorite(e, item.id)} 
-                    className={`w-12 h-12 md:w-14 md:h-14 rounded-full border flex items-center justify-center backdrop-blur-sm transition-all group ${isFavorite ? 'bg-[#007df7] border-[#007df7] text-white shadow-lg' : 'bg-white/5 border-white/10 text-white hover:bg-white/20 hover:border-white/30'}`} 
+                    className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full border flex items-center justify-center backdrop-blur-sm transition-all group ${isFavorite ? 'bg-[#007df7] border-[#007df7] text-white shadow-lg' : 'bg-white/5 border-white/10 text-white hover:bg-white/20 hover:border-white/30'}`} 
                     title="Favoritos"
+                    aria-label="Favoritos"
                   >
-                    <Heart className={`w-5 h-5 md:w-5 md:h-5 group-hover:scale-110 transition-transform ${isFavorite ? 'fill-current' : ''}`} />
+                    <Heart className={`w-4 h-4 sm:w-5 sm:h-5 md:w-5 md:h-5 group-hover:scale-110 transition-transform ${isFavorite ? 'fill-current' : ''}`} />
                   </button>
                   <button 
                     onClick={(e) => onToggleList(e, item.id)} 
-                    className={`w-12 h-12 md:w-14 md:h-14 rounded-full border flex items-center justify-center backdrop-blur-sm transition-all group ${isInList ? 'bg-white text-[#007df7] border-white shadow-lg' : 'bg-white/5 border-white/10 text-white hover:bg-white/20 hover:border-white/30'}`} 
+                    className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full border flex items-center justify-center backdrop-blur-sm transition-all group ${isInList ? 'bg-white text-[#007df7] border-white shadow-lg' : 'bg-white/5 border-white/10 text-white hover:bg-white/20 hover:border-white/30'}`} 
                     title="Minha Lista"
+                    aria-label="Minha Lista"
                   >
-                    <Bookmark className={`w-5 h-5 md:w-6 md:h-6 group-hover:scale-110 transition-transform ${isInList ? 'fill-current' : ''}`} />
+                    <Bookmark className={`w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 group-hover:scale-110 transition-transform ${isInList ? 'fill-current' : ''}`} />
+                  </button>
+                  <button 
+                    onClick={() => setShowFeedbackModal(true)} 
+                    className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full border border-white/10 bg-white/5 text-white/70 hover:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/30 flex items-center justify-center backdrop-blur-sm transition-all group cursor-pointer" 
+                    title="Reportar problema neste título"
+                    aria-label="Reportar problema"
+                  >
+                    <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 md:w-5 md:h-5 group-hover:scale-110 transition-transform" />
                   </button>
                 </div>
               </div>
             </div>
 
-            <div className="px-8 md:px-12 py-8 grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-10">
+            <div className="px-4 sm:px-8 md:px-12 py-5 sm:py-8 grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6 md:gap-10">
               <div>
-                <div className="flex items-center flex-wrap gap-3 text-white mb-6 font-medium">
-                  <span className="text-green-400 font-black">{item.year}</span>
+                <div className="flex items-center flex-wrap gap-2 sm:gap-3 text-white mb-4 sm:mb-6 font-medium">
+                  <span className="text-green-400 font-black text-sm">{item.year}</span>
                   <span className="bg-white/10 border border-white/10 px-1.5 py-0.5 text-xs text-white rounded font-bold uppercase tracking-wider">HD</span>
                   <span className="bg-yellow-500 text-black text-xs font-black px-2 py-0.5 rounded">{item.rating > 8 ? '16' : '12'}</span>
-                  <span className="text-gray-300">{item.type}</span>
+                  <span className="text-gray-300 text-xs sm:text-sm">{item.type}</span>
                   <span className="px-2 py-0.5 rounded text-xs font-black bg-green-500/20 text-green-400 border border-green-500/30">
                     🇧🇷 Áudio Dublado PT-BR
                   </span>
                 </div>
-                <p className="text-gray-300 text-sm md:text-base leading-relaxed mb-6 font-medium">
+                <p className="text-gray-300 text-xs sm:text-sm md:text-base leading-relaxed mb-4 sm:mb-6 font-medium">
                   {item.description || "Assista agora no ZapiTV com streaming em alta definição."}
                 </p>
               </div>
-              <div className="text-xs md:text-sm space-y-4">
+              <div className="text-xs md:text-sm space-y-3 sm:space-y-4">
                 {item.director && (<div><span className="text-gray-500 font-bold">Direção: </span><span className="text-gray-300">{item.director}</span></div>)}
                 {item.cast && item.cast.length > 0 && (<div><span className="text-gray-500 font-bold">Elenco: </span><span className="text-gray-300">{item.cast.join(', ')}</span></div>)}
                 {item.genres && (<div><span className="text-gray-500 font-bold">Gêneros: </span><span className="text-gray-300">{item.genres.join(', ')}</span></div>)}
@@ -617,31 +899,32 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
             </div>
 
             {hasEpisodes && (
-              <div className="px-8 md:px-12 py-8 border-t border-white/5 bg-transparent">
-                <div className="flex flex-row justify-between items-end mb-8">
-                  <h3 className="text-2xl font-black text-white">Episódios</h3>
+              <div className="px-4 sm:px-8 md:px-12 py-5 sm:py-8 border-t border-white/5 bg-transparent">
+                <div className="flex flex-row justify-between items-center mb-6 sm:mb-8">
+                  <h3 className="text-lg sm:text-xl md:text-2xl font-black text-white">Episódios</h3>
                   <div className="relative group">
                     <select 
                       value={currentSeason} 
                       onChange={(e) => setCurrentSeason(Number(e.target.value))} 
-                      className="appearance-none bg-[#242424] border border-white/20 text-white py-2 pl-4 pr-10 rounded font-bold text-sm outline-none cursor-pointer hover:bg-[#333] transition-colors"
+                      className="appearance-none bg-[#242424] border border-white/20 text-white py-1.5 sm:py-2 pl-3 sm:pl-4 pr-9 sm:pr-10 rounded-xl font-bold text-xs sm:text-sm outline-none cursor-pointer hover:bg-[#333] transition-colors"
+                      aria-label="Selecionar temporada"
                     >
-                      {Array.from({ length: totalSeasons }).map((_, i) => (
-                         <option key={i + 1} value={i + 1}>Temporada {i + 1}</option>
+                      {availableSeasons.map((sNum) => (
+                         <option key={sNum} value={sNum}>Temporada {sNum}</option>
                       ))}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-white" />
                   </div>
                 </div>
 
-                <div className="space-y-px bg-white/5 rounded-lg overflow-hidden border border-white/5">
+                <div className="space-y-px bg-white/5 rounded-xl overflow-hidden border border-white/5">
                   {isLoadingEpisodes ? (
-                    <div className="p-8 flex flex-col items-center justify-center gap-3 text-gray-400 font-bold text-sm">
+                    <div className="p-6 sm:p-8 flex flex-col items-center justify-center gap-3 text-gray-400 font-bold text-sm">
                       <ZapiLoader size="sm" />
                       <span>Carregando episódios da Temporada {currentSeason}...</span>
                     </div>
                   ) : episodes.length === 0 ? (
-                    <div className="p-8 text-center text-gray-400 text-sm">Não foi possível carregar os episódios agora. Tente novamente mais tarde.</div>
+                    <div className="p-6 sm:p-8 text-center text-gray-400 text-sm">Não foi possível carregar os episódios agora. Tente novamente mais tarde.</div>
                   ) : (
                     episodes.map((ep) => {
                       const epProgress = getEpisodeProgress(currentSeason, ep.number);
@@ -649,17 +932,18 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                         <div 
                           key={ep.id} 
                           onClick={() => handleEpisodeClick(currentSeason, ep.number)} 
-                          className="group flex flex-col md:flex-row items-center gap-4 md:gap-6 p-4 md:p-6 hover:bg-white/5 transition-colors cursor-pointer border-b border-black/20 last:border-0"
+                          className="group flex flex-row items-center gap-3 sm:gap-4 md:gap-6 p-3 sm:p-4 md:p-6 hover:bg-white/5 transition-colors cursor-pointer border-b border-black/20 last:border-0"
                         >
-                          <div className="text-2xl font-normal text-gray-500 w-8 text-center shrink-0">{ep.number}</div>
-                          <div className="relative w-full md:w-40 aspect-video rounded-lg overflow-hidden shrink-0 bg-black shadow-lg">
+                          <div className="text-base sm:text-xl md:text-2xl font-normal text-gray-500 w-6 sm:w-8 text-center shrink-0">{ep.number}</div>
+                          <div className="relative w-24 sm:w-36 md:w-40 aspect-video rounded-lg overflow-hidden shrink-0 bg-black shadow-lg">
                             <img 
                               src={ep.image} 
+                              alt={`Episódio ${ep.number} - ${ep.title}`}
                               className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
                               loading="lazy" 
                             />
                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
-                               <Play className="w-8 h-8 fill-white text-white" />
+                               <Play className="w-5 h-5 sm:w-8 sm:h-8 fill-white text-white" />
                             </div>
                             {/* Barrinha Vermelha de Progresso Assistido (Estilo Netflix) */}
                             {epProgress > 0 && (
@@ -671,9 +955,9 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                               </div>
                             )}
                           </div>
-                          <div className="flex-1 min-w-0 w-full text-center md:text-left">
-                            <h4 className="text-white font-bold text-sm md:text-base group-hover:text-[#007df7] transition-colors">{ep.title}</h4>
-                            <p className="text-xs md:text-sm text-gray-400 leading-relaxed line-clamp-2">{ep.description}</p>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-white font-bold text-xs sm:text-sm md:text-base group-hover:text-[#007df7] transition-colors truncate">{ep.title}</h4>
+                            <p className="text-[11px] sm:text-xs md:text-sm text-gray-400 leading-relaxed line-clamp-2 mt-0.5">{ep.description}</p>
                           </div>
                         </div>
                       );
@@ -683,30 +967,44 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
               </div>
             )}
 
-            <div className="px-8 md:px-12 py-8 border-t border-white/5 bg-black/20">
-              <h3 className="text-xl font-black text-white mb-6">Títulos semelhantes</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {initialSimilar.map(renderSimilarCard)}
-              </div>
-              {extraSimilar.length > 0 && (
-                 <div className={`transition-all duration-700 ease-in-out overflow-hidden ${isSimilarExpanded ? 'max-h-[1200px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-                       {extraSimilar.map(renderSimilarCard)}
-                    </div>
-                 </div>
-              )}
-              {similarTitles.length > 6 && (
-                <div className="relative w-full flex items-center justify-center mt-10 mb-4">
-                   <div className="absolute inset-x-0 top-1/2 h-[1px] bg-white/10" />
-                   <button onClick={() => setIsSimilarExpanded(!isSimilarExpanded)} className="relative z-10 w-12 h-12 rounded-full bg-[#0f1115] border border-white/20 hover:border-white hover:bg-[#1a1d24] flex items-center justify-center transition-all duration-300 shadow-lg group">
-                     {isSimilarExpanded ? <ChevronUp className="w-6 h-6 text-gray-400 group-hover:text-white" /> : <ChevronDown className="w-6 h-6 text-gray-400 group-hover:text-white" />}
-                   </button>
+            {similarTitles.length > 0 && (
+              <div className="px-4 sm:px-8 md:px-12 py-5 sm:py-8 border-t border-white/5 bg-black/20">
+                <h3 className="text-lg sm:text-xl font-black text-white mb-4 sm:mb-6">Títulos semelhantes</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                  {initialSimilar.map(renderSimilarCard)}
                 </div>
-              )}
-            </div>
+                {extraSimilar.length > 0 && (
+                   <div className={`transition-all duration-700 ease-in-out overflow-hidden ${isSimilarExpanded ? 'max-h-[1200px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-3 sm:mt-4">
+                         {extraSimilar.map(renderSimilarCard)}
+                      </div>
+                   </div>
+                )}
+                {similarTitles.length > 6 && (
+                  <div className="relative w-full flex items-center justify-center mt-10 mb-4">
+                     <div className="absolute inset-x-0 top-1/2 h-[1px] bg-white/10" />
+                     <button onClick={() => setIsSimilarExpanded(!isSimilarExpanded)} className="relative z-10 w-12 h-12 rounded-full bg-[#0f1115] border border-white/20 hover:border-white hover:bg-[#1a1d24] flex items-center justify-center transition-all duration-300 shadow-lg group">
+                       {isSimilarExpanded ? <ChevronUp className="w-6 h-6 text-gray-400 group-hover:text-white" /> : <ChevronDown className="w-6 h-6 text-gray-400 group-hover:text-white" />}
+                     </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
+
+      {/* Modal Inteligente de Feedback */}
+      <ReportFeedbackModal
+        isOpen={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        defaultCategory="catalog_problem"
+        playbackContext={{
+          item,
+          season: currentSeason,
+          episode: 1
+        }}
+      />
     </div>
   );
 };

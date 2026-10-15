@@ -19,6 +19,7 @@ import { catalogEligibilityService } from './CatalogEligibilityService';
 import { mediaAvailabilityIndex } from './MediaAvailabilityIndex';
 import { filmesData } from '../../../constants';
 import { VERIFIED_OPEN_ITEMS } from './verifiedCatalog';
+import { catalogReleaseStore } from './CatalogReleaseStore';
 
 export interface CatalogCategoryTotals {
   movies: number;
@@ -54,6 +55,9 @@ export class CatalogIndexCountService {
   private constructor() {
     // Inicialização assíncrona do catálogo base
     this.recomputeIndex();
+    catalogReleaseStore.subscribe(() => {
+      this.recomputeIndex();
+    });
   }
 
   public static getInstance(): CatalogIndexCountService {
@@ -67,6 +71,7 @@ export class CatalogIndexCountService {
    * Chave canônica única para deduplicação infalível entre múltiplas fontes
    */
   public getCanonicalKey(item: ContentItem): string {
+    if (item.id) return item.id.toLowerCase();
     if (item.imdbId && item.imdbId.startsWith('tt')) {
       return item.imdbId.toLowerCase();
     }
@@ -123,6 +128,19 @@ export class CatalogIndexCountService {
     // 3. Conteúdos adicionais do banco (Firebase / Dexie / Firestore)
     if (Array.isArray(additionalItems)) {
       for (const item of additionalItems) {
+        if (item && item.id) {
+          const key = this.getCanonicalKey(item);
+          if (!consolidatedMap.has(key)) {
+            consolidatedMap.set(key, item);
+          }
+        }
+      }
+    }
+
+    // 4. Lançamentos dinâmicos aprovados pelo AutoReleaseService
+    const releases = catalogReleaseStore.getReleases();
+    if (Array.isArray(releases)) {
+      for (const item of releases) {
         if (item && item.id) {
           const key = this.getCanonicalKey(item);
           if (!consolidatedMap.has(key)) {

@@ -3,6 +3,7 @@ import React, { memo, useState, useEffect, useRef } from 'react';
 import { Heart, Bookmark, Play, Star } from 'lucide-react';
 import { ContentItem, ContentType } from '../types';
 import { storageService, PlaybackContinuityInfo } from '../src/core/storage/storageService';
+import { posterRecoveryService } from '../src/core/catalog/PosterRecoveryService';
 
 interface ContentCardProps {
   item: ContentItem;
@@ -30,14 +31,47 @@ const ContentCard: React.FC<ContentCardProps> = ({
   // Verifica se é visualmente um Anime (por tipo ou gênero)
   const isAnime = item.type === ContentType.ANIME || item.genres?.includes('Anime');
 
-  const [isVisible, setIsVisible] = useState(false);
-  const [imgSrc, setImgSrc] = useState(item.image || item.backdrop || '');
+  const [isInViewport, setIsInViewport] = useState(false);
+  const [imgSrc, setImgSrc] = useState<string>(() => {
+    return posterRecoveryService.getCachedPoster(item) || item.image || item.backdrop || '';
+  });
   const [hasImageError, setHasImageError] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const [continuity, setContinuity] = useState<PlaybackContinuityInfo>(() => {
     return storageService.getPlaybackContinuity(item);
   });
+
+  // Detecção de Visibilidade no Viewport: carrega automaticamente antes de entrar na tela, sem depender de hover
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsInViewport(true);
+      return;
+    }
+
+    const currentCard = cardRef.current;
+    if (!currentCard) {
+      setIsInViewport(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          setIsInViewport(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: '400px', // Antecipa o carregamento 400px antes de entrar na área visível
+        threshold: 0.01
+      }
+    );
+
+    observer.observe(currentCard);
+    return () => observer.disconnect();
+  }, [item.id]);
 
   useEffect(() => {
     setContinuity(storageService.getPlaybackContinuity(item));
@@ -49,72 +83,66 @@ const ContentCard: React.FC<ContentCardProps> = ({
     };
     window.addEventListener('zapitv_progress_updated', handleProgress);
     return () => window.removeEventListener('zapitv_progress_updated', handleProgress);
-  }, [item]);
+  }, [item.id]);
 
+  // Sincroniza imagem se o item mudar
   useEffect(() => {
-    setImgSrc(item.image || item.backdrop || '');
-    setHasImageError(false);
-  }, [item.image, item.backdrop]);
+    const cached = posterRecoveryService.getCachedPoster(item);
+    const initial = cached || item.image || item.backdrop || '';
+    setImgSrc(initial);
+    setHasImageError(!initial);
 
-  const handleImageError = () => {
-    if (imgSrc === item.image && item.backdrop && item.backdrop !== item.image) {
-      setImgSrc(item.backdrop);
-    } else {
-      setHasImageError(true);
+    // Se o item inicial não possui imagem ou tem URL nula/vazia, tenta recuperação imediata
+    if (!initial) {
+      let isMounted = true;
+      posterRecoveryService.recoverPoster(item).then(recovered => {
+        if (isMounted && recovered) {
+          setImgSrc(recovered);
+          setHasImageError(false);
+        }
+      });
+      return () => { isMounted = false; };
     }
-  };
+  }, [item.id, item.image, item.backdrop]);
 
-  useEffect(() => {
-    if (!cardRef.current || typeof IntersectionObserver === 'undefined') {
-      setIsVisible(true);
+  // Tratamento inteligente de erro de imagem com recuperação automática oficial
+  const handleImageError = () => {
+    if (imgSrc && imgSrc === item.image && item.backdrop && item.backdrop !== item.image) {
+      setImgSrc(item.backdrop);
       return;
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setIsVisible(true);
-            if (cardRef.current) {
-              observer.unobserve(cardRef.current);
-            }
-          }
-        });
-      },
-      {
-        rootMargin: '800px', // Carrega a imagem 800px antes de entrar na tela
-        threshold: 0,
+    // Tenta recuperação canônica via TMDB/AniList sem depender de ação do usuário
+    posterRecoveryService.recoverPoster(item).then(recoveredUrl => {
+      if (recoveredUrl && recoveredUrl !== imgSrc) {
+        setImgSrc(recoveredUrl);
+        setHasImageError(false);
+      } else {
+        setHasImageError(true);
       }
-    );
-
-    observer.observe(cardRef.current);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
+    }).catch(() => {
+      setHasImageError(true);
+    });
+  };
 
   useEffect(() => {
-    if (!isVisible) return;
     let active = true;
     import('../src/core/catalog/CatalogAvailabilityQueue').then(({ catalogAvailabilityQueue }) => {
       if (active) catalogAvailabilityQueue.enqueue(item, 1);
     }).catch(error => console.warn('Falha ao iniciar verificação da fonte:', error));
     return () => { active = false; };
-  }, [isVisible, item]);
+  }, [item.id]);
 
   return (
     <div 
       ref={cardRef}
       onClick={() => onItemClick(item)}
-      className={`flex-none w-full group/card cursor-pointer transition-all duration-300 hover:scale-105 hover:z-30 relative transform-gpu will-change-transform ${className}`}
+      className={`flex-none w-full max-w-full min-w-0 group/card cursor-pointer transition-all duration-300 hover:scale-105 hover:z-30 relative transform-gpu will-change-transform ${className}`}
     >
-      {isVisible ? (
-        <>
-          {/* Brilho Azul no Hover - hardware accelerated */}
+      {/* Brilho Azul no Hover - hardware accelerated */}
           <div className="absolute inset-x-0 inset-y-[35%] rounded-full opacity-0 group-hover/card:opacity-100 transition-all duration-500 blur-2xl pointer-events-none transform-gpu translate-z-0" style={{ backgroundColor: '#007df7', zIndex: -1 }} />
           
-          <div className={`relative aspect-[2/3] rounded-xl md:rounded-2xl overflow-hidden transition-all duration-300 ${
+          <div className={`relative w-full max-w-full aspect-[2/3] rounded-xl md:rounded-2xl overflow-hidden transition-all duration-300 ${
             isDarkMode
               ? 'bg-gray-900 border border-white/10 group-hover/card:border-white/20 shadow-lg'
               : 'bg-transparent border-0 border-none shadow-md shadow-black/5 group-hover/card:border-none'
@@ -149,8 +177,8 @@ const ContentCard: React.FC<ContentCardProps> = ({
                 src={imgSrc} 
                 alt={item.title} 
                 onError={handleImageError}
-                className="w-full h-full object-cover transition-transform duration-700 pointer-events-none" 
-                loading="lazy"
+                className="w-full h-full max-w-full object-cover transition-transform duration-700 pointer-events-none block" 
+                loading={isInViewport ? "eager" : "lazy"}
                 decoding="async"
                 referrerPolicy="no-referrer"
               />
@@ -166,16 +194,6 @@ const ContentCard: React.FC<ContentCardProps> = ({
                       (IMDb #{item.imdbRank})
                     </span>
                   )}
-                </span>
-              )}
-              {item.audioStatus === 'pt-br-original' && (
-                <span className="px-1.5 md:px-2 py-0.5 rounded text-[8px] md:text-[9px] font-bold bg-blue-600/90 text-white shadow-lg backdrop-blur-sm flex items-center gap-1">
-                  🇧🇷 Áudio PT-BR
-                </span>
-              )}
-              {item.audioStatus === 'pt-br-dubbed' && (
-                <span className="px-1.5 md:px-2 py-0.5 rounded text-[8px] md:text-[9px] font-bold bg-emerald-700/90 text-white shadow-lg backdrop-blur-sm flex items-center gap-1">
-                  🇧🇷 Dublado
                 </span>
               )}
             </div>
@@ -255,12 +273,6 @@ const ContentCard: React.FC<ContentCardProps> = ({
               </div>
             )}
           </div>
-        </>
-      ) : (
-        <div className={`relative aspect-[2/3] rounded-xl md:rounded-2xl overflow-hidden ${
-          isDarkMode ? 'bg-gray-900/20 border border-white/5' : 'bg-gray-200/50 border-0'
-        }`} />
-      )}
     </div>
   );
 };

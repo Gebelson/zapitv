@@ -59,10 +59,10 @@ async function runParkLogicVerificationSuite() {
   // ----------------------------------------------------------------------
   console.log('👉 [TESTE 2/6] Testando Reprodução de Episódio de Série...');
   try {
-    const series = VERIFIED_OPEN_ITEMS.find(i => i.id === 'open-caminandes-s1');
+    const series = VERIFIED_OPEN_ITEMS.find(i => i.id === 'tmdb-95897');
     if (!series) throw new Error('Série não encontrada no acervo.');
 
-    const streams = await providerRegistry.resolveStreams('series', { id: series.id }, { season: 1, episode: 1 });
+    const streams = await providerRegistry.resolveStreams('anime', { id: series.id }, { season: 1, episode: 1 });
     if (!streams.length) throw new Error('Nenhuma fonte encontrada para o episódio 1.');
 
     const epStream = streams[0];

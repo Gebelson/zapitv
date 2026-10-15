@@ -72,17 +72,27 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
     return Math.max(0, Math.ceil(interval.endTime - currentTime));
   }, [currentTime, interval.endTime]);
 
-  // Detecta saltos manuais (seek) para evitar transições arrastadas
+  // Detecta saltos manuais (seek) para evitar transições arrastadas e permitir reuso imediato ao retroceder
   useEffect(() => {
     const delta = Math.abs(currentTime - prevTimeRef.current);
-    if (delta > 1.5) {
+    if (delta > 1.2) {
       setIsSeeking(true);
+      setIsSkipping(false);
+      setIsFlashing(false);
+      isSkippingRef.current = false;
       const timer = setTimeout(() => setIsSeeking(false), 80);
       prevTimeRef.current = currentTime;
       return () => clearTimeout(timer);
     }
     prevTimeRef.current = currentTime;
   }, [currentTime]);
+
+  // Reseta estado ao trocar de intervalo ou episódio
+  useEffect(() => {
+    setIsSkipping(false);
+    setIsFlashing(false);
+    isSkippingRef.current = false;
+  }, [interval.startTime, interval.endTime, interval.type]);
 
   // Mede as dimensões reais do botão para renderização vetorial pixel-perfect
   useLayoutEffect(() => {
@@ -129,9 +139,12 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
       setIsFlashing(true);
     }, 300);
 
-    // 3. Após o flash de glow (~520ms), dispara a ação de pular
+    // 3. Após o flash de glow (~520ms), dispara a ação de pular e reseta o lock
     setTimeout(() => {
       onSkip(interval);
+      setIsSkipping(false);
+      setIsFlashing(false);
+      isSkippingRef.current = false;
     }, 520);
   };
 

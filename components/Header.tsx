@@ -2,9 +2,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createPortal, flushSync } from 'react-dom';
-import { Search, Bell, Sun, Moon, User as UserIcon, X, Info, AlertTriangle, Star, Settings, LogOut, Menu, Edit3, HelpCircle, ChevronRight, RefreshCw, Lock, Activity } from 'lucide-react';
-import { AppView, User, SiteNotification, Profile, ContentItem, ContentType } from '../types';
+import { Search, Bell, Sun, Moon, User as UserIcon, X, Info, AlertTriangle, Star, Settings, LogOut, Menu, Edit3, HelpCircle, ChevronRight, RefreshCw, Lock, Activity, Clock, MessageSquarePlus } from 'lucide-react';
+import { AppView, User, SiteNotification, Profile, ContentItem, ContentType, ActorPerson } from '../types';
 import { searchService } from '../src/core/search/searchService';
+import { searchHistoryService } from '../src/core/search/searchHistoryService';
+import { ReportFeedbackModal } from '../src/components/feedback/ReportFeedbackModal';
 
 interface HeaderProps {
   isDarkMode: boolean;
@@ -62,12 +64,28 @@ const Header: React.FC<HeaderProps> = ({
   const searchPlaceholder = searchService.getPlaceholder(searchCategory);
 
   const [suggestions, setSuggestions] = useState<ContentItem[]>([]);
+  const [suggestedActors, setSuggestedActors] = useState<ActorPerson[]>([]);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => searchHistoryService.getHistory());
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+
+  // Assina atualizações do histórico de buscas em tempo real
+  useEffect(() => {
+    return searchHistoryService.subscribe((updated) => {
+      setSearchHistory(updated);
+      if (updated.length === 0) {
+        setShowHistoryDropdown(false);
+      }
+    });
+  }, []);
 
   // Ao mudar de rota ou view: cancela requisições pendentes e fecha dropdown
   useEffect(() => {
     setShowSearchDropdown(false);
+    setShowHistoryDropdown(false);
     setSuggestions([]);
+    setSuggestedActors([]);
     searchService.cancelPending();
   }, [location.pathname, currentView]);
 
@@ -81,6 +99,7 @@ const Header: React.FC<HeaderProps> = ({
       }
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
         setShowSearchDropdown(false);
+        setShowHistoryDropdown(false);
       }
     };
 
@@ -90,11 +109,12 @@ const Header: React.FC<HeaderProps> = ({
     };
   }, []);
 
-  // Busca sugestões com debounce enquanto o usuário digita
+  // Busca sugestões com debounce enquanto o usuário digita (produções e atores/atrizes)
   useEffect(() => {
     const trimmed = searchQuery.trim();
     if (trimmed.length < 2) {
       setSuggestions([]);
+      setSuggestedActors([]);
       setShowSearchDropdown(false);
       return;
     }
@@ -102,13 +122,17 @@ const Header: React.FC<HeaderProps> = ({
     let active = true;
     const timer = setTimeout(async () => {
       try {
-        const results = await searchService.getSuggestions(trimmed, searchCategory, 5, allContent);
+        const { items, actors } = await searchService.getSearchSuggestionsWithActors(trimmed, searchCategory, 5, allContent);
         if (active) {
-          setSuggestions(results);
-          setShowSearchDropdown(true);
+          setSuggestions(items);
+          setSuggestedActors(actors);
+          setShowSearchDropdown(items.length > 0 || actors.length > 0);
         }
       } catch {
-        if (active) setSuggestions([]);
+        if (active) {
+          setSuggestions([]);
+          setSuggestedActors([]);
+        }
       }
     }, 200);
 
@@ -286,51 +310,86 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className={`sticky top-0 z-[160] h-20 px-4 md:px-12 flex items-center justify-between transition-colors duration-300 ${
+    <header className={`sticky top-0 z-[160] h-16 sm:h-20 px-3 sm:px-6 md:px-12 flex items-center justify-between transition-colors duration-300 ${
       isDarkMode 
         ? 'bg-[#05070A]/75 border-b border-white/5 shadow-[0_4px_30px_rgba(0,0,0,0.3)]' 
         : 'bg-[#F8F9FC]/75 border-b border-black/5 shadow-[0_4px_30px_rgba(0,0,0,0.05)]'
     } backdrop-blur-2xl`}>
       
-      <div className="flex items-center gap-3 md:gap-4 flex-1 max-w-xl relative z-10">
+      <div className="flex items-center gap-2 sm:gap-3 md:gap-4 flex-1 min-w-0 max-w-xl relative z-10">
         <button 
           onClick={onToggleMobileMenu}
-          className={`lg:hidden p-2 rounded-xl transition-colors ${
+          className={`lg:hidden p-1.5 sm:p-2 rounded-xl transition-colors shrink-0 ${
             isDarkMode ? 'hover:bg-white/10 text-white' : 'hover:bg-black/5 text-gray-900'
           }`}
+          aria-label="Abrir menu de navegação"
         >
-          <Menu className="w-6 h-6" />
+          <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
 
-        <div ref={searchContainerRef} className="relative flex-1">
-          <Search className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} pointer-events-none`} />
+        <div ref={searchContainerRef} className="relative flex-1 min-w-0">
+          <Search className={`absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} pointer-events-none`} />
           <input
             type="text"
             value={searchQuery}
             onFocus={() => {
-              if (searchQuery.trim().length >= 2 && suggestions.length > 0) {
+              if (searchQuery.trim().length >= 2 && (suggestions.length > 0 || suggestedActors.length > 0)) {
                 setShowSearchDropdown(true);
+                setShowHistoryDropdown(false);
+              } else if (!searchQuery.trim()) {
+                const hist = searchHistoryService.getHistory();
+                setSearchHistory(hist);
+                if (hist.length > 0) {
+                  setShowHistoryDropdown(true);
+                  setShowSearchDropdown(false);
+                }
+              }
+            }}
+            onClick={() => {
+              if (!searchQuery.trim()) {
+                const hist = searchHistoryService.getHistory();
+                setSearchHistory(hist);
+                if (hist.length > 0) {
+                  setShowHistoryDropdown(true);
+                  setShowSearchDropdown(false);
+                }
               }
             }}
             onChange={(e) => {
               const val = e.target.value;
               setSearchQuery(val);
-              if (!val.trim() && onClearSearch) {
-                onClearSearch();
+              if (!val.trim()) {
+                setShowSearchDropdown(false);
+                const hist = searchHistoryService.getHistory();
+                setSearchHistory(hist);
+                if (hist.length > 0) {
+                  setShowHistoryDropdown(true);
+                }
+                if (onClearSearch) {
+                  onClearSearch();
+                }
+              } else {
+                setShowHistoryDropdown(false);
               }
             }}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 setShowSearchDropdown(false);
+                setShowHistoryDropdown(false);
               } else if (e.key === 'Enter') {
                 setShowSearchDropdown(false);
-                if (onSearchSubmit && searchQuery.trim()) {
-                  onSearchSubmit(searchQuery.trim());
+                setShowHistoryDropdown(false);
+                const trimmed = searchQuery.trim();
+                if (trimmed) {
+                  searchHistoryService.addSearch(trimmed);
+                  if (onSearchSubmit) {
+                    onSearchSubmit(trimmed);
+                  }
                 }
               }
             }}
             placeholder={searchPlaceholder}
-            className={`w-full pl-11 pr-10 py-2.5 rounded-xl border outline-none text-sm transition-all ${
+            className={`w-full pl-9 sm:pl-11 pr-8 sm:pr-10 py-2 sm:py-2.5 rounded-xl border outline-none text-xs sm:text-sm transition-all ${
               isDarkMode 
                 ? 'bg-black/40 focus:bg-black/60 text-white placeholder:text-gray-500 border-white/15 hover:border-white/25 focus:border-[#007df7]/60' 
                 : 'bg-black/5 focus:bg-black/10 text-gray-900 placeholder:text-gray-400 border-black/10 hover:border-black/20 focus:border-[#007df7]/60'
@@ -342,12 +401,18 @@ const Header: React.FC<HeaderProps> = ({
               onClick={() => {
                 setSearchQuery('');
                 setSuggestions([]);
+                setSuggestedActors([]);
                 setShowSearchDropdown(false);
+                const hist = searchHistoryService.getHistory();
+                setSearchHistory(hist);
+                if (hist.length > 0) {
+                  setShowHistoryDropdown(true);
+                }
                 if (onClearSearch) {
                   onClearSearch();
                 }
               }}
-              className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors cursor-pointer ${
+              className={`absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors cursor-pointer ${
                 isDarkMode ? 'text-gray-400 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-900 hover:bg-black/5'
               }`}
               title="Limpar busca"
@@ -356,68 +421,133 @@ const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Dropdown Contextual de Sugestões Rápidas */}
-          {showSearchDropdown && suggestions.length > 0 && (
+          {/* Dropdown Contextual de Sugestões Rápidas (Filmes, Séries e Atores) */}
+          {showSearchDropdown && (suggestions.length > 0 || suggestedActors.length > 0) && (
             <div className={`absolute top-full left-0 right-0 mt-2 rounded-2xl shadow-2xl border overflow-hidden z-50 backdrop-blur-xl ${
               isDarkMode 
                 ? 'bg-[#0f131a]/95 border-white/10 text-white shadow-black/80' 
                 : 'bg-white/95 border-black/10 text-gray-900 shadow-xl'
             }`}>
-              <div className="p-2 space-y-1 max-h-[360px] overflow-y-auto no-scrollbar">
-                {suggestions.map((item) => (
-                  <button
-                    key={`sug-${item.id}`}
-                    type="button"
-                    onClick={() => {
-                      setShowSearchDropdown(false);
-                      if (onSelectContent) {
-                        onSelectContent(item);
-                      }
-                    }}
-                    className={`w-full flex items-center gap-3 p-2 rounded-xl transition-all text-left ${
-                      isDarkMode 
-                        ? 'hover:bg-white/10 text-gray-200 hover:text-white' 
-                        : 'hover:bg-black/5 text-gray-800 hover:text-black'
-                    }`}
-                  >
-                    <img 
-                      src={item.image} 
-                      alt={item.title} 
-                      className="w-10 h-14 object-cover rounded-lg shrink-0 shadow-sm"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=200';
-                      }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm truncate">{item.title}</p>
-                      <div className="flex items-center gap-2 text-xs opacity-70 mt-0.5">
-                        <span>{item.year || ''}</span>
-                        <span>•</span>
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                          item.type === ContentType.MOVIE ? 'bg-blue-500/20 text-blue-400' :
-                          item.type === ContentType.ANIME ? 'bg-purple-500/20 text-purple-400' :
-                          'bg-emerald-500/20 text-emerald-400'
-                        }`}>
-                          {item.type === ContentType.MOVIE ? 'Filme' :
-                           item.type === ContentType.ANIME ? 'Anime' : 'Série'}
-                        </span>
-                        {item.rating && (
-                          <>
-                            <span>•</span>
-                            <span className="text-yellow-400 font-bold">★ {item.rating.toFixed(1)}</span>
-                          </>
-                        )}
-                      </div>
+              <div className="p-2 space-y-1 max-h-[70vh] sm:max-h-[380px] overflow-y-auto no-scrollbar">
+                
+                {/* 1. SEÇÃO DE ATORES / ATRIZES (Foto circular oficial + nome alinhado ao lado) */}
+                {suggestedActors.length > 0 && (
+                  <div className="mb-2 pb-1.5 border-b border-white/10">
+                    <div className="px-2 py-1 text-[10px] font-black uppercase tracking-wider text-[#007df7] flex items-center justify-between">
+                      <span>Artistas</span>
+                      <span className="text-[9px] text-gray-400 font-normal">Atores & Atrizes</span>
                     </div>
-                  </button>
-                ))}
+                    {suggestedActors.map((actor) => (
+                      <button
+                        key={`actor-sug-${actor.id}`}
+                        type="button"
+                        onClick={() => {
+                          setShowSearchDropdown(false);
+                          navigate(`/atores/${actor.id}`);
+                        }}
+                        className={`w-full flex items-center gap-3 p-2 rounded-xl transition-all text-left cursor-pointer ${
+                          isDarkMode 
+                            ? 'hover:bg-white/10 text-gray-200 hover:text-white' 
+                            : 'hover:bg-black/5 text-gray-800 hover:text-black'
+                        }`}
+                      >
+                        {/* Foto circular oficial do ator */}
+                        <img 
+                          src={actor.image} 
+                          alt={actor.name} 
+                          className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/20 shadow-sm ring-1 ring-white/10"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+                          }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm truncate">{actor.name}</p>
+                          <div className="flex items-center gap-2 text-xs opacity-70 mt-0.5">
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#007df7]/20 text-[#007df7] uppercase tracking-wider">
+                              {actor.knownForDepartment || 'Ator'}
+                            </span>
+                            {actor.knownForTitles && actor.knownForTitles.length > 0 && (
+                              <span className="truncate text-gray-400 text-[11px]">
+                                {actor.knownForTitles.slice(0, 2).join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-500 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* 2. SEÇÃO DE FILMES E SÉRIES */}
+                {suggestions.length > 0 && (
+                  <div>
+                    {suggestedActors.length > 0 && (
+                      <div className="px-2 py-1 text-[10px] font-black uppercase tracking-wider text-gray-400">
+                        Produções
+                      </div>
+                    )}
+                    {suggestions.map((item) => (
+                      <button
+                        key={`sug-${item.id}`}
+                        type="button"
+                        onClick={() => {
+                          setShowSearchDropdown(false);
+                          if (onSelectContent) {
+                            onSelectContent(item);
+                          }
+                        }}
+                        className={`w-full flex items-center gap-3 p-2 rounded-xl transition-all text-left cursor-pointer ${
+                          isDarkMode 
+                            ? 'hover:bg-white/10 text-gray-200 hover:text-white' 
+                            : 'hover:bg-black/5 text-gray-800 hover:text-black'
+                        }`}
+                      >
+                        <img 
+                          src={item.image} 
+                          alt={item.title} 
+                          className="w-10 h-14 object-cover rounded-lg shrink-0 shadow-sm"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=200';
+                          }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm truncate">{item.title}</p>
+                          <div className="flex items-center gap-2 text-xs opacity-70 mt-0.5">
+                            <span>{item.year || ''}</span>
+                            <span>•</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                              item.type === ContentType.MOVIE ? 'bg-blue-500/20 text-blue-400' :
+                              item.type === ContentType.ANIME ? 'bg-purple-500/20 text-purple-400' :
+                              'bg-emerald-500/20 text-emerald-400'
+                            }`}>
+                              {item.type === ContentType.MOVIE ? 'Filme' :
+                               item.type === ContentType.ANIME ? 'Anime' : 'Série'}
+                            </span>
+                            {item.rating && (
+                              <>
+                                <span>•</span>
+                                <span className="text-yellow-400 font-bold">★ {item.rating.toFixed(1)}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <button
                 type="button"
                 onClick={() => {
                   setShowSearchDropdown(false);
-                  if (onSearchSubmit && searchQuery.trim()) {
-                    onSearchSubmit(searchQuery.trim());
+                  setShowHistoryDropdown(false);
+                  const trimmed = searchQuery.trim();
+                  if (trimmed) {
+                    searchHistoryService.addSearch(trimmed);
+                    if (onSearchSubmit) {
+                      onSearchSubmit(trimmed);
+                    }
                   }
                 }}
                 className={`w-full p-2.5 border-t text-center text-xs font-semibold cursor-pointer transition-colors ${
@@ -426,20 +556,91 @@ const Header: React.FC<HeaderProps> = ({
                     : 'border-black/5 bg-black/5 hover:bg-black/10 text-gray-700 hover:text-black'
                 }`}
               >
-                Pressione Enter para ver todos os resultados
+                Ver todos os resultados para "{searchQuery}"
               </button>
+            </div>
+          )}
+
+          {/* Dropdown das Últimas 10 Pesquisas (Barra Vazia) */}
+          {showHistoryDropdown && !searchQuery.trim() && searchHistory.length > 0 && (
+            <div className={`absolute top-full left-0 right-0 mt-2 rounded-2xl shadow-2xl border overflow-hidden z-50 backdrop-blur-xl ${
+              isDarkMode 
+                ? 'bg-[#0f131a]/95 border-white/10 text-white shadow-black/80' 
+                : 'bg-white/95 border-black/10 text-gray-900 shadow-xl'
+            }`}>
+              <div className={`flex items-center justify-between px-3.5 py-2.5 border-b ${
+                isDarkMode ? 'border-white/10' : 'border-black/10'
+              }`}>
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-gray-400">
+                  <Clock className="w-3.5 h-3.5 text-[#007df7]" />
+                  <span>Pesquisas Recentes</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    searchHistoryService.clearHistory();
+                    setShowHistoryDropdown(false);
+                  }}
+                  className={`text-[11px] font-semibold transition-colors cursor-pointer px-2 py-0.5 rounded-md ${
+                    isDarkMode ? 'text-gray-400 hover:text-red-400 hover:bg-white/5' : 'text-gray-500 hover:text-red-600 hover:bg-black/5'
+                  }`}
+                >
+                  Limpar histórico
+                </button>
+              </div>
+
+              <div className="p-1.5 space-y-0.5 max-h-[70vh] sm:max-h-[360px] overflow-y-auto no-scrollbar">
+                {searchHistory.map((item, idx) => (
+                  <div
+                    key={`hist-${idx}-${item}`}
+                    onClick={() => {
+                      setSearchQuery(item);
+                      searchHistoryService.addSearch(item);
+                      setShowHistoryDropdown(false);
+                      if (onSearchSubmit) {
+                        onSearchSubmit(item);
+                      }
+                    }}
+                    className={`group flex items-center justify-between px-3 py-2 rounded-xl transition-all cursor-pointer ${
+                      isDarkMode 
+                        ? 'hover:bg-white/10 text-gray-200 hover:text-white' 
+                        : 'hover:bg-black/5 text-gray-800 hover:text-black'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
+                      <Clock className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#007df7] shrink-0 transition-colors" />
+                      <span className="text-sm font-medium truncate">{item}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        searchHistoryService.removeSearch(item);
+                      }}
+                      className={`p-1 rounded-lg opacity-60 group-hover:opacity-100 transition-all cursor-pointer ${
+                        isDarkMode ? 'hover:bg-white/15 text-gray-400 hover:text-red-400' : 'hover:bg-black/10 text-gray-500 hover:text-red-600'
+                      }`}
+                      title="Remover do histórico"
+                      aria-label={`Remover ${item} do histórico`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-2 md:gap-6 relative z-10 ml-4">
+      <div className="flex items-center gap-1 sm:gap-2 md:gap-5 relative z-10 ml-1.5 sm:ml-4 shrink-0">
         <button 
           onClick={handleToggleTheme}
           aria-label={isDarkMode ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
-          className={`p-2.5 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-white/10 text-gray-400 hover:text-white' : 'hover:bg-black/5 text-gray-500 hover:text-gray-900'}`}
+          className={`p-1.5 sm:p-2.5 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-white/10 text-gray-400 hover:text-white' : 'hover:bg-black/5 text-gray-500 hover:text-gray-900'}`}
         >
-          {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          {isDarkMode ? <Sun className="w-4 h-4 sm:w-5 sm:h-5" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5" />}
         </button>
 
         {onOpenDiagnostics && (
@@ -447,46 +648,60 @@ const Header: React.FC<HeaderProps> = ({
             onClick={onOpenDiagnostics}
             title="Diagnóstico do Catálogo"
             aria-label="Diagnóstico do Catálogo"
-            className={`p-2.5 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-white/10 text-orange-400 hover:text-orange-300' : 'hover:bg-black/5 text-orange-500 hover:text-orange-600'}`}
+            className={`p-1.5 sm:p-2.5 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-white/10 text-orange-400 hover:text-orange-300' : 'hover:bg-black/5 text-orange-500 hover:text-orange-600'}`}
           >
-            <Activity className="w-5 h-5" />
+            <Activity className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         )}
+
+        <button
+          onClick={() => setShowFeedbackModal(true)}
+          title="Relatar problema ou enviar sugestão"
+          aria-label="Relatar problema ou enviar sugestão"
+          className={`p-1.5 sm:p-2.5 rounded-xl transition-colors cursor-pointer ${
+            isDarkMode 
+              ? 'hover:bg-white/10 text-gray-400 hover:text-amber-400' 
+              : 'hover:bg-black/5 text-gray-500 hover:text-amber-600'
+          }`}
+        >
+          <MessageSquarePlus className="w-4 h-4 sm:w-5 sm:h-5" />
+        </button>
         
         <div className="relative" ref={notifyRef}>
           <button 
             onClick={() => { setShowNotifyPanel(!showNotifyPanel); setShowDropdown(false); }} 
-            className={`relative p-2.5 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-white/10 text-gray-400 hover:text-white' : 'hover:bg-black/5 text-gray-500 hover:text-gray-900'}`}
+            className={`relative p-1.5 sm:p-2.5 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-white/10 text-gray-400 hover:text-white' : 'hover:bg-black/5 text-gray-500 hover:text-gray-900'}`}
+            aria-label="Notificações"
           >
-            <Bell className="w-5 h-5" />
+            <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
             {notifications.length > 0 && (
-              <span className="absolute top-2.5 right-2.5 w-4 h-4 bg-[#007df7] rounded-full border-2 border-[#05070A] text-[8px] flex items-center justify-center font-bold text-white animate-pulse">
+              <span className="absolute top-1.5 right-1.5 sm:top-2.5 sm:right-2.5 w-4 h-4 bg-[#007df7] rounded-full border-2 border-[#05070A] text-[8px] flex items-center justify-center font-bold text-white animate-pulse">
                 {notifications.length}
               </span>
             )}
           </button>
 
           {showNotifyPanel && (
-            <div className={`absolute right-0 mt-3 w-72 md:w-80 rounded-3xl shadow-2xl border overflow-hidden animate-in slide-in-from-top-2 duration-200 z-[100] ${
+            <div className={`absolute right-0 mt-3 w-[calc(100vw-1.5rem)] max-w-xs sm:w-80 rounded-3xl shadow-2xl border overflow-hidden animate-in slide-in-from-top-2 duration-200 z-[100] ${
               isDarkMode ? 'bg-[#151C26] border-gray-800 text-white' : 'bg-white border-gray-100 text-gray-900'
             }`}>
-              <div className="p-6 border-b border-gray-800/50 flex justify-between items-center">
-                <h4 className="font-black text-sm">Central de Alertas</h4>
+              <div className="p-4 sm:p-6 border-b border-gray-800/50 flex justify-between items-center">
+                <h4 className="font-black text-xs sm:text-sm">Central de Alertas</h4>
                 <button onClick={() => setShowNotifyPanel(false)}><X className="w-4 h-4 opacity-40 hover:opacity-100" /></button>
               </div>
-              <div className="max-h-96 overflow-y-auto no-scrollbar">
+              <div className="max-h-80 sm:max-h-96 overflow-y-auto no-scrollbar">
                 {notifications.length > 0 ? (
                   notifications.map((n) => (
-                    <div key={n.id} className={`p-5 border-b border-gray-800/20 flex gap-4 hover:bg-white/5 transition-colors cursor-default animate-in fade-in`}>
-                      <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center ${
+                    <div key={n.id} className={`p-4 sm:p-5 border-b border-gray-800/20 flex gap-3 sm:gap-4 hover:bg-white/5 transition-colors cursor-default animate-in fade-in`}>
+                      <div className={`w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-xl flex items-center justify-center ${
                         n.type === 'info' ? 'bg-blue-500/10 text-blue-500' : 
                         n.type === 'alert' ? 'bg-[#007df7]/10 text-[#007df7]' : 'bg-[#007df7]/10 text-[#007df7]'
                       }`}>
-                        {n.type === 'info' && <Info className="w-5 h-5" />}
-                        {n.type === 'alert' && <AlertTriangle className="w-5 h-5" />}
-                        {n.type === 'promo' && <Star className="w-5 h-5" />}
+                        {n.type === 'info' && <Info className="w-4 h-4 sm:w-5 sm:h-5" />}
+                        {n.type === 'alert' && <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />}
+                        {n.type === 'promo' && <Star className="w-4 h-4 sm:w-5 sm:h-5" />}
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p className="font-black text-xs mb-1 leading-tight">{n.title}</p>
                         <p className="text-xs opacity-60 leading-relaxed mb-2 line-clamp-3">{n.message}</p>
                         <p className="text-[9px] uppercase font-black opacity-30 tracking-widest">{n.timestamp}</p>
@@ -494,8 +709,8 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                   ))
                 ) : (
-                  <div className="p-12 text-center opacity-30 flex flex-col items-center">
-                    <Bell className="w-10 h-10 mb-3" />
+                  <div className="p-8 sm:p-12 text-center opacity-30 flex flex-col items-center">
+                    <Bell className="w-8 h-8 sm:w-10 sm:h-10 mb-3" />
                     <p className="text-sm font-bold">Nada novo por aqui</p>
                   </div>
                 )}
@@ -507,11 +722,11 @@ const Header: React.FC<HeaderProps> = ({
         <div className="relative" ref={profileRef}>
           <button 
             onClick={() => setShowDropdown(!showDropdown)} 
-            className={`flex items-center gap-1.5 p-0.5 md:p-1 rounded-lg transition-all group ${
+            className={`flex items-center gap-1 sm:gap-1.5 p-0.5 md:p-1 rounded-lg transition-all group ${
               showDropdown ? 'opacity-100' : 'opacity-90'
             }`}
           >
-            <div className="w-8 h-8 md:w-9 md:h-9 rounded overflow-hidden shadow-lg group-hover:scale-105 transition-transform">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded overflow-hidden shadow-lg group-hover:scale-105 transition-transform">
               <img src={activeProfile?.avatar || 'https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png'} className="w-full h-full object-cover" loading="lazy" />
             </div>
             <div className={`w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] transition-transform duration-300 ${isDarkMode ? 'border-t-white' : 'border-t-gray-800'} ${showDropdown ? 'rotate-180' : ''}`} />
@@ -519,7 +734,7 @@ const Header: React.FC<HeaderProps> = ({
 
           {showDropdown && (
             <div 
-              className={`absolute right-0 mt-2 w-56 md:w-64 rounded-sm shadow-[0_0_20px_rgba(0,0,0,0.5)] border-t-2 border-t-white animate-in fade-in slide-in-from-top-1 duration-200 z-[200] ${
+              className={`absolute right-0 mt-2 w-56 max-w-[calc(100vw-1.5rem)] sm:w-64 rounded-sm shadow-[0_0_20px_rgba(0,0,0,0.5)] border-t-2 border-t-white animate-in fade-in slide-in-from-top-1 duration-200 z-[200] ${
               isDarkMode ? 'bg-black text-white' : 'bg-white text-gray-900 border-x border-b border-black/5'
             }`}>
               {/* Seta superior */}
@@ -587,6 +802,13 @@ const Header: React.FC<HeaderProps> = ({
       
       {/* Renderiza o modal se houver tentativa de troca protegida */}
       {renderPinModal()}
+
+      {/* Modal Geral de Feedback */}
+      <ReportFeedbackModal
+        isOpen={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        defaultCategory="broken_interface"
+      />
     </header>
   );
 };

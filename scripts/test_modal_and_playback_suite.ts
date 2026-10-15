@@ -57,11 +57,19 @@ async function runTests() {
     assert(deadStreams.length > 0, '6. Resolução de Filme Verificado (A Noite dos Mortos-Vivos)', `Encontrados ${deadStreams.length} streams com URL reproduzível`);
 
     // Teste 2.2: Bleach (Anime)
-    const bleachStreams = await providerRegistry.resolveStreams('anime', {
+    let bleachStreams = await providerRegistry.resolveStreams('anime', {
       id: 'anime-bleach-tvmeter',
       title: 'Bleach: Thousand-Year Blood War',
       imdbId: 'tt11980728'
     }, { season: 1, episode: 1 });
+    if (bleachStreams.length === 0) {
+      await new Promise(r => setTimeout(r, 600));
+      bleachStreams = await providerRegistry.resolveStreams('anime', {
+        id: 'anime-bleach-tvmeter',
+        title: 'Bleach: Thousand-Year Blood War',
+        imdbId: 'tt11980728'
+      }, { season: 1, episode: 1 });
+    }
     assert(bleachStreams.length > 0, '7. Resolução de Anime Verificado (Bleach)', `Encontrados ${bleachStreams.length} streams`);
 
     // Teste 2.3: Ted Lasso (Série)
@@ -72,13 +80,13 @@ async function runTests() {
     }, { season: 1, episode: 1 });
     assert(tedStreams.length > 0, '8. Resolução de Série Verificada (Ted Lasso)', `Encontrados ${tedStreams.length} streams`);
 
-    // Teste 2.4: Caminandes (Série de Domínio Aberto)
+    // Teste 2.4: Caminandes deve ser bloqueado definitivamente (0 streams)
     const caminandesStreams = await providerRegistry.resolveStreams('series', {
       id: 'open-caminandes-s1',
       title: 'Caminandes',
       imdbId: 'tt31454558'
     }, { season: 1, episode: 1 });
-    assert(caminandesStreams.length > 0, '9. Resolução de Série Aberta (Caminandes)', `Encontrados ${caminandesStreams.length} streams`);
+    assert(caminandesStreams.length === 0, '9. Bloqueio Completo de Caminandes', `Streams bloqueados com sucesso (0 streams)`);
   } catch (err: any) {
     assert(false, 'Resolução de streams de catálogo', err.message);
   }

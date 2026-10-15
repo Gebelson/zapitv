@@ -6,6 +6,10 @@
     {
       "path": "/api/featured/cron",
       "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/catalog/sync-releases",
+      "schedule": "0 6 * * *"
     }
   ],
   "rewrites": [

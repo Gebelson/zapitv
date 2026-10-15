@@ -67,8 +67,27 @@ function runCursorAutoHideValidation() {
   );
 
   assert(
-    playerCode.includes('!isCursorVisible ? \'cursor-none hide-cursor [&_*]:!cursor-none\' : \'cursor-default\''),
-    'Container aplica classes cursor-none, hide-cursor e descendente Tailwind [&_*]:!cursor-none'
+    playerCode.includes("!isCursorVisible && !hasOpenMenu ? 'cursor-none hide-cursor [&_*]:!cursor-none' : 'cursor-default'"),
+    'Container aplica classes cursor-none, hide-cursor e descendente Tailwind apenas quando nenhum menu está aberto'
+  );
+
+  assert(
+    playerCode.includes('hasOpenMenu = Boolean(') &&
+    playerCode.includes('shouldKeepControlsVisible = Boolean('),
+    'Condição centralizada hasOpenMenu e shouldKeepControlsVisible implementadas'
+  );
+
+  assert(
+    playerCode.includes('if (shouldKeepControlsVisibleRef.current) {\n      return;\n    }'),
+    'Auto-hide estritamente suspenso ao haver menus abertos ou controles ativos'
+  );
+
+  assert(
+    playerCode.includes('audioMenuRef') &&
+    playerCode.includes('qualityMenuRef') &&
+    playerCode.includes('subtitlesMenuRef') &&
+    playerCode.includes('handleClickOutsideMenus'),
+    'Detecção de clique externo configurada para fechar menus intencionalmente'
   );
 
   // --- 3. Simulação de ciclo de vida do timer ---

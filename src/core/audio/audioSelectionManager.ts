@@ -1,4 +1,5 @@
 import { StremioStream } from '../stremio/stremioTypes';
+import { audioPreferenceService } from './audioPreferenceService';
 
 export type AudioKind = 'hls-rendition' | 'embedded-track' | 'separate-source';
 
@@ -173,20 +174,21 @@ export class AudioSelectionManager {
     const desc = (stream.description || '').trim();
     const combined = `${name} ${title} ${desc}`.toLowerCase();
 
-    // 1. Provedores 100% verificados como acervo dublado brasileiro
-    const isBrazilianVerified = 
-      stream.providerId === 'zapitv-verified' ||
-      /zapitv verificado|cinema aberto|mico[-_]?le[aã]o|acervo zapitv/i.test(stream.providerName || '') ||
-      /redecanais|comando|bludv|lapumia|wolverdon/i.test(combined);
-
-    if (stream.isDubbed === true || isBrazilianVerified) {
+    const analysis = audioPreferenceService.analyzeAudio(stream);
+    if (analysis.isPtBr || analysis.language === 'pt-BR') {
       return 'pt-BR';
+    }
+    if (analysis.language === 'ja' || analysis.language === 'en' ||
+        analysis.language === 'es' || analysis.language === 'pt-PT') {
+      return analysis.language;
     }
 
     // 2. Tags explícitas de dublagem PT-BR
+    const isSubtitledOnly = /\b(legendado|legendada|softsub|hardsub|sub\b|leg\b)\b/i.test(combined);
     if (
+      (!isSubtitledOnly && /🇧🇷/i.test(combined)) ||
       /\b(dublado|dublada|dublados|audio\s*pt[-_]?br|áudio\s*pt[-_]?br|pt[-_]?br\s*dub|fhd[-_]?dub|hd[-_]?dub)\b/i.test(combined) ||
-      /🇧🇷\s*dublado|\[dublado\]|\[dub\]/i.test(combined)
+      /\[dublado\]|\[dub\]/i.test(combined)
     ) {
       return 'pt-BR';
     }
@@ -225,13 +227,11 @@ export class AudioSelectionManager {
 
     // 7. Se for expressamente legendado ('legendado', 'softsub', 'sub') ou indicar áudio original:
     if (/\b(legendado|softsub|hardsub|sub\b|leg\b|original)\b/i.test(combined)) {
-      return originalLang;
+      return 'unknown';
     }
 
     // 8. Se nada for conclusivo mas for PT-BR declarado no objeto
-    if (stream.isPtBr === true && !stream.isSubtitled) {
-      return 'pt-BR';
-    }
+    // Flags fornecidas pelo addon não substituem evidência da faixa reproduzida.
 
     return 'unknown';
   }
@@ -316,7 +316,7 @@ export class AudioSelectionManager {
     const currentStream = streams && streams[currentStreamIndex];
     if (currentStream && !Array.from(foundLanguages.values()).some(f => f.streamIndex === currentStreamIndex)) {
       const curLang = this.inspectStreamAudioLanguage(currentStream, originalLang);
-      const fallbackLang = curLang !== 'unknown' ? curLang : originalLang;
+      const fallbackLang = curLang !== 'unknown' ? curLang : 'other';
       if (!foundLanguages.has(fallbackLang)) {
         foundLanguages.set(fallbackLang, {
           streamIndex: currentStreamIndex,
@@ -350,17 +350,17 @@ export class AudioSelectionManager {
 
     // Se nenhuma fonte pôde ser classificada com precisão, fornece a opção do áudio atual
     if (optionsMap.size === 0 && currentStream) {
-      const display = this.getLanguageDisplay(originalLang);
+      const display = this.getLanguageDisplay('other');
       optionsMap.set('stream-default', {
         id: 'stream-default',
-        langCode: originalLang,
+        langCode: 'other',
         label: display.label,
         flag: display.flag,
         badge: 'Original',
         kind: 'separate-source',
         isCurrent: true,
         streamIndex: currentStreamIndex,
-        confidence: 0.8
+        confidence: 0
       });
     }
 

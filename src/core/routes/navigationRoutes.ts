@@ -19,11 +19,17 @@ export const ROUTES = {
   PROFILE: '/perfil',
   SETTINGS: '/configuracoes',
   HELP: '/ajuda',
+  ACTOR_DETAIL: '/atores/:id',
   AUTH: '/login',
   ADMIN: '/admin',
   ADMIN_WILDCARD: '/admin/*',
   NOT_FOUND: '*'
 } as const;
+
+export function getActorRoute(actorId: string | number): string {
+  const cleanId = String(actorId).replace(/^tmdb-actor-?/i, '');
+  return `/atores/${cleanId}`;
+}
 
 export function getContentRoute(item: ContentItem): string {
   if (item.type === ContentType.ANIME || item.genres?.includes('Anime')) {

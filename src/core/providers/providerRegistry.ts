@@ -13,6 +13,8 @@ import { mediaLoadingTracker } from '../tracking/mediaLoadingTracker';
 import { mediaSourceValidationService } from './mediaSourceValidationService';
 import { ContentItem } from '../../../types';
 import { filmesData } from '../../../constants';
+import { bannedContentRegistry } from '../catalog/BannedContentRegistry';
+import { playbackOptimizerService } from '../playback/PlaybackOptimizerService';
 
 export interface ProviderConfig {
   id: string;
@@ -176,18 +178,7 @@ export const DEFAULT_PROVIDERS: ProviderConfig[] = [
 
 // Open Source Verified Sample Streams para testes de reprodução garantida e verificação
 export const VERIFIED_TEST_STREAMS: Record<string, StremioStream[]> = {
-  // Sintel / Tears of Steel / Big Buck Bunny / Matrix test id
   "sample-stream": [
-    {
-      name: "ZapiTV HLS Master",
-      title: "[DUBLADO PT-BR] Big Buck Bunny - 1080p FHD HLS",
-      url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
-      sourceType: "hls",
-      isPtBr: true,
-      isDubbed: true,
-      quality: "1080p",
-      providerName: "ZapiTV Test Stream"
-    },
     {
       name: "Tears of Steel HLS",
       title: "[ÁUDIO ORIGINAL INGLÊS / MULTI-ÁUDIO] Tears of Steel - 4K UHD HLS",
@@ -241,6 +232,7 @@ class ProviderRegistryService {
   }
 
   public saveProviders() {
+    if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem('zapitv_providers_config', JSON.stringify(this.providers));
     } catch (e) {
@@ -315,12 +307,12 @@ class ProviderRegistryService {
    */
   public resolveStreams(
     type: 'movie' | 'series' | 'anime',
-    id: { tmdbId?: string | number; imdbId?: string; id?: string; title?: string },
+    id: { tmdbId?: string | number; imdbId?: string; id?: string; title?: string; originalTitle?: string; year?: number },
     episode?: { season: number; episode: number }
   ): Promise<StremioStream[]> {
-    const cacheKey = `v4_priority_${type}_${id.tmdbId || id.imdbId || id.id}_${id.imdbId || ''}_${episode?.season || 0}_${episode?.episode || 0}`;
+    const cacheKey = JSON.stringify(['v5_identity', type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
     const cached = this.cache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+    if (cached && cached.streams.length > 0 && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
       return Promise.resolve(cached.streams);
     }
     const existing = this.pending.get(cacheKey);
@@ -335,24 +327,62 @@ class ProviderRegistryService {
 
   private async resolveStreamsFresh(
     type: 'movie' | 'series' | 'anime',
-    id: { tmdbId?: string | number; imdbId?: string; id?: string; title?: string },
+    id: { tmdbId?: string | number; imdbId?: string; id?: string; title?: string; originalTitle?: string; year?: number },
     episode: { season: number; episode: number } | undefined,
     cacheKey: string,
     generation: number
   ): Promise<StremioStream[]> {
+    // Bloqueio total e imediato de conteúdos banidos (Big Buck Bunny, Caminandes, etc.)
+    if (bannedContentRegistry.isBanned(id)) {
+      return [];
+    }
+
     const streams: StremioStream[] = [];
     const activeProviders = this.providers.filter(p => p.enabled);
 
     // 0. Provedor de Cinema Aberto, Domínio Público e Obras Verificadas
     const rawTargetId = id.id || '';
     const cleanId = rawTargetId.replace(/^tmdb-?/i, '');
-    const tmdbNum = id.tmdbId ? String(id.tmdbId).replace(/^tmdb-?/i, '') : (!rawTargetId.startsWith('tt') ? cleanId : '');
+    let tmdbNum = id.tmdbId && /^\d+$/.test(String(id.tmdbId).replace(/^tmdb-?/i, ''))
+      ? String(id.tmdbId).replace(/^tmdb-?/i, '')
+      : (/^(?:tmdb-?)?\d+$/i.test(rawTargetId) ? cleanId : '');
     let imdbStr = id.imdbId ? String(id.imdbId) : '';
+
+    // Fontes locais pertencem exclusivamente ao item que as cadastrou. IDs externos
+    // podem ser compartilhados por remakes, temporadas e registros incorretos.
+    const openItem = VERIFIED_OPEN_ITEMS.find(item => item.id === rawTargetId &&
+      (type === 'movie' ? item.type === ContentType.MOVIE : item.type !== ContentType.MOVIE));
+
+    const catalogItem = !openItem ? filmesData.find(item => item.id === rawTargetId &&
+      (type === 'movie' ? item.type === ContentType.MOVIE : item.type !== ContentType.MOVIE)) : null;
+
+    if (!tmdbNum && (openItem?.tmdbId || catalogItem?.tmdbId)) {
+      const candidateTmdb = String(openItem?.tmdbId || catalogItem?.tmdbId || '').replace(/^tmdb-?/i, '');
+      if (/^\d+$/.test(candidateTmdb)) tmdbNum = candidateTmdb;
+    }
+
+    if (!imdbStr && (openItem?.imdbId || catalogItem?.imdbId)) {
+      imdbStr = String(openItem?.imdbId || catalogItem?.imdbId || '');
+    }
+
+    const altIds: string[] = [];
+    if (openItem?.imdbId && openItem.imdbId !== imdbStr && !altIds.includes(openItem.imdbId)) {
+      altIds.push(openItem.imdbId);
+    }
+    if (catalogItem?.imdbId && catalogItem.imdbId !== imdbStr && !altIds.includes(catalogItem.imdbId)) {
+      altIds.push(catalogItem.imdbId);
+    }
 
     if (tmdbNum) {
       try {
         const resolved = await tmdbService.getImdbId(tmdbNum, type);
-        if (resolved) imdbStr = resolved;
+        if (resolved) {
+          if (!imdbStr) {
+            imdbStr = resolved;
+          } else if (resolved !== imdbStr && !altIds.includes(resolved)) {
+            altIds.push(resolved);
+          }
+        }
       } catch {
         // Ignora
       }
@@ -360,35 +390,54 @@ class ProviderRegistryService {
     if (!imdbStr && rawTargetId.startsWith('tt')) {
       imdbStr = rawTargetId;
     }
-
-    const openItem = VERIFIED_OPEN_ITEMS.find(item => 
-      item.id === rawTargetId || 
-      item.id === id.id ||
-      (rawTargetId.startsWith('open-') && (
-        (tmdbNum && String(item.tmdbId) === String(tmdbNum)) ||
-        (imdbStr && item.imdbId === imdbStr)
-      )) ||
-      (imdbStr && item.imdbId === imdbStr && item.id.startsWith('anime-'))
-    );
-
-    const catalogItem = !openItem ? filmesData.find(item =>
-      item.id === rawTargetId ||
-      item.id === id.id ||
-      (imdbStr && item.imdbId === imdbStr) ||
-      (tmdbNum && String(item.tmdbId) === String(tmdbNum))
-    ) : null;
+    if (tmdbNum && !altIds.includes(tmdbNum)) {
+      altIds.push(tmdbNum);
+    }
 
     const targetTitle = (id.title || catalogItem?.title || openItem?.title || '').trim();
+
+    if (!tmdbNum && !imdbStr && targetTitle) {
+      try {
+        const searchResults = await Promise.race([
+          tmdbService.searchMulti(targetTitle),
+          new Promise<ContentItem[]>((resolve) => setTimeout(() => resolve([]), 2500))
+        ]);
+        if (searchResults && searchResults.length > 0) {
+          const match = searchResults.find(r => r.imdbId || r.tmdbId) || searchResults[0];
+          if (match.tmdbId) {
+            tmdbNum = String(match.tmdbId);
+            if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
+          } else if (match.id && !match.id.startsWith('open-') && !match.id.startsWith('local-')) {
+            if (/^\d+$/.test(match.id)) {
+              tmdbNum = match.id;
+              if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
+            }
+          }
+          if (match.imdbId) {
+            imdbStr = match.imdbId;
+            if (!altIds.includes(match.imdbId)) altIds.push(match.imdbId);
+          } else if (tmdbNum) {
+            const resolved = await tmdbService.getImdbId(tmdbNum, type);
+            if (resolved) {
+              imdbStr = resolved;
+              if (!altIds.includes(resolved)) altIds.push(resolved);
+            }
+          }
+        }
+      } catch {
+        // Ignora
+      }
+    }
 
     // 0. Streams legítimos de Domínio Público (exclusivo para itens 'open-')
     if (openItem) {
       if ((type === 'series' || type === 'anime') && openItem.episodes && openItem.episodes.length > 0) {
         const epNum = episode?.episode || 1;
-        const epObj = openItem.episodes.find(e => e.number === epNum) || openItem.episodes[0];
+        const epObj = (episode?.season || 1) === 1 ? openItem.episodes.find(e => e.number === epNum) : undefined;
         if (epObj?.videoUrl) {
           const directUrl = epObj.videoUrl;
           const proxyUrl = directUrl.startsWith('http') ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
-          const isPtBr = openItem.audioStatus === 'pt-br-original' || openItem.audioStatus === 'universal' || openItem.audioStatus === 'pt-br-dubbed';
+          const isPtBr = openItem.audioStatus === 'pt-br-original' || openItem.audioStatus === 'pt-br-dubbed';
           const isDubbed = openItem.audioStatus === 'pt-br-dubbed';
           streams.push({
             name: `${openItem.title} - Ep ${epObj.number}`,
@@ -422,7 +471,7 @@ class ProviderRegistryService {
     if (catalogItem) {
       if ((type === 'series' || type === 'anime') && catalogItem.episodes && catalogItem.episodes.length > 0) {
         const epNum = episode?.episode || 1;
-        const epObj = catalogItem.episodes.find(e => e.number === epNum) || catalogItem.episodes[0];
+        const epObj = (episode?.season || 1) === 1 ? catalogItem.episodes.find(e => e.number === epNum) : undefined;
         if (epObj?.videoUrl && !epObj.videoUrl.includes('Caminandes') && !epObj.videoUrl.includes('Night_of_the_Living_Dead')) {
           const directUrl = epObj.videoUrl;
           const proxyUrl = directUrl.startsWith('http') ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
@@ -432,7 +481,7 @@ class ProviderRegistryService {
             title: `[EPISÓDIO ${epObj.number}] ${epObj.title} (${isDubbed ? 'Dublado PT-BR' : 'Stream HD'})`,
             url: proxyUrl,
             sourceType: epObj.videoUrl.includes('.m3u8') ? 'hls' : 'mp4',
-            isPtBr: true,
+            isPtBr: catalogItem.audioStatus === 'pt-br-original' || isDubbed,
             isDubbed,
             quality: '1080p',
             providerName: 'Acervo ZapiTV Séries',
@@ -452,11 +501,11 @@ class ProviderRegistryService {
           const proxyUrl = directUrl.startsWith('http') ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
           streams.push({
             name: `${catalogItem.title} - Stream Oficial`,
-            title: `${catalogItem.title} (Dublado PT-BR 1080p)`,
+            title: `${catalogItem.title} (Stream Oficial)`,
             url: proxyUrl,
             sourceType: isHls ? 'hls' : 'mp4',
-            isPtBr: true,
-            isDubbed: true,
+            isPtBr: catalogItem.audioStatus === 'pt-br-original' || catalogItem.audioStatus === 'pt-br-dubbed',
+            isDubbed: catalogItem.audioStatus === 'pt-br-dubbed',
             quality: '1080p',
             providerName: 'Acervo ZapiTV Oficial',
             providerId: 'zapitv-catalog'
@@ -475,13 +524,22 @@ class ProviderRegistryService {
       : primaryId;
 
     if (stremioId) {
+      // Ordenação inteligente de provedores: prioridade oficial, PT-BR e score histórico de latência/estabilidade
+      const sortedAddons = [...stremioAddons].sort((a, b) => {
+        const scoreA = playbackOptimizerService.getProviderScore(a.id);
+        const scoreB = playbackOptimizerService.getProviderScore(b.id);
+        if (a.isPtBr !== b.isPtBr) return a.isPtBr ? -1 : 1;
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return (a.priority || 99) - (b.priority || 99);
+      });
+
       mediaLoadingTracker.transition(rawTargetId, 'SEARCHING_SOURCES', {
         stremioId,
         stremioType,
-        providerCount: stremioAddons.length
+        providerCount: sortedAddons.length
       });
 
-      const addonPromises = stremioAddons.map(async (addon) => {
+      const executeAddon = async (addon: ProviderConfig): Promise<StremioStream[]> => {
         const startProviderTime = Date.now();
         let providerSuccess = false;
         let providerStreamCount = 0;
@@ -489,24 +547,29 @@ class ProviderRegistryService {
 
         try {
           const client = new StremioClient(addon.url);
-          // Timeout individual estrito de 8 segundos por add-on
+          // Timeout individual de 10 segundos por add-on
           let res = await Promise.race([
             client.getStreams(stremioType, stremioId),
-            new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON')), 8000))
+            new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON')), 10000))
           ]);
 
-          // Fallback para ID secundário se o primeiro não retornou nada
-          if ((!res || !res.streams || res.streams.length === 0) && tmdbNum && imdbStr) {
-            const altBase = stremioId.startsWith('tt') ? tmdbNum : imdbStr;
-            const altId = episode && (type === 'series' || type === 'anime')
-              ? `${altBase}:${episode.season}:${episode.episode}`
-              : altBase;
-            try {
-              res = await Promise.race([
-                client.getStreams(stremioType, altId),
-                new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON_ALT')), 5000))
-              ]);
-            } catch {}
+          // Fallback para IDs secundários se o primeiro não retornou nada
+          if ((!res || !res.streams || res.streams.length === 0) && altIds.length > 0) {
+            for (const altBase of altIds) {
+              const altId = episode && (type === 'series' || type === 'anime')
+                ? `${altBase}:${episode.season}:${episode.episode}`
+                : altBase;
+              try {
+                const altRes = await Promise.race([
+                  client.getStreams(stremioType, altId),
+                  new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON_ALT')), 5000))
+                ]);
+                if (altRes && Array.isArray(altRes.streams) && altRes.streams.length > 0) {
+                  res = altRes;
+                  break;
+                }
+              } catch {}
+            }
           }
 
           if ((!res || !res.streams || res.streams.length === 0) && (type === 'anime' || type === 'series')) {
@@ -523,13 +586,19 @@ class ProviderRegistryService {
             const parsedStreams: StremioStream[] = [];
             for (const s of res.streams) {
               const sUrl = s.url || '';
+              // A variante Malfoy devolveu obras diferentes sob títulos corretos
+              // em várias mídias. A quarentena é por origem, nunca por título.
+              if (addon.id === 'fenixflix-animes' && /🐉\s*Malfoy/i.test(s.title || '')) continue;
               if (s.ytId || sUrl.includes('youtube.com') || sUrl.includes('youtu.be')) continue;
               if (sUrl.includes('embed') || sUrl.includes('iframe') || s.sourceType === ('embed' as any)) continue;
 
               const isHls = sUrl.includes('.m3u8') || s.sourceType === 'hls';
               const isDash = sUrl.includes('.mpd');
-              const isDirectVideo = sUrl.includes('.mp4') || sUrl.includes('.webm') || sUrl.includes('.ogv') || sUrl.includes('/api/proxy') || s.sourceType === 'mp4';
+              const isDirectVideo = sUrl.includes('.mp4') || sUrl.includes('.webm') || sUrl.includes('.ogv') || sUrl.includes('/api/proxy') || s.sourceType === 'mp4' || Boolean(sUrl && !s.infoHash && !sUrl.includes('.torrent'));
               const isTorrent = Boolean(s.infoHash);
+
+              const isDubbed = Boolean(s.isDubbed) || /dublado|dub\b/i.test(s.title || '') || (/🇧🇷/i.test(s.title || '') && /dual|áudio|audio/i.test(s.title || ''));
+              const isPtBr = Boolean(s.isPtBr) || /pt[-_]?br|dublado|🇧🇷/i.test(s.title || '');
 
               if (isHls || isDash || isDirectVideo) {
                 if (sUrl.startsWith('http://') && !sUrl.includes('/api/proxy')) {
@@ -541,7 +610,9 @@ class ProviderRegistryService {
                       url: sUrl.replace(/^http:/, 'https:'),
                       providerName: `${addon.name} (HTTPS Direto)`,
                       providerId: addon.id,
-                      sourceType: isHls ? 'hls' : 'mp4'
+                      sourceType: isHls ? 'hls' : 'mp4',
+                      ...(isDubbed ? { isDubbed: true } : {}),
+                      ...(isPtBr ? { isPtBr: true } : {})
                     });
                     continue;
                   }
@@ -550,7 +621,9 @@ class ProviderRegistryService {
                     url: `/api/proxy?url=${encodeURIComponent(sUrl)}`,
                     providerName: `${addon.name} (Proxy)`,
                     providerId: addon.id,
-                    sourceType: isHls ? 'hls' : 'mp4'
+                    sourceType: isHls ? 'hls' : 'mp4',
+                    ...(isDubbed ? { isDubbed: true } : {}),
+                    ...(isPtBr ? { isPtBr: true } : {})
                   });
                   if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
                     parsedStreams.push({
@@ -558,7 +631,9 @@ class ProviderRegistryService {
                       url: sUrl.replace(/^http:/, 'https:'),
                       providerName: `${addon.name} (HTTPS Direto)`,
                       providerId: addon.id,
-                      sourceType: isHls ? 'hls' : 'mp4'
+                      sourceType: isHls ? 'hls' : 'mp4',
+                      ...(isDubbed ? { isDubbed: true } : {}),
+                      ...(isPtBr ? { isPtBr: true } : {})
                     });
                   }
                 }
@@ -566,20 +641,31 @@ class ProviderRegistryService {
                   ...s,
                   providerName: addon.name,
                   providerId: addon.id,
-                  sourceType: isHls ? 'hls' : 'mp4'
+                  sourceType: isHls ? 'hls' : 'mp4',
+                  ...(isDubbed ? { isDubbed: true } : {}),
+                  ...(isPtBr ? { isPtBr: true } : {})
                 });
               } else if (isTorrent) {
                 const engineOnline = await isLocalStremioEngineOnline();
-                // A Vercel não pode acessar o Stremio Engine instalado no computador do visitante.
-                if (!engineOnline) continue;
+                let streamQuality = s.quality;
+                if (!streamQuality) {
+                  const combinedText = `${s.name || ''} ${s.title || ''}`.toLowerCase();
+                  if (combinedText.includes('2160p') || combinedText.includes('4k')) streamQuality = '2160p';
+                  else if (combinedText.includes('1080p')) streamQuality = '1080p';
+                  else if (combinedText.includes('720p')) streamQuality = '720p';
+                  else if (combinedText.includes('480p')) streamQuality = '480p';
+                }
                 const engineUrl = `http://127.0.0.1:11470/${s.infoHash}/${s.fileIdx || 0}`;
                 parsedStreams.push({
                   ...s,
                   url: engineUrl,
-                  providerName: `${addon.name}${engineOnline ? '' : ' (Requer Stremio Engine)'}`,
+                  providerName: `${addon.name}${engineOnline ? '' : ' (Stremio)'}`,
                   providerId: addon.id,
                   sourceType: 'mp4',
                   isTorrent: true,
+                  quality: streamQuality || '1080p',
+                  ...(isDubbed ? { isDubbed: true } : {}),
+                  ...(isPtBr ? { isPtBr: true } : {}),
                   behaviorHints: {
                     ...(s.behaviorHints || {}),
                     notWebReady: !engineOnline
@@ -595,6 +681,7 @@ class ProviderRegistryService {
           providerError = err.message || 'Erro de comunicação';
         } finally {
           const duration = Date.now() - startProviderTime;
+          playbackOptimizerService.recordProviderResult(addon.id, duration, providerSuccess);
           mediaLoadingTracker.recordProviderAttempt(rawTargetId, {
             providerId: addon.id,
             providerName: addon.name,
@@ -605,20 +692,56 @@ class ProviderRegistryService {
           });
         }
         return [];
-      });
+      };
 
-      const results = await Promise.allSettled(addonPromises);
-      for (const r of results) {
-        if (r.status === 'fulfilled' && Array.isArray(r.value)) {
-          streams.push(...r.value);
+      // Execução paralela com concorrência controlada (máx 4) e saída rápida inteligente
+      const CONCURRENCY_LIMIT = 4;
+      const collectedFromAddons: StremioStream[] = [];
+      let activeIndex = 0;
+      let stopSpawning = false;
+
+      const runWorker = async () => {
+        while (activeIndex < sortedAddons.length && !stopSpawning) {
+          const currentIndex = activeIndex++;
+          const addon = sortedAddons[currentIndex];
+          const result = await executeAddon(addon);
+          if (Array.isArray(result) && result.length > 0) {
+            collectedFromAddons.push(...result);
+            const hasPtBr = collectedFromAddons.some(s => s.isPtBr || s.isDubbed);
+            if (collectedFromAddons.length >= 2 && hasPtBr) {
+              stopSpawning = true;
+            }
+          }
         }
-      }
+      };
+
+      const workers = Array.from(
+        { length: Math.min(CONCURRENCY_LIMIT, sortedAddons.length) },
+        () => runWorker()
+      );
+
+      let timer: any = null;
+      let interval: any = null;
+      await Promise.race([
+        Promise.all(workers),
+        new Promise<void>((resolve) => {
+          interval = setInterval(() => {
+            const hasPtBr = collectedFromAddons.some(s => s.isPtBr || s.isDubbed);
+            if (collectedFromAddons.length >= 2 && hasPtBr) {
+              if (interval) clearInterval(interval);
+              timer = setTimeout(resolve, 600);
+            }
+          }, 80);
+        })
+      ]);
+      if (interval) clearInterval(interval);
+      if (timer) clearTimeout(timer);
+
+      streams.push(...collectedFromAddons);
     }
 
     // 2. Fallback para Test Streams se explicitamente solicitado
-    if (id.id === 'sample-stream' || id.tmdbId === 'sample-stream') {
-      streams.push(...VERIFIED_TEST_STREAMS['sample-stream']);
-    }
+    // Fontes de demonstração nunca participam da resolução de conteúdo publicado.
 
     // 3. Filtrar rigorosamente streams de domínios estacionados / ParkLogic / Embeds / YouTube e conteúdos trocados
     mediaLoadingTracker.transition(rawTargetId, 'VALIDATING_SOURCES', {
@@ -640,16 +763,15 @@ class ProviderRegistryService {
         if (u.startsWith('http://')) return false;
         if (/localhost|127\.0\.0\.1|%5b%3a%3a1%5d|\[::1\]/.test(u)) return false;
       }
-      if (u.includes('youtube.com') || u.includes('youtu.be')) return false;
-      if (u.includes('embedplay') || u.includes('playerflix') || u.includes('videasy') || u.includes('superflix')) return false;
+      if (!u.includes('.m3u8') && !u.includes('.mp4') && (u.includes('embedplay') || u.includes('playerflix') || u.includes('videasy') || u.includes('superflix'))) return false;
 
       // BLINDAGEM CONTRA SUBSTITUIÇÃO INDEVIDA POR CLÁSSICOS/MOCKS DE DOMÍNIO PÚBLICO OU BLENDER
       const isNightLivingDead = u.includes('night_of_the_living_dead') || t.includes('night of the living dead') || t.includes('noite dos mortos-vivos');
       if (isNightLivingDead && rawTargetId !== 'open-night-living-dead-1968' && id.imdbId !== 'tt0063350') {
         return false;
       }
-      const isCaminandes = u.includes('caminandes') || t.includes('caminandes');
-      if (isCaminandes && rawTargetId !== 'open-caminandes-s1') {
+      // BLOQUEIO TOTAL E IRRESTRITO DE QUALQUER FONTE DE CONTEÚDO BANIDO (BIG BUCK BUNNY, CAMINANDES, ETC.)
+      if (bannedContentRegistry.isBannedStream(s)) {
         return false;
       }
 
@@ -662,7 +784,8 @@ class ProviderRegistryService {
       title: targetTitle,
       type: type === 'movie' ? ContentType.MOVIE : (type === 'anime' ? ContentType.ANIME : ContentType.SERIES),
       rating: 7.0,
-      year: (id as any).year || openItem?.year || 0,
+      year: id.year || openItem?.year || catalogItem?.year || 0,
+      originalTitle: id.originalTitle || openItem?.originalTitle || catalogItem?.originalTitle,
       image: openItem?.image || '',
       tmdbId: id.tmdbId ? String(id.tmdbId) : undefined,
       imdbId: imdbStr || id.imdbId,
@@ -716,8 +839,8 @@ class ProviderRegistryService {
       }).catch(() => {});
     }
 
-    // Armazenar no cache
-    if (generation === this.cacheGeneration) {
+    // Armazenar no cache somente se encontrou fontes válidas
+    if (generation === this.cacheGeneration && sorted.length > 0) {
       this.cache.set(cacheKey, { streams: sorted, timestamp: Date.now() });
     }
 
