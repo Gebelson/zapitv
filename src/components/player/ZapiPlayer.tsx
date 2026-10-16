@@ -1855,7 +1855,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       setAllSourcesFailed(true);
       setHasError(true);
       setIsLoading(false);
-      setErrorMessage('Não foi possível reproduzir este conteúdo. Nenhuma fonte disponível funcionou.');
+      setErrorMessage(`Nenhuma fonte disponível funcionou agora. Última falha: ${reason}`);
       try {
         if (mediaAvailabilityIndex && item) {
           mediaAvailabilityIndex.markTemporaryError(
@@ -2712,6 +2712,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   // Opções de idioma de áudio e dublagem disponíveis gerenciadas pelo AudioSelectionManager
   const availableAudioOptions = useMemo<AudioOption[]>(() => {
+    if (allSourcesFailed) return [];
     return audioSelectionManager.buildAudioOptions({
       item,
       streams,
@@ -2720,7 +2721,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       activeAudioId,
       selectedHlsTrackId: selectedHlsAudioTrack
     });
-  }, [item, streams, hlsAudioTracks, selectedStreamIndex, activeAudioId, selectedHlsAudioTrack]);
+  }, [allSourcesFailed, item, streams, hlsAudioTracks, selectedStreamIndex, activeAudioId, selectedHlsAudioTrack]);
 
   const handleSelectAudio = (opt: AudioOption) => {
     setShowAudioMenu(false);
