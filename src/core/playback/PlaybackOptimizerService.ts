@@ -11,7 +11,7 @@
  * 7. Telemetria e diagnóstico em tempo real (bitrate, buffering, frames perdidos).
  */
 
-import Hls, { HlsConfig } from 'hls.js';
+import type { HlsConfig } from 'hls.js';
 import { StremioStream } from '../stremio/stremioTypes';
 import { audioCodecService } from '../audio/audioCodecService';
 

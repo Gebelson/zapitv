@@ -1,11 +1,11 @@
-import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { X, Play, Bookmark, Heart, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import React, { Suspense, lazy, useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { X, Play, Bookmark, Heart, ChevronDown, ChevronUp, AlertCircle, Download, Users } from 'lucide-react';
 import { ContentItem, ContentType } from '../types';
+import { DownloadButton } from '../src/components/offline/DownloadButton';
+import { offlineDownloadManager } from '../src/core/offline/offlineDownloadManager';
 import { tmdbService } from '../src/core/tmdb/tmdbClient';
 import { providerRegistry } from '../src/core/providers/providerRegistry';
 import { StremioStream } from '../src/core/stremio/stremioTypes';
-import { ZapiPlayer } from '../src/components/player/ZapiPlayer';
-import { ReportFeedbackModal } from '../src/components/feedback/ReportFeedbackModal';
 import { storageService } from '../src/core/storage/storageService';
 import { ZapiLoader } from '../src/components/common/ZapiLoader';
 import { playbackSessionService, NavigationType } from '../src/core/session/playbackSessionService';
@@ -20,6 +20,10 @@ import { audioEnhancer } from '../src/core/enhancement/audioEnhancer';
 import { similarTitlesService } from '../src/core/recommendations/similarTitlesService';
 import { userPreferenceStore } from '../src/core/recommendations/userPreferenceStore';
 import { episodeAvailabilityService } from '../src/core/episodes/episodeAvailabilityService';
+
+const ZapiPlayer = lazy(() => import('../src/components/player/ZapiPlayer').then(m => ({ default: m.ZapiPlayer })));
+const WatchPartyModal = lazy(() => import('../src/components/watchparty/WatchPartyModal').then(m => ({ default: m.WatchPartyModal })));
+const ReportFeedbackModal = lazy(() => import('../src/components/feedback/ReportFeedbackModal').then(m => ({ default: m.ReportFeedbackModal })));
 
 interface ContentDetailModalProps {
   item: ContentItem;
@@ -69,16 +73,21 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const [isLoadingStreams, setIsLoadingStreams] = useState(false);
   const [streamResolutionError, setStreamResolutionError] = useState<string | null>(null);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showWatchPartyModal, setShowWatchPartyModal] = useState(false);
   const [progressVersion, setProgressVersion] = useState(0);
 
   // Auto-play episode if directed by URL deep link
   const autoPlayTriggeredRef = useRef(false);
 
-  // Registro de interesse exploratório no motor de recomendações
+  // Registro de interesse exploratório no motor de recomendações e pré-aquecimento assíncrono do ZapiPlayer
   useEffect(() => {
     if (initialItem && initialItem.id) {
       userPreferenceStore.recordDetailView(initialItem).catch(() => {});
     }
+    const timer = setTimeout(() => {
+      import('../src/components/player/ZapiPlayer').catch(() => {});
+    }, 150);
+    return () => clearTimeout(timer);
   }, [initialItem?.id]);
 
   // Playback session lifecycle
@@ -174,6 +183,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       if (prefetchGenerationRef.current === gen && prefetchedSourcesRef.current?.targetKey === targetKey) {
         prefetchedSourcesRef.current.streams = streams;
         prefetchedSourcesRef.current.status = 'resolved';
+        setResolvedStreams(streams);
       }
     }).catch(() => {
       if (prefetchGenerationRef.current === gen && prefetchedSourcesRef.current?.targetKey === targetKey) {
@@ -271,16 +281,29 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     setSessionIntroPlayed(false);
   }, [playbackSessionId]);
 
-  // Click outside to close
+  // Click outside to close (apenas quando não estiver no player e nenhum modal flutuante estiver aberto)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      if (showFeedbackModal || showWatchPartyModal) return;
+
       if (modalRef.current && !modalRef.current.contains(event.target as Node) && !isPlaying) {
         handleClose();
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [handleClose, isPlaying]);
+  }, [handleClose, isPlaying, showFeedbackModal, showWatchPartyModal]);
+
+  // Tecla Escape: fecha a janela de detalhes apenas se nenhum modal flutuante e o player não estiverem abertos
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isPlaying && !showFeedbackModal && !showWatchPartyModal) {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleClose, isPlaying, showFeedbackModal, showWatchPartyModal]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -647,13 +670,46 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     }
   };
   
-  // Auto-play episode if directed by URL deep link
+  // Auto-play episode if directed by URL deep link or Watch Party
   useEffect(() => {
-    if (autoPlayInitialEpisode && initialEpisode && !autoPlayTriggeredRef.current) {
+    if (autoPlayInitialEpisode && !autoPlayTriggeredRef.current) {
       autoPlayTriggeredRef.current = true;
-      startPlayback(initialSeason || 1, initialEpisode, 'manual_start');
+      startPlayback(initialSeason || (hasEpisodes ? 1 : undefined), initialEpisode || (hasEpisodes ? 1 : undefined), 'manual_start');
     }
-  }, [autoPlayInitialEpisode, initialSeason, initialEpisode]);
+  }, [autoPlayInitialEpisode, initialSeason, initialEpisode, hasEpisodes]);
+
+  const handleDownloadSeason = useCallback(async () => {
+    if (!episodes || episodes.length === 0) return;
+    try {
+      const episodesToDownload = episodes.map(ep => ({
+        number: ep.number,
+        title: ep.title,
+        stream: ep.videoUrl ? {
+          name: 'Fonte Local',
+          title: ep.title,
+          url: ep.videoUrl,
+          quality: '720p',
+          isDubbed: true,
+          isPtBr: true
+        } : (resolvedStreams[0] || (item.verifiedStreams && item.verifiedStreams[0]) || {
+          name: 'ZapiTV Stream',
+          title: ep.title,
+          url: `/api/proxy?url=${encodeURIComponent(item.id)}`,
+          quality: '720p',
+          isDubbed: true,
+          isPtBr: true
+        })
+      }));
+
+      await offlineDownloadManager.downloadSeason({
+        item,
+        season: currentSeason,
+        episodes: episodesToDownload
+      });
+    } catch (err: any) {
+      alert(err.message || 'Erro ao iniciar download da temporada.');
+    }
+  }, [episodes, item, currentSeason, resolvedStreams]);
 
   const handleEpisodeClick = (season: number, episode: number) => {
     startPlayback(season, episode, 'manual_start');
@@ -743,36 +799,40 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       isClosing ? 'animate-out fade-out duration-300' : 'animate-in fade-in duration-300'
     }`}>
       {isPlaying && (
-        <ZapiPlayer 
-          key={hasEpisodes ? `${item.id}_s${currentEpisodeParams?.season || 1}_e${currentEpisodeParams?.episode || 1}` : item.id}
-          item={item} 
-          streams={resolvedStreams} 
-          isLoadingStreams={isLoadingStreams}
-          streamResolutionError={streamResolutionError}
-          onRetrySources={() => {
-            startPlayback(currentEpisodeParams?.season, currentEpisodeParams?.episode, 'retry_playback');
-          }}
-          initialSeason={currentEpisodeParams?.season || (hasEpisodes ? 1 : undefined)}
-          initialEpisode={currentEpisodeParams?.episode || (hasEpisodes ? 1 : undefined)}
-          nextEpisodeInfo={nextEpisodeInfo}
-          playbackSessionId={playbackSessionId}
-          navigationType={navigationType}
-          initialPlayIntro={!sessionIntroPlayed}
-          onIntroCompleted={() => {
-            setSessionIntroPlayed(true);
-            if (playbackSessionId) {
-              playbackSessionService.markIntroPlayed(playbackSessionId);
-            } else {
-              playbackSessionService.markIntroPlayed();
-            }
-          }}
-          onClose={handleClosePlayer}
-          onNextEpisode={hasNextEpisode ? handleNextEpisode : undefined}
-        />
+        <div key="modal-player-stage">
+          <Suspense fallback={<div className="fixed inset-0 z-[500] bg-black flex items-center justify-center"><ZapiLoader size="lg" /></div>}>
+            <ZapiPlayer 
+              key={hasEpisodes ? `${item.id}_s${currentEpisodeParams?.season || 1}_e${currentEpisodeParams?.episode || 1}` : item.id}
+              item={item} 
+              streams={resolvedStreams} 
+              isLoadingStreams={isLoadingStreams}
+              streamResolutionError={streamResolutionError}
+              onRetrySources={() => {
+                startPlayback(currentEpisodeParams?.season, currentEpisodeParams?.episode, 'retry_playback');
+              }}
+              initialSeason={currentEpisodeParams?.season || (hasEpisodes ? 1 : undefined)}
+              initialEpisode={currentEpisodeParams?.episode || (hasEpisodes ? 1 : undefined)}
+              nextEpisodeInfo={nextEpisodeInfo}
+              playbackSessionId={playbackSessionId}
+              navigationType={navigationType}
+              initialPlayIntro={!sessionIntroPlayed}
+              onIntroCompleted={() => {
+                setSessionIntroPlayed(true);
+                if (playbackSessionId) {
+                  playbackSessionService.markIntroPlayed(playbackSessionId);
+                } else {
+                  playbackSessionService.markIntroPlayed();
+                }
+              }}
+              onClose={handleClosePlayer}
+              onNextEpisode={hasNextEpisode ? handleNextEpisode : undefined}
+            />
+          </Suspense>
+        </div>
       )}
       
       {!isPlaying && (
-        <div className="min-h-full w-full flex items-start justify-center py-3 sm:py-8 md:py-12 px-2 sm:px-4 md:px-6">
+        <div key="modal-detail-stage" className="min-h-full w-full flex items-start justify-center py-3 sm:py-8 md:py-12 px-2 sm:px-4 md:px-6">
           <div ref={modalRef} className={`relative w-full max-w-[850px] bg-[#0f1115] rounded-2xl sm:rounded-3xl md:rounded-[32px] shadow-2xl overflow-hidden border border-white/10 ${
               isClosing ? 'animate-out zoom-out-95 slide-out-to-bottom-[5%] duration-300' : 'animate-in zoom-in-95 slide-in-from-bottom-[5%] duration-300'
             }`}>
@@ -815,11 +875,6 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                       🇧🇷 Áudio Original PT-BR Informado
                     </span>
                   )}
-                  {resolvedStreams.some(stream => audioPreferenceService.analyzeAudio(stream).isDubbed) && (
-                    <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 backdrop-blur-md flex items-center gap-1.5 shadow-lg">
-                      🇧🇷 Dublagem PT-BR Informada pela Fonte
-                    </span>
-                  )}
                   {item.audioStatus === 'other' && (
                     <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-black bg-purple-500/20 text-purple-300 border border-purple-500/40 backdrop-blur-md flex items-center gap-1.5 shadow-lg">
                       🌐 Áudio Original (Legendas conforme a fonte)
@@ -838,39 +893,66 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                 
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-4">
                   <button 
-                    className="flex items-center gap-2 px-4 sm:px-6 md:px-8 py-2.5 sm:py-3 md:py-3.5 bg-[#007df7] text-white rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm md:text-lg hover:bg-[#0069d9] transition-all hover:scale-105 shadow-xl shadow-[#007df7]/20 min-h-[44px]"
+                    className="h-11 sm:h-12 px-4 sm:px-6 md:px-8 bg-[#007df7] text-white rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm md:text-base hover:bg-[#0069d9] transition-all hover:scale-105 active:scale-95 shadow-xl shadow-[#007df7]/20 flex items-center justify-center gap-2 select-none border border-transparent box-border"
                     onClick={() => startPlayback(undefined, undefined, 'manual_start')}
                   >
-                    <Play className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 fill-current" />
+                    <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current shrink-0" />
                     <span>
-                      {hasEpisodes && playbackContinuity.hasStarted && !playbackContinuity.isCompleted
-                        ? `Continuar (${playbackContinuity.label})`
-                        : (playbackContinuity.hasStarted && !playbackContinuity.isCompleted ? 'Continuar assistindo' : 'Assistir')}
+                      {playbackContinuity.hasStarted && !playbackContinuity.isCompleted ? 'Continuar' : 'Assistir'}
                     </span>
                   </button>
+
+                  {/* Botão Grupo (Watch Party P2P Gratuita) */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowWatchPartyModal(true);
+                    }}
+                    className="h-11 sm:h-12 px-4 sm:px-5 bg-gradient-to-r from-cyan-600/20 to-[#007df7]/20 border border-cyan-500/30 hover:border-cyan-400 text-white hover:text-cyan-200 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm md:text-base backdrop-blur-sm transition-all hover:scale-105 active:scale-95 cursor-pointer group shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-2 select-none box-border"
+                    title="Assistir em grupo com amigos em tempo real (Watch Party P2P Gratuita)"
+                    aria-label="Grupo"
+                  >
+                    <Users className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 group-hover:scale-110 transition-transform shrink-0" />
+                    <span>Grupo</span>
+                  </button>
+
+                  {/* Botão Baixar Offline (Experiência Netflix) */}
+                  <DownloadButton
+                    item={item}
+                    streams={resolvedStreams.length > 0 ? resolvedStreams : (item.verifiedStreams || [])}
+                    season={hasEpisodes ? (currentSeason || 1) : undefined}
+                    episode={hasEpisodes ? (playbackContinuity.nextEpisodeNumber || 1) : undefined}
+                    className="h-11 sm:h-12 box-border"
+                  />
                   <button 
                     onClick={(e) => onToggleFavorite(e, item.id)} 
-                    className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full border flex items-center justify-center backdrop-blur-sm transition-all group ${isFavorite ? 'bg-[#007df7] border-[#007df7] text-white shadow-lg' : 'bg-white/5 border-white/10 text-white hover:bg-white/20 hover:border-white/30'}`} 
+                    className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full border flex items-center justify-center backdrop-blur-sm transition-all group shrink-0 select-none box-border active:scale-95 ${isFavorite ? 'bg-[#007df7] border-[#007df7] text-white shadow-lg' : 'bg-white/5 border-white/10 text-white hover:bg-white/20 hover:border-white/30'}`} 
                     title="Favoritos"
                     aria-label="Favoritos"
                   >
-                    <Heart className={`w-4 h-4 sm:w-5 sm:h-5 md:w-5 md:h-5 group-hover:scale-110 transition-transform ${isFavorite ? 'fill-current' : ''}`} />
+                    <Heart className={`w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform ${isFavorite ? 'fill-current' : ''}`} />
                   </button>
                   <button 
                     onClick={(e) => onToggleList(e, item.id)} 
-                    className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full border flex items-center justify-center backdrop-blur-sm transition-all group ${isInList ? 'bg-white text-[#007df7] border-white shadow-lg' : 'bg-white/5 border-white/10 text-white hover:bg-white/20 hover:border-white/30'}`} 
+                    className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full border flex items-center justify-center backdrop-blur-sm transition-all group shrink-0 select-none box-border active:scale-95 ${isInList ? 'bg-white text-[#007df7] border-white shadow-lg' : 'bg-white/5 border-white/10 text-white hover:bg-white/20 hover:border-white/30'}`} 
                     title="Minha Lista"
                     aria-label="Minha Lista"
                   >
-                    <Bookmark className={`w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 group-hover:scale-110 transition-transform ${isInList ? 'fill-current' : ''}`} />
+                    <Bookmark className={`w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform ${isInList ? 'fill-current' : ''}`} />
                   </button>
                   <button 
-                    onClick={() => setShowFeedbackModal(true)} 
-                    className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full border border-white/10 bg-white/5 text-white/70 hover:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/30 flex items-center justify-center backdrop-blur-sm transition-all group cursor-pointer" 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowFeedbackModal(true);
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="w-11 h-11 sm:w-12 sm:h-12 rounded-full border border-white/10 bg-white/5 text-white/70 hover:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/30 flex items-center justify-center backdrop-blur-sm transition-all group cursor-pointer shrink-0 select-none box-border active:scale-95" 
                     title="Reportar problema neste título"
                     aria-label="Reportar problema"
                   >
-                    <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 md:w-5 md:h-5 group-hover:scale-110 transition-transform" />
+                    <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
                   </button>
                 </div>
               </div>
@@ -900,8 +982,21 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
 
             {hasEpisodes && (
               <div className="px-4 sm:px-8 md:px-12 py-5 sm:py-8 border-t border-white/5 bg-transparent">
-                <div className="flex flex-row justify-between items-center mb-6 sm:mb-8">
-                  <h3 className="text-lg sm:text-xl md:text-2xl font-black text-white">Episódios</h3>
+                <div className="flex flex-row justify-between items-center mb-6 sm:mb-8 gap-3">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg sm:text-xl md:text-2xl font-black text-white">Episódios</h3>
+                    {episodes.length > 0 && !isLoadingEpisodes && (
+                      <button
+                        type="button"
+                        onClick={handleDownloadSeason}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/15 text-white rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                        title={`Baixar todos os episódios disponíveis da Temporada ${currentSeason}`}
+                      >
+                        <Download className="w-3.5 h-3.5 text-[#007df7]" />
+                        <span className="hidden sm:inline">Baixar Temporada</span>
+                      </button>
+                    )}
+                  </div>
                   <div className="relative group">
                     <select 
                       value={currentSeason} 
@@ -959,6 +1054,16 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                             <h4 className="text-white font-bold text-xs sm:text-sm md:text-base group-hover:text-[#007df7] transition-colors truncate">{ep.title}</h4>
                             <p className="text-[11px] sm:text-xs md:text-sm text-gray-400 leading-relaxed line-clamp-2 mt-0.5">{ep.description}</p>
                           </div>
+                          <div className="shrink-0 pl-2" onClick={(e) => e.stopPropagation()}>
+                            <DownloadButton
+                              item={item}
+                              streams={resolvedStreams.length > 0 ? resolvedStreams : (ep.videoUrl ? [{ name: 'Fonte Local', title: ep.title, url: ep.videoUrl, quality: '720p', isDubbed: true, isPtBr: true }] : (item.verifiedStreams || []))}
+                              season={currentSeason}
+                              episode={ep.number}
+                              episodeTitle={ep.title}
+                              variant="icon"
+                            />
+                          </div>
                         </div>
                       );
                     })
@@ -995,16 +1100,37 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       )}
 
       {/* Modal Inteligente de Feedback */}
-      <ReportFeedbackModal
-        isOpen={showFeedbackModal}
-        onClose={() => setShowFeedbackModal(false)}
-        defaultCategory="catalog_problem"
-        playbackContext={{
-          item,
-          season: currentSeason,
-          episode: 1
-        }}
-      />
+      {showFeedbackModal && (
+        <Suspense fallback={null}>
+          <ReportFeedbackModal
+            isOpen={showFeedbackModal}
+            onClose={() => setShowFeedbackModal(false)}
+            defaultCategory="catalog_problem"
+            playbackContext={{
+              item,
+              season: hasEpisodes && currentEpisodeParams?.season ? currentEpisodeParams.season : undefined,
+              episode: hasEpisodes && currentEpisodeParams?.episode ? currentEpisodeParams.episode : undefined
+            }}
+          />
+        </Suspense>
+      )}
+
+      {/* Modal Watch Party P2P Gratuita */}
+      {showWatchPartyModal && (
+        <Suspense fallback={null}>
+          <WatchPartyModal
+            isOpen={showWatchPartyModal}
+            onClose={() => setShowWatchPartyModal(false)}
+            item={item}
+            season={hasEpisodes ? (currentEpisodeParams?.season || currentSeason || 1) : undefined}
+            episode={hasEpisodes ? (currentEpisodeParams?.episode || playbackContinuity.nextEpisodeNumber || 1) : undefined}
+            onStartWatchPartyPlayback={(targetItem, targetSeason, targetEpisode) => {
+              setShowWatchPartyModal(false);
+              startPlayback(targetSeason, targetEpisode, 'manual_start');
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

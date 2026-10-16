@@ -55,7 +55,8 @@ export class FeedbackPromptGenerator {
     const safeUserText = this.sanitizeUserDescription(userDescription);
 
     const now = Date.now();
-    const isEpisode = (technicalContext.season || 0) > 0 && (technicalContext.episode || 0) > 0;
+    const isMovie = technicalContext.mediaType === 'movie';
+    const isEpisode = !isMovie && (technicalContext.season || 0) > 0 && (technicalContext.episode || 0) > 0;
     const epString = isEpisode ? ` (Temporada ${technicalContext.season}, Episódio ${technicalContext.episode})` : '';
 
     const markdown = `# ZAPITV — INVESTIGAÇÃO E CORREÇÃO: ${categoryLabel.toUpperCase()} EM ${mediaTitle.toUpperCase()}${epString.toUpperCase()}
@@ -206,9 +207,10 @@ Ao concluir a tarefa, apresente:
       ? affectedMedia.map(m => `- **${m.title}** (\`${m.id}\`, tipo: ${m.type})`).join('\n')
       : (cluster.technicalFingerprint?.mediaTitle ? `- **${cluster.technicalFingerprint.mediaTitle}**` : '- Mídia genérica ou não identificada.');
 
-    const episodesStr = affectedEpisodes.length > 0
+    const isMovieCluster = affectedMedia.length > 0 && affectedMedia.every(m => m.type === 'movie');
+    const episodesStr = (!isMovieCluster && affectedEpisodes.length > 0)
       ? affectedEpisodes.slice(0, 8).map(e => `T${e.season}:E${e.episode}`).join(', ')
-      : (cluster.technicalFingerprint?.season ? `T${cluster.technicalFingerprint.season}:E${cluster.technicalFingerprint.episode}` : 'Todos / Não aplicável');
+      : (isMovieCluster ? 'Não aplicável (Filme)' : 'Todos / Obra Completa');
 
     const providersStr = affectedProviders.length > 0 ? affectedProviders.join(', ') : (cluster.technicalFingerprint?.providerId || 'Desconhecido');
     const sourcesStr = affectedSources.length > 0 ? affectedSources.slice(0, 6).join(', ') : 'Várias';

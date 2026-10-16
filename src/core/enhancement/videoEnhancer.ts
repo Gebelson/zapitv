@@ -96,16 +96,38 @@ const FRAGMENT_SHADER_SRC = `
 
     vec3 lineEnhanced = filtered;
     if (sharpWeight > 0.05) {
-      vec3 minNeighbor = min(min(up, dn), min(lf, rt));
-      vec3 maxNeighbor = max(max(up, dn), max(lf, rt));
-      float edgeDiff = length(maxNeighbor - minNeighbor);
-      if (edgeDiff > 0.08 && edgeDiff < 0.92) {
-        float lineBlend = clamp(sharpWeight * 0.75, 0.0, 0.70);
-        lineEnhanced = mix(filtered, minNeighbor, lineBlend);
+      float l_tl = getLuma(ul); float l_tc = getLuma(up); float l_tr = getLuma(ur);
+      float l_ml = getLuma(lf); float l_mc = getLuma(filtered); float l_mr = getLuma(rt);
+      float l_bl = getLuma(dl); float l_bc = getLuma(dn); float l_br = getLuma(dr);
+
+      float gx = (l_tr + 2.0 * l_mr + l_br) - (l_tl + 2.0 * l_ml + l_bl);
+      float gy = (l_bl + 2.0 * l_bc + l_br) - (l_tl + 2.0 * l_tc + l_tr);
+      float gradLen = sqrt(gx * gx + gy * gy);
+
+      if (gradLen > 0.06) {
+        vec2 normal = normalize(vec2(gx, gy));
+        vec3 sampleA = texture2D(u_image, uv - normal * step * 0.85).rgb;
+        vec3 sampleB = texture2D(u_image, uv + normal * step * 0.85).rgb;
+
+        float lumaA = getLuma(sampleA);
+        float lumaB = getLuma(sampleB);
+
+        vec3 minSample = (lumaA < lumaB) ? sampleA : sampleB;
+        vec3 maxSample = (lumaA < lumaB) ? sampleB : sampleA;
+
+        float edgeContrast = max(lumaA, lumaB) - min(lumaA, lumaB);
+        float blendFactor = clamp(sharpWeight * 0.75 * edgeContrast * 2.5, 0.0, 0.65);
+
+        if (l_mc > min(lumaA, lumaB) + 0.08) {
+          lineEnhanced = mix(filtered, maxSample, blendFactor * 0.55);
+        } else {
+          lineEnhanced = mix(filtered, minSample, blendFactor * 0.40);
+        }
       } else {
         vec3 blur = (up + dn + lf + rt) * 0.25;
         vec3 detail = filtered - blur;
-        lineEnhanced = clamp(filtered + detail * (sharpWeight * 1.1), 0.0, 1.0);
+        vec3 clampedDetail = clamp(detail, vec3(-0.15), vec3(0.15));
+        lineEnhanced = clamp(filtered + clampedDetail * (sharpWeight * 1.1), 0.0, 1.0);
       }
     }
 
@@ -810,7 +832,27 @@ export class VideoEnhancer {
   /**
    * Calcula o plano de aprimoramento ideal adaptado automaticamente à resolução e tipo de conteúdo
    */
-  public computeProcessingPlan(metrics: VideoFrameMetrics): VideoProcessingPlan {
+  public computeProcessingPlan(metrics: VideoFrameMetrics, intensityOverride?: EnhancementIntensity): VideoProcessingPlan {
+    const effectiveIntensity = intensityOverride || this.settings.intensity || 'auto';
+
+    // Regra de Perfeição: Vídeo impecável em resolução nativa evita processamento desnecessário
+    if (metrics.isPristine && (effectiveIntensity === 'auto')) {
+      return {
+        pipeline: 'passthrough',
+        activeEngine: 'passthrough',
+        upscalingApplied: false,
+        upscalingMethod: 'none',
+        sharpenAmount: 0,
+        denoiseAmount: 0,
+        lineThinningAmount: 0,
+        luminanceCorrection: 0,
+        contrastMultiplier: 1.0,
+        saturationMultiplier: 1.0,
+        cssFilterString: 'none',
+        explanation: 'Vídeo impecável em alta definição (Passthrough sem desperdício de GPU)'
+      };
+    }
+
     const isAnime = metrics.category === 'anime';
     const is3D = metrics.category === 'animation-3d';
     const h = metrics.sourceHeight;

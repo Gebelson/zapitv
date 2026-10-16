@@ -11,6 +11,7 @@ import {
   TechnicalContext
 } from './feedbackTypes';
 import { ContentItem } from '../../../types';
+import { classifyFeedbackMedia } from './mediaClassifier';
 
 export interface PlaybackContextOptions {
   item?: ContentItem;
@@ -102,6 +103,12 @@ export class FeedbackCollector {
   public static captureTechnicalContext(options: PlaybackContextOptions = {}): TechnicalContext {
     const env = this.detectEnvironment();
     const item = options.item;
+    const classification = classifyFeedbackMedia(
+      item,
+      options.season,
+      options.episode,
+      options.streamName
+    );
 
     let host = options.streamUrlHost;
     if (!host && options.sourceId && options.sourceId.includes('://')) {
@@ -113,12 +120,12 @@ export class FeedbackCollector {
     const currentRoute = typeof window !== 'undefined' && window.location ? window.location.pathname : '/';
 
     return {
-      // Mídia
-      canonicalMediaId: item?.id,
-      mediaTitle: item?.title,
-      mediaType: item?.type === 'movie' ? 'movie' : (item?.type === 'anime' ? 'anime' : (item?.type === 'series' ? 'series' : 'app')),
-      season: options.season,
-      episode: options.episode,
+      // Mídia rigorosamente tipada
+      canonicalMediaId: classification.canonicalMediaId || item?.id,
+      mediaTitle: item?.title || (classification.displayTitle || undefined),
+      mediaType: classification.mediaType,
+      season: classification.season,
+      episode: classification.episode,
       year: item?.year,
       tmdbId: item?.tmdbId ? String(item.tmdbId) : undefined,
       imdbId: item?.imdbId,
@@ -203,4 +210,16 @@ export class FeedbackCollector {
       };
     }
   }
+
+  /**
+   * Método de conveniência para submissão direta de feedbacks
+   */
+  public static submitFeedback(
+    category: FeedbackCategory,
+    userDescription?: string,
+    contextOptions: PlaybackContextOptions = {}
+  ): Promise<FeedbackSubmissionResponse> {
+    return FeedbackCollector.sendFeedback(category, userDescription, contextOptions);
+  }
 }
+

@@ -24,11 +24,12 @@ export class FeedbackClusteringEngine {
     category: FeedbackCategory,
     context: Partial<TechnicalContext>
   ): { fingerprint: string; data: IssueFingerprintData } {
+    const isMovie = context.mediaType === 'movie';
     const mediaId = (context.canonicalMediaId || context.tmdbId || context.imdbId || 'global')
       .toLowerCase()
       .trim();
-    const season = context.season || 0;
-    const episode = context.episode || 0;
+    const season = !isMovie ? (context.season || 0) : 0;
+    const episode = !isMovie ? (context.episode || 0) : 0;
     const provider = (context.providerId || 'unknown').toLowerCase().trim();
     const failureStage = context.failureStage || 'none';
     const errorCode = context.errorCode ? context.errorCode.toUpperCase().trim() : 'NONE';
@@ -42,7 +43,7 @@ export class FeedbackClusteringEngine {
     }
 
     // Assinatura Level 1: Específica por obra, episódio e componente
-    const isEpisodeSpecific = season > 0 || episode > 0;
+    const isEpisodeSpecific = !isMovie && (season > 0 && episode > 0);
     const epKey = isEpisodeSpecific ? `S${season}E${episode}` : 'ALL';
     const errKey = errorCode !== 'NONE' ? errorCode : failureStage;
 
@@ -53,8 +54,8 @@ export class FeedbackClusteringEngine {
     const data: IssueFingerprintData = {
       category,
       canonicalMediaId: mediaId !== 'global' ? mediaId : undefined,
-      season: season > 0 ? season : undefined,
-      episode: episode > 0 ? episode : undefined,
+      season: (!isMovie && season > 0 && episode > 0) ? season : undefined,
+      episode: (!isMovie && season > 0 && episode > 0) ? episode : undefined,
       providerId: provider !== 'unknown' ? provider : undefined,
       sourceHost: sourceHost !== 'unknown' ? sourceHost : undefined,
       errorCode: errorCode !== 'NONE' ? errorCode : undefined,
@@ -74,7 +75,8 @@ export class FeedbackClusteringEngine {
   ): string {
     const categoryName = FEEDBACK_CATEGORY_LABELS[category] || 'Problema de Reprodução';
     const mediaName = context.mediaTitle ? context.mediaTitle.trim() : null;
-    const isEpisode = (context.season || 0) > 0 && (context.episode || 0) > 0;
+    const isMovie = context.mediaType === 'movie';
+    const isEpisode = !isMovie && (context.season || 0) > 0 && (context.episode || 0) > 0;
 
     if (mediaName) {
       if (isEpisode) {
@@ -380,8 +382,9 @@ export class FeedbackClusteringEngine {
       });
     }
 
+    const isMovie = technicalContext.mediaType === 'movie';
     const affectedEpisodes: Array<{ season: number; episode: number }> = [];
-    if (technicalContext.season && technicalContext.episode) {
+    if (!isMovie && technicalContext.season && technicalContext.episode) {
       affectedEpisodes.push({
         season: technicalContext.season,
         episode: technicalContext.episode
@@ -472,9 +475,10 @@ export class FeedbackClusteringEngine {
       });
     }
 
-    // Adiciona novo episódio se não existir
+    // Adiciona novo episódio se não existir e não for filme
+    const isMovie = technicalContext.mediaType === 'movie';
     const affectedEpisodes = [...cluster.affectedEpisodes];
-    if (technicalContext.season && technicalContext.episode) {
+    if (!isMovie && technicalContext.season && technicalContext.episode) {
       const epExists = affectedEpisodes.some(
         e => e.season === technicalContext.season && e.episode === technicalContext.episode
       );

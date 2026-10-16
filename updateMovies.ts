@@ -2442,59 +2442,57 @@ const enrichedMovies = [
   }
 ];
 
-export async function updateMovies() {
-  // Deduplicate existing content
-  let existingContent = await db.content.toArray();
+export const ENRICHED_MOVIES_SYNC_KEY = 'zapitv_enriched_sync_v6';
+
+export async function updateMovies(initialContent?: ContentItem[]): Promise<ContentItem[]> {
+  let existingContent = initialContent ? [...initialContent] : await db.content.toArray();
   const titlesMap = new Map<string, ContentItem[]>();
-  
+
   for (const item of existingContent) {
     const title = item.title.toLowerCase().trim();
-    if (!titlesMap.has(title)) {
-      titlesMap.set(title, []);
+    let group = titlesMap.get(title);
+    if (!group) {
+      group = [];
+      titlesMap.set(title, group);
     }
-    titlesMap.get(title)!.push(item);
+    group.push(item);
   }
 
-  const idsToDelete: string[] = [];
+  const idsToDelete = new Set<string>();
 
-  for (const [title, items] of titlesMap.entries()) {
+  for (const items of titlesMap.values()) {
     if (items.length > 1) {
-      // Sort items: those with imdbId come first, then those with description !== 'Sinopse indisponível.', then by rating
       items.sort((a, b) => {
         const aHasImdb = a.imdbId ? 1 : 0;
         const bHasImdb = b.imdbId ? 1 : 0;
         if (aHasImdb !== bHasImdb) return bHasImdb - aHasImdb;
-        
+
         const aHasDesc = a.description && a.description !== "Sinopse indisponível." ? 1 : 0;
         const bHasDesc = b.description && b.description !== "Sinopse indisponível." ? 1 : 0;
         if (aHasDesc !== bHasDesc) return bHasDesc - aHasDesc;
-        
+
         return (b.rating || 0) - (a.rating || 0);
       });
-      
-      // Keep the first one, delete the rest
+
       for (let i = 1; i < items.length; i++) {
-        idsToDelete.push(items[i].id);
+        idsToDelete.add(items[i].id);
       }
     }
   }
 
-  if (idsToDelete.length > 0) {
-    await db.content.bulkDelete(idsToDelete);
-    console.log(`Deleted ${idsToDelete.length} duplicate movies.`);
-    // Re-fetch existing content after deduplication
-    existingContent = await db.content.toArray();
+  if (idsToDelete.size > 0) {
+    existingContent = existingContent.filter(item => !idsToDelete.has(item.id));
+    await db.content.bulkDelete(Array.from(idsToDelete));
   }
 
-  const updates: ContentItem[] = [];
-  const newItems: ContentItem[] = [];
+  const existingById = new Map(existingContent.map(item => [item.id, item]));
   const existingByTitle = new Map(existingContent.map(item => [item.title, item]));
   const existingByImdb = new Map(existingContent.filter(item => item.imdbId).map(item => [item.imdbId!, item]));
+  const dirtyById = new Map<string, ContentItem>();
 
   for (const movie of enrichedMovies) {
     const existing = existingByTitle.get(movie.title) || (movie.imdbId ? existingByImdb.get(movie.imdbId) : undefined);
-    
-    // Determine the correct videoUrl
+
     let finalVideoUrl = movie.videoUrl;
     let imdbId = movie.imdbId;
     if (!imdbId && movie.videoUrl && movie.videoUrl.includes('/movie/tt')) {
@@ -2508,24 +2506,11 @@ export async function updateMovies() {
     if (existing) {
       let changed = false;
       const updated = { ...existing };
-      
-      // Update all properties if they differ
-      if (finalVideoUrl && existing.videoUrl !== finalVideoUrl) {
-        updated.videoUrl = finalVideoUrl;
-        changed = true;
-      }
-      if (movie.imdbId && existing.imdbId !== movie.imdbId) {
-        updated.imdbId = movie.imdbId;
-        changed = true;
-      }
-      if (movie.image && existing.image !== movie.image) {
-        updated.image = movie.image;
-        changed = true;
-      }
-      if (movie.backdrop && existing.backdrop !== movie.backdrop) {
-        updated.backdrop = movie.backdrop;
-        changed = true;
-      }
+
+      if (finalVideoUrl && existing.videoUrl !== finalVideoUrl) { updated.videoUrl = finalVideoUrl; changed = true; }
+      if (movie.imdbId && existing.imdbId !== movie.imdbId) { updated.imdbId = movie.imdbId; changed = true; }
+      if (movie.image && existing.image !== movie.image) { updated.image = movie.image; changed = true; }
+      if (movie.backdrop && existing.backdrop !== movie.backdrop) { updated.backdrop = movie.backdrop; changed = true; }
       if (movie.description && existing.description !== movie.description && existing.description === "Sinopse indisponível.") {
         updated.description = movie.description;
         changed = true;
@@ -2534,10 +2519,7 @@ export async function updateMovies() {
         updated.rating = movie.rating;
         changed = true;
       }
-      if (movie.director && existing.director !== movie.director) {
-        updated.director = movie.director;
-        changed = true;
-      }
+      if (movie.director && existing.director !== movie.director) { updated.director = movie.director; changed = true; }
       if (movie.cast && movie.cast.length > 0 && (!existing.cast || existing.cast.length === 0)) {
         updated.cast = movie.cast;
         changed = true;
@@ -2546,16 +2528,14 @@ export async function updateMovies() {
         updated.genres = movie.genres;
         changed = true;
       }
-      if (movie.ageRating && existing.ageRating !== movie.ageRating) {
-        updated.ageRating = movie.ageRating;
-        changed = true;
-      }
-      
+      if (movie.ageRating && existing.ageRating !== movie.ageRating) { updated.ageRating = movie.ageRating; changed = true; }
+
       if (changed) {
-        updates.push(updated);
+        existingById.set(updated.id, updated);
+        dirtyById.set(updated.id, updated);
       }
     } else {
-      newItems.push({
+      const created: ContentItem = {
         id: movie.id || `movie-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         title: movie.title,
         type: ContentType.MOVIE,
@@ -2572,21 +2552,13 @@ export async function updateMovies() {
         ageRating: movie.ageRating,
         platform: movie.platform || "Outros",
         isFeatured: movie.isFeatured || false
-      });
+      };
+      existingById.set(created.id, created);
+      dirtyById.set(created.id, created);
     }
   }
 
-  if (updates.length > 0) {
-    await db.content.bulkPut(updates);
-  }
-  if (newItems.length > 0) {
-    await db.content.bulkPut(newItems);
-  }
-
-  // Also update any other existing movies in the database that might not be in enrichedMovies
-  const allExisting = await db.content.toArray();
-  const extraUpdates: ContentItem[] = [];
-  for (const item of allExisting) {
+  for (const item of existingById.values()) {
     if (item.type === ContentType.MOVIE) {
       let imdbId = item.imdbId;
       if (!imdbId && item.videoUrl && item.videoUrl.includes('/movie/tt')) {
@@ -2596,13 +2568,22 @@ export async function updateMovies() {
       if (imdbId) {
         const newUrl = `https://embedplayapi.site/embed/${imdbId}`;
         if (item.videoUrl !== newUrl) {
-          extraUpdates.push({ ...item, videoUrl: newUrl, imdbId: imdbId });
+          const updated = { ...item, videoUrl: newUrl, imdbId };
+          existingById.set(updated.id, updated);
+          dirtyById.set(updated.id, updated);
         }
       }
     }
   }
-  if (extraUpdates.length > 0) {
-    await db.content.bulkPut(extraUpdates);
-    console.log(`Updated ${extraUpdates.length} existing movies with new videasy.net URL.`);
+
+  if (dirtyById.size > 0) {
+    await db.content.bulkPut(Array.from(dirtyById.values()));
   }
+
+  try {
+    localStorage.setItem(ENRICHED_MOVIES_SYNC_KEY, '1');
+  } catch {}
+
+  return Array.from(existingById.values());
 }
+

@@ -98,4 +98,5 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ isDarkMode }) =
   );
 };
 
-export default AnimatedBackground;
+export default React.memo(AnimatedBackground);
+

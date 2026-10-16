@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   AlertCircle, 
   CheckCircle2, 
@@ -23,6 +24,7 @@ import {
   FeedbackCollector, 
   PlaybackContextOptions 
 } from '../../core/feedback/feedbackCollector';
+import { classifyFeedbackMedia } from '../../core/feedback/mediaClassifier';
 
 interface ReportFeedbackModalProps {
   isOpen: boolean;
@@ -79,18 +81,21 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
     }
   }, [isOpen, defaultCategory]);
 
-  // Fechamento com tecla Escape
+  // Fechamento exclusivo com tecla Escape na fase de captura (evita fechar modais pai)
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         onClose();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -128,16 +133,27 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
     }
   };
 
-  const titleContext = playbackContext?.item?.title || 
-    (playbackContext?.item?.type === 'series' && playbackContext?.season !== undefined 
-      ? `Temporada ${playbackContext.season}, Episódio ${playbackContext.episode || 1}` 
-      : null);
+  const mediaInfo = classifyFeedbackMedia(
+    playbackContext?.item,
+    playbackContext?.season,
+    playbackContext?.episode,
+    playbackContext?.streamName
+  );
 
-  return (
+  const modalContent = (
     <div 
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
-      onClick={(e) => {
+      onMouseDown={(e) => {
+        e.stopPropagation();
         if (e.target === e.currentTarget) {
+          e.preventDefault();
+          onClose();
+        }
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
           onClose();
         }
       }}
@@ -148,6 +164,7 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
         aria-modal="true"
         aria-labelledby="feedback-modal-title"
         className="w-full max-w-lg bg-[#0f1115] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] text-white"
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -166,8 +183,14 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             title="Fechar"
             aria-label="Fechar"
           >
@@ -188,24 +211,24 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
               </p>
               <button
                 type="button"
-                onClick={onClose}
-                className="mt-4 px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onClose();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="mt-4 px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors cursor-pointer"
               >
                 Concluir
               </button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              {titleContext && (
+              {mediaInfo.displayTitle && (
                 <div className="p-2.5 rounded-lg bg-white/5 border border-white/10 flex items-center justify-between text-xs text-white/80">
                   <span className="text-white/50 font-medium">Conteúdo atual:</span>
                   <span className="font-semibold text-white truncate max-w-[280px]">
-                    {titleContext}
-                    {playbackContext?.season !== undefined && playbackContext?.episode !== undefined && (
-                      <span className="text-[#007df7] ml-1">
-                        (T{playbackContext.season}:E{playbackContext.episode})
-                      </span>
-                    )}
+                    {mediaInfo.displayTitle}
                   </span>
                 </div>
               )}
@@ -269,15 +292,20 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors font-medium"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onClose();
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className="px-4 py-2 text-sm text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors font-medium cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 bg-[#007df7] hover:bg-[#007df7]/90 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-[#007df7]/25 flex items-center gap-2"
+                  className="px-5 py-2 bg-[#007df7] hover:bg-[#007df7]/90 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-[#007df7]/25 flex items-center gap-2 cursor-pointer"
                 >
                   {submitting ? (
                     <>
@@ -298,4 +326,10 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 };
+

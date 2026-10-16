@@ -20,7 +20,8 @@
     "lucide-react": "^0.563.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "trystero": "^0.26.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.9",

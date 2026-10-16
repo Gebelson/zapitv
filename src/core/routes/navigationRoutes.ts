@@ -23,6 +23,9 @@ export const ROUTES = {
   AUTH: '/login',
   ADMIN: '/admin',
   ADMIN_WILDCARD: '/admin/*',
+  DEV_LAB: '/dev/video-enhancement-lab',
+  DEV_PLAYER_TEST: '/dev/player-test',
+  WATCH_PARTY: '/sala/:roomId',
   NOT_FOUND: '*'
 } as const;
 
@@ -47,3 +50,8 @@ export function getEpisodeRoute(item: ContentItem, season: number, episode: numb
   }
   return `/series/${item.id}/temporada/${season}/episodio/${episode}`;
 }
+
+export function getWatchPartyRoute(roomId: string): string {
+  return `/sala/${roomId}`;
+}
+

@@ -158,7 +158,7 @@ export function formatContentItem(raw: TMDBRawItem, forcedType?: ContentType): C
 
   const poster = raw.poster_path 
     ? `${TMDB_IMAGE_BASE}${raw.poster_path}` 
-    : '';
+    : (raw.backdrop_path ? `${TMDB_IMAGE_BASE}${raw.backdrop_path}` : '');
 
   const backdrop = raw.backdrop_path 
     ? `${TMDB_BACKDROP_BASE}${raw.backdrop_path}` 
@@ -198,6 +198,9 @@ export function formatCinemetaItem(raw: CinemetaMetaItem): ContentItem {
     rawGenres.push('Adulto');
   }
 
+  const poster = raw.poster || raw.background || '';
+  const backdrop = raw.background || raw.poster || '';
+
   return {
     id: raw.id,
     imdbId: raw.id,
@@ -207,8 +210,8 @@ export function formatCinemetaItem(raw: CinemetaMetaItem): ContentItem {
     mediaFormat: isMovie ? 'movie' : 'series',
     rating: isNaN(ratingNum) ? 8.0 : ratingNum,
     year: isNaN(yearNum) ? 2024 : yearNum,
-    image: raw.poster || '',
-    backdrop: raw.background || raw.poster || '',
+    image: poster,
+    backdrop,
     description: raw.description || 'Disponível no catálogo oficial do Stremio / Cinemeta.',
     genres: rawGenres,
     isFeatured: ratingNum >= 7.5,
@@ -1033,6 +1036,21 @@ class TMDBClientService {
       if (err?.name === 'AbortError' || signal?.aborted) return { movies: [], series: [], all: [] };
       console.warn(`[TMDBClient] Erro ao obter filmografia do artista ${personId}:`, err);
       return { movies: [], series: [], all: [] };
+    }
+  }
+
+  /**
+   * Obtém imagens oficiais completas (pôsteres e backdrops) em múltiplos idiomas
+   */
+  public async getImages(id: string | number, isMovie = true): Promise<{ posters: string[]; backdrops: string[] }> {
+    try {
+      const endpoint = isMovie ? `/movie/${id}/images` : `/tv/${id}/images`;
+      const data = await this.request(`${endpoint}?include_image_language=pt,en,null,es,fr,it,de,ja`);
+      const posters = (data?.posters || []).map((p: any) => `${TMDB_IMAGE_BASE}${p.file_path}`);
+      const backdrops = (data?.backdrops || []).map((b: any) => `${TMDB_BACKDROP_BASE}${b.file_path}`);
+      return { posters, backdrops };
+    } catch {
+      return { posters: [], backdrops: [] };
     }
   }
 }

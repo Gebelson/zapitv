@@ -133,26 +133,6 @@ const ProgramasView: React.FC<ProgramasViewProps> = ({ isDarkMode, initialMode }
             Programas
           </h2>
         </div>
-
-        {/* Barra de Busca de Canais e Programas ao Vivo */}
-        <div className="relative w-full md:w-80 shrink-0">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar canal ou programa..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-2xl text-white text-xs sm:text-sm placeholder-gray-500 outline-none focus:border-[#007df7] focus:bg-white/10 transition-all"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-1"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
       </div>
 
       {/* ========================================================================= */}

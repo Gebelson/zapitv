@@ -833,7 +833,7 @@ function formatContentItem(raw, forcedType) {
   if (isAdult && !genres.includes("Adulto")) {
     genres.push("Adulto");
   }
-  const poster = raw.poster_path ? `${TMDB_IMAGE_BASE}${raw.poster_path}` : "";
+  const poster = raw.poster_path ? `${TMDB_IMAGE_BASE}${raw.poster_path}` : raw.backdrop_path ? `${TMDB_IMAGE_BASE}${raw.backdrop_path}` : "";
   const backdrop = raw.backdrop_path ? `${TMDB_BACKDROP_BASE}${raw.backdrop_path}` : poster || "";
   return {
     id: `tmdb-${raw.id}`,
@@ -866,6 +866,8 @@ function formatCinemetaItem(raw) {
   if (isAdult && !rawGenres.includes("Adulto")) {
     rawGenres.push("Adulto");
   }
+  const poster = raw.poster || raw.background || "";
+  const backdrop = raw.background || raw.poster || "";
   return {
     id: raw.id,
     imdbId: raw.id,
@@ -875,8 +877,8 @@ function formatCinemetaItem(raw) {
     mediaFormat: isMovie ? "movie" : "series",
     rating: isNaN(ratingNum) ? 8 : ratingNum,
     year: isNaN(yearNum) ? 2024 : yearNum,
-    image: raw.poster || "",
-    backdrop: raw.background || raw.poster || "",
+    image: poster,
+    backdrop,
     description: raw.description || "Dispon\xEDvel no cat\xE1logo oficial do Stremio / Cinemeta.",
     genres: rawGenres,
     isFeatured: ratingNum >= 7.5,
@@ -1547,6 +1549,20 @@ var TMDBClientService = class {
       if (err?.name === "AbortError" || signal?.aborted) return { movies: [], series: [], all: [] };
       console.warn(`[TMDBClient] Erro ao obter filmografia do artista ${personId}:`, err);
       return { movies: [], series: [], all: [] };
+    }
+  }
+  /**
+   * Obtém imagens oficiais completas (pôsteres e backdrops) em múltiplos idiomas
+   */
+  async getImages(id, isMovie = true) {
+    try {
+      const endpoint = isMovie ? `/movie/${id}/images` : `/tv/${id}/images`;
+      const data = await this.request(`${endpoint}?include_image_language=pt,en,null,es,fr,it,de,ja`);
+      const posters = (data?.posters || []).map((p) => `${TMDB_IMAGE_BASE}${p.file_path}`);
+      const backdrops = (data?.backdrops || []).map((b) => `${TMDB_BACKDROP_BASE}${b.file_path}`);
+      return { posters, backdrops };
+    } catch {
+      return { posters: [], backdrops: [] };
     }
   }
 };
@@ -5388,6 +5404,8 @@ var MediaAvailabilityIndex = class _MediaAvailabilityIndex {
   constructor() {
     this.index = /* @__PURE__ */ new Map();
     this.listeners = /* @__PURE__ */ new Set();
+    this.saveTimer = null;
+    this.notifyTimer = null;
     this.cleanOldNegativeCaches();
     this.loadFromStorage();
   }
@@ -5464,12 +5482,16 @@ var MediaAvailabilityIndex = class _MediaAvailabilityIndex {
   }
   saveToStorage() {
     if (typeof window === "undefined" || !window.localStorage) return;
-    try {
-      const items = Array.from(this.index.values()).sort((a, b) => (b.checkedAt || 0) - (a.checkedAt || 0)).slice(0, 1e3);
-      localStorage.setItem(STORAGE_INDEX_KEY, JSON.stringify(items));
-    } catch (e) {
-      console.warn("Erro ao persistir \xEDndice de disponibilidade:", e);
-    }
+    if (this.saveTimer) return;
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      try {
+        const items = Array.from(this.index.values()).sort((a, b) => (b.checkedAt || 0) - (a.checkedAt || 0)).slice(0, 1e3);
+        localStorage.setItem(STORAGE_INDEX_KEY, JSON.stringify(items));
+      } catch (e) {
+        console.warn("Erro ao persistir \xEDndice de disponibilidade:", e);
+      }
+    }, 300);
   }
   getCanonicalKey(item) {
     if (item.id) return item.id.toLowerCase();
@@ -5670,13 +5692,19 @@ var MediaAvailabilityIndex = class _MediaAvailabilityIndex {
     return () => this.listeners.delete(listener);
   }
   notify() {
-    const stats = this.getStats();
-    for (const listener of this.listeners) {
-      try {
-        listener(stats);
-      } catch {
+    if (this.listeners.size === 0) return;
+    if (this.notifyTimer) return;
+    this.notifyTimer = setTimeout(() => {
+      this.notifyTimer = null;
+      if (this.listeners.size === 0) return;
+      const stats = this.getStats();
+      for (const listener of this.listeners) {
+        try {
+          listener(stats);
+        } catch {
+        }
       }
-    }
+    }, 120);
   }
   clearAll() {
     this.index.clear();
@@ -8683,8 +8711,8 @@ var FEATURED_CATALOG_ITEMS = [
     type: "FILME" /* MOVIE */,
     rating: 7.8,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt31454558/img",
-    backdrop: "https://images.metahub.space/background/medium/tt31454558/img",
+    image: "https://image.tmdb.org/t/p/w500/1ATXKrIPJyKNwnJ6lcG088Sa6zi.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/b7t3r39Oll5qPxBKzLZ8eHMBD7l.jpg",
     description: "Em uma regi\xE3o montanhosa e remota, um homem solit\xE1rio se v\xEA diante de conflitos do passado quando seu filho reaparece inesperadamente.",
     genres: ["Aventura", "Drama", "A\xE7\xE3o"],
     imdbId: "tt31454558",
@@ -8734,8 +8762,8 @@ var FEATURED_CATALOG_ITEMS = [
     type: "FILME" /* MOVIE */,
     rating: 7.2,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt28704204/img",
-    backdrop: "https://images.metahub.space/background/medium/tt28704204/img",
+    image: "https://image.tmdb.org/t/p/w500/i3kvS445sWWIhuxgXywPuUcsoP0.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/ePIY6b8TlIjqFzK1JKANPhxUIPn.jpg",
     description: "Cap\xEDtulo aterrorizante da saga onde padres e especialistas espirituais enfrentam manifesta\xE7\xF5es demon\xEDacas em comunidades isoladas.",
     genres: ["Terror", "Mist\xE9rio"],
     imdbId: "tt28704204",
@@ -8751,8 +8779,8 @@ var FEATURED_CATALOG_ITEMS = [
     type: "FILME" /* MOVIE */,
     rating: 7.5,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt31828574/img",
-    backdrop: "https://images.metahub.space/background/medium/tt31828574/img",
+    image: "https://image.tmdb.org/t/p/w500/lFKA4GMz36dImEy3DQPdPF7G4V9.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/y6RIuwuxLG3Nsb37KUj5yatnTIp.jpg",
     description: "A\xE7\xE3o em alta velocidade inspirada na lend\xE1ria linha de ve\xEDculos e pistas radicais, com persegui\xE7\xF5es cinematogr\xE1ficas alucinantes.",
     genres: ["A\xE7\xE3o", "Aventura"],
     imdbId: "tt31828574",
@@ -8836,8 +8864,8 @@ var FEATURED_CATALOG_ITEMS = [
     type: "FILME" /* MOVIE */,
     rating: 7.7,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt1392796/img",
-    backdrop: "https://images.metahub.space/background/medium/tt1392796/img",
+    image: "https://image.tmdb.org/t/p/w500/39aMkR8Y5vhCG9dTkjiqRl8AVqp.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/58D9nalUYW5L5K0guw7hcpsEJBH.jpg",
     description: "A hist\xF3ria real da ca\xE7ada do FBI ao terrorista matem\xE1tico Ted Kaczynski e a revolu\xE7\xE3o dos m\xE9todos de an\xE1lise lingu\xEDstica forense.",
     genres: ["Biografia", "Crime", "Drama"],
     imdbId: "tt1392796",
@@ -8913,7 +8941,7 @@ var FEATURED_CATALOG_ITEMS = [
     availabilityStatus: "verified",
     audioStatus: "pt-br-dubbed"
   },
-  // 16. BACKROOMS: UM NÃO-LUGAR (2026 - tt26658104)
+  // 16. BACKROOMS: UM NÃO-LUGAR (2026 - tt26657236)
   {
     id: "movie-backrooms-2026",
     title: "Backrooms: Um N\xE3o-Lugar",
@@ -8921,16 +8949,17 @@ var FEATURED_CATALOG_ITEMS = [
     type: "FILME" /* MOVIE */,
     rating: 7.1,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt26658104/img",
-    backdrop: "https://images.metahub.space/background/medium/tt26658104/img",
+    image: "https://image.tmdb.org/t/p/w500/rhGx6E3qRNMgj3i5su2oukNHwIQ.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/dqmMWNWfLnExDRpMtIMqI97GQFR.jpg",
     description: "Ao cair fora da realidade, um jovem se encontra em um labirinto infinito de salas vazias e carpete \xFAmido com entidades \xE0 espreita.",
     genres: ["Terror", "Fic\xE7\xE3o Cient\xEDfica"],
-    imdbId: "tt26658104",
+    imdbId: "tt26657236",
+    tmdbId: "1083381",
     isFeatured: true,
     availabilityStatus: "verified",
     audioStatus: "pt-br-dubbed"
   },
-  // 17. THE UPRISING: RISE OF ROBIN HOOD (2026 - tt18944118)
+  // 17. THE UPRISING: RISE OF ROBIN HOOD (2026 - tt27546684)
   {
     id: "movie-the-uprising-2026",
     title: "The Uprising: Rise of Robin Hood",
@@ -8938,16 +8967,17 @@ var FEATURED_CATALOG_ITEMS = [
     type: "FILME" /* MOVIE */,
     rating: 7,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt18944118/img",
-    backdrop: "https://images.metahub.space/background/medium/tt18944118/img",
+    image: "https://image.tmdb.org/t/p/w500/7TUl15TOsIvndKlgMWTtLgtEzZP.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/y0reRTsewsPh0ePtgvDeLIsb5Wk.jpg",
     description: "As origens sombrias e sangrentas da rebeli\xE3o de Robin dos Bosques contra a corrup\xE7\xE3o da monarquia brit\xE2nica.",
     genres: ["A\xE7\xE3o", "Aventura", "Hist\xF3rico"],
-    imdbId: "tt18944118",
+    imdbId: "tt27546684",
+    tmdbId: "977942",
     isFeatured: true,
     availabilityStatus: "verified",
     audioStatus: "pt-br-dubbed"
   },
-  // 23. CARRIE, A ESTRANHA (1976 - tt0074296)
+  // 23. CARRIE, A ESTRANHA (1976 - tt0074285)
   {
     id: "movie-carrie-1976",
     title: "Carrie, a Estranha",
@@ -8955,11 +8985,12 @@ var FEATURED_CATALOG_ITEMS = [
     type: "FILME" /* MOVIE */,
     rating: 7.4,
     year: 1976,
-    image: "https://images.metahub.space/poster/medium/tt0074296/img",
-    backdrop: "https://images.metahub.space/background/medium/tt0074296/img",
+    image: "https://image.tmdb.org/t/p/w500/8tT1rqlsTguyfUBMrbHR9cv1rxM.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/jyrqiT3BaUQVcGnLRkCwopnkyKj.jpg",
     description: "Carrie White, uma adolescente t\xEDmida e marginalizada com poderes telecin\xE9ticos, liberta sua f\xFAria ap\xF3s uma humilha\xE7\xE3o traum\xE1tica no baile escolar.",
     genres: ["Terror", "Drama"],
-    imdbId: "tt0074296",
+    imdbId: "tt0074285",
+    tmdbId: "7340",
     isFeatured: true,
     availabilityStatus: "verified",
     audioStatus: "pt-br-dubbed"
@@ -8975,8 +9006,8 @@ var FEATURED_CATALOG_ITEMS = [
     type: "S\xC9RIE" /* SERIES */,
     rating: 7.5,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt30147890/img",
-    backdrop: "https://images.metahub.space/background/medium/tt30147890/img",
+    image: "https://image.tmdb.org/t/p/w500/kloXz9qwO23z9Kbt3z3MgnjF4xO.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/pmJDMH2YX9YrIwiawqPrgpRiZXb.jpg",
     description: "Nova adapta\xE7\xE3o seriada da obra-prima de Stephen King sobre Carrie White e os segredos da sua pacata cidade.",
     genres: ["Terror", "Drama"],
     imdbId: "tt30147890",
@@ -8993,8 +9024,8 @@ var FEATURED_CATALOG_ITEMS = [
     type: "S\xC9RIE" /* SERIES */,
     rating: 7.6,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt32159846/img",
-    backdrop: "https://images.metahub.space/background/medium/tt32159846/img",
+    image: "https://image.tmdb.org/t/p/w500/3aoRvpHjuRmn76P2AVXZIBDoCdg.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/ixSG9hAB54A1dlmBOW8qTExOyzw.jpg",
     description: "Uma expedi\xE7\xE3o submarina a uma fossa abissal revela segredos que deveriam ter permanecido ocultos sob as ondas.",
     genres: ["Mist\xE9rio", "Fic\xE7\xE3o Cient\xEDfica"],
     imdbId: "tt32159846",
@@ -9011,11 +9042,12 @@ var FEATURED_CATALOG_ITEMS = [
     type: "S\xC9RIE" /* SERIES */,
     rating: 7.8,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt22020214/img",
-    backdrop: "https://images.metahub.space/background/medium/tt22020214/img",
+    image: "https://image.tmdb.org/t/p/w500/axdUor6gLMTrrB1UF4Qfy0TTSyX.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/70RZX7kNjA0Qjn6HigB1oMvFJ8R.jpg",
     description: "Adapta\xE7\xE3o do \xE9pico cl\xE1ssico de John Steinbeck sobre duas fam\xEDlias cujas hist\xF3rias se entrela\xE7am no vale de Salinas.",
     genres: ["Drama", "Hist\xF3rico"],
     imdbId: "tt22020214",
+    tmdbId: "258165",
     isFeatured: true,
     availabilityStatus: "unreleased",
     audioStatus: "other",
@@ -9029,11 +9061,12 @@ var FEATURED_CATALOG_ITEMS = [
     type: "S\xC9RIE" /* SERIES */,
     rating: 8,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt26540670/img",
-    backdrop: "https://images.metahub.space/background/medium/tt26540670/img",
+    image: "https://image.tmdb.org/t/p/w500/gpC7h43xPMEV3goYMQShfJbTtLq.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/6gqezQJ2mkm4jreWwLyOZy2Vf6i.jpg",
     description: "Os policiais intergal\xE1cticos Hal Jordan e John Stewart investigam um mist\xE9rio sombrio no cora\xE7\xE3o dos Estados Unidos.",
     genres: ["A\xE7\xE3o", "Aventura", "Fic\xE7\xE3o Cient\xEDfica"],
     imdbId: "tt26540670",
+    tmdbId: "95350",
     isFeatured: true,
     availabilityStatus: "unreleased",
     audioStatus: "other",
@@ -9197,7 +9230,7 @@ var FEATURED_CATALOG_ITEMS = [
       }
     ]
   },
-  // 11. MAGNATAS DO CRIME (2024- - tt16066148) — DISPONÍVEL (TVmeter #11)
+  // 11. MAGNATAS DO CRIME (2024- - tt13210838) — DISPONÍVEL (TVmeter #11)
   {
     id: "series-the-gentlemen",
     title: "Magnatas do Crime",
@@ -9205,11 +9238,12 @@ var FEATURED_CATALOG_ITEMS = [
     type: "S\xC9RIE" /* SERIES */,
     rating: 8.1,
     year: 2024,
-    image: "https://images.metahub.space/poster/medium/tt16066148/img",
-    backdrop: "https://images.metahub.space/background/medium/tt16066148/img",
+    image: "https://image.tmdb.org/t/p/w500/e5enRsAImbGcsT0BksqwurjA6CZ.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/l6PSAWVLyaZzwviMwBgYQOPVJ6Y.jpg",
     description: "Eddie Horniman herda inesperadamente a vasta propriedade rural do pai, descobrindo que ela faz parte de um imp\xE9rio bilion\xE1rio da cannabis.",
     genres: ["A\xE7\xE3o", "Com\xE9dia", "Crime"],
-    imdbId: "tt16066148",
+    imdbId: "tt13210838",
+    tmdbId: "125244",
     seasonsCount: 1,
     isFeatured: true,
     availabilityStatus: "verified",
@@ -9220,7 +9254,7 @@ var FEATURED_CATALOG_ITEMS = [
         number: 1,
         title: "Refinado e Perigoso",
         description: "Eddie descobre que o neg\xF3cio secreto da fam\xEDlia vem acompanhado de g\xE2ngsteres exc\xEAntricos e perigosos.",
-        image: "https://images.metahub.space/poster/medium/tt16066148/img"
+        image: "https://image.tmdb.org/t/p/w500/e5enRsAImbGcsT0BksqwurjA6CZ.jpg"
       }
     ]
   },
@@ -9232,11 +9266,12 @@ var FEATURED_CATALOG_ITEMS = [
     type: "S\xC9RIE" /* SERIES */,
     rating: 8.2,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt32567812/img",
-    backdrop: "https://images.metahub.space/background/medium/tt32567812/img",
+    image: "https://image.tmdb.org/t/p/w500/u62d0BPqsdv2TUDifcMmoePbHPL.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/t2KFGH07Al4XuIZLHRlF1Hj9IJB.jpg",
     description: "Uma nova jornada \xE9pica no mundo da dobra elemental onde jovens dominadores protegem os antigos santu\xE1rios sagrados.",
     genres: ["A\xE7\xE3o", "Aventura", "Fantasia"],
     imdbId: "tt32567812",
+    tmdbId: "284833",
     isFeatured: true,
     availabilityStatus: "unreleased",
     audioStatus: "other",
@@ -9250,11 +9285,12 @@ var FEATURED_CATALOG_ITEMS = [
     type: "S\xC9RIE" /* SERIES */,
     rating: 7.9,
     year: 2026,
-    image: "https://images.metahub.space/poster/medium/tt33314545/img",
-    backdrop: "https://images.metahub.space/background/medium/tt33314545/img",
+    image: "https://image.tmdb.org/t/p/w500/lKOPmO0ah17ogQ9hWg7lSd40kIr.jpg",
+    backdrop: "https://image.tmdb.org/t/p/original/uYOYLFQ4q7asuhdiKXCqGaeAQUH.jpg",
     description: "Spin-off de Reacher focado na investigadora de elite Frances Neagley resolvendo casos complexos em Chicago.",
     genres: ["A\xE7\xE3o", "Crime", "Drama"],
     imdbId: "tt33314545",
+    tmdbId: "273207",
     isFeatured: true,
     availabilityStatus: "unreleased",
     audioStatus: "other",
@@ -14757,7 +14793,7 @@ var FeaturedRankingService = class _FeaturedRankingService {
       seenIds.add(catalogItem.id);
       const featuredItem = {
         ...catalogItem,
-        imdbId: catalogItem.imdbId || cand.imdbId,
+        imdbId: cand.imdbId || catalogItem.imdbId,
         isFeatured: true,
         imdbRank: rankPosition,
         displayRank: finalPosition,
@@ -15993,9 +16029,10 @@ var FeedbackClusteringEngine = class {
    * Gera a assinatura técnica normalizada de um relato (Fingerprint)
    */
   static generateFingerprint(category, context) {
+    const isMovie = context.mediaType === "movie";
     const mediaId = (context.canonicalMediaId || context.tmdbId || context.imdbId || "global").toLowerCase().trim();
-    const season = context.season || 0;
-    const episode = context.episode || 0;
+    const season = !isMovie ? context.season || 0 : 0;
+    const episode = !isMovie ? context.episode || 0 : 0;
     const provider = (context.providerId || "unknown").toLowerCase().trim();
     const failureStage = context.failureStage || "none";
     const errorCode = context.errorCode ? context.errorCode.toUpperCase().trim() : "NONE";
@@ -16005,7 +16042,7 @@ var FeedbackClusteringEngine = class {
     } else if (context.sourceId) {
       sourceHost = context.sourceId.toLowerCase();
     }
-    const isEpisodeSpecific = season > 0 || episode > 0;
+    const isEpisodeSpecific = !isMovie && (season > 0 && episode > 0);
     const epKey = isEpisodeSpecific ? `S${season}E${episode}` : "ALL";
     const errKey = errorCode !== "NONE" ? errorCode : failureStage;
     const rawKey = `${category}|${mediaId}|${epKey}|${provider}|${errKey}`;
@@ -16014,8 +16051,8 @@ var FeedbackClusteringEngine = class {
     const data = {
       category,
       canonicalMediaId: mediaId !== "global" ? mediaId : void 0,
-      season: season > 0 ? season : void 0,
-      episode: episode > 0 ? episode : void 0,
+      season: !isMovie && season > 0 && episode > 0 ? season : void 0,
+      episode: !isMovie && season > 0 && episode > 0 ? episode : void 0,
       providerId: provider !== "unknown" ? provider : void 0,
       sourceHost: sourceHost !== "unknown" ? sourceHost : void 0,
       errorCode: errorCode !== "NONE" ? errorCode : void 0,
@@ -16030,7 +16067,8 @@ var FeedbackClusteringEngine = class {
   static generateClusterTitle(category, context) {
     const categoryName = FEEDBACK_CATEGORY_LABELS[category] || "Problema de Reprodu\xE7\xE3o";
     const mediaName = context.mediaTitle ? context.mediaTitle.trim() : null;
-    const isEpisode = (context.season || 0) > 0 && (context.episode || 0) > 0;
+    const isMovie = context.mediaType === "movie";
+    const isEpisode = !isMovie && (context.season || 0) > 0 && (context.episode || 0) > 0;
     if (mediaName) {
       if (isEpisode) {
         return `${mediaName} (T${context.season}:E${context.episode}) \u2014 ${categoryName}`;
@@ -16250,8 +16288,9 @@ var FeedbackClusteringEngine = class {
         type: technicalContext.mediaType || "movie"
       });
     }
+    const isMovie = technicalContext.mediaType === "movie";
     const affectedEpisodes = [];
-    if (technicalContext.season && technicalContext.episode) {
+    if (!isMovie && technicalContext.season && technicalContext.episode) {
       affectedEpisodes.push({
         season: technicalContext.season,
         episode: technicalContext.episode
@@ -16330,8 +16369,9 @@ var FeedbackClusteringEngine = class {
         type: technicalContext.mediaType || "movie"
       });
     }
+    const isMovie = technicalContext.mediaType === "movie";
     const affectedEpisodes = [...cluster.affectedEpisodes];
-    if (technicalContext.season && technicalContext.episode) {
+    if (!isMovie && technicalContext.season && technicalContext.episode) {
       const epExists = affectedEpisodes.some(
         (e) => e.season === technicalContext.season && e.episode === technicalContext.episode
       );
@@ -16434,7 +16474,8 @@ var FeedbackPromptGenerator = class {
     const mediaTitle = technicalContext.mediaTitle || "Aplica\xE7\xE3o ZapiTV";
     const safeUserText = this.sanitizeUserDescription(userDescription);
     const now = Date.now();
-    const isEpisode = (technicalContext.season || 0) > 0 && (technicalContext.episode || 0) > 0;
+    const isMovie = technicalContext.mediaType === "movie";
+    const isEpisode = !isMovie && (technicalContext.season || 0) > 0 && (technicalContext.episode || 0) > 0;
     const epString = isEpisode ? ` (Temporada ${technicalContext.season}, Epis\xF3dio ${technicalContext.episode})` : "";
     const markdown = `# ZAPITV \u2014 INVESTIGA\xC7\xC3O E CORRE\xC7\xC3O: ${categoryLabel.toUpperCase()} EM ${mediaTitle.toUpperCase()}${epString.toUpperCase()}
 
@@ -16571,7 +16612,8 @@ Ao concluir a tarefa, apresente:
     const isRegression = Boolean(cluster.isRegression);
     const regressionDetails = cluster.regressionDetails;
     const mediaListStr = affectedMedia.length > 0 ? affectedMedia.map((m) => `- **${m.title}** (\`${m.id}\`, tipo: ${m.type})`).join("\n") : cluster.technicalFingerprint?.mediaTitle ? `- **${cluster.technicalFingerprint.mediaTitle}**` : "- M\xEDdia gen\xE9rica ou n\xE3o identificada.";
-    const episodesStr = affectedEpisodes.length > 0 ? affectedEpisodes.slice(0, 8).map((e) => `T${e.season}:E${e.episode}`).join(", ") : cluster.technicalFingerprint?.season ? `T${cluster.technicalFingerprint.season}:E${cluster.technicalFingerprint.episode}` : "Todos / N\xE3o aplic\xE1vel";
+    const isMovieCluster = affectedMedia.length > 0 && affectedMedia.every((m) => m.type === "movie");
+    const episodesStr = !isMovieCluster && affectedEpisodes.length > 0 ? affectedEpisodes.slice(0, 8).map((e) => `T${e.season}:E${e.episode}`).join(", ") : isMovieCluster ? "N\xE3o aplic\xE1vel (Filme)" : "Todos / Obra Completa";
     const providersStr = affectedProviders.length > 0 ? affectedProviders.join(", ") : cluster.technicalFingerprint?.providerId || "Desconhecido";
     const sourcesStr = affectedSources.length > 0 ? affectedSources.slice(0, 6).join(", ") : "V\xE1rias";
     const versionsStr = affectedVersions.length > 0 ? affectedVersions.join(", ") : "Recente";
@@ -17764,10 +17806,24 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       if (req.headers.range) {
         headers["Range"] = req.headers.range;
       }
+      const controller = new AbortController();
+      const connectTimer = setTimeout(() => {
+        try {
+          controller.abort(new Error("Timeout de conex\xE3o com servidor de origem"));
+        } catch {
+        }
+      }, 25e3);
+      req.on("close", () => {
+        try {
+          controller.abort();
+        } catch {
+        }
+      });
       const response = await fetch(targetUrl, {
         headers,
-        signal: AbortSignal.timeout(15e3)
+        signal: controller.signal
       });
+      clearTimeout(connectTimer);
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "*");
@@ -18308,6 +18364,20 @@ if (!process.env.VERCEL) {
         appType: "spa"
       });
       app.use(vite.middlewares);
+      app.use(async (req, res, next) => {
+        const url = req.originalUrl;
+        if (url.startsWith("/api/") || url.startsWith("/stream/")) {
+          return next();
+        }
+        try {
+          let template = fs4.readFileSync(path4.resolve(process.cwd(), "index.html"), "utf-8");
+          template = await vite.transformIndexHtml(url, template);
+          res.status(200).set({ "Content-Type": "text/html" }).end(template);
+        } catch (e) {
+          vite.ssrFixStacktrace(e);
+          next(e);
+        }
+      });
     } else {
       const distPath = path4.join(process.cwd(), "dist");
       app.use(express.static(distPath));

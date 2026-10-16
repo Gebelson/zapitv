@@ -132,17 +132,24 @@ export class MediaAvailabilityIndex {
     }
   }
 
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private notifyTimer: ReturnType<typeof setTimeout> | null = null;
+
   public saveToStorage(): void {
     if (typeof window === 'undefined' || !window.localStorage) return;
-    try {
-      // Salva os 1000 itens mais recentes para não estourar o localStorage
-      const items = Array.from(this.index.values())
-        .sort((a, b) => (b.checkedAt || 0) - (a.checkedAt || 0))
-        .slice(0, 1000);
-      localStorage.setItem(STORAGE_INDEX_KEY, JSON.stringify(items));
-    } catch (e) {
-      console.warn('Erro ao persistir índice de disponibilidade:', e);
-    }
+    if (this.saveTimer) return;
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      try {
+        // Salva os 1000 itens mais recentes para não estourar o localStorage
+        const items = Array.from(this.index.values())
+          .sort((a, b) => (b.checkedAt || 0) - (a.checkedAt || 0))
+          .slice(0, 1000);
+        localStorage.setItem(STORAGE_INDEX_KEY, JSON.stringify(items));
+      } catch (e) {
+        console.warn('Erro ao persistir índice de disponibilidade:', e);
+      }
+    }, 300);
   }
 
   public getCanonicalKey(item: { id?: string; imdbId?: string; tmdbId?: string | number; title?: string }): string {
@@ -392,12 +399,18 @@ export class MediaAvailabilityIndex {
   }
 
   private notify(): void {
-    const stats = this.getStats();
-    for (const listener of this.listeners) {
-      try {
-        listener(stats);
-      } catch {}
-    }
+    if (this.listeners.size === 0) return;
+    if (this.notifyTimer) return;
+    this.notifyTimer = setTimeout(() => {
+      this.notifyTimer = null;
+      if (this.listeners.size === 0) return;
+      const stats = this.getStats();
+      for (const listener of this.listeners) {
+        try {
+          listener(stats);
+        } catch {}
+      }
+    }, 120);
   }
 
   public clearAll(): void {

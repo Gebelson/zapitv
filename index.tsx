@@ -1,29 +1,40 @@
-
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { initializeDatabase, db as localDb } from './db';
-import { updateMovies } from './updateMovies';
 import './index.css';
 
 let bootstrapPromise: Promise<any> | null = null;
+const ENRICHED_MOVIES_SYNC_KEY = 'zapitv_enriched_sync_v6';
 
 async function loadInitialState() {
-      // 1. Initialize local DB first to get the base catalog
-      await initializeDatabase();
-      await updateMovies();
-      
-      const localContent = await localDb.content.toArray();
-      const localCustomSections = await localDb.customSections.toArray();
-      
-      const getKv = async (key: string, def: any) => {
-        const item = await localDb.keyValueStore.get(key);
-        return item ? item.value : def;
-      };
+      // 1. Executa inicialização da base e leitura de configurações em paralelo
+      const [baseContent, localCustomSections, kvEntries] = await Promise.all([
+        initializeDatabase(),
+        localDb.customSections.toArray(),
+        localDb.keyValueStore.bulkGet([
+          'zapitv_theme',
+          'zapitv_last_email',
+          'zapitv_local_favorites',
+          'zapitv_local_mylist'
+        ])
+      ]);
 
-      const theme = await getKv('zapitv_theme', true);
-      const lastEmail = await getKv('zapitv_last_email', '');
+      let localContent = baseContent;
+      let alreadyEnriched = false;
+      try {
+        alreadyEnriched = localStorage.getItem(ENRICHED_MOVIES_SYNC_KEY) === '1';
+      } catch {}
+
+      if (!alreadyEnriched) {
+        const { updateMovies } = await import('./updateMovies');
+        localContent = await updateMovies(localContent);
+      }
+
+      const theme = kvEntries[0] ? kvEntries[0].value : true;
+      const savedFavs = kvEntries[2]?.value || [];
+      const savedList = kvEntries[3]?.value || [];
 
       const defaultProfile = {
         id: 'p1',
@@ -51,9 +62,6 @@ async function loadInitialState() {
         prime: "Mais Bem Avaliados",
         hbo: "Animes & Animações"
       };
-
-      const savedFavs = (await localDb.keyValueStore.get('zapitv_local_favorites'))?.value || [];
-      const savedList = (await localDb.keyValueStore.get('zapitv_local_mylist'))?.value || [];
 
       return {
         users: [defaultUser],

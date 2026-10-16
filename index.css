@@ -79,4 +79,10 @@
     animation: none;
     text-shadow: 0 0 8px rgba(0, 125, 247, 0.4);
   }
+  aside,
+  main,
+  aside * {
+    transition-duration: 0.01ms !important;
+  }
 }
+

@@ -136,23 +136,41 @@ fn applyAnime4K(uv: vec2<f32>, step: vec2<f32>, sharpWeight: f32, denoiseWeight:
     }
   }
 
-  // 2. Anime4K Line Restoration & Thinning (Aprimoramento de traços e contornos)
+  // 2. Anime4K Line Restoration & Thinning (Aprimoramento e afinamento de traços com Gradiente Sobel)
   var lineEnhanced = filtered;
   if (sharpWeight > 0.05) {
-    let minNeighbor = min(min(up, dn), min(lf, rt));
-    let maxNeighbor = max(max(up, dn), max(lf, rt));
-    let edgeDiff = length(maxNeighbor - minNeighbor);
+    let l_tl = getLuma(ul); let l_tc = getLuma(up); let l_tr = getLuma(ur);
+    let l_ml = getLuma(lf); let l_mc = getLuma(filtered); let l_mr = getLuma(rt);
+    let l_bl = getLuma(dl); let l_bc = getLuma(dn); let l_br = getLuma(dr);
 
-    // Identifica linhas pretas e bordas de anime
-    if (edgeDiff > 0.08 && edgeDiff < 0.92) {
-      // Afina o traço aproximando os pixels de borda do valor mínimo vizinho
-      let lineBlend = clamp(sharpWeight * 0.75, 0.0, 0.70);
-      lineEnhanced = mix(filtered, minNeighbor, lineBlend);
+    let gx = (l_tr + 2.0 * l_mr + l_br) - (l_tl + 2.0 * l_ml + l_bl);
+    let gy = (l_bl + 2.0 * l_bc + l_br) - (l_tl + 2.0 * l_tc + l_tr);
+    let gradLen = sqrt(gx * gx + gy * gy);
+
+    if (gradLen > 0.06) {
+      let normal = normalize(vec2<f32>(gx, gy));
+      let sampleA = textureSample(u_texture, u_sampler, uv - normal * step * 0.85).rgb;
+      let sampleB = textureSample(u_texture, u_sampler, uv + normal * step * 0.85).rgb;
+
+      let lumaA = getLuma(sampleA);
+      let lumaB = getLuma(sampleB);
+
+      let minSample = select(sampleB, sampleA, lumaA < lumaB);
+      let maxSample = select(sampleA, sampleB, lumaA < lumaB);
+
+      let edgeContrast = (max(lumaA, lumaB) - min(lumaA, lumaB));
+      let blendFactor = clamp(sharpWeight * 0.75 * edgeContrast * 2.5, 0.0, 0.65);
+
+      if (l_mc > min(lumaA, lumaB) + 0.08) {
+        lineEnhanced = mix(filtered, maxSample, blendFactor * 0.55);
+      } else {
+        lineEnhanced = mix(filtered, minSample, blendFactor * 0.40);
+      }
     } else {
-      // Texturas internas e detalhes: unsharp mask suave
       let blur = (up + dn + lf + rt) * 0.25;
       let detail = filtered - blur;
-      lineEnhanced = clamp(filtered + detail * (sharpWeight * 1.1), vec3<f32>(0.0), vec3<f32>(1.0));
+      let clampedDetail = clamp(detail, vec3<f32>(-0.15), vec3<f32>(0.15));
+      lineEnhanced = clamp(filtered + clampedDetail * (sharpWeight * 1.1), vec3<f32>(0.0), vec3<f32>(1.0));
     }
   }
 

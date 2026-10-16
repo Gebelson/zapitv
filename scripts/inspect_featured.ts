@@ -1,12 +1,34 @@
-import { featuredRankingService } from '../src/core/rankings/FeaturedRankingService.ts';
+import { chromium } from 'playwright';
 
-const res = featuredRankingService.getFeaturedSelectionSync();
-console.log('=== APPROVED MOVIES ===');
-res.featuredMovies.forEach((m, idx) => {
-  console.log((idx + 1) + '. ' + m.title + ' | IMDb: ' + m.imdbId + ' | ID: ' + m.id + ' | streams: ' + JSON.stringify((m.verifiedStreams || []).map(s => s.url)));
-});
+async function inspectFeaturedSelection() {
+  const browser = await chromium.launch({ 
+    headless: true,
+    executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+  });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  
+  await page.goto('http://localhost:4000', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForTimeout(2000);
 
-console.log('\n=== APPROVED SERIES ===');
-res.featuredSeries.forEach((s, idx) => {
-  console.log((idx + 1) + '. ' + s.title + ' | IMDb: ' + s.imdbId + ' | ID: ' + s.id + ' | ep1: ' + s.episodes?.[0]?.videoUrl);
-});
+  const featured = await page.evaluate(() => {
+    const raw = localStorage.getItem('zapitv_featured_ranking_selection_v3');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      updatedAt: parsed.updatedAt,
+      referenceWeek: parsed.referenceWeek,
+      featuredMoviesCount: parsed.featuredMovies?.length,
+      featuredMovies: parsed.featuredMovies?.map((m: any) => ({ id: m.id, title: m.title, available: m.availabilityStatus })),
+      featuredSeriesCount: parsed.featuredSeries?.length,
+      featuredSeries: parsed.featuredSeries?.map((s: any) => ({ id: s.id, title: s.title, available: s.availabilityStatus }))
+    };
+  });
+
+  console.log('featured_ranking_selection_v3:');
+  console.log(JSON.stringify(featured, null, 2));
+
+  await browser.close();
+}
+
+inspectFeaturedSelection().catch(console.error);

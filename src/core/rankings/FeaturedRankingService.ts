@@ -529,7 +529,7 @@ class FeaturedRankingService {
       
       const featuredItem: ContentItem = {
         ...catalogItem,
-        imdbId: catalogItem.imdbId || cand.imdbId,
+        imdbId: cand.imdbId || catalogItem.imdbId,
         isFeatured: true,
         imdbRank: rankPosition,
         displayRank: finalPosition,

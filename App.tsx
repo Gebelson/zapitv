@@ -36,6 +36,7 @@ import { userPreferenceStore } from './src/core/recommendations/userPreferenceSt
 import { hybridRecommendationEngine } from './src/core/recommendations/hybridRecommendationEngine';
 import { bannedContentRegistry } from './src/core/catalog/BannedContentRegistry';
 import { catalogSnapshotManager } from './src/core/catalog/CatalogSnapshotManager';
+import { heroCarouselStore } from './src/core/catalog/heroCarouselStore';
 
 const ProfileView = React.lazy(() => import('./components/ProfileView'));
 const AdminView = React.lazy(() => import('./components/AdminView'));
@@ -48,8 +49,16 @@ const AddSectionModal = React.lazy(() => import('./components/AddSectionModal'))
 const ProgramasView = React.lazy(() => import('./components/ProgramasView'));
 const NotFoundPage = React.lazy(() => import('./src/pages/NotFoundPage').then(module => ({ default: module.NotFoundPage })));
 const DownloadsPage = React.lazy(() => import('./src/pages/DownloadsPage').then(module => ({ default: module.DownloadsPage })));
+const ZapiPlayer = React.lazy(() => import('./src/components/player/ZapiPlayer').then(module => ({ default: module.ZapiPlayer })));
 const CatalogDiagnosticModal = React.lazy(() => import('./src/components/catalog/CatalogDiagnosticModal').then(module => ({ default: module.CatalogDiagnosticModal })));
 const ActorView = React.lazy(() => import('./src/pages/ActorView').then(module => ({ default: module.ActorView })));
+const VideoEnhancementLab = React.lazy(() => import('./src/pages/dev/VideoEnhancementLab').then(module => ({ default: module.VideoEnhancementLab })));
+const PlayerEnhancementTestPage = React.lazy(() => import('./src/pages/dev/PlayerEnhancementTest').then(module => ({ default: module.PlayerEnhancementTestPage })));
+const WatchPartyModal = React.lazy(() => import('./src/components/watchparty/WatchPartyModal').then(module => ({ default: module.WatchPartyModal })));
+
+import { offlineStorageDriver } from './src/core/offline/offlineStorageDriver';
+import { offlineDb } from './src/core/offline/offlineDb';
+import { OfflineDownload } from './src/core/offline/offlineTypes';
 
 const GENRES_LIST = [
   'Ação', 'Adulto', 'Animação', 'Anime', 'Aventura', 'Biografia', 'Comédia', 
@@ -61,7 +70,9 @@ const GENRES_LIST = [
 
 const ViewWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="animate-in fade-in duration-500 fill-mode-both transform-gpu">
-    {children}
+    <React.Suspense fallback={<div className="min-h-[75vh] flex items-center justify-center"><ZapiLoader size="xl" /></div>}>
+      {children}
+    </React.Suspense>
   </div>
 );
 
@@ -121,11 +132,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const matchAnimeEpisode = matchPath('/animes/:id/temporada/:season/episodio/:episode', location.pathname);
   const matchAnimeDetail = matchPath('/animes/:id', location.pathname);
   const matchActorDetail = matchPath('/atores/:id', location.pathname);
+  const matchWatchParty = matchPath('/sala/:roomId', location.pathname);
 
   // Derivação automática da view com base no pathname
   const currentView: AppView = useMemo(() => {
     const path = location.pathname;
-    if (path === '/') return 'home';
+    if (path === '/' || path.startsWith('/sala')) return 'home';
     if (path.startsWith('/em-destaque')) return 'featured';
     if (path.startsWith('/filmes')) return 'movies';
     if (path.startsWith('/series')) return 'series';
@@ -141,6 +153,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     if (path.startsWith('/ajuda')) return 'help';
     if (path.startsWith('/admin')) return 'admin';
     if (path.startsWith('/login') || path.startsWith('/auth')) return 'login';
+    if (path.startsWith('/dev/video-enhancement-lab')) return 'dev-lab';
+    if (path.startsWith('/dev/player-test')) return 'dev-player-test';
     return 'notfound';
   }, [location.pathname]);
 
@@ -164,6 +178,21 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const initialSeasonNum = urlSeason ? parseInt(urlSeason, 10) : undefined;
   const initialEpisodeNum = urlEpisode ? parseInt(urlEpisode, 10) : undefined;
   const hasDeepLinkEpisode = initialEpisodeNum !== undefined;
+
+  // Estado para Watch Party direta via URL /sala/:roomId ou ?sala=...
+  const [directPartyEpisode, setDirectPartyEpisode] = useState<{ season?: number; episode?: number } | null>(null);
+  const watchPartyRoomId = matchWatchParty?.params.roomId || searchParams.get('sala') || null;
+  const [showDirectWatchPartyModal, setShowDirectWatchPartyModal] = useState<boolean>(Boolean(watchPartyRoomId));
+
+  useEffect(() => {
+    if (watchPartyRoomId) {
+      setShowDirectWatchPartyModal(true);
+    }
+  }, [watchPartyRoomId]);
+
+  const effectiveSeasonNum = directPartyEpisode?.season !== undefined ? directPartyEpisode.season : initialSeasonNum;
+  const effectiveEpisodeNum = directPartyEpisode?.episode !== undefined ? directPartyEpisode.episode : initialEpisodeNum;
+  const effectiveAutoPlay = Boolean(directPartyEpisode || hasDeepLinkEpisode);
 
   const handleNavigateView = useCallback((view: AppView) => {
     setSelectedContent(null);
@@ -239,6 +268,19 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const [topRatedItems, setTopRatedItems] = useState<ContentItem[]>(() => deduplicateContentItems(storageService.getCachedCatalog('top_rated')));
   const [animeItems, setAnimeItems] = useState<ContentItem[]>(() => deduplicateContentItems(storageService.getCachedCatalog('animes').filter(i => searchService.isAnimeItem(i))));
   const [featuredSelection, setFeaturedSelection] = useState<FeaturedSelectionResult>(() => featuredRankingService.getFeaturedSelectionSync());
+  const [heroCarouselItems, setHeroCarouselItems] = useState<ContentItem[]>(() => 
+    heroCarouselStore.getCarouselItems(initialState.content || [])
+  );
+
+  useEffect(() => {
+    return heroCarouselStore.subscribe(items => setHeroCarouselItems(items));
+  }, []);
+
+  useEffect(() => {
+    if (content.length > 0 && heroCarouselItems.length === 0) {
+      setHeroCarouselItems(heroCarouselStore.getCarouselItems(content));
+    }
+  }, [content]);
   const [continueWatchingList, setContinueWatchingList] = useState<WatchProgress[]>([]);
   const [liveSearchResults, setLiveSearchResults] = useState<ContentItem[]>([]);
   const [liveSearchActors, setLiveSearchActors] = useState<ActorPerson[]>([]);
@@ -309,6 +351,22 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   // Snapshot estável de navegação por categoria (isolamento total entre Filmes, Séries e Animes)
   const [catalogSnapshots, setCatalogSnapshots] = useState<Record<string, ContentItem[]>>({});
+  const [visibleGridCount, setVisibleGridCount] = useState(42);
+
+  useEffect(() => {
+    setVisibleGridCount(42);
+  }, [currentView, selectedGenre, currentCategorySort]);
+
+  // Pré-aquece o chunk de ContentDetailModal após a montagem inicial para abertura instantânea (<16ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      import('./components/ContentDetailModal').catch(() => {});
+    }, 600);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const favoritesSet = useMemo(() => new Set(favorites), [favorites]);
+  const myListSet = useMemo(() => new Set(myList), [myList]);
 
   const availableGenres = useMemo(() => {
     return activeProfile?.isChild ? GENRES_LIST.filter(g => g !== 'Adulto') : GENRES_LIST;
@@ -493,28 +551,48 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const hasDiscoveredLiveRef = useRef(false);
   const needsCatalogDiscovery = currentView === 'home' || currentView === 'featured' ||
     currentView === 'movies' || currentView === 'series' || currentView === 'animes';
 
   useEffect(() => {
-    if (!needsCatalogDiscovery) return;
+    if (!needsCatalogDiscovery || hasDiscoveredLiveRef.current) return;
     let isMounted = true;
+    let discoveryTimer: ReturnType<typeof setTimeout> | null = null;
     const safetyTimer = setTimeout(() => {
       if (isMounted) {
         setIsCatalogLoading(false);
       }
     }, 3500);
 
+    // 1. Hidratação local imediata de Continuar Assistindo e Favoritos
+    Promise.allSettled([
+      storageService.getContinueWatching(),
+      storageService.getFavorites()
+    ]).then(([progressRes, favsRes]) => {
+      if (!isMounted) return;
+      if (progressRes.status === 'fulfilled') {
+        setContinueWatchingList(progressRes.value);
+        const favs = favsRes.status === 'fulfilled' ? favsRes.value : [];
+        const favItems = contentRef.current.filter(c => favs.includes(c.id));
+        userPreferenceStore.seedFromExistingContinuity(activeProfile?.id || 'default', progressRes.value, favItems);
+      }
+      if (favsRes.status === 'fulfilled' && favsRes.value.length > 0) {
+        setFavorites(favsRes.value);
+      }
+    });
+
+    // 2. Descoberta online em segundo plano após o primeiro paint (não bloqueia a Home)
     const fetchLiveCatalogs = async () => {
+      if (!isMounted) return;
+      hasDiscoveredLiveRef.current = true;
       setIsCatalogLoading(true);
       try {
         const [
-          trendingRes, 
-          moviesP1, moviesP2, 
-          seriesP1, seriesP2, 
-          animesP1, animesP2,
-          progressRes, 
-          favsRes
+          trendingRes,
+          moviesP1, moviesP2,
+          seriesP1, seriesP2,
+          animesP1, animesP2
         ] = await Promise.allSettled([
           catalogDiscoveryService.discoverTrending(),
           catalogDiscoveryService.discoverMovies(1),
@@ -522,9 +600,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           catalogDiscoveryService.discoverSeries(1),
           catalogDiscoveryService.discoverSeries(2),
           catalogDiscoveryService.discoverAnimes(1),
-          catalogDiscoveryService.discoverAnimes(2),
-          storageService.getContinueWatching(),
-          storageService.getFavorites()
+          catalogDiscoveryService.discoverAnimes(2)
         ]);
 
         if (!isMounted) return;
@@ -579,16 +655,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           combinedAnimes.forEach(addItem);
         }
 
-        if (progressRes.status === 'fulfilled') {
-          setContinueWatchingList(progressRes.value);
-          const favs = favsRes.status === 'fulfilled' ? favsRes.value : [];
-          const favItems = content.filter(c => favs.includes(c.id));
-          userPreferenceStore.seedFromExistingContinuity(activeProfile?.id || 'default', progressRes.value, favItems);
-        }
-        if (favsRes.status === 'fulfilled' && favsRes.value.length > 0) {
-          setFavorites(favsRes.value);
-        }
-
         // Sincroniza novos lançamentos validados do backend (AutoReleaseService)
         try {
           const relRes = await fetch('/api/catalog/new-releases', { signal: AbortSignal.timeout(2000) });
@@ -616,10 +682,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       }
     };
 
-    fetchLiveCatalogs();
+    discoveryTimer = setTimeout(fetchLiveCatalogs, 400);
 
     return () => {
       isMounted = false;
+      if (discoveryTimer) clearTimeout(discoveryTimer);
       clearTimeout(safetyTimer);
     };
   }, [needsCatalogDiscovery]);
@@ -1009,64 +1076,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
   }, [isLoadingMore, moviesPage, seriesPage, animesPage, selectedGenre, categorySorts, activeProfile?.id, activeProfile?.isChild, getSnapshotKeyForView]);
 
-  // Rolagem Infinita Automática (Infinite Scroll — carrega mais títulos conforme o usuário desce)
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    const container = scrollContainerRef.current;
-    const isBrowseView = currentView === 'movies' || currentView === 'series' || currentView === 'animes';
-    const hasMore = currentView === 'movies' ? hasMoreMovies : currentView === 'series' ? hasMoreSeries : currentView === 'animes' ? hasMoreAnimes : false;
-
-    if (!isBrowseView || !hasMore || isLoadingMore) return;
-
-    let observer: IntersectionObserver | null = null;
-    let mountTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-      if (typeof IntersectionObserver !== 'undefined' && sentinel) {
-        observer = new IntersectionObserver((entries) => {
-          const [entry] = entries;
-          if (entry.isIntersecting && !isLoadingMore && currentViewRef.current === currentView) {
-            handleLoadMore(currentView);
-          }
-        }, {
-          root: container || null,
-          rootMargin: '400px',
-          threshold: 0.05
-        });
-        observer.observe(sentinel);
-      }
-    }, 250);
-
-    // 2. Scroll listener no container como garantia adicional de fluidez
-    const handleScroll = () => {
-      if (!container || isLoadingMore || currentViewRef.current !== currentView) return;
-      const { scrollTop, scrollHeight, clientHeight } = container;
-      if (scrollTop + clientHeight >= scrollHeight - 600) {
-        handleLoadMore(currentView);
-      }
-    };
-
-    if (container) {
-      container.addEventListener('scroll', handleScroll, { passive: true });
-    }
-
-    // 3. Fallback no objeto window caso a rolagem ocorra na janela principal
-    const handleWindowScroll = () => {
-      if (isLoadingMore || currentViewRef.current !== currentView) return;
-      const scrollPos = window.innerHeight + window.scrollY;
-      const threshold = document.documentElement.offsetHeight - 600;
-      if (scrollPos >= threshold) {
-        handleLoadMore(currentView);
-      }
-    };
-    window.addEventListener('scroll', handleWindowScroll, { passive: true });
-
-    return () => {
-      if (mountTimer) clearTimeout(mountTimer);
-      if (observer) observer.disconnect();
-      if (container) container.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('scroll', handleWindowScroll);
-    };
-  }, [currentView, hasMoreMovies, hasMoreSeries, hasMoreAnimes, isLoadingMore, handleLoadMore]);
-
   // Atualiza a fileira "Continuar Assistindo" em tempo real sempre que o progresso é salvo
   useEffect(() => {
     const handleProgressUpdated = async () => {
@@ -1085,115 +1094,123 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     let unsubscribes: (() => void)[] = [];
     let cancelled = false;
 
-    import('firebase/firestore').then(({ collection, onSnapshot, doc }) => {
-      import('./firebase').then(({ db: firestoreDb }) => {
-        if (cancelled) return;
-        // Listen to content changes
-        unsubscribes.push(onSnapshot(collection(firestoreDb, 'content'), (snapshot) => {
-          const newContent = snapshot.docs.map(doc => doc.data() as ContentItem);
-          setContent(newContent);
-        }, (error) => {
-          if (error.code !== 'permission-denied') {
-            console.error("Error listening to content:", error);
-          }
-        }));
+    const syncTimer = setTimeout(() => {
+      if (cancelled) return;
+      import('firebase/firestore').then(({ collection, onSnapshot, doc }) => {
+        import('./firebase').then(({ db: firestoreDb }) => {
+          if (cancelled) return;
+          // Listen to content changes
+          unsubscribes.push(onSnapshot(collection(firestoreDb, 'content'), (snapshot) => {
+            const newContent = snapshot.docs.map(doc => doc.data() as ContentItem);
+            if (newContent.length > 0) {
+              setContent(prev => deduplicateContentItems([...prev, ...newContent]));
+            }
+          }, (error) => {
+            if (error.code !== 'permission-denied') {
+              console.error("Error listening to content:", error);
+            }
+          }));
 
-        // Listen to users changes
-        if (currentUser?.role === 'admin') {
-          unsubscribes.push(onSnapshot(collection(firestoreDb, 'users'), (snapshot) => {
-            const newUsers = snapshot.docs.map(doc => {
-              const u = doc.data() as User;
-              return { ...u, profiles: u.profiles || [] };
-            });
-            setUsers(newUsers);
-            
-            // Update current user if they are in the new list
-            if (currentUser) {
-              const updatedCurrentUser = newUsers.find(u => u.id === currentUser.id);
-              if (updatedCurrentUser) {
+          // Listen to users changes
+          if (currentUser?.role === 'admin') {
+            unsubscribes.push(onSnapshot(collection(firestoreDb, 'users'), (snapshot) => {
+              const newUsers = snapshot.docs.map(doc => {
+                const u = doc.data() as User;
+                return { ...u, profiles: u.profiles || [] };
+              });
+              if (newUsers.length > 0) {
+                setUsers(newUsers);
+              }
+              
+              // Update current user if they are in the new list
+              if (currentUser) {
+                const updatedCurrentUser = newUsers.find(u => u.id === currentUser.id);
+                if (updatedCurrentUser) {
+                  setCurrentUser(updatedCurrentUser);
+                  if (activeProfile) {
+                    const matchingProfile = updatedCurrentUser.profiles.find(p => p.id === activeProfile.id);
+                    if (matchingProfile) setActiveProfile(matchingProfile);
+                  }
+                }
+              }
+            }, (error) => {
+              if (error.code !== 'permission-denied') {
+                console.error("Error listening to users:", error);
+              }
+            }));
+          } else if (currentUser) {
+            unsubscribes.push(onSnapshot(doc(firestoreDb, 'users', currentUser.id), (snapshot) => {
+              if (snapshot.exists()) {
+                let updatedCurrentUser = snapshot.data() as User;
+                updatedCurrentUser = { ...updatedCurrentUser, profiles: updatedCurrentUser.profiles || [] };
                 setCurrentUser(updatedCurrentUser);
+                setUsers([updatedCurrentUser]);
                 if (activeProfile) {
                   const matchingProfile = updatedCurrentUser.profiles.find(p => p.id === activeProfile.id);
                   if (matchingProfile) setActiveProfile(matchingProfile);
                 }
               }
-            }
-          }, (error) => {
-            if (error.code !== 'permission-denied') {
-              console.error("Error listening to users:", error);
-            }
-          }));
-        } else if (currentUser) {
-          unsubscribes.push(onSnapshot(doc(firestoreDb, 'users', currentUser.id), (snapshot) => {
-            if (snapshot.exists()) {
-              let updatedCurrentUser = snapshot.data() as User;
-              updatedCurrentUser = { ...updatedCurrentUser, profiles: updatedCurrentUser.profiles || [] };
-              setCurrentUser(updatedCurrentUser);
-              setUsers([updatedCurrentUser]);
-              if (activeProfile) {
-                const matchingProfile = updatedCurrentUser.profiles.find(p => p.id === activeProfile.id);
-                if (matchingProfile) setActiveProfile(matchingProfile);
+            }, (error) => {
+              if (error.code !== 'permission-denied') {
+                console.error("Error listening to current user:", error);
               }
-            }
-          }, (error) => {
-            if (error.code !== 'permission-denied') {
-              console.error("Error listening to current user:", error);
-            }
-          }));
-        }
-
-        // Listen to custom sections changes
-        unsubscribes.push(onSnapshot(collection(firestoreDb, 'customSections'), (snapshot) => {
-          const newSections = snapshot.docs.map(doc => doc.data() as CustomSection);
-          setCustomSections(newSections);
-        }, (error) => {
-          if (error.code !== 'permission-denied') {
-            console.error("Error listening to custom sections:", error);
+            }));
           }
-        }));
 
-        // Listen to notifications changes
-        unsubscribes.push(onSnapshot(collection(firestoreDb, 'notifications'), (snapshot) => {
-          const newNotifications = snapshot.docs.map(doc => doc.data() as SiteNotification);
-          setSiteNotifications(newNotifications);
-        }, (error) => {
-          if (error.code !== 'permission-denied') {
-            console.error("Error listening to notifications:", error);
+          // Listen to custom sections changes
+          unsubscribes.push(onSnapshot(collection(firestoreDb, 'customSections'), (snapshot) => {
+            const newSections = snapshot.docs.map(doc => doc.data() as CustomSection);
+            if (newSections.length > 0) {
+              setCustomSections(newSections);
+            }
+          }, (error) => {
+            if (error.code !== 'permission-denied') {
+              console.error("Error listening to custom sections:", error);
+            }
+          }));
+
+          // Listen to notifications changes
+          unsubscribes.push(onSnapshot(collection(firestoreDb, 'notifications'), (snapshot) => {
+            const newNotifications = snapshot.docs.map(doc => doc.data() as SiteNotification);
+            if (newNotifications.length > 0) {
+              setSiteNotifications(newNotifications);
+            }
+          }, (error) => {
+            if (error.code !== 'permission-denied') {
+              console.error("Error listening to notifications:", error);
+            }
+          }));
+
+          // Listen to myList changes
+          if (currentUser) {
+            unsubscribes.push(onSnapshot(doc(firestoreDb, 'keyValueStore', `zapitv_mylist_${currentUser.id}`), (doc) => {
+              if (doc.exists() && Array.isArray(doc.data().value)) {
+                setMyList(doc.data().value);
+              }
+            }, (error) => {
+              if (error.code !== 'permission-denied') {
+                console.error("Error listening to myList:", error);
+              }
+            }));
+
+            // Listen to favorites changes
+            unsubscribes.push(onSnapshot(doc(firestoreDb, 'keyValueStore', `zapitv_favorites_${currentUser.id}`), (doc) => {
+              if (doc.exists() && Array.isArray(doc.data().value)) {
+                setFavorites(doc.data().value);
+              }
+            }, (error) => {
+              if (error.code !== 'permission-denied') {
+                console.error("Error listening to favorites:", error);
+              }
+            }));
           }
-        }));
-
-        // Listen to myList changes
-        if (currentUser) {
-          unsubscribes.push(onSnapshot(doc(firestoreDb, 'keyValueStore', `zapitv_mylist_${currentUser.id}`), (doc) => {
-            if (doc.exists()) {
-              setMyList(doc.data().value);
-            } else {
-              setMyList([]);
-            }
-          }, (error) => {
-            if (error.code !== 'permission-denied') {
-              console.error("Error listening to myList:", error);
-            }
-          }));
-
-          // Listen to favorites changes
-          unsubscribes.push(onSnapshot(doc(firestoreDb, 'keyValueStore', `zapitv_favorites_${currentUser.id}`), (doc) => {
-            if (doc.exists()) {
-              setFavorites(doc.data().value);
-            } else {
-              setFavorites([]);
-            }
-          }, (error) => {
-            if (error.code !== 'permission-denied') {
-              console.error("Error listening to favorites:", error);
-            }
-          }));
-        }
-      }).catch(error => console.warn('Falha ao iniciar sincronização remota:', error));
-    }).catch(error => console.warn('Falha ao carregar cliente de sincronização:', error));
+        }).catch(error => console.warn('Falha ao iniciar sincronização remota:', error));
+      }).catch(error => console.warn('Falha ao carregar cliente de sincronização:', error));
+    }, 3500);
 
     return () => {
       cancelled = true;
+      clearTimeout(syncTimer);
       unsubscribes.forEach(unsub => unsub());
     };
   }, [isAuthenticated, currentUser?.id, activeProfile?.id]);
@@ -1238,6 +1255,56 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
   });
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
+
+  // Estados e Handlers para Reprodução Offline sem Internet (Experiência Netflix)
+  const [activeOfflineDownload, setActiveOfflineDownload] = useState<OfflineDownload | null>(null);
+  const [offlineBlobUrl, setOfflineBlobUrl] = useState<string | null>(null);
+  const [offlinePlaybackItem, setOfflinePlaybackItem] = useState<ContentItem | null>(null);
+
+  const handlePlayOffline = useCallback(async (download: OfflineDownload) => {
+    try {
+      const file = await offlineStorageDriver.getFile(download.storagePath, download.storageDriver);
+      if (!file) {
+        alert('Arquivo de vídeo não encontrado no armazenamento local.');
+        return;
+      }
+      const blobUrl = URL.createObjectURL(file);
+      const mockItem: ContentItem = {
+        id: download.contentId,
+        title: download.title,
+        type: download.type,
+        image: download.image,
+        backdrop: download.image,
+        year: new Date(download.createdAt).getFullYear(),
+        rating: 10,
+        genres: ['Offline'],
+        duration: 'Offline',
+        description: `Reprodução offline local • Armazenamento ZapiTV (${download.quality})`,
+        streams: [{
+          id: `offline-${download.id}`,
+          name: `Download Offline (${download.quality})`,
+          url: blobUrl,
+          type: 'mp4',
+          quality: download.quality,
+          headers: {}
+        }]
+      };
+      setOfflineBlobUrl(blobUrl);
+      setActiveOfflineDownload(download);
+      setOfflinePlaybackItem(mockItem);
+    } catch (err) {
+      console.error('Erro ao iniciar reprodução offline:', err);
+    }
+  }, []);
+
+  const handleCloseOfflinePlayer = useCallback(() => {
+    if (offlineBlobUrl) {
+      URL.revokeObjectURL(offlineBlobUrl);
+    }
+    setOfflineBlobUrl(null);
+    setActiveOfflineDownload(null);
+    setOfflinePlaybackItem(null);
+  }, [offlineBlobUrl]);
 
   // Abertura in-loco de detalhes: abre o modal preservando a rota, página atual, scroll e contexto
   const handleSelectContent = useCallback((item: ContentItem) => {
@@ -1882,7 +1949,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       const targetKey = getSnapshotKeyForView('movies', selectedGenre, currentSort);
       const cached = catalogSnapshots[targetKey];
       if (cached && cached.length > 0) {
-        return deduplicateContentItems(cached.filter(i => searchService.isMovieItem(i, false)));
+        return cached;
       }
       const baseItems = getEligibleBrowseItems('movies', selectedGenre);
       const sorted = catalogSnapshotManager.createInitialSnapshot(baseItems, currentSort, {
@@ -1899,7 +1966,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       const targetKey = getSnapshotKeyForView('series', selectedGenre, currentSort);
       const cached = catalogSnapshots[targetKey];
       if (cached && cached.length > 0) {
-        return deduplicateContentItems(cached.filter(i => searchService.isSeriesItem(i)));
+        return cached;
       }
       const baseItems = getEligibleBrowseItems('series', selectedGenre);
       const sorted = catalogSnapshotManager.createInitialSnapshot(baseItems, currentSort, {
@@ -1916,7 +1983,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       const targetKey = getSnapshotKeyForView('animes', selectedGenre, currentSort);
       const cached = catalogSnapshots[targetKey];
       if (cached && cached.length > 0) {
-        return deduplicateContentItems(cached.filter(i => searchService.isAnimeItem(i)));
+        return cached;
       }
       const baseItems = getEligibleBrowseItems('animes', selectedGenre);
       const sorted = catalogSnapshotManager.createInitialSnapshot(baseItems, currentSort, {
@@ -1928,11 +1995,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       return deduplicateContentItems(sorted.filter(i => searchService.isAnimeItem(i)));
     }
 
+    if (currentView === 'home' && (!selectedGenre || selectedGenre === 'Todos')) {
+      return allowedContent;
+    }
+
     if (currentView === 'featured') {
       const source = trendingItems.length > 0 ? trendingItems : baseFiltered;
       baseFiltered = source.filter(i => i.isFeatured);
     } else if (currentView === 'mylist') {
-      baseFiltered = baseFiltered.filter(i => favorites.includes(i.id) || myList.includes(i.id));
+      baseFiltered = baseFiltered.filter(i => favoritesSet.has(i.id) || myListSet.has(i.id));
     }
 
     const isAdultGenre = selectedGenre === 'Adulto';
@@ -1955,8 +2026,78 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   }, [
     catalogSnapshots, snapshotKey, currentView, categorySorts, selectedGenre,
     getEligibleBrowseItems, getSnapshotKeyForView, submittedSearchQuery, liveSearchResults, content,
-    trendingItems, favorites, myList, activeProfile?.id, activeProfile?.isChild
+    allowedContent, trendingItems, favoritesSet, myListSet, activeProfile?.id, activeProfile?.isChild
   ]);
+
+  // Rolagem Infinita Automática (Infinite Scroll — revela lotes em memória instantaneamente e carrega mais da rede sob demanda)
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const container = scrollContainerRef.current;
+    const isBrowseView = currentView === 'movies' || currentView === 'series' || currentView === 'animes';
+    const hasMoreRemote = currentView === 'movies' ? hasMoreMovies : currentView === 'series' ? hasMoreSeries : currentView === 'animes' ? hasMoreAnimes : false;
+    const hasMoreLocal = visibleGridCount < filteredContent.length;
+
+    if (!isBrowseView || (!hasMoreLocal && !hasMoreRemote) || isLoadingMore) return;
+
+    const advanceCatalogWindow = () => {
+      if (currentViewRef.current !== currentView) return;
+      if (visibleGridCount < filteredContent.length) {
+        setVisibleGridCount(prev => prev + 42);
+        if (visibleGridCount + 42 >= filteredContent.length && hasMoreRemote && !isLoadingMore) {
+          handleLoadMore(currentView);
+        }
+      } else if (hasMoreRemote && !isLoadingMore) {
+        setVisibleGridCount(prev => prev + 42);
+        handleLoadMore(currentView);
+      }
+    };
+
+    let observer: IntersectionObserver | null = null;
+    let mountTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      if (typeof IntersectionObserver !== 'undefined' && sentinel) {
+        observer = new IntersectionObserver((entries) => {
+          const [entry] = entries;
+          if (entry.isIntersecting) {
+            advanceCatalogWindow();
+          }
+        }, {
+          root: container || null,
+          rootMargin: '600px',
+          threshold: 0.01
+        });
+        observer.observe(sentinel);
+      }
+    }, 100);
+
+    const handleScroll = () => {
+      if (!container || currentViewRef.current !== currentView) return;
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      if (scrollTop + clientHeight >= scrollHeight - 700) {
+        advanceCatalogWindow();
+      }
+    };
+
+    if (container) {
+      container.addEventListener('scroll', handleScroll, { passive: true });
+    }
+
+    const handleWindowScroll = () => {
+      if (currentViewRef.current !== currentView) return;
+      const scrollPos = window.innerHeight + window.scrollY;
+      const threshold = document.documentElement.offsetHeight - 700;
+      if (scrollPos >= threshold) {
+        advanceCatalogWindow();
+      }
+    };
+    window.addEventListener('scroll', handleWindowScroll, { passive: true });
+
+    return () => {
+      if (mountTimer) clearTimeout(mountTimer);
+      if (observer) observer.disconnect();
+      if (container) container.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleWindowScroll);
+    };
+  }, [currentView, hasMoreMovies, hasMoreSeries, hasMoreAnimes, isLoadingMore, handleLoadMore, visibleGridCount, filteredContent.length]);
 
   const renderContent = () => {
     const gridClass = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6 px-3 sm:px-6 md:px-12 max-w-[2560px] mx-auto";
@@ -2061,12 +2202,17 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             <div className="pb-12">
               <div className="px-3 sm:px-6 md:px-12 pt-4 sm:pt-6 max-w-[2560px] mx-auto">
                 <Hero 
-                  featuredItems={catalogEligibilityService.filterEligibleItemsSync(trendingItems.length > 0 ? trendingItems.slice(0, 8) : content.filter(i => i.isFeatured))} 
+                  featuredItems={heroCarouselItems.length > 0 ? heroCarouselItems : heroCarouselStore.getCarouselItems(content)} 
                   isDarkMode={isDarkMode} 
                   onActionClick={handleSelectContent} 
                   isAdmin={currentUser.role === 'admin' || currentUser.devMode}
                   onUpdateItem={handleUpdateContent}
                   onAddContent={handleAddContent}
+                  onSaveCarousel={(newItems) => {
+                    heroCarouselStore.saveCarouselItems(newItems);
+                    setHeroCarouselItems(newItems);
+                    newItems.forEach(it => handleUpdateContent(it));
+                  }}
                 />
               </div>
               <div className="space-y-4">
@@ -2258,14 +2404,14 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-                {filteredContent.map((item) => (
+                {filteredContent.slice(0, visibleGridCount).map((item) => (
                   <ContentCard 
                     key={`browse-${currentView}-${item.id}`}
                     item={item}
                     isDarkMode={isDarkMode}
                     onItemClick={handleSelectContent}
-                    isFavorite={favorites.includes(item.id)}
-                    isInList={myList.includes(item.id)}
+                    isFavorite={favoritesSet.has(item.id)}
+                    isInList={myListSet.has(item.id)}
                     onToggleFavorite={toggleFavorite}
                     onToggleList={toggleMyList}
                   />
@@ -2273,7 +2419,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               </div>
 
               {/* Sentinela de Rolagem Infinita (Carrega mais conteúdos automaticamente conforme o usuário desce) */}
-              {(currentView === 'movies' ? hasMoreMovies : currentView === 'series' ? hasMoreSeries : currentView === 'animes' ? hasMoreAnimes : false) && (
+              {(visibleGridCount < filteredContent.length || (currentView === 'movies' ? hasMoreMovies : currentView === 'series' ? hasMoreSeries : currentView === 'animes' ? hasMoreAnimes : false)) && (
                 <div ref={sentinelRef} className="flex justify-center py-12 min-h-[64px] select-none">
                   {isLoadingMore && (
                     <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-white/5 border border-white/10 text-gray-300 text-xs font-bold shadow-lg backdrop-blur-md animate-in fade-in duration-200">
@@ -2380,7 +2526,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           </ViewWrapper>
         );
       case 'downloads':
-        return <ViewWrapper><DownloadsPage isDarkMode={isDarkMode} onSelectItem={handleSelectContent} /></ViewWrapper>;
+        return (
+          <ViewWrapper>
+            <DownloadsPage
+              isDarkMode={isDarkMode}
+              onPlayOffline={handlePlayOffline}
+              onNavigateHome={() => setCurrentView('home')}
+            />
+          </ViewWrapper>
+        );
       case 'help': return <ViewWrapper><HelpView isDarkMode={isDarkMode} onNavigate={setCurrentView} /></ViewWrapper>;
       case 'actor':
         return (
@@ -2398,6 +2552,14 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             />
           </ViewWrapper>
         );
+      case 'dev-lab':
+        return (
+          <ViewWrapper>
+            <VideoEnhancementLab isDarkMode={isDarkMode} />
+          </ViewWrapper>
+        );
+      case 'dev-player-test':
+        return <PlayerEnhancementTestPage />;
       case 'notfound':
       default:
         return <ViewWrapper><NotFoundPage isDarkMode={isDarkMode} /></ViewWrapper>;
@@ -2407,7 +2569,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const viewContent = useMemo(() => renderContent(), [
     currentView, submittedSearchQuery, liveSearchActors, activeActorId, isDarkMode, favorites, myList, selectedGenre,
     currentUser, activeProfile, users, content, sectionTitles, customSections,
-    filteredContent, trendingItems, popularMovies, popularSeries, animeItems,
+    filteredContent, visibleGridCount, trendingItems, popularMovies, popularSeries, animeItems,
     topRatedItems, featuredSelection, continueWatchingList, isLoadingMore,
     hasMoreMovies, hasMoreSeries, hasMoreAnimes
   ]);
@@ -2451,7 +2613,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         activeProfile={activeProfile}
       />
       
-      <main className={`transition-[margin] duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} min-h-screen flex flex-col relative z-10`}>
+      <main className={`transition-[margin] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-[margin] ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} min-h-screen flex flex-col relative z-10`}>
         <Header 
           isDarkMode={isDarkMode} 
           setIsDarkMode={setIsDarkMode} 
@@ -2494,11 +2656,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-20 scroll-smooth transform-gpu">
           {isCatalogLoading && trendingItems.length === 0 ? (
-            <div className="min-h-[75vh] flex flex-col items-center justify-center select-none">
+            <div key="catalog-initial-loader" className="min-h-[75vh] flex flex-col items-center justify-center select-none">
               <ZapiLoader size="xl" />
             </div>
           ) : (
-            <React.Suspense fallback={<div className="min-h-[75vh] flex items-center justify-center"><ZapiLoader size="xl" /></div>}>{viewContent}</React.Suspense>
+            <div key={`active-view-${submittedSearchQuery ? 'search' : currentView}`}>
+              <React.Suspense fallback={<div className="min-h-[75vh] flex items-center justify-center"><ZapiLoader size="xl" /></div>}>
+                {viewContent}
+              </React.Suspense>
+            </div>
           )}
         </div>
       </main>
@@ -2580,10 +2746,56 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           onToggleList={toggleMyList}
           onToggleFavorite={toggleFavorite}
           allContent={allowedContent}
-          initialSeason={initialSeasonNum}
-          initialEpisode={initialEpisodeNum}
-          autoPlayInitialEpisode={hasDeepLinkEpisode}
+          initialSeason={effectiveSeasonNum}
+          initialEpisode={effectiveEpisodeNum}
+          autoPlayInitialEpisode={effectiveAutoPlay}
         /></React.Suspense>
+      )}
+
+      {/* Modal de Entrada Direta em Watch Party por Link (/sala/:roomId) */}
+      {showDirectWatchPartyModal && watchPartyRoomId && (
+        <React.Suspense fallback={null}>
+          <WatchPartyModal
+            isOpen={showDirectWatchPartyModal}
+            initialRoomId={watchPartyRoomId}
+            currentProfileName={activeProfile?.name || currentUser?.name || 'Convidado'}
+            onClose={() => {
+              setShowDirectWatchPartyModal(false);
+              if (location.pathname.startsWith('/sala')) {
+                navigate('/', { replace: true });
+              }
+            }}
+            onStartWatchPartyPlayback={async (synthItem, targetSeason, targetEpisode) => {
+              setShowDirectWatchPartyModal(false);
+              const existing = content.find(c => c.id === synthItem.id || c.tmdbId === synthItem.tmdbId) || synthItem;
+              setDirectPartyEpisode({ season: targetSeason, episode: targetEpisode });
+              setSelectedContent(existing);
+            }}
+          />
+        </React.Suspense>
+      )}
+
+      {/* Player de Reprodução Offline Integrado (Experiência Netflix) */}
+      {activeOfflineDownload && offlinePlaybackItem && offlineBlobUrl && (
+        <div className="fixed inset-0 z-[500] bg-black">
+          <React.Suspense fallback={<div className="fixed inset-0 z-[500] bg-black flex items-center justify-center"><ZapiLoader size="xl" message="Abrindo vídeo do armazenamento local..." /></div>}>
+            <ZapiPlayer
+              key={activeOfflineDownload.id}
+              item={offlinePlaybackItem}
+              streams={offlinePlaybackItem.streams || []}
+              isOfflineMode={true}
+              offlineSubtitles={activeOfflineDownload.subtitles}
+              initialResumeTime={activeOfflineDownload.lastPlaybackPosition}
+              onUpdatePlaybackPosition={(pos) => {
+                offlineDb.updatePlaybackPosition(activeOfflineDownload.id, pos);
+              }}
+              initialSeason={activeOfflineDownload.season}
+              initialEpisode={activeOfflineDownload.episode}
+              initialPlayIntro={false}
+              onClose={handleCloseOfflinePlayer}
+            />
+          </React.Suspense>
+        </div>
       )}
     </div>
   );

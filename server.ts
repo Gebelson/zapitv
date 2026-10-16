@@ -543,10 +543,19 @@ function createApp() {
         headers["Range"] = req.headers.range;
       }
 
+      const controller = new AbortController();
+      const connectTimer = setTimeout(() => {
+        try { controller.abort(new Error("Timeout de conexão com servidor de origem")); } catch {}
+      }, 25000);
+      req.on("close", () => {
+        try { controller.abort(); } catch {}
+      });
+
       const response = await fetch(targetUrl, {
         headers,
-        signal: AbortSignal.timeout(15000)
+        signal: controller.signal
       });
+      clearTimeout(connectTimer);
 
       // Set CORS and forward media headers
       res.setHeader("Access-Control-Allow-Origin", "*");
@@ -1201,6 +1210,20 @@ if (!process.env.VERCEL) {
         appType: "spa",
       });
       app.use(vite.middlewares);
+      app.use(async (req, res, next) => {
+        const url = req.originalUrl;
+        if (url.startsWith('/api/') || url.startsWith('/stream/')) {
+          return next();
+        }
+        try {
+          let template = fs.readFileSync(path.resolve(process.cwd(), "index.html"), "utf-8");
+          template = await vite.transformIndexHtml(url, template);
+          res.status(200).set({ "Content-Type": "text/html" }).end(template);
+        } catch (e) {
+          vite.ssrFixStacktrace(e as Error);
+          next(e);
+        }
+      });
     } else {
       const distPath = path.join(process.cwd(), "dist");
       app.use(express.static(distPath));

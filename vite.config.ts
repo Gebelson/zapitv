@@ -25,6 +25,29 @@ export default defineConfig(({ mode }) => {
           'fs': path.resolve(__dirname, 'src/core/rankings/browserNodeShim.ts'),
           'path': path.resolve(__dirname, 'src/core/rankings/browserNodeShim.ts'),
         }
+      },
+      build: {
+        target: 'es2020',
+        cssCodeSplit: true,
+        chunkSizeWarningLimit: 600,
+        rollupOptions: {
+          output: {
+            manualChunks(id) {
+              if (id.includes('constants.tsx') || id.includes('featuredCatalogItems') || id.includes('verifiedCatalog') || id.includes('imdbTop500Snapshot')) {
+                return 'catalog-seed';
+              }
+              if (id.includes('node_modules')) {
+                if (id.includes('hls.js')) return 'vendor-hls';
+                if (id.includes('firestore')) return 'vendor-firestore';
+                if (id.includes('firebase') || id.includes('@firebase')) return 'vendor-firebase';
+                if (id.includes('trystero')) return 'vendor-trystero';
+                if (id.includes('dexie')) return 'vendor-dexie';
+                if (id.includes('lucide-react')) return 'vendor-icons';
+                if (id.includes('react-dom') || id.includes('react-router') || id.includes('scheduler')) return 'vendor-react';
+              }
+            }
+          }
+        }
       }
     };
 });

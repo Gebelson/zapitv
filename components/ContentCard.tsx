@@ -1,4 +1,3 @@
-
 import React, { memo, useState, useEffect, useRef } from 'react';
 import { Heart, Bookmark, Play, Star } from 'lucide-react';
 import { ContentItem, ContentType } from '../types';
@@ -15,6 +14,53 @@ interface ContentCardProps {
   onToggleList: (e: React.MouseEvent, id: string) => void;
   className?: string;
   rankPosition?: number;
+}
+
+// Singleton IntersectionObserver compartilhado entre todos os ContentCards (evita criar centenas de instâncias)
+const viewportCallbacks = new WeakMap<Element, () => void>();
+let sharedViewportObserver: IntersectionObserver | null = null;
+
+function getSharedViewportObserver(): IntersectionObserver | null {
+  if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return null;
+  if (!sharedViewportObserver) {
+    sharedViewportObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const cb = viewportCallbacks.get(entry.target);
+            if (cb) {
+              viewportCallbacks.delete(entry.target);
+              sharedViewportObserver?.unobserve(entry.target);
+              cb();
+            }
+          }
+        }
+      },
+      {
+        rootMargin: '800px 0px',
+        threshold: 0.01
+      }
+    );
+  }
+  return sharedViewportObserver;
+}
+
+// Listener único compartilhado para atualizações de progresso de reprodução
+const progressListeners = new Set<(contentId?: string) => void>();
+let isGlobalProgressBound = false;
+
+function subscribeProgressUpdates(fn: (contentId?: string) => void): () => void {
+  if (typeof window !== 'undefined' && !isGlobalProgressBound) {
+    isGlobalProgressBound = true;
+    window.addEventListener('zapitv_progress_updated', (e: any) => {
+      const cid = e?.detail?.contentId;
+      progressListeners.forEach(listener => listener(cid));
+    });
+  }
+  progressListeners.add(fn);
+  return () => {
+    progressListeners.delete(fn);
+  };
 }
 
 const ContentCard: React.FC<ContentCardProps> = ({
@@ -37,52 +83,43 @@ const ContentCard: React.FC<ContentCardProps> = ({
   });
   const [hasImageError, setHasImageError] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const hoverPrefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [continuity, setContinuity] = useState<PlaybackContinuityInfo>(() => {
     return storageService.getPlaybackContinuity(item);
   });
+  const retryCountRef = useRef(0);
 
-  // Detecção de Visibilidade no Viewport: carrega automaticamente antes de entrar na tela, sem depender de hover
+  // Detecção de Visibilidade no Viewport com observer único compartilhado
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') {
-      setIsInViewport(true);
-      return;
-    }
+    retryCountRef.current = 0;
+    if (isInViewport) return;
 
     const currentCard = cardRef.current;
-    if (!currentCard) {
+    const observer = getSharedViewportObserver();
+    if (!currentCard || !observer) {
       setIsInViewport(true);
       return;
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting) {
-          setIsInViewport(true);
-          observer.disconnect();
-        }
-      },
-      {
-        rootMargin: '400px', // Antecipa o carregamento 400px antes de entrar na área visível
-        threshold: 0.01
-      }
-    );
-
+    viewportCallbacks.set(currentCard, () => setIsInViewport(true));
     observer.observe(currentCard);
-    return () => observer.disconnect();
-  }, [item.id]);
+
+    return () => {
+      viewportCallbacks.delete(currentCard);
+      observer.unobserve(currentCard);
+    };
+  }, [item.id, isInViewport]);
 
   useEffect(() => {
     setContinuity(storageService.getPlaybackContinuity(item));
-    const handleProgress = (e: any) => {
+    return subscribeProgressUpdates((contentId) => {
+      if (!contentId) return;
       const keys = storageService.getCandidateKeys(item);
-      if (keys.includes(e.detail?.contentId)) {
+      if (keys.includes(contentId)) {
         setContinuity(storageService.getPlaybackContinuity(item));
       }
-    };
-    window.addEventListener('zapitv_progress_updated', handleProgress);
-    return () => window.removeEventListener('zapitv_progress_updated', handleProgress);
+    });
   }, [item.id]);
 
   // Sincroniza imagem se o item mudar
@@ -92,51 +129,77 @@ const ContentCard: React.FC<ContentCardProps> = ({
     setImgSrc(initial);
     setHasImageError(!initial);
 
-    // Se o item inicial não possui imagem ou tem URL nula/vazia, tenta recuperação imediata
-    if (!initial) {
+    // Se o item inicial não possui imagem ou tem URL nula/vazia, tenta recuperação imediata quando visível
+    if (!initial && isInViewport) {
       let isMounted = true;
       posterRecoveryService.recoverPoster(item).then(recovered => {
-        if (isMounted && recovered) {
-          setImgSrc(recovered);
-          setHasImageError(false);
+        if (isMounted) {
+          if (recovered) {
+            setImgSrc(recovered);
+            setHasImageError(false);
+          } else {
+            setHasImageError(true);
+          }
         }
       });
       return () => { isMounted = false; };
     }
-  }, [item.id, item.image, item.backdrop]);
+  }, [item.id, item.image, item.backdrop, isInViewport]);
 
-  // Tratamento inteligente de erro de imagem com recuperação automática oficial
+  // Tratamento inteligente de erro de imagem com recuperação automática oficial e limite de tentativas
   const handleImageError = () => {
-    if (imgSrc && imgSrc === item.image && item.backdrop && item.backdrop !== item.image) {
-      setImgSrc(item.backdrop);
+    if (retryCountRef.current < 2) {
+      retryCountRef.current += 1;
+      if (imgSrc && imgSrc === item.image && item.backdrop && item.backdrop !== item.image) {
+        setImgSrc(item.backdrop);
+        return;
+      }
+
+      // Tenta recuperação canônica via TMDB/AniList sem depender de ação do usuário
+      posterRecoveryService.recoverPoster(item).then(recoveredUrl => {
+        if (recoveredUrl && recoveredUrl !== imgSrc) {
+          setImgSrc(recoveredUrl);
+          setHasImageError(false);
+        } else {
+          setHasImageError(true);
+        }
+      }).catch(() => {
+        setHasImageError(true);
+      });
       return;
     }
+    setHasImageError(true);
+  };
 
-    // Tenta recuperação canônica via TMDB/AniList sem depender de ação do usuário
-    posterRecoveryService.recoverPoster(item).then(recoveredUrl => {
-      if (recoveredUrl && recoveredUrl !== imgSrc) {
-        setImgSrc(recoveredUrl);
-        setHasImageError(false);
-      } else {
-        setHasImageError(true);
-      }
-    }).catch(() => {
-      setHasImageError(true);
-    });
+  // Pré-busca inteligente de fontes apenas quando o usuário demonstra intenção (hover > 350ms)
+  const handleMouseEnter = () => {
+    if (hoverPrefetchTimerRef.current) clearTimeout(hoverPrefetchTimerRef.current);
+    hoverPrefetchTimerRef.current = setTimeout(() => {
+      import('../src/core/catalog/CatalogAvailabilityQueue').then(({ catalogAvailabilityQueue }) => {
+        catalogAvailabilityQueue.enqueue(item, 2);
+      }).catch(() => {});
+    }, 350);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverPrefetchTimerRef.current) {
+      clearTimeout(hoverPrefetchTimerRef.current);
+      hoverPrefetchTimerRef.current = null;
+    }
   };
 
   useEffect(() => {
-    let active = true;
-    import('../src/core/catalog/CatalogAvailabilityQueue').then(({ catalogAvailabilityQueue }) => {
-      if (active) catalogAvailabilityQueue.enqueue(item, 1);
-    }).catch(error => console.warn('Falha ao iniciar verificação da fonte:', error));
-    return () => { active = false; };
-  }, [item.id]);
+    return () => {
+      if (hoverPrefetchTimerRef.current) clearTimeout(hoverPrefetchTimerRef.current);
+    };
+  }, []);
 
   return (
     <div 
       ref={cardRef}
       onClick={() => onItemClick(item)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       className={`flex-none w-full max-w-full min-w-0 group/card cursor-pointer transition-all duration-300 hover:scale-105 hover:z-30 relative transform-gpu will-change-transform ${className}`}
     >
       {/* Brilho Azul no Hover - hardware accelerated */}
@@ -151,37 +214,45 @@ const ContentCard: React.FC<ContentCardProps> = ({
               <div className={`w-full h-full flex flex-col justify-end p-4 relative select-none ${
                 isDarkMode
                   ? 'bg-gradient-to-br from-[#1a2232] via-[#0f141d] to-[#070a0f] border border-white/5'
-                  : 'bg-gradient-to-br from-gray-100 via-gray-200 to-gray-300'
+                  : 'bg-gradient-to-br from-slate-100 via-slate-200 to-slate-300 border border-slate-300/60'
               }`}>
                 <div className="absolute inset-0 flex items-center justify-center opacity-15">
-                  <Play className="w-16 h-16 text-[#007df7]" />
+                  <Play className={`w-16 h-16 ${isDarkMode ? 'text-[#007df7]' : 'text-blue-600'}`} />
                 </div>
                 <div className="relative z-10">
-                  <span className="text-[10px] font-black uppercase text-[#007df7] tracking-wider mb-1 block">
+                  <span className={`text-[10px] font-black uppercase tracking-wider mb-1 block ${
+                    isDarkMode ? 'text-[#007df7]' : 'text-blue-600'
+                  }`}>
                     {item.genres?.[0] || item.type}
                   </span>
-                  <h4 className="font-black text-xs md:text-sm text-white line-clamp-2 leading-tight drop-shadow">
+                  <h4 className={`font-black text-xs md:text-sm line-clamp-2 leading-tight drop-shadow-sm ${
+                    isDarkMode ? 'text-white' : 'text-slate-900'
+                  }`}>
                     {item.title}
                   </h4>
-                  <div className="flex items-center gap-2 mt-1.5 text-[10px] text-gray-400 font-bold">
-                    <span>{item.year}</span>
+                  <div className={`flex items-center gap-2 mt-1.5 text-[10px] font-bold ${
+                    isDarkMode ? 'text-gray-400' : 'text-slate-600'
+                  }`}>
+                    <span>{item.year || 'N/A'}</span>
                     <span>•</span>
-                    <span className="text-yellow-400 flex items-center gap-0.5">
-                      ★ {item.rating}
+                    <span className="text-amber-500 flex items-center gap-0.5">
+                      ★ {item.rating || '—'}
                     </span>
                   </div>
                 </div>
               </div>
-            ) : (
+            ) : isInViewport ? (
               <img 
                 src={imgSrc} 
                 alt={item.title} 
                 onError={handleImageError}
                 className="w-full h-full max-w-full object-cover transition-transform duration-700 pointer-events-none block" 
-                loading={isInViewport ? "eager" : "lazy"}
+                loading="eager"
                 decoding="async"
                 referrerPolicy="no-referrer"
               />
+            ) : (
+              <div className={`w-full h-full ${isDarkMode ? 'bg-gray-800/20' : 'bg-slate-200/40'} animate-pulse`} />
             )}
             
             {/* Badges de Áudio e Ranking Oficial */}
@@ -277,4 +348,18 @@ const ContentCard: React.FC<ContentCardProps> = ({
   );
 };
 
-export default memo(ContentCard);
+export default memo(ContentCard, (prev, next) => {
+  return (
+    prev.item.id === next.item.id &&
+    prev.item.image === next.item.image &&
+    prev.item.backdrop === next.item.backdrop &&
+    prev.item.title === next.item.title &&
+    prev.item.rating === next.item.rating &&
+    prev.isDarkMode === next.isDarkMode &&
+    prev.isFavorite === next.isFavorite &&
+    prev.isInList === next.isInList &&
+    prev.rankPosition === next.rankPosition &&
+    prev.className === next.className
+  );
+});
+
