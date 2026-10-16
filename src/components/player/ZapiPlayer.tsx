@@ -756,6 +756,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const [allSourcesFailed, setAllSourcesFailed] = useState(false);
   const triedIndicesRef = useRef<Set<number>>(new Set());
   const isSwitchingStreamRef = useRef(false);
+  const startupTimedOutRef = useRef(false);
 
   // Máquina de estados explícita do ciclo de vida da reprodução
   const playbackPhase: PlaybackPhase = useMemo(() => {
@@ -1781,6 +1782,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Instant Fallback Algorithm (<50ms)
   const handleStreamFallback = useCallback((reason: string) => {
     if (!isMountedRef.current) return;
+    if (startupTimedOutRef.current) return;
     if (isLoadingStreams) return;
     if (isSwitchingStreamRef.current) return;
     isSwitchingStreamRef.current = true;
@@ -1884,6 +1886,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Monitor loading of streams from parent modal
   useEffect(() => {
     if (isLoadingStreams) {
+      startupTimedOutRef.current = false;
       setIsLoading(true);
       setAllSourcesFailed(false);
       setHasError(false);
@@ -1910,6 +1913,26 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       setHasError(false);
     }
   }, [isLoadingStreams, streams.length, streamResolutionError]);
+
+  // Um provedor pode falhar sem emitir um erro final, mesmo após o watchdog de
+  // cada fonte. Encerra a tentativa inteira para não deixar o player preso.
+  useEffect(() => {
+    if (isLoadingStreams || streams.length === 0 || isMediaReady || allSourcesFailed) return;
+    const timer = setTimeout(() => {
+      if (!isMountedRef.current || isMediaReadyRef.current) return;
+      startupTimedOutRef.current = true;
+      isSwitchingStreamRef.current = false;
+      setAllSourcesFailed(true);
+      setHasError(true);
+      setIsLoading(false);
+      setIsPlayingIntro(false);
+      setIsIntroEnded(true);
+      setErrorMessage('As fontes encontradas não iniciaram a reprodução em 30 segundos. Pode ser uma falha temporária do provedor. Tente novamente mais tarde.');
+      introVideoRef.current?.pause();
+      videoRef.current?.pause();
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [isLoadingStreams, streams.length, isMediaReady, allSourcesFailed]);
 
   // Pre-flight instant probe of candidate stream
   useEffect(() => {
