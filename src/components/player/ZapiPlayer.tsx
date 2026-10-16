@@ -3671,7 +3671,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               >
                 <Languages className="w-5 h-5" />
                 <span className="text-[11px] font-bold hidden xl:inline">
-                  {availableAudioOptions.find(o => o.isCurrent)?.flag || '🇧🇷'}
+                  {availableAudioOptions.find(o => o.isCurrent)?.flag || '🌐'}
                 </span>
               </button>
 
@@ -3714,7 +3714,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                       </button>
                     ))}
 
-                    {availableAudioOptions.length <= 1 && (
+                    {availableAudioOptions.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 py-2 px-1 text-center leading-relaxed">
+                        Nenhuma faixa de áudio disponível nesta fonte.
+                      </p>
+                    ) : availableAudioOptions.length === 1 && (
                       <p className="text-[11px] text-gray-400 py-2 px-1 text-center leading-relaxed">
                         Áudio atual em reprodução direta.
                       </p>
