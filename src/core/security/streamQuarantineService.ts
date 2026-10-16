@@ -61,7 +61,10 @@ export class StreamQuarantineService {
 
   public purgePlaywebFalsePositives(): void {
     for (const [key, item] of this.quarantinedMap.entries()) {
-      if (item.reason?.toLowerCase().includes('playweb')) {
+      const reason = item.reason?.toLowerCase() || '';
+      if (reason.includes('playweb') ||
+          reason.includes('release web-dl/bluray fraudulenta de filme em cartaz') ||
+          reason.includes('release digital fraudulenta para obra em cartaz/não lançada')) {
         this.quarantinedMap.delete(key);
       }
     }
@@ -181,19 +184,6 @@ export class StreamQuarantineService {
       ) {
         const reason = 'Colisão conhecida de anime upstream: "Sparks of Tomorrow" atribuído a Doraemon';
         if (url) this.quarantine(url, reason, 'title_collision', targetTitle, stream.providerName);
-        return { isQuarantined: true, reason };
-      }
-    }
-
-    // 5. Caso Hope (2026): filme em cartaz com suposto WEB-DL/AMZN/Bluray (100% trote falso)
-    if (targetTitle && /hope.*primeiro.*impacto|hopeu|1058424|tt27369017/i.test(targetTitle)) {
-      if (
-        (title.includes('web-dl') || title.includes('webrip') || title.includes('amzn') || title.includes('bluray')) &&
-        !title.includes('trailer') &&
-        !title.includes('teaser')
-      ) {
-        const reason = 'Release WEB-DL/Bluray fraudulenta de filme em cartaz nos cinemas (Hope 2026)';
-        if (hash) this.quarantine(hash, reason, 'adult_troll', targetTitle, stream.providerName);
         return { isQuarantined: true, reason };
       }
     }

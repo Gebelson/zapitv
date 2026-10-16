@@ -6,8 +6,8 @@
  * 
  * Regra de Ouro:
  * O título somente pode ser exibido no catálogo quando:
- * 1. For elegível pela política de lançamento (RELEASED, não NOT_RELEASED, não IN_THEATERS).
- * 2. Não estiver bloqueado pela regra de cinema brasileiro (theatricalFilterService).
+ * 1. Já ter estreado (filmes em cartaz são elegíveis).
+ * 2. Ter fontes válidas segundo as verificações de reprodução.
  * 3. Possuir ao menos UMA fonte válida, autorizada e tecnicamente reproduzível no ZapiTV.
  * 4. A fonte corresponder à obra correta (sem trocas de filmes/séries).
  * 5. A fonte possuir vídeo compatível e áudio funcional.
@@ -109,18 +109,6 @@ const TTL_ERROR_MS = 15 * 60 * 1000; // 15 minutos
 // Lista de bloqueio estrito para títulos com indisponibilidade confirmada
 const KNOWN_EXCLUDED_PATTERNS = [
   /^tyson$/i,                 // Série Tyson 2026 - Apenas fontes de filme trocado
-  /o intruso.*incomer/i,      // O Intruso (The Incomer) 2026 - Theatrical sem fonte digital
-  /^o intruso$/i,             // O Intruso - Sem fontes válidas
-  /^profundezas$/i,           // Profundezas 2026 - Sem fonte válida compatível
-  /vingadores.*(doutor destino|guerras secretas|doomsday|secret wars)/i,
-  /avengers.*(doomsday|secret wars)/i,
-  /avatar.*(fogo e cinzas|fire and ash)/i,
-  /the batman.*(parte ii|part ii)/i,
-  /spider-man.*(brand new day|um novo dia|beyond the spider-verse)/i,
-  /homem-aranha.*(um novo dia|brand new day|al[eé]m do aranhaverso)/i,
-  /mandalorian.*grogu/i,
-  /toy story 5/i,
-  /shrek 5/i,
   /caminandes/i
 ];
 
@@ -174,6 +162,15 @@ class CatalogEligibilityService {
           let purged = false;
           for (const rec of parsed) {
             if (rec && rec.canonicalId) {
+              // A política antiga marcava filmes em cartaz como indisponíveis sem consultar fontes.
+              // Reavaliar apenas esses registros, preservando os demais caches e dados do usuário.
+              if (rec.mediaType === 'movie' && rec.playbackStatus === 'UNAVAILABLE_CONFIRMED' &&
+                  (!rec.providersChecked?.length) &&
+                  (!rec.releaseDate || rec.releaseDate <= new Date().toISOString().slice(0, 10)) &&
+                  (!rec.year || Number(rec.year) <= new Date().getFullYear())) {
+                purged = true;
+                continue;
+              }
               if (bannedContentRegistry.isBannedKeyOrId(rec.canonicalId) || bannedContentRegistry.isBannedTitle(rec.title)) {
                 purged = true;
                 continue;
@@ -284,24 +281,18 @@ class CatalogEligibilityService {
     const itemYear = Number(item.year) || currentYear;
 
     // 1. Bloqueio estrito de padrões não lançados ou obras futuras conhecidas
-    if (item.imdbId && item.imdbId.trim().toLowerCase() === 'tt20221436') {
-      return false;
-    }
-    if (item.id && item.id.trim().toLowerCase() === 'movie-spiderman-new-day-2026') {
-      return false;
-    }
     for (const pat of KNOWN_EXCLUDED_PATTERNS) {
       if (pat.test(titleLower) || (item.originalTitle && pat.test(item.originalTitle))) {
         return false;
       }
     }
 
-    // 2. Regra Teatral Estrita (Filmes em cartaz ou sem digital no Brasil)
+    // 2. Data de estreia; estar em cartaz não impede a descoberta.
     if (!theatricalFilterService.isMovieAllowedSync(item)) {
       return false;
     }
 
-    // 3. Acervo verificado oficial: permitido se não bloqueado por regras de cinema/lançamento
+    // 3. Acervo verificado oficial: permitido se já estreou
     if (item.id.startsWith('open-') || item.availabilityStatus === 'verified') {
       return true;
     }
@@ -332,7 +323,7 @@ class CatalogEligibilityService {
       return true;
     }
 
-    // 8. Títulos com ano válido já lançado (sem impedimento confirmado, sem janela de cinema restrita)
+    // 8. Títulos com ano válido já lançado
     if (itemYear <= currentYear) {
       if (record && typeof record.isPubliclyPlayable === 'boolean') {
         return record.isPubliclyPlayable;

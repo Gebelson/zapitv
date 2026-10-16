@@ -201,7 +201,7 @@ describe('ZapiTV — Pesquisa por Atores e Atrizes & Filmografia Oficial', () =>
   });
 
   describe('6. Filtros de Elegibilidade e Validação de Catálogo', () => {
-    it('deve bloquear produções em cartaz nos cinemas brasileiros e títulos indisponíveis', () => {
+    it('deve permitir descobrir filmes em cartaz já estreados', () => {
       const testItems: ContentItem[] = [
         {
           id: 'tmdb-valid-1',
@@ -224,8 +224,7 @@ describe('ZapiTV — Pesquisa por Atores e Atrizes & Filmografia Oficial', () =>
 
       const approved = catalogEligibilityService.filterEligibleItemsSync(testItems);
       expect(approved.some(i => i.title.includes('2023'))).toBe(true);
-      // O filme em cartaz nos cinemas não deve ser aprovado
-      expect(approved.some(i => i.inTheaters === true)).toBe(false);
+      expect(approved.some(i => i.inTheaters === true)).toBe(true);
     });
   });
 });

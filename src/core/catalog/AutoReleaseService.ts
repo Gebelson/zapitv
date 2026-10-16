@@ -5,7 +5,7 @@
  * Funcionalidades:
  * 1. Descoberta Diária: Varre TMDB e AniList por filmes em lançamento digital, novas séries e animes da temporada.
  * 2. Bloqueio Rigoroso de CAM: Rejeita gravações de sala de cinema via CamBlockerEngine.
- * 3. Janela Cinematográfica: Obedece theatricalFilterService (sem filmes em cartaz).
+ * 3. Data de estreia: impede apenas filmes ainda não lançados.
  * 4. Validação Prévia de Reprodução: NUNCA adiciona uma obra sem fonte confirmada, compatível e autorizada.
  * 5. Novos Episódios: Atualiza séries e animes já catalogados com episódios recém-disponibilizados.
  * 6. Priorização de Áudio PT-BR: Identifica dublagens e versões em português.

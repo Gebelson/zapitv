@@ -1569,52 +1569,7 @@ var TMDBClientService = class {
 var tmdbService = new TMDBClientService();
 
 // src/core/catalog/theatricalFilterService.ts
-var STORAGE_KEY = "zapitv_theatrical_evaluations_v2";
-var KNOWN_UNRELEASED_OR_THEATRICAL_IDS = /* @__PURE__ */ new Set([
-  "1003596",
-  // Vingadores: Doutor Destino / Avengers: Doomsday
-  "1003598",
-  // Vingadores: Guerras Secretas / Avengers: Secret Wars
-  "83533",
-  // Avatar: Fogo e Cinzas / Avatar: Fire and Ash
-  "9659",
-  // The Batman Parte II
-  "480530",
-  // Blade
-  "569094",
-  // Homem-Aranha: Além do Aranhaverso / Spider-Man: Beyond the Spider-Verse
-  "1229730",
-  // The Mandalorian & Grogu
-  "1084736",
-  // Toy Story 5
-  "402431",
-  // Wicked: Part Two
-  "1064213",
-  // Anora
-  "1100782",
-  // Smile 2
-  "1034541",
-  // Terrifier 3
-  "912649",
-  // Venom: A Última Rodada / Venom: The Last Dance
-  "1184918",
-  // O Robô Selvagem / The Wild Robot
-  "823219",
-  // Flow
-  "tt20221436"
-  // Homem-Aranha: Um Novo Dia / Spider-Man: Brand New Day (2026 unreleased)
-]);
-var KNOWN_UNRELEASED_PATTERNS = [
-  /vingadores.*(doutor destino|guerras secretas|doomsday|secret wars)/i,
-  /avengers.*(doomsday|secret wars)/i,
-  /avatar.*(fogo e cinzas|fire and ash)/i,
-  /the batman.*(parte ii|part ii)/i,
-  /spider-man.*(brand new day|um novo dia|beyond the spider-verse)/i,
-  /homem-aranha.*(um novo dia|brand new day|al[eé]m do aranhaverso)/i,
-  /mandalorian.*grogu/i,
-  /toy story 5/i,
-  /shrek 5/i
-];
+var STORAGE_KEY = "zapitv_theatrical_evaluations_v3";
 var TheatricalFilterService = class {
   constructor() {
     this.cache = /* @__PURE__ */ new Map();
@@ -1738,26 +1693,10 @@ var TheatricalFilterService = class {
    */
   isKnownUnreleasedOrTheatrical(item) {
     if (!item) return false;
-    if (item.tmdbId && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(String(item.tmdbId))) {
-      return true;
-    }
-    if (item.imdbId && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(item.imdbId.trim().toLowerCase())) {
-      return true;
-    }
-    const rawTmdbId = item.id?.startsWith("tmdb-") ? item.id.replace("tmdb-", "") : null;
-    if (rawTmdbId && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(rawTmdbId)) {
-      return true;
-    }
-    if (item.id && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(item.id.trim().toLowerCase())) {
-      return true;
-    }
-    const titlesToCheck = [item.title, item.originalTitle].filter(Boolean);
-    for (const t of titlesToCheck) {
-      for (const pattern of KNOWN_UNRELEASED_PATTERNS) {
-        if (pattern.test(t)) return true;
-      }
-    }
-    return false;
+    const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    return Boolean(
+      item.releaseDate && item.releaseDate > todayStr || Number(item.year) > (/* @__PURE__ */ new Date()).getFullYear()
+    );
   }
   /**
    * Verifica se o item está em exibição confirmada nos cinemas
@@ -1828,6 +1767,9 @@ var TheatricalFilterService = class {
     const cached = this.cache.get(cacheKey);
     const now = Date.now();
     if (cached && now < cached.expiresAt) {
+      if (cached.status === "IN_THEATERS" || cached.status === "THEATRICAL_STATUS_UNKNOWN") {
+        return { ...cached, allowed: true };
+      }
       return cached;
     }
     const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
@@ -1876,8 +1818,8 @@ var TheatricalFilterService = class {
         region: "BR",
         title: item.title,
         status: "IN_THEATERS",
-        allowed: false,
-        reason: "Comprovadamente em exibi\xE7\xE3o comercial nos cinemas brasileiros (circuito ativo)",
+        allowed: true,
+        reason: "Em exibi\xE7\xE3o nos cinemas brasileiros; fontes ainda precisam ser validadas",
         evidence: ["now_playing_brazil_active", "commercial_theatrical_run"],
         evaluatedAt: now,
         expiresAt: now + 12 * 60 * 60 * 1e3
@@ -2030,7 +1972,7 @@ var TheatricalFilterService = class {
             this.saveToStorage();
             return evaluation;
           }
-          if (digitalDate && digitalDate <= todayStr && !this.isKnownInTheaters(item)) {
+          if (digitalDate && digitalDate <= todayStr) {
             const evaluation = {
               id: item.id,
               tmdbId: item.tmdbId,
@@ -2059,8 +2001,8 @@ var TheatricalFilterService = class {
                 region: "BR",
                 title: item.title,
                 status: "IN_THEATERS",
-                allowed: false,
-                reason: `Em cartaz nos cinemas h\xE1 ${diffDays} dias (Janela exclusiva ativa)`,
+                allowed: true,
+                reason: `Em cartaz nos cinemas h\xE1 ${diffDays} dias; fontes ainda precisam ser validadas`,
                 evidence: [...evidence, `${diffDays}_days_theatrical_window`],
                 theatricalDate,
                 evaluatedAt: now,
@@ -2076,8 +2018,8 @@ var TheatricalFilterService = class {
                 region: "BR",
                 title: item.title,
                 status: "THEATRICAL_STATUS_UNKNOWN",
-                allowed: false,
-                reason: `Per\xEDodo de transi\xE7\xE3o de cinema (${diffDays} dias). Aguardando confirma\xE7\xE3o oficial de encerramento do circuito ou lan\xE7amento digital.`,
+                allowed: true,
+                reason: `Per\xEDodo de transi\xE7\xE3o de cinema (${diffDays} dias); fontes ainda precisam ser validadas`,
                 evidence: [...evidence, "theatrical_status_uncertain"],
                 theatricalDate,
                 evaluatedAt: now,
@@ -2129,11 +2071,10 @@ var TheatricalFilterService = class {
   }
   /**
    * Avaliação instantânea síncrona com base no cache e heurísticas imediatas.
-   * Executa em tempo zero (0ms), garantindo que títulos bloqueados jamais sejam renderizados.
+   * Executa sem requisições para evitar esconder títulos já lançados.
    */
   isMovieAllowedSync(item) {
     if (!item) return false;
-    if (item.inTheaters === true) return false;
     if (item.type === "S\xC9RIE" /* SERIES */) return true;
     const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
@@ -2141,13 +2082,14 @@ var TheatricalFilterService = class {
     if (itemYear > currentYear) return false;
     if (item.releaseDate && item.releaseDate > todayStr) return false;
     if (this.isKnownUnreleasedOrTheatrical(item)) return false;
-    if (this.isKnownInTheaters(item) || this.isKnownUpcoming(item)) {
+    if (!this.isKnownInTheaters(item) && this.isKnownUpcoming(item)) {
       return false;
     }
+    if (this.isKnownInTheaters(item)) return true;
     const cacheKey = item.tmdbId ? `tmdb-${item.tmdbId}` : item.imdbId || item.id;
     const cached = this.cache.get(cacheKey);
     if (cached) {
-      return cached.allowed;
+      return cached.status === "IN_THEATERS" || cached.status === "THEATRICAL_STATUS_UNKNOWN" || cached.allowed;
     }
     if (itemYear < currentYear - 1) return true;
     return true;
@@ -2160,7 +2102,7 @@ var TheatricalFilterService = class {
     return res.allowed;
   }
   /**
-   * Filtra uma lista de itens removendo filmes que ainda estejam em cartaz ou não lançados
+   * Filtra uma lista de itens removendo filmes ainda não lançados
    */
   async filterAllowedMovies(items) {
     if (!items || items.length === 0) return [];
@@ -2240,7 +2182,7 @@ var CanonicalIdentityService = class {
     const genres = (item.genres || []).map((g) => g.toLowerCase());
     const isChildFriendly = genres.some((g) => /infantil|fam[ií]lia|kids|children|desenho|crian[çc]a/i.test(g)) || /doraemon|peppa|galinha pintadinha|patrulha canina|pocoyo|chaves/i.test(item.title);
     const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-    const isTheatricalUnreleased = theatricalFilterService.isKnownUnreleasedOrTheatrical(item) || Boolean(item.year && item.year > currentYear) || /hope.*primeiro.*impacto|vingadores.*destino|avengers.*doomsday|batman.*part.*ii/i.test(item.title);
+    const isTheatricalUnreleased = theatricalFilterService.isKnownUnreleasedOrTheatrical(item) || Boolean(item.year && item.year > currentYear);
     const aliases = [item.title.toLowerCase()];
     if (item.originalTitle) {
       aliases.push(item.originalTitle.toLowerCase());
@@ -2339,7 +2281,8 @@ var StreamQuarantineService = class {
   }
   purgePlaywebFalsePositives() {
     for (const [key, item] of this.quarantinedMap.entries()) {
-      if (item.reason?.toLowerCase().includes("playweb")) {
+      const reason = item.reason?.toLowerCase() || "";
+      if (reason.includes("playweb") || reason.includes("release web-dl/bluray fraudulenta de filme em cartaz") || reason.includes("release digital fraudulenta para obra em cartaz/n\xE3o lan\xE7ada")) {
         this.quarantinedMap.delete(key);
       }
     }
@@ -2434,13 +2377,6 @@ var StreamQuarantineService = class {
         return { isQuarantined: true, reason };
       }
     }
-    if (targetTitle && /hope.*primeiro.*impacto|hopeu|1058424|tt27369017/i.test(targetTitle)) {
-      if ((title.includes("web-dl") || title.includes("webrip") || title.includes("amzn") || title.includes("bluray")) && !title.includes("trailer") && !title.includes("teaser")) {
-        const reason = "Release WEB-DL/Bluray fraudulenta de filme em cartaz nos cinemas (Hope 2026)";
-        if (hash) this.quarantine(hash, reason, "adult_troll", targetTitle, stream.providerName);
-        return { isQuarantined: true, reason };
-      }
-    }
     return { isQuarantined: false };
   }
   /**
@@ -2494,7 +2430,7 @@ var SourceConfidenceEngine = class {
     if (identity.isTheatricalUnreleased) {
       const isClaimingDigital = (combined.includes("web-dl") || combined.includes("webrip") || combined.includes("bluray") || combined.includes("amzn")) && !combined.includes("trailer") && !combined.includes("teaser");
       if (isClaimingDigital) {
-        const reason = `Release digital fraudulenta para obra em cartaz/n\xE3o lan\xE7ada: "${identity.title}"`;
+        const reason = `Release digital para obra ainda n\xE3o lan\xE7ada: "${identity.title}"`;
         streamQuarantineService.quarantine(streamInfoHash || streamUrl, reason, "adult_troll", identity.title, stream.providerName);
         reasons.push(reason);
         return {
@@ -6335,8 +6271,8 @@ var CamBlockerEngine = class {
         return {
           isCam: true,
           confidence: "DEFINITIVE",
-          reason: "Rejeitado: filme em exibi\xE7\xE3o exclusiva nos cinemas ou n\xE3o lan\xE7ado (qualquer fonte atual \xE9 grava\xE7\xE3o de sala)",
-          matchedSignatures: ["theatrical_window_active"]
+          reason: "Rejeitado: filme ainda n\xE3o lan\xE7ado",
+          matchedSignatures: ["unreleased_movie"]
         };
       }
     }
@@ -6398,13 +6334,12 @@ var KNOWN_UPSTREAM_MISMATCHES = [
       return text.includes("/1332/") || text.includes("saving 80,000 gold") || text.includes("80,000 gold") || text.includes("8-manmai") || text.includes("black adam");
     }
   },
-  // 5. Hope: O Primeiro Impacto (2026) / Hopeu (Na Hong-jin): filme em cartaz nos cinemas
-  // Torrents fraudulentos indexados como supostos "WEB-DL AMZN" contêm vídeos adultos / trotes (Mia Khalifa).
+  // 5. Hope: bloquear apenas hashes e assinaturas conhecidos de vídeos trocados.
   {
     targetPattern: /hope.*primeiro.*impacto|hopeu|1058424|tt27369017/i,
     rejectStream: (s) => {
       const text = `${s.name || ""} ${s.title || ""} ${s.url || ""} ${s.infoHash || ""}`.toLowerCase();
-      if (text.includes("f9a842dfe9f5b2e7fda509f2306e0700b97a4036") || text.includes("d0eacddff07a24173d8f7dc11a18ef3ed32b886a") || text.includes("playweb") || text.includes("ben the men") || text.includes("khalifa") || text.includes("mia") || text.includes("web-dl") && !text.includes("trailer") || text.includes("webrip") && !text.includes("trailer") || text.includes("amzn") && !text.includes("trailer")) {
+      if (text.includes("f9a842dfe9f5b2e7fda509f2306e0700b97a4036") || text.includes("d0eacddff07a24173d8f7dc11a18ef3ed32b886a") || text.includes("ben the men") || text.includes("khalifa") || text.includes("mia khalifa")) {
         return true;
       }
       return false;
@@ -13271,21 +13206,6 @@ var TTL_ERROR_MS = 15 * 60 * 1e3;
 var KNOWN_EXCLUDED_PATTERNS = [
   /^tyson$/i,
   // Série Tyson 2026 - Apenas fontes de filme trocado
-  /o intruso.*incomer/i,
-  // O Intruso (The Incomer) 2026 - Theatrical sem fonte digital
-  /^o intruso$/i,
-  // O Intruso - Sem fontes válidas
-  /^profundezas$/i,
-  // Profundezas 2026 - Sem fonte válida compatível
-  /vingadores.*(doutor destino|guerras secretas|doomsday|secret wars)/i,
-  /avengers.*(doomsday|secret wars)/i,
-  /avatar.*(fogo e cinzas|fire and ash)/i,
-  /the batman.*(parte ii|part ii)/i,
-  /spider-man.*(brand new day|um novo dia|beyond the spider-verse)/i,
-  /homem-aranha.*(um novo dia|brand new day|al[eé]m do aranhaverso)/i,
-  /mandalorian.*grogu/i,
-  /toy story 5/i,
-  /shrek 5/i,
   /caminandes/i
 ];
 var CatalogEligibilityService = class _CatalogEligibilityService {
@@ -13329,6 +13249,10 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
           let purged = false;
           for (const rec of parsed) {
             if (rec && rec.canonicalId) {
+              if (rec.mediaType === "movie" && rec.playbackStatus === "UNAVAILABLE_CONFIRMED" && !rec.providersChecked?.length && (!rec.releaseDate || rec.releaseDate <= (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)) && (!rec.year || Number(rec.year) <= (/* @__PURE__ */ new Date()).getFullYear())) {
+                purged = true;
+                continue;
+              }
               if (bannedContentRegistry.isBannedKeyOrId(rec.canonicalId) || bannedContentRegistry.isBannedTitle(rec.title)) {
                 purged = true;
                 continue;
@@ -13424,12 +13348,6 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
     const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
     const itemYear = Number(item.year) || currentYear;
-    if (item.imdbId && item.imdbId.trim().toLowerCase() === "tt20221436") {
-      return false;
-    }
-    if (item.id && item.id.trim().toLowerCase() === "movie-spiderman-new-day-2026") {
-      return false;
-    }
     for (const pat of KNOWN_EXCLUDED_PATTERNS) {
       if (pat.test(titleLower) || item.originalTitle && pat.test(item.originalTitle)) {
         return false;
@@ -14722,8 +14640,7 @@ var FeaturedRankingService = class _FeaturedRankingService {
         continue;
       }
       if (rankType === "movie") {
-        const isSpidermanUnreleased = cand.imdbId.toLowerCase() === "tt20221436" || catalogItem.imdbId && catalogItem.imdbId.toLowerCase() === "tt20221436";
-        const isTheatricallyAllowed = !isSpidermanUnreleased && theatricalFilterService.isMovieAllowedSync(catalogItem);
+        const isTheatricallyAllowed = theatricalFilterService.isMovieAllowedSync(catalogItem);
         if (!isTheatricallyAllowed) {
           audit.push({
             imdbId: cand.imdbId,
@@ -14738,7 +14655,7 @@ var FeaturedRankingService = class _FeaturedRankingService {
             isIncluded: false,
             canonicalId: catalogItem.id,
             availabilityStatus: "theatrical_window",
-            rejectionReason: "Filme em cartaz nos cinemas brasileiros ou aguarda lan\xE7amento digital oficial"
+            rejectionReason: "Filme ainda n\xE3o lan\xE7ado"
           });
           continue;
         }

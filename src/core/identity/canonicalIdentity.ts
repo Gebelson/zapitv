@@ -60,12 +60,11 @@ export class CanonicalIdentityService {
       /doraemon|peppa|galinha pintadinha|patrulha canina|pocoyo|chaves/i.test(item.title)
     );
 
-    // Identifica filmes que estão em cartaz no cinema ou ainda não lançados em digital (sem WEB-DL oficial)
+    // Identifica apenas filmes cuja estreia ainda está no futuro.
     const currentYear = new Date().getFullYear();
     const isTheatricalUnreleased = (
       theatricalFilterService.isKnownUnreleasedOrTheatrical(item) ||
-      Boolean(item.year && item.year > currentYear) ||
-      /hope.*primeiro.*impacto|vingadores.*destino|avengers.*doomsday|batman.*part.*ii/i.test(item.title)
+      Boolean(item.year && item.year > currentYear)
     );
 
     const aliases: string[] = [item.title.toLowerCase()];

@@ -24,40 +24,8 @@ export interface TheatricalEvaluation {
   expiresAt: number;
 }
 
-const STORAGE_KEY = 'zapitv_theatrical_evaluations_v2';
-
-// Conjunto de IDs do TMDB com lançamento cinematográfico futuro ou exclusivo de cinema confirmado
-const KNOWN_UNRELEASED_OR_THEATRICAL_IDS = new Set<string>([
-  '1003596', // Vingadores: Doutor Destino / Avengers: Doomsday
-  '1003598', // Vingadores: Guerras Secretas / Avengers: Secret Wars
-  '83533',   // Avatar: Fogo e Cinzas / Avatar: Fire and Ash
-  '9659',    // The Batman Parte II
-  '480530',  // Blade
-  '569094',  // Homem-Aranha: Além do Aranhaverso / Spider-Man: Beyond the Spider-Verse
-  '1229730', // The Mandalorian & Grogu
-  '1084736', // Toy Story 5
-  '402431',  // Wicked: Part Two
-  '1064213', // Anora
-  '1100782', // Smile 2
-  '1034541', // Terrifier 3
-  '912649',  // Venom: A Última Rodada / Venom: The Last Dance
-  '1184918', // O Robô Selvagem / The Wild Robot
-  '823219',  // Flow
-  'tt20221436', // Homem-Aranha: Um Novo Dia / Spider-Man: Brand New Day (2026 unreleased)
-]);
-
-// Padrões de títulos não lançados ou em cartaz
-const KNOWN_UNRELEASED_PATTERNS = [
-  /vingadores.*(doutor destino|guerras secretas|doomsday|secret wars)/i,
-  /avengers.*(doomsday|secret wars)/i,
-  /avatar.*(fogo e cinzas|fire and ash)/i,
-  /the batman.*(parte ii|part ii)/i,
-  /spider-man.*(brand new day|um novo dia|beyond the spider-verse)/i,
-  /homem-aranha.*(um novo dia|brand new day|al[eé]m do aranhaverso)/i,
-  /mandalorian.*grogu/i,
-  /toy story 5/i,
-  /shrek 5/i,
-];
+// A versão anterior persistia bloqueios por estar em cartaz.
+const STORAGE_KEY = 'zapitv_theatrical_evaluations_v3';
 
 class TheatricalFilterService {
   private cache = new Map<string, TheatricalEvaluation>();
@@ -211,31 +179,13 @@ class TheatricalFilterService {
    */
   public isKnownUnreleasedOrTheatrical(item: ContentItem): boolean {
     if (!item) return false;
-    
-    // 1. Por ID do TMDB ou IMDb
-    if (item.tmdbId && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(String(item.tmdbId))) {
-      return true;
-    }
-    if (item.imdbId && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(item.imdbId.trim().toLowerCase())) {
-      return true;
-    }
-    const rawTmdbId = item.id?.startsWith('tmdb-') ? item.id.replace('tmdb-', '') : null;
-    if (rawTmdbId && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(rawTmdbId)) {
-      return true;
-    }
-    if (item.id && KNOWN_UNRELEASED_OR_THEATRICAL_IDS.has(item.id.trim().toLowerCase())) {
-      return true;
-    }
-
-    // 2. Por Padrão de Título
-    const titlesToCheck = [item.title, item.originalTitle].filter(Boolean) as string[];
-    for (const t of titlesToCheck) {
-      for (const pattern of KNOWN_UNRELEASED_PATTERNS) {
-        if (pattern.test(t)) return true;
-      }
-    }
-
-    return false;
+    // Listas fixas de títulos envelhecem: um filme pode estrear sem atualização do app.
+    // Só a data futura do próprio item é uma restrição síncrona confiável.
+    const todayStr = new Date().toISOString().slice(0, 10);
+    return Boolean(
+      (item.releaseDate && item.releaseDate > todayStr) ||
+      (Number(item.year) > new Date().getFullYear())
+    );
   }
 
   /**
@@ -317,6 +267,9 @@ class TheatricalFilterService {
     const cached = this.cache.get(cacheKey);
     const now = Date.now();
     if (cached && now < cached.expiresAt) {
+      if (cached.status === 'IN_THEATERS' || cached.status === 'THEATRICAL_STATUS_UNKNOWN') {
+        return { ...cached, allowed: true };
+      }
       return cached;
     }
 
@@ -347,7 +300,7 @@ class TheatricalFilterService {
       return evaluation;
     }
 
-    // 3. Trava direta para obras conhecidas ainda não lançadas (ex: Vingadores: Doutor Destino)
+    // 3. Obras cuja data de estreia ainda está no futuro
     if (this.isKnownUnreleasedOrTheatrical(item)) {
       const evaluation: TheatricalEvaluation = {
         id: item.id,
@@ -366,7 +319,7 @@ class TheatricalFilterService {
       return evaluation;
     }
 
-    // 4. Filmes confirmados na lista de em cartaz ou próximos lançamentos do TMDB
+    // 4. A presença na lista de em cartaz informa o status, sem impedir o catálogo.
     if (this.isKnownInTheaters(item)) {
       const evaluation: TheatricalEvaluation = {
         id: item.id,
@@ -374,8 +327,8 @@ class TheatricalFilterService {
         region: 'BR',
         title: item.title,
         status: 'IN_THEATERS',
-        allowed: false,
-        reason: 'Comprovadamente em exibição comercial nos cinemas brasileiros (circuito ativo)',
+        allowed: true,
+        reason: 'Em exibição nos cinemas brasileiros; fontes ainda precisam ser validadas',
         evidence: ['now_playing_brazil_active', 'commercial_theatrical_run'],
         evaluatedAt: now,
         expiresAt: now + (12 * 60 * 60 * 1000)
@@ -548,8 +501,8 @@ class TheatricalFilterService {
             return evaluation;
           }
 
-          // Regra B: Lançamento digital/físico oficial confirmado E não está em cartaz
-          if (digitalDate && digitalDate <= todayStr && !this.isKnownInTheaters(item)) {
+          // Regra B: Lançamento digital/físico oficial confirmado
+          if (digitalDate && digitalDate <= todayStr) {
             const evaluation: TheatricalEvaluation = {
               id: item.id,
               tmdbId: item.tmdbId,
@@ -573,15 +526,15 @@ class TheatricalFilterService {
           if (theatricalDate) {
             const diffDays = Math.floor((now - new Date(theatricalDate).getTime()) / (1000 * 60 * 60 * 24));
             if (diffDays < 70) {
-              // Menos de 70 dias: em cartaz
+              // Menos de 70 dias: em cartaz, mas a fonte é validada separadamente.
               const evaluation: TheatricalEvaluation = {
                 id: item.id,
                 tmdbId: item.tmdbId,
                 region: 'BR',
                 title: item.title,
                 status: 'IN_THEATERS',
-                allowed: false,
-                reason: `Em cartaz nos cinemas há ${diffDays} dias (Janela exclusiva ativa)`,
+                allowed: true,
+                reason: `Em cartaz nos cinemas há ${diffDays} dias; fontes ainda precisam ser validadas`,
                 evidence: [...evidence, `${diffDays}_days_theatrical_window`],
                 theatricalDate,
                 evaluatedAt: now,
@@ -591,15 +544,15 @@ class TheatricalFilterService {
               this.saveToStorage();
               return evaluation;
             } else if (diffDays < 95) {
-              // Entre 70 e 95 dias sem confirmação digital: status incerto (THEATRICAL_STATUS_UNKNOWN)
+              // Entre 70 e 95 dias sem confirmação digital: status incerto.
               const evaluation: TheatricalEvaluation = {
                 id: item.id,
                 tmdbId: item.tmdbId,
                 region: 'BR',
                 title: item.title,
                 status: 'THEATRICAL_STATUS_UNKNOWN',
-                allowed: false,
-                reason: `Período de transição de cinema (${diffDays} dias). Aguardando confirmação oficial de encerramento do circuito ou lançamento digital.`,
+                allowed: true,
+                reason: `Período de transição de cinema (${diffDays} dias); fontes ainda precisam ser validadas`,
                 evidence: [...evidence, 'theatrical_status_uncertain'],
                 theatricalDate,
                 evaluatedAt: now,
@@ -654,11 +607,10 @@ class TheatricalFilterService {
 
   /**
    * Avaliação instantânea síncrona com base no cache e heurísticas imediatas.
-   * Executa em tempo zero (0ms), garantindo que títulos bloqueados jamais sejam renderizados.
+   * Executa sem requisições para evitar esconder títulos já lançados.
    */
   public isMovieAllowedSync(item: ContentItem): boolean {
     if (!item) return false;
-    if (item.inTheaters === true) return false;
     if (item.type === ContentType.SERIES) return true;
 
     const todayStr = new Date().toISOString().slice(0, 10);
@@ -671,22 +623,24 @@ class TheatricalFilterService {
     // 2. Bloqueia imediatamente se a data de lançamento for futura em relação a hoje
     if (item.releaseDate && item.releaseDate > todayStr) return false;
 
-    // 3. Bloqueia imediatamente obras notorias unreleased / em cartaz
+    // 3. Bloqueia somente obras cuja estreia ainda está no futuro
     if (this.isKnownUnreleasedOrTheatrical(item)) return false;
 
-    // 4. Bloqueia se já está presente nas listas em cartaz ou próximos lançamentos
-    if (this.isKnownInTheaters(item) || this.isKnownUpcoming(item)) {
+    // 4. Próximos lançamentos continuam bloqueados; filmes já em cartaz podem aparecer.
+    if (!this.isKnownInTheaters(item) && this.isKnownUpcoming(item)) {
       return false;
     }
+
+    if (this.isKnownInTheaters(item)) return true;
 
     // 5. Consulta cache pré-avaliado
     const cacheKey = item.tmdbId ? `tmdb-${item.tmdbId}` : (item.imdbId || item.id);
     const cached = this.cache.get(cacheKey);
     if (cached) {
-      return cached.allowed;
+      return cached.status === 'IN_THEATERS' || cached.status === 'THEATRICAL_STATUS_UNKNOWN' || cached.allowed;
     }
 
-    // 6. Libera imediatamente filmes lançados antes do ano anterior que não estejam em cartaz
+    // 6. Libera imediatamente filmes lançados antes do ano anterior
     if (itemYear < currentYear - 1) return true;
 
     return true;
@@ -701,7 +655,7 @@ class TheatricalFilterService {
   }
 
   /**
-   * Filtra uma lista de itens removendo filmes que ainda estejam em cartaz ou não lançados
+   * Filtra uma lista de itens removendo filmes ainda não lançados
    */
   public async filterAllowedMovies(items: ContentItem[]): Promise<ContentItem[]> {
     if (!items || items.length === 0) return [];

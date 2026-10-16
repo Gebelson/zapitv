@@ -1004,7 +1004,7 @@ const AdminView: React.FC<AdminViewProps> = ({
                     <Activity className="w-5 h-5 text-indigo-500" /> Diagnóstico Central de Elegibilidade e Fontes Reais
                   </h3>
                   <p className="text-xs text-gray-400 mt-1">
-                    Separação estrita de Lançamento vs. Reprodução Real. Títulos futuros, em cartaz ou sem fontes funcionais são excluídos antes da renderização.
+                    Separação de lançamento e reprodução real. Títulos futuros ou sem fontes funcionais são excluídos antes da renderização.
                   </p>
                 </div>
               </div>

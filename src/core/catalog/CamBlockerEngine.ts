@@ -4,7 +4,7 @@
  * 
  * Regras:
  * 1. Análise profunda de metadados: Rejeita termos de gravação de sala de cinema.
- * 2. Janela cinematográfica e evidências temporais: Obras ainda em cartaz ou sem data digital confirmada
+ * 2. Evidência temporal: Obras cuja estreia ainda está no futuro
  *    são rejeitadas preventivamente, pois não há possibilidade física de haver fonte digital legítima.
  * 3. Detecção de incongruências: Resoluções falsas (ex.: 1080p CAM) e áudio de microfone ambiente (mic).
  * 4. Não confia apenas no nome do arquivo: cruza evidências de provedores e metadados oficiais.
@@ -94,15 +94,15 @@ export class CamBlockerEngine {
       };
     }
 
-    // 3. EVIDÊNCIA TEMPORAL E JANELA CINEMATOGRÁFICA (Crucial para filmes novos)
+    // 3. Filmes sem estreia continuam indisponíveis; estar em cartaz não caracteriza CAM.
     if (targetItem) {
       const isRestricted = theatricalFilterService.isKnownUnreleasedOrTheatrical(targetItem) || !theatricalFilterService.isMovieAllowedSync(targetItem);
       if (isRestricted) {
         return {
           isCam: true,
           confidence: 'DEFINITIVE',
-          reason: 'Rejeitado: filme em exibição exclusiva nos cinemas ou não lançado (qualquer fonte atual é gravação de sala)',
-          matchedSignatures: ['theatrical_window_active']
+          reason: 'Rejeitado: filme ainda não lançado',
+          matchedSignatures: ['unreleased_movie']
         };
       }
     }

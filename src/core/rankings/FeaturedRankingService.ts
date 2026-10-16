@@ -438,10 +438,9 @@ class FeaturedRankingService {
         continue;
       }
 
-      // CASO 4: Restrição cinematográfica e obras não lançadas (Filmes em cartaz nos cinemas brasileiros ou sem digital)
+      // CASO 4: Obras cuja estreia ainda está no futuro
       if (rankType === 'movie') {
-        const isSpidermanUnreleased = cand.imdbId.toLowerCase() === 'tt20221436' || (catalogItem.imdbId && catalogItem.imdbId.toLowerCase() === 'tt20221436');
-        const isTheatricallyAllowed = !isSpidermanUnreleased && theatricalFilterService.isMovieAllowedSync(catalogItem);
+        const isTheatricallyAllowed = theatricalFilterService.isMovieAllowedSync(catalogItem);
         if (!isTheatricallyAllowed) {
           audit.push({
             imdbId: cand.imdbId,
@@ -456,7 +455,7 @@ class FeaturedRankingService {
             isIncluded: false,
             canonicalId: catalogItem.id,
             availabilityStatus: 'theatrical_window',
-            rejectionReason: 'Filme em cartaz nos cinemas brasileiros ou aguarda lançamento digital oficial'
+            rejectionReason: 'Filme ainda não lançado'
           });
           continue;
         }

@@ -105,23 +105,18 @@ export const KNOWN_UPSTREAM_MISMATCHES: Array<{
       );
     }
   },
-  // 5. Hope: O Primeiro Impacto (2026) / Hopeu (Na Hong-jin): filme em cartaz nos cinemas
-  // Torrents fraudulentos indexados como supostos "WEB-DL AMZN" contêm vídeos adultos / trotes (Mia Khalifa).
+  // 5. Hope: bloquear apenas hashes e assinaturas conhecidos de vídeos trocados.
   {
     targetPattern: /hope.*primeiro.*impacto|hopeu|1058424|tt27369017/i,
     rejectStream: (s) => {
       const text = `${s.name || ''} ${s.title || ''} ${s.url || ''} ${s.infoHash || ''}`.toLowerCase();
-      // Rejeita hashes de torrents fraudulentos conhecidos e supostas releases de WEB-DL falsas
+      // O rótulo WEB-DL, WEBRip ou AMZN não prova que a fonte está errada.
       if (
         text.includes('f9a842dfe9f5b2e7fda509f2306e0700b97a4036') ||
         text.includes('d0eacddff07a24173d8f7dc11a18ef3ed32b886a') ||
-        text.includes('playweb') ||
         text.includes('ben the men') ||
         text.includes('khalifa') ||
-        text.includes('mia') ||
-        (text.includes('web-dl') && !text.includes('trailer')) ||
-        (text.includes('webrip') && !text.includes('trailer')) ||
-        (text.includes('amzn') && !text.includes('trailer'))
+        text.includes('mia khalifa')
       ) {
         return true;
       }

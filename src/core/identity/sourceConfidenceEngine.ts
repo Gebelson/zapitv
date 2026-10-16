@@ -67,8 +67,7 @@ export class SourceConfidenceEngine {
       };
     }
 
-    // 2. FILMES EM CARTAZ / NÃO LANÇADOS EM DIGITAL (Proteção Anti-Scam)
-    // Filmes como Hope (2026), Vingadores 2026 que não saíram em streaming não possuem WEB-DL legítimo
+    // 2. Filmes cuja estreia ainda está no futuro (proteção contra fontes falsas)
     if (identity.isTheatricalUnreleased) {
       const isClaimingDigital = (
         (combined.includes('web-dl') || combined.includes('webrip') || combined.includes('bluray') || combined.includes('amzn')) &&
@@ -76,7 +75,7 @@ export class SourceConfidenceEngine {
         !combined.includes('teaser')
       );
       if (isClaimingDigital) {
-        const reason = `Release digital fraudulenta para obra em cartaz/não lançada: "${identity.title}"`;
+        const reason = `Release digital para obra ainda não lançada: "${identity.title}"`;
         streamQuarantineService.quarantine(streamInfoHash || streamUrl, reason, 'adult_troll', identity.title, stream.providerName);
         reasons.push(reason);
         return {
