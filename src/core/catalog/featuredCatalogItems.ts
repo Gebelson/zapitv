@@ -70,7 +70,7 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     audioStatus: 'pt-br-dubbed'
   },
 
-  // 4. VERITY (2026 - tt15888806) — Disponível
+  // 4. VERITY (2026 - tt15888806) — disponibilidade e áudio dependem das fontes resolvidas
   {
     id: 'movie-verity-2026',
     title: 'Verity',
@@ -83,9 +83,7 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     description: 'Uma escritora em dificuldades financeiras aceita a proposta de concluir a série de sucesso de uma famosa autora incapacitada, descobrindo segredos aterrorizantes em seus manuscritos.',
     genres: ['Romance', 'Mistério', 'Drama'],
     imdbId: 'tt15888806',
-    isFeatured: true,
-    availabilityStatus: 'verified',
-    audioStatus: 'pt-br-dubbed'
+    isFeatured: true
   },
 
   // 5. O EXORCISTA: MÁRTIRES (2026 - tt28704204) — Disponível

@@ -13,6 +13,7 @@ import { catalogReleaseStore } from "./src/core/catalog/CatalogReleaseStore.ts";
 import { collaborativeTrainer } from "./src/core/recommendations/CollaborativeTrainer.ts";
 import { bannedContentRegistry } from "./src/core/catalog/BannedContentRegistry.ts";
 import { feedbackStore } from "./src/core/feedback/FeedbackStore.ts";
+import { resolveValidationTargetUrl } from "./src/core/providers/validationTargetUrl.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -605,7 +606,12 @@ function createApp() {
       return res.status(400).json({ valid: false, reason: "Parâmetro 'url' é obrigatório" });
     }
 
-    const lowerTarget = `${targetUrl} ${targetTitle}`.toLowerCase().replace(/[-_./+]/g, ' ');
+    const probeUrl = resolveValidationTargetUrl(targetUrl);
+    if (!probeUrl) {
+      return res.status(400).json({ valid: false, reason: 'URL de mídia inválida para validação' });
+    }
+
+    const lowerTarget = `${probeUrl} ${targetTitle}`.toLowerCase().replace(/[-_./+]/g, ' ');
     const ADULT_TERMS = ['mia khalifa', 'khalifa', 'brazzers', 'xvideos', 'pornhub', 'redtube', 'youporn', 'bangbros', 'spankbang', 'xhamster', 'naughtyamerica', 'hardcore xxx'];
     if (ADULT_TERMS.some(t => lowerTarget.includes(t))) {
       return res.json({
@@ -618,7 +624,7 @@ function createApp() {
     }
 
     try {
-      const parsed = new URL(targetUrl.startsWith("/") ? `http://localhost:${process.env.PORT || "4000"}${targetUrl}` : targetUrl);
+      const parsed = new URL(probeUrl);
       const host = parsed.hostname.toLowerCase();
 
       const PARKED_DOMAINS = [
@@ -644,7 +650,7 @@ function createApp() {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 6000);
 
-      const response = await fetch(targetUrl, {
+      const response = await fetch(probeUrl, {
         method: "GET",
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -718,7 +724,7 @@ function createApp() {
       }
 
       // Validação de Manifesto HLS
-      const isHls = expectedType === "hls" || targetUrl.includes(".m3u8") || contentType.includes("mpegurl");
+      const isHls = expectedType === "hls" || probeUrl.includes(".m3u8") || contentType.includes("mpegurl");
       if (isHls) {
         if (contentType.includes("text/html") && !text.includes("#EXTM3U")) {
           return res.json({

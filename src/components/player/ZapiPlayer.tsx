@@ -756,7 +756,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const [allSourcesFailed, setAllSourcesFailed] = useState(false);
   const triedIndicesRef = useRef<Set<number>>(new Set());
   const isSwitchingStreamRef = useRef(false);
-  const autoRetryCountRef = useRef<number>(0);
 
   // Máquina de estados explícita do ciclo de vida da reprodução
   const playbackPhase: PlaybackPhase = useMemo(() => {
@@ -1811,7 +1810,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (!nextCandidate) {
       // REGRA OBRIGATÓRIA: NUNCA substituir silenciosamente o áudio selecionado por outro idioma!
       // Se não houver mais fontes com dublagem brasileira, pausa e oferece a escolha ao usuário
-      if (requiredLanguage === 'pt-br') {
+      const anyRemaining = streams
+        .map((s, idx) => ({ s, idx }))
+        .filter(({ idx }) => !triedIndicesRef.current.has(idx));
+      if (requiredLanguage.toLowerCase() === 'pt-br' && anyRemaining.length > 0) {
         isSwitchingStreamRef.current = false;
         setForcedNonDubbedPrompt(true);
         if (videoRef.current && !videoRef.current.paused) {
@@ -1819,10 +1821,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         }
         return;
       }
-
-      const anyRemaining = streams
-        .map((s, idx) => ({ s, idx }))
-        .filter(({ idx }) => !triedIndicesRef.current.has(idx));
       if (anyRemaining.length > 0) {
         nextCandidate = anyRemaining[0];
       }
@@ -1854,14 +1852,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         isSwitchingStreamRef.current = false;
       }, 50);
     } else {
-      // Se todas as fontes da lista falharam e ainda não fizemos recuperação silenciosa, tenta onRetrySources uma vez!
-      if (autoRetryCountRef.current === 0 && onRetrySources) {
-        autoRetryCountRef.current += 1;
-        isSwitchingStreamRef.current = false;
-        onRetrySources();
-        return;
-      }
-
       setAllSourcesFailed(true);
       setHasError(true);
       setIsLoading(false);
@@ -1904,11 +1894,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
 
     if (streams.length === 0) {
-      if (autoRetryCountRef.current === 0 && onRetrySources) {
-        autoRetryCountRef.current += 1;
-        onRetrySources();
-        return;
-      }
       setAllSourcesFailed(true);
       setHasError(true);
       setErrorMessage(streamResolutionError || 'Não foi possível encontrar uma fonte verificada agora. Tente novamente.');
@@ -1923,7 +1908,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     } else {
       setAllSourcesFailed(false);
       setHasError(false);
-      autoRetryCountRef.current = 0;
     }
   }, [isLoadingStreams, streams.length, streamResolutionError, onRetrySources]);
 
@@ -1976,9 +1960,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     let isMounted = true;
     streamValidator.validateStream(currentStream, 6000).then((res) => {
       if (!isMounted) return;
-      // Só descarta se comprovadamente for domínio de estacionamento/ParkLogic
-      if (!res.valid && res.isParked) {
-        handleStreamFallback('Domínio na lista de estacionamento/ParkLogic.');
+      // Falhas HTTP definitivas e respostas HTML não são arquivos de vídeo.
+      // Timeouts e falhas de rede sem resposta seguem pelo watchdog do player.
+      if (!res.valid && (res.isParked || [401, 403, 404, 410].includes(res.status || 0) || /resposta html/i.test(res.reason || ''))) {
+        handleStreamFallback(res.reason || 'A fonte não retornou um arquivo de vídeo.');
       }
     }).catch(() => {});
 

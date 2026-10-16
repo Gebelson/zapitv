@@ -8584,7 +8584,7 @@ var FEATURED_CATALOG_ITEMS = [
     availabilityStatus: "verified",
     audioStatus: "pt-br-dubbed"
   },
-  // 4. VERITY (2026 - tt15888806) — Disponível
+  // 4. VERITY (2026 - tt15888806) — disponibilidade e áudio dependem das fontes resolvidas
   {
     id: "movie-verity-2026",
     title: "Verity",
@@ -8597,9 +8597,7 @@ var FEATURED_CATALOG_ITEMS = [
     description: "Uma escritora em dificuldades financeiras aceita a proposta de concluir a s\xE9rie de sucesso de uma famosa autora incapacitada, descobrindo segredos aterrorizantes em seus manuscritos.",
     genres: ["Romance", "Mist\xE9rio", "Drama"],
     imdbId: "tt15888806",
-    isFeatured: true,
-    availabilityStatus: "verified",
-    audioStatus: "pt-br-dubbed"
+    isFeatured: true
   },
   // 5. O EXORCISTA: MÁRTIRES (2026 - tt28704204) — Disponível
   {
@@ -17270,6 +17268,20 @@ var FeedbackStore = class _FeedbackStore {
 };
 var feedbackStore = FeedbackStore.getInstance();
 
+// src/core/providers/validationTargetUrl.ts
+function resolveValidationTargetUrl(targetUrl) {
+  let candidate = targetUrl;
+  if (targetUrl.startsWith("/api/proxy?")) {
+    candidate = new URL(targetUrl, "https://zapitv.invalid").searchParams.get("url") || "";
+  }
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 // server.ts
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path4.dirname(__filename);
@@ -17779,7 +17791,11 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     if (!targetUrl) {
       return res.status(400).json({ valid: false, reason: "Par\xE2metro 'url' \xE9 obrigat\xF3rio" });
     }
-    const lowerTarget = `${targetUrl} ${targetTitle}`.toLowerCase().replace(/[-_./+]/g, " ");
+    const probeUrl = resolveValidationTargetUrl(targetUrl);
+    if (!probeUrl) {
+      return res.status(400).json({ valid: false, reason: "URL de m\xEDdia inv\xE1lida para valida\xE7\xE3o" });
+    }
+    const lowerTarget = `${probeUrl} ${targetTitle}`.toLowerCase().replace(/[-_./+]/g, " ");
     const ADULT_TERMS = ["mia khalifa", "khalifa", "brazzers", "xvideos", "pornhub", "redtube", "youporn", "bangbros", "spankbang", "xhamster", "naughtyamerica", "hardcore xxx"];
     if (ADULT_TERMS.some((t) => lowerTarget.includes(t))) {
       return res.json({
@@ -17791,7 +17807,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       });
     }
     try {
-      const parsed = new URL(targetUrl.startsWith("/") ? `http://localhost:${process.env.PORT || "4000"}${targetUrl}` : targetUrl);
+      const parsed = new URL(probeUrl);
       const host = parsed.hostname.toLowerCase();
       const PARKED_DOMAINS = [
         "superflixapi.top",
@@ -17813,7 +17829,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       }
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 6e3);
-      const response = await fetch(targetUrl, {
+      const response = await fetch(probeUrl, {
         method: "GET",
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -17875,7 +17891,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
           });
         }
       }
-      const isHls = expectedType === "hls" || targetUrl.includes(".m3u8") || contentType.includes("mpegurl");
+      const isHls = expectedType === "hls" || probeUrl.includes(".m3u8") || contentType.includes("mpegurl");
       if (isHls) {
         if (contentType.includes("text/html") && !text.includes("#EXTM3U")) {
           return res.json({

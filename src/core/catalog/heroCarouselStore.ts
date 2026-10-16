@@ -84,8 +84,6 @@ export const DEFAULT_HERO_BANNER_SEEDS: ContentItem[] = [
     genres: ['Romance', 'Mistério', 'Drama'],
     imdbId: 'tt15888806',
     isFeatured: true,
-    availabilityStatus: 'verified',
-    audioStatus: 'pt-br-dubbed',
     heroTags: [
       { id: 'tag-ver-1', text: 'Mais Votado', style: 'solid', color: '#dc2626' },
       { id: 'tag-ver-2', text: 'Alta Tensão', style: 'transparent', color: '#ffffff' }
