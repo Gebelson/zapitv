@@ -232,7 +232,7 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     audioStatus: 'pt-br-dubbed'
   },
 
-  // 13. A ODISSEIA (2026 - tt2788314) — Disponível
+  // 13. A ODISSEIA (2026 - tt2788314) — disponibilidade e áudio dependem das fontes resolvidas
   {
     id: 'movie-a-odisseia-2026',
     title: 'A Odisseia',
@@ -245,9 +245,7 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     description: 'A épica jornada de Ulisses narrada em uma superprodução visual, enfrentando monstros mitológicos e a ira dos deuses gregos para retornar a Ítaca.',
     genres: ['Aventura', 'Fantasia', 'Drama'],
     imdbId: 'tt2788314',
-    isFeatured: true,
-    availabilityStatus: 'verified',
-    audioStatus: 'pt-br-dubbed'
+    isFeatured: true
   },
 
   // 14. OBSESSÃO (1976 - tt0074991) — Disponível

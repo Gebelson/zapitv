@@ -965,9 +965,11 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                   <span className="bg-white/10 border border-white/10 px-1.5 py-0.5 text-xs text-white rounded font-bold uppercase tracking-wider">HD</span>
                   <span className="bg-yellow-500 text-black text-xs font-black px-2 py-0.5 rounded">{item.rating > 8 ? '16' : '12'}</span>
                   <span className="text-gray-300 text-xs sm:text-sm">{item.type}</span>
-                  <span className="px-2 py-0.5 rounded text-xs font-black bg-green-500/20 text-green-400 border border-green-500/30">
-                    🇧🇷 Áudio Dublado PT-BR
-                  </span>
+                  {resolvedStreams.some(stream => audioPreferenceService.analyzeAudio(stream).tier === 'dubbed_ptbr') && (
+                    <span className="px-2 py-0.5 rounded text-xs font-black bg-green-500/20 text-green-400 border border-green-500/30">
+                      🇧🇷 Fonte informa áudio dublado PT-BR
+                    </span>
+                  )}
                 </div>
                 <p className="text-gray-300 text-xs sm:text-sm md:text-base leading-relaxed mb-4 sm:mb-6 font-medium">
                   {item.description || "Assista agora no ZapiTV com streaming em alta definição."}

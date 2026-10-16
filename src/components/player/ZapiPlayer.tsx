@@ -422,7 +422,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const hasPtBrSubtitlesAvailable = useMemo(() => {
     if (currentStream) {
       const formatAnalysis = analyzeStreamSubtitleFormat(currentStream);
-      if (formatAnalysis.isHardsub) return true;
+      if (formatAnalysis.format === 'hardsub_ptbr') return true;
     }
     if (subtitlesList.length > 0) {
       return subtitlesList.some(s => s.isPtBr || /^(pob|pt-br|bra|por-br|por|pt|pt-pt)$/i.test(s.lang));

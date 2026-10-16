@@ -34,6 +34,8 @@ const SOFTSUB_PATTERNS = [
 ];
 
 const HARDSUB_FOREIGN_PATTERNS = [
+  /\b(?:spanish|espa[nñ]ol|espanhol|castellano|latino|spa|esp|es)[-_\s]*(?:hard[-_\s]?subs?|burned[-_\s]?in|legendas?[-_\s]?(?:fixas?|embutidas?))\b/i,
+  /\b(?:hard[-_\s]?subs?|hardcoded[-_\s]*subs?|legendas?[-_\s]?(?:fixas?|embutidas?))[-_\s]*(?:spanish|espa[nñ]ol|espanhol|castellano|latino|spa|esp|es)\b/i,
   /\b(eng(?:lish)?[-_\s]*hardsubs?|hardsubs?[-_\s]*eng(?:lish)?|hardcoded[-_\s]*(?:eng|english|spa|spanish|esp|fre|french|ita|italian))\b/i,
   /\b(hardsub\s*\[(?:eng|en|es|spa|fre|ita)\]|subbed\s*\[(?:eng|en|es|spa|fre|ita)\])\b/i,
   /\b(subs?\s*burned\s*in\s*eng(?:lish)?|burned[-_\s]*in\s*eng(?:lish)?)\b/i,
@@ -44,9 +46,7 @@ const HARDSUB_FOREIGN_PATTERNS = [
 
 const HARDSUB_PTBR_PATTERNS = [
   /\b(hardsub[-_]?pt[-_]?br|pt[-_]?br[-_]?hardsub|hardsub\s*\[pt[-_]?br\]|hardsub\s*pt|hardsub[-_]?br)\b/i,
-  /\b(hardsub|hard[-_]?sub|hardcoded|legenda[-_]?fixa|legendas[-_]?fixas|legenda[-_]?embutida)\b/i,
-  /\b(legenda[-_]?gravada|gravada[-_]?na[-_]?imagem|burned[-_]?in[-_]?subs?)\b/i,
-  /\b(anbient|animefire|otakupt|goyabu|animesvision|betteranime)\b/i
+  /\b(?:legendas?[-_\s]?(?:fixas?|embutidas?|gravadas?)|burned[-_\s]?in[-_\s]?subs?)[-_\s]*(?:pt[-_]?br|portugu[eê]s(?:[-_\s]*brasileiro)?)\b/i
 ];
 
 export class SubtitlePreferenceService {
@@ -60,7 +60,7 @@ export class SubtitlePreferenceService {
     const hasPtBrIndication = /\b(pt[-_]?br|portugu[eê]s|legenda[-_]?pt|legendado)\b/i.test(combined);
 
     // 1. Identificar hardsub estrangeiro
-    if (HARDSUB_FOREIGN_PATTERNS.some(p => p.test(combined)) && !hasPtBrIndication) {
+    if (HARDSUB_FOREIGN_PATTERNS.some(p => p.test(combined))) {
       return {
         format: 'hardsub_foreign',
         isHardsub: true,
@@ -107,7 +107,7 @@ export class SubtitlePreferenceService {
       };
     }
 
-    if (hasHardsubPtBrKeyword || (hasPtBrIndication && (combined.includes('legendado') || combined.includes('[leg]')))) {
+    if (hasHardsubPtBrKeyword) {
       return {
         format: 'hardsub_ptbr',
         isHardsub: true,
@@ -117,6 +117,18 @@ export class SubtitlePreferenceService {
         hasPtSubtitle: true,
         confidence: 0.85,
         details: 'Legenda gravada na imagem em PT-BR (Hardsub)'
+      };
+    }
+
+    if (/\b(hard[-_]?subs?|hardcoded|legendas?[-_\s]?(?:fixas?|embutidas?|gravadas?))\b/i.test(combined)) {
+      return {
+        format: 'unknown',
+        isHardsub: true,
+        isClean: false,
+        isSoftsub: false,
+        hasPtSubtitle: hasExternalPtSub,
+        confidence: 0.5,
+        details: 'Legenda gravada com idioma não confirmado'
       };
     }
 
