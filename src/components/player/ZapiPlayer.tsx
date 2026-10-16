@@ -1833,7 +1833,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
       const lastTime = (videoRef.current && videoRef.current.currentTime > 0)
         ? videoRef.current.currentTime
-        : (latestProgressRef.current.currentTime || currentTime);
+        : (latestProgressRef.current.currentTime || 0);
       if (lastTime > 0) {
         targetResumeTimeRef.current = lastTime;
       }
@@ -1879,7 +1879,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         } catch {}
       }
     }
-  }, [selectedStreamIndex, streams, isLoadingStreams, currentStream, item, activeAudioId, onRetrySources, currentTime]);
+  }, [selectedStreamIndex, streams, isLoadingStreams, currentStream, item, activeAudioId]);
 
   // Monitor loading of streams from parent modal
   useEffect(() => {
@@ -1909,7 +1909,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       setAllSourcesFailed(false);
       setHasError(false);
     }
-  }, [isLoadingStreams, streams.length, streamResolutionError, onRetrySources]);
+  }, [isLoadingStreams, streams.length, streamResolutionError]);
 
   // Pre-flight instant probe of candidate stream
   useEffect(() => {
