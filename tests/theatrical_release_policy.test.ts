@@ -3,6 +3,7 @@ import { ContentType, type ContentItem } from '../types';
 import { theatricalFilterService } from '../src/core/catalog/theatricalFilterService';
 import { catalogEligibilityService } from '../src/core/catalog/CatalogEligibilityService';
 import { CamBlockerEngine } from '../src/core/catalog/CamBlockerEngine';
+import { streamValidator } from '../src/core/providers/streamValidator';
 
 const today = new Date().toISOString().slice(0, 10);
 const nextYear = new Date().getFullYear() + 1;
@@ -29,6 +30,8 @@ assert.equal(theatricalFilterService.isMovieAllowedSync(inTheaters), true);
 assert.equal(catalogEligibilityService.isItemPubliclyPlayableSync(inTheaters), true);
 assert.equal(CamBlockerEngine.isCamStream({ title: 'Filme lançado em cartaz WEB-DL 1080p' }, inTheaters), false);
 assert.equal(CamBlockerEngine.isCamStream({ title: 'Filme lançado em cartaz HDCAM' }, inTheaters), true);
+assert.equal(streamValidator.isStreamMatchingTargetTitle({ title: 'Filme lançado em cartaz HDCAM 720p', url: 'https://example.org/movie.mp4' }, inTheaters.title), true);
+assert.equal(streamValidator.isStreamMatchingTargetTitle({ title: 'Filme lançado em cartaz Trailer CAM', url: 'https://example.org/trailer.mp4' }, inTheaters.title), false);
 assert.equal(theatricalFilterService.isMovieAllowedSync(upcoming), false);
 
 const originalFetch = globalThis.fetch;

@@ -6196,100 +6196,6 @@ var VideoAdBlockerService = class {
 };
 var videoAdBlocker = new VideoAdBlockerService();
 
-// src/core/catalog/CamBlockerEngine.ts
-var CamBlockerEngine = class {
-  static {
-    // Padrões canônicos de gravações de sala de cinema
-    this.CAM_PATTERNS = [
-      /\bcam\b/i,
-      /\bhd-?cam\b/i,
-      /\bcam-?rip\b/i,
-      /\bcamrip\b/i,
-      /\btelesync\b/i,
-      /\btele-?sync\b/i,
-      /\bhd-?ts\b/i,
-      /\bhdts\b/i,
-      /\btele-?cine\b/i,
-      /\btelecine\b/i,
-      /\b\d+p\s*tc\b/i,
-      /\b\d+p\s*ts\b/i,
-      /\bdvdscr\b/i,
-      /\bscreener\b/i,
-      /\bdvd-?screener\b/i,
-      /\bcinema-?rip\b/i,
-      /\btheater-?rip\b/i,
-      /\btheatre-?rip\b/i,
-      /\bline-?audio\b/i,
-      /\bmic-?audio\b/i,
-      /\bdirect-?mic\b/i,
-      /\bworkprint\b/i,
-      /\bcinemax-?cam\b/i,
-      /\bc1nem4\b/i,
-      /\bhive-?cm8\b/i,
-      /\bcam-?latino\b/i,
-      /\bcam-?legendado\b/i,
-      /\bcam-?dublado\b/i,
-      /\bgravado-?no-?cinema\b/i,
-      /\bfilme-?de-?cinema\b/i,
-      /\bcinema\s*hd\b/i,
-      /\bqualidade\s*cinema\b/i
-    ];
-  }
-  /**
-   * Avalia uma fonte de vídeo contra evidências de gravação de cinema.
-   */
-  static evaluateStream(stream, targetItem) {
-    const sName = stream.name || "";
-    const sTitle = stream.title || "";
-    const sUrl = stream.url || "";
-    const combined = `${sName} ${sTitle} ${sUrl}`.toLowerCase();
-    const matchedSignatures = [];
-    for (const pattern of this.CAM_PATTERNS) {
-      if (pattern.test(combined)) {
-        matchedSignatures.push(pattern.source);
-      }
-    }
-    if (matchedSignatures.length > 0) {
-      return {
-        isCam: true,
-        confidence: "DEFINITIVE",
-        reason: `Rejeitado: assinatura de grava\xE7\xE3o de cinema detectada (${matchedSignatures[0]})`,
-        matchedSignatures
-      };
-    }
-    if (/\b(mic|line\s*in|audio\s*de\s*cinema|gravado\s*em\s*sala)\b/i.test(`${sTitle} ${sName}`)) {
-      return {
-        isCam: true,
-        confidence: "HIGH",
-        reason: "Rejeitado: \xE1udio de microfone de cinema detectado",
-        matchedSignatures: ["mic_audio"]
-      };
-    }
-    if (targetItem) {
-      const isRestricted = theatricalFilterService.isKnownUnreleasedOrTheatrical(targetItem) || !theatricalFilterService.isMovieAllowedSync(targetItem);
-      if (isRestricted) {
-        return {
-          isCam: true,
-          confidence: "DEFINITIVE",
-          reason: "Rejeitado: filme ainda n\xE3o lan\xE7ado",
-          matchedSignatures: ["unreleased_movie"]
-        };
-      }
-    }
-    return {
-      isCam: false,
-      confidence: "CLEAN",
-      matchedSignatures: []
-    };
-  }
-  /**
-   * Atalho booleano rápido para verificar se uma fonte é CAM.
-   */
-  static isCamStream(stream, targetItem) {
-    return this.evaluateStream(stream, targetItem).isCam;
-  }
-};
-
 // src/core/providers/streamValidator.ts
 var KNOWN_PARKED_DOMAINS = [
   "superflixapi.top",
@@ -6478,11 +6384,6 @@ var StreamValidator = class {
     const sUrl = (stream.url || "").trim();
     const combined = `${sName} ${sTitle} ${sUrl}`.toLowerCase();
     if (/\b(trailer|teaser|sample|demo)\b/i.test(`${sName} ${sTitle}`)) {
-      return false;
-    }
-    const camEval = CamBlockerEngine.evaluateStream(stream);
-    if (camEval.isCam) {
-      console.warn(`[StreamValidator] Stream rejeitado por CAM / grava\xE7\xE3o de cinema: ${sTitle || sUrl} (Motivo: ${camEval.reason})`);
       return false;
     }
     if (/🐉\s*Malfoy/i.test(`${sName} ${sTitle}`)) return false;
@@ -13501,7 +13402,7 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
           candidateSourceCount = streams.length;
           const validStreams = [];
           for (const s of streams) {
-            if (theatricalFilterService.isCamRecording(`${s.name} ${s.title}`)) {
+            if (mediaType !== "movie" && theatricalFilterService.isCamRecording(`${s.name} ${s.title}`)) {
               rejectedSourceCount++;
               continue;
             }
@@ -15129,6 +15030,100 @@ var WeeklyFeaturedScheduler = class _WeeklyFeaturedScheduler {
 };
 var weeklyFeaturedScheduler = WeeklyFeaturedScheduler.getInstance();
 
+// src/core/catalog/CamBlockerEngine.ts
+var CamBlockerEngine = class {
+  static {
+    // Padrões canônicos de gravações de sala de cinema
+    this.CAM_PATTERNS = [
+      /\bcam\b/i,
+      /\bhd-?cam\b/i,
+      /\bcam-?rip\b/i,
+      /\bcamrip\b/i,
+      /\btelesync\b/i,
+      /\btele-?sync\b/i,
+      /\bhd-?ts\b/i,
+      /\bhdts\b/i,
+      /\btele-?cine\b/i,
+      /\btelecine\b/i,
+      /\b\d+p\s*tc\b/i,
+      /\b\d+p\s*ts\b/i,
+      /\bdvdscr\b/i,
+      /\bscreener\b/i,
+      /\bdvd-?screener\b/i,
+      /\bcinema-?rip\b/i,
+      /\btheater-?rip\b/i,
+      /\btheatre-?rip\b/i,
+      /\bline-?audio\b/i,
+      /\bmic-?audio\b/i,
+      /\bdirect-?mic\b/i,
+      /\bworkprint\b/i,
+      /\bcinemax-?cam\b/i,
+      /\bc1nem4\b/i,
+      /\bhive-?cm8\b/i,
+      /\bcam-?latino\b/i,
+      /\bcam-?legendado\b/i,
+      /\bcam-?dublado\b/i,
+      /\bgravado-?no-?cinema\b/i,
+      /\bfilme-?de-?cinema\b/i,
+      /\bcinema\s*hd\b/i,
+      /\bqualidade\s*cinema\b/i
+    ];
+  }
+  /**
+   * Avalia uma fonte de vídeo contra evidências de gravação de cinema.
+   */
+  static evaluateStream(stream, targetItem) {
+    const sName = stream.name || "";
+    const sTitle = stream.title || "";
+    const sUrl = stream.url || "";
+    const combined = `${sName} ${sTitle} ${sUrl}`.toLowerCase();
+    const matchedSignatures = [];
+    for (const pattern of this.CAM_PATTERNS) {
+      if (pattern.test(combined)) {
+        matchedSignatures.push(pattern.source);
+      }
+    }
+    if (matchedSignatures.length > 0) {
+      return {
+        isCam: true,
+        confidence: "DEFINITIVE",
+        reason: `Rejeitado: assinatura de grava\xE7\xE3o de cinema detectada (${matchedSignatures[0]})`,
+        matchedSignatures
+      };
+    }
+    if (/\b(mic|line\s*in|audio\s*de\s*cinema|gravado\s*em\s*sala)\b/i.test(`${sTitle} ${sName}`)) {
+      return {
+        isCam: true,
+        confidence: "HIGH",
+        reason: "Rejeitado: \xE1udio de microfone de cinema detectado",
+        matchedSignatures: ["mic_audio"]
+      };
+    }
+    if (targetItem) {
+      const isRestricted = theatricalFilterService.isKnownUnreleasedOrTheatrical(targetItem) || !theatricalFilterService.isMovieAllowedSync(targetItem);
+      if (isRestricted) {
+        return {
+          isCam: true,
+          confidence: "DEFINITIVE",
+          reason: "Rejeitado: filme ainda n\xE3o lan\xE7ado",
+          matchedSignatures: ["unreleased_movie"]
+        };
+      }
+    }
+    return {
+      isCam: false,
+      confidence: "CLEAN",
+      matchedSignatures: []
+    };
+  }
+  /**
+   * Atalho booleano rápido para verificar se uma fonte é CAM.
+   */
+  static isCamStream(stream, targetItem) {
+    return this.evaluateStream(stream, targetItem).isCam;
+  }
+};
+
 // src/core/catalog/AutoReleaseService.ts
 var AutoReleaseService = class _AutoReleaseService {
   constructor() {
@@ -15207,14 +15202,7 @@ var AutoReleaseService = class _AutoReleaseService {
           originalTitle: candidate.originalTitle,
           year: candidate.year
         });
-        const cleanStreams = streams.filter((s) => {
-          const camEval = CamBlockerEngine.evaluateStream(s, candidate);
-          if (camEval.isCam) {
-            result.camSourcesBlocked++;
-            return false;
-          }
-          return true;
-        });
+        const cleanStreams = streams;
         if (cleanStreams.length > 0) {
           const hasPtBr = cleanStreams.some((s) => audioPreferenceService.analyzeAudio(s).isPtBr || s.isPtBr);
           if (hasPtBr) {
@@ -15239,7 +15227,7 @@ var AutoReleaseService = class _AutoReleaseService {
             title: candidate.title,
             type: "FILME" /* MOVIE */,
             year: candidate.year,
-            reason: "Aguardando libera\xE7\xE3o de fontes limpas sem CAM"
+            reason: "Aguardando fonte v\xE1lida para reprodu\xE7\xE3o"
           });
           result.pendingUnavailables++;
         }
@@ -15250,7 +15238,7 @@ var AutoReleaseService = class _AutoReleaseService {
   }
   /**
    * Processa uma candidata a série: enriquece IDs, identifica episódios lançados,
-   * valida streams (sem CAM) e adiciona ao catálogo apenas com episódios reais e comprovados.
+   * valida streams e adiciona ao catálogo apenas com episódios reais e comprovados.
    */
   async processSeriesCandidate(candidate) {
     if (!searchService.isSeriesItem(candidate)) {
@@ -15543,7 +15531,7 @@ var AutoReleaseService = class _AutoReleaseService {
         pending.type === "FILME" /* MOVIE */ ? "movie" : pending.type === "ANIME" /* ANIME */ ? "anime" : "series",
         { id: pending.id, imdbId: pending.imdbId, tmdbId: pending.tmdbId, title: pending.title }
       );
-      const cleanStreams = streams.filter((s) => !CamBlockerEngine.isCamStream(s));
+      const cleanStreams = pending.type === "FILME" /* MOVIE */ ? streams : streams.filter((s) => !CamBlockerEngine.isCamStream(s));
       if (cleanStreams.length > 0) {
         const item = {
           id: pending.id,
@@ -16697,7 +16685,7 @@ Ao finalizar, reporte:
       case "subtitles_out_of_sync":
         return `As legendas em portugu\xEAs devem ser apresentadas no idioma correto (PT-BR), sincronizadas perfeitamente com os di\xE1logos dos personagens, com formata\xE7\xE3o limpa e sem atrasos acumulativos.`;
       case "wrong_quality":
-        return `A resolu\xE7\xE3o informada (ex: 1080p, 4K) deve corresponder \xE0 resolu\xE7\xE3o real dos quadros. Grava\xE7\xF5es de cinema (CAM, TS) devem ser estritamente bloqueadas pelo CamBlockerEngine.`;
+        return `A resolu\xE7\xE3o informada (ex: 1080p, 4K) deve corresponder \xE0 resolu\xE7\xE3o real dos quadros. Fontes CAM/TS podem ser usadas em filmes, desde que a obra e a fonte sejam v\xE1lidas; n\xE3o anuncie qualidade superior \xE0 real.`;
       case "ai_enhancer_not_working":
       case "split_screen_not_working":
         return `A Melhoria por IA e a compara\xE7\xE3o em tela dividida devem processar e renderizar em tempo real sobre o canvas de v\xEDdeo sem distor\xE7\xE3o, sem tela preta e sem desativar inesperadamente.`;
@@ -17367,8 +17355,6 @@ function createApp() {
       "ben the men"
     ];
     if (adultTerms.some((term) => combined.includes(term))) return false;
-    const camRegex = /\b(cam|camrip|cam-rip|telesync|hdcam|hd-ts|hdts|telecine|tc|screener|scr|dvdscr)\b/i;
-    if (camRegex.test(combined)) return false;
     return true;
   }
   app2.get("/api/stremio/cinema-aberto/manifest.json", (req, res) => {

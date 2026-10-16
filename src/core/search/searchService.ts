@@ -10,7 +10,7 @@
  * Recursos:
  * - Cancelamento automático de requisições pendentes (AbortController) ao mudar página ou termo.
  * - Cache contextual por (categoria + termo normalizado) com TTL de 10 minutos.
- * - Integração estrita com CatalogEligibilityService (disponibilidade real, sem CAM, sem títulos futuros).
+ * - Integração com CatalogEligibilityService (disponibilidade real e sem títulos futuros).
  * - Sugestões rápidas para dropdown com debouncing controlado.
  */
 

@@ -4,7 +4,7 @@
  * 
  * Funcionalidades:
  * 1. Descoberta Diária: Varre TMDB e AniList por filmes em lançamento digital, novas séries e animes da temporada.
- * 2. Bloqueio Rigoroso de CAM: Rejeita gravações de sala de cinema via CamBlockerEngine.
+ * 2. Filmes podem usar fontes CAM; outras validações de conteúdo continuam ativas.
  * 3. Data de estreia: impede apenas filmes ainda não lançados.
  * 4. Validação Prévia de Reprodução: NUNCA adiciona uma obra sem fonte confirmada, compatível e autorizada.
  * 5. Novos Episódios: Atualiza séries e animes já catalogados com episódios recém-disponibilizados.
@@ -127,7 +127,7 @@ export class AutoReleaseService {
           continue;
         }
 
-        // Regra 2: Verifica fontes de reprodução e bloqueio de CAM
+        // Regra 2: Verifica fontes de reprodução disponíveis
         const streams = await providerRegistry.resolveStreams('movie', {
           id: candidate.id,
           imdbId: candidate.imdbId,
@@ -137,15 +137,7 @@ export class AutoReleaseService {
           year: candidate.year
         });
 
-        // Filtra fontes válidas sem CAM
-        const cleanStreams = streams.filter(s => {
-          const camEval = CamBlockerEngine.evaluateStream(s, candidate);
-          if (camEval.isCam) {
-            result.camSourcesBlocked++;
-            return false;
-          }
-          return true;
-        });
+        const cleanStreams = streams;
 
         if (cleanStreams.length > 0) {
           // Identifica dublagem PT-BR
@@ -175,7 +167,7 @@ export class AutoReleaseService {
             title: candidate.title,
             type: ContentType.MOVIE,
             year: candidate.year,
-            reason: 'Aguardando liberação de fontes limpas sem CAM'
+            reason: 'Aguardando fonte válida para reprodução'
           });
           result.pendingUnavailables++;
         }
@@ -187,7 +179,7 @@ export class AutoReleaseService {
 
   /**
    * Processa uma candidata a série: enriquece IDs, identifica episódios lançados,
-   * valida streams (sem CAM) e adiciona ao catálogo apenas com episódios reais e comprovados.
+   * valida streams e adiciona ao catálogo apenas com episódios reais e comprovados.
    */
   public async processSeriesCandidate(candidate: ContentItem): Promise<{ added: boolean; episodesAdded: number; reason?: string }> {
     if (!searchService.isSeriesItem(candidate)) {
@@ -527,7 +519,9 @@ export class AutoReleaseService {
         { id: pending.id, imdbId: pending.imdbId, tmdbId: pending.tmdbId, title: pending.title }
       );
 
-      const cleanStreams = streams.filter(s => !CamBlockerEngine.isCamStream(s));
+      const cleanStreams = pending.type === ContentType.MOVIE
+        ? streams
+        : streams.filter(s => !CamBlockerEngine.isCamStream(s));
 
       if (cleanStreams.length > 0) {
         // Título que estava pendente agora tem fonte limpa disponível!

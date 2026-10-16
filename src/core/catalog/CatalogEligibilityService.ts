@@ -480,8 +480,8 @@ class CatalogEligibilityService {
           // Validação rigorosa de cada fonte candidata
           const validStreams: any[] = [];
           for (const s of streams) {
-            // Rejeita streams de cinema / CAM
-            if (theatricalFilterService.isCamRecording(`${s.name} ${s.title}`)) {
+            // Séries e animes mantêm a política anterior; filmes podem usar CAM.
+            if (mediaType !== 'movie' && theatricalFilterService.isCamRecording(`${s.name} ${s.title}`)) {
               rejectedSourceCount++;
               continue;
             }

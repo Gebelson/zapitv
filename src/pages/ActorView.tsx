@@ -6,7 +6,7 @@
  * 
  * Regras:
  * 1. Utiliza os créditos oficiais do TMDB (person/{id}/combined_credits).
- * 2. Valida disponibilidade no catálogo do ZapiTV via CatalogEligibilityService (sem CAM, sem em cartaz 2026).
+ * 2. Valida disponibilidade no catálogo do ZapiTV via CatalogEligibilityService.
  * 3. Permite ordenação por relevância e por ano de lançamento.
  * 4. Carregamento progressivo para navegação fluida sem limites artificiais.
  * 5. Ao clicar no card, abre a janela de detalhes no próprio contexto.

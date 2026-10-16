@@ -121,10 +121,6 @@ function createApp() {
     ];
     if (adultTerms.some(term => combined.includes(term))) return false;
 
-    // Bloqueio rigoroso de gravações de cinema (CAM, CamRip, Telesync, HDCAM, Telecine)
-    const camRegex = /\b(cam|camrip|cam-rip|telesync|hdcam|hd-ts|hdts|telecine|tc|screener|scr|dvdscr)\b/i;
-    if (camRegex.test(combined)) return false;
-
     return true;
   }
 

@@ -1,7 +1,6 @@
 import { StremioStream } from '../stremio/stremioTypes';
 import { videoAdBlocker } from '../security/videoAdBlocker';
 import { streamQuarantineService } from '../security/streamQuarantineService';
-import { CamBlockerEngine } from '../catalog/CamBlockerEngine';
 
 export interface StreamValidationResult {
   valid: boolean;
@@ -273,15 +272,8 @@ class StreamValidator {
     const sUrl = (stream.url || '').trim();
     const combined = `${sName} ${sTitle} ${sUrl}`.toLowerCase();
 
-    // Uma URL acessível pode ser trailer, amostra ou gravação de cinema.
+    // Uma URL acessível pode ser trailer ou amostra.
     if (/\b(trailer|teaser|sample|demo)\b/i.test(`${sName} ${sTitle}`)) {
-      return false;
-    }
-
-    // Bloqueio rigoroso de CAM, HDCAM, TS, Telesync, etc.
-    const camEval = CamBlockerEngine.evaluateStream(stream);
-    if (camEval.isCam) {
-      console.warn(`[StreamValidator] Stream rejeitado por CAM / gravação de cinema: ${sTitle || sUrl} (Motivo: ${camEval.reason})`);
       return false;
     }
 

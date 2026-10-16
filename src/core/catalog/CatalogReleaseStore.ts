@@ -4,7 +4,7 @@
  * e validados pelo sistema automático.
  * 
  * Mantém:
- * - Obras novas adicionadas ao catálogo após validação integral de fontes (sem CAM)
+ * - Obras novas adicionadas ao catálogo após validação de fontes
  * - Novos episódios identificados para séries e animes existentes
  * - Fila de títulos pendentes sem fonte (para rechecagem periódica sem sobrecarga)
  */

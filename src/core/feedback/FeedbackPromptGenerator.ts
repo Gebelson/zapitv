@@ -390,7 +390,7 @@ Ao finalizar, reporte:
       case 'subtitles_out_of_sync':
         return `As legendas em português devem ser apresentadas no idioma correto (PT-BR), sincronizadas perfeitamente com os diálogos dos personagens, com formatação limpa e sem atrasos acumulativos.`;
       case 'wrong_quality':
-        return `A resolução informada (ex: 1080p, 4K) deve corresponder à resolução real dos quadros. Gravações de cinema (CAM, TS) devem ser estritamente bloqueadas pelo CamBlockerEngine.`;
+        return `A resolução informada (ex: 1080p, 4K) deve corresponder à resolução real dos quadros. Fontes CAM/TS podem ser usadas em filmes, desde que a obra e a fonte sejam válidas; não anuncie qualidade superior à real.`;
       case 'ai_enhancer_not_working':
       case 'split_screen_not_working':
         return `A Melhoria por IA e a comparação em tela dividida devem processar e renderizar em tempo real sobre o canvas de vídeo sem distorção, sem tela preta e sem desativar inesperadamente.`;
