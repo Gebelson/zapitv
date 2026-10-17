@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Home, CreditCard, Shield, Monitor, User, ChevronRight, 
   ArrowLeft, Plus, Smartphone, Key, Mail, Phone, 
-  AlertCircle, PlayCircle, Lock, Users, HelpCircle, Settings, Edit3, Clock, Trash2, Info, Download, ShieldCheck, Smile, Sun, Moon, Bell, X, Star, LogOut, Check, Copy, AlertTriangle, Gift, FileText, Volume2
+  AlertCircle, PlayCircle, Lock, Users, HelpCircle, Settings, Edit3, Clock, Trash2, Info, ShieldCheck, Smile, Sun, Moon, Bell, X, Star, LogOut, Check, Copy, AlertTriangle, Gift, FileText, Volume2
 } from 'lucide-react';
 import { User as UserType, AppView, SiteNotification } from '../types';
 import { skipService } from '../src/core/skip/skipService';

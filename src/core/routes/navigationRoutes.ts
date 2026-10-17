@@ -13,7 +13,6 @@ export const ROUTES = {
   ANIME_EPISODE: '/animes/:id/temporada/:season/episodio/:episode',
   PROGRAMAS: '/programas',
   TELEVISION: '/televisao',
-  DOWNLOADS: '/downloads',
   MY_LIST: '/minha-lista',
   HISTORY: '/historico',
   PROFILE: '/perfil',

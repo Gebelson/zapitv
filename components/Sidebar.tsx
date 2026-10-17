@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Flame, Film, Tv, List, ChevronLeft, ChevronRight, Sparkles, MonitorPlay, DownloadCloud, Volume2, VolumeX } from 'lucide-react';
+import { Home, Flame, Film, Tv, List, ChevronLeft, ChevronRight, Sparkles, MonitorPlay, Volume2, VolumeX } from 'lucide-react';
 import { AppView, Profile } from '../types';
 import { uiSoundService } from '../src/core/audio/uiSoundService';
 
@@ -41,7 +41,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'series', path: '/series', label: 'Séries', icon: SeriesIcon },
     { id: 'animes', path: '/animes', label: 'Animes', icon: Sparkles },
     { id: 'programas', path: '/programas', label: 'Programas', icon: MonitorPlay },
-    { id: 'downloads', path: '/downloads', label: 'Downloads', icon: DownloadCloud },
     { id: 'mylist', path: '/minha-lista', label: 'Minha Lista', icon: List },
   ];
 

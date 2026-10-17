@@ -68,7 +68,6 @@ export interface StremioStream {
   isTorrent?: boolean;
   isDirectVideo?: boolean;
   requiresEngine?: boolean;
-  offlineAllowed?: boolean; // Permissão explícita para armazenamento local
 }
 
 export interface StremioMetaVideo {

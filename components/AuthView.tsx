@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Mail, Lock, Check, ChevronRight, ShieldCheck, Tv, Monitor, Smartphone, Tablet, Plus, X, ArrowLeft, CreditCard, Calendar, Download, Globe } from 'lucide-react';
+import { Mail, Lock, Check, ChevronRight, ShieldCheck, Tv, Monitor, Smartphone, Tablet, Plus, X, ArrowLeft, CreditCard, Calendar, Play, Globe } from 'lucide-react';
 import { User } from '../types';
 
 interface AuthViewProps {
@@ -256,30 +256,35 @@ const AuthView: React.FC<AuthViewProps> = ({ isDarkMode, onLogin, onSignup, onRe
 
       <SectionDivider />
 
-      {/* Feature Section 2: Mobile Download */}
+      {/* Feature Section 2: Mobile Streaming */}
       <div className="bg-black py-20 px-6 md:px-20">
         <div className="max-w-6xl mx-auto flex flex-col-reverse md:flex-row items-center justify-between gap-12">
           <div className="flex-1 relative">
             <div className="relative w-full max-w-sm mx-auto aspect-[9/16] bg-zinc-900 rounded-[2rem] border-8 border-zinc-800 shadow-2xl overflow-hidden group">
                 <img src="https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?q=80&w=600&auto=format&fit=crop" className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" />
                 
-                {/* Download Animation Card */}
+                {/* Now Playing Card */}
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[85%] bg-black border-2 border-zinc-700 rounded-xl p-3 flex items-center gap-4 shadow-xl z-20">
                     <div className="w-12 h-16 bg-zinc-800 rounded overflow-hidden shrink-0">
                          <img src="https://picsum.photos/seed/stranger/100/150" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="font-bold text-sm text-white truncate">Stranger Things</div>
-                        <div className="text-xs text-blue-500 font-semibold">Baixando...</div>
+                        <div className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Reproduzindo
+                        </div>
                     </div>
-                    <div className="w-10 h-10 rounded-full border-4 border-zinc-700 border-t-blue-600 animate-spin shrink-0" />
+                    <div className="w-9 h-9 rounded-full bg-[#007df7] text-white flex items-center justify-center shrink-0 shadow-lg">
+                      <Play className="w-4 h-4 fill-white" />
+                    </div>
                 </div>
             </div>
           </div>
           <div className="flex-1 text-center md:text-left space-y-6">
-            <h2 className="text-4xl md:text-5xl font-black">Baixe séries para assistir offline.</h2>
+            <h2 className="text-4xl md:text-5xl font-black">Streaming instantâneo em qualquer lugar.</h2>
             <p className="text-xl md:text-2xl leading-relaxed opacity-90">
-              Disponível em planos selecionados. Salve seus títulos favoritos e sempre tenha algo para assistir.
+              Assista no celular, tablet, computador ou TV sem consumir o espaço do seu aparelho.
             </p>
           </div>
         </div>
@@ -461,7 +466,7 @@ const AuthView: React.FC<AuthViewProps> = ({ isDarkMode, onLogin, onSignup, onRe
                   </div>
                   <div className="flex items-center gap-3">
                     <div className={`p-1.5 rounded-full ${isSelected ? 'bg-[#007df7] text-white' : 'bg-white/10 text-gray-400'}`}><Smartphone className="w-3 h-3" /></div>
-                    <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-gray-400'}`}>Download em {p.devices}</span>
+                    <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-gray-400'}`}>Perfis e áudio HD</span>
                   </div>
                 </div>
               </div>

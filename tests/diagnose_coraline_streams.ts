@@ -13,7 +13,7 @@ async function diagnoseCoralineInBrowser() {
   });
 
   page.on('console', msg => {
-    if (msg.type() === 'error' || msg.text().includes('Coraline') || msg.text().includes('stream') || msg.text().includes('Download')) {
+    if (msg.type() === 'error' || msg.text().includes('Coraline') || msg.text().includes('stream') || msg.text().includes('source')) {
       console.log(`[Browser Console ${msg.type()}]:`, msg.text());
     }
   });
@@ -22,7 +22,7 @@ async function diagnoseCoralineInBrowser() {
   await page.goto('http://localhost:4000/filmes', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(3000);
 
-  // Executa teste direto do providerRegistry e offlineSourceInspector dentro do contexto do navegador
+  // Executa teste direto do providerRegistry dentro do contexto do navegador
   const testResult = await page.evaluate(async () => {
     // Procura o módulo providerRegistry ou testa via fetch nos addons registrados
     // Vamos verificar o que o app tem carregado

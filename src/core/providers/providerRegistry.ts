@@ -562,10 +562,9 @@ class ProviderRegistryService {
             sourceType: epObj.videoUrl.includes('.m3u8') ? 'hls' : 'mp4',
             isPtBr,
             isDubbed,
-            quality: epObj.offlineAllowed ? epObj.quality : '1080p',
+            quality: epObj.quality || '1080p',
             providerName: 'Acervo ZapiTV Verificado',
-            providerId: 'zapitv-verified',
-            offlineAllowed: epObj.offlineAllowed === true
+            providerId: 'zapitv-verified'
           });
           streams.push({
             name: `${openItem.title} - Ep ${epObj.number} (CDN)`,
@@ -574,10 +573,9 @@ class ProviderRegistryService {
             sourceType: epObj.videoUrl.includes('.m3u8') ? 'hls' : 'mp4',
             isPtBr,
             isDubbed,
-            quality: epObj.offlineAllowed ? epObj.quality : '1080p',
+            quality: epObj.quality || '1080p',
             providerName: 'Acervo ZapiTV CDN',
-            providerId: 'zapitv-verified',
-            offlineAllowed: epObj.offlineAllowed === true
+            providerId: 'zapitv-verified'
           });
         }
       } else if (openItem.verifiedStreams && openItem.verifiedStreams.length > 0) {
@@ -602,10 +600,9 @@ class ProviderRegistryService {
             sourceType: epObj.videoUrl.includes('.m3u8') ? 'hls' : 'mp4',
             isPtBr: catalogItem.audioStatus === 'pt-br-original' || isDubbed,
             isDubbed,
-            quality: epObj.offlineAllowed ? epObj.quality : '1080p',
+            quality: epObj.quality || '1080p',
             providerName: 'Acervo ZapiTV Séries',
-            providerId: 'zapitv-series',
-            offlineAllowed: epObj.offlineAllowed === true
+            providerId: 'zapitv-series'
           });
         }
       } else if (catalogItem.verifiedStreams && catalogItem.verifiedStreams.length > 0) {
@@ -628,10 +625,9 @@ class ProviderRegistryService {
             sourceType: isHls ? 'hls' : 'mp4',
             isPtBr: catalogItem.audioStatus === 'pt-br-original' || catalogItem.audioStatus === 'pt-br-dubbed',
             isDubbed: catalogItem.audioStatus === 'pt-br-dubbed',
-            quality: catalogItem.offlineAllowed ? undefined : '1080p',
+            quality: '1080p',
             providerName: 'Acervo ZapiTV Oficial',
-            providerId: 'zapitv-catalog',
-            offlineAllowed: catalogItem.offlineAllowed === true
+            providerId: 'zapitv-catalog'
           });
         }
       }

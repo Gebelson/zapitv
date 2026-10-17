@@ -57,10 +57,9 @@ async function runNavigationSuite() {
     assert(ROUTES.ANIME_EPISODE === '/animes/:id/temporada/:season/episodio/:episode', 'ROUTES.ANIME_EPISODE deve conter parâmetros de temporada e episódio');
   });
 
-  test('1.6: Rotas de Funcionalidades Especiais (Programas, Televisão, Downloads, Minha Lista, Histórico)', () => {
+  test('1.6: Rotas de Funcionalidades Especiais (Programas, Televisão, Minha Lista, Histórico)', () => {
     assert(ROUTES.PROGRAMAS === '/programas', 'ROUTES.PROGRAMAS deve ser "/programas"');
     assert(ROUTES.TELEVISION === '/televisao', 'ROUTES.TELEVISION deve ser "/televisao"');
-    assert(ROUTES.DOWNLOADS === '/downloads', 'ROUTES.DOWNLOADS deve ser "/downloads"');
     assert(ROUTES.MY_LIST === '/minha-lista', 'ROUTES.MY_LIST deve ser "/minha-lista"');
     assert(ROUTES.HISTORY === '/historico', 'ROUTES.HISTORY deve ser "/historico"');
   });

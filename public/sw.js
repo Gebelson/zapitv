@@ -47,7 +47,6 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   // NUNCA interceptar módulos de desenvolvimento do Vite/HMR, chamadas de API, vídeo em streaming, chunks parciais ou proxies de vídeo
-  // Os downloads offline são gerenciados privadamente via OPFS/IndexedDB
   if (
     url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/src/') ||

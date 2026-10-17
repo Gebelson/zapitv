@@ -19,15 +19,13 @@ const FAQ_DATA = {
   ],
   technical: [
     { q: 'O vídeo está travando ou carregando', a: 'Verifique sua conexão com a internet. Recomendamos pelo menos 5Mbps para HD e 25Mbps para 4K. Tente reiniciar seu roteador.' },
-    { q: 'Erro ao baixar conteúdo', a: 'Certifique-se de que há espaço livre no dispositivo. Downloads estão disponíveis apenas nos aplicativos móveis (iOS e Android).' },
     { q: 'Tela preta com som', a: 'Isso geralmente é um problema de DRM ou cabo HDMI. Tente desconectar e reconectar o cabo HDMI ou atualizar os drivers da sua placa de vídeo.' },
     { q: 'Como limpar o cache do app?', a: 'Nas configurações do seu dispositivo, vá em Aplicativos > ZapiTV > Armazenamento e selecione "Limpar Cache".' }
   ],
   content: [
     { q: 'Como ativar as legendas?', a: 'Durante a reprodução, clique no ícone de "Balão de Fala" no canto inferior direito do player e selecione o idioma desejado.' },
     { q: 'Como sugerir um filme ou série?', a: 'Adoramos sugestões! Envie o nome do título pelo nosso chat ou e-mail. Nossa equipe de curadoria analisa todos os pedidos.' },
-    { q: 'O que é o Perfil Kids?', a: 'O Perfil Kids oferece uma interface simplificada e exibe apenas conteúdos classificados como livres ou para crianças até 12 anos.' },
-    { q: 'Posso baixar filmes no PC?', a: 'O recurso de download para assistir offline está disponível atualmente apenas para dispositivos móveis e tablets Android e iOS, e no app para Windows 10/11.' }
+    { q: 'O que é o Perfil Kids?', a: 'O Perfil Kids oferece uma interface simplificada e exibe apenas conteúdos classificados como livres ou para crianças até 12 anos.' }
   ]
 };
 

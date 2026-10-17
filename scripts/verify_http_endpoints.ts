@@ -10,7 +10,6 @@ const routes = [
   '/animes/open-anime-1/temporada/2/episodio/8',
   '/programas',
   '/televisao',
-  '/downloads',
   '/minha-lista',
   '/historico',
   '/api/featured'

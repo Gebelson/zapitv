@@ -51,17 +51,10 @@ const ProfileSelectorView = React.lazy(() => import('./components/ProfileSelecto
 const AddSectionModal = React.lazy(() => import('./components/AddSectionModal'));
 const ProgramasView = React.lazy(() => import('./components/ProgramasView'));
 const NotFoundPage = React.lazy(() => import('./src/pages/NotFoundPage').then(module => ({ default: module.NotFoundPage })));
-const DownloadsPage = React.lazy(() => import('./src/pages/DownloadsPage').then(module => ({ default: module.DownloadsPage })));
 const ZapiPlayer = React.lazy(() => import('./src/components/player/ZapiPlayer').then(module => ({ default: module.ZapiPlayer })));
 const CatalogDiagnosticModal = React.lazy(() => import('./src/components/catalog/CatalogDiagnosticModal').then(module => ({ default: module.CatalogDiagnosticModal })));
 const ActorView = React.lazy(() => import('./src/pages/ActorView').then(module => ({ default: module.ActorView })));
 const WatchPartyModal = React.lazy(() => import('./src/components/watchparty/WatchPartyModal').then(module => ({ default: module.WatchPartyModal })));
-
-import { offlineStorageDriver } from './src/core/offline/offlineStorageDriver';
-import { offlineDb } from './src/core/offline/offlineDb';
-import { OfflineDownload } from './src/core/offline/offlineTypes';
-import { HelperJob } from './src/core/offline/helperClient';
-import { StremioStream } from './src/core/stremio/stremioTypes';
 
 const GENRES_LIST = [
   'Ação', 'Adulto', 'Animação', 'Anime', 'Aventura', 'Biografia', 'Comédia', 
@@ -147,7 +140,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     if (path.startsWith('/animes')) return 'animes';
     if (path.startsWith('/atores')) return 'actor';
     if (path === '/programas' || path.startsWith('/televisao')) return 'programas';
-    if (path.startsWith('/downloads')) return 'downloads';
     if (path.startsWith('/minha-lista')) return 'mylist';
     if (path.startsWith('/historico')) return 'profile';
     if (path.startsWith('/perfil-selector')) return 'profile-selector';
@@ -215,7 +207,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       case 'programas':
       case 'television':
       case 'live': navigate('/programas'); break;
-      case 'downloads': navigate('/downloads'); break;
       case 'mylist': navigate('/minha-lista'); break;
       case 'history': navigate('/perfil'); break;
       case 'profile': navigate('/perfil'); break;
@@ -1305,73 +1296,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   });
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
 
-  // Estados e Handlers para Reprodução Offline sem Internet (Experiência Netflix)
-  const [activeOfflineDownload, setActiveOfflineDownload] = useState<OfflineDownload | null>(null);
-  const [offlineBlobUrl, setOfflineBlobUrl] = useState<string | null>(null);
-  const [offlinePlaybackItem, setOfflinePlaybackItem] = useState<ContentItem | null>(null);
-  const [offlinePlaybackStreams, setOfflinePlaybackStreams] = useState<StremioStream[]>([]);
-
-  const handlePlayOffline = useCallback(async (download: OfflineDownload) => {
-    try {
-      const file = await offlineStorageDriver.getFile(download.storagePath, download.storageDriver, download.fileHandle, true);
-      if (!file) {
-        alert('Arquivo de vídeo não encontrado no armazenamento local.');
-        return;
-      }
-      const blobUrl = URL.createObjectURL(file);
-      const localItem: ContentItem = {
-        id: download.itemId,
-        title: download.title,
-        type: download.type,
-        image: download.image,
-        backdrop: download.image,
-        year: new Date(download.createdAt).getFullYear(),
-        rating: 0,
-        genres: download.genres,
-        duration: download.duration || undefined,
-        description: download.episodeTitle || download.title
-      };
-      setOfflinePlaybackStreams([{
-        name: `Download Offline (${download.quality})`,
-        url: blobUrl,
-        sourceType: download.format === 'webm' ? 'webm' : 'mp4',
-        isDubbed: download.audioTrack.isDubbed,
-        isPtBr: download.audioTrack.language === 'pt-BR'
-      }]);
-      setOfflineBlobUrl(blobUrl);
-      setActiveOfflineDownload(download);
-      setOfflinePlaybackItem(localItem);
-    } catch (err) {
-      console.error('Erro ao iniciar reprodução offline:', err);
-    }
-  }, []);
-
-  const handlePlayHelper = useCallback((job: HelperJob, url: string) => {
-    const type = job.type === ContentType.ANIME ? ContentType.ANIME : job.type === ContentType.SERIES || job.episode ? ContentType.SERIES : ContentType.MOVIE;
-    const download: OfflineDownload = {
-      id: `helper_${job.id}`, itemId: job.itemId, title: job.title, type,
-      season: job.season, episode: job.episode, image: '', genres: [],
-      quality: job.quality, format: job.format, sourceUrl: url,
-      audioTrack: { name: 'Áudio não identificado', language: 'und', isDubbed: false, isOriginal: false },
-      subtitles: [], storagePath: '', storageDriver: 'file', totalBytes: job.total || job.bytes,
-      downloadedBytes: job.bytes, speedBytesPerSec: 0, status: 'completed',
-      createdAt: Date.now(), lastPlaybackPosition: 0, duration: 0
-    };
-    setOfflinePlaybackStreams([{ name: `Download Offline (${job.quality})`, url, sourceType: job.format }]);
-    setOfflineBlobUrl(url);
-    setActiveOfflineDownload(download);
-    setOfflinePlaybackItem({ id: job.itemId, title: job.title, type, image: '', year: new Date().getFullYear(), rating: 0, genres: [], description: job.title });
-  }, []);
-
-  const handleCloseOfflinePlayer = useCallback(() => {
-    if (offlineBlobUrl?.startsWith('blob:')) {
-      URL.revokeObjectURL(offlineBlobUrl);
-    }
-    setOfflineBlobUrl(null);
-    setActiveOfflineDownload(null);
-    setOfflinePlaybackItem(null);
-    setOfflinePlaybackStreams([]);
-  }, [offlineBlobUrl]);
 
   // Abertura in-loco de detalhes: abre o modal preservando a rota, página atual, scroll e contexto
   const handleSelectContent = useCallback((item: ContentItem) => {
@@ -1404,7 +1328,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     } else if (path.startsWith('/animes/')) {
       navigate('/animes', { replace: true });
     }
-    // Para todas as outras páginas (/, /em-destaque, /minha-lista, /downloads, etc.),
+    // Para todas as outras páginas (/, /em-destaque, /minha-lista, etc.),
     // NÃO executa navegação nem navigate(-1), mantendo o usuário exatamente onde ele estava!
   }, [location.pathname, navigate]);
 
@@ -2622,17 +2546,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             />
           </ViewWrapper>
         );
-      case 'downloads':
-        return (
-          <ViewWrapper>
-            <DownloadsPage
-              isDarkMode={isDarkMode}
-              onPlayOffline={handlePlayOffline}
-              onPlayHelper={handlePlayHelper}
-              onNavigateHome={() => setCurrentView('home')}
-            />
-          </ViewWrapper>
-        );
+
       case 'help': return <ViewWrapper><HelpView isDarkMode={isDarkMode} onNavigate={setCurrentView} /></ViewWrapper>;
       case 'actor':
         return (
@@ -2895,28 +2809,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         </React.Suspense>
       )}
 
-      {/* Player de Reprodução Offline Integrado (Experiência Netflix) */}
-      {activeOfflineDownload && offlinePlaybackItem && offlineBlobUrl && (
-        <div className="fixed inset-0 z-[500] bg-black">
-          <React.Suspense fallback={<div className="fixed inset-0 z-[500] bg-black flex items-center justify-center"><ZapiLoader size="xl" text="Abrindo vídeo do armazenamento local..." showText /></div>}>
-            <ZapiPlayer
-              key={activeOfflineDownload.id}
-              item={offlinePlaybackItem}
-              streams={offlinePlaybackStreams}
-              isOfflineMode={true}
-              offlineSubtitles={activeOfflineDownload.subtitles}
-              initialResumeTime={activeOfflineDownload.lastPlaybackPosition}
-              onUpdatePlaybackPosition={(pos) => {
-                if (!activeOfflineDownload.id.startsWith('helper_')) offlineDb.updatePlaybackPosition(activeOfflineDownload.id, pos);
-              }}
-              initialSeason={activeOfflineDownload.season}
-              initialEpisode={activeOfflineDownload.episode}
-              initialPlayIntro={false}
-              onClose={handleCloseOfflinePlayer}
-            />
-          </React.Suspense>
-        </div>
-      )}
     </div>
   );
 };

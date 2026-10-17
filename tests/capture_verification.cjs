@@ -43,10 +43,10 @@ const { chromium } = require('playwright');
   await page.waitForTimeout(1000);
   await page.screenshot({ path: 'verification_filmes.png' });
 
-  // 4. Downloads View
-  await page.goto('http://localhost:4000/downloads', { waitUntil: 'domcontentloaded' });
+  // 4. Minha Lista View
+  await page.goto('http://localhost:4000/minha-lista', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1000);
-  await page.screenshot({ path: 'verification_downloads.png' });
+  await page.screenshot({ path: 'verification_minha_lista.png' });
 
   // 5. Mobile
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } });

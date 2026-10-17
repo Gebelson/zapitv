@@ -47,8 +47,6 @@ import { watchPartyService } from '../../core/watchparty/WatchPartyService';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { WatchPartyOverlay } from '../watchparty/WatchPartyOverlay';
 import { RoomLifecycleState } from '../../core/watchparty/watchPartyTypes';
-
-import { OfflineSubtitleTrack } from '../../core/offline/offlineTypes';
 import { VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../../core/providers/sourceVerificationService';
 
 export interface NextEpisodeInfo {
@@ -73,8 +71,6 @@ interface ZapiPlayerProps {
   onIntroCompleted?: () => void;
   onClose: () => void;
   onNextEpisode?: () => void;
-  isOfflineMode?: boolean;
-  offlineSubtitles?: OfflineSubtitleTrack[];
   initialResumeTime?: number;
   onUpdatePlaybackPosition?: (positionSeconds: number) => void;
 }
@@ -145,8 +141,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   onIntroCompleted,
   onClose,
   onNextEpisode,
-  isOfflineMode = false,
-  offlineSubtitles = [],
   initialResumeTime,
   onUpdatePlaybackPosition
 }) => {
@@ -159,7 +153,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   } | null>(null);
 
   useEffect(() => {
-    if (!currentStream?.url || isLoadingStreams || isOfflineMode) {
+    if (!currentStream?.url || isLoadingStreams) {
       sourceEvidenceRef.current = null;
       return;
     }
@@ -176,7 +170,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         season: initialSeason || 0, episode: initialEpisode || 0,
       }, currentStream),
     };
-  }, [currentStream?.url, currentStream?.providerId, isLoadingStreams, isOfflineMode,
+  }, [currentStream?.url, currentStream?.providerId, isLoadingStreams,
     item.id, item.canonicalId, item.imdbId, item.tmdbId, item.aniListId,
     item.type, item.mediaFormat, initialSeason, initialEpisode]);
 
@@ -343,9 +337,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       return true;
     }
 
-    if (isOfflineMode) {
-      return false;
-    }
     if (navigationType === 'continuous_playback' || navigationType === 'retry_playback') {
       return false;
     }
@@ -1999,22 +1990,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     userManuallyChangedSubRef.current = false;
     setIsLoadingSubtitles(true);
 
-    if (isOfflineMode) {
-      const offlineList = offlineSubtitles.map(s => ({
-        id: s.id,
-        lang: s.languageCode || 'pt',
-        languageName: s.languageName,
-        flag: s.isPtBr ? '🇧🇷' : '🌐',
-        isPtBr: s.isPtBr,
-        isAutoTranslated: false,
-        url: '',
-        offlineCues: s.cues
-      }));
-      setSubtitlesList(offlineList as any);
-      setIsLoadingSubtitles(false);
-      return () => { active = false; };
-    }
-
     const fetchSubs = async () => {
       try {
         const list = await subtitleService.fetchSubtitles(item, initialSeason, initialEpisode, currentStream);
@@ -2031,7 +2006,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     };
     fetchSubs();
     return () => { active = false; };
-  }, [item, initialSeason, initialEpisode, currentStream, isOfflineMode, offlineSubtitles]);
+  }, [item, initialSeason, initialEpisode, currentStream]);
 
   // Aplicação estrita da preferência do usuário de legendas (Requisitos 1 a 10):
   useEffect(() => {
@@ -2112,7 +2087,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     };
   }, [disableNativeTextTracks, currentStream]);
 
-  // Download, validação linguística & aplicação rigorosa da legenda selecionada
+  // Carregamento, validação linguística & aplicação rigorosa da legenda selecionada
   useEffect(() => {
     if (selectedSubtitleId === 'off') {
       setCues([]);
@@ -2129,13 +2104,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       return;
     }
 
-    // Suporte a legendas offline com cues locais pré-armazenadas
-    if ((track as any).offlineCues) {
-      setCues((track as any).offlineCues);
-      setAppliedSubtitleId(track.id);
-      setSubtitleStatus('applied');
-      return;
-    }
 
     if (!track.url) {
       setCues([]);
@@ -2504,9 +2472,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Pre-flight instant probe of candidate stream
   useEffect(() => {
     if (isBroadcastGuest || isLoadingStreams || !currentStream?.url) return;
-    // O blob já foi obtido do download identificado por item/temporada/episódio.
-    // Validadores de provedores rejeitam URLs blob e não se aplicam ao arquivo local.
-    if (isOfflineMode && (currentStream.url.startsWith('blob:') || currentStream.url.startsWith('http://127.0.0.1:19573/media/'))) return;
     triedIndicesRef.current.add(selectedStreamIndex);
 
     // Validação estrita de correspondência de identidade da obra e episódio (Impede obras trocadas)
@@ -2562,7 +2527,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [selectedStreamIndex, currentStream, handleStreamFallback, isLoadingStreams, item, initialSeason, initialEpisode, isOfflineMode]);
+  }, [selectedStreamIndex, currentStream, handleStreamFallback, isLoadingStreams, item, initialSeason, initialEpisode]);
 
   const markMediaAsReadyRef = useRef(markMediaAsReady);
   useEffect(() => {
