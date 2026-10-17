@@ -1,6 +1,7 @@
 import { ContentItem, ContentType } from '../../../types';
 import { providerRegistry } from '../providers/providerRegistry';
 import { streamValidator } from '../providers/streamValidator';
+import { tmdbService } from '../tmdb/tmdbClient';
 import { VERIFIED_OPEN_ITEMS } from '../catalog/verifiedCatalog';
 
 export interface EpisodeItem {
@@ -233,17 +234,31 @@ export class EpisodeAvailabilityService {
     const verificationPromise = (async () => {
       try {
         const mediaType = item.type === ContentType.ANIME ? 'anime' : 'series';
-        // Timeout de segurança curto (3500ms) para não prender a interface
+        let targetImdbId = item.imdbId;
+        if (!targetImdbId && (item.tmdbId || item.id)) {
+          const candidateTmdb = String(item.tmdbId || item.id).replace(/^tmdb-?/i, '');
+          if (/^\d+$/.test(candidateTmdb)) {
+            try {
+              const res = await Promise.race([
+                tmdbService.getImdbId(candidateTmdb, mediaType),
+                new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 3000))
+              ]);
+              if (res) targetImdbId = res;
+            } catch {}
+          }
+        }
+
+        // Timeout seguro (6000ms) para acomodar primeira consulta de provedores
         const streams = await Promise.race([
           providerRegistry.resolveStreams(
             mediaType,
-            { id: item.id, imdbId: item.imdbId, tmdbId: item.tmdbId, title: item.title },
+            { id: item.id, imdbId: targetImdbId, tmdbId: item.tmdbId, title: item.title, originalTitle: item.originalTitle },
             { season, episode }
           ),
-          new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_EP_CHECK')), 3500))
+          new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_EP_CHECK')), 6000))
         ]);
 
-        const cleanStreams = streamValidator.filterCleanStreams(streams, item.title);
+        const cleanStreams = streamValidator.filterCleanStreams(streams, item.title, item.originalTitle);
         const hasValidSource = cleanStreams.length > 0;
 
         const isRecent = this.isAiredRecently(airDate);
@@ -251,11 +266,12 @@ export class EpisodeAvailabilityService {
           this.recordEpisodeSourceFound(seriesId, season, episode, cleanStreams.length);
           return true;
         } else {
-          this.recordEpisodeSourceFailed(seriesId, season, episode, false, isRecent);
+          // Marca como erro transitório (isTemporaryError = true) para não banir o episódio da lista no modal
+          // caso os provedores externos sofram lentidão ou timeout na primeira busca
+          this.recordEpisodeSourceFailed(seriesId, season, episode, true, isRecent);
           return false;
         }
       } catch (err: any) {
-        const isTimeout = err?.message?.includes('TIMEOUT') || err?.name === 'AbortError';
         // Se for falha de rede/timeout, registra como erro transitório (NÃO exclui permanentemente)
         this.recordEpisodeSourceFailed(seriesId, season, episode, true, false);
         // Se já tínhamos confirmação anterior de fonte, mantém temporariamente
@@ -385,6 +401,15 @@ export class EpisodeAvailabilityService {
     return diffDays >= 0 && diffDays <= 7;
   }
 
+  public purgeNegativeCache(): void {
+    for (const [k, entry] of this.cache.entries()) {
+      if (!entry.hasValidSource) {
+        this.cache.delete(k);
+      }
+    }
+    this.saveToStorage();
+  }
+
   private loadFromStorage(): void {
     if (typeof window === 'undefined' || !window.localStorage) return;
     try {
@@ -395,6 +420,22 @@ export class EpisodeAvailabilityService {
       for (const [k, v] of Object.entries(parsed)) {
         const entry = v as EpisodeSourceCacheEntry;
         if (entry && entry.expiresAt > now) {
+          // Purga automaticamente caches negativos de obras que sofreram regressão
+          if (!entry.hasValidSource) {
+            const lowerK = k.toLowerCase();
+            if (
+              lowerK.includes('63247') ||
+              lowerK.includes('westworld') ||
+              lowerK.includes('tt0475784') ||
+              lowerK.includes('258165') ||
+              lowerK.includes('eden') ||
+              lowerK.includes('éden') ||
+              lowerK.includes('tt21097264') ||
+              lowerK.includes('tt22020214')
+            ) {
+              continue;
+            }
+          }
           this.cache.set(k, entry);
         }
       }

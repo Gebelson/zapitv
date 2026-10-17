@@ -44,7 +44,6 @@ export const ADULT_ACTORS_AND_TERMS: string[] = [
   'hardcore xxx',
   'creampie',
   'blowjob',
-  'ben the men',
   'mature porn',
   'erotic xxx'
 ];
@@ -57,6 +56,7 @@ export class StreamQuarantineService {
     this.initDefaultQuarantine();
     this.loadFromStorage();
     this.purgePlaywebFalsePositives();
+    this.purgeBenTheMenFalsePositives();
   }
 
   public purgePlaywebFalsePositives(): void {
@@ -65,6 +65,17 @@ export class StreamQuarantineService {
       if (reason.includes('playweb') ||
           reason.includes('release web-dl/bluray fraudulenta de filme em cartaz') ||
           reason.includes('release digital fraudulenta para obra em cartaz/não lançada')) {
+        this.quarantinedMap.delete(key);
+      }
+    }
+    this.saveToStorage();
+  }
+
+  public purgeBenTheMenFalsePositives(): void {
+    for (const [key, item] of this.quarantinedMap.entries()) {
+      const reason = item.reason?.toLowerCase() || '';
+      const target = item.targetTitle?.toLowerCase() || '';
+      if (reason.includes('ben the men') || target.includes('eden') || target.includes('éden')) {
         this.quarantinedMap.delete(key);
       }
     }

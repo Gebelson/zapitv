@@ -25,7 +25,7 @@ export const OFFICIAL_IMDB_WEEKLY_SNAPSHOTS: ImdbWeeklySnapshot[] = [
       { rankType: 'movie', position: 1, imdbId: 'tt29971038', title: 'Sobrevivência', originalTitle: 'Animals', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 2, imdbId: 'tt31454558', title: 'Digger', originalTitle: 'Digger', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 3, imdbId: 'tt21440780', title: 'Outra Mamãe', originalTitle: 'Another Mother', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
-      { rankType: 'movie', position: 4, imdbId: 'tt15888806', title: 'Verity', originalTitle: 'Verity', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
+      { rankType: 'movie', position: 4, imdbId: 'tt32261958', title: 'Verity', originalTitle: 'Verity', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 5, imdbId: 'tt28704204', title: 'O Exorcista: Mártires', originalTitle: 'The Exorcist: Martyrs', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 6, imdbId: 'tt31828574', title: 'Matchbox: O Filme', originalTitle: 'Matchbox', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 7, imdbId: 'tt13000574', title: 'Resident Evil', originalTitle: 'Resident Evil', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
@@ -34,7 +34,7 @@ export const OFFICIAL_IMDB_WEEKLY_SNAPSHOTS: ImdbWeeklySnapshot[] = [
       { rankType: 'movie', position: 10, imdbId: 'tt11464826', title: 'O Outro Lado das Redes', originalTitle: 'The Social Dilemma', year: 2020, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 11, imdbId: 'tt1392796', title: 'Unabomber', originalTitle: 'Unabomber', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 12, imdbId: 'tt11576182', title: 'Dia D', originalTitle: 'D-Day', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
-      { rankType: 'movie', position: 13, imdbId: 'tt2788314', title: 'A Odisseia', originalTitle: 'The Odyssey', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
+      { rankType: 'movie', position: 13, imdbId: 'tt33764258', title: 'A Odisseia', originalTitle: 'The Odyssey', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 14, imdbId: 'tt0074991', title: 'Obsessão', originalTitle: 'Obsession', year: 1976, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 15, imdbId: 'tt11897478', title: 'Prisioneiro', originalTitle: 'Prisoner', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 16, imdbId: 'tt26658104', title: 'Backrooms: Um Não-Lugar', originalTitle: 'The Backrooms', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-moviemeter' },
@@ -70,7 +70,7 @@ export const OFFICIAL_IMDB_WEEKLY_SNAPSHOTS: ImdbWeeklySnapshot[] = [
       { rankType: 'movie', position: 1, imdbId: 'tt29971038', title: 'Sobrevivência', originalTitle: 'Animals', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 2, imdbId: 'tt31454558', title: 'Digger', originalTitle: 'Digger', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 3, imdbId: 'tt21440780', title: 'Outra Mamãe', originalTitle: 'Another Mother', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' },
-      { rankType: 'movie', position: 4, imdbId: 'tt15888806', title: 'Verity', originalTitle: 'Verity', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' },
+      { rankType: 'movie', position: 4, imdbId: 'tt32261958', title: 'Verity', originalTitle: 'Verity', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 5, imdbId: 'tt28704204', title: 'O Exorcista: Mártires', originalTitle: 'The Exorcist: Martyrs', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 6, imdbId: 'tt31828574', title: 'Matchbox: O Filme', originalTitle: 'Matchbox', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 7, imdbId: 'tt13000574', title: 'Resident Evil', originalTitle: 'Resident Evil', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' },
@@ -79,7 +79,7 @@ export const OFFICIAL_IMDB_WEEKLY_SNAPSHOTS: ImdbWeeklySnapshot[] = [
       { rankType: 'movie', position: 10, imdbId: 'tt11464826', title: 'O Outro Lado das Redes', originalTitle: 'The Social Dilemma', year: 2020, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 11, imdbId: 'tt1392796', title: 'Unabomber', originalTitle: 'Unabomber', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 12, imdbId: 'tt11576182', title: 'Dia D', originalTitle: 'D-Day', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' },
-      { rankType: 'movie', position: 13, imdbId: 'tt2788314', title: 'A Odisseia', originalTitle: 'The Odyssey', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' },
+      { rankType: 'movie', position: 13, imdbId: 'tt33764258', title: 'A Odisseia', originalTitle: 'The Odyssey', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' },
       { rankType: 'movie', position: 14, imdbId: 'tt0074991', title: 'Obsessão', originalTitle: 'Obsession', year: 1976, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-moviemeter' }
     ]
   },
@@ -98,7 +98,7 @@ export const OFFICIAL_IMDB_WEEKLY_SNAPSHOTS: ImdbWeeklySnapshot[] = [
     items: [
       { rankType: 'series', position: 1, imdbId: 'tt30147890', title: 'Carrie: A Estranha', originalTitle: 'Carrie', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-tvmeter' },
       { rankType: 'series', position: 2, imdbId: 'tt32159846', title: 'Profundezas', originalTitle: 'The Deep', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-tvmeter' },
-      { rankType: 'series', position: 3, imdbId: 'tt22020214', title: 'A Leste do Éden', originalTitle: 'East of Eden', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-tvmeter' },
+      { rankType: 'series', position: 3, imdbId: 'tt21097264', title: 'A Leste do Éden', originalTitle: 'East of Eden', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-tvmeter' },
       { rankType: 'series', position: 4, imdbId: 'tt26540670', title: 'Lanternas', originalTitle: 'Lanterns', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-tvmeter' },
       { rankType: 'series', position: 5, imdbId: 'tt10986410', title: 'Ted Lasso', originalTitle: 'Ted Lasso', year: 2020, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-tvmeter' },
       { rankType: 'series', position: 6, imdbId: 'tt28289508', title: 'Terra de Máfia', originalTitle: 'MobLand', year: 2026, referenceDate: '2026-10-12', capturedAt: 1791859200000, source: 'imdb-tvmeter' },
@@ -143,7 +143,7 @@ export const OFFICIAL_IMDB_WEEKLY_SNAPSHOTS: ImdbWeeklySnapshot[] = [
     items: [
       { rankType: 'series', position: 1, imdbId: 'tt30147890', title: 'Carrie: A Estranha', originalTitle: 'Carrie', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-tvmeter' },
       { rankType: 'series', position: 2, imdbId: 'tt32159846', title: 'Profundezas', originalTitle: 'The Deep', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-tvmeter' },
-      { rankType: 'series', position: 3, imdbId: 'tt22020214', title: 'A Leste do Éden', originalTitle: 'East of Eden', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-tvmeter' },
+      { rankType: 'series', position: 3, imdbId: 'tt21097264', title: 'A Leste do Éden', originalTitle: 'East of Eden', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-tvmeter' },
       { rankType: 'series', position: 4, imdbId: 'tt26540670', title: 'Lanternas', originalTitle: 'Lanterns', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-tvmeter' },
       { rankType: 'series', position: 5, imdbId: 'tt10986410', title: 'Ted Lasso', originalTitle: 'Ted Lasso', year: 2020, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-tvmeter' },
       { rankType: 'series', position: 6, imdbId: 'tt28289508', title: 'Terra de Máfia', originalTitle: 'MobLand', year: 2026, referenceDate: '2026-10-05', capturedAt: 1791254400000, source: 'imdb-tvmeter' },

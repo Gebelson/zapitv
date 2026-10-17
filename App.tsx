@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate, useSearchParams, matchPath } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Hero from './components/Hero';
@@ -37,6 +38,7 @@ import { hybridRecommendationEngine } from './src/core/recommendations/hybridRec
 import { bannedContentRegistry } from './src/core/catalog/BannedContentRegistry';
 import { catalogSnapshotManager } from './src/core/catalog/CatalogSnapshotManager';
 import { heroCarouselStore } from './src/core/catalog/heroCarouselStore';
+import { fetchHeroCarousel, fetchSectionTitles, saveHeroCarousel, saveSectionTitles } from './src/core/admin/globalSettingsClient';
 
 const ProfileView = React.lazy(() => import('./components/ProfileView'));
 const AdminView = React.lazy(() => import('./components/AdminView'));
@@ -52,8 +54,6 @@ const DownloadsPage = React.lazy(() => import('./src/pages/DownloadsPage').then(
 const ZapiPlayer = React.lazy(() => import('./src/components/player/ZapiPlayer').then(module => ({ default: module.ZapiPlayer })));
 const CatalogDiagnosticModal = React.lazy(() => import('./src/components/catalog/CatalogDiagnosticModal').then(module => ({ default: module.CatalogDiagnosticModal })));
 const ActorView = React.lazy(() => import('./src/pages/ActorView').then(module => ({ default: module.ActorView })));
-const VideoEnhancementLab = React.lazy(() => import('./src/pages/dev/VideoEnhancementLab').then(module => ({ default: module.VideoEnhancementLab })));
-const PlayerEnhancementTestPage = React.lazy(() => import('./src/pages/dev/PlayerEnhancementTest').then(module => ({ default: module.PlayerEnhancementTestPage })));
 const WatchPartyModal = React.lazy(() => import('./src/components/watchparty/WatchPartyModal').then(module => ({ default: module.WatchPartyModal })));
 
 import { offlineStorageDriver } from './src/core/offline/offlineStorageDriver';
@@ -153,8 +153,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     if (path.startsWith('/ajuda')) return 'help';
     if (path.startsWith('/admin')) return 'admin';
     if (path.startsWith('/login') || path.startsWith('/auth')) return 'login';
-    if (path.startsWith('/dev/video-enhancement-lab')) return 'dev-lab';
-    if (path.startsWith('/dev/player-test')) return 'dev-player-test';
     return 'notfound';
   }, [location.pathname]);
 
@@ -235,6 +233,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   // Estado para títulos das seções padrão
   const [sectionTitles, setSectionTitles] = useState(() => initialState.sectionTitles);
+  const [sectionTitleSaveError, setSectionTitleSaveError] = useState('');
 
   // Estado para Seções Customizadas Dinâmicas
   const [customSections, setCustomSections] = useState<CustomSection[]>(() => initialState.customSections);
@@ -271,6 +270,33 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const [heroCarouselItems, setHeroCarouselItems] = useState<ContentItem[]>(() => 
     heroCarouselStore.getCarouselItems(initialState.content || [])
   );
+  const queryClient = useQueryClient();
+  const heroCarouselQuery = useQuery({
+    queryKey: ['global-settings', 'hero-carousel'],
+    queryFn: ({ signal }) => fetchHeroCarousel(signal),
+    refetchInterval: 60_000,
+    retry: false,
+  });
+  const sectionTitlesQuery = useQuery({
+    queryKey: ['global-settings', 'section-titles'],
+    queryFn: ({ signal }) => fetchSectionTitles(signal),
+    refetchInterval: 60_000,
+    retry: false,
+  });
+
+  useEffect(() => {
+    const remoteTitles = sectionTitlesQuery.data?.titles;
+    if (remoteTitles) {
+      setSectionTitles(current => ({ ...current, ...remoteTitles }));
+    }
+  }, [sectionTitlesQuery.data?.titles]);
+
+  useEffect(() => {
+    const remoteItems = heroCarouselQuery.data?.items;
+    if (Array.isArray(remoteItems) && remoteItems.length > 0) {
+      setHeroCarouselItems(remoteItems);
+    }
+  }, [heroCarouselQuery.data?.items]);
 
   useEffect(() => {
     return heroCarouselStore.subscribe(items => setHeroCarouselItems(items));
@@ -302,7 +328,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const [moviesPage, setMoviesPage] = useState(2);
   const [seriesPage, setSeriesPage] = useState(2);
   const [animesPage, setAnimesPage] = useState(2);
+  const moviesPageRef = useRef(2);
+  const seriesPageRef = useRef(2);
+  const animesPageRef = useRef(2);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const isLoadingMoreRef = useRef(false);
   const [hasMoreMovies, setHasMoreMovies] = useState(true);
   const [hasMoreSeries, setHasMoreSeries] = useState(true);
   const [hasMoreAnimes, setHasMoreAnimes] = useState(true);
@@ -386,8 +416,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
     setSelectedGenre(genre);
     setMoviesPage(1);
+    moviesPageRef.current = 1;
     setSeriesPage(1);
+    seriesPageRef.current = 1;
     setAnimesPage(1);
+    animesPageRef.current = 1;
   }, [activeProfile]);
 
   // Função pura para extrair itens elegíveis da categoria respeitando o filtro de gênero
@@ -423,7 +456,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   // Função geradora de chave canônica por visualização e filtros
   const getSnapshotKeyForView = useCallback((view: 'movies' | 'series' | 'animes', genre = selectedGenre, sort?: CatalogSortOption) => {
     const effectiveSort = sort || categorySorts[view] || 'recommended';
-    return `${view}:${genre || 'all'}:${effectiveSort}:${activeProfile?.id || 'default'}:${activeProfile?.isChild ? 'child' : 'adult'}`;
+    const normGenre = (!genre || genre === 'Todos') ? 'all' : genre;
+    return `${view}:${normGenre}:${effectiveSort}:${activeProfile?.id || 'default'}:${activeProfile?.isChild ? 'child' : 'adult'}`;
   }, [selectedGenre, categorySorts, activeProfile?.id, activeProfile?.isChild]);
 
   // Chave canônica que define uma nova entrada de página ou mudança explícita de filtros
@@ -447,9 +481,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }));
 
     // 2. Reseta paginação da categoria
-    if (view === 'movies') setMoviesPage(1);
-    else if (view === 'series') setSeriesPage(1);
-    else if (view === 'animes') setAnimesPage(1);
+    if (view === 'movies') { setMoviesPage(1); moviesPageRef.current = 1; }
+    else if (view === 'series') { setSeriesPage(1); seriesPageRef.current = 1; }
+    else if (view === 'animes') { setAnimesPage(1); animesPageRef.current = 1; }
 
     // 3. Aplica a ordenação ao catálogo COMPLETO daquela categoria
     const targetKey = getSnapshotKeyForView(view, selectedGenre, newSort);
@@ -895,16 +929,19 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   // Paginação e carregamento incremental sob demanda ("Carregar Mais" / Infinite Scroll sem limites artificiais)
   const handleLoadMore = useCallback(async (view: AppView) => {
-    if (isLoadingMore) return;
+    if (isLoadingMoreRef.current) return;
     const isBrowse = view === 'movies' || view === 'series' || view === 'animes';
     if (!isBrowse) return;
 
+    isLoadingMoreRef.current = true;
     setIsLoadingMore(true);
     const targetKey = getSnapshotKeyForView(view as 'movies' | 'series' | 'animes');
 
     try {
       if (view === 'movies') {
-        let nextPage = moviesPage + 1;
+        let nextPage = moviesPageRef.current + 1;
+        moviesPageRef.current = nextPage;
+        setMoviesPage(nextPage);
         let attempts = 0;
         const maxAttempts = 3;
         let newItems: ContentItem[] = [];
@@ -924,6 +961,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           }
 
           nextPage++;
+          moviesPageRef.current = nextPage;
+          setMoviesPage(nextPage);
           attempts++;
         }
 
@@ -945,7 +984,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 genreFilter: selectedGenre
               }
             );
-            return { ...prev, [targetKey]: updated.filter(i => searchService.isMovieItem(i, false)) };
+            return { ...prev, [targetKey]: deduplicateContentItems(updated.filter(i => searchService.isMovieItem(i, false))) };
           });
 
           setPopularMovies(prev => {
@@ -956,10 +995,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           setContent(prev => deduplicateContentItems([...prev, ...newItems]));
         }
 
-        setMoviesPage(nextPage);
         setHasMoreMovies(hasMore);
       } else if (view === 'series') {
-        let nextPage = seriesPage + 1;
+        let nextPage = seriesPageRef.current + 1;
+        seriesPageRef.current = nextPage;
+        setSeriesPage(nextPage);
         let attempts = 0;
         const maxAttempts = 3;
         let newItems: ContentItem[] = [];
@@ -979,6 +1019,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           }
 
           nextPage++;
+          seriesPageRef.current = nextPage;
+          setSeriesPage(nextPage);
           attempts++;
         }
 
@@ -1000,7 +1042,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 genreFilter: selectedGenre
               }
             );
-            return { ...prev, [targetKey]: updated.filter(i => searchService.isSeriesItem(i)) };
+            return { ...prev, [targetKey]: deduplicateContentItems(updated.filter(i => searchService.isSeriesItem(i))) };
           });
 
           setPopularSeries(prev => {
@@ -1011,10 +1053,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           setContent(prev => deduplicateContentItems([...prev, ...newItems]));
         }
 
-        setSeriesPage(nextPage);
         setHasMoreSeries(hasMore);
       } else if (view === 'animes') {
-        let nextPage = animesPage + 1;
+        let nextPage = animesPageRef.current + 1;
+        animesPageRef.current = nextPage;
+        setAnimesPage(nextPage);
         let attempts = 0;
         const maxAttempts = 3;
         let newItems: ContentItem[] = [];
@@ -1034,6 +1077,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           }
 
           nextPage++;
+          animesPageRef.current = nextPage;
+          setAnimesPage(nextPage);
           attempts++;
         }
 
@@ -1055,7 +1100,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 genreFilter: selectedGenre
               }
             );
-            return { ...prev, [targetKey]: updated.filter(i => searchService.isAnimeItem(i)) };
+            return { ...prev, [targetKey]: deduplicateContentItems(updated.filter(i => searchService.isAnimeItem(i))) };
           });
 
           setAnimeItems(prev => {
@@ -1066,15 +1111,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           setContent(prev => deduplicateContentItems([...prev, ...newItems]));
         }
 
-        setAnimesPage(nextPage);
         setHasMoreAnimes(hasMore);
       }
     } catch (e) {
       console.warn('Erro ao carregar mais itens:', e);
     } finally {
+      isLoadingMoreRef.current = false;
       setIsLoadingMore(false);
     }
-  }, [isLoadingMore, moviesPage, seriesPage, animesPage, selectedGenre, categorySorts, activeProfile?.id, activeProfile?.isChild, getSnapshotKeyForView]);
+  }, [selectedGenre, categorySorts, activeProfile?.id, activeProfile?.isChild, getSnapshotKeyForView]);
 
   // Atualiza a fileira "Continuar Assistindo" em tempo real sempre que o progresso é salvo
   useEffect(() => {
@@ -1843,6 +1888,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   };
 
   const handleEditSectionTitle = async (key: keyof typeof sectionTitles) => {
+    setSectionTitleSaveError('');
     setEditingSection({ key, title: sectionTitles[key] });
   };
 
@@ -1850,13 +1896,24 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     if (editingSection && editingSection.title.trim() !== "") {
       const newTitles = { ...sectionTitles, [editingSection.key]: editingSection.title };
       try {
-        const { doc, setDoc } = await import('firebase/firestore');
-        const { db: firestoreDb } = await import('./firebase');
-        await setDoc(doc(firestoreDb, 'keyValueStore', 'zapitv_section_titles'), { value: newTitles });
+        if (sectionTitlesQuery.isError || sectionTitlesQuery.isPending) {
+          throw new Error('Não foi possível verificar o banco. Tente salvar novamente.');
+        }
+        if (sectionTitlesQuery.data.configured) {
+          const saved = await saveSectionTitles(newTitles, sectionTitlesQuery.data.version);
+          queryClient.setQueryData(['global-settings', 'section-titles'], saved);
+        } else {
+          const { doc, setDoc } = await import('firebase/firestore');
+          const { db: firestoreDb } = await import('./firebase');
+          await setDoc(doc(firestoreDb, 'keyValueStore', 'zapitv_section_titles'), { value: newTitles });
+        }
+        await db.keyValueStore.put({ key: 'zapitv_section_titles', value: newTitles });
+        await db.keyValueStore.put({ key: 'zapitv_section_titles_manual_v1', value: true });
         setSectionTitles(newTitles);
         setEditingSection(null);
       } catch (error) {
         console.error("Error saving section title:", error);
+        setSectionTitleSaveError(error instanceof Error ? error.message : 'Não foi possível salvar o título.');
       }
     }
   };
@@ -1949,7 +2006,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       const targetKey = getSnapshotKeyForView('movies', selectedGenre, currentSort);
       const cached = catalogSnapshots[targetKey];
       if (cached && cached.length > 0) {
-        return cached;
+        return deduplicateContentItems(cached);
       }
       const baseItems = getEligibleBrowseItems('movies', selectedGenre);
       const sorted = catalogSnapshotManager.createInitialSnapshot(baseItems, currentSort, {
@@ -1966,7 +2023,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       const targetKey = getSnapshotKeyForView('series', selectedGenre, currentSort);
       const cached = catalogSnapshots[targetKey];
       if (cached && cached.length > 0) {
-        return cached;
+        return deduplicateContentItems(cached);
       }
       const baseItems = getEligibleBrowseItems('series', selectedGenre);
       const sorted = catalogSnapshotManager.createInitialSnapshot(baseItems, currentSort, {
@@ -1983,7 +2040,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       const targetKey = getSnapshotKeyForView('animes', selectedGenre, currentSort);
       const cached = catalogSnapshots[targetKey];
       if (cached && cached.length > 0) {
-        return cached;
+        return deduplicateContentItems(cached);
       }
       const baseItems = getEligibleBrowseItems('animes', selectedGenre);
       const sorted = catalogSnapshotManager.createInitialSnapshot(baseItems, currentSort, {
@@ -2037,18 +2094,27 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     const hasMoreRemote = currentView === 'movies' ? hasMoreMovies : currentView === 'series' ? hasMoreSeries : currentView === 'animes' ? hasMoreAnimes : false;
     const hasMoreLocal = visibleGridCount < filteredContent.length;
 
-    if (!isBrowseView || (!hasMoreLocal && !hasMoreRemote) || isLoadingMore) return;
+    if (!isBrowseView || (!hasMoreLocal && !hasMoreRemote) || isLoadingMore || isLoadingMoreRef.current) return;
 
+    let isAdvancing = false;
     const advanceCatalogWindow = () => {
       if (currentViewRef.current !== currentView) return;
-      if (visibleGridCount < filteredContent.length) {
-        setVisibleGridCount(prev => prev + 42);
-        if (visibleGridCount + 42 >= filteredContent.length && hasMoreRemote && !isLoadingMore) {
+      if (isLoadingMoreRef.current || isLoadingMore || isAdvancing) return;
+      isAdvancing = true;
+      try {
+        if (visibleGridCount < filteredContent.length) {
+          setVisibleGridCount(prev => prev + 42);
+          if (visibleGridCount + 42 >= filteredContent.length && hasMoreRemote && !isLoadingMoreRef.current && !isLoadingMore) {
+            handleLoadMore(currentView);
+          }
+        } else if (hasMoreRemote && !isLoadingMoreRef.current && !isLoadingMore) {
+          setVisibleGridCount(prev => prev + 42);
           handleLoadMore(currentView);
         }
-      } else if (hasMoreRemote && !isLoadingMore) {
-        setVisibleGridCount(prev => prev + 42);
-        handleLoadMore(currentView);
+      } finally {
+        setTimeout(() => {
+          isAdvancing = false;
+        }, 150);
       }
     };
 
@@ -2208,10 +2274,16 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                   isAdmin={currentUser.role === 'admin' || currentUser.devMode}
                   onUpdateItem={handleUpdateContent}
                   onAddContent={handleAddContent}
-                  onSaveCarousel={(newItems) => {
+                  onSaveCarousel={async (newItems) => {
+                    if (heroCarouselQuery.isError || heroCarouselQuery.isPending) {
+                      throw new Error('Não foi possível verificar o banco. Tente salvar novamente.');
+                    }
+                    if (heroCarouselQuery.data.configured) {
+                      const saved = await saveHeroCarousel(newItems, heroCarouselQuery.data.version);
+                      queryClient.setQueryData(['global-settings', 'hero-carousel'], saved);
+                    }
                     heroCarouselStore.saveCarouselItems(newItems);
                     setHeroCarouselItems(newItems);
-                    newItems.forEach(it => handleUpdateContent(it));
                   }}
                 />
               </div>
@@ -2406,7 +2478,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
                 {filteredContent.slice(0, visibleGridCount).map((item) => (
                   <ContentCard 
-                    key={`browse-${currentView}-${item.id}`}
+                    key={`browse-${currentView}-${item.canonicalId || item.imdbId || item.tmdbId || item.id}`}
                     item={item}
                     isDarkMode={isDarkMode}
                     onItemClick={handleSelectContent}
@@ -2552,14 +2624,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             />
           </ViewWrapper>
         );
-      case 'dev-lab':
-        return (
-          <ViewWrapper>
-            <VideoEnhancementLab isDarkMode={isDarkMode} />
-          </ViewWrapper>
-        );
-      case 'dev-player-test':
-        return <PlayerEnhancementTestPage />;
       case 'notfound':
       default:
         return <ViewWrapper><NotFoundPage isDarkMode={isDarkMode} /></ViewWrapper>;
@@ -2701,6 +2765,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 }}
                 className={`w-full p-4 rounded-xl border outline-none font-bold mb-6 ${isDarkMode ? 'bg-black/20 border-gray-700 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}
               />
+              {sectionTitleSaveError && <p role="alert" className="text-sm text-red-400 mb-4">{sectionTitleSaveError}</p>}
               <div className="flex gap-3">
                 <button onClick={() => setEditingSection(null)} className="flex-1 py-3 font-bold rounded-xl bg-transparent border border-gray-500/30 text-gray-500 hover:bg-gray-500/10">Cancelar</button>
                 <button onClick={saveSectionTitle} className="flex-1 py-3 font-bold rounded-xl bg-orange-600 text-white hover:bg-orange-700 shadow-lg shadow-orange-600/20">Salvar</button>
@@ -2767,9 +2832,29 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             }}
             onStartWatchPartyPlayback={async (synthItem, targetSeason, targetEpisode) => {
               setShowDirectWatchPartyModal(false);
-              const existing = content.find(c => c.id === synthItem.id || c.tmdbId === synthItem.tmdbId) || synthItem;
+              let existing = content.find(c => 
+                (synthItem.id && c.id === synthItem.id) || 
+                (synthItem.tmdbId && c.tmdbId === synthItem.tmdbId) || 
+                (synthItem.imdbId && c.imdbId === synthItem.imdbId)
+              );
+
+              if (!existing) {
+                try {
+                  if (synthItem.imdbId) {
+                    const found = await tmdbService.findByImdb(synthItem.imdbId);
+                    if (found) existing = found;
+                  } else if (synthItem.tmdbId) {
+                    const found = await tmdbService.getDetails(synthItem.tmdbId, (synthItem.type as any) || 'movie');
+                    if (found?.item) existing = found.item;
+                  }
+                } catch (e) {
+                  console.warn('[WatchParty] Erro ao resolver mídia do TMDB:', e);
+                }
+              }
+
+              const resolvedItem = existing || synthItem;
               setDirectPartyEpisode({ season: targetSeason, episode: targetEpisode });
-              setSelectedContent(existing);
+              setSelectedContent(resolvedItem);
             }}
           />
         </React.Suspense>

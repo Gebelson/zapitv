@@ -157,9 +157,6 @@ export class FeedbackClusteringEngine {
       case 'subtitles_wrong_language':
       case 'subtitles_out_of_sync':
         return 'subtitles';
-      case 'ai_enhancer_not_working':
-      case 'split_screen_not_working':
-        return 'enhancer';
       case 'search_problem':
       case 'catalog_problem':
         return 'catalog';
@@ -228,8 +225,6 @@ export class FeedbackClusteringEngine {
       'video_stuttering',
       'unstable_volume',
       'wrong_quality',
-      'ai_enhancer_not_working',
-      'split_screen_not_working',
       'search_problem',
       'catalog_problem',
       'live_channel_unavailable'

@@ -20,6 +20,9 @@ import { catalogEligibilityService } from '../catalog/CatalogEligibilityService'
 import { catalogReleaseStore } from '../catalog/CatalogReleaseStore';
 import { adultContentService } from '../adult/AdultContentService';
 import { bannedContentRegistry } from '../catalog/BannedContentRegistry';
+import { LruCache } from '../cache/LruCache';
+import { aniListClient } from '../anilist/aniListClient';
+import { canonicalCatalogMaster } from '../catalog/CanonicalCatalogMaster';
 
 export type SearchCategory = 'all' | 'movies' | 'series' | 'animes' | 'live';
 
@@ -86,8 +89,8 @@ const LIVE_ACTION_MARKERS = [
 
 class SearchService {
   private static instance: SearchService;
-  private cache = new Map<string, CacheEntry>();
-  private actorCache = new Map<string, { timestamp: number; actors: ActorPerson[] }>();
+  private cache = new LruCache<string, CacheEntry>(60, CACHE_TTL_MS);
+  private actorCache = new LruCache<string, { timestamp: number; actors: ActorPerson[] }>(60, CACHE_TTL_MS);
   private activeAbortController: AbortController | null = null;
 
   private constructor() {}
@@ -313,9 +316,14 @@ class SearchService {
         }
 
         case 'animes': {
-          rawResults = await tmdbService.searchAnimes(trimmed, controller.signal);
+          const [tmdbRes, anilistRes] = await Promise.allSettled([
+            tmdbService.searchAnimes(trimmed, controller.signal),
+            aniListClient.searchAnime(trimmed, 1, 15)
+          ]);
+          const tmdbList = tmdbRes.status === 'fulfilled' ? tmdbRes.value : [];
+          const aniListList = anilistRes.status === 'fulfilled' ? anilistRes.value : [];
           // Garante exclusão de live-actions e animações ocidentais
-          rawResults = rawResults.filter(it => this.isAnimeItem(it));
+          rawResults = [...tmdbList, ...aniListList].filter(it => this.isAnimeItem(it));
           break;
         }
 
@@ -355,6 +363,11 @@ class SearchService {
 
       // 6. Filtro central de elegibilidade pública e reprodução real
       const eligible = catalogEligibilityService.filterEligibleItemsSync(rawResults, { allowAdult });
+
+      // Registra no Catálogo Mestre Canônico
+      for (const item of eligible) {
+        canonicalCatalogMaster.registerItem(item);
+      }
 
       // Salva no cache contextual
       this.cache.set(cacheKey, {

@@ -128,7 +128,6 @@ Execute testes para validar a resolução do problema:
 
 ## 8. FUNCIONALIDADES A PRESERVAR
 - Inicialização rápida e pré-buffer do player.
-- Melhoria por IA e comparação em tela dividida.
 - Pular abertura e encerramento.
 - Preservação da numeração oficial e metadados canônicos.
 - Compatibilidade estrita com a Vercel e o servidor local.
@@ -391,9 +390,6 @@ Ao finalizar, reporte:
         return `As legendas em português devem ser apresentadas no idioma correto (PT-BR), sincronizadas perfeitamente com os diálogos dos personagens, com formatação limpa e sem atrasos acumulativos.`;
       case 'wrong_quality':
         return `A resolução informada (ex: 1080p, 4K) deve corresponder à resolução real dos quadros. Fontes CAM/TS podem ser usadas em filmes, desde que a obra e a fonte sejam válidas; não anuncie qualidade superior à real.`;
-      case 'ai_enhancer_not_working':
-      case 'split_screen_not_working':
-        return `A Melhoria por IA e a comparação em tela dividida devem processar e renderizar em tempo real sobre o canvas de vídeo sem distorção, sem tela preta e sem desativar inesperadamente.`;
       case 'live_channel_unavailable':
         return `O canal ao vivo deve reproduzir o sinal oficial estável da emissora. Se o sinal primário cair, o agregador de TV ao vivo deve tentar o stream reserva ou sinalizar indisponibilidade temporária.`;
       default:
@@ -459,11 +455,6 @@ Ao finalizar, reporte:
       case 'subtitles_out_of_sync':
         return `- \`src/core/subtitles/subtitleLanguageDetector.ts\` (Detecção de idioma de legendas)
 - \`src/core/subtitles/subtitleStyleService.ts\` (Sincronização e ajuste de delay)`;
-      case 'ai_enhancer_not_working':
-      case 'split_screen_not_working':
-        return `- \`src/core/enhancement/aiEnhancerService.ts\` (Gerenciamento do motor de IA)
-- \`src/core/enhancement/videoEnhancer.ts\` (WebGPU, WebGL e shaders Anime4K)
-- \`src/core/enhancement/audioEnhancer.ts\` (DSP e Web Audio)`;
       case 'live_channel_unavailable':
         return `- \`src/core/livetv/OfficialChannelProvider.ts\` (Fontes de canais ao vivo)
 - \`src/core/livetv/channelHealthService.ts\` (Monitoramento de saúde e uptime dos canais)`;

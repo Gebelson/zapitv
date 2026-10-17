@@ -16,10 +16,12 @@ import { mediaAvailabilityIndex } from '../src/core/catalog/MediaAvailabilityInd
 import { canonicalIdentityService } from '../src/core/identity/canonicalIdentity';
 import { audioPreferenceService } from '../src/core/audio/audioPreferenceService';
 import { streamValidator } from '../src/core/providers/streamValidator';
-import { audioEnhancer } from '../src/core/enhancement/audioEnhancer';
 import { similarTitlesService } from '../src/core/recommendations/similarTitlesService';
 import { userPreferenceStore } from '../src/core/recommendations/userPreferenceStore';
 import { episodeAvailabilityService } from '../src/core/episodes/episodeAvailabilityService';
+import { sourceVerificationService, VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../src/core/providers/sourceVerificationService';
+import { watchPartyService } from '../src/core/watchparty/WatchPartyService';
+import { getRememberedSources, prioritizeRememberedSources, RememberedSource } from '../src/core/providers/sourceMemory';
 
 const ZapiPlayer = lazy(() => import('../src/components/player/ZapiPlayer').then(m => ({ default: m.ZapiPlayer })));
 const WatchPartyModal = lazy(() => import('../src/components/watchparty/WatchPartyModal').then(m => ({ default: m.WatchPartyModal })));
@@ -72,6 +74,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const [resolvedStreams, setResolvedStreams] = useState<StremioStream[]>([]);
   const [isLoadingStreams, setIsLoadingStreams] = useState(false);
   const [streamResolutionError, setStreamResolutionError] = useState<string | null>(null);
+  const [verificationState, setVerificationState] = useState<VerificationState>('IDLE');
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showWatchPartyModal, setShowWatchPartyModal] = useState(false);
   const [progressVersion, setProgressVersion] = useState(0);
@@ -104,6 +107,21 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     status: 'idle' | 'pending' | 'resolved' | 'error';
   } | null>(null);
   const prefetchGenerationRef = useRef<number>(0);
+  const prefetchAbortControllerRef = useRef<AbortController | null>(null);
+  const activePlaybackAbortControllerRef = useRef<AbortController | null>(null);
+
+  const cancelAllPendingRequests = useCallback(() => {
+    prefetchGenerationRef.current++;
+    if (prefetchAbortControllerRef.current) {
+      try { prefetchAbortControllerRef.current.abort(); } catch {}
+      prefetchAbortControllerRef.current = null;
+    }
+    if (activePlaybackAbortControllerRef.current) {
+      try { activePlaybackAbortControllerRef.current.abort(); } catch {}
+      activePlaybackAbortControllerRef.current = null;
+    }
+    prefetchedSourcesRef.current = null;
+  }, []);
 
   // Dynamic episodes from TMDB
   const [episodes, setEpisodes] = useState<{
@@ -121,6 +139,25 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const isFavorite = favorites.includes(item.id);
   const isInList = myList.includes(item.id);
   const hasEpisodes = item.mediaFormat !== 'movie' && (item.type === ContentType.SERIES || item.type === ContentType.ANIME);
+  const [rememberedSources, setRememberedSources] = useState<RememberedSource[]>([]);
+  useEffect(() => {
+    let active = true;
+    const identity = canonicalIdentityService.buildIdentity(item,
+      hasEpisodes ? { season: currentSeason, episode: currentEpisodeParams?.episode || 1 } : undefined);
+    setRememberedSources([]);
+    getRememberedSources({
+      canonicalId: identity.canonicalId || '',
+      mediaType: (identity.canonicalId?.split(':')[0] as 'movie' | 'series' | 'anime') || 'movie',
+      season: hasEpisodes ? currentSeason : 0,
+      episode: hasEpisodes ? currentEpisodeParams?.episode || 1 : 0,
+    }).then(rows => { if (active) setRememberedSources(rows); });
+    return () => { active = false; };
+  }, [item.id, item.canonicalId, item.imdbId, item.tmdbId, item.aniListId,
+    item.title, item.type, item.mediaFormat, currentSeason, currentEpisodeParams?.episode, hasEpisodes]);
+  const verifiedStreamsForPlayer = useMemo(() => prioritizeRememberedSources(
+    (item.verifiedStreams || []).map(source => ({ ...source, providerId: source.providerId || 'zapitv-verified' })),
+    rememberedSources,
+  ), [item.verifiedStreams, rememberedSources]);
 
   // ETAPA 1: Busca e validação leve em segundo plano das fontes, priorizando PT-BR sem baixar o vídeo
   const prefetchSources = useCallback((targetItem: ContentItem, targetSeason?: number, targetEpisode?: number) => {
@@ -136,6 +173,13 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     if (prefetchedSourcesRef.current?.targetKey === targetKey) {
       return;
     }
+
+    if (prefetchAbortControllerRef.current) {
+      try { prefetchAbortControllerRef.current.abort(); } catch {}
+      prefetchAbortControllerRef.current = null;
+    }
+    const abortController = new AbortController();
+    prefetchAbortControllerRef.current = abortController;
 
     const gen = ++prefetchGenerationRef.current;
     const targetType = isMovie ? 'movie' : (targetItem.type === ContentType.ANIME ? 'anime' : 'series');
@@ -153,9 +197,19 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
         const streams = await providerRegistry.resolveStreams(
           targetType,
           targetId,
-          epParams
+          epParams,
+          {
+            signal: abortController.signal,
+            onProgressiveStreams: (progressive) => {
+              if (prefetchGenerationRef.current !== gen || abortController.signal.aborted) return;
+              if (prefetchedSourcesRef.current?.targetKey === targetKey) {
+                prefetchedSourcesRef.current.streams = progressive;
+                prefetchedSourcesRef.current.status = 'resolved';
+              }
+            }
+          }
         );
-        if (prefetchGenerationRef.current !== gen) return [];
+        if (prefetchGenerationRef.current !== gen || abortController.signal.aborted) return [];
 
         // Validação leve em segundo plano das 3 primeiras fontes sem baixar vídeo
         if (streams && streams.length > 0) {
@@ -206,13 +260,12 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     }
   }, [item.id, item.tmdbId, item.imdbId, currentSeason, totalSeasons, episodes.length, isPlaying, prefetchSources]);
 
-  // Limpeza de tarefas de prefetch obsoletas ao desmontar
+  // Limpeza de tarefas de prefetch e requisições pendentes ao desmontar
   useEffect(() => {
     return () => {
-      prefetchGenerationRef.current++;
-      prefetchedSourcesRef.current = null;
+      cancelAllPendingRequests();
     };
-  }, []);
+  }, [cancelAllPendingRequests]);
 
   // Reage imediatamente a atualizações de progresso do player
   useEffect(() => {
@@ -251,8 +304,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
 
   const handleClose = useCallback(() => {
     playbackRequestIdRef.current++;
-    prefetchGenerationRef.current++;
-    prefetchedSourcesRef.current = null;
+    cancelAllPendingRequests();
     setIsClosing(true);
     if (playbackSessionId) {
       playbackSessionService.endSession(playbackSessionId);
@@ -264,12 +316,11 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     setTimeout(() => {
       onClose();
     }, 280);
-  }, [onClose, playbackSessionId]);
+  }, [cancelAllPendingRequests, onClose, playbackSessionId]);
 
   const handleClosePlayer = useCallback(() => {
     playbackRequestIdRef.current++;
-    prefetchGenerationRef.current++;
-    prefetchedSourcesRef.current = null;
+    cancelAllPendingRequests();
     setIsPlaying(false);
     setResolvedStreams([]);
     if (playbackSessionId) {
@@ -279,7 +330,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     }
     setPlaybackSessionId('');
     setSessionIntroPlayed(false);
-  }, [playbackSessionId]);
+  }, [cancelAllPendingRequests, playbackSessionId]);
 
   // Click outside to close (apenas quando não estiver no player e nenhum modal flutuante estiver aberto)
   useEffect(() => {
@@ -450,8 +501,11 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
 
               if (!active) break;
               if (!hasSource) {
-                // Remove da lista se confirmado sem fontes, preservando a numeração dos outros
-                setEpisodes(prev => prev.filter(e => e.number !== ep.number));
+                // Remove da lista apenas se comprovadamente sem fontes (não em erros temporários)
+                const check = episodeAvailabilityService.getCachedAvailability(item.id, currentSeason, ep.number);
+                if (check.checked && !check.hasSource && !check.isTemporaryError) {
+                  setEpisodes(prev => prev.filter(e => e.number !== ep.number));
+                }
               }
             }
           })().catch(() => {});
@@ -478,10 +532,6 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     navType: NavigationType = 'manual_start',
     isAutoRetry = false
   ) => {
-    // PREVENÇÃO DE FALHA DE ÁUDIO: Desbloqueia o AudioContext e o pipeline de mídia
-    // síncronamente durante o gesto direto do usuário (trusted ClickEvent)
-    audioEnhancer.unlockAudioContext();
-
     const currentRequestId = ++playbackRequestIdRef.current;
     const currentTargetItem = item;
     let epParams: { season: number; episode: number } | undefined = undefined;
@@ -516,19 +566,37 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       ? `${currentTargetItem.id}:movie`
       : `${currentTargetItem.id}:s${epParams?.season || 1}:e${epParams?.episode || 1}`;
 
-    // Inicia ou continua a sessão de reprodução rastreando a intro
-    const session = playbackSessionService.startSession(
-      currentTargetItem.id,
-      navType,
-      epParams?.season,
-      epParams?.episode
-    );
-    setPlaybackSessionId(session.sessionId);
-    setNavigationType(navType);
-    setSessionIntroPlayed(session.introPlayed);
+    // A recuperação automática da busca pertence ao mesmo clique do usuário.
+    // Não a transforme em retry_playback, que marcaria a intro como já exibida.
+    if (!isAutoRetry) {
+      const session = playbackSessionService.startSession(
+        currentTargetItem.id,
+        navType,
+        epParams?.season,
+        epParams?.episode
+      );
+      setPlaybackSessionId(session.sessionId);
+      setNavigationType(navType);
+      setSessionIntroPlayed(session.introPlayed);
+    }
 
     setIsPlaying(true);
     setStreamResolutionError(null);
+
+    // Se for convidado em modo Transmissão do Host (WebRTC), não busca fontes no dispositivo do convidado
+    if (watchPartyService.isConnected && !watchPartyService.isHost() && watchPartyService.isHostBroadcastMode()) {
+      setVerificationState('AVAILABLE');
+      setResolvedStreams([{
+        name: 'Transmissão do Host',
+        title: 'Transmissão do Host (WebRTC Direto)',
+        url: '',
+        quality: '1080p',
+        isDubbed: true,
+        isPtBr: true
+      } as any]);
+      setIsLoadingStreams(false);
+      return;
+    }
 
     // ETAPA 2: Verifica se já temos fontes pré-resolvidas em cache da etapa 1
     const prefetched = prefetchedSourcesRef.current;
@@ -540,6 +608,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
 
     if (hasReadyPrefetch) {
       // Fontes já prontas: passa imediatamente ao ZapiPlayer para pré-buffer durante a intro
+      setVerificationState('AVAILABLE');
       setResolvedStreams(prefetched.streams);
       setIsLoadingStreams(false);
       mediaLoadingTracker.transition(currentTargetItem.id, 'BUFFERING', {
@@ -572,51 +641,67 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       episode: epParams?.episode
     });
 
+    if (activePlaybackAbortControllerRef.current) {
+      try { activePlaybackAbortControllerRef.current.abort(); } catch {}
+      activePlaybackAbortControllerRef.current = null;
+    }
+    const playbackAbort = new AbortController();
+    activePlaybackAbortControllerRef.current = playbackAbort;
+
     try {
-      let streams: StremioStream[] = [];
-      if (hasPendingPrefetch) {
-        // Reutiliza a promessa já em voo sem criar requisições duplicadas
-        streams = await Promise.race([
-          prefetched.promise,
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Tempo limite na busca de fontes. Tente novamente.')), 18000))
-        ]);
-      } else {
-        let timer: ReturnType<typeof setTimeout> | undefined;
-        streams = await Promise.race([
-          providerRegistry.resolveStreams(
-            currentTargetItem.mediaFormat === 'movie' || currentTargetItem.type === ContentType.MOVIE ? 'movie' : (currentTargetItem.type === ContentType.ANIME ? 'anime' : 'series'),
-            { tmdbId: currentTargetItem.tmdbId, imdbId: currentTargetItem.imdbId, id: currentTargetItem.id, title: currentTargetItem.title, originalTitle: currentTargetItem.originalTitle, year: currentTargetItem.year },
-            epParams
-          ),
-          new Promise<never>((_, reject) => {
-            timer = setTimeout(() => reject(new Error('Tempo limite na busca de fontes. Tente novamente.')), 18000);
-          })
-        ]).finally(() => clearTimeout(timer));
-      }
+      let progressiveStreamsFound: StremioStream[] = [];
+      const handleProgressive = (progressive: StremioStream[]) => {
+        if (currentRequestId !== playbackRequestIdRef.current || playbackAbort.signal.aborted) return;
+        if (progressive && progressive.length > 0) {
+          progressiveStreamsFound = progressive;
+          setResolvedStreams(progressive);
+          setIsLoadingStreams(false);
+          mediaLoadingTracker.transition(currentTargetItem.id, 'BUFFERING', {
+            streamCount: progressive.length,
+            bestStream: progressive[0]?.title,
+            progressive: true
+          });
+        }
+      };
 
-      // Se a primeira consulta retornar vazia, realiza uma recuperação automática e silenciosa
-      if (streams.length === 0 && !isAutoRetry) {
-        console.log(`[ContentDetailModal] 0 fontes na primeira tentativa de "${currentTargetItem.title}". Tentando recuperação automática silenciosa...`);
-        await new Promise(r => setTimeout(r, 600));
-        if (currentRequestId !== playbackRequestIdRef.current) return;
-        return startPlayback(epParams?.season, epParams?.episode, 'retry_playback', true);
-      }
+      setVerificationState(isAutoRetry ? 'RETRYING' : 'SEARCHING');
 
-      if (currentRequestId !== playbackRequestIdRef.current) {
-        // Ignora respostas assíncronas antigas se o usuário já mudou de obra ou solicitou outra ação!
+      // Sistema Inteligente de Verificação Dupla de Fontes (com Primeira e Segunda busca automáticas)
+      const verificationResult = await sourceVerificationService.verifySources(
+        currentTargetItem,
+        epParams,
+        {
+          signal: playbackAbort.signal,
+          onStateChange: (state) => {
+            if (currentRequestId === playbackRequestIdRef.current && !playbackAbort.signal.aborted) {
+              setVerificationState(state);
+            }
+          },
+          onProgressiveStreams: handleProgressive,
+          forceRefresh: isAutoRetry,
+          bypassNegativeCache: isAutoRetry
+        }
+      );
+
+      if (currentRequestId !== playbackRequestIdRef.current || playbackAbort.signal.aborted) {
         return;
       }
 
-      // Atualiza o cache de prefetch com o resultado obtido
-      prefetchedSourcesRef.current = {
-        targetKey: requestedKey,
-        promise: Promise.resolve(streams),
-        streams,
-        status: 'resolved'
-      };
+      // Se a verificação retornou fontes ou se fontes progressivas já foram validadas, preserva as fontes
+      const streams = (verificationResult.streams && verificationResult.streams.length > 0)
+        ? verificationResult.streams
+        : (progressiveStreamsFound.length > 0 ? progressiveStreamsFound : []);
 
-      setResolvedStreams(streams);
       if (streams.length > 0) {
+        setVerificationState('AVAILABLE');
+        prefetchedSourcesRef.current = {
+          targetKey: requestedKey,
+          promise: Promise.resolve(streams),
+          streams,
+          status: 'resolved'
+        };
+
+        setResolvedStreams(streams);
         if (hasEpisodes && epParams) {
           episodeAvailabilityService.recordEpisodeSourceFound(
             currentTargetItem.id,
@@ -630,26 +715,26 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
           bestStream: streams[0]?.title
         });
       } else {
+        setVerificationState(verificationResult.state);
+        setResolvedStreams([]);
         if (hasEpisodes && epParams) {
           episodeAvailabilityService.recordEpisodeSourceFailed(
             currentTargetItem.id,
             epParams.season,
             epParams.episode,
-            false
+            verificationResult.state === 'INCONCLUSIVE'
           );
         }
-        mediaLoadingTracker.transition(currentTargetItem.id, 'UNAVAILABLE', {
-          reason: 'Nenhum provedor retornou streams reproduzíveis'
+        setStreamResolutionError(
+          verificationResult.errorMessage ||
+          (verificationResult.state === 'INCONCLUSIVE' ? MSG_INCONCLUSIVE : MSG_UNAVAILABLE)
+        );
+        mediaLoadingTracker.transition(currentTargetItem.id, verificationResult.state === 'INCONCLUSIVE' ? 'ERROR' : 'UNAVAILABLE', {
+          reason: verificationResult.errorMessage || 'Nenhum provedor retornou streams reproduzíveis'
         });
       }
     } catch (err: any) {
-      if (currentRequestId !== playbackRequestIdRef.current) return;
-      if (!isAutoRetry) {
-        console.log(`[ContentDetailModal] Erro temporário na primeira tentativa de "${currentTargetItem.title}". Tentando recuperação automática silenciosa...`);
-        await new Promise(r => setTimeout(r, 600));
-        if (currentRequestId !== playbackRequestIdRef.current) return;
-        return startPlayback(epParams?.season, epParams?.episode, 'retry_playback', true);
-      }
+      if (currentRequestId !== playbackRequestIdRef.current || playbackAbort.signal.aborted) return;
       if (hasEpisodes && epParams) {
         episodeAvailabilityService.recordEpisodeSourceFailed(
           currentTargetItem.id,
@@ -659,7 +744,8 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
         );
       }
       console.error('Erro ao resolver provedores:', err);
-      setStreamResolutionError(err?.message || 'Falha temporária na busca de fontes. Tente novamente.');
+      setVerificationState('INCONCLUSIVE');
+      setStreamResolutionError(err?.message || MSG_INCONCLUSIVE);
       mediaLoadingTracker.transition(currentTargetItem.id, 'ERROR', {
         error: err?.message || 'Falha ao resolver provedores'
       });
@@ -734,6 +820,9 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     if (nextEpisodeInfo.season !== currentSeason) {
       setCurrentSeason(nextEpisodeInfo.season);
     }
+    if (watchPartyService.isConnected && (watchPartyService.isHost() || watchPartyService.canLocalControl('canChangeEpisode'))) {
+      watchPartyService.changeEpisode(nextEpisodeInfo.season, nextEpisodeInfo.episode);
+    }
     startPlayback(nextEpisodeInfo.season, nextEpisodeInfo.episode, 'continuous_playback');
   };
 
@@ -747,8 +836,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
         key={similar.id} 
         onClick={() => {
           playbackRequestIdRef.current++;
-          prefetchGenerationRef.current++;
-          prefetchedSourcesRef.current = null;
+          cancelAllPendingRequests();
           setIsPlaying(false);
           setResolvedStreams([]);
           setCurrentEpisodeParams(null);
@@ -807,8 +895,10 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
               streams={resolvedStreams} 
               isLoadingStreams={isLoadingStreams}
               streamResolutionError={streamResolutionError}
+              verificationState={verificationState}
               onRetrySources={() => {
-                startPlayback(currentEpisodeParams?.season, currentEpisodeParams?.episode, 'retry_playback');
+                providerRegistry.invalidateCache(item);
+                startPlayback(currentEpisodeParams?.season, currentEpisodeParams?.episode, 'retry_playback', true);
               }}
               initialSeason={currentEpisodeParams?.season || (hasEpisodes ? 1 : undefined)}
               initialEpisode={currentEpisodeParams?.episode || (hasEpisodes ? 1 : undefined)}
@@ -920,7 +1010,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                   {/* Botão Baixar Offline (Experiência Netflix) */}
                   <DownloadButton
                     item={item}
-                    streams={resolvedStreams.length > 0 ? resolvedStreams : (item.verifiedStreams || [])}
+                    streams={resolvedStreams.length > 0 ? resolvedStreams : verifiedStreamsForPlayer}
                     season={hasEpisodes ? (currentSeason || 1) : undefined}
                     episode={hasEpisodes ? (playbackContinuity.nextEpisodeNumber || 1) : undefined}
                     className="h-11 sm:h-12 box-border"

@@ -10,12 +10,15 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+backups/
 .vercel
 .env
 .env.*
 !.env.example
 *.local
-vercel_*.png
+/*.png
+*.db
+*.sqlite
 .playwright-cli/
 
 # Editor directories and files

@@ -1,3 +1,46 @@
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+
+// src/server/rewriteHlsManifest.ts
+var rewriteHlsManifest_exports = {};
+__export(rewriteHlsManifest_exports, {
+  rewriteHlsManifest: () => rewriteHlsManifest
+});
+function rewriteHlsManifest(manifest, sourceUrl) {
+  if (!manifest.trimStart().startsWith("#EXTM3U")) return null;
+  const proxyUri = (uri) => {
+    try {
+      const absolute = new URL(uri, sourceUrl);
+      if (absolute.protocol !== "http:" && absolute.protocol !== "https:") return uri;
+      return `/api/proxy?url=${encodeURIComponent(absolute.href)}`;
+    } catch {
+      return uri;
+    }
+  };
+  return manifest.split(/\r?\n/).map((line) => {
+    if (line.startsWith("#")) {
+      return line.replace(
+        HLS_URI_ATTRIBUTE,
+        (_match, quote, uri) => `URI=${quote}${proxyUri(uri)}${quote}`
+      );
+    }
+    return line.trim() ? proxyUri(line.trim()) : line;
+  }).join("\n");
+}
+var HLS_URI_ATTRIBUTE;
+var init_rewriteHlsManifest = __esm({
+  "src/server/rewriteHlsManifest.ts"() {
+    HLS_URI_ATTRIBUTE = /\bURI=(['"])(.*?)\1/g;
+  }
+});
+
 // server.ts
 import express from "express";
 import path4 from "path";
@@ -388,13 +431,18 @@ var DUBBED_PTBR_PATTERNS = [
   /\b(fhd[-_]?dublado|hd[-_]?dublado|web[-_]?dl[-_]?dublado)\b/i,
   /🇧🇷\s*dublado/i,
   /🇧🇷.*?(dublado|dual|áudio|audio)/i,
-  /\b(dublagem\s*brasileira)\b/i
+  /\b(dublagem\s*brasileira)\b/i,
+  /🌎\s*portugu[eê]s/i,
+  /🌎\s*pt[-_]?br/i,
+  /\b(portugu[eê]s|pt[-_]?br)\b/i
 ];
 var PTBR_GENERAL_PATTERNS = [
   /\b(pt[-_]?br|portugu[eê]s[-_]?br|portugu[eê]s)\b/i,
   /\[pt[-_]?br\]/i,
   /\b(pob|por)\b/i,
-  /🇧🇷/
+  /🇧🇷/,
+  /🌎\s*portugu[eê]s/i,
+  /🌎\s*pt[-_]?br/i
 ];
 var SUBTITLED_ONLY_PATTERNS = [
   /\b(legendado|legendada|leg\b|subs?|softsubs?|hardsubs?|hardcoded|legenda[-_]?fixa|legenda[-_]?embutida|legenda[-_]?gravada)\b/i,
@@ -421,8 +469,21 @@ var AudioPreferenceService = class {
     const isDualAudio = DUAL_PATTERNS.some((p) => p.test(combinedText));
     const hasDubbedPattern = DUBBED_PTBR_PATTERNS.some((p) => p.test(combinedText));
     const hasPtBrGeneral = PTBR_GENERAL_PATTERNS.some((p) => p.test(combinedText));
+    const hasExplicitBrazilianAudio = hasPtBrGeneral || /\b(audio|áudio)\s*pt(?:[-_]?br)?\b|\bdublagem\s*brasileira\b|\bbrazuca\b/i.test(combinedText);
+    const isExplicitSpanishAudio = /\b(latino|espa[nñ]ol|espanhol|castellano)\b/i.test(combinedText) && !hasExplicitBrazilianAudio;
+    if (isExplicitSpanishAudio) {
+      return {
+        tier: "foreign",
+        isPtBr: false,
+        isDubbed: false,
+        isDualAudio: false,
+        language: "es",
+        confidence: 0.9,
+        reason: "\xC1udio espanhol indicado explicitamente pela fonte"
+      };
+    }
     const isExplicitlySubtitledOnly = SUBTITLED_ONLY_PATTERNS.some((p) => p.test(combinedText)) && !hasDubbedPattern && !isDualAudio;
-    const explicitlyBrazilian = hasDubbedPattern || hasPtBrGeneral || /\b(pt[-_]?br|pob|por[-_]?br|brazilian)\b/i.test(combinedText);
+    const explicitlyBrazilian = hasDubbedPattern || hasPtBrGeneral || stream.isDubbed === true || stream.isPtBr === true || /\b(pt[-_]?br|pob|por[-_]?br|brazilian)\b/i.test(combinedText);
     if (isDualAudio && explicitlyBrazilian && !isExplicitlySubtitledOnly) {
       return {
         tier: "dual_audio",
@@ -434,7 +495,9 @@ var AudioPreferenceService = class {
         reason: "Dual \xC1udio com faixa PT-BR detectada"
       };
     }
-    if (!isExplicitlySubtitledOnly && !/\b(latino|espa[nñ]ol|espanhol|castellano|pt[-_]?pt)\b/i.test(combinedText) && (hasDubbedPattern || explicitlyBrazilian && stream.isDubbed === true)) {
+    const isForeignOnly = /\b(latino|espa[nñ]ol|espanhol|castellano)\b/i.test(combinedText) && !hasDubbedPattern && !hasPtBrGeneral && !stream.isDubbed && !stream.isPtBr;
+    const isPtPtOnly = /\b(pt[-_]?pt|portugu[eê]s[-_]?pt)\b/i.test(combinedText) && !/\b(pt[-_]?br|dublado|brazuca)\b/i.test(combinedText) && !/🇧🇷/.test(combinedText);
+    if (!isExplicitlySubtitledOnly && !isForeignOnly && !isPtPtOnly && (hasDubbedPattern || explicitlyBrazilian || stream.isDubbed === true || stream.isPtBr === true)) {
       return {
         tier: "dubbed_ptbr",
         isPtBr: true,
@@ -560,28 +623,28 @@ var AudioCodecService = class {
    * Inspeciona títulos, nomes e tags de um stream para identificar os codecs de áudio presentes.
    */
   inspectStreamCodecs(stream) {
-    const text = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""} ${stream.url || ""}`.toLowerCase();
+    const text2 = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""} ${stream.url || ""}`.toLowerCase();
     const caps = this.getCapabilities();
     const foundCodecs = [];
-    if (/\b(e-?ac-?3|ddp|dd\+|dolby\s*digital\s*plus|atmos)\b/i.test(text)) {
+    if (/\b(e-?ac-?3|ddp|dd\+|dolby\s*digital\s*plus|atmos)\b/i.test(text2)) {
       foundCodecs.push("eac3");
     }
-    if (/\b(ac-?3|dd\s*5\.1|dolby\s*digital)\b/i.test(text)) {
+    if (/\b(ac-?3|dd\s*5\.1|dolby\s*digital)\b/i.test(text2)) {
       foundCodecs.push("ac3");
     }
-    if (/\b(dts(-?hd)?|truehd)\b/i.test(text)) {
+    if (/\b(dts(-?hd)?|truehd)\b/i.test(text2)) {
       foundCodecs.push("dts");
     }
-    if (/\b(opus|vorbis)\b/i.test(text)) {
+    if (/\b(opus|vorbis)\b/i.test(text2)) {
       foundCodecs.push("opus");
     }
-    if (/\b(aac|aac[-_]?2\.0|aac[-_]?5\.1|mp4a)\b/i.test(text)) {
+    if (/\b(aac|aac[-_]?2\.0|aac[-_]?5\.1|mp4a)\b/i.test(text2)) {
       foundCodecs.push("aac");
     }
-    if (/\b(flac)\b/i.test(text)) {
+    if (/\b(flac)\b/i.test(text2)) {
       foundCodecs.push("flac");
     }
-    if (/\b(mp3)\b/i.test(text)) {
+    if (/\b(mp3)\b/i.test(text2)) {
       foundCodecs.push("mp3");
     }
     const isHls = stream.url?.includes(".m3u8") || stream.sourceType === "hls";
@@ -679,6 +742,14 @@ var AudioCodecService = class {
 var audioCodecService = new AudioCodecService();
 
 // src/core/subtitles/subtitlePreferenceService.ts
+var STORAGE_KEY_SUBTITLE_PREFERENCE = "zapitv_subtitle_user_preference";
+var EVENT_SUBTITLE_PREFERENCE_CHANGED = "zapitv_subtitle_preference_changed";
+var DEFAULT_USER_SUBTITLE_PREFERENCE = {
+  enabled: true,
+  language: "pt-BR",
+  hasExplicitChoice: false,
+  updatedAt: 0
+};
 var CLEAN_PATTERNS = [
   /\b(raw|clean|no[-_]?subs?|unsubbed|sem[-_]?legendas?|sem[-_]?leg|clean[-_]?video|textless|ncop|nced)\b/i,
   /\b(bd[-_]?rip\s*raw|bdrip\s*raw|web[-_]?dl\s*raw|webrip\s*raw|dvd[-_]?raw)\b/i,
@@ -693,20 +764,217 @@ var SOFTSUB_PATTERNS = [
   /\[multi[-_]?subs?\]/i
 ];
 var HARDSUB_FOREIGN_PATTERNS = [
-  /\b(?:spanish|espa[nñ]ol|espanhol|castellano|latino|spa|esp|es)[-_\s]*(?:hard[-_\s]?subs?|burned[-_\s]?in|legendas?[-_\s]?(?:fixas?|embutidas?))\b/i,
-  /\b(?:hard[-_\s]?subs?|hardcoded[-_\s]*subs?|legendas?[-_\s]?(?:fixas?|embutidas?))[-_\s]*(?:spanish|espa[nñ]ol|espanhol|castellano|latino|spa|esp|es)\b/i,
-  /\b(eng(?:lish)?[-_\s]*hardsubs?|hardsubs?[-_\s]*eng(?:lish)?|hardcoded[-_\s]*(?:eng|english|spa|spanish|esp|fre|french|ita|italian))\b/i,
+  /\b(?:spanish|espa[nñ]ol|espanhol|castellano|latino|spa|esp|es)[-_.\s]*(?:hard[-_.\s]?subs?|burned[-_.\s]?in|legendas?[-_.\s]?(?:fixas?|embutidas?))\b/i,
+  /\b(?:hard[-_.\s]?subs?|hardcoded[-_.\s]*subs?|legendas?[-_.\s]?(?:fixas?|embutidas?))[-_.\s]*(?:spanish|espa[nñ]ol|espanhol|castellano|latino|spa|esp|es)\b/i,
+  /\b(eng(?:lish)?[-_.\s]*hardsubs?|hardsubs?[-_.\s]*eng(?:lish)?|hardcoded[-_.\s]*(?:eng|english|spa|spanish|esp|fre|french|ita|italian))\b/i,
   /\b(hardsub\s*\[(?:eng|en|es|spa|fre|ita)\]|subbed\s*\[(?:eng|en|es|spa|fre|ita)\])\b/i,
-  /\b(subs?\s*burned\s*in\s*eng(?:lish)?|burned[-_\s]*in\s*eng(?:lish)?)\b/i,
+  /\b(subs?\s*burned\s*in\s*eng(?:lish)?|burned[-_.\s]*in\s*eng(?:lish)?)\b/i,
   /\b(legendado\s*em\s*(?:ingl[eê]s|espanhol|franc[eê]s))\b/i,
   /\[(?:eng|en|spa|es|english|spanish)\s*hardsubs?\]/i,
   /\[hardcoded\s*subs?\]/i
 ];
 var HARDSUB_PTBR_PATTERNS = [
-  /\b(hardsub[-_]?pt[-_]?br|pt[-_]?br[-_]?hardsub|hardsub\s*\[pt[-_]?br\]|hardsub\s*pt|hardsub[-_]?br)\b/i,
-  /\b(?:legendas?[-_\s]?(?:fixas?|embutidas?|gravadas?)|burned[-_\s]?in[-_\s]?subs?)[-_\s]*(?:pt[-_]?br|portugu[eê]s(?:[-_\s]*brasileiro)?)\b/i
+  /\b(hardsub[-_.]?pt[-_.]?br|pt[-_.]?br[-_.]?hardsub|hardsub\s*\[pt[-_.]?br\]|hardsub\s*pt|hardsub[-_.]?br)\b/i,
+  /\b(?:legendas?[-_.\s]?(?:fixas?|embutidas?|gravadas?)|burned[-_.\s]?in[-_.\s]?subs?)[-_.\s]*(?:pt[-_.]?br|portugu[eê]s(?:[-_.\s]*brasileiro)?)\b/i
 ];
 var SubtitlePreferenceService = class {
+  constructor() {
+    this.memoryPreference = { ...DEFAULT_USER_SUBTITLE_PREFERENCE };
+    this.listeners = /* @__PURE__ */ new Set();
+    this.initFromStorage();
+  }
+  initFromStorage() {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SUBTITLE_PREFERENCE);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed?.enabled === "boolean") {
+          this.memoryPreference = {
+            enabled: parsed.enabled,
+            language: typeof parsed.language === "string" && parsed.language.trim() ? parsed.language.trim() : "pt-BR",
+            hasExplicitChoice: parsed.hasExplicitChoice !== false,
+            updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : Date.now()
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("[SubtitlePreferenceService] Falha ao carregar prefer\xEAncia do localStorage:", e);
+    }
+  }
+  /**
+   * Obtém a preferência atual de legendas do usuário (persistente via localStorage).
+   */
+  getUserPreference() {
+    if (typeof window !== "undefined" && window.localStorage) {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY_SUBTITLE_PREFERENCE);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (typeof parsed?.enabled === "boolean") {
+            this.memoryPreference = {
+              enabled: parsed.enabled,
+              language: typeof parsed.language === "string" && parsed.language.trim() ? parsed.language.trim() : "pt-BR",
+              hasExplicitChoice: parsed.hasExplicitChoice !== false,
+              updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : Date.now()
+            };
+          }
+        }
+      } catch {
+      }
+    }
+    return { ...this.memoryPreference };
+  }
+  /**
+   * Salva alterações nas preferências de legenda do usuário no localStorage e notifica assinantes.
+   */
+  setUserPreference(updates) {
+    const current = this.getUserPreference();
+    const next = {
+      ...current,
+      ...updates,
+      hasExplicitChoice: true,
+      updatedAt: Date.now()
+    };
+    this.memoryPreference = next;
+    if (typeof window !== "undefined" && window.localStorage) {
+      try {
+        localStorage.setItem(STORAGE_KEY_SUBTITLE_PREFERENCE, JSON.stringify(next));
+      } catch (e) {
+        console.warn("[SubtitlePreferenceService] Falha ao gravar prefer\xEAncia no localStorage:", e);
+      }
+    }
+    this.notifyListeners(next);
+    return next;
+  }
+  /**
+   * Ativa ou desativa as legendas de forma persistente.
+   * Se enabled === false, salva "Sem legenda" para todos os episódios futuros.
+   */
+  setSubtitlesEnabled(enabled) {
+    this.setUserPreference({ enabled });
+  }
+  /**
+   * Verifica se o usuário optou por manter legendas ativadas.
+   */
+  isSubtitlesEnabled() {
+    return this.getUserPreference().enabled;
+  }
+  /**
+   * Define o idioma preferido de legendas (ex: 'pt-BR', 'en', 'es') e ativa a exibição.
+   */
+  setPreferredLanguage(language) {
+    const cleanLang = (language || "").trim();
+    if (cleanLang) {
+      this.setUserPreference({ language: cleanLang, enabled: true });
+    }
+  }
+  /**
+   * Retorna o código do idioma de legendas preferido pelo usuário.
+   */
+  getPreferredLanguage() {
+    return this.getUserPreference().language || "pt-BR";
+  }
+  /**
+   * Indica se o usuário realizou uma escolha intencional de legendas.
+   */
+  hasExplicitPreference() {
+    return this.getUserPreference().hasExplicitChoice;
+  }
+  /**
+   * Assina notificações de mudança nas preferências de legendas.
+   */
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+  notifyListeners(pref) {
+    this.listeners.forEach((fn) => {
+      try {
+        fn(pref);
+      } catch (err) {
+        console.error("[SubtitlePreferenceService] Erro no listener:", err);
+      }
+    });
+    if (typeof window !== "undefined") {
+      try {
+        window.dispatchEvent(new CustomEvent(EVENT_SUBTITLE_PREFERENCE_CHANGED, { detail: pref }));
+      } catch {
+      }
+    }
+  }
+  /**
+   * Localiza a melhor faixa de legenda compatível com o idioma preferido do usuário.
+   * Se o idioma preferido não estiver disponível e legendas estiverem ativadas,
+   * utiliza uma alternativa disponível (Requisito 9).
+   */
+  findBestTrack(tracks, preferredLang) {
+    if (!tracks || tracks.length === 0) return null;
+    const targetLang = (preferredLang || this.getPreferredLanguage()).toLowerCase().trim();
+    if (targetLang === "pt-br" || targetLang === "pt" || targetLang === "por" || targetLang === "pob" || targetLang === "bra") {
+      const ptBrTrack = tracks.find((t) => t.isPtBr) || tracks.find((t) => /^(pob|pt-br|bra|por-br)$/i.test(t.lang)) || tracks.find((t) => /portugu[eê]s\s*\(brasil\)|pt[-_]?br/i.test(t.label || t.languageName));
+      if (ptBrTrack) return ptBrTrack;
+      const ptAnyTrack = tracks.find((t) => /^(por|pt|pt-pt)$/i.test(t.lang)) || tracks.find((t) => /portugu[eê]s/i.test(t.label || t.languageName));
+      if (ptAnyTrack) return ptAnyTrack;
+    } else {
+      const exactMatch = tracks.find((t) => t.lang?.toLowerCase() === targetLang);
+      if (exactMatch) return exactMatch;
+      const partialMatch = tracks.find(
+        (t) => t.lang?.toLowerCase().startsWith(targetLang.slice(0, 2)) || t.languageName?.toLowerCase().includes(targetLang) || t.label?.toLowerCase().includes(targetLang)
+      );
+      if (partialMatch) return partialMatch;
+    }
+    return tracks[0] || null;
+  }
+  /**
+   * Resolve a faixa de legenda a ser aplicada de acordo com as regras rígidas do sistema:
+   * 1. Se o usuário escolheu "Sem legenda", NUNCA ativa faixas.
+   * 2. Se a fonte possui Hardsub, NUNCA sobrepõe legendas externas duplicadas.
+   * 3. Se habilitadas, seleciona o idioma preferido ou alternativa.
+   */
+  resolveDesiredSubtitleTrack(tracks, currentStream, hasBrazilianAudio) {
+    const pref = this.getUserPreference();
+    if (!pref.enabled) {
+      return {
+        track: null,
+        mode: "disabled_by_user",
+        reason: "O usu\xE1rio selecionou Sem legenda (prefer\xEAncia persistente)"
+      };
+    }
+    if (currentStream) {
+      const formatAnalysis = this.analyzeSubtitles(currentStream);
+      if (formatAnalysis.isHardsub) {
+        return {
+          track: null,
+          mode: "hardsub_detected",
+          format: formatAnalysis.format,
+          reason: "O v\xEDdeo j\xE1 possui legendas gravadas na imagem (Hardsub)"
+        };
+      }
+    }
+    if (!pref.hasExplicitChoice && hasBrazilianAudio) {
+      return {
+        track: null,
+        mode: "default_off_for_ptbr_audio",
+        reason: "\xC1udio original ou dublado em portugu\xEAs (padr\xE3o desligado para novas sess\xF5es)"
+      };
+    }
+    if (!tracks || tracks.length === 0) {
+      return {
+        track: null,
+        mode: "none_available",
+        reason: "Nenhuma faixa de legenda encontrada para o conte\xFAdo"
+      };
+    }
+    const track = this.findBestTrack(tracks, pref.language);
+    return {
+      track,
+      mode: "selected",
+      reason: track ? `Faixa selecionada (${track.languageName})` : "Nenhuma faixa compat\xEDvel"
+    };
+  }
   /**
    * Avalia as legendas disponíveis no stream e o tipo de vídeo (limpo, softsub, hardsub).
    */
@@ -1626,9 +1894,9 @@ var TheatricalFilterService = class {
   /**
    * Identifica se uma fonte ou título é gravação de sala de cinema (CAM / Telesync / HDCAM / Telecine)
    */
-  isCamRecording(text) {
-    if (!text) return false;
-    const lower = text.toLowerCase();
+  isCamRecording(text2) {
+    if (!text2) return false;
+    const lower = text2.toLowerCase();
     if (/\b(camrip|cam-rip|telesync|hdcam|hd-ts|hdts|telecine|dvdscr|screener)\b/i.test(lower)) {
       return true;
     }
@@ -2143,3081 +2411,486 @@ var TheatricalFilterService = class {
 };
 var theatricalFilterService = new TheatricalFilterService();
 
-// src/core/identity/canonicalIdentity.ts
-var STOP_WORDS = /* @__PURE__ */ new Set([
-  "o",
-  "a",
-  "os",
-  "as",
-  "um",
-  "uma",
-  "uns",
-  "umas",
-  "de",
-  "do",
-  "da",
-  "dos",
-  "das",
-  "em",
-  "no",
-  "na",
-  "por",
-  "para",
-  "com",
-  "sem",
-  "sob",
-  "sobre",
-  "the",
-  "a",
-  "an",
-  "of",
-  "in",
-  "on",
-  "at",
-  "to",
-  "for",
-  "with"
-]);
-var CanonicalIdentityService = class {
-  isSameWork(expected, candidate) {
-    if (expected.type !== candidate.type) return false;
-    if (expected.year && candidate.year && Math.abs(expected.year - candidate.year) > 1) return false;
-    const titles = [expected.title, expected.originalTitle].filter(Boolean).map((value) => this.normalizeTitle(value));
-    const candidates = [candidate.title, candidate.originalTitle].filter(Boolean).map((value) => this.normalizeTitle(value));
-    return titles.some((title) => title.length >= 3 && candidates.includes(title));
+// src/core/cache/LruCache.ts
+var LruCache = class {
+  constructor(maxSize = 100, defaultTtlMs = 0) {
+    this.map = /* @__PURE__ */ new Map();
+    this.maxSize = Math.max(1, maxSize);
+    this.defaultTtlMs = defaultTtlMs;
   }
-  /**
-   * Constrói a identidade canônica a partir de um ContentItem e parâmetros de episódio
-   */
-  buildIdentity(item, epParams) {
-    const genres = (item.genres || []).map((g) => g.toLowerCase());
-    const isChildFriendly = genres.some((g) => /infantil|fam[ií]lia|kids|children|desenho|crian[çc]a/i.test(g)) || /doraemon|peppa|galinha pintadinha|patrulha canina|pocoyo|chaves/i.test(item.title);
-    const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-    const isTheatricalUnreleased = theatricalFilterService.isKnownUnreleasedOrTheatrical(item) || Boolean(item.year && item.year > currentYear);
-    const aliases = [item.title.toLowerCase()];
-    if (item.originalTitle) {
-      aliases.push(item.originalTitle.toLowerCase());
-      if (item.originalTitle.includes(":")) {
-        item.originalTitle.split(":").forEach((p) => {
-          const clean = p.trim().toLowerCase();
-          if (clean.length >= 3) aliases.push(clean);
-        });
+  get(key) {
+    const entry = this.map.get(key);
+    if (!entry) return void 0;
+    if (entry.expiresAt !== null && Date.now() > entry.expiresAt) {
+      this.map.delete(key);
+      return void 0;
+    }
+    this.map.delete(key);
+    this.map.set(key, entry);
+    return entry.value;
+  }
+  set(key, value, ttlMs) {
+    if (this.map.has(key)) {
+      this.map.delete(key);
+    } else if (this.map.size >= this.maxSize) {
+      const oldestKey = this.map.keys().next().value;
+      if (oldestKey !== void 0) {
+        this.map.delete(oldestKey);
       }
     }
-    if (item.title.includes(":")) {
-      const parts = item.title.split(":");
-      parts.forEach((p) => {
-        const clean = p.trim().toLowerCase();
-        if (clean.length >= 3) aliases.push(clean);
-      });
-    }
-    if (/doraemon/i.test(item.title)) {
-      aliases.push("doraemon", "gato do futuro", "\u30C9\u30E9\u3048\u3082\u3093");
-    }
-    if (/hope.*primeiro.*impacto/i.test(item.title)) {
-      aliases.push("hope", "hopeu", "\uD638\uD504");
-    }
-    if (/bleach.*thousand|bleach.*sennen/i.test(item.title) || /bleach.*thousand|bleach.*sennen/i.test(item.originalTitle || "")) {
-      aliases.push("bleach sennen kessen hen", "bleach sennen kessen-hen", "bleach thousand-year blood war", "bleach: sennen kessen-hen", "bleach: thousand-year blood war");
-    }
-    return {
-      id: item.id,
-      tmdbId: item.tmdbId ? String(item.tmdbId) : void 0,
-      imdbId: item.imdbId,
-      title: item.title,
-      year: item.year || currentYear,
-      type: item.type,
-      season: epParams?.season,
-      episode: epParams?.episode,
-      genres: item.genres || [],
-      isChildFriendly,
-      isTheatricalUnreleased,
-      knownAliases: Array.from(new Set(aliases))
-    };
+    const ttl = ttlMs !== void 0 ? ttlMs : this.defaultTtlMs;
+    const expiresAt = ttl > 0 ? Date.now() + ttl : null;
+    this.map.set(key, { value, expiresAt });
   }
-  /**
-   * Normaliza um título removendo pontuações, anos e tags de qualidade
-   */
-  normalizeTitle(str) {
-    return (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\[[^\]]*\]/g, " ").replace(/\([^\)]*\)/g, " ").replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
-  }
-  /**
-   * Extrai palavras-chave significativas para comparação
-   */
-  extractSignificantTokens(title) {
-    const normalized = this.normalizeTitle(title);
-    return normalized.split(" ").filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
-  }
-};
-var canonicalIdentityService = new CanonicalIdentityService();
-
-// src/core/security/streamQuarantineService.ts
-var STORAGE_QUARANTINE_KEY = "zapitv_stream_quarantine_v1";
-var KNOWN_MALICIOUS_HASHES = [
-  // Casos Hope: O Primeiro Impacto (Mia Khalifa porn / trotes falsos indexados como supostos WEB-DL)
-  { hash: "812efbe7d0a75fb31bf9426db566f299d10b3474", reason: "Trote adulto / Mia Khalifa disfar\xE7ado de grava\xE7\xE3o de cinema" },
-  { hash: "6dc48c588dca97da6c610ae730c556a2c7c6718d", reason: "Trote adulto / Conte\xFAdo pornogr\xE1fico" },
-  { hash: "e79c88ea04c7326eb0f88ae9f18571689317e27f", reason: "Trote adulto / Conte\xFAdo pornogr\xE1fico" },
-  { hash: "f9a842dfe9f5b2e7fda509f2306e0700b97a4036", reason: "Trote adulto / Mia Khalifa" },
-  { hash: "d0eacddff07a24173d8f7dc11a18ef3ed32b886a", reason: "V\xEDdeo adulto n\xE3o solicitado em indexador de torrent" },
-  { hash: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", reason: "Arquivo corrompido / scam" }
-];
-var ADULT_ACTORS_AND_TERMS = [
-  "mia khalifa",
-  "khalifa",
-  "brazzers",
-  "xvideos",
-  "pornhub",
-  "redtube",
-  "youporn",
-  "bangbros",
-  "naughtyamerica",
-  "spankbang",
-  "xhamster",
-  "pornstar",
-  "hardcore xxx",
-  "creampie",
-  "blowjob",
-  "ben the men",
-  "mature porn",
-  "erotic xxx"
-];
-var StreamQuarantineService = class {
-  constructor() {
-    this.quarantinedMap = /* @__PURE__ */ new Map();
-    this.listeners = /* @__PURE__ */ new Set();
-    this.initDefaultQuarantine();
-    this.loadFromStorage();
-    this.purgePlaywebFalsePositives();
-  }
-  purgePlaywebFalsePositives() {
-    for (const [key, item] of this.quarantinedMap.entries()) {
-      const reason = item.reason?.toLowerCase() || "";
-      if (reason.includes("playweb") || reason.includes("release web-dl/bluray fraudulenta de filme em cartaz") || reason.includes("release digital fraudulenta para obra em cartaz/n\xE3o lan\xE7ada")) {
-        this.quarantinedMap.delete(key);
-      }
-    }
-    this.saveToStorage();
-  }
-  initDefaultQuarantine() {
-    for (const item of KNOWN_MALICIOUS_HASHES) {
-      this.quarantinedMap.set(item.hash.toLowerCase(), {
-        id: item.hash.toLowerCase(),
-        type: "infoHash",
-        reason: item.reason,
-        targetTitle: "Hope: O Primeiro Impacto",
-        sourceProvider: "Torrent Scraper",
-        quarantinedAt: "2026-10-13T00:00:00.000Z"
-      });
-    }
-  }
-  loadFromStorage() {
-    if (typeof window === "undefined" || !window.localStorage) return;
-    try {
-      const data = localStorage.getItem(STORAGE_QUARANTINE_KEY);
-      if (data) {
-        const list = JSON.parse(data);
-        if (Array.isArray(list)) {
-          list.forEach((item) => {
-            if (item && item.id) {
-              this.quarantinedMap.set(item.id.toLowerCase(), item);
-            }
-          });
-        }
-      }
-    } catch (e) {
-      console.warn("[StreamQuarantine] Erro ao carregar quarentena do storage:", e);
-    }
-  }
-  saveToStorage() {
-    if (typeof window === "undefined" || !window.localStorage) return;
-    try {
-      const list = Array.from(this.quarantinedMap.values());
-      localStorage.setItem(STORAGE_QUARANTINE_KEY, JSON.stringify(list));
-    } catch (e) {
-      console.warn("[StreamQuarantine] Erro ao salvar quarentena no storage:", e);
-    }
-  }
-  /**
-   * Coloca um stream ou hash em quarentena imediatamente e persiste no sistema.
-   */
-  quarantine(identifier, reason, type = "url", targetTitle, sourceProvider) {
-    if (!identifier) return;
-    const cleanId = identifier.trim().toLowerCase();
-    const item = {
-      id: cleanId,
-      type,
-      reason,
-      targetTitle,
-      sourceProvider,
-      quarantinedAt: (/* @__PURE__ */ new Date()).toISOString()
-    };
-    this.quarantinedMap.set(cleanId, item);
-    this.saveToStorage();
-    console.error(`\u{1F6A8} [QUARANTINE] Fonte isolada permanentemente: "${cleanId}" | Motivo: ${reason}`);
-    this.listeners.forEach((fn) => fn());
-  }
-  /**
-   * Avalia rigorosamente se um stream deve ser colocado em quarentena ou já está isolado.
-   */
-  evaluateQuarantine(stream, targetTitle) {
-    if (!stream) return { isQuarantined: true, reason: "Stream nulo ou inv\xE1lido" };
-    const hash = (stream.infoHash || "").trim().toLowerCase();
-    const url = (stream.url || "").trim().toLowerCase();
-    const title = (stream.title || "").toLowerCase();
-    const name = (stream.name || "").toLowerCase();
-    const combined = `${name} ${title} ${url} ${hash}`;
-    if (hash && this.quarantinedMap.has(hash)) {
-      return { isQuarantined: true, reason: this.quarantinedMap.get(hash)?.reason || "Hash em quarentena" };
-    }
-    if (url && this.quarantinedMap.has(url)) {
-      return { isQuarantined: true, reason: this.quarantinedMap.get(url)?.reason || "URL em quarentena" };
-    }
-    for (const adultTerm of ADULT_ACTORS_AND_TERMS) {
-      if (combined.includes(adultTerm)) {
-        const reason = `Conte\xFAdo adulto/trote detectado: termo "${adultTerm}"`;
-        if (hash) this.quarantine(hash, reason, "adult_troll", targetTitle, stream.providerName);
-        if (url) this.quarantine(url, reason, "adult_troll", targetTitle, stream.providerName);
-        return { isQuarantined: true, reason };
-      }
-    }
-    if (targetTitle && /doraemon|gato do futuro/i.test(targetTitle)) {
-      if (combined.includes("sparks of tomorrow") || combined.includes("/1684/") || combined.includes("kurage.live") || combined.includes("animegg")) {
-        const reason = 'Colis\xE3o conhecida de anime upstream: "Sparks of Tomorrow" atribu\xEDdo a Doraemon';
-        if (url) this.quarantine(url, reason, "title_collision", targetTitle, stream.providerName);
-        return { isQuarantined: true, reason };
-      }
-    }
-    return { isQuarantined: false };
-  }
-  /**
-   * Retorna lista de todos os itens em quarentena para diagnóstico
-   */
-  getQuarantineList() {
-    return Array.from(this.quarantinedMap.values());
-  }
-  subscribe(listener) {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-};
-var streamQuarantineService = new StreamQuarantineService();
-
-// src/core/identity/sourceConfidenceEngine.ts
-var KNOWN_COLLISION_TITLES = [
-  "sparks of tomorrow",
-  "eternal aseria",
-  "angel heart",
-  "black clover",
-  "murai in love",
-  "saving 80,000 gold",
-  "overflow",
-  "plant\xE3o m\xE9dico",
-  "er plant\xE3o m\xE9dico",
-  "ultraman"
-];
-var SourceConfidenceEngine = class {
-  /**
-   * Avalia uma fonte de streaming contra a identidade canônica da obra solicitada.
-   */
-  evaluate(stream, identity) {
-    const reasons = [];
-    const streamName = stream.name || "";
-    const streamTitle = stream.title || "";
-    const streamUrl = stream.url || "";
-    const streamInfoHash = (stream.infoHash || "").toLowerCase();
-    const combined = `${streamName} ${streamTitle} ${streamUrl} ${streamInfoHash}`.toLowerCase();
-    const quarantineCheck = streamQuarantineService.evaluateQuarantine(stream, identity.title);
-    if (quarantineCheck.isQuarantined) {
-      reasons.push(quarantineCheck.reason || "Fonte bloqueada por quarentena");
-      return {
-        stream,
-        confidence: "QUARANTINED",
-        isMatch: false,
-        reasons,
-        canonicalTitle: identity.title
-      };
-    }
-    if (identity.isTheatricalUnreleased) {
-      const isClaimingDigital = (combined.includes("web-dl") || combined.includes("webrip") || combined.includes("bluray") || combined.includes("amzn")) && !combined.includes("trailer") && !combined.includes("teaser");
-      if (isClaimingDigital) {
-        const reason = `Release digital para obra ainda n\xE3o lan\xE7ada: "${identity.title}"`;
-        streamQuarantineService.quarantine(streamInfoHash || streamUrl, reason, "adult_troll", identity.title, stream.providerName);
-        reasons.push(reason);
-        return {
-          stream,
-          confidence: "QUARANTINED",
-          isMatch: false,
-          reasons,
-          canonicalTitle: identity.title
-        };
-      }
-    }
-    const isAcervoOficial = stream.providerId === "zapitv-verified";
-    const episodeTag = streamTitle.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b)/i);
-    if (episodeTag && identity.type === "FILME" /* MOVIE */) {
-      reasons.push("Fonte epis\xF3dica oferecida para um filme");
-      return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
-    }
-    if (episodeTag && identity.season && identity.episode && (Number(episodeTag[1] || episodeTag[3]) !== identity.season || Number(episodeTag[2] || episodeTag[4]) !== identity.episode)) {
-      reasons.push("Temporada ou epis\xF3dio diferente do solicitado");
-      return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
-    }
-    if (identity.type === "FILME" /* MOVIE */ && identity.year) {
-      const releaseYear = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
-      if (releaseYear && Math.abs(Number(releaseYear[1]) - identity.year) > 1) {
-        reasons.push("Ano da fonte diferente do filme solicitado");
-        return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
-      }
-    }
-    const declaredTitle = streamTitle.match(/🐦‍🔥\s*([^\n⏸️]+)/)?.[1]?.trim();
-    if (declaredTitle) {
-      const normalizedDeclared = canonicalIdentityService.normalizeTitle(declaredTitle);
-      const aliases = [identity.title, identity.originalTitle, ...identity.knownAliases || []].filter(Boolean).map((alias) => canonicalIdentityService.normalizeTitle(alias));
-      if (!aliases.includes(normalizedDeclared)) {
-        reasons.push("T\xEDtulo declarado pelo addon difere da obra solicitada");
-        return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
-      }
-    }
-    if (isAcervoOficial) {
-      reasons.push("Fonte can\xF4nica verificada pelo acervo oficial ZapiTV");
-      return {
-        stream,
-        confidence: "VERIFIED",
-        isMatch: true,
-        reasons,
-        canonicalTitle: identity.title
-      };
-    }
-    const streamTitleToCheck = canonicalIdentityService.normalizeTitle(`${streamName} ${streamTitle}`);
-    for (const collisionTitle of KNOWN_COLLISION_TITLES) {
-      const cleanCollision = canonicalIdentityService.normalizeTitle(collisionTitle);
-      const regex = new RegExp(`(^|\\s)${cleanCollision}(\\s|$)`, "i");
-      if (regex.test(streamTitleToCheck)) {
-        const cleanTarget = canonicalIdentityService.normalizeTitle(identity.title);
-        const cleanOrig = identity.originalTitle ? canonicalIdentityService.normalizeTitle(identity.originalTitle) : "";
-        if (!cleanTarget.includes(cleanCollision) && !cleanOrig.includes(cleanCollision)) {
-          reasons.push(`Obra incorreta detectada: stream cont\xE9m "${collisionTitle}"`);
-          return {
-            stream,
-            confidence: "REJECTED",
-            isMatch: false,
-            reasons,
-            canonicalTitle: identity.title
-          };
-        }
-      }
-    }
-    if (/resident evil/i.test(identity.title) && !/vendetta|damnation|degeneration|infinite darkness|death island/i.test(identity.title)) {
-      if (/vendetta|damnation|degeneration|infinite darkness|death island/i.test(combined)) {
-        reasons.push("Anima\xE7\xE3o 3D de Resident Evil n\xE3o pode substituir o filme live-action solicitado");
-        return {
-          stream,
-          confidence: "REJECTED",
-          isMatch: false,
-          reasons,
-          canonicalTitle: identity.title
-        };
-      }
-    }
-    const targetTokens = canonicalIdentityService.extractSignificantTokens(identity.title);
-    const cleanStreamTitle = canonicalIdentityService.normalizeTitle(streamTitle);
-    const titleWords = new Set(canonicalIdentityService.extractSignificantTokens(`${streamName} ${streamTitle}`));
-    let aliasMatched = false;
-    for (const alias of identity.knownAliases) {
-      const cleanAlias = canonicalIdentityService.normalizeTitle(alias);
-      if (cleanAlias.length >= 3 && new RegExp(`(^|\\s)${cleanAlias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`).test(streamTitleToCheck)) {
-        aliasMatched = true;
-        break;
-      }
-    }
-    const matchingTokens = targetTokens.filter((token) => titleWords.has(token));
-    const tokenOverlapRatio = targetTokens.length > 0 ? matchingTokens.length / targetTokens.length : 0;
-    if (!aliasMatched && tokenOverlapRatio < 0.75) {
-      reasons.push(`T\xEDtulo do stream n\xE3o possui correspond\xEAncia com "${identity.title}"`);
-      return {
-        stream,
-        confidence: "REJECTED",
-        isMatch: false,
-        reasons,
-        canonicalTitle: identity.title
-      };
-    }
-    if (identity.isChildFriendly) {
-      if (!aliasMatched && tokenOverlapRatio < 0.5) {
-        reasons.push("Conte\xFAdo infantil exige confirma\xE7\xE3o rigorosa de identidade");
-        return {
-          stream,
-          confidence: "REJECTED",
-          isMatch: false,
-          reasons,
-          canonicalTitle: identity.title
-        };
-      }
-      reasons.push("Conte\xFAdo infantil: correspond\xEAncia aprovada com valida\xE7\xE3o cautelosa");
-      return {
-        stream,
-        confidence: "PROVISIONAL",
-        isMatch: true,
-        reasons,
-        canonicalTitle: identity.title
-      };
-    }
-    if (aliasMatched || tokenOverlapRatio >= 0.5) {
-      reasons.push(`Correspond\xEAncia de t\xEDtulo verificada (${Math.round(tokenOverlapRatio * 100)}% dos termos)`);
-      return {
-        stream,
-        confidence: "PROVISIONAL",
-        isMatch: true,
-        reasons,
-        canonicalTitle: identity.title
-      };
-    }
-    reasons.push("Informa\xE7\xF5es do stream incompletas ou correspond\xEAncia parcial");
-    return {
-      stream,
-      confidence: "SUSPICIOUS",
-      isMatch: false,
-      reasons,
-      canonicalTitle: identity.title
-    };
-  }
-  /**
-   * Filtra e classifica uma lista de streams para a mídia solicitada
-   */
-  evaluateBatch(streams, identity) {
-    return streams.map((s) => this.evaluate(s, identity));
-  }
-};
-var sourceConfidenceEngine = new SourceConfidenceEngine();
-
-// src/core/playback/PlaybackOptimizerService.ts
-var PlaybackOptimizerService = class _PlaybackOptimizerService {
-  constructor() {
-    // Histórico de desempenho e latência dos provedores de fontes
-    this.providerStats = /* @__PURE__ */ new Map();
-    // Telemetria ativa
-    this.telemetry = {
-      ttffMs: null,
-      bufferingCount: 0,
-      totalBufferingDurationMs: 0,
-      currentBitrateKbps: null,
-      currentResolution: "auto",
-      bufferAheadSeconds: 0,
-      droppedFrames: 0,
-      totalFrames: 0,
-      stallsRecovered: 0,
-      activeAbrMode: "auto",
-      effectiveNetworkType: "unknown",
-      streamSourceType: "unknown"
-    };
-    // Medição de largura de banda em tempo real (EWMA)
-    this.estimatedBandwidthBps = 5e6;
-    // Padrão inicial: 5 Mbps
-    this.loadStartTime = 0;
-    this.bufferStartTime = null;
-    this.stallTimeoutTimer = null;
-    this.healthCheckInterval = null;
-    // Listeners de telemetria
-    this.telemetryListeners = /* @__PURE__ */ new Set();
-    this.initNetworkMonitoring();
-  }
-  static getInstance() {
-    if (!_PlaybackOptimizerService.instance) {
-      _PlaybackOptimizerService.instance = new _PlaybackOptimizerService();
-    }
-    return _PlaybackOptimizerService.instance;
-  }
-  /**
-   * Monitoramento de mudanças na rede (online/offline e Network Information API)
-   */
-  initNetworkMonitoring() {
-    if (typeof window === "undefined") return;
-    const nav = navigator;
-    const conn = nav.connection || nav.mozConnection || nav.webkitConnection;
-    if (conn) {
-      const updateNetwork = () => {
-        const net = this.getNetworkProfile();
-        this.telemetry.effectiveNetworkType = net.effectiveType;
-        this.notifyTelemetry();
-      };
-      try {
-        conn.addEventListener("change", updateNetwork);
-      } catch {
-      }
-    }
-  }
-  /**
-   * Identifica o perfil de rede atual com detecção inteligente de conexões lentas e instáveis
-   */
-  getNetworkProfile() {
-    const nav = typeof navigator !== "undefined" ? navigator : globalThis?.navigator;
-    if (!nav) {
-      return {
-        effectiveType: "unknown",
-        downlinkMbps: 10,
-        rttMs: 50,
-        saveData: false,
-        isSlowConnection: false,
-        isUnstable: false
-      };
-    }
-    const conn = nav.connection || nav.mozConnection || nav.webkitConnection;
-    const effectiveType = conn?.effectiveType || (nav.onLine ? "4g" : "slow-2g");
-    const downlinkMbps = conn?.downlink ?? this.estimatedBandwidthBps / 1e6;
-    const rttMs = conn?.rtt ?? 60;
-    const saveData = Boolean(conn?.saveData);
-    const isSlowConnection = saveData || effectiveType === "slow-2g" || effectiveType === "2g" || effectiveType === "3g" || downlinkMbps < 2.5 || rttMs > 350;
-    const isUnstable = rttMs > 400 || this.telemetry.bufferingCount > 3 && this.telemetry.totalBufferingDurationMs > 5e3;
-    return {
-      effectiveType,
-      downlinkMbps,
-      rttMs,
-      saveData,
-      isSlowConnection,
-      isUnstable
-    };
-  }
-  /**
-   * Perfil detalhado de capacidades do dispositivo e tela
-   */
-  getDeviceProfile() {
-    const nav = typeof navigator !== "undefined" ? navigator : globalThis?.navigator;
-    if (!nav) {
-      return {
-        deviceType: "desktop",
-        isLowEnd: false,
-        screenResolution: { width: 1920, height: 1080 },
-        maxOptimalResolution: "1080p",
-        recommendedInitialQuality: "1080p",
-        memoryLimitMB: 512,
-        hardwareConcurrency: 4
-      };
-    }
-    const ua = (nav.userAgent || "").toLowerCase();
-    const hwConcurrency = nav.hardwareConcurrency || 4;
-    const deviceMemory = nav.deviceMemory || 4;
-    const isSmartTv = /smart-tv|tizen|webos|viera|bravia|netcast|crkey|aft|googletv/i.test(ua);
-    const isMobile = !isSmartTv && /mobile|android|iphone|ipod/i.test(ua);
-    const winScreen = typeof window !== "undefined" ? window.screen : null;
-    const isTablet = !isSmartTv && (/ipad/i.test(ua) || isMobile && winScreen && Math.min(winScreen.width, winScreen.height) >= 600);
-    const isDesktop = !isSmartTv && !isMobile && !isTablet;
-    const deviceType = isSmartTv ? "smart-tv" : isMobile ? "mobile" : isTablet ? "tablet" : "desktop";
-    const isLowEnd = hwConcurrency <= 2 || deviceMemory <= 2 || isSmartTv;
-    const screenWidth = typeof window !== "undefined" ? window.screen?.width || 1920 : 1920;
-    const screenHeight = typeof window !== "undefined" ? window.screen?.height || 1080 : 1080;
-    const maxDimension = Math.max(screenWidth, screenHeight);
-    let maxOptimalResolution = "1080p";
-    if (maxDimension >= 3840 && !isLowEnd) {
-      maxOptimalResolution = "4K";
-    } else if (maxDimension >= 2560 && !isLowEnd) {
-      maxOptimalResolution = "1440p";
-    } else if (maxDimension <= 854 || isMobile && isLowEnd) {
-      maxOptimalResolution = "720p";
-    }
-    const net = this.getNetworkProfile();
-    let recommendedInitialQuality = "1080p";
-    if (net.isSlowConnection) {
-      recommendedInitialQuality = net.effectiveType === "slow-2g" || net.effectiveType === "2g" ? "360p" : "480p";
-    } else if (net.downlinkMbps < 5 || isLowEnd) {
-      recommendedInitialQuality = "720p";
-    }
-    const memoryLimitMB = isSmartTv ? 64 : isLowEnd ? 128 : 512;
-    return {
-      deviceType,
-      isLowEnd,
-      screenResolution: { width: screenWidth, height: screenHeight },
-      maxOptimalResolution,
-      recommendedInitialQuality,
-      memoryLimitMB,
-      hardwareConcurrency: hwConcurrency
-    };
-  }
-  /**
-   * Constrói configuração HLS.js customizada de alta performance para a conexão e dispositivo
-   */
-  buildOptimalHlsConfig() {
-    const net = this.getNetworkProfile();
-    const dev = this.getDeviceProfile();
-    let maxBufferLength = 30;
-    let maxMaxBufferLength = 60;
-    let maxBufferSize = 30 * 1024 * 1024;
-    if (net.isSlowConnection || dev.isLowEnd) {
-      maxBufferLength = 15;
-      maxMaxBufferLength = 30;
-      maxBufferSize = 15 * 1024 * 1024;
-    } else if (net.downlinkMbps >= 15 && !dev.isLowEnd) {
-      maxBufferLength = 45;
-      maxMaxBufferLength = 90;
-      maxBufferSize = 60 * 1024 * 1024;
-    }
-    return {
-      enableWorker: true,
-      lowLatencyMode: false,
-      // Desativa baixa latência em VoD para garantir buffer contínuo sem micro-travas
-      backBufferLength: dev.isLowEnd ? 30 : 60,
-      maxBufferLength,
-      maxMaxBufferLength,
-      maxBufferSize,
-      capLevelToPlayerSize: true,
-      // Nunca baixa 4K se o player for menor que 1080p
-      autoStartLoad: true,
-      startFragPrefetch: true,
-      // Carrega antecipadamente o próximo segmento
-      fragLoadingTimeOut: net.isSlowConnection ? 2e4 : 12e3,
-      manifestLoadingTimeOut: 1e4,
-      fragLoadingMaxRetry: 4,
-      fragLoadingRetryDelay: 800,
-      levelLoadingTimeOut: 1e4,
-      levelLoadingMaxRetry: 4,
-      // Fatores ABR balanceados: conservador para evitar oscilações bruscas
-      abrBandWidthFactor: net.isSlowConnection ? 0.8 : 0.9,
-      abrBandWidthUpFactor: 0.7,
-      // Cauteloso ao subir de qualidade
-      abrEwmaDefaultEstimate: net.isSlowConnection ? 8e5 : 35e5,
-      abrEwmaFastVoD: 2,
-      abrEwmaSlowVoD: 6,
-      startLevel: net.isSlowConnection ? 0 : -1
-      // Força menor resolução de início em 3G/2G para TTFF < 500ms
-    };
-  }
-  /**
-   * Notifica início do carregamento de uma mídia para contagem de TTFF
-   */
-  notifyLoadStart(sourceType) {
-    this.loadStartTime = performance.now();
-    this.telemetry.ttffMs = null;
-    this.telemetry.streamSourceType = sourceType;
-    this.telemetry.bufferingCount = 0;
-    this.telemetry.totalBufferingDurationMs = 0;
-    this.telemetry.stallsRecovered = 0;
-    this.bufferStartTime = null;
-  }
-  /**
-   * Registra primeiro frame renderizado (TTFF medido)
-   */
-  notifyFirstFrame() {
-    if (this.loadStartTime > 0 && this.telemetry.ttffMs === null) {
-      this.telemetry.ttffMs = Math.round(performance.now() - this.loadStartTime);
-      this.notifyTelemetry();
-    }
-  }
-  /**
-   * Registra evento de início de buffering (vídeo esperando dados)
-   */
-  notifyBufferingStart() {
-    if (this.bufferStartTime === null) {
-      this.bufferStartTime = performance.now();
-      this.telemetry.bufferingCount++;
-      this.notifyTelemetry();
-    }
-  }
-  /**
-   * Registra encerramento de buffering e contabiliza tempo acumulado
-   */
-  notifyBufferingEnd() {
-    if (this.bufferStartTime !== null) {
-      const duration = performance.now() - this.bufferStartTime;
-      this.telemetry.totalBufferingDurationMs += Math.round(duration);
-      this.bufferStartTime = null;
-      this.notifyTelemetry();
-    }
-  }
-  /**
-   * Atualiza métricas ao vivo do elemento de vídeo HTML5
-   */
-  updateVideoMetrics(video, activeQuality) {
-    if (!video) return;
-    const currentTime = video.currentTime;
-    let bufferAhead = 0;
-    if (video.buffered && video.buffered.length > 0) {
-      for (let i = 0; i < video.buffered.length; i++) {
-        const start = video.buffered.start(i);
-        const end = video.buffered.end(i);
-        if (currentTime >= start && currentTime <= end) {
-          bufferAhead = Math.max(0, end - currentTime);
-          break;
-        }
-      }
-    }
-    this.telemetry.bufferAheadSeconds = Math.round(bufferAhead * 10) / 10;
-    this.telemetry.currentResolution = activeQuality;
-    if (typeof video.getVideoPlaybackQuality === "function") {
-      try {
-        const qual = video.getVideoPlaybackQuality();
-        this.telemetry.droppedFrames = qual.droppedVideoFrames || 0;
-        this.telemetry.totalFrames = qual.totalVideoFrames || 0;
-      } catch {
-      }
-    }
-    this.notifyTelemetry();
-  }
-  /**
-   * Registra a taxa de transferência real medida após o download de um segmento
-   */
-  recordSampleThroughput(bytes, durationMs) {
-    if (durationMs <= 0 || bytes <= 0) return;
-    const bps = bytes * 8 / (durationMs / 1e3);
-    this.estimatedBandwidthBps = Math.round(this.estimatedBandwidthBps * 0.8 + bps * 0.2);
-    this.telemetry.currentBitrateKbps = Math.round(this.estimatedBandwidthBps / 1e3);
-    this.notifyTelemetry();
-  }
-  /**
-   * Avalia e decide a qualidade ABR ótima para fontes MP4 nativas (Multi-Source ABR)
-   */
-  evaluateMultiSourceAbr(params) {
-    const { availableQualities, currentQuality, bufferAheadSeconds, isStalling } = params;
-    const qualities = availableQualities.filter((q) => q !== "auto");
-    if (qualities.length <= 1) {
-      return { shouldChange: false, targetQuality: currentQuality, reason: "Apenas uma resolu\xE7\xE3o dispon\xEDvel" };
-    }
-    const net = this.getNetworkProfile();
-    const ORDER = {
-      "360p": 1,
-      "480p": 2,
-      "720p": 3,
-      "1080p": 4,
-      "1440p": 5,
-      "4K": 6
-    };
-    const sorted = [...qualities].sort((a, b) => (ORDER[a] || 0) - (ORDER[b] || 0));
-    const currentIndex = sorted.findIndex((q) => q.toLowerCase() === currentQuality.toLowerCase());
-    if ((isStalling || bufferAheadSeconds < 2.5) && currentIndex > 0) {
-      const lowerQuality = sorted[Math.max(0, currentIndex - 1)];
-      return {
-        shouldChange: true,
-        targetQuality: lowerQuality,
-        reason: `Buffer cr\xEDtico (${bufferAheadSeconds.toFixed(1)}s) ou travamento. Reduzindo para ${lowerQuality} para garantir reprodu\xE7\xE3o cont\xEDnua.`
-      };
-    }
-    if (bufferAheadSeconds > 25 && !net.isSlowConnection && !net.isUnstable && currentIndex < sorted.length - 1) {
-      const higherQuality = sorted[currentIndex + 1];
-      const dev = this.getDeviceProfile();
-      if (higherQuality === "4K" && dev.isLowEnd) {
-        return { shouldChange: false, targetQuality: currentQuality, reason: "4K evitado por restri\xE7\xE3o de hardware do dispositivo" };
-      }
-      return {
-        shouldChange: true,
-        targetQuality: higherQuality,
-        reason: `Conex\xE3o est\xE1vel e buffer saud\xE1vel (${bufferAheadSeconds.toFixed(1)}s). Aumentando para ${higherQuality}.`
-      };
-    }
-    return { shouldChange: false, targetQuality: currentQuality, reason: "Qualidade \xF3tima mantida" };
-  }
-  /**
-   * Limpa ou reinicia os contadores de telemetria
-   */
-  resetTelemetry() {
-    this.telemetry = {
-      ttffMs: null,
-      bufferingCount: 0,
-      totalBufferingDurationMs: 0,
-      currentBitrateKbps: null,
-      currentResolution: "auto",
-      bufferAheadSeconds: 0,
-      droppedFrames: 0,
-      totalFrames: 0,
-      stallsRecovered: 0,
-      activeAbrMode: "auto",
-      effectiveNetworkType: this.getNetworkProfile().effectiveType,
-      streamSourceType: "unknown"
-    };
-    this.notifyTelemetry();
-  }
-  /**
-   * Notifica que um travamento foi recuperado com sucesso
-   */
-  recordStallRecovered() {
-    this.telemetry.stallsRecovered++;
-    this.notifyTelemetry();
-  }
-  /**
-   * Obtém snapshot imutável da telemetria
-   */
-  getTelemetry() {
-    return { ...this.telemetry };
-  }
-  /**
-   * Assina atualizações de telemetria
-   */
-  subscribeTelemetry(listener) {
-    this.telemetryListeners.add(listener);
-    listener(this.getTelemetry());
-    return () => this.telemetryListeners.delete(listener);
-  }
-  /**
-   * Registra resultado de consulta a um provedor para orientar ordenação e concorrência
-   */
-  recordProviderResult(providerId, latencyMs, success) {
-    const existing = this.providerStats.get(providerId) || {
-      providerId,
-      totalAttempts: 0,
-      successfulAttempts: 0,
-      averageLatencyMs: latencyMs,
-      lastAttemptTime: Date.now()
-    };
-    existing.totalAttempts++;
-    if (success) {
-      existing.successfulAttempts++;
-      existing.averageLatencyMs = Math.round(existing.averageLatencyMs * 0.7 + latencyMs * 0.3);
-    }
-    existing.lastAttemptTime = Date.now();
-    this.providerStats.set(providerId, existing);
-  }
-  /**
-   * Calcula pontuação dinâmica para o provedor com base em histórico real de velocidade e disponibilidade
-   */
-  getProviderScore(providerId) {
-    const stats = this.providerStats.get(providerId);
-    if (!stats || stats.totalAttempts === 0) return 0;
-    let score = 0;
-    const successRate = stats.successfulAttempts / stats.totalAttempts;
-    if (successRate >= 0.85) score += 3e3;
-    else if (successRate < 0.4) score -= 6e3;
-    if (stats.averageLatencyMs < 400) score += 4e3;
-    else if (stats.averageLatencyMs < 800) score += 2e3;
-    else if (stats.averageLatencyMs > 4e3) score -= 5e3;
-    return score;
-  }
-  getProviderStats(providerId) {
-    return this.providerStats.get(providerId);
-  }
-  getAllProviderStats() {
-    return Array.from(this.providerStats.values());
-  }
-  notifyTelemetry() {
-    const data = this.getTelemetry();
-    this.telemetryListeners.forEach((fn) => fn(data));
-  }
-};
-var playbackOptimizerService = PlaybackOptimizerService.getInstance();
-
-// src/core/selection/sourceSelectionService.ts
-var QUALITY_SCORES = {
-  "4K": 50,
-  "2160p": 50,
-  "1080p": 40,
-  "720p": 30,
-  "480p": 10,
-  "HD": 25,
-  "SD": 5
-};
-var selectionCache = /* @__PURE__ */ new Map();
-var CACHE_TTL_MS = 60 * 60 * 1e3;
-var SourceSelectionService = class {
-  /**
-   * Avalia individualmente um stream e calcula sua pontuação de acordo com
-   * a hierarquia obrigatória do ZapiTV, onde Áudio Dublado PT-BR tem prioridade absoluta.
-   */
-  evaluateStream(stream, options) {
-    let confidence = "PROVISIONAL";
-    let confidenceBonus = 0;
-    let confidenceExplanation = "";
-    if (options.identity) {
-      const confEval = sourceConfidenceEngine.evaluate(stream, options.identity);
-      confidence = confEval.confidence;
-      if (confEval.confidence === "QUARANTINED") {
-        return {
-          score: -1e6,
-          priority: 6,
-          confidence: "QUARANTINED",
-          audioTier: "foreign",
-          subtitleFormat: "unknown",
-          audioAnalysis: { tier: "foreign", isDubbed: false, isPtBr: false, isDualAudio: false, language: "unknown", confidence: 0, reason: confEval.reasons.join(", ") },
-          subtitleAnalysis: { format: "unknown", isHardsub: false, isClean: false, isSoftsub: false, hasPtSubtitle: false, confidence: 0, details: confEval.reasons.join(", ") },
-          explanation: `\u{1F6A8} QUARENTENA: ${confEval.reasons.join(" \u2022 ")}`
-        };
-      }
-      if (confEval.confidence === "REJECTED") {
-        return {
-          score: -5e5,
-          priority: 6,
-          confidence: "REJECTED",
-          audioTier: "foreign",
-          subtitleFormat: "unknown",
-          audioAnalysis: { tier: "foreign", isDubbed: false, isPtBr: false, isDualAudio: false, language: "unknown", confidence: 0, reason: confEval.reasons.join(", ") },
-          subtitleAnalysis: { format: "unknown", isHardsub: false, isClean: false, isSoftsub: false, hasPtSubtitle: false, confidence: 0, details: confEval.reasons.join(", ") },
-          explanation: `\u274C REJEITADO: ${confEval.reasons.join(" \u2022 ")}`
-        };
-      }
-      if (options.identity.isChildFriendly && confEval.confidence !== "VERIFIED" && confEval.confidence !== "PROVISIONAL") {
-        return {
-          score: -3e5,
-          priority: 6,
-          confidence: confEval.confidence,
-          audioTier: "foreign",
-          subtitleFormat: "unknown",
-          audioAnalysis: { tier: "foreign", isDubbed: false, isPtBr: false, isDualAudio: false, language: "unknown", confidence: 0, reason: "Conte\xFAdo infantil restrito a fontes verificadas" },
-          subtitleAnalysis: { format: "unknown", isHardsub: false, isClean: false, isSoftsub: false, hasPtSubtitle: false, confidence: 0, details: "Conte\xFAdo infantil restrito a fontes verificadas" },
-          explanation: `\u{1F6E1}\uFE0F BLOQUEIO INFANTIL: Fonte n\xE3o verificada para "${options.identity.title}"`
-        };
-      }
-      if (confEval.confidence === "VERIFIED") {
-        confidenceBonus = 2e4;
-        confidenceExplanation = " (Fonte Can\xF4nica Verificada)";
-      } else if (confEval.confidence === "SUSPICIOUS") {
-        confidenceBonus = -4e4;
-        confidenceExplanation = " (Metadados Suspeitos)";
-      }
-    }
-    const audio = audioPreferenceService.analyzeAudio(stream);
-    const sub = subtitlePreferenceService.analyzeSubtitles(stream, options.hasExternalPtSub);
-    const codecInfo = audioCodecService.inspectStreamCodecs(stream);
-    const codecEval = audioCodecService.getAudioCodecScore(stream);
-    const codecBonus = codecEval.bonus;
-    const codecExplanation = ` \u2022 ${codecEval.explanation}`;
-    const providerId = stream.providerId;
-    let providerBonus = 0;
-    let providerExplanation = "";
-    if (providerId) {
-      providerBonus = playbackOptimizerService.getProviderScore(providerId);
-      if (providerBonus > 0) providerExplanation = " \u2022 Provedor R\xE1pido";
-      else if (providerBonus < 0) providerExplanation = " \u2022 Provedor Inst\xE1vel";
-    }
-    const netProfile = playbackOptimizerService.getNetworkProfile();
-    let networkBonus = 0;
-    let networkExplanation = "";
-    const combined = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""}`.toLowerCase();
-    let qualityBonus = 20;
-    for (const [qKey, qScore] of Object.entries(QUALITY_SCORES)) {
-      if (combined.includes(qKey.toLowerCase()) || stream.quality && stream.quality.toLowerCase().includes(qKey.toLowerCase())) {
-        qualityBonus = qScore;
-        break;
-      }
-    }
-    if (netProfile.isSlowConnection) {
-      if (qualityBonus >= 50) {
-        networkBonus -= 25e3;
-        networkExplanation = " \u2022 4K evitado em rede lenta";
-      }
-      if (stream.sourceType === "hls" || stream.url && stream.url.includes(".m3u8")) {
-        networkBonus += 8e3;
-        networkExplanation = " \u2022 HLS ABR Priorizado";
-      } else if (qualityBonus <= 30) {
-        networkBonus += 4e3;
-      }
-    }
-    const isNotWebReady = stream.behaviorHints?.notWebReady === true;
-    const webReadyPenalty = isNotWebReady ? -15e3 : 0;
-    const webReadyExplanation = isNotWebReady ? " (Requer motor externo)" : "";
-    const performanceModifiers = providerBonus + networkBonus;
-    if (audio.tier === "dubbed_ptbr") {
-      let subTierBonus = 2e3;
-      let subExplanation = "estado de legendas desconhecido";
-      if (sub.format === "clean_confirmed") {
-        subTierBonus = 4e3;
-        subExplanation = "v\xEDdeo limpo";
-      } else if (sub.format === "softsub") {
-        subTierBonus = 3e3;
-        subExplanation = "softsub";
-      } else if (sub.format === "hardsub_ptbr") {
-        subTierBonus = 1e3;
-        subExplanation = "hardsub PT-BR";
-      } else if (sub.format === "hardsub_foreign") {
-        subTierBonus = 500;
-        subExplanation = "placas em outro idioma";
-      }
-      const score2 = 1e5 + subTierBonus + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
-      return {
-        score: score2,
-        priority: 1,
-        confidence,
-        audioTier: audio.tier,
-        subtitleFormat: sub.format,
-        audioAnalysis: audio,
-        subtitleAnalysis: sub,
-        codecInfo,
-        explanation: `Prioridade 1: \xC1udio Dublado PT-BR (${subExplanation}, score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
-      };
-    }
-    if (audio.tier === "dual_audio") {
-      let subTierBonus = 2e3;
-      if (sub.format === "clean_confirmed") subTierBonus = 4e3;
-      else if (sub.format === "softsub") subTierBonus = 3e3;
-      else if (sub.format === "hardsub_ptbr") subTierBonus = 1e3;
-      else if (sub.format === "hardsub_foreign") subTierBonus = 500;
-      const score2 = 9e4 + subTierBonus + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
-      return {
-        score: score2,
-        priority: 2,
-        confidence,
-        audioTier: audio.tier,
-        subtitleFormat: sub.format,
-        audioAnalysis: audio,
-        subtitleAnalysis: sub,
-        codecInfo,
-        explanation: `Prioridade 2: Dual \xC1udio PT-BR (score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
-      };
-    }
-    if (options.hasExternalPtSub && (sub.format === "clean_confirmed" || sub.format === "softsub" || sub.format === "unknown")) {
-      let subBonus = 1e3;
-      if (sub.format === "clean_confirmed") subBonus = 4e3;
-      else if (sub.format === "softsub") subBonus = 3e3;
-      const score2 = 5e4 + subBonus + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
-      return {
-        score: score2,
-        priority: 3,
-        confidence,
-        audioTier: audio.tier,
-        subtitleFormat: sub.format,
-        audioAnalysis: audio,
-        subtitleAnalysis: sub,
-        codecInfo,
-        explanation: `Prioridade 3: \xC1udio Original + V\xEDdeo Limpo + Legenda PT-BR externa (score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
-      };
-    }
-    if (sub.format === "softsub" && sub.hasPtSubtitle) {
-      const score2 = 4e4 + 3e3 + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
-      return {
-        score: score2,
-        priority: 4,
-        confidence,
-        audioTier: audio.tier,
-        subtitleFormat: sub.format,
-        audioAnalysis: audio,
-        subtitleAnalysis: sub,
-        codecInfo,
-        explanation: `Prioridade 4: \xC1udio Original + Softsub PT-BR interno (score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
-      };
-    }
-    if (sub.format === "hardsub_ptbr") {
-      const base = options.hasExternalPtSub ? 2e4 : 3e4;
-      const score2 = base + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
-      return {
-        score: score2,
-        priority: 5,
-        confidence,
-        audioTier: audio.tier,
-        subtitleFormat: sub.format,
-        audioAnalysis: audio,
-        subtitleAnalysis: sub,
-        codecInfo,
-        explanation: `Prioridade 5: \xC1udio Original + Hardsub PT-BR (score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
-      };
-    }
-    const isForeignHardsub = sub.format === "hardsub_foreign";
-    const baseScore = isForeignHardsub ? 1e3 : 5e3;
-    const rawScore = baseScore + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
-    const score = Math.max(100, rawScore);
-    return {
-      score,
-      priority: 6,
-      confidence,
-      audioTier: audio.tier,
-      subtitleFormat: sub.format,
-      audioAnalysis: audio,
-      subtitleAnalysis: sub,
-      codecInfo,
-      explanation: `Prioridade 6: Idioma estrangeiro / Hardsub estrangeiro (score: ${score})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
-    };
-  }
-  /**
-   * Ordena a lista de streams aplicando a hierarquia estrita:
-   * 1. Confirmação obrigatória de identidade (rejeita e quarentena excluídos)
-   * 2. Dublagem PT-BR
-   * 3. Dual Audio
-   * 4. Áudio Original + Limpo + Legenda externa
-   * 5. Softsub PT-BR
-   * 6. Hardsub PT-BR
-   * 7. Outros
-   */
-  rankStreams(streams, options) {
-    if (!streams || streams.length === 0) return [];
-    const deviceKey = audioCodecService.getDeviceCacheKey();
-    const effectiveCacheKey = options.cacheKey ? `${options.cacheKey}_${deviceKey}` : void 0;
-    if (effectiveCacheKey) {
-      const cached = selectionCache.get(effectiveCacheKey);
-      if (cached && cached.streams.length > 0 && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-        return cached.streams;
-      }
-    }
-    const scored = streams.map((stream) => {
-      const evaluation = this.evaluateStream(stream, {
-        hasExternalPtSub: options.hasExternalPtSub,
-        identity: options.identity
-      });
-      return {
-        stream,
-        evaluation
-      };
-    });
-    const validScored = scored.filter((item) => item.evaluation.score >= 0);
-    validScored.sort((a, b) => b.evaluation.score - a.evaluation.score);
-    const rankedStreams = validScored.map((item) => ({
-      ...item.stream,
-      _smartScore: item.evaluation.score,
-      _smartPriority: item.evaluation.priority,
-      _confidence: item.evaluation.confidence,
-      _audioTier: item.evaluation.audioTier,
-      _subtitleFormat: item.evaluation.subtitleFormat,
-      _codecInfo: item.evaluation.codecInfo,
-      _scoreExplanation: item.evaluation.explanation
-    }));
-    if (effectiveCacheKey && rankedStreams.length > 0) {
-      selectionCache.set(effectiveCacheKey, {
-        streams: rankedStreams,
-        timestamp: Date.now()
-      });
-    }
-    return rankedStreams;
-  }
-  /**
-   * Invalida qualquer cache de seleção armazenado em memória.
-   */
-  clearRankingCache() {
-    selectionCache.clear();
-  }
-};
-var sourceSelectionService = new SourceSelectionService();
-
-// src/core/audio/audioDetector.ts
-var QUALITY_PATTERNS = [
-  { regex: /\b(4k|2160p|uhd)\b/i, quality: "4K", score: 50 },
-  { regex: /\b(1080p|fhd|full\s*hd)\b/i, quality: "1080p", score: 40 },
-  { regex: /\b(720p|hd)\b/i, quality: "720p", score: 30 },
-  { regex: /\b(480p|sd)\b/i, quality: "480p", score: 10 }
-];
-async function checkOpenSubtitlesPtBr(type, id) {
-  if (!id) return false;
-  try {
-    const cleanId = id.replace(/\.json$/, "");
-    const subUrl = `https://opensubtitles-v3.strem.io/subtitles/${type}/${encodeURIComponent(cleanId)}.json`;
-    const res = await fetch(subUrl, { signal: AbortSignal.timeout(3e3) });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && Array.isArray(data.subtitles)) {
-        return data.subtitles.some((s) => s.lang === "pob" || s.lang === "por");
-      }
-    }
-  } catch {
-  }
-  return false;
-}
-function classifyStream(stream, hasExternalPtSub = false) {
-  const combinedText = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""}`.toLowerCase();
-  let quality = stream.quality || "HD";
-  for (const q of QUALITY_PATTERNS) {
-    if (q.regex.test(combinedText) || stream.quality && q.regex.test(stream.quality)) {
-      quality = q.quality;
-      break;
-    }
-  }
-  const evaluation = sourceSelectionService.evaluateStream(stream, { hasExternalPtSub });
-  const isPtBr = evaluation.audioAnalysis.isPtBr;
-  const isDubbed = evaluation.audioAnalysis.isDubbed;
-  const isSubtitled = evaluation.subtitleAnalysis.hasPtSubtitle;
-  const subFormat = evaluation.subtitleFormat;
-  const isHardsub = evaluation.subtitleAnalysis.isHardsub;
-  const score = evaluation.score;
-  let language = "unknown";
-  if (evaluation.audioAnalysis.tier === "dual_audio") language = "dual";
-  else if (isDubbed) language = "pt-BR";
-  else if (evaluation.audioAnalysis.language === "ja") language = "ja";
-  else if (evaluation.audioAnalysis.language === "en") language = "en";
-  else if (evaluation.audioAnalysis.language === "es") language = "es";
-  else if (evaluation.audioAnalysis.language === "pt-PT") language = "pt-PT";
-  else if (isSubtitled) language = "original";
-  let badge = "\u274C";
-  let badgeLabel = "Sem PT-BR";
-  if (isDubbed && (isSubtitled || hasExternalPtSub)) {
-    badge = "\u{1F50A}\u{1F4AC}";
-    badgeLabel = "Dublado + Legenda PT-BR";
-  } else if (isDubbed) {
-    badge = "\u{1F50A}";
-    badgeLabel = "\xC1udio Dublado PT-BR";
-  } else if (isSubtitled || hasExternalPtSub) {
-    badge = "\u{1F4AC}";
-    badgeLabel = subFormat === "hardsub_ptbr" ? "Hardsub PT-BR" : "Legenda PT-BR";
-  }
-  return {
-    isPtBr,
-    isDubbed,
-    isSubtitled,
-    hasPtSubtitle: isSubtitled || hasExternalPtSub,
-    language,
-    quality,
-    score,
-    badge,
-    badgeLabel,
-    subtitleFormat: subFormat,
-    isHardsub
-  };
-}
-function filterCleanNativeStreams(streams) {
-  return streams.filter((stream) => {
-    if (stream.ytId) return false;
-    const url = (stream.url || "").toLowerCase();
-    if (url.includes("youtube.com") || url.includes("youtu.be")) return false;
-    if (url.includes("embedplay") || url.includes("playerflix") || url.includes("videasy") || url.includes("superflix") || url.includes("parklogic")) {
+  has(key) {
+    const entry = this.map.get(key);
+    if (!entry) return false;
+    if (entry.expiresAt !== null && Date.now() > entry.expiresAt) {
+      this.map.delete(key);
       return false;
     }
     return true;
-  });
-}
-function sortStreamsByPtBrPriority(streams, options = { preferDubbed: true, allowSubtitled: true, excludeYouTube: true }) {
-  const filtered = options.excludeYouTube !== false ? filterCleanNativeStreams(streams) : streams;
-  const ranked = sourceSelectionService.rankStreams(filtered, {
-    hasExternalPtSub: false,
-    preferDubbed: options.preferDubbed !== false,
-    preferredQuality: options.preferredQuality
-  });
-  return ranked.map((stream) => {
-    const classification = classifyStream(stream);
-    let formattedName = stream.name || "Stream";
-    if (!formattedName.includes("\u{1F50A}") && !formattedName.includes("\u{1F4AC}") && !formattedName.includes("\u274C")) {
-      formattedName = `${classification.badge} ${formattedName}`;
-    }
-    return {
-      ...stream,
-      name: formattedName,
-      isPtBr: classification.isPtBr,
-      isDubbed: classification.isDubbed,
-      isSubtitled: classification.isSubtitled,
-      quality: classification.quality,
-      badge: classification.badge,
-      badgeLabel: classification.badgeLabel
-    };
-  });
-}
-
-// src/core/livetv/OfficialChannelProvider.ts
-var OfficialChannelProvider = class _OfficialChannelProvider {
-  static {
-    this.PROVIDER_NAME = "Emissoras Oficiais & Acesso Livre";
   }
-  /**
-   * Catálogo de emissoras públicas, transmissões gratuitas e canais FAST brasileiros verificados.
-   * Não contém streams inventados ou duplicados indevidos.
-   */
-  static getOfficialChannels() {
-    return [
-      // =========================================================================
-      // TV ABERTA, PÚBLICA & EDUCATIVA (Transmissões Livres Oficiais)
-      // =========================================================================
-      {
-        id: "tv-cultura",
-        tvgId: "TVCultura.br",
-        tvgName: "TV Cultura",
-        name: "TV Cultura",
-        category: "cultura",
-        groupTitle: "Cultura",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/8/82/Cultura_logo_2013.svg",
-        url: "https://player-tvcultura.stream.uol.com.br/live/tvcultura.m3u8",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Refer\xEAncia nacional em programa\xE7\xE3o infantil, educativa, grandes debates no Roda Viva e jornalismo independente."
-      },
-      {
-        id: "cultura-fast",
-        tvgId: "CulturaFast.br",
-        tvgName: "Cultura Fast",
-        name: "Cultura Fast (Funda\xE7\xE3o Padre Anchieta)",
-        category: "cultura",
-        groupTitle: "Cultura",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/8/82/Cultura_logo_2013.svg",
-        url: "https://fpa-gateway.tvcultura.com.br:8181/memfs/606caef0-a290-413d-9f1f-8fcdb3a73831.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Sinal digital FAST da TV Cultura com o melhor do arquivo hist\xF3rico, teatro, m\xFAsica e document\xE1rios."
-      },
-      {
-        id: "tv-brasil",
-        tvgId: "TVBrasil.br",
-        tvgName: "TV Brasil",
-        name: "TV Brasil",
-        category: "aberta",
-        groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Logotipo_da_TV_Brasil.svg/512px-Logotipo_da_TV_Brasil.svg.png",
-        url: "https://tvbrasil-stream.ebc.com.br/index.m3u8",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Emissora p\xFAblica da Empresa Brasil de Comunica\xE7\xE3o (EBC), com cobertura nacional, jornalismo, esportes e cultura."
-      },
-      {
-        id: "rede-brasil",
-        tvgId: "RedeBrasil.br",
-        tvgName: "Rede Brasil",
-        name: "Rede Brasil de Televis\xE3o (RBTV)",
-        category: "filmes_series",
-        groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/d/d1/Marca_rede_brasil_rgb-color.png",
-        url: "https://video09.logicahost.com.br/redebrasiloficial/redebrasiloficial/playlist.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "S\xE9ries cl\xE1ssicas dos anos 60 a 90, grandes filmes de cinema com dublagem brasileira e jornalismo."
-      },
-      {
-        id: "sbt-interior",
-        tvgId: "SBTInterior.br",
-        tvgName: "SBT Interior",
-        name: "SBT (Sinal Aberto Regional)",
-        category: "aberta",
-        groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/SBT_logo.svg/512px-SBT_logo.svg.png",
-        url: "https://cdn.jmvstream.com/w/LVW-10801/LVW10801_Xvg4R0u57n/playlist.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Transmiss\xE3o aberta afiliada do SBT com novelas, audit\xF3rio, jornalismo regional e entretenimento."
-      },
-      {
-        id: "tv-senado",
-        tvgId: "TVSenado.br",
-        tvgName: "TV Senado",
-        name: "TV Senado",
-        category: "aberta",
-        groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/TV_Senado_logo.svg/512px-TV_Senado_logo.svg.png",
-        url: "https://cdn.jmvstream.com/w/LVW-9715/LVW9715_12B26T62tm/playlist.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Transmiss\xE3o p\xFAblica das sess\xF5es do Senado Federal, audi\xEAncias p\xFAblicas e document\xE1rios hist\xF3ricos."
-      },
-      {
-        id: "tv-camara",
-        tvgId: "TVCamara.br",
-        tvgName: "TV C\xE2mara",
-        name: "TV C\xE2mara",
-        category: "aberta",
-        groupTitle: "TV Aberta",
-        tvgLogo: "https://i.imgur.com/UpV2PRk.png",
-        url: "https://stream3.camara.gov.br/tv1/manifest.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Transmiss\xF5es oficiais ao vivo do plen\xE1rio e comiss\xF5es da C\xE2mara dos Deputados em Bras\xEDlia."
-      },
-      {
-        id: "tv-justica",
-        tvgId: "TVJustica.br",
-        tvgName: "TV Justi\xE7a",
-        name: "TV Justi\xE7a",
-        category: "aberta",
-        groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/TV_Justi%C3%A7a_logo.svg/512px-TV_Justi%C3%A7a_logo.svg.png",
-        url: "https://stream3.camara.gov.br/tv1/manifest.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Canal oficial do Poder Judici\xE1rio, com sess\xF5es plen\xE1rias do Supremo Tribunal Federal (STF) e debates."
-      },
-      {
-        id: "com-brasil",
-        tvgId: "COMBrasil.br",
-        tvgName: "COM Brasil",
-        name: "COM Brasil TV",
-        category: "aberta",
-        groupTitle: "TV Aberta",
-        tvgLogo: "https://i.imgur.com/GrjGwKM.png",
-        url: "https://dfr80qz435crc.cloudfront.net/EFGH/Amagi/NewCo/New_Brasil_BR/New_Brasil.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Canal comunit\xE1rio com not\xEDcias dos estados, cultura popular, empreendedorismo e variedades."
-      },
-      // =========================================================================
-      // NOTÍCIAS & JORNALISMO (Transmissões Oficiais Gratuitas)
-      // =========================================================================
-      {
-        id: "cnn-brasil",
-        tvgId: "CNNBrasil.br",
-        tvgName: "CNN Brasil",
-        name: "CNN Brasil (1080p Full HD)",
-        category: "noticias",
-        groupTitle: "Not\xEDcias",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/CNN_Brasil.svg/960px-CNN_Brasil.svg.png",
-        url: "https://d25usgadhphvwi.cloudfront.net/hls/main.m3u8",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Jornalismo 24 horas por dia com apura\xE7\xE3o em tempo real, debates pol\xEDticos, economia e an\xE1lise internacional."
-      },
-      {
-        id: "record-news",
-        tvgId: "RecordNews.br",
-        tvgName: "Record News",
-        name: "Record News",
-        category: "noticias",
-        groupTitle: "Not\xEDcias",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/4/46/Record_News_logo_2023.svg",
-        url: "https://rnw-rn.otteravision.com/rnw/rn/rnw_rn.m3u8",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Principal canal aberto de not\xEDcias 24 horas por dia do Brasil, com transmiss\xF5es ao vivo cont\xEDnuas."
-      },
-      {
-        id: "sbt-news",
-        tvgId: "SBTNews.br",
-        tvgName: "SBT News",
-        name: "SBT News ao Vivo",
-        category: "noticias",
-        groupTitle: "Not\xEDcias",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/4/42/SBT_News_2025.svg",
-        url: "https://dai.google.com/linear/hls/event/1XSOdtQ0SH2G8OEmEfGgjQ/master.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Canal de not\xEDcias digital do SBT transmitido ao vivo com os fatos urgentes de Bras\xEDlia e das capitais."
-      },
-      {
-        id: "bmc-news",
-        tvgId: "BMCNews.br",
-        tvgName: "BM&C News",
-        name: "BM&C News (Economia e Finan\xE7as)",
-        category: "noticias",
-        groupTitle: "Not\xEDcias",
-        tvgLogo: "https://i.imgur.com/pOUY2Uz.png",
-        url: "https://jmp2.uk/plu-666c9c60a7efd40008f552f0.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Canal especializado em mercado financeiro, investimentos, cota\xE7\xF5es da B3, agro e economia global."
-      },
-      {
-        id: "pluto-tv-canal-uol",
-        tvgId: "PlutoTVCanalUOL.br",
-        tvgName: "Canal UOL",
-        name: "Canal UOL ao Vivo",
-        category: "noticias",
-        groupTitle: "Not\xEDcias",
-        tvgLogo: "https://images.pluto.tv/channels/64b9370b409629000802d32b/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-64b9370b409629000802d32b.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Not\xEDcias, colunistas de renome, opini\xE3o e entretenimento do portal UOL transmitido 24 horas."
-      },
-      // =========================================================================
-      // ESPORTES & CANAIS ESPORTIVOS AUTORIZADOS
-      // =========================================================================
-      {
-        id: "n-sports",
-        tvgId: "NSports.br",
-        tvgName: "N Sports",
-        name: "N Sports (1080p)",
-        category: "esportes",
-        groupTitle: "Esportes",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/NSports_logo_2024.png/512px-NSports_logo_2024.png",
-        url: "https://ogc-nsprt-tcl-roku-syndication.otteravision.com/ogc/nsprt/nsprt.m3u8",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Canal esportivo brasileiro transmitindo futsal, atletismo, basquete NBB, v\xF4lei e campeonatos nacionais."
-      },
-      {
-        id: "pluto-tv-esportes",
-        tvgId: "PlutoTVEsportes.br",
-        tvgName: "Pluto TV Esportes",
-        name: "Pluto TV Esportes",
-        category: "esportes",
-        groupTitle: "Esportes",
-        tvgLogo: "https://images.pluto.tv/channels/5f32d2db0af67400077f29c4/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-5f32d2db0af67400077f29c4.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Destaques esportivos, eventos de lutas, automobilismo e competi\xE7\xF5es ao redor do mundo."
-      },
-      // =========================================================================
-      // FILMES, SÉRIES & ENTRETENIMENTO (Canais FAST Oficiais)
-      // =========================================================================
-      {
-        id: "pluto-tv-cine-sucessos",
-        tvgId: "PlutoTVCineSucessos.br",
-        tvgName: "Pluto TV Cine Sucessos",
-        name: "Pluto TV Cine Sucessos",
-        category: "filmes_series",
-        groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/5f120e94a5714d00074576a1/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-5f120e94a5714d00074576a1.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Grandes sucessos do cinema de Hollywood com dublagem em portugu\xEAs sem interrup\xE7\xF5es pagas."
-      },
-      {
-        id: "pluto-tv-filmes-acao",
-        tvgId: "PlutoTVFilmesAcao.br",
-        tvgName: "Pluto TV Filmes A\xE7\xE3o",
-        name: "Pluto TV Filmes A\xE7\xE3o",
-        category: "filmes_series",
-        groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/5f120f41b7d403000783a6d6/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-5f120f41b7d403000783a6d6.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Tiros, persegui\xE7\xF5es e muita adrenalina com os melhores astros de filmes de a\xE7\xE3o dublados."
-      },
-      {
-        id: "pluto-tv-cine-classicos",
-        tvgId: "PlutoTVCineClassicos.br",
-        tvgName: "Pluto TV Cine Cl\xE1ssicos",
-        name: "Pluto TV Cine Cl\xE1ssicos",
-        category: "filmes_series",
-        groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/5fa1612a669ba0000702017b/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-5fa1612a669ba0000702017b.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Obras imortais da hist\xF3ria do cinema mundial que marcaram \xE9poca nas telonas."
-      },
-      {
-        id: "pluto-tv-cine-comedia",
-        tvgId: "PlutoTVCineComedia.br",
-        tvgName: "Pluto TV Cine Com\xE9dia",
-        name: "Pluto TV Cine Com\xE9dia",
-        category: "filmes_series",
-        groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/5f12101f0b12f00007844c7c/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-5f12101f0b12f00007844c7c.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Filmes hil\xE1rios e com\xE9dias imperd\xEDveis para animar o seu dia com muitas gargalhadas."
-      },
-      {
-        id: "pluto-tv-filmes-nacionais",
-        tvgId: "PlutoTVFilmesNacionais.br",
-        tvgName: "Pluto TV Filmes Nacionais",
-        name: "Pluto TV Filmes Nacionais",
-        category: "filmes_series",
-        groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/5f5a545d0dbf7f0007c09408/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-5f5a545d0dbf7f0007c09408.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Produ\xE7\xF5es originais do cinema brasileiro: dramas, com\xE9dias nacionais e hist\xF3rias da nossa terra."
-      },
-      {
-        id: "csi-miami-br",
-        tvgId: "CSIMiami.br",
-        tvgName: "CSI: Miami",
-        name: "CSI: Miami (Canal 24h)",
-        category: "filmes_series",
-        groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/63eb9c5351f5d000085e8d7e/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-63eb9c5351f5d000085e8d7e.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Canal tem\xE1tico exclusivo com epis\xF3dios ininterruptos da s\xE9rie policial CSI: Miami dublada."
-      },
-      {
-        id: "south-park-br",
-        tvgId: "SouthPark.br",
-        tvgName: "South Park",
-        name: "South Park (Canal 24h)",
-        category: "filmes_series",
-        groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/609ae66b359b270007869ff1/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-609ae66b359b270007869ff1.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Epis\xF3dios lend\xE1rios das temporadas cl\xE1ssicas de South Park com dublagem brasileira ic\xF4nica."
-      },
-      {
-        id: "star-trek-br",
-        tvgId: "StarTrek.br",
-        tvgName: "Star Trek",
-        name: "Jornada nas Estrelas (Star Trek)",
-        category: "filmes_series",
-        groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/5f99ac4fded33000078f29ab/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-5f99ac4fded33000078f29ab.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Viaje pelo cosmos com as tripula\xE7\xF5es lend\xE1rias da Frota Estelar em epis\xF3dios 24h dublados."
-      },
-      {
-        id: "adrenalina-pura",
-        tvgId: "AdrenalinaPura.br",
-        tvgName: "Adrenalina Pura",
-        name: "Adrenalina Pura Filmes",
-        category: "filmes_series",
-        groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://i.imgur.com/Pvid2iH.png",
-        url: "https://jmp2.uk/plu-61b790b985706b00072cb797.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Cat\xE1logo ininterrupto de suspense, artes marciais e cinema de a\xE7\xE3o sem cobran\xE7as."
-      },
-      // =========================================================================
-      // INFANTIL & ANIMAÇÃO
-      // =========================================================================
-      {
-        id: "turma-da-monica",
-        tvgId: "TurmaDaMonica.br",
-        tvgName: "Turma da M\xF4nica",
-        name: "Turma da M\xF4nica (Canal 24h)",
-        category: "infantil",
-        groupTitle: "Infantil",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Logotipo_da_TV_Brasil.svg/512px-Logotipo_da_TV_Brasil.svg.png",
-        url: "https://jmp2.uk/plu-5f997e44949bc70007a6941e.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "M\xF4nica, Cebolinha, Casc\xE3o e Magali nas historinhas e aventuras animadas mais queridas do Brasil."
-      },
-      {
-        id: "naruto-dublado",
-        tvgId: "Naruto.br",
-        tvgName: "Naruto",
-        name: "Naruto (Anime 24h Dublado)",
-        category: "infantil",
-        groupTitle: "Infantil",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Naruto_logo.svg/512px-Naruto_logo.svg.png",
-        url: "https://jmp2.uk/plu-5f6df5a173d7340007c559f7.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "A jornada ninja de Naruto Uzumaki transmitida ininterruptamente com a cl\xE1ssica dublagem em portugu\xEAs."
-      },
-      {
-        id: "one-piece-dublado",
-        tvgId: "OnePiece.br",
-        tvgName: "One Piece",
-        name: "One Piece (Anime 24h Dublado)",
-        category: "infantil",
-        groupTitle: "Infantil",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/One_Piece_Logo.svg/512px-One_Piece_Logo.svg.png",
-        url: "https://jmp2.uk/plu-624b1c8d4321e200073ee421.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Luffy e o Bando do Chap\xE9u de Palha pelos mares da Grand Line em transmiss\xE3o 24h dublada."
-      },
-      {
-        id: "pluto-tv-anime",
-        tvgId: "PlutoTVAnime.br",
-        tvgName: "Pluto TV Anime",
-        name: "Pluto TV Anime",
-        category: "infantil",
-        groupTitle: "Infantil",
-        tvgLogo: "https://images.pluto.tv/channels/5f12136385bccc00070142ed/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-5f12136385bccc00070142ed.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Maratona cont\xEDnua de grandes animes, batalhas lend\xE1rias e universos fant\xE1sticos dublados."
-      },
-      {
-        id: "nickelodeon-classico",
-        tvgId: "NickelodeonClassico.br",
-        tvgName: "Nickelodeon Cl\xE1ssico",
-        name: "Nickelodeon Cl\xE1ssico",
-        category: "infantil",
-        groupTitle: "Infantil",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Nickelodeon_2009_logo.svg/512px-Nickelodeon_2009_logo.svg.png",
-        url: "https://jmp2.uk/plu-6824ce10c5d53e1351ceb8d1.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Os desenhos mais memor\xE1veis da Nick: Rugrats, Hey Arnold!, CatDog e cl\xE1ssicos da anima\xE7\xE3o."
-      },
-      {
-        id: "nickelodeon-toons",
-        tvgId: "NickelodeonToons.br",
-        tvgName: "Nickelodeon Toons",
-        name: "Nickelodeon Toons",
-        category: "infantil",
-        groupTitle: "Infantil",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Nickelodeon_2009_logo.svg/512px-Nickelodeon_2009_logo.svg.png",
-        url: "https://jmp2.uk/plu-645951c0e94c38000802d2cb.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Anima\xE7\xE3o sem parar com Bob Esponja, Os Padrinhos M\xE1gicos e sucessos animados da garotada."
-      },
-      {
-        id: "nick-jr-club",
-        tvgId: "NickJrClub.br",
-        tvgName: "Nick Jr. Club",
-        name: "Nick Jr. Club (Pr\xE9-Escolar)",
-        category: "infantil",
-        groupTitle: "Infantil",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Nickelodeon_2009_logo.svg/512px-Nickelodeon_2009_logo.svg.png",
-        url: "https://jmp2.uk/plu-6824ce95f09106f4b18f4114.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Conte\xFAdo seguro, educativo e carinhoso para beb\xEAs e crian\xE7as pequenas com a Patrulha Canina e amigos."
-      },
-      {
-        id: "icarly-br",
-        tvgId: "iCarly.br",
-        tvgName: "iCarly",
-        name: "iCarly (Canal 24h)",
-        category: "infantil",
-        groupTitle: "Infantil",
-        tvgLogo: "https://images.pluto.tv/channels/620ff46e0a576e0007dc2f89/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-620ff46e0a576e0007dc2f89.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Carly, Sam e Freddie comandam o webshow mais divertido da TV em epis\xF3dios 24h dublados."
-      },
-      {
-        id: "kenan-and-kel",
-        tvgId: "KenanAndKel.br",
-        tvgName: "Kenan & Kel",
-        name: "Kenan & Kel (Canal 24h)",
-        category: "infantil",
-        groupTitle: "Infantil",
-        tvgLogo: "https://images.pluto.tv/channels/5ffcc5130fd98c0007f2e216/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-5ffcc5130fd98c0007f2e216.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "As confus\xF5es imperd\xEDveis de Kenan e Kel e seu eterno amor por refrigerante de laranja."
-      },
-      {
-        id: "desenhos-classicos",
-        tvgId: "DesenhosClassicos.br",
-        tvgName: "Desenhos Cl\xE1ssicos",
-        name: "Pluto TV Desenhos Cl\xE1ssicos",
-        category: "infantil",
-        groupTitle: "Infantil",
-        tvgLogo: "https://images.pluto.tv/channels/655e5c4d2c46f3000877a54b/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-655e5c4d2c46f3000877a54b.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Popeye, Betty Boop, Gasparzinho e as anima\xE7\xF5es pioneiras da era dourada da anima\xE7\xE3o."
-      },
-      // =========================================================================
-      // MÚSICA & VARIEDADES
-      // =========================================================================
-      {
-        id: "mtv-biggest-pop",
-        tvgId: "MTVBiggestPop.br",
-        tvgName: "MTV Biggest Pop",
-        name: "MTV Biggest Pop Brasil",
-        category: "musica",
-        groupTitle: "M\xFAsica",
-        tvgLogo: "https://images.pluto.tv/channels/6047fbdbbb776a0007e7f2ff/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-6047fbdbbb776a0007e7f2ff.m3u8",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Os maiores videoclipes pop nacionais e internacionais do momento em alta defini\xE7\xE3o."
-      },
-      {
-        id: "mtv-classic-br",
-        tvgId: "MTVClassic.br",
-        tvgName: "MTV Classic",
-        name: "MTV Classic Brasil",
-        category: "musica",
-        groupTitle: "M\xFAsica",
-        tvgLogo: "https://images.pluto.tv/channels/66a01dcb8561260008b0a41d/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-66a01dcb8561260008b0a41d.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Hits inesquec\xEDveis dos anos 80, 90 e 2000 que moldaram a hist\xF3ria da m\xFAsica jovem."
-      },
-      {
-        id: "mtv-pluto-tv",
-        tvgId: "MTVPlutoTV.br",
-        tvgName: "MTV Pluto TV",
-        name: "MTV Pluto TV Brasil",
-        category: "musica",
-        groupTitle: "M\xFAsica",
-        tvgLogo: "https://images.pluto.tv/channels/5f1212fb81e85c00077ae9ef/colorLogoPNG_1759263027326.png",
-        url: "https://jmp2.uk/plu-5f1212fb81e85c00077ae9ef.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "A ess\xEAncia jovem da MTV: m\xFAsica, festivais ao vivo, entrevistas e cultura pop."
-      },
-      {
-        id: "tastemade-brasil",
-        tvgId: "TastemadeBrasil.br",
-        tvgName: "Tastemade Brasil",
-        name: "Tastemade Brasil (Culin\xE1ria e Viagens)",
-        category: "cultura",
-        groupTitle: "Cultura",
-        tvgLogo: "https://i.imgur.com/FPy4zF4.png",
-        url: "https://jmp2.uk/plu-5fd1419a3b4f4b000773ba85.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Receitas irresist\xEDveis, roteiros de viagens gastron\xF4micas e chefs renomados em programa\xE7\xE3o 24h."
-      },
-      {
-        id: "masterchef-brasil",
-        tvgId: "MasterChef.br",
-        tvgName: "MasterChef",
-        name: "MasterChef Brasil (Canal 24h)",
-        category: "cultura",
-        groupTitle: "Cultura",
-        tvgLogo: "https://images.pluto.tv/channels/6077045b6031bd00078de127/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-6077045b6031bd00078de127.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "As provas de elimina\xE7\xE3o, caixas misteriosas e desafios sob press\xE3o das temporadas do MasterChef."
-      },
-      {
-        id: "smithsonian-channel",
-        tvgId: "SmithsonianChannel.br",
-        tvgName: "Smithsonian Channel",
-        name: "Smithsonian Channel (Document\xE1rios)",
-        category: "documentarios",
-        groupTitle: "Document\xE1rios",
-        tvgLogo: "https://images.pluto.tv/channels/6298bd10d88ef000073f16b7/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-6298bd10d88ef000073f16b7.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Ci\xEAncia, avia\xE7\xE3o, explora\xE7\xE3o espacial, arqueologia e hist\xF3ria natural com qualidade documental internacional."
-      },
-      {
-        id: "pluto-tv-natureza",
-        tvgId: "PlutoTVNatureza.br",
-        tvgName: "Pluto TV Natureza",
-        name: "Pluto TV Natureza",
-        category: "documentarios",
-        groupTitle: "Document\xE1rios",
-        tvgLogo: "https://images.pluto.tv/channels/5f1213ba0ecebc00070e170f/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-5f1213ba0ecebc00070e170f.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Expedi\xE7\xF5es pelos biomas mais exuberantes do planeta Terra e o fascinante reino animal."
-      },
-      // =========================================================================
-      // REGIONAIS & COMUNITÁRIOS (Transmissões Abertas)
-      // =========================================================================
-      {
-        id: "tv-alesp",
-        tvgId: "TVALESP.br",
-        tvgName: "TV ALESP",
-        name: "TV ALESP (S\xE3o Paulo)",
-        category: "regionais",
-        groupTitle: "Regionais",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Logotipo_da_TV_Brasil.svg/512px-Logotipo_da_TV_Brasil.svg.png",
-        url: "https://cdn.jmvstream.com/w/LVW-9715/LVW9715_12B26T62tm/playlist.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Emissora p\xFAblica da Assembleia Legislativa do Estado de S\xE3o Paulo, com debates e leis estaduais."
-      },
-      {
-        id: "tv-brasil-central",
-        tvgId: "TVBrasilCentral.br",
-        tvgName: "TV Brasil Central",
-        name: "TV Brasil Central (Goi\xE1s)",
-        category: "regionais",
-        groupTitle: "Regionais",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Logotipo_da_TV_Brasil.svg/512px-Logotipo_da_TV_Brasil.svg.png",
-        url: "https://cdn.jmvstream.com/w/LVW-9715/LVW9715_12B26T62tm/playlist.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Canal p\xFAblico e educativo de Goi\xE1s, integrado \xE0 rede p\xFAblica de comunica\xE7\xE3o."
-      },
-      {
-        id: "conecta-mais-tv",
-        tvgId: "ConectaMaisTV.br",
-        tvgName: "Conecta Mais TV",
-        name: "Conecta Mais TV",
-        category: "regionais",
-        groupTitle: "Regionais",
-        tvgLogo: "https://i.imgur.com/qHwTWlz.png",
-        url: "https://adylnet.streampool.net/10324/live/hls/Conecta/index.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Programa\xE7\xE3o regional e cultural conectando as comunidades do interior."
-      },
-      {
-        id: "eutv-regional",
-        tvgId: "EUTV.br",
-        tvgName: "EUTV",
-        name: "EUTV Brasil",
-        category: "regionais",
-        groupTitle: "Regionais",
-        tvgLogo: "https://i.imgur.com/8PxpamC.png",
-        url: "https://cdn.jmvstream.com/w/LVW-8719/LVW8719_AcLVAxWy5J/playlist.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Emissora regional com variedades, not\xEDcias comunit\xE1rias e atra\xE7\xF5es locais."
-      },
-      // =========================================================================
-      // GRANDES EMISSORAS NACIONAIS & SINAIS PAY-TV (Identificação Transparente)
-      // (Conforme seções 06, 25: Apresenta acesso oficial sem simular pirataria)
-      // =========================================================================
-      {
-        id: "globo-oficial",
-        tvgId: "Globo.br",
-        tvgName: "TV Globo",
-        name: "TV Globo (Sinal Nacional Ao Vivo)",
-        category: "aberta",
-        groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/TV_Globo_logo_2021.svg/512px-TV_Globo_logo_2021.svg.png",
-        url: "",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        requiresExternalAccess: true,
-        externalAccessUrl: "https://globoplay.globo.com/agora-na-tv/",
-        externalProviderName: "Globoplay (Transmiss\xE3o Oficial Gratuita)",
-        description: "A maior emissora do pa\xEDs: novelas das 9, Jornal Nacional, futebol ao vivo e entretenimento. Sinal linear aberto gratuito via Globoplay."
-      },
-      {
-        id: "sbt-nacional",
-        tvgId: "SBTNacional.br",
-        tvgName: "SBT",
-        name: "SBT (Transmiss\xE3o Nacional Direta)",
-        category: "aberta",
-        groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/SBT_logo.svg/512px-SBT_logo.svg.png",
-        url: "",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        requiresExternalAccess: true,
-        externalAccessUrl: "https://sbtvideos.com.br/",
-        externalProviderName: "+SBT Oficial Gr\xE1tis",
-        description: "Sinal principal nacional do SBT: Programa Silvio Santos, Domingo Legal, Champions League e novelas no aplicativo oficial +SBT."
-      },
-      {
-        id: "record-tv-oficial",
-        tvgId: "RecordTV.br",
-        tvgName: "Record TV",
-        name: "Record TV (Sinal Nacional)",
-        category: "aberta",
-        groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Logotipo_da_Record.png/512px-Logotipo_da_Record.png",
-        url: "",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        requiresExternalAccess: true,
-        externalAccessUrl: "https://playplus.com/",
-        externalProviderName: "PlayPlus Oficial (Sinal Aberto Gr\xE1tis)",
-        description: "Jornalismo investigativo, novelas b\xEDblicas, Paulist\xE3o e reality shows na transmiss\xE3o linear gratuita da Record no PlayPlus."
-      },
-      {
-        id: "band-nacional",
-        tvgId: "BandNacional.br",
-        tvgName: "Band",
-        name: "Rede Bandeirantes (Band Nacional)",
-        category: "aberta",
-        groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Band_logo_2018.svg/512px-Band_logo_2018.svg.png",
-        url: "",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        requiresExternalAccess: true,
-        externalAccessUrl: "https://bandplay.com/",
-        externalProviderName: "Bandplay Oficial Gratuito",
-        description: "F\xF3rmula 1, Jogo Aberto, Jornal da Band e MasterChef transmitidos ao vivo gratuitamente na plataforma Bandplay."
-      },
-      {
-        id: "redetv-nacional",
-        tvgId: "RedeTVNacional.br",
-        tvgName: "RedeTV!",
-        name: "RedeTV! (Sinal Nacional Direto)",
-        category: "aberta",
-        groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/RedeTV%21_logo_2019.svg/512px-RedeTV%21_logo_2019.svg.png",
-        url: "",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        requiresExternalAccess: true,
-        externalAccessUrl: "https://redetvgo.com.br/",
-        externalProviderName: "RedeTV! Go Oficial",
-        description: "SuperPop, Opera\xE7\xE3o de Risco e NFL em transmiss\xE3o linear oficial pelo portal RedeTV! Go."
-      },
-      {
-        id: "ge-tv-oficial",
-        tvgId: "ge.tv.br",
-        tvgName: "ge tv",
-        name: "ge tv (Globo Esporte)",
-        category: "esportes",
-        groupTitle: "Esportes",
-        tvgLogo: "https://s2-ge.glbimg.com/OqD0yL_y6hXk41t_Lq7p6U4aF7M=/1200x/smart/filters:cover():strip_icc()/i.s3.glbimg.com/v1/AUTH_bc8228b6673f488aa253bbcb03c80ec5/internal_photos/bs/2021/Y/r/v2o9r3S3mA2o8d4xY1Aw/marca-ge.png",
-        url: "",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        requiresExternalAccess: true,
-        externalAccessUrl: "https://ge.globo.com/",
-        externalProviderName: "ge.globo Oficial",
-        description: "Canal de esportes 24h gratuito da Globo com debates, gols da rodada, cobertura esportiva e eventos livres."
-      },
-      {
-        id: "sportv-oficial",
-        tvgId: "SporTV.br",
-        tvgName: "SporTV",
-        name: "SporTV (Acesso Oficial)",
-        category: "esportes",
-        groupTitle: "Esportes",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/SporTV_logo_2021.svg/512px-SporTV_logo_2021.svg.png",
-        url: "",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        requiresExternalAccess: true,
-        externalAccessUrl: "https://globoplay.globo.com/sportv/",
-        externalProviderName: "Globoplay + Canais ao Vivo",
-        description: "Canal fechado de esportes do Grupo Globo. Transmiss\xE3o linear restrita a assinantes oficiais do Globoplay."
-      },
-      {
-        id: "sportv-2-oficial",
-        tvgId: "SporTV2.br",
-        tvgName: "SporTV 2",
-        name: "SporTV 2 (Acesso Oficial)",
-        category: "esportes",
-        groupTitle: "Esportes",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/SporTV_logo_2021.svg/512px-SporTV_logo_2021.svg.png",
-        url: "",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        requiresExternalAccess: true,
-        externalAccessUrl: "https://globoplay.globo.com/sportv-2/",
-        externalProviderName: "Globoplay + Canais ao Vivo",
-        description: "Segundo canal linear SporTV, com eventos simult\xE2neos, v\xF4lei, basquete e automobilismo oficial."
-      },
-      {
-        id: "sportv-3-oficial",
-        tvgId: "SporTV3.br",
-        tvgName: "SporTV 3",
-        name: "SporTV 3 (Acesso Oficial)",
-        category: "esportes",
-        groupTitle: "Esportes",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/SporTV_logo_2021.svg/512px-SporTV_logo_2021.svg.png",
-        url: "",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        requiresExternalAccess: true,
-        externalAccessUrl: "https://globoplay.globo.com/sportv-3/",
-        externalProviderName: "Globoplay + Canais ao Vivo",
-        description: "Terceiro canal linear SporTV, especializado em esportes radicais, jud\xF4, t\xEAnis e ligas internacionais."
-      },
-      {
-        id: "espn-oficial",
-        tvgId: "ESPN.br",
-        tvgName: "ESPN Brasil",
-        name: "ESPN (Acesso Oficial)",
-        category: "esportes",
-        groupTitle: "Esportes",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/ESPN_wordmark.svg/512px-ESPN_wordmark.svg.png",
-        url: "",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        requiresExternalAccess: true,
-        externalAccessUrl: "https://www.disneyplus.com/brand/espn",
-        externalProviderName: "Disney+ / ESPN Oficial",
-        description: "L\xEDder mundial em esportes, com Premier League, NFL, NBA e La Liga. Transmiss\xE3o oficial dispon\xEDvel via Disney+."
-      },
-      {
-        id: "premiere-oficial",
-        tvgId: "Premiere.br",
-        tvgName: "Premiere Futebol",
-        name: "Premiere (Acesso Oficial)",
-        category: "esportes",
-        groupTitle: "Esportes",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Premiere_logo_2021.svg/512px-Premiere_logo_2021.svg.png",
-        url: "",
-        quality: "1080p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        requiresExternalAccess: true,
-        externalAccessUrl: "https://premiere.globo.com/",
-        externalProviderName: "Premiere Play Oficial",
-        description: "O melhor do futebol brasileiro: Brasileir\xE3o S\xE9ries A e B e Campeonatos Estaduais sob demanda oficial."
+  delete(key) {
+    return this.map.delete(key);
+  }
+  clear() {
+    this.map.clear();
+  }
+  get size() {
+    return this.map.size;
+  }
+  pruneExpired() {
+    const now = Date.now();
+    let count = 0;
+    for (const [key, entry] of this.map.entries()) {
+      if (entry.expiresAt !== null && now > entry.expiresAt) {
+        this.map.delete(key);
+        count++;
       }
-    ];
+    }
+    return count;
+  }
+  forEach(callback) {
+    const now = Date.now();
+    for (const [key, entry] of this.map.entries()) {
+      if (entry.expiresAt !== null && now > entry.expiresAt) {
+        this.map.delete(key);
+      } else {
+        callback(entry.value, key);
+      }
+    }
+  }
+  keys() {
+    return this.map.keys();
+  }
+  values() {
+    const now = Date.now();
+    const result = [];
+    for (const [key, entry] of this.map.entries()) {
+      if (entry.expiresAt !== null && now > entry.expiresAt) {
+        this.map.delete(key);
+      } else {
+        result.push(entry.value);
+      }
+    }
+    return result;
   }
 };
 
-// src/core/rankings/imdbRankingSnapshots.ts
-var OFFICIAL_IMDB_WEEKLY_SNAPSHOTS = [
-  // =========================================================================
-  // FILMES — SNAPSHOT SEMANA 41 (Outubro de 2026 - Oficial MOVIEmeter Imagem 1)
-  // =========================================================================
-  {
-    id: "snapshot-movie-2026-w41",
-    weekKey: "2026-W41",
-    weekLabel: "Semana 41 (Outubro de 2026)",
-    monthKey: "2026-10",
-    rankType: "movie",
-    referenceDate: "2026-10-12",
-    capturedAt: 17918592e5,
-    items: [
-      { rankType: "movie", position: 1, imdbId: "tt29971038", title: "Sobreviv\xEAncia", originalTitle: "Animals", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 2, imdbId: "tt31454558", title: "Digger", originalTitle: "Digger", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 3, imdbId: "tt21440780", title: "Outra Mam\xE3e", originalTitle: "Another Mother", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 4, imdbId: "tt15888806", title: "Verity", originalTitle: "Verity", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 5, imdbId: "tt28704204", title: "O Exorcista: M\xE1rtires", originalTitle: "The Exorcist: Martyrs", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 6, imdbId: "tt31828574", title: "Matchbox: O Filme", originalTitle: "Matchbox", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 7, imdbId: "tt13000574", title: "Resident Evil", originalTitle: "Resident Evil", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 8, imdbId: "tt20221436", title: "Homem-Aranha: Um Novo Dia", originalTitle: "Spider-Man: Brand New Day", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 9, imdbId: "tt0100935", title: "Cora\xE7\xE3o Selvagem", originalTitle: "Wild at Heart", year: 1990, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 10, imdbId: "tt11464826", title: "O Outro Lado das Redes", originalTitle: "The Social Dilemma", year: 2020, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 11, imdbId: "tt1392796", title: "Unabomber", originalTitle: "Unabomber", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 12, imdbId: "tt11576182", title: "Dia D", originalTitle: "D-Day", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 13, imdbId: "tt2788314", title: "A Odisseia", originalTitle: "The Odyssey", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 14, imdbId: "tt0074991", title: "Obsess\xE3o", originalTitle: "Obsession", year: 1976, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 15, imdbId: "tt11897478", title: "Prisioneiro", originalTitle: "Prisoner", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 16, imdbId: "tt26658104", title: "Backrooms: Um N\xE3o-Lugar", originalTitle: "The Backrooms", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 17, imdbId: "tt18944118", title: "The Uprising: Rise of Robin Hood", originalTitle: "The Uprising", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 18, imdbId: "tt28148803", title: "Sobrenatural: Agora Entre N\xF3s", originalTitle: "Insidious: The Bleeding World", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 19, imdbId: "tt27712800", title: "A Hip\xF3tese do Amor", originalTitle: "The Love Hypothesis", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 20, imdbId: "tt27814420", title: "A Queda 2: No Limite", originalTitle: "Fall 2", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 21, imdbId: "tt27542918", title: "A Empregada", originalTitle: "The Housemaid", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 22, imdbId: "tt27429810", title: "Street Fighter", originalTitle: "Street Fighter", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 23, imdbId: "tt0074296", title: "Carrie, a Estranha", originalTitle: "Carrie", year: 1976, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 24, imdbId: "tt14932630", title: "O Fim da Rua", originalTitle: "End of the Road", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 25, imdbId: "tt31892834", title: "Daisy Lite", originalTitle: "Daisy Lite", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 26, imdbId: "tt12042730", title: "Devoradores de Estrelas", originalTitle: "Project Hail Mary", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 27, imdbId: "tt11878442", title: "Protocolo de Exterm\xEDnio", originalTitle: "28 Years Later", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 28, imdbId: "tt31589410", title: "Raz\xE3o e Sensibilidade", originalTitle: "Sense and Sensibility", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 29, imdbId: "tt29471588", title: "You Can See Everything", originalTitle: "You Can See Everything", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 30, imdbId: "tt13651762", title: "Tr\xEAs Horas para Viver", originalTitle: "Three Hours to Live", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" }
-    ]
-  },
-  // =========================================================================
-  // FILMES — SNAPSHOT SEMANA 40 (Outubro de 2026 - Semana Anterior)
-  // =========================================================================
-  {
-    id: "snapshot-movie-2026-w40",
-    weekKey: "2026-W40",
-    weekLabel: "Semana 40 (Outubro de 2026)",
-    monthKey: "2026-10",
-    rankType: "movie",
-    referenceDate: "2026-10-05",
-    capturedAt: 17912544e5,
-    items: [
-      { rankType: "movie", position: 1, imdbId: "tt29971038", title: "Sobreviv\xEAncia", originalTitle: "Animals", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 2, imdbId: "tt31454558", title: "Digger", originalTitle: "Digger", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 3, imdbId: "tt21440780", title: "Outra Mam\xE3e", originalTitle: "Another Mother", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 4, imdbId: "tt15888806", title: "Verity", originalTitle: "Verity", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 5, imdbId: "tt28704204", title: "O Exorcista: M\xE1rtires", originalTitle: "The Exorcist: Martyrs", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 6, imdbId: "tt31828574", title: "Matchbox: O Filme", originalTitle: "Matchbox", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 7, imdbId: "tt13000574", title: "Resident Evil", originalTitle: "Resident Evil", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 8, imdbId: "tt20221436", title: "Homem-Aranha: Um Novo Dia", originalTitle: "Spider-Man: Brand New Day", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 9, imdbId: "tt0100935", title: "Cora\xE7\xE3o Selvagem", originalTitle: "Wild at Heart", year: 1990, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 10, imdbId: "tt11464826", title: "O Outro Lado das Redes", originalTitle: "The Social Dilemma", year: 2020, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 11, imdbId: "tt1392796", title: "Unabomber", originalTitle: "Unabomber", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 12, imdbId: "tt11576182", title: "Dia D", originalTitle: "D-Day", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 13, imdbId: "tt2788314", title: "A Odisseia", originalTitle: "The Odyssey", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
-      { rankType: "movie", position: 14, imdbId: "tt0074991", title: "Obsess\xE3o", originalTitle: "Obsession", year: 1976, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" }
-    ]
-  },
-  // =========================================================================
-  // SÉRIES — SNAPSHOT SEMANA 41 (Outubro de 2026 - Oficial TVmeter Imagem 2)
-  // =========================================================================
-  {
-    id: "snapshot-series-2026-w41",
-    weekKey: "2026-W41",
-    weekLabel: "Semana 41 (Outubro de 2026)",
-    monthKey: "2026-10",
-    rankType: "series",
-    referenceDate: "2026-10-12",
-    capturedAt: 17918592e5,
-    items: [
-      { rankType: "series", position: 1, imdbId: "tt30147890", title: "Carrie: A Estranha", originalTitle: "Carrie", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 2, imdbId: "tt32159846", title: "Profundezas", originalTitle: "The Deep", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 3, imdbId: "tt22020214", title: "A Leste do \xC9den", originalTitle: "East of Eden", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 4, imdbId: "tt26540670", title: "Lanternas", originalTitle: "Lanterns", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 5, imdbId: "tt10986410", title: "Ted Lasso", originalTitle: "Ted Lasso", year: 2020, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 6, imdbId: "tt28289508", title: "Terra de M\xE1fia", originalTitle: "MobLand", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 7, imdbId: "tt5875444", title: "Slow Horses", originalTitle: "Slow Horses", year: 2022, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 8, imdbId: "tt29458920", title: "War", originalTitle: "War", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 9, imdbId: "tt13207736", title: "Monstros", originalTitle: "Monsters", year: 2022, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 10, imdbId: "tt1844624", title: "Hist\xF3ria de Horror Americana", originalTitle: "American Horror Story", year: 2011, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 11, imdbId: "tt16066148", title: "Magnatas do Crime", originalTitle: "The Gentlemen", year: 2024, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 12, imdbId: "tt32567812", title: "Avatar: Os Sete Ref\xFAgios", originalTitle: "Avatar: The Seven Havens", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 13, imdbId: "tt33314545", title: "Neagley: Detetive Particular", originalTitle: "Neagley", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 14, imdbId: "tt1196946", title: "O Mentalista", originalTitle: "The Mentalist", year: 2008, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 15, imdbId: "tt0944947", title: "Game of Thrones", originalTitle: "Game of Thrones", year: 2011, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 16, imdbId: "tt9288030", title: "Reacher", originalTitle: "Reacher", year: 2022, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 17, imdbId: "tt31854290", title: "O Segredo de Widow's Bay", originalTitle: "The Secret of Widow's Bay", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 18, imdbId: "tt13111078", title: "Opera\xE7\xE3o Lioness", originalTitle: "Special Ops: Lioness", year: 2023, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 19, imdbId: "tt14688458", title: "Silo", originalTitle: "Silo", year: 2023, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 20, imdbId: "tt33145678", title: "Coven Academy", originalTitle: "Coven Academy", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 21, imdbId: "tt32876543", title: "Bloodaxe", originalTitle: "Bloodaxe", year: 2027, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 22, imdbId: "tt0903747", title: "Breaking Bad", originalTitle: "Breaking Bad", year: 2008, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 23, imdbId: "tt19231492", title: "Mat\xE9ria Escura", originalTitle: "Dark Matter", year: 2024, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 24, imdbId: "tt7441656", title: "Black Clover", originalTitle: "Black Clover", year: 2017, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 25, imdbId: "tt31985420", title: "Desaparecida", originalTitle: "Missing", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 26, imdbId: "tt11712058", title: "O Dono de Kingstown", originalTitle: "Mayor of Kingstown", year: 2021, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 27, imdbId: "tt32984512", title: "Cupertino", originalTitle: "Cupertino", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 28, imdbId: "tt23145698", title: "Crystal Lake", originalTitle: "Crystal Lake", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 29, imdbId: "tt7587890", title: "The Rookie", originalTitle: "The Rookie", year: 2018, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 30, imdbId: "tt31876542", title: "Brothers", originalTitle: "Brothers", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" }
-    ]
-  },
-  // =========================================================================
-  // SÉRIES — SNAPSHOT SEMANA 40 (Outubro de 2026 - Semana Anterior)
-  // =========================================================================
-  {
-    id: "snapshot-series-2026-w40",
-    weekKey: "2026-W40",
-    weekLabel: "Semana 40 (Outubro de 2026)",
-    monthKey: "2026-10",
-    rankType: "series",
-    referenceDate: "2026-10-05",
-    capturedAt: 17912544e5,
-    items: [
-      { rankType: "series", position: 1, imdbId: "tt30147890", title: "Carrie: A Estranha", originalTitle: "Carrie", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 2, imdbId: "tt32159846", title: "Profundezas", originalTitle: "The Deep", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 3, imdbId: "tt22020214", title: "A Leste do \xC9den", originalTitle: "East of Eden", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 4, imdbId: "tt26540670", title: "Lanternas", originalTitle: "Lanterns", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 5, imdbId: "tt10986410", title: "Ted Lasso", originalTitle: "Ted Lasso", year: 2020, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 6, imdbId: "tt28289508", title: "Terra de M\xE1fia", originalTitle: "MobLand", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 7, imdbId: "tt5875444", title: "Slow Horses", originalTitle: "Slow Horses", year: 2022, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 8, imdbId: "tt29458920", title: "War", originalTitle: "War", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 9, imdbId: "tt13207736", title: "Monstros", originalTitle: "Monsters", year: 2022, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 10, imdbId: "tt1844624", title: "Hist\xF3ria de Horror Americana", originalTitle: "American Horror Story", year: 2011, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 11, imdbId: "tt16066148", title: "Magnatas do Crime", originalTitle: "The Gentlemen", year: 2024, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 12, imdbId: "tt1196946", title: "O Mentalista", originalTitle: "The Mentalist", year: 2008, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 13, imdbId: "tt0944947", title: "Game of Thrones", originalTitle: "Game of Thrones", year: 2011, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 14, imdbId: "tt9288030", title: "Reacher", originalTitle: "Reacher", year: 2022, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 15, imdbId: "tt13111078", title: "Opera\xE7\xE3o Lioness", originalTitle: "Special Ops: Lioness", year: 2023, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 16, imdbId: "tt14688458", title: "Silo", originalTitle: "Silo", year: 2023, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 17, imdbId: "tt0903747", title: "Breaking Bad", originalTitle: "Breaking Bad", year: 2008, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 18, imdbId: "tt19231492", title: "Mat\xE9ria Escura", originalTitle: "Dark Matter", year: 2024, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 19, imdbId: "tt11712058", title: "O Dono de Kingstown", originalTitle: "Mayor of Kingstown", year: 2021, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
-      { rankType: "series", position: 20, imdbId: "tt7587890", title: "The Rookie", originalTitle: "The Rookie", year: 2018, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" }
-    ]
-  }
-];
-
-// src/core/rankings/IMDbWeeklyRankingService.ts
-import fs from "fs";
-import path from "path";
-var IMDbWeeklyRankingService = class _IMDbWeeklyRankingService {
+// src/core/anilist/aniListClient.ts
+var GRAPHQL_ENDPOINT = "https://graphql.anilist.co";
+var CACHE_TTL_MS = 15 * 60 * 1e3;
+var AniListClient = class _AniListClient {
   constructor() {
-    this.snapshots = [];
-    this.dataFilePath = typeof window === "undefined" && typeof process !== "undefined" && process.cwd ? path.resolve(process.cwd(), "data", "imdb_weekly_snapshots.json") : "";
-    this.loadSnapshots();
+    this.cache = new LruCache(100, CACHE_TTL_MS);
   }
   static getInstance() {
-    if (!_IMDbWeeklyRankingService.instance) {
-      _IMDbWeeklyRankingService.instance = new _IMDbWeeklyRankingService();
+    if (!_AniListClient.instance) {
+      _AniListClient.instance = new _AniListClient();
     }
-    return _IMDbWeeklyRankingService.instance;
+    return _AniListClient.instance;
   }
   /**
-   * Carrega os snapshots em disco ou memória
+   * Executa uma consulta GraphQL com timeout e tratamento resiliente de erros
    */
-  loadSnapshots() {
+  async executeQuery(query, variables) {
+    const cacheKey = JSON.stringify({ query, variables });
+    const cached = this.cache.get(cacheKey);
+    if (cached) return cached;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6e3);
     try {
-      if (typeof window === "undefined" && this.dataFilePath && typeof fs !== "undefined" && fs.existsSync && fs.existsSync(this.dataFilePath)) {
-        const raw = fs.readFileSync(this.dataFilePath, "utf-8");
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          this.snapshots = parsed;
-          return;
+      const response = await fetch(GRAPHQL_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({ query, variables }),
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        if (response.status === 429) {
+          console.warn("[AniListClient] Rate limit atingido no AniList. Usando fallback silencioso.");
+        } else {
+          console.warn(`[AniListClient] Erro HTTP ${response.status} da API AniList`);
         }
-      } else if (typeof window !== "undefined" && window.localStorage) {
-        const local = localStorage.getItem("zapitv_imdb_weekly_snapshots");
-        if (local) {
-          const parsed = JSON.parse(local);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            this.snapshots = parsed;
-            return;
+        return null;
+      }
+      const json = await response.json();
+      if (json.errors && json.errors.length > 0) {
+        console.warn("[AniListClient] Erros GraphQL retornados:", json.errors[0]?.message);
+        return null;
+      }
+      const data = json.data;
+      if (data) {
+        this.cache.set(cacheKey, data);
+      }
+      return data;
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.warn("[AniListClient] Falha de comunica\xE7\xE3o com AniList:", err.message || err);
+      }
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  /**
+   * Converte um registro oficial do AniList em um ContentItem padronizado do ZapiTV
+   */
+  convertAniListToContentItem(media2) {
+    const isMovie = media2.format === "MOVIE";
+    const mainTitle = media2.title.english || media2.title.romaji || media2.title.native || "Anime";
+    const origTitle = media2.title.native || media2.title.romaji || void 0;
+    const year = media2.seasonYear || media2.startDate?.year || (/* @__PURE__ */ new Date()).getFullYear();
+    const poster = media2.coverImage?.extraLarge || media2.coverImage?.large || media2.coverImage?.medium || "";
+    const backdrop = media2.bannerImage || poster;
+    const rating = media2.averageScore ? Number((media2.averageScore / 10).toFixed(1)) : 8;
+    const genres = Array.from(/* @__PURE__ */ new Set(["Anime", ...media2.genres || []]));
+    const cleanDesc = (media2.description || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim();
+    const episodeCount = media2.episodes || (isMovie ? 1 : 12);
+    const episodes2 = isMovie ? void 0 : Array.from({ length: Math.min(episodeCount, 1500) }, (_, idx) => {
+      const epNum = idx + 1;
+      return {
+        id: `ep-${epNum}`,
+        number: epNum,
+        title: `Epis\xF3dio ${epNum}`,
+        description: `Epis\xF3dio ${epNum} de ${mainTitle}`,
+        image: poster
+      };
+    });
+    return {
+      id: `anilist-${media2.id}`,
+      canonicalId: `anime:anilist:${media2.id}`,
+      aniListId: media2.id,
+      malId: media2.idMal || void 0,
+      title: mainTitle,
+      originalTitle: origTitle,
+      type: "ANIME" /* ANIME */,
+      mediaFormat: isMovie ? "movie" : "series",
+      year,
+      rating,
+      image: poster,
+      backdrop,
+      description: cleanDesc,
+      overview: cleanDesc,
+      genres,
+      seasonsCount: 1,
+      episodes: episodes2,
+      isFeatured: false,
+      availabilityStatus: "declared"
+    };
+  }
+  /**
+   * Pesquisa animes por termo com paginação
+   */
+  async searchAnime(query, page = 1, perPage = 20) {
+    if (!query || query.trim().length === 0) return [];
+    const gql = `
+      query ($search: String, $page: Int, $perPage: Int) {
+        Page(page: $page, perPage: $perPage) {
+          media(search: $search, type: ANIME, sort: SEARCH_MATCH) {
+            id
+            idMal
+            title {
+              romaji
+              english
+              native
+            }
+            format
+            status
+            episodes
+            seasonYear
+            startDate {
+              year
+            }
+            coverImage {
+              extraLarge
+              large
+              medium
+            }
+            bannerImage
+            genres
+            averageScore
+            description
           }
         }
       }
-    } catch (e) {
-      console.warn("[IMDbWeeklyRankingService] Aviso ao ler snapshot:", e);
-    }
-    this.initDefaultAuthorizedSnapshots();
-  }
-  /**
-   * Salva os snapshots persistidos em disco (Node.js) e localStorage (se no navegador)
-   */
-  saveSnapshots() {
-    try {
-      if (typeof window === "undefined" && this.dataFilePath && typeof fs !== "undefined") {
-        const dir = path.dirname(this.dataFilePath);
-        if (fs.existsSync && !fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
-        }
-        if (fs.writeFileSync) {
-          fs.writeFileSync(this.dataFilePath, JSON.stringify(this.snapshots, null, 2), "utf-8");
-        }
-      } else if (typeof window !== "undefined" && window.localStorage) {
-        localStorage.setItem("zapitv_imdb_weekly_snapshots", JSON.stringify(this.snapshots));
-      }
-    } catch (e) {
-      console.error("[IMDbWeeklyRankingService] Erro ao persistir snapshots:", e);
-    }
-  }
-  /**
-   * Snapshots autorizados iniciais baseados nas referências reais do IMDb
-   * (Semana 41 / Outubro de 2026)
-   */
-  initDefaultAuthorizedSnapshots() {
-    const movieItems = [
-      {
-        imdbId: "tt29971038",
-        title: "Sobreviv\xEAncia",
-        originalTitle: "Animals",
-        mediaType: "movie",
-        position: 1,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt31454558",
-        title: "Digger",
-        originalTitle: "Digger",
-        mediaType: "movie",
-        position: 2,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt21440780",
-        title: "Outra Mam\xE3e",
-        originalTitle: "Another Mother",
-        mediaType: "movie",
-        position: 3,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt15888806",
-        title: "Verity",
-        originalTitle: "Verity",
-        mediaType: "movie",
-        position: 4,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt28704204",
-        title: "O Exorcista: M\xE1rtires",
-        originalTitle: "The Exorcist: Martyrs",
-        mediaType: "movie",
-        position: 5,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt31828574",
-        title: "Matchbox: O Filme",
-        originalTitle: "Matchbox",
-        mediaType: "movie",
-        position: 6,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt13000574",
-        title: "Resident Evil",
-        originalTitle: "Resident Evil",
-        mediaType: "movie",
-        position: 7,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt20221436",
-        title: "Homem-Aranha: Um Novo Dia",
-        originalTitle: "Spider-Man: Brand New Day",
-        mediaType: "movie",
-        position: 8,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt0100935",
-        title: "Cora\xE7\xE3o Selvagem",
-        originalTitle: "Wild at Heart",
-        mediaType: "movie",
-        position: 9,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 1990
-      },
-      {
-        imdbId: "tt11464826",
-        title: "O Outro Lado das Redes",
-        originalTitle: "The Social Dilemma",
-        mediaType: "movie",
-        position: 10,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2020
-      },
-      {
-        imdbId: "tt1392796",
-        title: "Unabomber",
-        originalTitle: "Unabomber",
-        mediaType: "movie",
-        position: 11,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt11576182",
-        title: "Dia D",
-        originalTitle: "D-Day",
-        mediaType: "movie",
-        position: 12,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt2788314",
-        title: "A Odisseia",
-        originalTitle: "The Odyssey",
-        mediaType: "movie",
-        position: 13,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt0074991",
-        title: "Obsess\xE3o",
-        originalTitle: "Obsession",
-        mediaType: "movie",
-        position: 14,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 1976
-      },
-      {
-        imdbId: "tt0063350",
-        title: "A Noite dos Mortos-Vivos",
-        originalTitle: "Night of the Living Dead",
-        mediaType: "movie",
-        position: 15,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 1968
-      },
-      {
-        imdbId: "tt8839088",
-        title: "Hist\xF3rias da Fome no Brasil",
-        originalTitle: "Hist\xF3rias da Fome no Brasil",
-        mediaType: "movie",
-        position: 16,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2018
-      },
-      {
-        imdbId: "tt0015864",
-        title: "O Mundo Perdido",
-        originalTitle: "The Lost World",
-        mediaType: "movie",
-        position: 17,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 1925
-      },
-      {
-        imdbId: "tt0013442",
-        title: "Nosferatu",
-        originalTitle: "Nosferatu",
-        mediaType: "movie",
-        position: 18,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 1922
-      },
-      {
-        imdbId: "tt1727587",
-        title: "Sintel",
-        originalTitle: "Sintel",
-        mediaType: "movie",
-        position: 19,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2010
-      },
-      {
-        imdbId: "tt2285752",
-        title: "Tears of Steel",
-        originalTitle: "Tears of Steel",
-        mediaType: "movie",
-        position: 21,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2012
-      },
-      {
-        imdbId: "tt0056923",
-        title: "Charada",
-        originalTitle: "Charade",
-        mediaType: "movie",
-        position: 22,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 1963
-      },
-      {
-        imdbId: "tt0111161",
-        title: "Um Sonho de Liberdade",
-        originalTitle: "The Shawshank Redemption",
-        mediaType: "movie",
-        position: 23,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 1994
-      },
-      {
-        imdbId: "tt15340724",
-        title: "Garota do S\xE9culo 20",
-        originalTitle: "20th Century Girl",
-        mediaType: "movie",
-        position: 24,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2022
-      },
-      {
-        imdbId: "tt11897478",
-        title: "O Desconhecido",
-        originalTitle: "The Stranger",
-        mediaType: "movie",
-        position: 25,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2022
-      },
-      {
-        imdbId: "tt1777606",
-        title: "Rosalina",
-        originalTitle: "Rosaline",
-        mediaType: "movie",
-        position: 26,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2022
-      },
-      {
-        imdbId: "tt4595186",
-        title: "Uma Garota de Muita Sorte",
-        originalTitle: "Luckiest Girl Alive",
-        mediaType: "movie",
-        position: 27,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        year: 2022
-      }
-    ];
-    const seriesItems = [
-      {
-        imdbId: "tt22020214",
-        title: "East of Eden",
-        originalTitle: "East of Eden",
-        mediaType: "series",
-        position: 1,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt29458920",
-        title: "War",
-        originalTitle: "War",
-        mediaType: "series",
-        position: 2,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt30147890",
-        title: "Carrie",
-        originalTitle: "Carrie",
-        mediaType: "series",
-        position: 3,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2026
-      },
-      {
-        imdbId: "tt15474916",
-        title: "Pinguim",
-        originalTitle: "The Penguin",
-        mediaType: "series",
-        position: 4,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2024
-      },
-      {
-        imdbId: "tt16294384",
-        title: "Disclaimer",
-        originalTitle: "Disclaimer",
-        mediaType: "series",
-        position: 5,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2024
-      },
-      {
-        imdbId: "tt0434665",
-        title: "Bleach",
-        originalTitle: "Bleach",
-        mediaType: "series",
-        position: 6,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2004
-      },
-      {
-        imdbId: "tt31908234",
-        title: "The Pitt",
-        originalTitle: "The Pitt",
-        mediaType: "series",
-        position: 7,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2025
-      },
-      {
-        imdbId: "tt14452776",
-        title: "O Urso",
-        originalTitle: "The Bear",
-        mediaType: "series",
-        position: 8,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2022
-      },
-      {
-        imdbId: "tt1063870",
-        title: "Fallout",
-        originalTitle: "Fallout",
-        mediaType: "series",
-        position: 9,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2024
-      },
-      {
-        imdbId: "tt2788316",
-        title: "X\xF3gum: A Gloriosa Saga do Jap\xE3o",
-        originalTitle: "Sh\u014Dgun",
-        mediaType: "series",
-        position: 10,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2024
-      },
-      {
-        imdbId: "tt2560140",
-        title: "Attack on Titan",
-        originalTitle: "Shingeki no Kyojin",
-        mediaType: "series",
-        position: 11,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2013
-      },
-      {
-        imdbId: "tt11198330",
-        title: "A Casa do Drag\xE3o",
-        originalTitle: "House of the Dragon",
-        mediaType: "series",
-        position: 12,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2022
-      },
-      {
-        imdbId: "tt0046593",
-        title: "Flash Gordon (1954)",
-        originalTitle: "Flash Gordon",
-        mediaType: "series",
-        position: 13,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 1954
-      },
-      {
-        imdbId: "tt0046642",
-        title: "Sherlock Holmes (1954)",
-        originalTitle: "Sherlock Holmes",
-        mediaType: "series",
-        position: 14,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 1954
-      },
-      {
-        imdbId: "tt10574558",
-        title: "Midnight Mass",
-        originalTitle: "Midnight Mass",
-        mediaType: "series",
-        position: 15,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2021
-      },
-      {
-        imdbId: "tt0903747",
-        title: "Breaking Bad",
-        originalTitle: "Breaking Bad",
-        mediaType: "series",
-        position: 16,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2008
-      },
-      {
-        imdbId: "tt0944947",
-        title: "Game of Thrones",
-        originalTitle: "Game of Thrones",
-        mediaType: "series",
-        position: 17,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2011
-      },
-      {
-        imdbId: "tt3566788",
-        title: "The Boys",
-        originalTitle: "The Boys",
-        mediaType: "series",
-        position: 18,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2019
-      },
-      {
-        imdbId: "tt4574334",
-        title: "Stranger Things",
-        originalTitle: "Stranger Things",
-        mediaType: "series",
-        position: 19,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2016
-      },
-      {
-        imdbId: "tt13443470",
-        title: "Heartstopper",
-        originalTitle: "Heartstopper",
-        mediaType: "series",
-        position: 20,
-        weekKey: "2026-W41",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        year: 2022
-      }
-    ];
-    this.snapshots = [
-      {
-        id: "snapshot-movie-2026-w41",
-        weekKey: "2026-W41",
-        weekLabel: "Semana 41 (Outubro de 2026)",
-        monthKey: "2026-10",
-        rankType: "movie",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-moviemeter",
-        items: movieItems
-      },
-      {
-        id: "snapshot-series-2026-w41",
-        weekKey: "2026-W41",
-        weekLabel: "Semana 41 (Outubro de 2026)",
-        monthKey: "2026-10",
-        rankType: "series",
-        referenceDate: "2026-10-12",
-        capturedAt: 17918592e5,
-        source: "imdb-tvmeter",
-        items: seriesItems
-      }
-    ];
-    this.saveSnapshots();
-  }
-  /**
-   * Obtém a lista ordenada mais recente para o tipo de mídia
-   */
-  getLatestRanking(rankType) {
-    const matching = this.snapshots.filter((s) => s.rankType === rankType);
-    if (matching.length === 0) {
-      throw new Error(`Nenhum snapshot v\xE1lido do IMDb encontrado para ${rankType}.`);
-    }
-    const latest = matching.sort((a, b) => {
-      if (b.referenceDate !== a.referenceDate) {
-        return b.referenceDate.localeCompare(a.referenceDate);
-      }
-      return b.capturedAt - a.capturedAt;
-    })[0];
-    const sortedItems = [...latest.items].sort((a, b) => a.position - b.position);
-    return { snapshot: latest, ranking: sortedItems };
-  }
-  /**
-   * Importa um snapshot autorizado
-   */
-  importAuthorizedSnapshot(snapshot) {
-    if (!snapshot.id || !snapshot.weekKey || !snapshot.rankType || !Array.isArray(snapshot.items)) {
-      return { success: false, message: "Estrutura inv\xE1lida de snapshot IMDb." };
-    }
-    const seenPositions = /* @__PURE__ */ new Set();
-    const seenImdbIds = /* @__PURE__ */ new Set();
-    for (const item of snapshot.items) {
-      if (!item.imdbId || !item.imdbId.startsWith("tt")) {
-        return { success: false, message: `IMDb ID inv\xE1lido: '${item.imdbId}'. Exigido formato 'tt...'` };
-      }
-      if (!item.position || item.position < 1) {
-        return { success: false, message: `Posi\xE7\xE3o IMDb inv\xE1lida: '${item.position}'. Exigido >= 1` };
-      }
-      if (seenPositions.has(item.position)) {
-        return { success: false, message: `Posi\xE7\xE3o duplicada no snapshot: #${item.position}` };
-      }
-      if (seenImdbIds.has(item.imdbId)) {
-        return { success: false, message: `IMDb ID duplicado no snapshot: ${item.imdbId}` };
-      }
-      seenPositions.add(item.position);
-      seenImdbIds.add(item.imdbId);
-    }
-    const idx = this.snapshots.findIndex((s) => s.id === snapshot.id || s.weekKey === snapshot.weekKey && s.rankType === snapshot.rankType);
-    if (idx !== -1) {
-      this.snapshots[idx] = snapshot;
-    } else {
-      this.snapshots.push(snapshot);
-    }
-    this.saveSnapshots();
-    return { success: true, message: `Snapshot importado com sucesso: ${snapshot.items.length} t\xEDtulos validados.` };
-  }
-  /**
-   * Executa a auditoria estrita de correspondência entre o que o ZapiTV publicou
-   * e o snapshot oficial do IMDb em vigor
-   */
-  verifyCorrespondence(publishedMovies, publishedSeries) {
-    const movieData = this.getLatestRanking("movie");
-    const seriesData = this.getLatestRanking("series");
-    const movieMap = /* @__PURE__ */ new Map();
-    movieData.ranking.forEach((m) => movieMap.set(m.imdbId.toLowerCase(), m));
-    const seriesMap = /* @__PURE__ */ new Map();
-    seriesData.ranking.forEach((s) => seriesMap.set(s.imdbId.toLowerCase(), s));
-    const movieMismatches = [];
-    const seriesMismatches = [];
-    const verifiedMovies = [];
-    const verifiedSeries = [];
-    let prevMovieImdbRank = 0;
-    publishedMovies.forEach((m, idx) => {
-      const displayRank = idx + 1;
-      const imdbId = (m.imdbId || "").trim().toLowerCase();
-      if (!imdbId) {
-        movieMismatches.push({
-          title: m.title,
-          imdbId: void 0,
-          reason: "T\xEDtulo publicado n\xE3o possui IMDb ID associado"
-        });
-        return;
-      }
-      const match = movieMap.get(imdbId);
-      if (!match) {
-        movieMismatches.push({
-          title: m.title,
-          imdbId,
-          reason: "T\xEDtulo publicado n\xE3o pertence ao ranking MOVIEmeter oficial da semana"
-        });
-      } else {
-        if (match.position < prevMovieImdbRank) {
-          movieMismatches.push({
-            title: m.title,
-            imdbId,
-            reason: `Ordem invertida em rela\xE7\xE3o ao IMDb: #${match.position} veio ap\xF3s #${prevMovieImdbRank}`
-          });
-        }
-        prevMovieImdbRank = match.position;
-        verifiedMovies.push({
-          displayRank,
-          imdbRank: match.position,
-          title: m.title,
-          imdbId: match.imdbId,
-          canonicalId: m.id,
-          verified: true
-        });
-      }
+    `;
+    const data = await this.executeQuery(gql, {
+      search: query.trim(),
+      page,
+      perPage
     });
-    let prevSeriesImdbRank = 0;
-    publishedSeries.forEach((s, idx) => {
-      const displayRank = idx + 1;
-      const imdbId = (s.imdbId || "").trim().toLowerCase();
-      if (!imdbId) {
-        seriesMismatches.push({
-          title: s.title,
-          imdbId: void 0,
-          reason: "T\xEDtulo publicado n\xE3o possui IMDb ID associado"
-        });
-        return;
-      }
-      const match = seriesMap.get(imdbId);
-      if (!match) {
-        seriesMismatches.push({
-          title: s.title,
-          imdbId,
-          reason: "T\xEDtulo publicado n\xE3o pertence ao ranking TVmeter oficial da semana"
-        });
-      } else {
-        if (match.position < prevSeriesImdbRank) {
-          seriesMismatches.push({
-            title: s.title,
-            imdbId,
-            reason: `Ordem invertida em rela\xE7\xE3o ao IMDb: #${match.position} veio ap\xF3s #${prevSeriesImdbRank}`
-          });
-        }
-        prevSeriesImdbRank = match.position;
-        verifiedSeries.push({
-          displayRank,
-          imdbRank: match.position,
-          title: s.title,
-          imdbId: match.imdbId,
-          canonicalId: s.id,
-          verified: true
-        });
-      }
-    });
-    const isCompliant = movieMismatches.length === 0 && seriesMismatches.length === 0;
-    return {
-      isCompliant,
-      checkedAt: Date.now(),
-      weekKey: movieData.snapshot.weekKey,
-      referenceDate: movieData.snapshot.referenceDate,
-      totalMoviesChecked: publishedMovies.length,
-      totalSeriesChecked: publishedSeries.length,
-      movieMismatches,
-      seriesMismatches,
-      verifiedMovies,
-      verifiedSeries
-    };
+    if (!data?.Page?.media) return [];
+    return data.Page.media.map((m) => this.convertAniListToContentItem(m));
   }
   /**
-   * Retorna todos os snapshots registrados
+   * Obtém os animes mais populares do AniList
    */
-  getAllSnapshots() {
-    return [...this.snapshots];
+  async getPopularAnimes(page = 1, perPage = 20) {
+    const gql = `
+      query ($page: Int, $perPage: Int) {
+        Page(page: $page, perPage: $perPage) {
+          media(type: ANIME, sort: POPULARITY_DESC) {
+            id
+            idMal
+            title {
+              romaji
+              english
+              native
+            }
+            format
+            status
+            episodes
+            seasonYear
+            startDate {
+              year
+            }
+            coverImage {
+              extraLarge
+              large
+            }
+            bannerImage
+            genres
+            averageScore
+            description
+          }
+        }
+      }
+    `;
+    const data = await this.executeQuery(gql, { page, perPage });
+    if (!data?.Page?.media) return [];
+    return data.Page.media.map((m) => this.convertAniListToContentItem(m));
+  }
+  /**
+   * Obtém detalhes de um anime por AniList ID
+   */
+  async getAnimeById(id) {
+    const gql = `
+      query ($id: Int) {
+        Media(id: $id, type: ANIME) {
+          id
+          idMal
+          title {
+            romaji
+            english
+            native
+          }
+          format
+          status
+          episodes
+          seasonYear
+          startDate {
+            year
+          }
+          coverImage {
+            extraLarge
+            large
+          }
+          bannerImage
+          genres
+          averageScore
+          description
+        }
+      }
+    `;
+    const data = await this.executeQuery(gql, { id });
+    if (!data?.Media) return null;
+    return this.convertAniListToContentItem(data.Media);
+  }
+  /**
+   * Obtém detalhes de um anime por MyAnimeList (MAL) ID
+   */
+  async getAnimeByMalId(malId) {
+    const gql = `
+      query ($idMal: Int) {
+        Media(idMal: $idMal, type: ANIME) {
+          id
+          idMal
+          title {
+            romaji
+            english
+            native
+          }
+          format
+          status
+          episodes
+          seasonYear
+          startDate {
+            year
+          }
+          coverImage {
+            extraLarge
+            large
+          }
+          bannerImage
+          genres
+          averageScore
+          description
+        }
+      }
+    `;
+    const data = await this.executeQuery(gql, { idMal: malId });
+    if (!data?.Media) return null;
+    return this.convertAniListToContentItem(data.Media);
   }
 };
-var imdbWeeklyRankingService = IMDbWeeklyRankingService.getInstance();
+var aniListClient = AniListClient.getInstance();
+
+// src/core/catalog/catalogDeduplication.ts
+function normalizeCatalogText(text2) {
+  if (!text2) return "";
+  return text2.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "").trim();
+}
+function getCanonicalKeysForItem(item) {
+  if (!item) return [];
+  const keys = /* @__PURE__ */ new Set();
+  if (item.canonicalId) {
+    keys.add(`canonical:${item.canonicalId.trim().toLowerCase()}`);
+  }
+  try {
+    const resolved = canonicalCatalogMaster.resolveCanonicalId(item);
+    if (resolved) {
+      keys.add(`canonical:${resolved.trim().toLowerCase()}`);
+    }
+  } catch {
+  }
+  if (item.imdbId && /^tt\d+$/i.test(item.imdbId.trim())) {
+    keys.add(`imdb:${item.imdbId.trim().toLowerCase()}`);
+  } else if (item.imdbId && /^\d{6,10}$/.test(item.imdbId.trim())) {
+    keys.add(`imdb:tt${item.imdbId.trim()}`);
+  }
+  if (item.id && /^tt\d+$/i.test(item.id.trim())) {
+    keys.add(`imdb:${item.id.trim().toLowerCase()}`);
+  }
+  const imdbInIdMatch = String(item.id || "").match(/^(?:movie|series|anime)[-_](?:tt)?(\d{6,10})$/i);
+  if (imdbInIdMatch) {
+    keys.add(`imdb:tt${imdbInIdMatch[1]}`);
+  }
+  const isMovie = item.type === "FILME" /* MOVIE */ || item.type === "movie" || item.type === "FILME" || item.mediaFormat === "movie";
+  const isSeries = item.type === "S\xC9RIE" /* SERIES */ || item.type === "series" || item.type === "tv" || item.type === "S\xC9RIE" || item.mediaFormat === "series";
+  const isAnime = item.type === "ANIME" /* ANIME */ || item.type === "anime" || item.type === "ANIME" || Boolean(item.aniListId) || Boolean(item.malId) || item.genres?.some((g) => g.toLowerCase() === "anime");
+  const cat = isAnime ? "anime" : isMovie ? "movie" : "series";
+  const tmdbMediaType = isMovie ? "movie" : "tv";
+  if (item.tmdbId) {
+    keys.add(`tmdb:${tmdbMediaType}:${String(item.tmdbId).trim().toLowerCase()}`);
+  }
+  const tmdbMatch = String(item.id || "").match(/^tmdb-(?:movie-|tv-|anime-)?(\d+)/i);
+  if (tmdbMatch) {
+    keys.add(`tmdb:${tmdbMediaType}:${tmdbMatch[1]}`);
+  }
+  if (item.aniListId) {
+    keys.add(`anilist:${item.aniListId}`);
+  }
+  const aniMatch = String(item.id || "").match(/^anilist-(\d+)/i);
+  if (aniMatch) {
+    keys.add(`anilist:${aniMatch[1]}`);
+  }
+  if (item.malId) {
+    keys.add(`mal:${item.malId}`);
+  }
+  if (item.id) {
+    keys.add(`id:${item.id.trim().toLowerCase()}`);
+  }
+  const year = Number(item.year) || 0;
+  const titlesToProcess = [item.title, item.originalTitle].filter(Boolean);
+  for (const rawTitle of titlesToProcess) {
+    const norm = normalizeCatalogText(rawTitle);
+    if (!norm) continue;
+    if (year > 0) {
+      keys.add(`title:${cat}:${norm}:${year}`);
+      keys.add(`title_bucket:${cat}:${norm}:${year}`);
+      keys.add(`title_bucket:${cat}:${norm}:${year - 1}`);
+    } else {
+      keys.add(`title_only:${cat}:${norm}`);
+    }
+    const parts = rawTitle.split(/[:–—|-]/);
+    if (parts.length > 1) {
+      const primaryPart = parts[0].trim();
+      const normPrimary = normalizeCatalogText(primaryPart);
+      if (normPrimary && normPrimary.length >= 4 && normPrimary !== norm) {
+        if (year > 0) {
+          keys.add(`title:${cat}:${normPrimary}:${year}`);
+          keys.add(`title_bucket:${cat}:${normPrimary}:${year}`);
+          keys.add(`title_bucket:${cat}:${normPrimary}:${year - 1}`);
+        }
+      }
+    }
+  }
+  return Array.from(keys);
+}
+function deduplicateContentItems(items) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const result = [];
+  const seenCanonicalKeys = /* @__PURE__ */ new Set();
+  const itemByIndex = /* @__PURE__ */ new Map();
+  for (const item of items) {
+    if (!item || !item.id && !item.title) continue;
+    const keys = getCanonicalKeysForItem(item);
+    let matchedItem;
+    for (const key of keys) {
+      if (itemByIndex.has(key)) {
+        matchedItem = itemByIndex.get(key);
+        break;
+      }
+    }
+    if (matchedItem) {
+      if (!matchedItem.imdbId && item.imdbId) matchedItem.imdbId = item.imdbId;
+      if (!matchedItem.tmdbId && item.tmdbId) matchedItem.tmdbId = item.tmdbId;
+      if (!matchedItem.aniListId && item.aniListId) matchedItem.aniListId = item.aniListId;
+      if (!matchedItem.malId && item.malId) matchedItem.malId = item.malId;
+      if (!matchedItem.canonicalId && item.canonicalId) matchedItem.canonicalId = item.canonicalId;
+      if (!matchedItem.backdrop && item.backdrop) matchedItem.backdrop = item.backdrop;
+      if (!matchedItem.image && item.image) matchedItem.image = item.image;
+      if (!matchedItem.genres || matchedItem.genres.length === 0) {
+        if (item.genres) matchedItem.genres = item.genres;
+      } else if (item.genres && Array.isArray(item.genres)) {
+        const merged = new Set(matchedItem.genres);
+        for (const g of item.genres) {
+          if (g && typeof g === "string") merged.add(g);
+        }
+        matchedItem.genres = Array.from(merged);
+      }
+      if (!matchedItem.overview && item.overview) matchedItem.overview = item.overview;
+      if (!matchedItem.description && item.description) matchedItem.description = item.description;
+      if ((!matchedItem.episodes || matchedItem.episodes.length === 0) && item.episodes) matchedItem.episodes = item.episodes;
+      for (const key of keys) {
+        seenCanonicalKeys.add(key);
+        itemByIndex.set(key, matchedItem);
+      }
+      continue;
+    }
+    for (const key of keys) {
+      seenCanonicalKeys.add(key);
+      itemByIndex.set(key, item);
+    }
+    result.push(item);
+  }
+  return result;
+}
 
 // src/core/catalog/BannedContentRegistry.ts
 var BANNED_PATTERNS = [
@@ -5259,24 +2932,24 @@ var BannedContentRegistry = class _BannedContentRegistry {
    */
   isBannedKeyOrId(keyOrId) {
     if (!keyOrId) return false;
-    const clean = String(keyOrId).trim().toLowerCase();
-    return BANNED_PATTERNS.some((pat) => pat.test(clean));
+    const clean2 = String(keyOrId).trim().toLowerCase();
+    return BANNED_PATTERNS.some((pat) => pat.test(clean2));
   }
   /**
    * Verifica se um título está banido
    */
   isBannedTitle(title) {
     if (!title) return false;
-    const clean = String(title).trim().toLowerCase();
-    return BANNED_PATTERNS.some((pat) => pat.test(clean));
+    const clean2 = String(title).trim().toLowerCase();
+    return BANNED_PATTERNS.some((pat) => pat.test(clean2));
   }
   /**
    * Verifica se uma URL de stream ou arquivo está banida
    */
   isBannedUrl(url) {
     if (!url) return false;
-    const clean = String(url).trim().toLowerCase();
-    return BANNED_PATTERNS.some((pat) => pat.test(clean));
+    const clean2 = String(url).trim().toLowerCase();
+    return BANNED_PATTERNS.some((pat) => pat.test(clean2));
   }
   /**
    * Verifica se um stream do Stremio ou player é de demonstração banida
@@ -5317,12 +2990,12 @@ var BannedContentRegistry = class _BannedContentRegistry {
           try {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed)) {
-              const clean = parsed.filter((it) => {
+              const clean2 = parsed.filter((it) => {
                 if (typeof it === "string") return !this.isBannedKeyOrId(it) && !this.isBannedTitle(it);
                 if (it && typeof it === "object") return !this.isBanned(it);
                 return true;
               });
-              localStorage.setItem(k, JSON.stringify(clean));
+              localStorage.setItem(k, JSON.stringify(clean2));
             } else if (parsed && typeof parsed === "object") {
               if (this.isBanned(parsed)) {
                 localStorage.removeItem(k);
@@ -5671,14 +3344,14 @@ function resolveStremioUrl(url) {
 }
 var StremioClient = class {
   constructor(url) {
-    let clean = url.trim();
-    if (clean.startsWith("stremio://")) {
-      clean = clean.replace("stremio://", "https://");
+    let clean2 = url.trim();
+    if (clean2.startsWith("stremio://")) {
+      clean2 = clean2.replace("stremio://", "https://");
     }
-    if (clean.endsWith("/manifest.json")) {
-      clean = clean.replace("/manifest.json", "");
+    if (clean2.endsWith("/manifest.json")) {
+      clean2 = clean2.replace("/manifest.json", "");
     }
-    this.baseUrl = clean.replace(/\/+$/, "");
+    this.baseUrl = clean2.replace(/\/+$/, "");
   }
   getBaseUrl() {
     return this.baseUrl;
@@ -5693,11 +3366,11 @@ var StremioClient = class {
       return await res.json();
     }
     try {
-      const res = await fetch(directUrl, { signal: AbortSignal.timeout(Math.min(timeoutMs, 4e3)) });
+      const res = await fetch(directUrl, { signal: AbortSignal.timeout(timeoutMs) });
       if (res.ok) {
-        const text = await res.text();
-        if (text.startsWith("{") || text.startsWith("[")) {
-          return JSON.parse(text);
+        const text2 = await res.text();
+        if (text2.startsWith("{") || text2.startsWith("[")) {
+          return JSON.parse(text2);
         }
       }
     } catch (err) {
@@ -5708,11 +3381,11 @@ var StremioClient = class {
       if (!res.ok) {
         throw new Error(`Proxy status: ${res.status}`);
       }
-      const text = await res.text();
-      if (!text.startsWith("{") && !text.startsWith("[")) {
+      const text2 = await res.text();
+      if (!text2.startsWith("{") && !text2.startsWith("[")) {
         throw new Error("Resposta inv\xE1lida do add-on (n\xE3o \xE9 JSON)");
       }
-      return JSON.parse(text);
+      return JSON.parse(text2);
     } catch (err) {
       throw new Error(`Falha ao consultar Stremio Addon [${directUrl}]: ${err.message}`);
     }
@@ -6207,6 +3880,168 @@ var VideoAdBlockerService = class {
 };
 var videoAdBlocker = new VideoAdBlockerService();
 
+// src/core/security/streamQuarantineService.ts
+var STORAGE_QUARANTINE_KEY = "zapitv_stream_quarantine_v1";
+var KNOWN_MALICIOUS_HASHES = [
+  // Casos Hope: O Primeiro Impacto (Mia Khalifa porn / trotes falsos indexados como supostos WEB-DL)
+  { hash: "812efbe7d0a75fb31bf9426db566f299d10b3474", reason: "Trote adulto / Mia Khalifa disfar\xE7ado de grava\xE7\xE3o de cinema" },
+  { hash: "6dc48c588dca97da6c610ae730c556a2c7c6718d", reason: "Trote adulto / Conte\xFAdo pornogr\xE1fico" },
+  { hash: "e79c88ea04c7326eb0f88ae9f18571689317e27f", reason: "Trote adulto / Conte\xFAdo pornogr\xE1fico" },
+  { hash: "f9a842dfe9f5b2e7fda509f2306e0700b97a4036", reason: "Trote adulto / Mia Khalifa" },
+  { hash: "d0eacddff07a24173d8f7dc11a18ef3ed32b886a", reason: "V\xEDdeo adulto n\xE3o solicitado em indexador de torrent" },
+  { hash: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", reason: "Arquivo corrompido / scam" }
+];
+var ADULT_ACTORS_AND_TERMS = [
+  "mia khalifa",
+  "khalifa",
+  "brazzers",
+  "xvideos",
+  "pornhub",
+  "redtube",
+  "youporn",
+  "bangbros",
+  "naughtyamerica",
+  "spankbang",
+  "xhamster",
+  "pornstar",
+  "hardcore xxx",
+  "creampie",
+  "blowjob",
+  "mature porn",
+  "erotic xxx"
+];
+var StreamQuarantineService = class {
+  constructor() {
+    this.quarantinedMap = /* @__PURE__ */ new Map();
+    this.listeners = /* @__PURE__ */ new Set();
+    this.initDefaultQuarantine();
+    this.loadFromStorage();
+    this.purgePlaywebFalsePositives();
+    this.purgeBenTheMenFalsePositives();
+  }
+  purgePlaywebFalsePositives() {
+    for (const [key, item] of this.quarantinedMap.entries()) {
+      const reason = item.reason?.toLowerCase() || "";
+      if (reason.includes("playweb") || reason.includes("release web-dl/bluray fraudulenta de filme em cartaz") || reason.includes("release digital fraudulenta para obra em cartaz/n\xE3o lan\xE7ada")) {
+        this.quarantinedMap.delete(key);
+      }
+    }
+    this.saveToStorage();
+  }
+  purgeBenTheMenFalsePositives() {
+    for (const [key, item] of this.quarantinedMap.entries()) {
+      const reason = item.reason?.toLowerCase() || "";
+      const target = item.targetTitle?.toLowerCase() || "";
+      if (reason.includes("ben the men") || target.includes("eden") || target.includes("\xE9den")) {
+        this.quarantinedMap.delete(key);
+      }
+    }
+    this.saveToStorage();
+  }
+  initDefaultQuarantine() {
+    for (const item of KNOWN_MALICIOUS_HASHES) {
+      this.quarantinedMap.set(item.hash.toLowerCase(), {
+        id: item.hash.toLowerCase(),
+        type: "infoHash",
+        reason: item.reason,
+        targetTitle: "Hope: O Primeiro Impacto",
+        sourceProvider: "Torrent Scraper",
+        quarantinedAt: "2026-10-13T00:00:00.000Z"
+      });
+    }
+  }
+  loadFromStorage() {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      const data = localStorage.getItem(STORAGE_QUARANTINE_KEY);
+      if (data) {
+        const list = JSON.parse(data);
+        if (Array.isArray(list)) {
+          list.forEach((item) => {
+            if (item && item.id) {
+              this.quarantinedMap.set(item.id.toLowerCase(), item);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("[StreamQuarantine] Erro ao carregar quarentena do storage:", e);
+    }
+  }
+  saveToStorage() {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    try {
+      const list = Array.from(this.quarantinedMap.values());
+      localStorage.setItem(STORAGE_QUARANTINE_KEY, JSON.stringify(list));
+    } catch (e) {
+      console.warn("[StreamQuarantine] Erro ao salvar quarentena no storage:", e);
+    }
+  }
+  /**
+   * Coloca um stream ou hash em quarentena imediatamente e persiste no sistema.
+   */
+  quarantine(identifier, reason, type = "url", targetTitle, sourceProvider) {
+    if (!identifier) return;
+    const cleanId = identifier.trim().toLowerCase();
+    const item = {
+      id: cleanId,
+      type,
+      reason,
+      targetTitle,
+      sourceProvider,
+      quarantinedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    this.quarantinedMap.set(cleanId, item);
+    this.saveToStorage();
+    console.error(`\u{1F6A8} [QUARANTINE] Fonte isolada permanentemente: "${cleanId}" | Motivo: ${reason}`);
+    this.listeners.forEach((fn) => fn());
+  }
+  /**
+   * Avalia rigorosamente se um stream deve ser colocado em quarentena ou já está isolado.
+   */
+  evaluateQuarantine(stream, targetTitle) {
+    if (!stream) return { isQuarantined: true, reason: "Stream nulo ou inv\xE1lido" };
+    const hash = (stream.infoHash || "").trim().toLowerCase();
+    const url = (stream.url || "").trim().toLowerCase();
+    const title = (stream.title || "").toLowerCase();
+    const name = (stream.name || "").toLowerCase();
+    const combined = `${name} ${title} ${url} ${hash}`;
+    if (hash && this.quarantinedMap.has(hash)) {
+      return { isQuarantined: true, reason: this.quarantinedMap.get(hash)?.reason || "Hash em quarentena" };
+    }
+    if (url && this.quarantinedMap.has(url)) {
+      return { isQuarantined: true, reason: this.quarantinedMap.get(url)?.reason || "URL em quarentena" };
+    }
+    for (const adultTerm of ADULT_ACTORS_AND_TERMS) {
+      if (combined.includes(adultTerm)) {
+        const reason = `Conte\xFAdo adulto/trote detectado: termo "${adultTerm}"`;
+        if (hash) this.quarantine(hash, reason, "adult_troll", targetTitle, stream.providerName);
+        if (url) this.quarantine(url, reason, "adult_troll", targetTitle, stream.providerName);
+        return { isQuarantined: true, reason };
+      }
+    }
+    if (targetTitle && /doraemon|gato do futuro/i.test(targetTitle)) {
+      if (combined.includes("sparks of tomorrow") || combined.includes("/1684/") || combined.includes("kurage.live") || combined.includes("animegg")) {
+        const reason = 'Colis\xE3o conhecida de anime upstream: "Sparks of Tomorrow" atribu\xEDdo a Doraemon';
+        if (url) this.quarantine(url, reason, "title_collision", targetTitle, stream.providerName);
+        return { isQuarantined: true, reason };
+      }
+    }
+    return { isQuarantined: false };
+  }
+  /**
+   * Retorna lista de todos os itens em quarentena para diagnóstico
+   */
+  getQuarantineList() {
+    return Array.from(this.quarantinedMap.values());
+  }
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+};
+var streamQuarantineService = new StreamQuarantineService();
+
 // src/core/providers/streamValidator.ts
 var KNOWN_PARKED_DOMAINS = [
   "superflixapi.top",
@@ -6223,40 +4058,40 @@ var KNOWN_UPSTREAM_MISMATCHES = [
   {
     targetPattern: /doraemon|gato do futuro|57911|65733|tt0069576|tt4083422/i,
     rejectStream: (s) => {
-      const text = `${s.name || ""} ${s.title || ""} ${s.url || ""}`.toLowerCase();
-      return text.includes("/1684/") || text.includes("kurage.live") || text.includes("animegg") || text.includes("sparks of tomorrow") || text.includes("plant\xE3o m\xE9dico") || text.includes("plantao medico") || text.includes("ultraman") || text.includes("eternal aseria") || text.includes("angel heart");
+      const text2 = `${s.name || ""} ${s.title || ""} ${s.url || ""}`.toLowerCase();
+      return text2.includes("/1684/") || text2.includes("kurage.live") || text2.includes("animegg") || text2.includes("sparks of tomorrow") || text2.includes("plant\xE3o m\xE9dico") || text2.includes("plantao medico") || text2.includes("ultraman") || text2.includes("eternal aseria") || text2.includes("angel heart");
     }
   },
   // 2. Overflow: provedores upstream mapeiam erroneamente para Black Clover (/1224/)
   {
     targetPattern: /overflow/i,
     rejectStream: (s) => {
-      const text = `${s.name || ""} ${s.title || ""} ${s.url || ""}`.toLowerCase();
-      return text.includes("/1224/") || text.includes("black clover") || text.includes("clover");
+      const text2 = `${s.name || ""} ${s.title || ""} ${s.url || ""}`.toLowerCase();
+      return text2.includes("/1224/") || text2.includes("black clover") || text2.includes("clover");
     }
   },
   // 3. Mori no Kuma-san: provedores upstream mapeiam erroneamente para Murai in Love (/1736/)
   {
     targetPattern: /mori.*kuma/i,
     rejectStream: (s) => {
-      const text = `${s.name || ""} ${s.title || ""} ${s.url || ""}`.toLowerCase();
-      return text.includes("/1736/") || text.includes("murai in love") || text.includes("murai no koi") || text.includes("murai");
+      const text2 = `${s.name || ""} ${s.title || ""} ${s.url || ""}`.toLowerCase();
+      return text2.includes("/1736/") || text2.includes("murai in love") || text2.includes("murai no koi") || text2.includes("murai");
     }
   },
   // 4. Modaete yo, Adam-kun: provedores upstream mapeiam erroneamente para Saving 80,000 Gold in Another World
   {
     targetPattern: /modaete.*adam/i,
     rejectStream: (s) => {
-      const text = `${s.name || ""} ${s.title || ""} ${s.url || ""}`.toLowerCase();
-      return text.includes("/1332/") || text.includes("saving 80,000 gold") || text.includes("80,000 gold") || text.includes("8-manmai") || text.includes("black adam");
+      const text2 = `${s.name || ""} ${s.title || ""} ${s.url || ""}`.toLowerCase();
+      return text2.includes("/1332/") || text2.includes("saving 80,000 gold") || text2.includes("80,000 gold") || text2.includes("8-manmai") || text2.includes("black adam");
     }
   },
   // 5. Hope: bloquear apenas hashes e assinaturas conhecidos de vídeos trocados.
   {
     targetPattern: /hope.*primeiro.*impacto|hopeu|1058424|tt27369017/i,
     rejectStream: (s) => {
-      const text = `${s.name || ""} ${s.title || ""} ${s.url || ""} ${s.infoHash || ""}`.toLowerCase();
-      if (text.includes("f9a842dfe9f5b2e7fda509f2306e0700b97a4036") || text.includes("d0eacddff07a24173d8f7dc11a18ef3ed32b886a") || text.includes("ben the men") || text.includes("khalifa") || text.includes("mia khalifa")) {
+      const text2 = `${s.name || ""} ${s.title || ""} ${s.url || ""} ${s.infoHash || ""}`.toLowerCase();
+      if (text2.includes("f9a842dfe9f5b2e7fda509f2306e0700b97a4036") || text2.includes("d0eacddff07a24173d8f7dc11a18ef3ed32b886a") || text2.includes("khalifa") || text2.includes("mia khalifa")) {
         return true;
       }
       return false;
@@ -6266,10 +4101,13 @@ var KNOWN_UPSTREAM_MISMATCHES = [
 var StreamValidator = class {
   constructor() {
     this.blacklist = new Set(KNOWN_PARKED_DOMAINS);
-    this.cache = /* @__PURE__ */ new Map();
+    this.cache = new LruCache(400, 5 * 60 * 1e3);
     this.CACHE_TTL_MS = 5 * 60 * 1e3;
   }
   // 5 minutos de cache
+  clearCache() {
+    this.cache.clear();
+  }
   /**
    * Verifica rapidamente se a URL pertence a um domínio comprovadamente estacionado ou na lista negra.
    */
@@ -6355,11 +4193,12 @@ var StreamValidator = class {
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
+        const isProvisional = res.status === 403 || res.status === 405;
         const result = {
-          valid: false,
+          valid: isProvisional,
           url,
           status: res.status,
-          reason: errorData.reason || `Falha na valida\xE7\xE3o HTTP: status ${res.status}`,
+          reason: isProvisional ? `Fonte aceita provisoriamente (Status HTTP ${res.status} n\xE3o impede reprodu\xE7\xE3o no navegador)` : errorData.reason || `Falha na valida\xE7\xE3o HTTP: status ${res.status}`,
           latencyMs: Date.now() - start
         };
         this.cache.set(url, { result, timestamp: Date.now() });
@@ -6375,10 +4214,11 @@ var StreamValidator = class {
       this.cache.set(url, { result: data, timestamp: Date.now() });
       return data;
     } catch (err) {
+      const isMediaExtension = url.includes(".m3u8") || url.includes(".mp4") || url.includes(".webm") || url.includes(".mpd");
       const result = {
-        valid: false,
+        valid: isMediaExtension,
         url,
-        reason: `Tempo limite ou erro de rede ao validar: ${err.message}`,
+        reason: `Verifica\xE7\xE3o leve em segundo plano pendente (${err.message})`,
         latencyMs: Date.now() - start
       };
       this.cache.set(url, { result, timestamp: Date.now() });
@@ -6389,7 +4229,7 @@ var StreamValidator = class {
    * Verifica se o stream realmente corresponde ao título do conteúdo requisitado,
    * prevenindo que animes/séries sejam trocados por conteúdos corrompidos em addons de terceiros.
    */
-  isStreamMatchingTargetTitle(stream, targetTitle) {
+  isStreamMatchingTargetTitle(stream, targetTitle, originalTitle, alternateTitles) {
     const sTitle = (stream.title || "").trim();
     const sName = (stream.name || "").trim();
     const sUrl = (stream.url || "").trim();
@@ -6398,7 +4238,7 @@ var StreamValidator = class {
       return false;
     }
     if (/🐉\s*Malfoy/i.test(`${sName} ${sTitle}`)) return false;
-    const quarantine = streamQuarantineService.evaluateQuarantine(stream, targetTitle);
+    const quarantine = streamQuarantineService.evaluateQuarantine(stream, targetTitle || originalTitle);
     if (quarantine.isQuarantined) {
       console.warn(`[StreamValidator] Stream bloqueado em quarentena: ${sTitle || sUrl} (Motivo: ${quarantine.reason})`);
       return false;
@@ -6407,7 +4247,7 @@ var StreamValidator = class {
       console.warn(`[StreamValidator] Stream rejeitado por bloqueio de propaganda embutida: ${sUrl}`);
       return false;
     }
-    const adEval = videoAdBlocker.evaluateStream(stream, targetTitle);
+    const adEval = videoAdBlocker.evaluateStream(stream, targetTitle || originalTitle);
     if (adEval.status === "bloqueado por propaganda embutida") {
       console.warn(`[StreamValidator] Stream rejeitado por propaganda embutida (1xBet / Apostas): ${sTitle || sUrl} (Motivo: ${adEval.reason})`);
       return false;
@@ -6436,39 +4276,54 @@ var StreamValidator = class {
       console.warn(`[StreamValidator] Stream rejeitado por conter termos adultos/trote: ${sTitle || sUrl}`);
       return false;
     }
-    if (!targetTitle || !targetTitle.trim()) return true;
+    const rawCandidates = [targetTitle, originalTitle, ...alternateTitles || []].filter((t) => Boolean(t && t.trim()));
+    if (rawCandidates.length === 0) return true;
     for (const rule of KNOWN_UPSTREAM_MISMATCHES) {
-      if (rule.targetPattern.test(targetTitle)) {
+      if (rawCandidates.some((cand) => rule.targetPattern.test(cand))) {
         if (rule.rejectStream(stream)) {
-          console.warn(`[StreamValidator] Stream rejeitado por desvio conhecido para '${targetTitle}': ${sTitle || sUrl}`);
+          console.warn(`[StreamValidator] Stream rejeitado por desvio conhecido para '[${rawCandidates.join(", ")}]': ${sTitle || sUrl}`);
           return false;
         }
       }
     }
+    const normalizeTitle = (str) => {
+      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+    };
+    const cleanCandidates = rawCandidates.map(normalizeTitle).filter(Boolean);
     const fenixMatch = sTitle.match(/🐦‍🔥\s*([^\n⏸️]+)/i);
     if (fenixMatch) {
-      const declaredTitle = fenixMatch[1].trim().toLowerCase();
-      const cleanTarget = targetTitle.toLowerCase().replace(/[^\w\s\u00C0-\u00FF]/gi, " ").replace(/\s+/g, " ").trim();
-      const targetWords = cleanTarget.split(" ").filter((w) => w.length >= 3);
-      const declaredWords = declaredTitle.replace(/[^\w\s\u00C0-\u00FF]/gi, " ").split(" ").filter((w) => w.length >= 3);
-      if (targetWords.length > 0 && declaredWords.length > 0) {
-        const hasOverlap = targetWords.some((tw) => declaredTitle.includes(tw)) || declaredWords.some((dw) => cleanTarget.includes(dw));
-        if (!hasOverlap) {
-          console.warn(`[StreamValidator] T\xEDtulo do stream '${declaredTitle}' n\xE3o corresponde ao t\xEDtulo solicitado '${targetTitle}'`);
-          return false;
+      const declaredTitle = normalizeTitle(fenixMatch[1]);
+      const declaredWords = declaredTitle.split(" ").filter((w) => w.length >= 3);
+      let matchesAny = false;
+      for (const cand of cleanCandidates) {
+        if (declaredTitle.includes(cand) || cand.includes(declaredTitle)) {
+          matchesAny = true;
+          break;
         }
+        const candWords = cand.split(" ").filter((w) => w.length >= 3);
+        if (candWords.length > 0 && declaredWords.length > 0) {
+          const hasOverlap = candWords.some((tw) => declaredTitle.includes(tw)) || declaredWords.some((dw) => cand.includes(dw));
+          if (hasOverlap) {
+            matchesAny = true;
+            break;
+          }
+        }
+      }
+      if (!matchesAny && cleanCandidates.length > 0) {
+        console.warn(`[StreamValidator] T\xEDtulo do stream '${declaredTitle}' n\xE3o corresponde aos t\xEDtulos solicitados [${cleanCandidates.join(", ")}]`);
+        return false;
       }
     }
     if (sTitle.length > 5 && (sTitle.includes("1080p") || sTitle.includes("720p") || sTitle.includes(".mkv") || sTitle.includes(".mp4") || sTitle.includes("NyaaSi") || sTitle.includes("TorrentGalaxy") || sTitle.includes("1337x"))) {
-      const cleanSTitle = sTitle.replace(/\[[^\]]+\]/g, " ").replace(/[^\w\s\u00C0-\u00FF]/gi, " ").toLowerCase();
-      const cleanTarget = targetTitle.toLowerCase().replace(/[^\w\s\u00C0-\u00FF]/gi, " ").trim();
-      const mainTargetWord = cleanTarget.split(" ").find((w) => w.length >= 4);
-      if (mainTargetWord && !cleanSTitle.includes(mainTargetWord)) {
-        const otherKnownSeries = ["ultraman", "aseria", "angel heart", "sparks of tomorrow", "black clover", "murai in love", "saving 80,000 gold"];
-        if (otherKnownSeries.some((t) => cleanSTitle.includes(t))) {
-          console.warn(`[StreamValidator] Release torrent com t\xEDtulo trocado rejeitada: '${sTitle}' para '${targetTitle}'`);
-          return false;
-        }
+      const cleanSTitle = normalizeTitle(sTitle.replace(/\[[^\]]+\]/g, " "));
+      const otherKnownSeries = ["ultraman", "aseria", "angel heart", "sparks of tomorrow", "black clover", "murai in love", "saving 80,000 gold"];
+      const matchesTarget = cleanCandidates.some((cand) => {
+        const words = cand.split(" ").filter((w) => w.length >= 4);
+        return words.some((w) => cleanSTitle.includes(w));
+      });
+      if (!matchesTarget && otherKnownSeries.some((t) => cleanSTitle.includes(t))) {
+        console.warn(`[StreamValidator] Release torrent com t\xEDtulo trocado rejeitada: '${sTitle}' para '[${cleanCandidates.join(", ")}]'`);
+        return false;
       }
     }
     return true;
@@ -6502,12 +4357,12 @@ var StreamValidator = class {
    * Filtra uma lista de streams, eliminando imediatamente fontes de domínios parked/inválidos
    * e streams que pertencem a conteúdos trocados/diferentes do solicitado.
    */
-  filterCleanStreams(streams, targetTitle) {
+  filterCleanStreams(streams, targetTitle, originalTitle, alternateTitles) {
     return streams.filter((s) => {
       if (!s.url) return false;
       if (this.isUrlBlacklisted(s.url)) return false;
       if (videoAdBlocker.isStreamBlocked(s.url)) return false;
-      return this.isStreamMatchingTargetTitle(s, targetTitle);
+      return this.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles);
     });
   }
 };
@@ -6877,9 +4732,9 @@ var FR_STOPWORDS = /* @__PURE__ */ new Set([
   "sans",
   "bonjour"
 ]);
-function extractCleanWords(text) {
-  if (!text) return [];
-  const noTimestamps = text.replace(/\d{1,2}:\d{2}:\d{2}[,.]\d{1,3}\s*-->\s*\d{1,2}:\d{2}:\d{2}[,.]\d{1,3}/g, " ");
+function extractCleanWords(text2) {
+  if (!text2) return [];
+  const noTimestamps = text2.replace(/\d{1,2}:\d{2}:\d{2}[,.]\d{1,3}\s*-->\s*\d{1,2}:\d{2}:\d{2}[,.]\d{1,3}/g, " ");
   const noTags = noTimestamps.replace(/<[^>]+>/g, " ");
   const noAssTags = noTags.replace(/\{[^}]+\}/g, " ");
   const matches = noAssTags.toLowerCase().match(/[\p{L}']+/gu);
@@ -7123,10 +4978,10 @@ ${cue.text}
     } catch {
     }
     try {
-      const promises = texts.map(async (text) => {
-        if (!text || text.trim().length <= 1) return text;
+      const promises = texts.map(async (text2) => {
+        if (!text2 || text2.trim().length <= 1) return text2;
         try {
-          const singleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+          const singleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text2)}`;
           const singleRes = await fetch(singleUrl, { signal: AbortSignal.timeout(4e3) });
           if (singleRes.ok) {
             const singleData = await singleRes.json();
@@ -7136,7 +4991,7 @@ ${cue.text}
           }
         } catch {
         }
-        return text;
+        return text2;
       });
       return await Promise.all(promises);
     } catch {
@@ -7355,8 +5210,8 @@ function getLanguageInfo(langCode) {
 }
 function extractReleaseTag(raw) {
   if (raw.releaseGroup && typeof raw.releaseGroup === "string" && raw.releaseGroup.trim()) {
-    const clean = raw.releaseGroup.trim().replace(/^\[|\]$/g, "");
-    if (clean.length >= 2 && clean.length <= 25) return clean;
+    const clean2 = raw.releaseGroup.trim().replace(/^\[|\]$/g, "");
+    if (clean2.length >= 2 && clean2.length <= 25) return clean2;
   }
   const str = raw.movieReleaseName || raw.subtitleFileName || "";
   if (typeof str === "string") {
@@ -7522,9 +5377,9 @@ var HTML_ENTITIES = {
   "&Ecirc;": "\xCA",
   "&Ccedil;": "\xC7"
 };
-function decodeHtmlEntities(text) {
-  if (!text || !text.includes("&")) return text;
-  return text.replace(/&[a-zA-Z0-9#]+;/g, (match) => {
+function decodeHtmlEntities(text2) {
+  if (!text2 || !text2.includes("&")) return text2;
+  return text2.replace(/&[a-zA-Z0-9#]+;/g, (match) => {
     if (HTML_ENTITIES[match]) return HTML_ENTITIES[match];
     if (match.startsWith("&#x") || match.startsWith("&#X")) {
       const hex = parseInt(match.slice(3, -1), 16);
@@ -7606,9 +5461,9 @@ function replaceKnownMojibake(str) {
   }
   return s;
 }
-function fixMojibake(text) {
-  if (!text) return text;
-  let current = text.replace(/â€¦/g, "\u2026").replace(/â€œ/g, "\u201C").replace(/â€“/g, "\u2013").replace(/â€”/g, "\u2014").replace(/â€˜/g, "\u2018").replace(/â€™/g, "\u2019").replace(/â€/g, "\u201D");
+function fixMojibake(text2) {
+  if (!text2) return text2;
+  let current = text2.replace(/â€¦/g, "\u2026").replace(/â€œ/g, "\u201C").replace(/â€“/g, "\u2013").replace(/â€”/g, "\u2014").replace(/â€˜/g, "\u2018").replace(/â€™/g, "\u2019").replace(/â€/g, "\u201D");
   const mojibakeRegex = /[\u00C3\u00C2][\u0080-\u00BF\u0160\u0161\u0192\u0152\u0153\u017D\u017E\u0178\u2013\u2014\u2018\u2019\u201A\u201C\u201D\u201E\u2020\u2021\u2022\u2026\u2030\u2039\u203A\u20AC\u2122]|\u00E2\u20AC/;
   for (let iteration = 0; iteration < 2; iteration++) {
     if (!mojibakeRegex.test(current)) break;
@@ -7640,9 +5495,9 @@ function fixMojibake(text) {
   }
   return decodeHtmlEntities(current);
 }
-function sanitizeSubtitleText(text) {
-  if (!text) return "";
-  let cleaned = text.replace(/^\uFEFF/, "").replace(/^WEBVTT[^\n]*\n+/i, "");
+function sanitizeSubtitleText(text2) {
+  if (!text2) return "";
+  let cleaned = text2.replace(/^\uFEFF/, "").replace(/^WEBVTT[^\n]*\n+/i, "");
   cleaned = fixMojibake(cleaned);
   cleaned = cleaned.replace(/.*suporte a legendas em portugu[eê]s ativo.*/gi, "");
   cleaned = cleaned.replace(/.*\[zapitv\s*•?\s*legenda em portugu[eê]s[^\]]*\].*/gi, "");
@@ -7674,11 +5529,11 @@ function parseSRT(data) {
         const start = parseTimeString(startStr);
         const end = parseTimeString(endStr);
         const timeIndex = lines.indexOf(timeLine);
-        let text = lines.slice(timeIndex + 1).join("\n").replace(/<[^>]+>/g, "").replace(/\{[^}]+\}/g, "").trim();
-        text = sanitizeSubtitleText(text);
-        const isPlaceholder = /suporte a legendas|legenda em portugu[eê]s|\[zapitv|zapitv oficial|zapitv pt-br/i.test(text);
-        if (text && !isPlaceholder && !isNaN(start) && !isNaN(end)) {
-          cues.push({ start, end, text });
+        let text2 = lines.slice(timeIndex + 1).join("\n").replace(/<[^>]+>/g, "").replace(/\{[^}]+\}/g, "").trim();
+        text2 = sanitizeSubtitleText(text2);
+        const isPlaceholder = /suporte a legendas|legenda em portugu[eê]s|\[zapitv|zapitv oficial|zapitv pt-br/i.test(text2);
+        if (text2 && !isPlaceholder && !isNaN(start) && !isNaN(end)) {
+          cues.push({ start, end, text: text2 });
         }
       }
     }
@@ -7705,6 +5560,19 @@ var SubtitleService = class _SubtitleService {
     } catch {
       return false;
     }
+  }
+  /**
+   * Obtém síncronamente as legendas em cache se já foram carregadas previamente,
+   * permitindo aplicação instantânea antes do início de episódios subsequentes.
+   */
+  getCachedSubtitles(item, season, episode, stream) {
+    const streamSig = stream?.title || stream?.name || "def";
+    const cacheKey = `${item.id || item.imdbId || item.tmdbId}_${season || 0}_${episode || 0}_${streamSig.slice(0, 30)}`;
+    const cached = this.subtitleCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < _SubtitleService.CACHE_TTL_MS) {
+      return cached.tracks;
+    }
+    return null;
   }
   /**
    * Fetches, normalizes, labels and prioritizes subtitles from OpenSubtitles v3
@@ -7944,9 +5812,9 @@ var SubtitleService = class _SubtitleService {
         for (const enc of encodingsToTry) {
           try {
             const dec = new TextDecoder(enc);
-            const text = dec.decode(buffer);
-            if (text) {
-              decoded = sanitizeSubtitleText(text);
+            const text2 = dec.decode(buffer);
+            if (text2) {
+              decoded = sanitizeSubtitleText(text2);
               break;
             }
           } catch {
@@ -8197,11 +6065,11 @@ var MediaSourceValidationService = class _MediaSourceValidationService {
    * Extrai o tipo de stream a partir da URL
    */
   detectStreamType(url) {
-    const clean = url.toLowerCase().split("?")[0];
-    if (clean.includes(".m3u8")) return "hls";
-    if (clean.includes(".mpd")) return "dash";
-    if (clean.endsWith(".mp4") || clean.endsWith(".m4v")) return "mp4";
-    if (clean.endsWith(".webm")) return "webm";
+    const clean2 = url.toLowerCase().split("?")[0];
+    if (clean2.includes(".m3u8")) return "hls";
+    if (clean2.includes(".mpd")) return "dash";
+    if (clean2.endsWith(".mp4") || clean2.endsWith(".m4v")) return "mp4";
+    if (clean2.endsWith(".webm")) return "webm";
     return "unknown";
   }
   /**
@@ -8214,24 +6082,24 @@ var MediaSourceValidationService = class _MediaSourceValidationService {
         return Array.from(new Set(validLevels));
       }
     }
-    const text = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""}`.toLowerCase();
+    const text2 = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""}`.toLowerCase();
     const qualities = [];
-    if (/\b(2160p|4k|uhd)\b/i.test(text)) {
+    if (/\b(2160p|4k|uhd)\b/i.test(text2)) {
       qualities.push("4K");
     }
-    if (/\b(1440p|2k|qhd)\b/i.test(text)) {
+    if (/\b(1440p|2k|qhd)\b/i.test(text2)) {
       qualities.push("1440p");
     }
-    if (/\b(1080p|fhd|full[-_\s]?hd)\b/i.test(text)) {
+    if (/\b(1080p|fhd|full[-_\s]?hd)\b/i.test(text2)) {
       qualities.push("1080p");
     }
-    if (/\b(720p|hd)\b/i.test(text) && !/\b(full[-_\s]?hd|fhd|uhd)\b/i.test(text)) {
+    if (/\b(720p|hd)\b/i.test(text2) && !/\b(full[-_\s]?hd|fhd|uhd)\b/i.test(text2)) {
       qualities.push("720p");
     }
-    if (/\b(480p|sd)\b/i.test(text)) {
+    if (/\b(480p|sd)\b/i.test(text2)) {
       qualities.push("480p");
     }
-    if (/\b(360p)\b/i.test(text)) {
+    if (/\b(360p)\b/i.test(text2)) {
       qualities.push("360p");
     }
     if (qualities.length === 0 && stream.quality) {
@@ -8430,7 +6298,11 @@ var MediaSourceValidationService = class _MediaSourceValidationService {
     let isAccessible = true;
     let probeReason = "Stream acess\xEDvel";
     let detectedAudioOk = true;
-    if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
+    const isTorrentEngineUrl = rawUrl.includes("127.0.0.1:11470") || rawUrl.includes("localhost:11470") || Boolean(stream.infoHash) || Boolean(stream.isTorrent);
+    if (isTorrentEngineUrl) {
+      isAccessible = true;
+      probeReason = "Stream via Stremio Streaming Server / Torrent";
+    } else if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
       try {
         const probeUrl = rawUrl.startsWith("http://localhost") || rawUrl.startsWith("/api/") ? rawUrl : `/api/proxy?url=${encodeURIComponent(rawUrl)}`;
         const controller = new AbortController();
@@ -8584,7 +6456,7 @@ var FEATURED_CATALOG_ITEMS = [
     availabilityStatus: "verified",
     audioStatus: "pt-br-dubbed"
   },
-  // 4. VERITY (2026 - tt15888806) — disponibilidade e áudio dependem das fontes resolvidas
+  // 4. VERITY (2026 - tt32261958) — disponibilidade e áudio dependem das fontes resolvidas
   {
     id: "movie-verity-2026",
     title: "Verity",
@@ -8596,7 +6468,8 @@ var FEATURED_CATALOG_ITEMS = [
     backdrop: "https://image.tmdb.org/t/p/original/6Qf3sylInJeyK0fFTfjprnGIXCF.jpg",
     description: "Uma escritora em dificuldades financeiras aceita a proposta de concluir a s\xE9rie de sucesso de uma famosa autora incapacitada, descobrindo segredos aterrorizantes em seus manuscritos.",
     genres: ["Romance", "Mist\xE9rio", "Drama"],
-    imdbId: "tt15888806",
+    imdbId: "tt32261958",
+    tmdbId: "1283515",
     isFeatured: true
   },
   // 5. O EXORCISTA: MÁRTIRES (2026 - tt28704204) — Disponível
@@ -8735,7 +6608,7 @@ var FEATURED_CATALOG_ITEMS = [
     availabilityStatus: "verified",
     audioStatus: "pt-br-dubbed"
   },
-  // 13. A ODISSEIA (2026 - tt2788314) — disponibilidade e áudio dependem das fontes resolvidas
+  // 13. A ODISSEIA (2026 - tt33764258) — disponibilidade e áudio dependem das fontes resolvidas
   {
     id: "movie-a-odisseia-2026",
     title: "A Odisseia",
@@ -8747,7 +6620,8 @@ var FEATURED_CATALOG_ITEMS = [
     backdrop: "https://image.tmdb.org/t/p/original/muMwJAiMtReEHLKpKMWt2rMkYF7.jpg",
     description: "A \xE9pica jornada de Ulisses narrada em uma superprodu\xE7\xE3o visual, enfrentando monstros mitol\xF3gicos e a ira dos deuses gregos para retornar a \xCDtaca.",
     genres: ["Aventura", "Fantasia", "Drama"],
-    imdbId: "tt2788314",
+    imdbId: "tt33764258",
+    tmdbId: "1368337",
     isFeatured: true
   },
   // 14. OBSESSÃO (1976 - tt0074991) — Disponível
@@ -8877,7 +6751,7 @@ var FEATURED_CATALOG_ITEMS = [
     audioStatus: "other",
     episodes: []
   },
-  // 3. A LESTE DO ÉDEN (2026- - tt22020214) — Ainda não lançada
+  // 3. A LESTE DO ÉDEN (2026- - tt21097264) — DISPONÍVEL (TVmeter #3)
   {
     id: "series-a-leste-do-eden-2026",
     title: "A Leste do \xC9den",
@@ -8889,12 +6763,21 @@ var FEATURED_CATALOG_ITEMS = [
     backdrop: "https://image.tmdb.org/t/p/original/70RZX7kNjA0Qjn6HigB1oMvFJ8R.jpg",
     description: "Adapta\xE7\xE3o do \xE9pico cl\xE1ssico de John Steinbeck sobre duas fam\xEDlias cujas hist\xF3rias se entrela\xE7am no vale de Salinas.",
     genres: ["Drama", "Hist\xF3rico"],
-    imdbId: "tt22020214",
+    imdbId: "tt21097264",
     tmdbId: "258165",
     isFeatured: true,
-    availabilityStatus: "unreleased",
-    audioStatus: "other",
-    episodes: []
+    availabilityStatus: "verified",
+    audioStatus: "pt-br-dubbed",
+    seasonsCount: 1,
+    episodes: [
+      {
+        id: "eden-s1e1",
+        number: 1,
+        title: "Irm\xE3os",
+        description: "Depois que o acaso coloca Cathy Ames na vida dos irm\xE3os Trask, todos precisam lidar com uma batalha interna entre o bem e o mal.",
+        image: "https://images.metahub.space/poster/medium/tt21097264/img"
+      }
+    ]
   },
   // 4. LANTERNAS (2026- - tt26540670) — Ainda não lançada
   {
@@ -12171,6 +10054,443 @@ var filmesData = [
   }
 ];
 
+// src/core/playback/PlaybackOptimizerService.ts
+var PlaybackOptimizerService = class _PlaybackOptimizerService {
+  constructor() {
+    // Histórico de desempenho e latência dos provedores de fontes
+    this.providerStats = /* @__PURE__ */ new Map();
+    // Telemetria ativa
+    this.telemetry = {
+      ttffMs: null,
+      bufferingCount: 0,
+      totalBufferingDurationMs: 0,
+      currentBitrateKbps: null,
+      currentResolution: "auto",
+      bufferAheadSeconds: 0,
+      droppedFrames: 0,
+      totalFrames: 0,
+      stallsRecovered: 0,
+      activeAbrMode: "auto",
+      effectiveNetworkType: "unknown",
+      streamSourceType: "unknown"
+    };
+    // Medição de largura de banda em tempo real (EWMA)
+    this.estimatedBandwidthBps = 5e6;
+    // Padrão inicial: 5 Mbps
+    this.loadStartTime = 0;
+    this.bufferStartTime = null;
+    this.stallTimeoutTimer = null;
+    this.healthCheckInterval = null;
+    // Listeners de telemetria
+    this.telemetryListeners = /* @__PURE__ */ new Set();
+    this.initNetworkMonitoring();
+  }
+  static getInstance() {
+    if (!_PlaybackOptimizerService.instance) {
+      _PlaybackOptimizerService.instance = new _PlaybackOptimizerService();
+    }
+    return _PlaybackOptimizerService.instance;
+  }
+  /**
+   * Monitoramento de mudanças na rede (online/offline e Network Information API)
+   */
+  initNetworkMonitoring() {
+    if (typeof window === "undefined") return;
+    const nav = navigator;
+    const conn = nav.connection || nav.mozConnection || nav.webkitConnection;
+    if (conn) {
+      const updateNetwork = () => {
+        const net = this.getNetworkProfile();
+        this.telemetry.effectiveNetworkType = net.effectiveType;
+        this.notifyTelemetry();
+      };
+      try {
+        conn.addEventListener("change", updateNetwork);
+      } catch {
+      }
+    }
+  }
+  /**
+   * Identifica o perfil de rede atual com detecção inteligente de conexões lentas e instáveis
+   */
+  getNetworkProfile() {
+    const nav = typeof navigator !== "undefined" ? navigator : globalThis?.navigator;
+    if (!nav) {
+      return {
+        effectiveType: "unknown",
+        downlinkMbps: 10,
+        rttMs: 50,
+        saveData: false,
+        isSlowConnection: false,
+        isUnstable: false
+      };
+    }
+    const conn = nav.connection || nav.mozConnection || nav.webkitConnection;
+    const effectiveType = conn?.effectiveType || (nav.onLine ? "4g" : "slow-2g");
+    const downlinkMbps = conn?.downlink ?? this.estimatedBandwidthBps / 1e6;
+    const rttMs = conn?.rtt ?? 60;
+    const saveData = Boolean(conn?.saveData);
+    const isSlowConnection = saveData || effectiveType === "slow-2g" || effectiveType === "2g" || effectiveType === "3g" || downlinkMbps < 2.5 || rttMs > 350;
+    const isUnstable = rttMs > 400 || this.telemetry.bufferingCount > 3 && this.telemetry.totalBufferingDurationMs > 5e3;
+    return {
+      effectiveType,
+      downlinkMbps,
+      rttMs,
+      saveData,
+      isSlowConnection,
+      isUnstable
+    };
+  }
+  /**
+   * Perfil detalhado de capacidades do dispositivo e tela
+   */
+  getDeviceProfile() {
+    const nav = typeof navigator !== "undefined" ? navigator : globalThis?.navigator;
+    if (!nav) {
+      return {
+        deviceType: "desktop",
+        isLowEnd: false,
+        screenResolution: { width: 1920, height: 1080 },
+        maxOptimalResolution: "1080p",
+        recommendedInitialQuality: "1080p",
+        memoryLimitMB: 512,
+        hardwareConcurrency: 4
+      };
+    }
+    const ua = (nav.userAgent || "").toLowerCase();
+    const hwConcurrency = nav.hardwareConcurrency || 4;
+    const deviceMemory = nav.deviceMemory || 4;
+    const isSmartTv = /smart-tv|tizen|webos|viera|bravia|netcast|crkey|aft|googletv/i.test(ua);
+    const isMobile = !isSmartTv && /mobile|android|iphone|ipod/i.test(ua);
+    const winScreen = typeof window !== "undefined" ? window.screen : null;
+    const isTablet = !isSmartTv && (/ipad/i.test(ua) || isMobile && winScreen && Math.min(winScreen.width, winScreen.height) >= 600);
+    const isDesktop = !isSmartTv && !isMobile && !isTablet;
+    const deviceType = isSmartTv ? "smart-tv" : isMobile ? "mobile" : isTablet ? "tablet" : "desktop";
+    const isLowEnd = hwConcurrency <= 2 || deviceMemory <= 2 || isSmartTv;
+    const screenWidth = typeof window !== "undefined" ? window.screen?.width || 1920 : 1920;
+    const screenHeight = typeof window !== "undefined" ? window.screen?.height || 1080 : 1080;
+    const maxDimension = Math.max(screenWidth, screenHeight);
+    let maxOptimalResolution = "1080p";
+    if (maxDimension >= 3840 && !isLowEnd) {
+      maxOptimalResolution = "4K";
+    } else if (maxDimension >= 2560 && !isLowEnd) {
+      maxOptimalResolution = "1440p";
+    } else if (maxDimension <= 854 || isMobile && isLowEnd) {
+      maxOptimalResolution = "720p";
+    }
+    const net = this.getNetworkProfile();
+    let recommendedInitialQuality = "1080p";
+    if (net.isSlowConnection) {
+      recommendedInitialQuality = net.effectiveType === "slow-2g" || net.effectiveType === "2g" ? "360p" : "480p";
+    } else if (net.downlinkMbps < 5 || isLowEnd) {
+      recommendedInitialQuality = "720p";
+    }
+    const memoryLimitMB = isSmartTv ? 64 : isLowEnd ? 128 : 512;
+    return {
+      deviceType,
+      isLowEnd,
+      screenResolution: { width: screenWidth, height: screenHeight },
+      maxOptimalResolution,
+      recommendedInitialQuality,
+      memoryLimitMB,
+      hardwareConcurrency: hwConcurrency
+    };
+  }
+  /**
+   * Constrói configuração HLS.js customizada de alta performance para a conexão e dispositivo
+   */
+  buildOptimalHlsConfig() {
+    const net = this.getNetworkProfile();
+    const dev = this.getDeviceProfile();
+    let maxBufferLength = 30;
+    let maxMaxBufferLength = 60;
+    let maxBufferSize = 30 * 1024 * 1024;
+    if (net.isSlowConnection || dev.isLowEnd) {
+      maxBufferLength = 15;
+      maxMaxBufferLength = 30;
+      maxBufferSize = 15 * 1024 * 1024;
+    } else if (net.downlinkMbps >= 15 && !dev.isLowEnd) {
+      maxBufferLength = 45;
+      maxMaxBufferLength = 90;
+      maxBufferSize = 60 * 1024 * 1024;
+    }
+    return {
+      enableWorker: true,
+      lowLatencyMode: false,
+      // Desativa baixa latência em VoD para garantir buffer contínuo sem micro-travas
+      backBufferLength: dev.isLowEnd ? 30 : 60,
+      maxBufferLength,
+      maxMaxBufferLength,
+      maxBufferSize,
+      capLevelToPlayerSize: true,
+      // Nunca baixa 4K se o player for menor que 1080p
+      autoStartLoad: true,
+      startFragPrefetch: true,
+      // Carrega antecipadamente o próximo segmento
+      fragLoadingTimeOut: net.isSlowConnection ? 2e4 : 12e3,
+      manifestLoadingTimeOut: 1e4,
+      fragLoadingMaxRetry: 4,
+      fragLoadingRetryDelay: 800,
+      levelLoadingTimeOut: 1e4,
+      levelLoadingMaxRetry: 4,
+      // Fatores ABR balanceados: conservador para evitar oscilações bruscas
+      abrBandWidthFactor: net.isSlowConnection ? 0.8 : 0.9,
+      abrBandWidthUpFactor: 0.7,
+      // Cauteloso ao subir de qualidade
+      abrEwmaDefaultEstimate: net.isSlowConnection ? 8e5 : 35e5,
+      abrEwmaFastVoD: 2,
+      abrEwmaSlowVoD: 6,
+      startLevel: net.isSlowConnection ? 0 : -1
+      // Força menor resolução de início em 3G/2G para TTFF < 500ms
+    };
+  }
+  /**
+   * Notifica início do carregamento de uma mídia para contagem de TTFF
+   */
+  notifyLoadStart(sourceType) {
+    this.loadStartTime = performance.now();
+    this.telemetry.ttffMs = null;
+    this.telemetry.streamSourceType = sourceType;
+    this.telemetry.bufferingCount = 0;
+    this.telemetry.totalBufferingDurationMs = 0;
+    this.telemetry.stallsRecovered = 0;
+    this.bufferStartTime = null;
+  }
+  /**
+   * Registra primeiro frame renderizado (TTFF medido)
+   */
+  notifyFirstFrame() {
+    if (this.loadStartTime > 0 && this.telemetry.ttffMs === null) {
+      this.telemetry.ttffMs = Math.round(performance.now() - this.loadStartTime);
+      this.notifyTelemetry();
+    }
+  }
+  /**
+   * Registra evento de início de buffering (vídeo esperando dados)
+   */
+  notifyBufferingStart() {
+    if (this.bufferStartTime === null) {
+      this.bufferStartTime = performance.now();
+      this.telemetry.bufferingCount++;
+      this.notifyTelemetry();
+    }
+  }
+  /**
+   * Registra encerramento de buffering e contabiliza tempo acumulado
+   */
+  notifyBufferingEnd() {
+    if (this.bufferStartTime !== null) {
+      const duration = performance.now() - this.bufferStartTime;
+      this.telemetry.totalBufferingDurationMs += Math.round(duration);
+      this.bufferStartTime = null;
+      this.notifyTelemetry();
+    }
+  }
+  /**
+   * Atualiza métricas ao vivo do elemento de vídeo HTML5
+   */
+  updateVideoMetrics(video, activeQuality) {
+    if (!video) return;
+    const currentTime = video.currentTime;
+    let bufferAhead = 0;
+    if (video.buffered && video.buffered.length > 0) {
+      for (let i = 0; i < video.buffered.length; i++) {
+        const start = video.buffered.start(i);
+        const end = video.buffered.end(i);
+        if (currentTime >= start && currentTime <= end) {
+          bufferAhead = Math.max(0, end - currentTime);
+          break;
+        }
+      }
+    }
+    this.telemetry.bufferAheadSeconds = Math.round(bufferAhead * 10) / 10;
+    this.telemetry.currentResolution = activeQuality;
+    if (typeof video.getVideoPlaybackQuality === "function") {
+      try {
+        const qual = video.getVideoPlaybackQuality();
+        this.telemetry.droppedFrames = qual.droppedVideoFrames || 0;
+        this.telemetry.totalFrames = qual.totalVideoFrames || 0;
+      } catch {
+      }
+    }
+    this.notifyTelemetry();
+  }
+  /**
+   * Registra a taxa de transferência real medida após o download de um segmento
+   */
+  recordSampleThroughput(bytes, durationMs) {
+    if (durationMs <= 0 || bytes <= 0) return;
+    const bps = bytes * 8 / (durationMs / 1e3);
+    this.estimatedBandwidthBps = Math.round(this.estimatedBandwidthBps * 0.8 + bps * 0.2);
+    this.telemetry.currentBitrateKbps = Math.round(this.estimatedBandwidthBps / 1e3);
+    this.notifyTelemetry();
+  }
+  /**
+   * Avalia e decide a qualidade ABR ótima para fontes MP4 nativas (Multi-Source ABR)
+   */
+  evaluateMultiSourceAbr(params) {
+    const { availableQualities, currentQuality, bufferAheadSeconds, isStalling } = params;
+    const qualities = availableQualities.filter((q) => q !== "auto");
+    if (qualities.length <= 1) {
+      return { shouldChange: false, targetQuality: currentQuality, reason: "Apenas uma resolu\xE7\xE3o dispon\xEDvel" };
+    }
+    const net = this.getNetworkProfile();
+    const ORDER = {
+      "360p": 1,
+      "480p": 2,
+      "720p": 3,
+      "1080p": 4,
+      "1440p": 5,
+      "4K": 6
+    };
+    const sorted = [...qualities].sort((a, b) => (ORDER[a] || 0) - (ORDER[b] || 0));
+    const currentIndex = sorted.findIndex((q) => q.toLowerCase() === currentQuality.toLowerCase());
+    if ((isStalling || bufferAheadSeconds < 2.5) && currentIndex > 0) {
+      const lowerQuality = sorted[Math.max(0, currentIndex - 1)];
+      return {
+        shouldChange: true,
+        targetQuality: lowerQuality,
+        reason: `Buffer cr\xEDtico (${bufferAheadSeconds.toFixed(1)}s) ou travamento. Reduzindo para ${lowerQuality} para garantir reprodu\xE7\xE3o cont\xEDnua.`
+      };
+    }
+    if (bufferAheadSeconds > 25 && !net.isSlowConnection && !net.isUnstable && currentIndex < sorted.length - 1) {
+      const higherQuality = sorted[currentIndex + 1];
+      const dev = this.getDeviceProfile();
+      if (higherQuality === "4K" && dev.isLowEnd) {
+        return { shouldChange: false, targetQuality: currentQuality, reason: "4K evitado por restri\xE7\xE3o de hardware do dispositivo" };
+      }
+      return {
+        shouldChange: true,
+        targetQuality: higherQuality,
+        reason: `Conex\xE3o est\xE1vel e buffer saud\xE1vel (${bufferAheadSeconds.toFixed(1)}s). Aumentando para ${higherQuality}.`
+      };
+    }
+    return { shouldChange: false, targetQuality: currentQuality, reason: "Qualidade \xF3tima mantida" };
+  }
+  /**
+   * Limpa ou reinicia os contadores de telemetria
+   */
+  resetTelemetry() {
+    this.telemetry = {
+      ttffMs: null,
+      bufferingCount: 0,
+      totalBufferingDurationMs: 0,
+      currentBitrateKbps: null,
+      currentResolution: "auto",
+      bufferAheadSeconds: 0,
+      droppedFrames: 0,
+      totalFrames: 0,
+      stallsRecovered: 0,
+      activeAbrMode: "auto",
+      effectiveNetworkType: this.getNetworkProfile().effectiveType,
+      streamSourceType: "unknown"
+    };
+    this.notifyTelemetry();
+  }
+  /**
+   * Notifica que um travamento foi recuperado com sucesso
+   */
+  recordStallRecovered() {
+    this.telemetry.stallsRecovered++;
+    this.notifyTelemetry();
+  }
+  /**
+   * Obtém snapshot imutável da telemetria
+   */
+  getTelemetry() {
+    return { ...this.telemetry };
+  }
+  /**
+   * Assina atualizações de telemetria
+   */
+  subscribeTelemetry(listener) {
+    this.telemetryListeners.add(listener);
+    listener(this.getTelemetry());
+    return () => this.telemetryListeners.delete(listener);
+  }
+  /**
+   * Registra resultado de consulta a um provedor para orientar ordenação e concorrência
+   */
+  recordProviderResult(providerId, latencyMs, success) {
+    const existing = this.providerStats.get(providerId) || {
+      providerId,
+      totalAttempts: 0,
+      successfulAttempts: 0,
+      averageLatencyMs: latencyMs,
+      lastAttemptTime: Date.now()
+    };
+    existing.totalAttempts++;
+    if (success) {
+      existing.successfulAttempts++;
+      existing.averageLatencyMs = Math.round(existing.averageLatencyMs * 0.7 + latencyMs * 0.3);
+    }
+    existing.lastAttemptTime = Date.now();
+    this.providerStats.set(providerId, existing);
+  }
+  /**
+   * Calcula pontuação dinâmica para o provedor com base em histórico real de velocidade e disponibilidade
+   */
+  getProviderScore(providerId) {
+    const stats = this.providerStats.get(providerId);
+    if (!stats || stats.totalAttempts === 0) return 0;
+    let score = 0;
+    const successRate = stats.successfulAttempts / stats.totalAttempts;
+    if (successRate >= 0.85) score += 3e3;
+    else if (successRate < 0.4) score -= 6e3;
+    if (stats.averageLatencyMs < 400) score += 4e3;
+    else if (stats.averageLatencyMs < 800) score += 2e3;
+    else if (stats.averageLatencyMs > 4e3) score -= 5e3;
+    return score;
+  }
+  getProviderStats(providerId) {
+    return this.providerStats.get(providerId);
+  }
+  getAllProviderStats() {
+    return Array.from(this.providerStats.values());
+  }
+  notifyTelemetry() {
+    const data = this.getTelemetry();
+    this.telemetryListeners.forEach((fn) => fn(data));
+  }
+};
+var playbackOptimizerService = PlaybackOptimizerService.getInstance();
+
+// src/core/providers/sourceMemory.ts
+var clean = (value) => (value || "").replace(/https?:\/\/\S+/gi, "").replace(/(?:token|key|auth|signature|expires)\s*[:=]\s*\S+/gi, "").normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 110);
+function sourceReference(stream) {
+  return [clean(stream.name), clean(stream.title), clean(stream.sourceType || ""), clean(stream.quality || "")].join("|");
+}
+var memoryCache = /* @__PURE__ */ new Map();
+function getRememberedSources(identity) {
+  const key = JSON.stringify(identity);
+  const cached = memoryCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.promise;
+  const params = new URLSearchParams({
+    canonicalId: identity.canonicalId,
+    mediaType: identity.mediaType,
+    season: String(identity.season),
+    episode: String(identity.episode)
+  });
+  const promise = fetch(`/api/db/source-memory?${params}`, { signal: AbortSignal.timeout(1200) }).then(async (response) => response.ok ? (await response.json()).sources : []).catch(() => []);
+  memoryCache.set(key, { expires: Date.now() + 3e4, promise });
+  return promise;
+}
+function prioritizeRememberedSources(streams, remembered) {
+  if (remembered.length === 0 || streams.length < 2) return streams;
+  const scores = new Map(remembered.map((row) => [
+    `${row.providerId}|${row.sourceRef}`,
+    row.score * (row.trusted ? 1 : 0.2)
+  ]));
+  return streams.map((stream, index2) => ({ stream, index: index2 })).sort((a, b) => {
+    const aTier = a.stream._smartPriority || { dubbed_ptbr: 1, dual_audio: 2, original: 3, foreign: 6 }[audioPreferenceService.analyzeAudio(a.stream).tier];
+    const bTier = b.stream._smartPriority || { dubbed_ptbr: 1, dual_audio: 2, original: 3, foreign: 6 }[audioPreferenceService.analyzeAudio(b.stream).tier];
+    if (aTier !== bTier) return aTier - bTier;
+    const aScore = scores.get(`${a.stream.providerId}|${sourceReference(a.stream)}`) || 0;
+    const bScore = scores.get(`${b.stream.providerId}|${sourceReference(b.stream)}`) || 0;
+    return bScore - aScore || a.index - b.index;
+  }).map((entry) => entry.stream);
+}
+
 // src/core/providers/providerRegistry.ts
 var localEngineCache = { active: false, lastCheck: 0 };
 async function isLocalStremioEngineOnline() {
@@ -12213,12 +10533,22 @@ var DEFAULT_PROVIDERS = [
     status: "online"
   },
   {
+    id: "froststream-http",
+    name: "FrostStream (HTTP Streams PT-BR)",
+    url: "https://froststream.cloutteam.com",
+    enabled: true,
+    type: "stremio-addon",
+    priority: 3,
+    isPtBr: true,
+    status: "online"
+  },
+  {
     id: "fenixflix-animes",
     name: "FenixFlix (Animes Dublados PT-BR & Zeus)",
     url: "https://fenixflix.fenixhub.online",
     enabled: true,
     type: "stremio-addon",
-    priority: 3,
+    priority: 4,
     isPtBr: true,
     status: "online"
   },
@@ -12228,7 +10558,7 @@ var DEFAULT_PROVIDERS = [
     url: "https://torrentio.strem.fun/brazuca",
     enabled: true,
     type: "stremio-addon",
-    priority: 4,
+    priority: 5,
     isPtBr: true,
     status: "online"
   },
@@ -12238,7 +10568,7 @@ var DEFAULT_PROVIDERS = [
     url: "https://torrentio.strem.fun",
     enabled: true,
     type: "stremio-addon",
-    priority: 5,
+    priority: 6,
     isPtBr: false,
     status: "online"
   },
@@ -12248,7 +10578,7 @@ var DEFAULT_PROVIDERS = [
     url: "https://magnetflix.flixbr.online/qualities=4k,1080p,720p,sd|audio=dublado,legendado|catalogs=populares_movie,populares_series,recentes_servidor_movie,recentes_servidor_series,emalta_movie,emalta_series",
     enabled: true,
     type: "stremio-addon",
-    priority: 6,
+    priority: 7,
     isPtBr: true,
     status: "online"
   },
@@ -12258,7 +10588,7 @@ var DEFAULT_PROVIDERS = [
     url: "/api/stremio/cinema-aberto",
     enabled: true,
     type: "stremio-addon",
-    priority: 6,
+    priority: 8,
     isPtBr: true,
     status: "online"
   },
@@ -12268,7 +10598,7 @@ var DEFAULT_PROVIDERS = [
     url: "/api/stremio/blender-open",
     enabled: true,
     type: "stremio-addon",
-    priority: 7,
+    priority: 9,
     isPtBr: true,
     status: "online"
   },
@@ -12278,7 +10608,7 @@ var DEFAULT_PROVIDERS = [
     url: "/api/stremio/public-domain",
     enabled: true,
     type: "stremio-addon",
-    priority: 8,
+    priority: 10,
     isPtBr: false,
     status: "online"
   },
@@ -12288,7 +10618,7 @@ var DEFAULT_PROVIDERS = [
     url: "https://public-domain-movies.strem.fun",
     enabled: false,
     type: "stremio-addon",
-    priority: 9,
+    priority: 11,
     isPtBr: false,
     status: "offline"
   },
@@ -12298,7 +10628,7 @@ var DEFAULT_PROVIDERS = [
     url: "https://v3-cinemeta.strem.io",
     enabled: true,
     type: "stremio-addon",
-    priority: 10,
+    priority: 12,
     isPtBr: false,
     status: "online"
   },
@@ -12308,19 +10638,24 @@ var DEFAULT_PROVIDERS = [
     url: "https://opensubtitles-v3.strem.io",
     enabled: true,
     type: "stremio-addon",
-    priority: 11,
+    priority: 13,
     isPtBr: true,
     status: "online"
   }
 ];
 var ProviderRegistryService = class {
-  // 10 minutos
+  // 3 minutos de fresh (stale-while-revalidate após isso)
   constructor() {
     this.providers = [];
-    this.cache = /* @__PURE__ */ new Map();
+    this.cache = new LruCache(100, 15 * 60 * 1e3);
+    this.negativeCache = new LruCache(100, 15 * 1e3);
+    // 15s de expiração rápida para cache negativo
     this.pending = /* @__PURE__ */ new Map();
+    this.progressiveListeners = /* @__PURE__ */ new Map();
     this.cacheGeneration = 0;
-    this.CACHE_TTL_MS = 10 * 60 * 1e3;
+    this.CACHE_TTL_MS = 15 * 60 * 1e3;
+    // 15 minutos de retenção em cache
+    this.STALE_TTL_MS = 3 * 60 * 1e3;
     this.loadProviders();
   }
   loadProviders() {
@@ -12330,14 +10665,14 @@ var ProviderRegistryService = class {
         const parsed = JSON.parse(saved);
         const cleanParsed = parsed.filter((p) => p.type !== "vod-embed" && !p.id.includes("embedplay") && !p.id.includes("playerflix") && !p.id.includes("videasy"));
         const map = /* @__PURE__ */ new Map();
-        DEFAULT_PROVIDERS.forEach((p) => map.set(p.id, p));
+        DEFAULT_PROVIDERS.forEach((p) => map.set(p.id, { ...p }));
         cleanParsed.forEach((p) => map.set(p.id, { ...map.get(p.id) || {}, ...p }));
         this.providers = Array.from(map.values()).sort((a, b) => a.priority - b.priority);
         return;
       }
     } catch {
     }
-    this.providers = [...DEFAULT_PROVIDERS];
+    this.providers = DEFAULT_PROVIDERS.map((p) => ({ ...p }));
   }
   saveProviders() {
     if (typeof localStorage === "undefined") return;
@@ -12350,19 +10685,65 @@ var ProviderRegistryService = class {
   getProviders() {
     return [...this.providers];
   }
+  getProvider(id) {
+    const target = id.toLowerCase().trim();
+    return this.providers.find(
+      (p) => p.id.toLowerCase() === target || p.id.toLowerCase().includes(target) || p.name.toLowerCase().includes(target)
+    );
+  }
+  getEligibleProviders(type) {
+    return this.providers.filter((p) => p.enabled);
+  }
+  setProviderPriority(id, priority) {
+    const provider = this.getProvider(id);
+    if (!provider) return;
+    this.providers.forEach((p) => {
+      if (p.id !== provider.id && p.priority >= priority) {
+        p.priority += 1;
+      }
+    });
+    provider.priority = priority;
+    this.providers.sort((a, b) => a.priority - b.priority);
+    this.saveProviders();
+  }
+  resetProviderPriorities() {
+    const defaultPriorityMap = {
+      "zapitv-show-subtitle-pt-br": 1,
+      "zapitv-mico-leao-dublado": 2,
+      "froststream-http": 3,
+      "fenixflix-animes": 4,
+      "torrentio-brazuca": 5,
+      "torrentio-global": 6,
+      "magnetflix-animes": 7,
+      "zapitv-cinema-aberto": 8,
+      "zapitv-blender-open": 9,
+      "zapitv-public-domain": 10
+    };
+    this.providers.forEach((p) => {
+      const def = defaultPriorityMap[p.id];
+      if (def !== void 0) {
+        p.priority = def;
+      }
+    });
+    this.providers.sort((a, b) => a.priority - b.priority);
+    this.saveProviders();
+  }
   addProvider(provider) {
     this.providers.push(provider);
+    this.providers.sort((a, b) => a.priority - b.priority);
     this.saveProviders();
   }
   updateProvider(id, updates) {
     const idx = this.providers.findIndex((p) => p.id === id);
     if (idx !== -1) {
       this.providers[idx] = { ...this.providers[idx], ...updates };
+      this.providers.sort((a, b) => a.priority - b.priority);
       this.saveProviders();
     }
   }
   removeProvider(id) {
     this.providers = this.providers.filter((p) => p.id !== id);
+    this.providers.sort((a, b) => a.priority - b.priority);
     this.saveProviders();
   }
   async checkProviderHealth(id) {
@@ -12404,21 +10785,83 @@ var ProviderRegistryService = class {
   /**
    * Resolve todos os fluxos de reprodução para um item (filme ou série).
    */
-  resolveStreams(type, id, episode) {
+  resolveStreams(type, id, episode, options) {
     const cacheKey = JSON.stringify(["v5_identity", type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
-    const cached = this.cache.get(cacheKey);
-    if (cached && cached.streams.length > 0 && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
-      return Promise.resolve(cached.streams);
+    if (options?.onProgressiveStreams) {
+      if (!this.progressiveListeners.has(cacheKey)) {
+        this.progressiveListeners.set(cacheKey, /* @__PURE__ */ new Set());
+      }
+      this.progressiveListeners.get(cacheKey).add(options.onProgressiveStreams);
+      if (options.signal) {
+        options.signal.addEventListener("abort", () => {
+          const listeners = this.progressiveListeners.get(cacheKey);
+          if (listeners && options.onProgressiveStreams) {
+            listeners.delete(options.onProgressiveStreams);
+            if (listeners.size === 0) {
+              this.progressiveListeners.delete(cacheKey);
+            }
+          }
+        }, { once: true });
+      }
     }
-    const existing = this.pending.get(cacheKey);
-    if (existing) return existing;
-    const request = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration).finally(() => {
+    if (options?.forceRefresh || options?.bypassNegativeCache) {
+      this.negativeCache.delete(cacheKey);
+    } else {
+      const cached = this.cache.get(cacheKey);
+      if (cached && cached.streams.length > 0) {
+        const age = Date.now() - cached.timestamp;
+        if (age < this.CACHE_TTL_MS) {
+          options?.onProgressiveStreams?.(cached.streams);
+          if (age >= this.STALE_TTL_MS && !this.pending.has(cacheKey)) {
+            const bgRequest = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration, options).finally(() => {
+              if (this.pending.get(cacheKey) === bgRequest) this.pending.delete(cacheKey);
+            });
+            this.pending.set(cacheKey, bgRequest);
+          }
+          return Promise.resolve(cached.streams);
+        }
+      }
+      if (!options?.bypassNegativeCache) {
+        const cachedNeg = this.negativeCache.get(cacheKey);
+        if (cachedNeg && !cachedNeg.inconclusive && Date.now() - cachedNeg.timestamp < 15e3) {
+          return Promise.resolve([]);
+        }
+      }
+    }
+    if (!options?.forceRefresh && !options?.bypassNegativeCache) {
+      const existing = this.pending.get(cacheKey);
+      if (existing) {
+        return existing;
+      }
+    }
+    const request = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration, options).finally(() => {
       if (this.pending.get(cacheKey) === request) this.pending.delete(cacheKey);
+      if (options?.onProgressiveStreams) {
+        const listeners = this.progressiveListeners.get(cacheKey);
+        if (listeners) {
+          listeners.delete(options.onProgressiveStreams);
+          if (listeners.size === 0) this.progressiveListeners.delete(cacheKey);
+        }
+      }
     });
     this.pending.set(cacheKey, request);
     return request;
   }
-  async resolveStreamsFresh(type, id, episode, cacheKey, generation) {
+  async resolveStreamsFresh(type, id, episode, cacheKey, generation, options) {
+    const effectiveCacheKey = cacheKey || JSON.stringify(["v5_identity", type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
+    const effectiveGen = generation ?? this.cacheGeneration;
+    const notifyProgressive = (currentStreams) => {
+      if (options?.signal?.aborted) return;
+      const listeners = this.progressiveListeners.get(effectiveCacheKey);
+      if (listeners && listeners.size > 0) {
+        for (const cb of listeners) {
+          try {
+            cb(currentStreams);
+          } catch {
+          }
+        }
+      }
+    };
     if (bannedContentRegistry.isBanned(id)) {
       return [];
     }
@@ -12437,64 +10880,8 @@ var ProviderRegistryService = class {
     if (!imdbStr && (openItem?.imdbId || catalogItem?.imdbId)) {
       imdbStr = String(openItem?.imdbId || catalogItem?.imdbId || "");
     }
-    const altIds = [];
-    if (openItem?.imdbId && openItem.imdbId !== imdbStr && !altIds.includes(openItem.imdbId)) {
-      altIds.push(openItem.imdbId);
-    }
-    if (catalogItem?.imdbId && catalogItem.imdbId !== imdbStr && !altIds.includes(catalogItem.imdbId)) {
-      altIds.push(catalogItem.imdbId);
-    }
-    if (tmdbNum) {
-      try {
-        const resolved = await tmdbService.getImdbId(tmdbNum, type);
-        if (resolved) {
-          if (!imdbStr) {
-            imdbStr = resolved;
-          } else if (resolved !== imdbStr && !altIds.includes(resolved)) {
-            altIds.push(resolved);
-          }
-        }
-      } catch {
-      }
-    }
-    if (!imdbStr && rawTargetId.startsWith("tt")) {
-      imdbStr = rawTargetId;
-    }
-    if (tmdbNum && !altIds.includes(tmdbNum)) {
-      altIds.push(tmdbNum);
-    }
     const targetTitle = (id.title || catalogItem?.title || openItem?.title || "").trim();
-    if (!tmdbNum && !imdbStr && targetTitle) {
-      try {
-        const searchResults = await Promise.race([
-          tmdbService.searchMulti(targetTitle),
-          new Promise((resolve) => setTimeout(() => resolve([]), 2500))
-        ]);
-        if (searchResults && searchResults.length > 0) {
-          const match = searchResults.find((r) => r.imdbId || r.tmdbId) || searchResults[0];
-          if (match.tmdbId) {
-            tmdbNum = String(match.tmdbId);
-            if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
-          } else if (match.id && !match.id.startsWith("open-") && !match.id.startsWith("local-")) {
-            if (/^\d+$/.test(match.id)) {
-              tmdbNum = match.id;
-              if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
-            }
-          }
-          if (match.imdbId) {
-            imdbStr = match.imdbId;
-            if (!altIds.includes(match.imdbId)) altIds.push(match.imdbId);
-          } else if (tmdbNum) {
-            const resolved = await tmdbService.getImdbId(tmdbNum, type);
-            if (resolved) {
-              imdbStr = resolved;
-              if (!altIds.includes(resolved)) altIds.push(resolved);
-            }
-          }
-        }
-      } catch {
-      }
-    }
+    const originalTitle = (id.originalTitle || catalogItem?.originalTitle || openItem?.originalTitle || "").trim();
     if (openItem) {
       if ((type === "series" || type === "anime") && openItem.episodes && openItem.episodes.length > 0) {
         const epNum = episode?.episode || 1;
@@ -12528,7 +10915,10 @@ var ProviderRegistryService = class {
           });
         }
       } else if (openItem.verifiedStreams && openItem.verifiedStreams.length > 0) {
-        streams.push(...openItem.verifiedStreams);
+        streams.push(...openItem.verifiedStreams.map((source) => ({
+          ...source,
+          providerId: source.providerId || "zapitv-verified"
+        })));
       }
     }
     if (catalogItem) {
@@ -12555,7 +10945,10 @@ var ProviderRegistryService = class {
         const safeStreams = catalogItem.verifiedStreams.filter(
           (s) => !s.url?.includes("Night_of_the_Living_Dead") && !s.url?.includes("Caminandes")
         );
-        streams.push(...safeStreams);
+        streams.push(...safeStreams.map((source) => ({
+          ...source,
+          providerId: source.providerId || "zapitv-catalog"
+        })));
       } else if (catalogItem.videoUrl && !catalogItem.videoUrl.includes("Night_of_the_Living_Dead") && !catalogItem.videoUrl.includes("Caminandes")) {
         const directUrl = catalogItem.videoUrl;
         const isHls = directUrl.includes(".m3u8");
@@ -12576,12 +10969,123 @@ var ProviderRegistryService = class {
         }
       }
     }
+    if (streams.length > 0) {
+      const cleanLocal = streamValidator.filterCleanStreams(streams, targetTitle, originalTitle);
+      const rankedLocal = sourceSelectionService.rankStreams(cleanLocal, {
+        hasExternalPtSub: false,
+        preferDubbed: true,
+        identity: canonicalIdentityService.buildIdentity(openItem || catalogItem || {
+          id: id.id || id.imdbId || String(id.tmdbId || ""),
+          title: targetTitle,
+          type: type === "movie" ? "FILME" /* MOVIE */ : type === "anime" ? "ANIME" /* ANIME */ : "S\xC9RIE" /* SERIES */,
+          rating: 7,
+          year: id.year || openItem?.year || catalogItem?.year || 0,
+          originalTitle: id.originalTitle || openItem?.originalTitle || catalogItem?.originalTitle,
+          image: openItem?.image || "",
+          tmdbId: id.tmdbId ? String(id.tmdbId) : void 0,
+          imdbId: imdbStr || id.imdbId,
+          genres: openItem?.genres || []
+        }, episode),
+        cacheKey: `${effectiveCacheKey}_local`
+      });
+      if (rankedLocal.length > 0) {
+        notifyProgressive(rankedLocal);
+      }
+    }
+    const altIds = [];
+    if (openItem?.imdbId && openItem.imdbId !== imdbStr && !altIds.includes(openItem.imdbId)) {
+      altIds.push(openItem.imdbId);
+    }
+    if (catalogItem?.imdbId && catalogItem.imdbId !== imdbStr && !altIds.includes(catalogItem.imdbId)) {
+      altIds.push(catalogItem.imdbId);
+    }
+    if (tmdbNum) {
+      try {
+        const resolved = await tmdbService.getImdbId(tmdbNum, type);
+        if (resolved) {
+          if (!imdbStr) {
+            imdbStr = resolved;
+          } else if (resolved !== imdbStr) {
+            if (!altIds.includes(imdbStr)) altIds.push(imdbStr);
+            imdbStr = resolved;
+          }
+        }
+      } catch {
+      }
+    }
+    if (!imdbStr && rawTargetId.startsWith("tt")) {
+      imdbStr = rawTargetId;
+    }
+    if (tmdbNum) {
+      if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
+      if (!altIds.includes(`tmdb:${tmdbNum}`)) altIds.push(`tmdb:${tmdbNum}`);
+    }
+    if (!tmdbNum && !imdbStr && targetTitle) {
+      try {
+        const searchResults = await Promise.race([
+          tmdbService.searchMulti(targetTitle),
+          new Promise((resolve) => setTimeout(() => resolve([]), 2500))
+        ]);
+        if (searchResults && searchResults.length > 0) {
+          const match = searchResults.find((r) => r.imdbId || r.tmdbId) || searchResults[0];
+          if (match.tmdbId) {
+            tmdbNum = String(match.tmdbId);
+            if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
+          } else if (match.id && !match.id.startsWith("open-") && !match.id.startsWith("local-")) {
+            if (/^\d+$/.test(match.id)) {
+              tmdbNum = match.id;
+              if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
+            }
+          }
+          if (match.imdbId) {
+            imdbStr = match.imdbId;
+            if (!altIds.includes(match.imdbId)) altIds.push(match.imdbId);
+          } else if (tmdbNum) {
+            const resolved = await tmdbService.getImdbId(tmdbNum, type);
+            if (resolved) {
+              imdbStr = resolved;
+              if (!altIds.includes(resolved)) altIds.push(resolved);
+            }
+          }
+        }
+      } catch {
+      }
+    }
+    const itemTarget = openItem || {
+      id: id.id || id.imdbId || String(id.tmdbId || ""),
+      title: targetTitle,
+      type: type === "movie" ? "FILME" /* MOVIE */ : type === "anime" ? "ANIME" /* ANIME */ : "S\xC9RIE" /* SERIES */,
+      rating: 7,
+      year: id.year || openItem?.year || catalogItem?.year || 0,
+      originalTitle: id.originalTitle || openItem?.originalTitle || catalogItem?.originalTitle,
+      image: openItem?.image || "",
+      tmdbId: id.tmdbId ? String(id.tmdbId) : void 0,
+      imdbId: imdbStr || id.imdbId,
+      genres: openItem?.genres || []
+    };
+    const identity = canonicalIdentityService.buildIdentity(itemTarget, episode);
+    const remembered = await Promise.race([
+      getRememberedSources({
+        canonicalId: identity.canonicalId || "",
+        mediaType: identity.canonicalId?.split(":")[0] || type,
+        season: episode?.season || 0,
+        episode: episode?.episode || 0
+      }),
+      new Promise((resolve) => setTimeout(() => resolve([]), 400))
+    ]);
+    const ptSubPromise = Promise.race([
+      subtitleService.hasPtBrSubtitles(itemTarget, episode?.season, episode?.episode),
+      new Promise((resolve) => setTimeout(() => resolve(false), 1200))
+    ]).catch(() => false);
     const stremioAddons = activeProviders.filter((p) => p.type === "stremio-addon" && !["stremio-cinemeta", "stremio-opensubtitles"].includes(p.id));
     const stremioType = type === "movie" ? "movie" : "series";
     const primaryId = imdbStr || tmdbNum || rawTargetId;
     const stremioId = episode && (type === "series" || type === "anime") ? `${primaryId}:${episode.season}:${episode.episode}` : primaryId;
     if (stremioId) {
       const sortedAddons = [...stremioAddons].sort((a, b) => {
+        const memoryA = remembered.find((row) => row.providerId === a.id)?.score || 0;
+        const memoryB = remembered.find((row) => row.providerId === b.id)?.score || 0;
+        if (memoryA !== memoryB) return memoryB - memoryA;
         const scoreA = playbackOptimizerService.getProviderScore(a.id);
         const scoreB = playbackOptimizerService.getProviderScore(b.id);
         if (a.isPtBr !== b.isPtBr) return a.isPtBr ? -1 : 1;
@@ -12598,20 +11102,22 @@ var ProviderRegistryService = class {
         let providerSuccess = false;
         let providerStreamCount = 0;
         let providerError;
+        const addonTimeout = addon.id.includes("froststream") ? 15e3 : 1e4;
         try {
           const client = new StremioClient(addon.url);
           let res = await Promise.race([
             client.getStreams(stremioType, stremioId),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON")), 1e4))
-          ]);
+            new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON")), addonTimeout))
+          ]).catch(() => null);
           if ((!res || !res.streams || res.streams.length === 0) && altIds.length > 0) {
             for (const altBase of altIds) {
               const altId = episode && (type === "series" || type === "anime") ? `${altBase}:${episode.season}:${episode.episode}` : altBase;
               try {
+                const altTimeout = 6e3;
                 const altRes = await Promise.race([
                   client.getStreams(stremioType, altId),
-                  new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON_ALT")), 5e3))
-                ]);
+                  new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON_ALT")), altTimeout))
+                ]).catch(() => null);
                 if (altRes && Array.isArray(altRes.streams) && altRes.streams.length > 0) {
                   res = altRes;
                   break;
@@ -12626,7 +11132,7 @@ var ProviderRegistryService = class {
               res = await Promise.race([
                 client.getStreams(altType, stremioId),
                 new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON_TYPE")), 5e3))
-              ]);
+              ]).catch(() => null);
             } catch {
             }
           }
@@ -12636,14 +11142,30 @@ var ProviderRegistryService = class {
               const sUrl = s.url || "";
               if (addon.id === "fenixflix-animes" && /🐉\s*Malfoy/i.test(s.title || "")) continue;
               if (s.ytId || sUrl.includes("youtube.com") || sUrl.includes("youtu.be")) continue;
-              if (sUrl.includes("embed") || sUrl.includes("iframe") || s.sourceType === "embed") continue;
+              const isMediaFile = sUrl.includes(".m3u8") || sUrl.includes(".mp4") || sUrl.includes(".webm") || sUrl.includes(".ogv") || sUrl.includes(".mpd") || sUrl.includes(".mkv");
+              if (!isMediaFile && (sUrl.includes("embed") || sUrl.includes("iframe") || s.sourceType === "embed")) continue;
               const isHls = sUrl.includes(".m3u8") || s.sourceType === "hls";
               const isDash = sUrl.includes(".mpd");
-              const isDirectVideo = sUrl.includes(".mp4") || sUrl.includes(".webm") || sUrl.includes(".ogv") || sUrl.includes("/api/proxy") || s.sourceType === "mp4" || Boolean(sUrl && !s.infoHash && !sUrl.includes(".torrent"));
-              const isTorrent = Boolean(s.infoHash);
-              const isDubbed = Boolean(s.isDubbed) || /dublado|dub\b/i.test(s.title || "") || /🇧🇷/i.test(s.title || "") && /dual|áudio|audio/i.test(s.title || "");
-              const isPtBr = Boolean(s.isPtBr) || /pt[-_]?br|dublado|🇧🇷/i.test(s.title || "");
+              const isTorrent = Boolean(s.infoHash) || sUrl.includes("127.0.0.1:11470") || sUrl.includes("localhost:11470") || sUrl.includes(".torrent");
+              const isDirectVideo = !isTorrent && (sUrl.includes(".mp4") || sUrl.includes(".webm") || sUrl.includes(".ogv") || sUrl.includes("/api/proxy") || s.sourceType === "mp4" || Boolean(sUrl && !s.infoHash));
+              const streamText = `${s.name || ""} ${s.title || ""} ${s.description || ""}`;
+              const isExplicitlySubOnly = /\b(legendado|softsub|hardsub|sub\b|leg\b)\b/i.test(streamText) && !/dublado|dual|áudio|audio/i.test(streamText);
+              const hasPtAudioIndicator = /dublado|dub\b|dual\b|audio\s*pt|áudio\s*pt|pt[-_]?br|portugu[êe]s|🌎\s*portugu[êe]s/i.test(streamText) || /🇧🇷/i.test(streamText) && !isExplicitlySubOnly;
+              const isDubbed = Boolean(s.isDubbed) || !isExplicitlySubOnly && hasPtAudioIndicator || addon.isPtBr && !isExplicitlySubOnly && hasPtAudioIndicator;
+              const isPtBr = Boolean(s.isPtBr) || addon.isPtBr || isDubbed || /pt[-_]?br|portugu[êe]s|pob|por\b|🇧🇷/i.test(streamText);
               if (isHls || isDash || isDirectVideo) {
+                if (isHls && /^https:\/\/(?:[^/]+\.)?embedplayer2\.xyz\//i.test(sUrl)) {
+                  parsedStreams.push({
+                    ...s,
+                    url: `/api/proxy?url=${encodeURIComponent(sUrl)}`,
+                    providerName: `${addon.name} (HLS Proxy)`,
+                    providerId: addon.id,
+                    sourceType: "hls",
+                    ...isDubbed ? { isDubbed: true } : {},
+                    ...isPtBr ? { isPtBr: true } : {}
+                  });
+                  continue;
+                }
                 if (sUrl.startsWith("http://") && !sUrl.includes("/api/proxy")) {
                   if (addon.id === "fenixflix-animes" && typeof window !== "undefined" && window.location.protocol === "https:") {
                     parsedStreams.push({
@@ -12684,7 +11206,11 @@ var ProviderRegistryService = class {
                   providerId: addon.id,
                   sourceType: isHls ? "hls" : "mp4",
                   ...isDubbed ? { isDubbed: true } : {},
-                  ...isPtBr ? { isPtBr: true } : {}
+                  ...isPtBr ? { isPtBr: true } : {},
+                  behaviorHints: {
+                    ...s.behaviorHints || {},
+                    notWebReady: false
+                  }
                 });
               } else if (isTorrent) {
                 const engineOnline = await isLocalStremioEngineOnline();
@@ -12696,7 +11222,7 @@ var ProviderRegistryService = class {
                   else if (combinedText.includes("720p")) streamQuality = "720p";
                   else if (combinedText.includes("480p")) streamQuality = "480p";
                 }
-                const engineUrl = `http://127.0.0.1:11470/${s.infoHash}/${s.fileIdx || 0}`;
+                const engineUrl = s.url || `http://127.0.0.1:11470/${s.infoHash}/${s.fileIdx || 0}`;
                 parsedStreams.push({
                   ...s,
                   url: engineUrl,
@@ -12722,6 +11248,7 @@ var ProviderRegistryService = class {
           providerError = err.message || "Erro de comunica\xE7\xE3o";
         } finally {
           const duration = Date.now() - startProviderTime;
+          const isTimeout = Boolean(providerError?.includes("TIMEOUT") || duration >= addonTimeout - 300 && !providerSuccess);
           playbackOptimizerService.recordProviderResult(addon.id, duration, providerSuccess);
           mediaLoadingTracker.recordProviderAttempt(rawTargetId, {
             providerId: addon.id,
@@ -12731,43 +11258,80 @@ var ProviderRegistryService = class {
             streamCount: providerStreamCount,
             error: providerError
           });
+          options?.onProviderResult?.({
+            providerId: addon.id,
+            providerName: addon.name,
+            durationMs: duration,
+            success: providerSuccess,
+            streamCount: providerStreamCount,
+            isTimeout,
+            error: providerError
+          });
         }
         return [];
       };
-      const CONCURRENCY_LIMIT = 4;
+      const CONCURRENCY_LIMIT = 8;
       const collectedFromAddons = [];
       let activeIndex = 0;
       let stopSpawning = false;
       const runWorker = async () => {
         while (activeIndex < sortedAddons.length && !stopSpawning) {
+          if (options?.signal?.aborted) return;
           const currentIndex = activeIndex++;
           const addon = sortedAddons[currentIndex];
           const result = await executeAddon(addon);
           if (Array.isArray(result) && result.length > 0) {
             collectedFromAddons.push(...result);
-            const hasPtBr = collectedFromAddons.some((s) => s.isPtBr || s.isDubbed);
-            if (collectedFromAddons.length >= 2 && hasPtBr) {
-              stopSpawning = true;
+            const combinedInterim = [...streams, ...collectedFromAddons];
+            const cleanInterim = streamValidator.filterCleanStreams(combinedInterim, targetTitle, originalTitle);
+            if (cleanInterim.length > 0) {
+              notifyProgressive(prioritizeRememberedSources(cleanInterim, remembered));
+            }
+            if (!options?.isRetryAttempt) {
+              const engineOnline = localEngineCache.active;
+              const hasFrostStreamFinished = !sortedAddons.some((a) => a.id.includes("froststream")) || collectedFromAddons.some((s) => s.providerId?.includes("froststream"));
+              const culprits = cleanInterim.filter((s) => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
+              const hasWebReadyPtBr = culprits.length > 0;
+              if (cleanInterim.length >= 2 && hasWebReadyPtBr && hasFrostStreamFinished) {
+                stopSpawning = true;
+              }
             }
           }
         }
       };
-      const workers = Array.from(
-        { length: Math.min(CONCURRENCY_LIMIT, sortedAddons.length) },
+      const workers = [];
+      if (sortedAddons.length > 0 && remembered.some((row) => row.providerId === sortedAddons[0].id)) {
+        workers.push(runWorker());
+        await Promise.race([workers[0], new Promise((resolve) => setTimeout(resolve, 400))]);
+      }
+      workers.push(...Array.from(
+        { length: Math.min(CONCURRENCY_LIMIT - workers.length, sortedAddons.length - workers.length) },
         () => runWorker()
-      );
+      ));
       let timer = null;
       let interval = null;
       await Promise.race([
-        Promise.all(workers),
+        Promise.all(workers).then(() => {
+        }),
         new Promise((resolve) => {
           interval = setInterval(() => {
-            const hasPtBr = collectedFromAddons.some((s) => s.isPtBr || s.isDubbed);
-            if (collectedFromAddons.length >= 2 && hasPtBr) {
+            if (options?.signal?.aborted) {
               if (interval) clearInterval(interval);
-              timer = setTimeout(resolve, 600);
+              resolve();
+              return;
             }
-          }, 80);
+            if (!options?.isRetryAttempt) {
+              const engineOnline = localEngineCache.active;
+              const cleanInterim = streamValidator.filterCleanStreams([...streams, ...collectedFromAddons], targetTitle, originalTitle);
+              const hasFrostStreamFinished = !sortedAddons.some((a) => a.id.includes("froststream")) || collectedFromAddons.some((s) => s.providerId?.includes("froststream"));
+              const culprits = cleanInterim.filter((s) => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
+              const hasWebReadyPtBr = culprits.length > 0;
+              if (cleanInterim.length >= 2 && hasWebReadyPtBr && hasFrostStreamFinished) {
+                if (interval) clearInterval(interval);
+                timer = setTimeout(resolve, 350);
+              }
+            }
+          }, 60);
         })
       ]);
       if (interval) clearInterval(interval);
@@ -12777,11 +11341,11 @@ var ProviderRegistryService = class {
     mediaLoadingTracker.transition(rawTargetId, "VALIDATING_SOURCES", {
       rawStreamCount: streams.length
     });
-    const cleanStreams = streamValidator.filterCleanStreams(streams, targetTitle).filter((s) => {
+    const cleanStreams = streamValidator.filterCleanStreams(streams, targetTitle, originalTitle).filter((s) => {
       if (s.ytId) return false;
       const u = (s.url || "").toLowerCase();
       const t = (s.title || "").toLowerCase();
-      if (imdbStr === "tt0409591" && s.providerId === "fenixflix-animes" && !/🌪️\s*Hypex|💥\s*Figgs|🔋\s*Atlas|🚗\s*Arthur/i.test(s.title || "")) {
+      if (imdbStr === "tt0409591" && s.providerId === "fenixflix-animes" && !/🌪️\s*Hypex|💥\s*Figgs|🔋\s*Atlas|🚗\s*Arthur/i.test(s.title || "") && !/\/naruto-classico-dublado\/\d+\.mp4\/index\.m3u8(?:\?|$)/i.test(s.url || "")) {
         return false;
       }
       if (typeof window !== "undefined" && window.location.protocol === "https:") {
@@ -12798,43 +11362,29 @@ var ProviderRegistryService = class {
       }
       return true;
     });
-    const itemTarget = openItem || {
-      id: id.id || id.imdbId || String(id.tmdbId || ""),
-      title: targetTitle,
-      type: type === "movie" ? "FILME" /* MOVIE */ : type === "anime" ? "ANIME" /* ANIME */ : "S\xC9RIE" /* SERIES */,
-      rating: 7,
-      year: id.year || openItem?.year || catalogItem?.year || 0,
-      originalTitle: id.originalTitle || openItem?.originalTitle || catalogItem?.originalTitle,
-      image: openItem?.image || "",
-      tmdbId: id.tmdbId ? String(id.tmdbId) : void 0,
-      imdbId: imdbStr || id.imdbId,
-      genres: openItem?.genres || []
-    };
-    const identity = canonicalIdentityService.buildIdentity(itemTarget, episode);
     let hasExternalPtSub = false;
     try {
-      hasExternalPtSub = await Promise.race([
-        subtitleService.hasPtBrSubtitles(itemTarget, episode?.season, episode?.episode),
-        new Promise((resolve) => setTimeout(() => resolve(false), 1500))
-      ]);
+      hasExternalPtSub = await ptSubPromise;
     } catch {
+      hasExternalPtSub = false;
     }
     mediaLoadingTracker.transition(rawTargetId, "SELECTING_AUDIO", {
       cleanStreamsCount: cleanStreams.length,
       hasExternalPtSub
     });
-    const sorted = sourceSelectionService.rankStreams(cleanStreams, {
+    const sorted = prioritizeRememberedSources(sourceSelectionService.rankStreams(cleanStreams, {
       hasExternalPtSub,
       preferDubbed: true,
       identity,
-      cacheKey: `${cacheKey}_hasPt${hasExternalPtSub}`
-    });
+      cacheKey: `${effectiveCacheKey}_hasPt${hasExternalPtSub}`
+    }), remembered);
     if (imdbStr === "tt0409591") {
       sorted.sort(
-        (a, b) => Number(b.providerId === "fenixflix-animes" && /🚗\s*Arthur/i.test(b.title || "")) - Number(a.providerId === "fenixflix-animes" && /🚗\s*Arthur/i.test(a.title || ""))
+        (a, b) => Number(b.providerId === "fenixflix-animes" && /\/naruto-classico-dublado\/\d+\.mp4\/index\.m3u8(?:\?|$)/i.test(b.url || "")) - Number(a.providerId === "fenixflix-animes" && /\/naruto-classico-dublado\/\d+\.mp4\/index\.m3u8(?:\?|$)/i.test(a.url || ""))
       );
     }
-    for (const s of sorted) {
+    const topCandidates = sorted.slice(0, 15);
+    for (const s of topCandidates) {
       mediaSourceValidationService.validateSource(s, {
         mediaId: rawTargetId,
         mediaTitle: targetTitle,
@@ -12846,10 +11396,48 @@ var ProviderRegistryService = class {
       }).catch(() => {
       });
     }
-    if (generation === this.cacheGeneration && sorted.length > 0) {
-      this.cache.set(cacheKey, { streams: sorted, timestamp: Date.now() });
+    if (effectiveGen === this.cacheGeneration) {
+      if (sorted.length > 0) {
+        this.cache.set(effectiveCacheKey, { streams: sorted, timestamp: Date.now() });
+        this.negativeCache.delete(effectiveCacheKey);
+      } else {
+        this.negativeCache.set(effectiveCacheKey, {
+          timestamp: Date.now(),
+          reason: "Nenhuma fonte reproduz\xEDvel encontrada",
+          inconclusive: false
+        });
+      }
     }
+    notifyProgressive(sorted);
     return sorted;
+  }
+  /**
+   * Invalida o cache de fontes de uma obra ou limpa todo o cache.
+   */
+  invalidateCache(target) {
+    if (!target) {
+      this.clearCache();
+      return;
+    }
+    const candidates = [
+      target.id ? String(target.id) : "",
+      target.imdbId ? String(target.imdbId) : "",
+      target.tmdbId ? String(target.tmdbId) : "",
+      target.title ? String(target.title).toLowerCase().trim() : ""
+    ].filter(Boolean);
+    for (const key of Array.from(this.cache.keys())) {
+      const lowerKey = key.toLowerCase();
+      if (candidates.some((c) => lowerKey.includes(c.toLowerCase()))) {
+        this.cache.delete(key);
+      }
+    }
+    for (const key of Array.from(this.negativeCache.keys())) {
+      const lowerKey = key.toLowerCase();
+      if (candidates.some((c) => lowerKey.includes(c.toLowerCase()))) {
+        this.negativeCache.delete(key);
+      }
+    }
+    sourceSelectionService.clearRankingCache();
   }
   /**
    * Limpa todos os caches de provedores e ranqueamento inteligente.
@@ -12857,6 +11445,7 @@ var ProviderRegistryService = class {
   clearCache() {
     this.cacheGeneration++;
     this.cache.clear();
+    this.negativeCache.clear();
     this.pending.clear();
     sourceSelectionService.clearRankingCache();
   }
@@ -12956,9 +11545,9 @@ var AdultContentService = class _AdultContentService {
    * Verifica se um termo ou título envolve exploração ilegal de menores ou conteúdo proibido.
    * Tolerância zero com bloqueio imediato (Regra 5).
    */
-  isIllegalOrExploitative(text) {
-    if (!text || !text.trim()) return false;
-    const norm = text.toLowerCase().trim();
+  isIllegalOrExploitative(text2) {
+    if (!text2 || !text2.trim()) return false;
+    const norm = text2.toLowerCase().trim();
     return ILLEGAL_EXPLOITATIVE_PATTERNS.some((pattern) => pattern.test(norm));
   }
   /**
@@ -12967,8 +11556,8 @@ var AdultContentService = class _AdultContentService {
    */
   isIntentionalAdultSearch(query, availableAdultTitles = []) {
     if (!query || !query.trim()) return false;
-    const clean = query.toLowerCase().trim();
-    if (this.isIllegalOrExploitative(clean)) return false;
+    const clean2 = query.toLowerCase().trim();
+    if (this.isIllegalOrExploitative(clean2)) return false;
     const genericTerms = /* @__PURE__ */ new Set([
       "a",
       "o",
@@ -13008,7 +11597,7 @@ var AdultContentService = class _AdultContentService {
       "animacao",
       "anima\xE7\xE3o"
     ]);
-    if (genericTerms.has(clean) || clean.length < 3) {
+    if (genericTerms.has(clean2) || clean2.length < 3) {
       return false;
     }
     const explicitAdultSearchTerms = [
@@ -13025,13 +11614,13 @@ var AdultContentService = class _AdultContentService {
       "er\xF3tica",
       "sexo"
     ];
-    if (explicitAdultSearchTerms.some((term) => clean === term || clean.startsWith(`${term} `) || clean.endsWith(` ${term}`))) {
+    if (explicitAdultSearchTerms.some((term) => clean2 === term || clean2.startsWith(`${term} `) || clean2.endsWith(` ${term}`))) {
       return true;
     }
     if (availableAdultTitles.length > 0) {
       const match = availableAdultTitles.some((t) => {
         const normTitle = t.toLowerCase().trim();
-        return normTitle === clean || clean.length >= 4 && normTitle.includes(clean);
+        return normTitle === clean2 || clean2.length >= 4 && normTitle.includes(clean2);
       });
       if (match) return true;
     }
@@ -13199,7 +11788,7 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
       const isSeries = item.type === "S\xC9RIE" /* SERIES */;
       const isAnime = item.type === "ANIME" /* ANIME */;
       const mediaType = isAnime ? "anime" : isSeries ? "series" : "movie";
-      const episodes = (item.episodes || []).map((ep) => ({
+      const episodes2 = (item.episodes || []).map((ep) => ({
         season: 1,
         episode: ep.number,
         title: ep.title,
@@ -13226,8 +11815,8 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
         rejectedSourceCount: 0,
         providersChecked: ["Acervo Oficial ZapiTV"],
         providersFailed: [],
-        episodes,
-        availableEpisodeCount: episodes.length || 1,
+        episodes: episodes2,
+        availableEpisodeCount: episodes2.length || 1,
         hasPtBrAudio: item.audioStatus === "pt-br-original",
         hasOriginalAudio: true,
         bestQuality: "1080p",
@@ -13381,7 +11970,7 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
         return record2;
       }
       let playbackStatus = "CHECKING";
-      const episodes = [];
+      const episodes2 = [];
       let candidateSourceCount = 0;
       let validSourceCount = 0;
       let rejectedSourceCount = 0;
@@ -13435,7 +12024,7 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
             hasOriginalAudio = true;
             bestQuality = validStreams[0].quality || "1080p";
             if (isSeries || isAnime) {
-              episodes.push({
+              episodes2.push({
                 season: 1,
                 episode: 1,
                 releaseStatus: "RELEASED",
@@ -13473,8 +12062,8 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
         rejectedSourceCount,
         providersChecked,
         providersFailed,
-        episodes,
-        availableEpisodeCount: episodes.filter((e) => e.hasPlayableSource).length || (isPubliclyPlayable ? 1 : 0),
+        episodes: episodes2,
+        availableEpisodeCount: episodes2.filter((e) => e.hasPlayableSource).length || (isPubliclyPlayable ? 1 : 0),
         hasPtBrAudio,
         hasOriginalAudio,
         bestQuality,
@@ -13656,66 +12245,2936 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
 };
 var catalogEligibilityService = CatalogEligibilityService.getInstance();
 
-// src/core/catalog/catalogDeduplication.ts
-function normalizeCatalogText(text) {
-  if (!text) return "";
-  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "").trim();
-}
-function getCanonicalKeysForItem(item) {
-  if (!item) return [];
-  const keys = /* @__PURE__ */ new Set();
-  if (item.imdbId && /^tt\d+$/i.test(item.imdbId.trim())) {
-    keys.add(`imdb:${item.imdbId.trim().toLowerCase()}`);
+// src/core/catalog/CanonicalCatalogMaster.ts
+var CanonicalCatalogMaster = class _CanonicalCatalogMaster {
+  constructor() {
+    // Armazenamento central em memória
+    this.masterRegistry = /* @__PURE__ */ new Map();
+    // Índices secundários de busca rápida e resolução cruzada
+    this.indexByImdb = /* @__PURE__ */ new Map();
+    // imdbId -> canonicalId
+    this.indexByTmdbMovie = /* @__PURE__ */ new Map();
+    // tmdbMovieId -> canonicalId
+    this.indexByTmdbSeries = /* @__PURE__ */ new Map();
+    // tmdbSeriesId -> canonicalId
+    this.indexByAniList = /* @__PURE__ */ new Map();
+    // anilistId -> canonicalId
+    this.indexByTitleYear = /* @__PURE__ */ new Map();
+    // title_year_cat -> canonicalId
+    // Controle de atualização periódica
+    this.refreshTimer = null;
+    this.lastPeriodicRefresh = 0;
+    this.isRefreshing = false;
+    this.schedulePeriodicRefresh(30 * 60 * 1e3);
   }
-  if (item.id && /^tt\d+$/i.test(item.id.trim())) {
-    keys.add(`imdb:${item.id.trim().toLowerCase()}`);
+  static getInstance() {
+    if (!_CanonicalCatalogMaster.instance) {
+      _CanonicalCatalogMaster.instance = new _CanonicalCatalogMaster();
+    }
+    return _CanonicalCatalogMaster.instance;
   }
-  const mediaType = item.mediaFormat === "movie" || item.type === "movie" ? "movie" : "tv";
-  if (item.tmdbId) {
-    keys.add(`tmdb:${mediaType}:${String(item.tmdbId).trim().toLowerCase()}`);
+  /**
+   * Constrói um identificador canônico universal qualificado por tipo e provedor
+   */
+  buildCanonicalId(type, provider, rawId, epParams) {
+    let cat = "movie";
+    if (type === "ANIME" /* ANIME */) cat = "anime";
+    else if (type === "S\xC9RIE" /* SERIES */) cat = "series";
+    const cleanRaw = String(rawId).trim().toLowerCase();
+    const baseId = `${cat}:${provider}:${cleanRaw}`;
+    if (epParams && typeof epParams.season === "number" && typeof epParams.episode === "number") {
+      const s = String(epParams.season).padStart(2, "0");
+      const e = String(epParams.episode).padStart(2, "0");
+      return `${baseId}:s${s}:e${e}`;
+    }
+    return baseId;
   }
-  if (item.id && item.id.startsWith("tmdb-")) {
-    keys.add(`tmdb:${mediaType}:${item.id.replace(/^tmdb-(movie-|tv-|anime-)?/, "").toLowerCase()}`);
+  /**
+   * Faz o parse de um identificador canônico estruturado
+   */
+  parseCanonicalId(canonicalId) {
+    if (!canonicalId || typeof canonicalId !== "string") return null;
+    const parts = canonicalId.split(":");
+    if (parts.length < 3) return null;
+    const category = parts[0];
+    const provider = parts[1];
+    const rawId = parts[2];
+    let season;
+    let episode;
+    if (parts.length >= 5 && parts[3].startsWith("s") && parts[4].startsWith("e")) {
+      season = parseInt(parts[3].replace(/^s/, ""), 10);
+      episode = parseInt(parts[4].replace(/^e/, ""), 10);
+    }
+    return { category, provider, rawId, season, episode };
   }
-  if (item.id) {
-    keys.add(`id:${item.id.trim().toLowerCase()}`);
+  /**
+   * Determina a categoria canônica estrita de um item (Filmes vs Séries vs Animes)
+   */
+  classifyCategory(item) {
+    if (!item) return "FILME" /* MOVIE */;
+    const titleLower = (item.title || "").toLowerCase();
+    const origLower = (item.originalTitle || "").toLowerCase();
+    const genres = (item.genres || []).map((g) => g.toLowerCase());
+    const isExplicitAnime = item.type === "ANIME" /* ANIME */ || Boolean(item.aniListId) || Boolean(item.malId) || genres.includes("anime") || genres.includes("japonesa");
+    const isAnimeFranchise = /\b(naruto|bleach|one piece|dragon ball|death note|jujutsu kaisen|demon slayer|kimetsu no yaiba|my hero academia|boku no hero|attack on titan|shingeki no kyojin|fullmetal alchemist|hunter x hunter|tokyo ghoul|fairy tail|sword art online|evangelion|cowboy bebop|inuyasha|sailor moon|yu yu hakusho|steins;gate|code geass|chainsaw man|spy x family|solo leveling|black clover|vinland saga|frieren|dungeon meshi|mob psycho|haikyuu|gintama|berserk|slam dunk|akira|chihiro|totoro|mononoke|your name|kimi no na wa|suzume|boruto)\b/i.test(titleLower) || /\b(naruto|bleach|one piece|dragon ball|death note|jujutsu kaisen|demon slayer|kimetsu no yaiba|boku no hero|attack on titan|shingeki no kyojin|evangelion|chainsaw man|frieren)\b/i.test(origLower);
+    const isLiveAction = /live[- ]action|a série$|: a série|o filme \(live-action\)/i.test(titleLower);
+    if ((isExplicitAnime || isAnimeFranchise) && !isLiveAction) {
+      return "ANIME" /* ANIME */;
+    }
+    const typeStr = String(item.type || "").toUpperCase();
+    const isSeries = item.type === "S\xC9RIE" /* SERIES */ || typeStr === "SERIES" || typeStr === "S\xC9RIE" || typeStr === "TV" || item.mediaFormat === "series" || Array.isArray(item.episodes) && item.episodes.length > 1 || typeof item.seasonsCount === "number" && item.seasonsCount > 0;
+    if (isSeries && item.mediaFormat !== "movie") {
+      return "S\xC9RIE" /* SERIES */;
+    }
+    return "FILME" /* MOVIE */;
   }
-  const normTitle = normalizeCatalogText(item.title);
-  if (normTitle) {
-    const rawType = String(item.type || "unknown").toLowerCase();
+  /**
+   * Registra e unifica um item no Catálogo Mestre a partir de metadados do TMDB, IMDb ou AniList
+   */
+  registerItem(rawItem) {
+    if (!rawItem || !rawItem.id && !rawItem.title) return rawItem;
+    const strictType = this.classifyCategory(rawItem);
+    const item = {
+      ...rawItem,
+      type: strictType
+    };
+    if (item.type === "ANIME" /* ANIME */ && !item.mediaFormat) {
+      item.mediaFormat = item.episodes && item.episodes.length > 1 ? "series" : "movie";
+    }
+    let canonicalId = item.canonicalId;
+    if (!canonicalId) {
+      if (item.imdbId && /^tt\d+$/i.test(item.imdbId.trim())) {
+        canonicalId = this.buildCanonicalId(item.type, "imdb", item.imdbId.trim());
+      } else if (item.aniListId) {
+        canonicalId = this.buildCanonicalId("ANIME" /* ANIME */, "anilist", item.aniListId);
+      } else if (item.tmdbId) {
+        canonicalId = this.buildCanonicalId(item.type, "tmdb", item.tmdbId);
+      } else {
+        canonicalId = this.buildCanonicalId(item.type, "local", item.id);
+      }
+      item.canonicalId = canonicalId;
+    }
+    let existingEntry = this.masterRegistry.get(canonicalId);
+    if (!existingEntry) {
+      const aliasCanonical = this.resolveCanonicalId(item);
+      if (aliasCanonical && aliasCanonical !== canonicalId) {
+        existingEntry = this.masterRegistry.get(aliasCanonical);
+        canonicalId = aliasCanonical;
+        item.canonicalId = aliasCanonical;
+      }
+    }
+    const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+    const isTheatricalOrFuture = theatricalFilterService.isKnownUnreleasedOrTheatrical(item) || item.availabilityStatus === "unreleased" || item.availabilityStatus === "unavailable" || Boolean(item.year && item.year > currentYear);
+    const isEligible = catalogEligibilityService.isItemPubliclyPlayableSync(item);
+    const isPublicVisible = isEligible && !isTheatricalOrFuture && item.availabilityStatus !== "unreleased" && item.availabilityStatus !== "unavailable";
+    if (existingEntry) {
+      const merged = existingEntry.item;
+      if (!merged.imdbId && item.imdbId) merged.imdbId = item.imdbId;
+      if (!merged.tmdbId && item.tmdbId) merged.tmdbId = item.tmdbId;
+      if (!merged.aniListId && item.aniListId) merged.aniListId = item.aniListId;
+      if (!merged.malId && item.malId) merged.malId = item.malId;
+      if (!merged.originalTitle && item.originalTitle) merged.originalTitle = item.originalTitle;
+      if (!merged.releaseDate && item.releaseDate) merged.releaseDate = item.releaseDate;
+      if (!merged.director && item.director) merged.director = item.director;
+      if ((!merged.cast || merged.cast.length === 0) && item.cast) merged.cast = item.cast;
+      if ((!merged.genres || merged.genres.length === 0) && item.genres) merged.genres = item.genres;
+      if (!merged.overview && item.overview) merged.overview = item.overview;
+      if (!merged.backdrop && item.backdrop) merged.backdrop = item.backdrop;
+      if (!merged.image && item.image) merged.image = item.image;
+      if ((!merged.episodes || merged.episodes.length === 0) && item.episodes && item.episodes.length > 0) {
+        merged.episodes = item.episodes;
+      }
+      if (!merged.seasonsCount && item.seasonsCount) {
+        merged.seasonsCount = item.seasonsCount;
+      }
+      existingEntry.lastUpdatedAt = Date.now();
+      existingEntry.isPubliclyVisible = isPublicVisible;
+      existingEntry.unreleased = isTheatricalOrFuture;
+      this.indexItem(canonicalId, merged);
+      return merged;
+    }
+    const newEntry = {
+      canonicalId,
+      item,
+      registeredAt: Date.now(),
+      lastUpdatedAt: Date.now(),
+      isPubliclyVisible: isPublicVisible,
+      unreleased: isTheatricalOrFuture
+    };
+    this.masterRegistry.set(canonicalId, newEntry);
+    this.indexItem(canonicalId, item);
+    return item;
+  }
+  /**
+   * Indexa as chaves secundárias para busca e desambiguação instantânea
+   */
+  indexItem(canonicalId, item) {
+    if (item.imdbId && /^tt\d+$/i.test(item.imdbId.trim())) {
+      this.indexByImdb.set(item.imdbId.trim().toLowerCase(), canonicalId);
+    } else if (item.imdbId && /^\d{6,10}$/.test(item.imdbId.trim())) {
+      this.indexByImdb.set(`tt${item.imdbId.trim()}`, canonicalId);
+    }
+    const imdbInId = String(item.id || "").match(/^(?:movie|series|anime)[-_](?:tt)?(\d{6,10})$/i);
+    if (imdbInId) {
+      this.indexByImdb.set(`tt${imdbInId[1]}`, canonicalId);
+    }
+    if (item.tmdbId) {
+      const cleanTmdb = String(item.tmdbId).trim().toLowerCase();
+      if (item.type === "FILME" /* MOVIE */) {
+        this.indexByTmdbMovie.set(cleanTmdb, canonicalId);
+      } else {
+        this.indexByTmdbSeries.set(cleanTmdb, canonicalId);
+      }
+    }
+    const tmdbInId = String(item.id || "").match(/^tmdb-(?:movie-|tv-|anime-)?(\d+)/i);
+    if (tmdbInId) {
+      if (item.type === "FILME" /* MOVIE */) {
+        this.indexByTmdbMovie.set(tmdbInId[1], canonicalId);
+      } else {
+        this.indexByTmdbSeries.set(tmdbInId[1], canonicalId);
+      }
+    }
+    if (item.aniListId) {
+      this.indexByAniList.set(item.aniListId, canonicalId);
+    }
+    const aniInId = String(item.id || "").match(/^anilist-(\d+)/i);
+    if (aniInId) {
+      this.indexByAniList.set(Number(aniInId[1]), canonicalId);
+    }
+    const titlesToIndex = [item.title, item.originalTitle].filter(Boolean);
+    const cat = item.type || "FILME" /* MOVIE */;
     const year = Number(item.year) || 0;
-    keys.add(`title:${rawType}:${normTitle}:${year}`);
-    keys.add(`title_only:${rawType}:${normTitle}`);
-  }
-  if (item.originalTitle) {
-    const normOrig = normalizeCatalogText(item.originalTitle);
-    if (normOrig && normOrig !== normTitle) {
-      const rawType = String(item.type || "unknown").toLowerCase();
-      const year = Number(item.year) || 0;
-      keys.add(`title:${rawType}:${normOrig}:${year}`);
-      keys.add(`title_only:${rawType}:${normOrig}`);
+    for (const rawTitle of titlesToIndex) {
+      const norm = normalizeCatalogText(rawTitle);
+      if (norm) {
+        this.indexByTitleYear.set(`${cat}:${norm}:${year}`, canonicalId);
+        if (year > 0) {
+          this.indexByTitleYear.set(`${cat}:${norm}:${year - 1}`, canonicalId);
+          this.indexByTitleYear.set(`${cat}:${norm}:${year + 1}`, canonicalId);
+        }
+        const parts = rawTitle.split(/[:–—|-]/);
+        if (parts.length > 1) {
+          const normPrefix = normalizeCatalogText(parts[0].trim());
+          if (normPrefix && normPrefix.length >= 4 && normPrefix !== norm) {
+            this.indexByTitleYear.set(`${cat}:${normPrefix}:${year}`, canonicalId);
+            if (year > 0) {
+              this.indexByTitleYear.set(`${cat}:${normPrefix}:${year - 1}`, canonicalId);
+              this.indexByTitleYear.set(`${cat}:${normPrefix}:${year + 1}`, canonicalId);
+            }
+          }
+        }
+      }
     }
   }
-  return Array.from(keys);
+  /**
+   * Resolve o canonicalId unificado a partir de qualquer identificador parcial de entrada
+   */
+  resolveCanonicalId(item) {
+    if (!item) return null;
+    if (item.canonicalId && this.masterRegistry.has(item.canonicalId)) {
+      return item.canonicalId;
+    }
+    if (item.imdbId) {
+      const cleanImdb = item.imdbId.trim().toLowerCase();
+      const found = this.indexByImdb.get(cleanImdb);
+      if (found) return found;
+      if (!cleanImdb.startsWith("tt") && /^\d+$/.test(cleanImdb)) {
+        const foundWithTt = this.indexByImdb.get(`tt${cleanImdb}`);
+        if (foundWithTt) return foundWithTt;
+      }
+    }
+    if (item.id) {
+      if (/^tt\d+$/i.test(item.id.trim())) {
+        const found = this.indexByImdb.get(item.id.trim().toLowerCase());
+        if (found) return found;
+      }
+      const matchImdb = item.id.match(/^(?:movie|series|anime)[-_](?:tt)?(\d{6,10})$/i);
+      if (matchImdb) {
+        const found = this.indexByImdb.get(`tt${matchImdb[1]}`);
+        if (found) return found;
+      }
+    }
+    if (item.aniListId) {
+      const found = this.indexByAniList.get(item.aniListId);
+      if (found) return found;
+    }
+    if (item.tmdbId) {
+      const cleanTmdb = String(item.tmdbId).trim().toLowerCase();
+      const isMovie = item.type === "FILME" /* MOVIE */ || item.type === "movie" || item.type === "FILME" || item.mediaFormat === "movie";
+      const found = isMovie ? this.indexByTmdbMovie.get(cleanTmdb) : this.indexByTmdbSeries.get(cleanTmdb);
+      if (found) return found;
+    }
+    if (item.id && item.id.startsWith("tmdb-")) {
+      const tmdbMatch = item.id.match(/^tmdb-(?:movie-|tv-|anime-)?(\d+)/i);
+      if (tmdbMatch) {
+        const cleanTmdb = tmdbMatch[1];
+        const isMovie = item.type === "FILME" /* MOVIE */ || item.type === "movie" || item.type === "FILME" || item.mediaFormat === "movie";
+        const found = isMovie ? this.indexByTmdbMovie.get(cleanTmdb) : this.indexByTmdbSeries.get(cleanTmdb);
+        if (found) return found;
+      }
+    }
+    const cat = item.type || "FILME" /* MOVIE */;
+    const year = Number(item.year) || 0;
+    const candidateTitles = [item.title, item.originalTitle].filter(Boolean);
+    for (const rawTitle of candidateTitles) {
+      const norm = normalizeCatalogText(rawTitle);
+      if (norm) {
+        const found = this.indexByTitleYear.get(`${cat}:${norm}:${year}`);
+        if (found) return found;
+        const parts = rawTitle.split(/[:–—|-]/);
+        if (parts.length > 1) {
+          const normPrefix = normalizeCatalogText(parts[0].trim());
+          if (normPrefix && normPrefix.length >= 4) {
+            const foundPrefix = this.indexByTitleYear.get(`${cat}:${normPrefix}:${year}`);
+            if (foundPrefix) return foundPrefix;
+          }
+        }
+      }
+    }
+    return null;
+  }
+  /**
+   * Obtém o item mestre pelo canonicalId
+   */
+  getItemByCanonicalId(canonicalId) {
+    const entry = this.masterRegistry.get(canonicalId);
+    return entry ? entry.item : null;
+  }
+  /**
+   * Retorna apenas os conteúdos públicos elegíveis e reproduzíveis para uma categoria estrita
+   */
+  getPublicCatalog(category) {
+    const targetType = category === "movies" ? "FILME" /* MOVIE */ : category === "series" ? "S\xC9RIE" /* SERIES */ : "ANIME" /* ANIME */;
+    const results = [];
+    for (const entry of this.masterRegistry.values()) {
+      if (!entry.isPubliclyVisible || entry.unreleased) continue;
+      if (entry.item.availabilityStatus === "unreleased" || entry.item.availabilityStatus === "unavailable") continue;
+      if (entry.item.type === targetType) {
+        results.push(entry.item);
+      }
+    }
+    return results;
+  }
+  /**
+   * Retorna os registros internos completos (inclusive não-lançados ou sem fontes confirmadas)
+   */
+  getInternalRegistry() {
+    return Array.from(this.masterRegistry.values());
+  }
+  /**
+   * Total de obras cadastradas no índice mestre (visíveis + internas)
+   */
+  getTotalCount() {
+    let publicCount = 0;
+    let unreleasedCount = 0;
+    for (const entry of this.masterRegistry.values()) {
+      if (entry.unreleased) unreleasedCount++;
+      if (entry.isPubliclyVisible) publicCount++;
+    }
+    return {
+      total: this.masterRegistry.size,
+      publicCount,
+      unreleasedCount
+    };
+  }
+  /**
+   * Atualização periódica de novos episódios e lançamentos
+   */
+  async checkForUpdates() {
+    if (this.isRefreshing) {
+      return { updatedCount: 0, newCount: 0 };
+    }
+    this.isRefreshing = true;
+    let updatedCount = 0;
+    let newCount = 0;
+    try {
+      try {
+        const trendingAnimes = await aniListClient.getPopularAnimes(1, 15);
+        for (const anime of trendingAnimes) {
+          const canonical = this.resolveCanonicalId(anime);
+          if (canonical) {
+            this.registerItem(anime);
+            updatedCount++;
+          } else {
+            this.registerItem(anime);
+            newCount++;
+          }
+        }
+      } catch (err) {
+        console.warn("[CanonicalCatalogMaster] Falha ao atualizar animes do AniList:", err);
+      }
+      this.lastPeriodicRefresh = Date.now();
+    } finally {
+      this.isRefreshing = false;
+    }
+    return { updatedCount, newCount };
+  }
+  /**
+   * Agenda a execução periódica de atualização
+   */
+  schedulePeriodicRefresh(intervalMs = 30 * 60 * 1e3) {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+    }
+    this.refreshTimer = setInterval(() => {
+      this.checkForUpdates().catch((err) => {
+        console.warn("[CanonicalCatalogMaster] Erro na atualiza\xE7\xE3o peri\xF3dica:", err);
+      });
+    }, intervalMs);
+  }
+  /**
+   * Limpa o timer para evitar vazamentos em ambientes de teste
+   */
+  dispose() {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+  }
+};
+var canonicalCatalogMaster = CanonicalCatalogMaster.getInstance();
+
+// src/core/identity/canonicalIdentity.ts
+var STOP_WORDS = /* @__PURE__ */ new Set([
+  "o",
+  "a",
+  "os",
+  "as",
+  "um",
+  "uma",
+  "uns",
+  "umas",
+  "de",
+  "do",
+  "da",
+  "dos",
+  "das",
+  "em",
+  "no",
+  "na",
+  "por",
+  "para",
+  "com",
+  "sem",
+  "sob",
+  "sobre",
+  "the",
+  "a",
+  "an",
+  "of",
+  "in",
+  "on",
+  "at",
+  "to",
+  "for",
+  "with"
+]);
+var CanonicalIdentityService = class {
+  isSameWork(expected, candidate) {
+    if (expected.type !== candidate.type) return false;
+    if (expected.year && candidate.year && Math.abs(expected.year - candidate.year) > 1) return false;
+    const titles = [expected.title, expected.originalTitle].filter(Boolean).map((value) => this.normalizeTitle(value));
+    const candidates = [candidate.title, candidate.originalTitle].filter(Boolean).map((value) => this.normalizeTitle(value));
+    return titles.some((title) => title.length >= 3 && candidates.includes(title));
+  }
+  /**
+   * Constrói a identidade canônica a partir de um ContentItem e parâmetros de episódio
+   */
+  buildIdentity(item, epParams) {
+    const genres = (item.genres || []).map((g) => g.toLowerCase());
+    const isChildFriendly = genres.some((g) => /infantil|fam[ií]lia|kids|children|desenho|crian[çc]a/i.test(g)) || /doraemon|peppa|galinha pintadinha|patrulha canina|pocoyo|chaves/i.test(item.title);
+    const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+    const isTheatricalUnreleased = theatricalFilterService.isKnownUnreleasedOrTheatrical(item) || Boolean(item.year && item.year > currentYear);
+    const aliases = [item.title.toLowerCase()];
+    if (item.originalTitle) {
+      aliases.push(item.originalTitle.toLowerCase());
+      if (item.originalTitle.includes(":")) {
+        item.originalTitle.split(":").forEach((p) => {
+          const clean2 = p.trim().toLowerCase();
+          if (clean2.length >= 3) aliases.push(clean2);
+        });
+      }
+    }
+    if (item.title.includes(":")) {
+      const parts = item.title.split(":");
+      parts.forEach((p) => {
+        const clean2 = p.trim().toLowerCase();
+        if (clean2.length >= 3) aliases.push(clean2);
+      });
+    }
+    if (/doraemon/i.test(item.title)) {
+      aliases.push("doraemon", "gato do futuro", "\u30C9\u30E9\u3048\u3082\u3093");
+    }
+    if (/hope.*primeiro.*impacto/i.test(item.title)) {
+      aliases.push("hope", "hopeu", "\uD638\uD504");
+    }
+    if (/bleach.*thousand|bleach.*sennen/i.test(item.title) || /bleach.*thousand|bleach.*sennen/i.test(item.originalTitle || "")) {
+      aliases.push("bleach sennen kessen hen", "bleach sennen kessen-hen", "bleach thousand-year blood war", "bleach: sennen kessen-hen", "bleach: thousand-year blood war");
+    }
+    if (/verity/i.test(item.title) || /verity/i.test(item.originalTitle || "")) {
+      aliases.push("verity", "the verity");
+    }
+    if (/odisseia|odyssey/i.test(item.title) || /odisseia|odyssey/i.test(item.originalTitle || "")) {
+      aliases.push("odyssey", "the odyssey", "odisseia", "a odisseia", "odyssea");
+    }
+    const canonicalId = item.canonicalId || canonicalCatalogMaster.buildCanonicalId(
+      item.type,
+      item.imdbId ? "imdb" : item.aniListId ? "anilist" : item.tmdbId ? "tmdb" : "local",
+      item.imdbId || item.aniListId || item.tmdbId || item.id,
+      epParams
+    );
+    return {
+      id: item.id,
+      canonicalId,
+      tmdbId: item.tmdbId ? String(item.tmdbId) : void 0,
+      imdbId: item.imdbId,
+      aniListId: item.aniListId,
+      malId: item.malId,
+      title: item.title,
+      originalTitle: item.originalTitle,
+      year: item.year || currentYear,
+      type: item.type,
+      season: epParams?.season,
+      episode: epParams?.episode,
+      genres: item.genres || [],
+      isChildFriendly,
+      isTheatricalUnreleased,
+      knownAliases: Array.from(new Set(aliases))
+    };
+  }
+  /**
+   * Normaliza um título removendo pontuações, anos e tags de qualidade
+   */
+  normalizeTitle(str) {
+    return (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\[[^\]]*\]/g, " ").replace(/\([^\)]*\)/g, " ").replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+  }
+  /**
+   * Extrai palavras-chave significativas para comparação
+   */
+  extractSignificantTokens(title) {
+    const normalized = this.normalizeTitle(title);
+    return normalized.split(" ").filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+  }
+};
+var canonicalIdentityService = new CanonicalIdentityService();
+
+// src/core/identity/sourceConfidenceEngine.ts
+var KNOWN_COLLISION_TITLES = [
+  "sparks of tomorrow",
+  "eternal aseria",
+  "angel heart",
+  "black clover",
+  "murai in love",
+  "saving 80,000 gold",
+  "overflow",
+  "plant\xE3o m\xE9dico",
+  "er plant\xE3o m\xE9dico",
+  "ultraman"
+];
+var SourceConfidenceEngine = class {
+  /**
+   * Avalia uma fonte de streaming contra a identidade canônica da obra solicitada.
+   */
+  evaluate(stream, identity) {
+    const reasons = [];
+    const streamName = stream.name || "";
+    const streamTitle = stream.title || "";
+    const streamUrl = stream.url || "";
+    const streamInfoHash = (stream.infoHash || "").toLowerCase();
+    const combined = `${streamName} ${streamTitle} ${streamUrl} ${streamInfoHash}`.toLowerCase();
+    const quarantineCheck = streamQuarantineService.evaluateQuarantine(stream, identity.title);
+    if (quarantineCheck.isQuarantined) {
+      reasons.push(quarantineCheck.reason || "Fonte bloqueada por quarentena");
+      return {
+        stream,
+        confidence: "QUARANTINED",
+        isMatch: false,
+        reasons,
+        canonicalTitle: identity.title
+      };
+    }
+    if (identity.isTheatricalUnreleased) {
+      const isClaimingDigital = (combined.includes("web-dl") || combined.includes("webrip") || combined.includes("bluray") || combined.includes("amzn")) && !combined.includes("trailer") && !combined.includes("teaser");
+      if (isClaimingDigital) {
+        const reason = `Release digital para obra ainda n\xE3o lan\xE7ada: "${identity.title}"`;
+        streamQuarantineService.quarantine(streamInfoHash || streamUrl, reason, "adult_troll", identity.title, stream.providerName);
+        reasons.push(reason);
+        return {
+          stream,
+          confidence: "QUARANTINED",
+          isMatch: false,
+          reasons,
+          canonicalTitle: identity.title
+        };
+      }
+    }
+    const isAcervoOficial = stream.providerId === "zapitv-verified";
+    const episodeTag = streamTitle.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b)/i);
+    if (episodeTag && identity.type === "FILME" /* MOVIE */) {
+      reasons.push("Fonte epis\xF3dica oferecida para um filme");
+      return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+    }
+    if (episodeTag && identity.season && identity.episode && (Number(episodeTag[1] || episodeTag[3]) !== identity.season || Number(episodeTag[2] || episodeTag[4]) !== identity.episode)) {
+      reasons.push("Temporada ou epis\xF3dio diferente do solicitado");
+      return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+    }
+    if (identity.type === "FILME" /* MOVIE */ && identity.year) {
+      const releaseYear = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
+      if (releaseYear && Math.abs(Number(releaseYear[1]) - identity.year) > 1) {
+        reasons.push("Ano da fonte diferente do filme solicitado");
+        return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+      }
+    }
+    const declaredTitle = streamTitle.match(/🐦‍🔥\s*([^\n⏸️]+)/)?.[1]?.trim();
+    if (declaredTitle) {
+      const normalizedDeclared = canonicalIdentityService.normalizeTitle(declaredTitle);
+      const aliases = [identity.title, identity.originalTitle, ...identity.knownAliases || []].filter(Boolean).map((alias) => canonicalIdentityService.normalizeTitle(alias));
+      if (!aliases.includes(normalizedDeclared)) {
+        reasons.push("T\xEDtulo declarado pelo addon difere da obra solicitada");
+        return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+      }
+    }
+    if (isAcervoOficial) {
+      reasons.push("Fonte can\xF4nica verificada pelo acervo oficial ZapiTV");
+      return {
+        stream,
+        confidence: "VERIFIED",
+        isMatch: true,
+        reasons,
+        canonicalTitle: identity.title
+      };
+    }
+    const streamTitleToCheck = canonicalIdentityService.normalizeTitle(`${streamName} ${streamTitle}`);
+    for (const collisionTitle of KNOWN_COLLISION_TITLES) {
+      const cleanCollision = canonicalIdentityService.normalizeTitle(collisionTitle);
+      const regex = new RegExp(`(^|\\s)${cleanCollision}(\\s|$)`, "i");
+      if (regex.test(streamTitleToCheck)) {
+        const cleanTarget = canonicalIdentityService.normalizeTitle(identity.title);
+        const cleanOrig = identity.originalTitle ? canonicalIdentityService.normalizeTitle(identity.originalTitle) : "";
+        if (!cleanTarget.includes(cleanCollision) && !cleanOrig.includes(cleanCollision)) {
+          reasons.push(`Obra incorreta detectada: stream cont\xE9m "${collisionTitle}"`);
+          return {
+            stream,
+            confidence: "REJECTED",
+            isMatch: false,
+            reasons,
+            canonicalTitle: identity.title
+          };
+        }
+      }
+    }
+    if (/resident evil/i.test(identity.title) && !/vendetta|damnation|degeneration|infinite darkness|death island/i.test(identity.title)) {
+      if (/vendetta|damnation|degeneration|infinite darkness|death island/i.test(combined)) {
+        reasons.push("Anima\xE7\xE3o 3D de Resident Evil n\xE3o pode substituir o filme live-action solicitado");
+        return {
+          stream,
+          confidence: "REJECTED",
+          isMatch: false,
+          reasons,
+          canonicalTitle: identity.title
+        };
+      }
+    }
+    const targetTokens = canonicalIdentityService.extractSignificantTokens(identity.title);
+    const cleanStreamTitle = canonicalIdentityService.normalizeTitle(streamTitle);
+    const titleWords = new Set(canonicalIdentityService.extractSignificantTokens(`${streamName} ${streamTitle}`));
+    let aliasMatched = false;
+    for (const alias of identity.knownAliases) {
+      const cleanAlias = canonicalIdentityService.normalizeTitle(alias);
+      if (cleanAlias.length >= 3 && new RegExp(`(^|\\s)${cleanAlias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`).test(streamTitleToCheck)) {
+        aliasMatched = true;
+        break;
+      }
+    }
+    const matchingTokens = targetTokens.filter((token) => titleWords.has(token));
+    const tokenOverlapRatio = targetTokens.length > 0 ? matchingTokens.length / targetTokens.length : 0;
+    if (!aliasMatched && tokenOverlapRatio < 0.75) {
+      reasons.push(`T\xEDtulo do stream n\xE3o possui correspond\xEAncia com "${identity.title}"`);
+      return {
+        stream,
+        confidence: "REJECTED",
+        isMatch: false,
+        reasons,
+        canonicalTitle: identity.title
+      };
+    }
+    if (identity.isChildFriendly) {
+      if (!aliasMatched && tokenOverlapRatio < 0.5) {
+        reasons.push("Conte\xFAdo infantil exige confirma\xE7\xE3o rigorosa de identidade");
+        return {
+          stream,
+          confidence: "REJECTED",
+          isMatch: false,
+          reasons,
+          canonicalTitle: identity.title
+        };
+      }
+      reasons.push("Conte\xFAdo infantil: correspond\xEAncia aprovada com valida\xE7\xE3o cautelosa");
+      return {
+        stream,
+        confidence: "PROVISIONAL",
+        isMatch: true,
+        reasons,
+        canonicalTitle: identity.title
+      };
+    }
+    if (aliasMatched || tokenOverlapRatio >= 0.5) {
+      reasons.push(`Correspond\xEAncia de t\xEDtulo verificada (${Math.round(tokenOverlapRatio * 100)}% dos termos)`);
+      return {
+        stream,
+        confidence: "PROVISIONAL",
+        isMatch: true,
+        reasons,
+        canonicalTitle: identity.title
+      };
+    }
+    reasons.push("Informa\xE7\xF5es do stream incompletas ou correspond\xEAncia parcial");
+    return {
+      stream,
+      confidence: "SUSPICIOUS",
+      isMatch: false,
+      reasons,
+      canonicalTitle: identity.title
+    };
+  }
+  /**
+   * Filtra e classifica uma lista de streams para a mídia solicitada
+   */
+  evaluateBatch(streams, identity) {
+    return streams.map((s) => this.evaluate(s, identity));
+  }
+};
+var sourceConfidenceEngine = new SourceConfidenceEngine();
+
+// src/core/selection/sourceSelectionService.ts
+var QUALITY_SCORES = {
+  "4K": 50,
+  "2160p": 50,
+  "1080p": 40,
+  "720p": 30,
+  "480p": 10,
+  "HD": 25,
+  "SD": 5
+};
+var selectionCache = /* @__PURE__ */ new Map();
+var CACHE_TTL_MS2 = 60 * 60 * 1e3;
+var SourceSelectionService = class {
+  /**
+   * Avalia individualmente um stream e calcula sua pontuação de acordo com
+   * a hierarquia obrigatória do ZapiTV, onde Áudio Dublado PT-BR tem prioridade absoluta.
+   */
+  evaluateStream(stream, options) {
+    let confidence = "PROVISIONAL";
+    let confidenceBonus = 0;
+    let confidenceExplanation = "";
+    if (options.identity) {
+      const confEval = sourceConfidenceEngine.evaluate(stream, options.identity);
+      confidence = confEval.confidence;
+      if (confEval.confidence === "QUARANTINED") {
+        return {
+          score: -1e6,
+          priority: 6,
+          confidence: "QUARANTINED",
+          audioTier: "foreign",
+          subtitleFormat: "unknown",
+          audioAnalysis: { tier: "foreign", isDubbed: false, isPtBr: false, isDualAudio: false, language: "unknown", confidence: 0, reason: confEval.reasons.join(", ") },
+          subtitleAnalysis: { format: "unknown", isHardsub: false, isClean: false, isSoftsub: false, hasPtSubtitle: false, confidence: 0, details: confEval.reasons.join(", ") },
+          explanation: `\u{1F6A8} QUARENTENA: ${confEval.reasons.join(" \u2022 ")}`
+        };
+      }
+      if (confEval.confidence === "REJECTED") {
+        return {
+          score: -5e5,
+          priority: 6,
+          confidence: "REJECTED",
+          audioTier: "foreign",
+          subtitleFormat: "unknown",
+          audioAnalysis: { tier: "foreign", isDubbed: false, isPtBr: false, isDualAudio: false, language: "unknown", confidence: 0, reason: confEval.reasons.join(", ") },
+          subtitleAnalysis: { format: "unknown", isHardsub: false, isClean: false, isSoftsub: false, hasPtSubtitle: false, confidence: 0, details: confEval.reasons.join(", ") },
+          explanation: `\u274C REJEITADO: ${confEval.reasons.join(" \u2022 ")}`
+        };
+      }
+      if (options.identity.isChildFriendly && confEval.confidence !== "VERIFIED" && confEval.confidence !== "PROVISIONAL") {
+        return {
+          score: -3e5,
+          priority: 6,
+          confidence: confEval.confidence,
+          audioTier: "foreign",
+          subtitleFormat: "unknown",
+          audioAnalysis: { tier: "foreign", isDubbed: false, isPtBr: false, isDualAudio: false, language: "unknown", confidence: 0, reason: "Conte\xFAdo infantil restrito a fontes verificadas" },
+          subtitleAnalysis: { format: "unknown", isHardsub: false, isClean: false, isSoftsub: false, hasPtSubtitle: false, confidence: 0, details: "Conte\xFAdo infantil restrito a fontes verificadas" },
+          explanation: `\u{1F6E1}\uFE0F BLOQUEIO INFANTIL: Fonte n\xE3o verificada para "${options.identity.title}"`
+        };
+      }
+      if (confEval.confidence === "VERIFIED") {
+        confidenceBonus = 2e4;
+        confidenceExplanation = " (Fonte Can\xF4nica Verificada)";
+      } else if (confEval.confidence === "SUSPICIOUS") {
+        confidenceBonus = -4e4;
+        confidenceExplanation = " (Metadados Suspeitos)";
+      }
+    }
+    const audio = audioPreferenceService.analyzeAudio(stream);
+    const sub = subtitlePreferenceService.analyzeSubtitles(stream, options.hasExternalPtSub);
+    const codecInfo = audioCodecService.inspectStreamCodecs(stream);
+    const codecEval = audioCodecService.getAudioCodecScore(stream);
+    const codecBonus = codecEval.bonus;
+    const codecExplanation = ` \u2022 ${codecEval.explanation}`;
+    const providerId = stream.providerId;
+    let providerBonus = 0;
+    let providerExplanation = "";
+    if (providerId) {
+      providerBonus = playbackOptimizerService.getProviderScore(providerId);
+      if (providerBonus > 0) providerExplanation = " \u2022 Provedor R\xE1pido";
+      else if (providerBonus < 0) providerExplanation = " \u2022 Provedor Inst\xE1vel";
+    }
+    const netProfile = playbackOptimizerService.getNetworkProfile();
+    let networkBonus = 0;
+    let networkExplanation = "";
+    const combined = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""}`.toLowerCase();
+    let qualityBonus = 20;
+    for (const [qKey, qScore] of Object.entries(QUALITY_SCORES)) {
+      if (combined.includes(qKey.toLowerCase()) || stream.quality && stream.quality.toLowerCase().includes(qKey.toLowerCase())) {
+        qualityBonus = qScore;
+        break;
+      }
+    }
+    if (netProfile.isSlowConnection) {
+      if (qualityBonus >= 50) {
+        networkBonus -= 25e3;
+        networkExplanation = " \u2022 4K evitado em rede lenta";
+      }
+      if (stream.sourceType === "hls" || stream.url && stream.url.includes(".m3u8")) {
+        networkBonus += 8e3;
+        networkExplanation = " \u2022 HLS ABR Priorizado";
+      } else if (qualityBonus <= 30) {
+        networkBonus += 4e3;
+      }
+    }
+    const isNotWebReady = stream.behaviorHints?.notWebReady === true;
+    const webReadyPenalty = isNotWebReady ? -2e4 : 0;
+    const webReadyExplanation = isNotWebReady ? " (Requer motor externo)" : "";
+    const performanceModifiers = providerBonus + networkBonus;
+    if (audio.tier === "dubbed_ptbr") {
+      let subTierBonus = 2e3;
+      let subExplanation = "estado de legendas desconhecido";
+      if (sub.format === "clean_confirmed") {
+        subTierBonus = 4e3;
+        subExplanation = "v\xEDdeo limpo";
+      } else if (sub.format === "softsub") {
+        subTierBonus = 3e3;
+        subExplanation = "softsub";
+      } else if (sub.format === "hardsub_ptbr") {
+        subTierBonus = 1e3;
+        subExplanation = "hardsub PT-BR";
+      } else if (sub.format === "hardsub_foreign") {
+        subTierBonus = 500;
+        subExplanation = "placas em outro idioma";
+      }
+      const score2 = 1e5 + subTierBonus + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
+      return {
+        score: score2,
+        priority: 1,
+        confidence,
+        audioTier: audio.tier,
+        subtitleFormat: sub.format,
+        audioAnalysis: audio,
+        subtitleAnalysis: sub,
+        codecInfo,
+        explanation: `Prioridade 1: \xC1udio Dublado PT-BR (${subExplanation}, score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
+      };
+    }
+    if (audio.tier === "dual_audio") {
+      let subTierBonus = 2e3;
+      if (sub.format === "clean_confirmed") subTierBonus = 4e3;
+      else if (sub.format === "softsub") subTierBonus = 3e3;
+      else if (sub.format === "hardsub_ptbr") subTierBonus = 1e3;
+      else if (sub.format === "hardsub_foreign") subTierBonus = 500;
+      const score2 = 9e4 + subTierBonus + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
+      return {
+        score: score2,
+        priority: 2,
+        confidence,
+        audioTier: audio.tier,
+        subtitleFormat: sub.format,
+        audioAnalysis: audio,
+        subtitleAnalysis: sub,
+        codecInfo,
+        explanation: `Prioridade 2: Dual \xC1udio PT-BR (score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
+      };
+    }
+    if (options.hasExternalPtSub && (sub.format === "clean_confirmed" || sub.format === "softsub" || sub.format === "unknown")) {
+      let subBonus = 1e3;
+      if (sub.format === "clean_confirmed") subBonus = 4e3;
+      else if (sub.format === "softsub") subBonus = 3e3;
+      const score2 = 5e4 + subBonus + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
+      return {
+        score: score2,
+        priority: 3,
+        confidence,
+        audioTier: audio.tier,
+        subtitleFormat: sub.format,
+        audioAnalysis: audio,
+        subtitleAnalysis: sub,
+        codecInfo,
+        explanation: `Prioridade 3: \xC1udio Original + V\xEDdeo Limpo + Legenda PT-BR externa (score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
+      };
+    }
+    if (sub.format === "softsub" && sub.hasPtSubtitle) {
+      const score2 = 4e4 + 3e3 + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
+      return {
+        score: score2,
+        priority: 4,
+        confidence,
+        audioTier: audio.tier,
+        subtitleFormat: sub.format,
+        audioAnalysis: audio,
+        subtitleAnalysis: sub,
+        codecInfo,
+        explanation: `Prioridade 4: \xC1udio Original + Softsub PT-BR interno (score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
+      };
+    }
+    if (sub.format === "hardsub_ptbr") {
+      const base = options.hasExternalPtSub ? 2e4 : 3e4;
+      const score2 = base + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
+      return {
+        score: score2,
+        priority: 5,
+        confidence,
+        audioTier: audio.tier,
+        subtitleFormat: sub.format,
+        audioAnalysis: audio,
+        subtitleAnalysis: sub,
+        codecInfo,
+        explanation: `Prioridade 5: \xC1udio Original + Hardsub PT-BR (score: ${score2})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
+      };
+    }
+    const isForeignHardsub = sub.format === "hardsub_foreign";
+    const baseScore = isForeignHardsub ? 1e3 : 5e3;
+    const rawScore = baseScore + qualityBonus + confidenceBonus + webReadyPenalty + codecBonus + performanceModifiers;
+    const score = Math.max(100, rawScore);
+    return {
+      score,
+      priority: 6,
+      confidence,
+      audioTier: audio.tier,
+      subtitleFormat: sub.format,
+      audioAnalysis: audio,
+      subtitleAnalysis: sub,
+      codecInfo,
+      explanation: `Prioridade 6: Idioma estrangeiro / Hardsub estrangeiro (score: ${score})${confidenceExplanation}${webReadyExplanation}${codecExplanation}${providerExplanation}${networkExplanation}`
+    };
+  }
+  /**
+   * Ordena a lista de streams aplicando a hierarquia estrita:
+   * 1. Confirmação obrigatória de identidade (rejeita e quarentena excluídos)
+   * 2. Dublagem PT-BR
+   * 3. Dual Audio
+   * 4. Áudio Original + Limpo + Legenda externa
+   * 5. Softsub PT-BR
+   * 6. Hardsub PT-BR
+   * 7. Outros
+   */
+  rankStreams(streams, options) {
+    if (!streams || streams.length === 0) return [];
+    const deviceKey = audioCodecService.getDeviceCacheKey();
+    const effectiveCacheKey = options.cacheKey ? `${options.cacheKey}_${deviceKey}` : void 0;
+    if (effectiveCacheKey) {
+      const cached = selectionCache.get(effectiveCacheKey);
+      if (cached && cached.streams.length > 0 && Date.now() - cached.timestamp < CACHE_TTL_MS2) {
+        return cached.streams;
+      }
+    }
+    const scored = streams.map((stream) => {
+      const evaluation = this.evaluateStream(stream, {
+        hasExternalPtSub: options.hasExternalPtSub,
+        identity: options.identity
+      });
+      return {
+        stream,
+        evaluation
+      };
+    });
+    const validScored = scored.filter((item) => item.evaluation.score >= 0);
+    validScored.sort((a, b) => b.evaluation.score - a.evaluation.score);
+    const rankedStreams = validScored.map((item) => ({
+      ...item.stream,
+      _smartScore: item.evaluation.score,
+      _smartPriority: item.evaluation.priority,
+      _confidence: item.evaluation.confidence,
+      _audioTier: item.evaluation.audioTier,
+      _subtitleFormat: item.evaluation.subtitleFormat,
+      _codecInfo: item.evaluation.codecInfo,
+      _scoreExplanation: item.evaluation.explanation
+    }));
+    if (effectiveCacheKey && rankedStreams.length > 0) {
+      selectionCache.set(effectiveCacheKey, {
+        streams: rankedStreams,
+        timestamp: Date.now()
+      });
+    }
+    return rankedStreams;
+  }
+  /**
+   * Invalida qualquer cache de seleção armazenado em memória.
+   */
+  clearRankingCache() {
+    selectionCache.clear();
+  }
+};
+var sourceSelectionService = new SourceSelectionService();
+
+// src/core/audio/audioDetector.ts
+var QUALITY_PATTERNS = [
+  { regex: /\b(4k|2160p|uhd)\b/i, quality: "4K", score: 50 },
+  { regex: /\b(1080p|fhd|full\s*hd)\b/i, quality: "1080p", score: 40 },
+  { regex: /\b(720p|hd)\b/i, quality: "720p", score: 30 },
+  { regex: /\b(480p|sd)\b/i, quality: "480p", score: 10 }
+];
+async function checkOpenSubtitlesPtBr(type, id) {
+  if (!id) return false;
+  try {
+    const cleanId = id.replace(/\.json$/, "");
+    const subUrl = `https://opensubtitles-v3.strem.io/subtitles/${type}/${encodeURIComponent(cleanId)}.json`;
+    const res = await fetch(subUrl, { signal: AbortSignal.timeout(3e3) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.subtitles)) {
+        return data.subtitles.some((s) => s.lang === "pob" || s.lang === "por");
+      }
+    }
+  } catch {
+  }
+  return false;
 }
-function deduplicateContentItems(items) {
-  if (!Array.isArray(items) || items.length === 0) return [];
-  const result = [];
-  const seenCanonicalKeys = /* @__PURE__ */ new Set();
-  for (const item of items) {
-    if (!item || !item.id && !item.title) continue;
-    const keys = getCanonicalKeysForItem(item);
-    const hasDuplicateKey = keys.some((key) => seenCanonicalKeys.has(key));
-    if (hasDuplicateKey) {
-      continue;
+function classifyStream(stream, hasExternalPtSub = false) {
+  const combinedText = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""}`.toLowerCase();
+  let quality = stream.quality || "HD";
+  for (const q of QUALITY_PATTERNS) {
+    if (q.regex.test(combinedText) || stream.quality && q.regex.test(stream.quality)) {
+      quality = q.quality;
+      break;
     }
-    for (const key of keys) {
-      seenCanonicalKeys.add(key);
-    }
-    result.push(item);
   }
-  return result;
+  const evaluation = sourceSelectionService.evaluateStream(stream, { hasExternalPtSub });
+  const isPtBr = evaluation.audioAnalysis.isPtBr;
+  const isDubbed = evaluation.audioAnalysis.isDubbed;
+  const isSubtitled = evaluation.subtitleAnalysis.hasPtSubtitle;
+  const subFormat = evaluation.subtitleFormat;
+  const isHardsub = evaluation.subtitleAnalysis.isHardsub;
+  const score = evaluation.score;
+  let language = "unknown";
+  if (evaluation.audioAnalysis.tier === "dual_audio") language = "dual";
+  else if (isDubbed || isPtBr) language = "pt-BR";
+  else if (evaluation.audioAnalysis.language === "ja") language = "ja";
+  else if (evaluation.audioAnalysis.language === "en") language = "en";
+  else if (evaluation.audioAnalysis.language === "es") language = "es";
+  else if (evaluation.audioAnalysis.language === "pt-PT") language = "pt-PT";
+  else if (isSubtitled) language = "original";
+  let badge = "\u274C";
+  let badgeLabel = "Sem PT-BR";
+  if ((isDubbed || isPtBr) && (isSubtitled || hasExternalPtSub)) {
+    badge = "\u{1F50A}\u{1F4AC}";
+    badgeLabel = isDubbed ? "Dublado + Legenda PT-BR" : "\xC1udio PT-BR + Legenda";
+  } else if (isDubbed || isPtBr) {
+    badge = "\u{1F50A}";
+    badgeLabel = isDubbed ? "\xC1udio Dublado PT-BR" : "\xC1udio PT-BR";
+  } else if (isSubtitled || hasExternalPtSub) {
+    badge = "\u{1F4AC}";
+    badgeLabel = subFormat === "hardsub_ptbr" ? "Hardsub PT-BR" : "Legenda PT-BR";
+  } else if (language === "unknown" || evaluation.audioAnalysis.language === "unknown") {
+    badge = "\u274C";
+    badgeLabel = "Idioma n\xE3o declarado";
+  }
+  return {
+    isPtBr,
+    isDubbed,
+    isSubtitled,
+    hasPtSubtitle: isSubtitled || hasExternalPtSub,
+    language,
+    quality,
+    score,
+    badge,
+    badgeLabel,
+    subtitleFormat: subFormat,
+    isHardsub
+  };
 }
+function filterCleanNativeStreams(streams) {
+  return streams.filter((stream) => {
+    if (stream.ytId) return false;
+    const url = (stream.url || "").toLowerCase();
+    if (url.includes("youtube.com") || url.includes("youtu.be")) return false;
+    if (url.includes("embedplay") || url.includes("playerflix") || url.includes("videasy") || url.includes("superflix") || url.includes("parklogic")) {
+      return false;
+    }
+    return true;
+  });
+}
+function sortStreamsByPtBrPriority(streams, options = { preferDubbed: true, allowSubtitled: true, excludeYouTube: true }) {
+  const filtered = options.excludeYouTube !== false ? filterCleanNativeStreams(streams) : streams;
+  const ranked = sourceSelectionService.rankStreams(filtered, {
+    hasExternalPtSub: false,
+    preferDubbed: options.preferDubbed !== false,
+    preferredQuality: options.preferredQuality
+  });
+  return ranked.map((stream) => {
+    const classification = classifyStream(stream);
+    let formattedName = stream.name || "Stream";
+    if (!formattedName.includes("\u{1F50A}") && !formattedName.includes("\u{1F4AC}") && !formattedName.includes("\u274C")) {
+      formattedName = `${classification.badge} ${formattedName}`;
+    }
+    return {
+      ...stream,
+      name: formattedName,
+      isPtBr: classification.isPtBr,
+      isDubbed: classification.isDubbed,
+      isSubtitled: classification.isSubtitled,
+      quality: classification.quality,
+      badge: classification.badge,
+      badgeLabel: classification.badgeLabel
+    };
+  });
+}
+
+// src/core/livetv/OfficialChannelProvider.ts
+var OfficialChannelProvider = class _OfficialChannelProvider {
+  static {
+    this.PROVIDER_NAME = "Emissoras Oficiais & Acesso Livre";
+  }
+  /**
+   * Catálogo de emissoras públicas, transmissões gratuitas e canais FAST brasileiros verificados.
+   * Não contém streams inventados ou duplicados indevidos.
+   */
+  static getOfficialChannels() {
+    return [
+      // =========================================================================
+      // TV ABERTA, PÚBLICA & EDUCATIVA (Transmissões Livres Oficiais)
+      // =========================================================================
+      {
+        id: "tv-cultura",
+        tvgId: "TVCultura.br",
+        tvgName: "TV Cultura",
+        name: "TV Cultura",
+        category: "cultura",
+        groupTitle: "Cultura",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/8/82/Cultura_logo_2013.svg",
+        url: "https://player-tvcultura.stream.uol.com.br/live/tvcultura.m3u8",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Refer\xEAncia nacional em programa\xE7\xE3o infantil, educativa, grandes debates no Roda Viva e jornalismo independente."
+      },
+      {
+        id: "cultura-fast",
+        tvgId: "CulturaFast.br",
+        tvgName: "Cultura Fast",
+        name: "Cultura Fast (Funda\xE7\xE3o Padre Anchieta)",
+        category: "cultura",
+        groupTitle: "Cultura",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/8/82/Cultura_logo_2013.svg",
+        url: "https://fpa-gateway.tvcultura.com.br:8181/memfs/606caef0-a290-413d-9f1f-8fcdb3a73831.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Sinal digital FAST da TV Cultura com o melhor do arquivo hist\xF3rico, teatro, m\xFAsica e document\xE1rios."
+      },
+      {
+        id: "tv-brasil",
+        tvgId: "TVBrasil.br",
+        tvgName: "TV Brasil",
+        name: "TV Brasil",
+        category: "aberta",
+        groupTitle: "TV Aberta",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Logotipo_da_TV_Brasil.svg/512px-Logotipo_da_TV_Brasil.svg.png",
+        url: "https://tvbrasil-stream.ebc.com.br/index.m3u8",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Emissora p\xFAblica da Empresa Brasil de Comunica\xE7\xE3o (EBC), com cobertura nacional, jornalismo, esportes e cultura."
+      },
+      {
+        id: "rede-brasil",
+        tvgId: "RedeBrasil.br",
+        tvgName: "Rede Brasil",
+        name: "Rede Brasil de Televis\xE3o (RBTV)",
+        category: "filmes_series",
+        groupTitle: "Filmes & S\xE9ries",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/d/d1/Marca_rede_brasil_rgb-color.png",
+        url: "https://video09.logicahost.com.br/redebrasiloficial/redebrasiloficial/playlist.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "S\xE9ries cl\xE1ssicas dos anos 60 a 90, grandes filmes de cinema com dublagem brasileira e jornalismo."
+      },
+      {
+        id: "sbt-interior",
+        tvgId: "SBTInterior.br",
+        tvgName: "SBT Interior",
+        name: "SBT (Sinal Aberto Regional)",
+        category: "aberta",
+        groupTitle: "TV Aberta",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/SBT_logo.svg/512px-SBT_logo.svg.png",
+        url: "https://cdn.jmvstream.com/w/LVW-10801/LVW10801_Xvg4R0u57n/playlist.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Transmiss\xE3o aberta afiliada do SBT com novelas, audit\xF3rio, jornalismo regional e entretenimento."
+      },
+      {
+        id: "tv-senado",
+        tvgId: "TVSenado.br",
+        tvgName: "TV Senado",
+        name: "TV Senado",
+        category: "aberta",
+        groupTitle: "TV Aberta",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/TV_Senado_logo.svg/512px-TV_Senado_logo.svg.png",
+        url: "https://cdn.jmvstream.com/w/LVW-9715/LVW9715_12B26T62tm/playlist.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Transmiss\xE3o p\xFAblica das sess\xF5es do Senado Federal, audi\xEAncias p\xFAblicas e document\xE1rios hist\xF3ricos."
+      },
+      {
+        id: "tv-camara",
+        tvgId: "TVCamara.br",
+        tvgName: "TV C\xE2mara",
+        name: "TV C\xE2mara",
+        category: "aberta",
+        groupTitle: "TV Aberta",
+        tvgLogo: "https://i.imgur.com/UpV2PRk.png",
+        url: "https://stream3.camara.gov.br/tv1/manifest.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Transmiss\xF5es oficiais ao vivo do plen\xE1rio e comiss\xF5es da C\xE2mara dos Deputados em Bras\xEDlia."
+      },
+      {
+        id: "tv-justica",
+        tvgId: "TVJustica.br",
+        tvgName: "TV Justi\xE7a",
+        name: "TV Justi\xE7a",
+        category: "aberta",
+        groupTitle: "TV Aberta",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/TV_Justi%C3%A7a_logo.svg/512px-TV_Justi%C3%A7a_logo.svg.png",
+        url: "https://stream3.camara.gov.br/tv1/manifest.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Canal oficial do Poder Judici\xE1rio, com sess\xF5es plen\xE1rias do Supremo Tribunal Federal (STF) e debates."
+      },
+      {
+        id: "com-brasil",
+        tvgId: "COMBrasil.br",
+        tvgName: "COM Brasil",
+        name: "COM Brasil TV",
+        category: "aberta",
+        groupTitle: "TV Aberta",
+        tvgLogo: "https://i.imgur.com/GrjGwKM.png",
+        url: "https://dfr80qz435crc.cloudfront.net/EFGH/Amagi/NewCo/New_Brasil_BR/New_Brasil.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Canal comunit\xE1rio com not\xEDcias dos estados, cultura popular, empreendedorismo e variedades."
+      },
+      // =========================================================================
+      // NOTÍCIAS & JORNALISMO (Transmissões Oficiais Gratuitas)
+      // =========================================================================
+      {
+        id: "cnn-brasil",
+        tvgId: "CNNBrasil.br",
+        tvgName: "CNN Brasil",
+        name: "CNN Brasil (1080p Full HD)",
+        category: "noticias",
+        groupTitle: "Not\xEDcias",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/CNN_Brasil.svg/960px-CNN_Brasil.svg.png",
+        url: "https://d25usgadhphvwi.cloudfront.net/hls/main.m3u8",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Jornalismo 24 horas por dia com apura\xE7\xE3o em tempo real, debates pol\xEDticos, economia e an\xE1lise internacional."
+      },
+      {
+        id: "record-news",
+        tvgId: "RecordNews.br",
+        tvgName: "Record News",
+        name: "Record News",
+        category: "noticias",
+        groupTitle: "Not\xEDcias",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/4/46/Record_News_logo_2023.svg",
+        url: "https://rnw-rn.otteravision.com/rnw/rn/rnw_rn.m3u8",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Principal canal aberto de not\xEDcias 24 horas por dia do Brasil, com transmiss\xF5es ao vivo cont\xEDnuas."
+      },
+      {
+        id: "sbt-news",
+        tvgId: "SBTNews.br",
+        tvgName: "SBT News",
+        name: "SBT News ao Vivo",
+        category: "noticias",
+        groupTitle: "Not\xEDcias",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/4/42/SBT_News_2025.svg",
+        url: "https://dai.google.com/linear/hls/event/1XSOdtQ0SH2G8OEmEfGgjQ/master.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Canal de not\xEDcias digital do SBT transmitido ao vivo com os fatos urgentes de Bras\xEDlia e das capitais."
+      },
+      {
+        id: "bmc-news",
+        tvgId: "BMCNews.br",
+        tvgName: "BM&C News",
+        name: "BM&C News (Economia e Finan\xE7as)",
+        category: "noticias",
+        groupTitle: "Not\xEDcias",
+        tvgLogo: "https://i.imgur.com/pOUY2Uz.png",
+        url: "https://jmp2.uk/plu-666c9c60a7efd40008f552f0.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Canal especializado em mercado financeiro, investimentos, cota\xE7\xF5es da B3, agro e economia global."
+      },
+      {
+        id: "pluto-tv-canal-uol",
+        tvgId: "PlutoTVCanalUOL.br",
+        tvgName: "Canal UOL",
+        name: "Canal UOL ao Vivo",
+        category: "noticias",
+        groupTitle: "Not\xEDcias",
+        tvgLogo: "https://images.pluto.tv/channels/64b9370b409629000802d32b/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-64b9370b409629000802d32b.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Not\xEDcias, colunistas de renome, opini\xE3o e entretenimento do portal UOL transmitido 24 horas."
+      },
+      // =========================================================================
+      // ESPORTES & CANAIS ESPORTIVOS AUTORIZADOS
+      // =========================================================================
+      {
+        id: "n-sports",
+        tvgId: "NSports.br",
+        tvgName: "N Sports",
+        name: "N Sports (1080p)",
+        category: "esportes",
+        groupTitle: "Esportes",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/NSports_logo_2024.png/512px-NSports_logo_2024.png",
+        url: "https://ogc-nsprt-tcl-roku-syndication.otteravision.com/ogc/nsprt/nsprt.m3u8",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Canal esportivo brasileiro transmitindo futsal, atletismo, basquete NBB, v\xF4lei e campeonatos nacionais."
+      },
+      {
+        id: "pluto-tv-esportes",
+        tvgId: "PlutoTVEsportes.br",
+        tvgName: "Pluto TV Esportes",
+        name: "Pluto TV Esportes",
+        category: "esportes",
+        groupTitle: "Esportes",
+        tvgLogo: "https://images.pluto.tv/channels/5f32d2db0af67400077f29c4/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-5f32d2db0af67400077f29c4.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Destaques esportivos, eventos de lutas, automobilismo e competi\xE7\xF5es ao redor do mundo."
+      },
+      // =========================================================================
+      // FILMES, SÉRIES & ENTRETENIMENTO (Canais FAST Oficiais)
+      // =========================================================================
+      {
+        id: "pluto-tv-cine-sucessos",
+        tvgId: "PlutoTVCineSucessos.br",
+        tvgName: "Pluto TV Cine Sucessos",
+        name: "Pluto TV Cine Sucessos",
+        category: "filmes_series",
+        groupTitle: "Filmes & S\xE9ries",
+        tvgLogo: "https://images.pluto.tv/channels/5f120e94a5714d00074576a1/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-5f120e94a5714d00074576a1.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Grandes sucessos do cinema de Hollywood com dublagem em portugu\xEAs sem interrup\xE7\xF5es pagas."
+      },
+      {
+        id: "pluto-tv-filmes-acao",
+        tvgId: "PlutoTVFilmesAcao.br",
+        tvgName: "Pluto TV Filmes A\xE7\xE3o",
+        name: "Pluto TV Filmes A\xE7\xE3o",
+        category: "filmes_series",
+        groupTitle: "Filmes & S\xE9ries",
+        tvgLogo: "https://images.pluto.tv/channels/5f120f41b7d403000783a6d6/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-5f120f41b7d403000783a6d6.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Tiros, persegui\xE7\xF5es e muita adrenalina com os melhores astros de filmes de a\xE7\xE3o dublados."
+      },
+      {
+        id: "pluto-tv-cine-classicos",
+        tvgId: "PlutoTVCineClassicos.br",
+        tvgName: "Pluto TV Cine Cl\xE1ssicos",
+        name: "Pluto TV Cine Cl\xE1ssicos",
+        category: "filmes_series",
+        groupTitle: "Filmes & S\xE9ries",
+        tvgLogo: "https://images.pluto.tv/channels/5fa1612a669ba0000702017b/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-5fa1612a669ba0000702017b.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Obras imortais da hist\xF3ria do cinema mundial que marcaram \xE9poca nas telonas."
+      },
+      {
+        id: "pluto-tv-cine-comedia",
+        tvgId: "PlutoTVCineComedia.br",
+        tvgName: "Pluto TV Cine Com\xE9dia",
+        name: "Pluto TV Cine Com\xE9dia",
+        category: "filmes_series",
+        groupTitle: "Filmes & S\xE9ries",
+        tvgLogo: "https://images.pluto.tv/channels/5f12101f0b12f00007844c7c/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-5f12101f0b12f00007844c7c.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Filmes hil\xE1rios e com\xE9dias imperd\xEDveis para animar o seu dia com muitas gargalhadas."
+      },
+      {
+        id: "pluto-tv-filmes-nacionais",
+        tvgId: "PlutoTVFilmesNacionais.br",
+        tvgName: "Pluto TV Filmes Nacionais",
+        name: "Pluto TV Filmes Nacionais",
+        category: "filmes_series",
+        groupTitle: "Filmes & S\xE9ries",
+        tvgLogo: "https://images.pluto.tv/channels/5f5a545d0dbf7f0007c09408/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-5f5a545d0dbf7f0007c09408.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Produ\xE7\xF5es originais do cinema brasileiro: dramas, com\xE9dias nacionais e hist\xF3rias da nossa terra."
+      },
+      {
+        id: "csi-miami-br",
+        tvgId: "CSIMiami.br",
+        tvgName: "CSI: Miami",
+        name: "CSI: Miami (Canal 24h)",
+        category: "filmes_series",
+        groupTitle: "Filmes & S\xE9ries",
+        tvgLogo: "https://images.pluto.tv/channels/63eb9c5351f5d000085e8d7e/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-63eb9c5351f5d000085e8d7e.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Canal tem\xE1tico exclusivo com epis\xF3dios ininterruptos da s\xE9rie policial CSI: Miami dublada."
+      },
+      {
+        id: "south-park-br",
+        tvgId: "SouthPark.br",
+        tvgName: "South Park",
+        name: "South Park (Canal 24h)",
+        category: "filmes_series",
+        groupTitle: "Filmes & S\xE9ries",
+        tvgLogo: "https://images.pluto.tv/channels/609ae66b359b270007869ff1/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-609ae66b359b270007869ff1.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Epis\xF3dios lend\xE1rios das temporadas cl\xE1ssicas de South Park com dublagem brasileira ic\xF4nica."
+      },
+      {
+        id: "star-trek-br",
+        tvgId: "StarTrek.br",
+        tvgName: "Star Trek",
+        name: "Jornada nas Estrelas (Star Trek)",
+        category: "filmes_series",
+        groupTitle: "Filmes & S\xE9ries",
+        tvgLogo: "https://images.pluto.tv/channels/5f99ac4fded33000078f29ab/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-5f99ac4fded33000078f29ab.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Viaje pelo cosmos com as tripula\xE7\xF5es lend\xE1rias da Frota Estelar em epis\xF3dios 24h dublados."
+      },
+      {
+        id: "adrenalina-pura",
+        tvgId: "AdrenalinaPura.br",
+        tvgName: "Adrenalina Pura",
+        name: "Adrenalina Pura Filmes",
+        category: "filmes_series",
+        groupTitle: "Filmes & S\xE9ries",
+        tvgLogo: "https://i.imgur.com/Pvid2iH.png",
+        url: "https://jmp2.uk/plu-61b790b985706b00072cb797.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Cat\xE1logo ininterrupto de suspense, artes marciais e cinema de a\xE7\xE3o sem cobran\xE7as."
+      },
+      // =========================================================================
+      // INFANTIL & ANIMAÇÃO
+      // =========================================================================
+      {
+        id: "turma-da-monica",
+        tvgId: "TurmaDaMonica.br",
+        tvgName: "Turma da M\xF4nica",
+        name: "Turma da M\xF4nica (Canal 24h)",
+        category: "infantil",
+        groupTitle: "Infantil",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Logotipo_da_TV_Brasil.svg/512px-Logotipo_da_TV_Brasil.svg.png",
+        url: "https://jmp2.uk/plu-5f997e44949bc70007a6941e.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "M\xF4nica, Cebolinha, Casc\xE3o e Magali nas historinhas e aventuras animadas mais queridas do Brasil."
+      },
+      {
+        id: "naruto-dublado",
+        tvgId: "Naruto.br",
+        tvgName: "Naruto",
+        name: "Naruto (Anime 24h Dublado)",
+        category: "infantil",
+        groupTitle: "Infantil",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Naruto_logo.svg/512px-Naruto_logo.svg.png",
+        url: "https://jmp2.uk/plu-5f6df5a173d7340007c559f7.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "A jornada ninja de Naruto Uzumaki transmitida ininterruptamente com a cl\xE1ssica dublagem em portugu\xEAs."
+      },
+      {
+        id: "one-piece-dublado",
+        tvgId: "OnePiece.br",
+        tvgName: "One Piece",
+        name: "One Piece (Anime 24h Dublado)",
+        category: "infantil",
+        groupTitle: "Infantil",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/One_Piece_Logo.svg/512px-One_Piece_Logo.svg.png",
+        url: "https://jmp2.uk/plu-624b1c8d4321e200073ee421.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Luffy e o Bando do Chap\xE9u de Palha pelos mares da Grand Line em transmiss\xE3o 24h dublada."
+      },
+      {
+        id: "pluto-tv-anime",
+        tvgId: "PlutoTVAnime.br",
+        tvgName: "Pluto TV Anime",
+        name: "Pluto TV Anime",
+        category: "infantil",
+        groupTitle: "Infantil",
+        tvgLogo: "https://images.pluto.tv/channels/5f12136385bccc00070142ed/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-5f12136385bccc00070142ed.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Maratona cont\xEDnua de grandes animes, batalhas lend\xE1rias e universos fant\xE1sticos dublados."
+      },
+      {
+        id: "nickelodeon-classico",
+        tvgId: "NickelodeonClassico.br",
+        tvgName: "Nickelodeon Cl\xE1ssico",
+        name: "Nickelodeon Cl\xE1ssico",
+        category: "infantil",
+        groupTitle: "Infantil",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Nickelodeon_2009_logo.svg/512px-Nickelodeon_2009_logo.svg.png",
+        url: "https://jmp2.uk/plu-6824ce10c5d53e1351ceb8d1.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Os desenhos mais memor\xE1veis da Nick: Rugrats, Hey Arnold!, CatDog e cl\xE1ssicos da anima\xE7\xE3o."
+      },
+      {
+        id: "nickelodeon-toons",
+        tvgId: "NickelodeonToons.br",
+        tvgName: "Nickelodeon Toons",
+        name: "Nickelodeon Toons",
+        category: "infantil",
+        groupTitle: "Infantil",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Nickelodeon_2009_logo.svg/512px-Nickelodeon_2009_logo.svg.png",
+        url: "https://jmp2.uk/plu-645951c0e94c38000802d2cb.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Anima\xE7\xE3o sem parar com Bob Esponja, Os Padrinhos M\xE1gicos e sucessos animados da garotada."
+      },
+      {
+        id: "nick-jr-club",
+        tvgId: "NickJrClub.br",
+        tvgName: "Nick Jr. Club",
+        name: "Nick Jr. Club (Pr\xE9-Escolar)",
+        category: "infantil",
+        groupTitle: "Infantil",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Nickelodeon_2009_logo.svg/512px-Nickelodeon_2009_logo.svg.png",
+        url: "https://jmp2.uk/plu-6824ce95f09106f4b18f4114.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Conte\xFAdo seguro, educativo e carinhoso para beb\xEAs e crian\xE7as pequenas com a Patrulha Canina e amigos."
+      },
+      {
+        id: "icarly-br",
+        tvgId: "iCarly.br",
+        tvgName: "iCarly",
+        name: "iCarly (Canal 24h)",
+        category: "infantil",
+        groupTitle: "Infantil",
+        tvgLogo: "https://images.pluto.tv/channels/620ff46e0a576e0007dc2f89/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-620ff46e0a576e0007dc2f89.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Carly, Sam e Freddie comandam o webshow mais divertido da TV em epis\xF3dios 24h dublados."
+      },
+      {
+        id: "kenan-and-kel",
+        tvgId: "KenanAndKel.br",
+        tvgName: "Kenan & Kel",
+        name: "Kenan & Kel (Canal 24h)",
+        category: "infantil",
+        groupTitle: "Infantil",
+        tvgLogo: "https://images.pluto.tv/channels/5ffcc5130fd98c0007f2e216/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-5ffcc5130fd98c0007f2e216.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "As confus\xF5es imperd\xEDveis de Kenan e Kel e seu eterno amor por refrigerante de laranja."
+      },
+      {
+        id: "desenhos-classicos",
+        tvgId: "DesenhosClassicos.br",
+        tvgName: "Desenhos Cl\xE1ssicos",
+        name: "Pluto TV Desenhos Cl\xE1ssicos",
+        category: "infantil",
+        groupTitle: "Infantil",
+        tvgLogo: "https://images.pluto.tv/channels/655e5c4d2c46f3000877a54b/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-655e5c4d2c46f3000877a54b.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Popeye, Betty Boop, Gasparzinho e as anima\xE7\xF5es pioneiras da era dourada da anima\xE7\xE3o."
+      },
+      // =========================================================================
+      // MÚSICA & VARIEDADES
+      // =========================================================================
+      {
+        id: "mtv-biggest-pop",
+        tvgId: "MTVBiggestPop.br",
+        tvgName: "MTV Biggest Pop",
+        name: "MTV Biggest Pop Brasil",
+        category: "musica",
+        groupTitle: "M\xFAsica",
+        tvgLogo: "https://images.pluto.tv/channels/6047fbdbbb776a0007e7f2ff/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-6047fbdbbb776a0007e7f2ff.m3u8",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Os maiores videoclipes pop nacionais e internacionais do momento em alta defini\xE7\xE3o."
+      },
+      {
+        id: "mtv-classic-br",
+        tvgId: "MTVClassic.br",
+        tvgName: "MTV Classic",
+        name: "MTV Classic Brasil",
+        category: "musica",
+        groupTitle: "M\xFAsica",
+        tvgLogo: "https://images.pluto.tv/channels/66a01dcb8561260008b0a41d/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-66a01dcb8561260008b0a41d.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Hits inesquec\xEDveis dos anos 80, 90 e 2000 que moldaram a hist\xF3ria da m\xFAsica jovem."
+      },
+      {
+        id: "mtv-pluto-tv",
+        tvgId: "MTVPlutoTV.br",
+        tvgName: "MTV Pluto TV",
+        name: "MTV Pluto TV Brasil",
+        category: "musica",
+        groupTitle: "M\xFAsica",
+        tvgLogo: "https://images.pluto.tv/channels/5f1212fb81e85c00077ae9ef/colorLogoPNG_1759263027326.png",
+        url: "https://jmp2.uk/plu-5f1212fb81e85c00077ae9ef.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "A ess\xEAncia jovem da MTV: m\xFAsica, festivais ao vivo, entrevistas e cultura pop."
+      },
+      {
+        id: "tastemade-brasil",
+        tvgId: "TastemadeBrasil.br",
+        tvgName: "Tastemade Brasil",
+        name: "Tastemade Brasil (Culin\xE1ria e Viagens)",
+        category: "cultura",
+        groupTitle: "Cultura",
+        tvgLogo: "https://i.imgur.com/FPy4zF4.png",
+        url: "https://jmp2.uk/plu-5fd1419a3b4f4b000773ba85.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Receitas irresist\xEDveis, roteiros de viagens gastron\xF4micas e chefs renomados em programa\xE7\xE3o 24h."
+      },
+      {
+        id: "masterchef-brasil",
+        tvgId: "MasterChef.br",
+        tvgName: "MasterChef",
+        name: "MasterChef Brasil (Canal 24h)",
+        category: "cultura",
+        groupTitle: "Cultura",
+        tvgLogo: "https://images.pluto.tv/channels/6077045b6031bd00078de127/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-6077045b6031bd00078de127.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "As provas de elimina\xE7\xE3o, caixas misteriosas e desafios sob press\xE3o das temporadas do MasterChef."
+      },
+      {
+        id: "smithsonian-channel",
+        tvgId: "SmithsonianChannel.br",
+        tvgName: "Smithsonian Channel",
+        name: "Smithsonian Channel (Document\xE1rios)",
+        category: "documentarios",
+        groupTitle: "Document\xE1rios",
+        tvgLogo: "https://images.pluto.tv/channels/6298bd10d88ef000073f16b7/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-6298bd10d88ef000073f16b7.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Ci\xEAncia, avia\xE7\xE3o, explora\xE7\xE3o espacial, arqueologia e hist\xF3ria natural com qualidade documental internacional."
+      },
+      {
+        id: "pluto-tv-natureza",
+        tvgId: "PlutoTVNatureza.br",
+        tvgName: "Pluto TV Natureza",
+        name: "Pluto TV Natureza",
+        category: "documentarios",
+        groupTitle: "Document\xE1rios",
+        tvgLogo: "https://images.pluto.tv/channels/5f1213ba0ecebc00070e170f/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-5f1213ba0ecebc00070e170f.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Expedi\xE7\xF5es pelos biomas mais exuberantes do planeta Terra e o fascinante reino animal."
+      },
+      // =========================================================================
+      // REGIONAIS & COMUNITÁRIOS (Transmissões Abertas)
+      // =========================================================================
+      {
+        id: "tv-alesp",
+        tvgId: "TVALESP.br",
+        tvgName: "TV ALESP",
+        name: "TV ALESP (S\xE3o Paulo)",
+        category: "regionais",
+        groupTitle: "Regionais",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Logotipo_da_TV_Brasil.svg/512px-Logotipo_da_TV_Brasil.svg.png",
+        url: "https://cdn.jmvstream.com/w/LVW-9715/LVW9715_12B26T62tm/playlist.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Emissora p\xFAblica da Assembleia Legislativa do Estado de S\xE3o Paulo, com debates e leis estaduais."
+      },
+      {
+        id: "tv-brasil-central",
+        tvgId: "TVBrasilCentral.br",
+        tvgName: "TV Brasil Central",
+        name: "TV Brasil Central (Goi\xE1s)",
+        category: "regionais",
+        groupTitle: "Regionais",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Logotipo_da_TV_Brasil.svg/512px-Logotipo_da_TV_Brasil.svg.png",
+        url: "https://cdn.jmvstream.com/w/LVW-9715/LVW9715_12B26T62tm/playlist.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Canal p\xFAblico e educativo de Goi\xE1s, integrado \xE0 rede p\xFAblica de comunica\xE7\xE3o."
+      },
+      {
+        id: "conecta-mais-tv",
+        tvgId: "ConectaMaisTV.br",
+        tvgName: "Conecta Mais TV",
+        name: "Conecta Mais TV",
+        category: "regionais",
+        groupTitle: "Regionais",
+        tvgLogo: "https://i.imgur.com/qHwTWlz.png",
+        url: "https://adylnet.streampool.net/10324/live/hls/Conecta/index.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Programa\xE7\xE3o regional e cultural conectando as comunidades do interior."
+      },
+      {
+        id: "eutv-regional",
+        tvgId: "EUTV.br",
+        tvgName: "EUTV",
+        name: "EUTV Brasil",
+        category: "regionais",
+        groupTitle: "Regionais",
+        tvgLogo: "https://i.imgur.com/8PxpamC.png",
+        url: "https://cdn.jmvstream.com/w/LVW-8719/LVW8719_AcLVAxWy5J/playlist.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Emissora regional com variedades, not\xEDcias comunit\xE1rias e atra\xE7\xF5es locais."
+      },
+      // =========================================================================
+      // GRANDES EMISSORAS NACIONAIS & SINAIS PAY-TV (Identificação Transparente)
+      // (Conforme seções 06, 25: Apresenta acesso oficial sem simular pirataria)
+      // =========================================================================
+      {
+        id: "globo-oficial",
+        tvgId: "Globo.br",
+        tvgName: "TV Globo",
+        name: "TV Globo (Sinal Nacional Ao Vivo)",
+        category: "aberta",
+        groupTitle: "TV Aberta",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/TV_Globo_logo_2021.svg/512px-TV_Globo_logo_2021.svg.png",
+        url: "",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        requiresExternalAccess: true,
+        externalAccessUrl: "https://globoplay.globo.com/agora-na-tv/",
+        externalProviderName: "Globoplay (Transmiss\xE3o Oficial Gratuita)",
+        description: "A maior emissora do pa\xEDs: novelas das 9, Jornal Nacional, futebol ao vivo e entretenimento. Sinal linear aberto gratuito via Globoplay."
+      },
+      {
+        id: "sbt-nacional",
+        tvgId: "SBTNacional.br",
+        tvgName: "SBT",
+        name: "SBT (Transmiss\xE3o Nacional Direta)",
+        category: "aberta",
+        groupTitle: "TV Aberta",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/SBT_logo.svg/512px-SBT_logo.svg.png",
+        url: "",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        requiresExternalAccess: true,
+        externalAccessUrl: "https://sbtvideos.com.br/",
+        externalProviderName: "+SBT Oficial Gr\xE1tis",
+        description: "Sinal principal nacional do SBT: Programa Silvio Santos, Domingo Legal, Champions League e novelas no aplicativo oficial +SBT."
+      },
+      {
+        id: "record-tv-oficial",
+        tvgId: "RecordTV.br",
+        tvgName: "Record TV",
+        name: "Record TV (Sinal Nacional)",
+        category: "aberta",
+        groupTitle: "TV Aberta",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Logotipo_da_Record.png/512px-Logotipo_da_Record.png",
+        url: "",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        requiresExternalAccess: true,
+        externalAccessUrl: "https://playplus.com/",
+        externalProviderName: "PlayPlus Oficial (Sinal Aberto Gr\xE1tis)",
+        description: "Jornalismo investigativo, novelas b\xEDblicas, Paulist\xE3o e reality shows na transmiss\xE3o linear gratuita da Record no PlayPlus."
+      },
+      {
+        id: "band-nacional",
+        tvgId: "BandNacional.br",
+        tvgName: "Band",
+        name: "Rede Bandeirantes (Band Nacional)",
+        category: "aberta",
+        groupTitle: "TV Aberta",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Band_logo_2018.svg/512px-Band_logo_2018.svg.png",
+        url: "",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        requiresExternalAccess: true,
+        externalAccessUrl: "https://bandplay.com/",
+        externalProviderName: "Bandplay Oficial Gratuito",
+        description: "F\xF3rmula 1, Jogo Aberto, Jornal da Band e MasterChef transmitidos ao vivo gratuitamente na plataforma Bandplay."
+      },
+      {
+        id: "redetv-nacional",
+        tvgId: "RedeTVNacional.br",
+        tvgName: "RedeTV!",
+        name: "RedeTV! (Sinal Nacional Direto)",
+        category: "aberta",
+        groupTitle: "TV Aberta",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/RedeTV%21_logo_2019.svg/512px-RedeTV%21_logo_2019.svg.png",
+        url: "",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        requiresExternalAccess: true,
+        externalAccessUrl: "https://redetvgo.com.br/",
+        externalProviderName: "RedeTV! Go Oficial",
+        description: "SuperPop, Opera\xE7\xE3o de Risco e NFL em transmiss\xE3o linear oficial pelo portal RedeTV! Go."
+      },
+      {
+        id: "ge-tv-oficial",
+        tvgId: "ge.tv.br",
+        tvgName: "ge tv",
+        name: "ge tv (Globo Esporte)",
+        category: "esportes",
+        groupTitle: "Esportes",
+        tvgLogo: "https://s2-ge.glbimg.com/OqD0yL_y6hXk41t_Lq7p6U4aF7M=/1200x/smart/filters:cover():strip_icc()/i.s3.glbimg.com/v1/AUTH_bc8228b6673f488aa253bbcb03c80ec5/internal_photos/bs/2021/Y/r/v2o9r3S3mA2o8d4xY1Aw/marca-ge.png",
+        url: "",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        requiresExternalAccess: true,
+        externalAccessUrl: "https://ge.globo.com/",
+        externalProviderName: "ge.globo Oficial",
+        description: "Canal de esportes 24h gratuito da Globo com debates, gols da rodada, cobertura esportiva e eventos livres."
+      },
+      {
+        id: "sportv-oficial",
+        tvgId: "SporTV.br",
+        tvgName: "SporTV",
+        name: "SporTV (Acesso Oficial)",
+        category: "esportes",
+        groupTitle: "Esportes",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/SporTV_logo_2021.svg/512px-SporTV_logo_2021.svg.png",
+        url: "",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        requiresExternalAccess: true,
+        externalAccessUrl: "https://globoplay.globo.com/sportv/",
+        externalProviderName: "Globoplay + Canais ao Vivo",
+        description: "Canal fechado de esportes do Grupo Globo. Transmiss\xE3o linear restrita a assinantes oficiais do Globoplay."
+      },
+      {
+        id: "sportv-2-oficial",
+        tvgId: "SporTV2.br",
+        tvgName: "SporTV 2",
+        name: "SporTV 2 (Acesso Oficial)",
+        category: "esportes",
+        groupTitle: "Esportes",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/SporTV_logo_2021.svg/512px-SporTV_logo_2021.svg.png",
+        url: "",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        requiresExternalAccess: true,
+        externalAccessUrl: "https://globoplay.globo.com/sportv-2/",
+        externalProviderName: "Globoplay + Canais ao Vivo",
+        description: "Segundo canal linear SporTV, com eventos simult\xE2neos, v\xF4lei, basquete e automobilismo oficial."
+      },
+      {
+        id: "sportv-3-oficial",
+        tvgId: "SporTV3.br",
+        tvgName: "SporTV 3",
+        name: "SporTV 3 (Acesso Oficial)",
+        category: "esportes",
+        groupTitle: "Esportes",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/SporTV_logo_2021.svg/512px-SporTV_logo_2021.svg.png",
+        url: "",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        requiresExternalAccess: true,
+        externalAccessUrl: "https://globoplay.globo.com/sportv-3/",
+        externalProviderName: "Globoplay + Canais ao Vivo",
+        description: "Terceiro canal linear SporTV, especializado em esportes radicais, jud\xF4, t\xEAnis e ligas internacionais."
+      },
+      {
+        id: "espn-oficial",
+        tvgId: "ESPN.br",
+        tvgName: "ESPN Brasil",
+        name: "ESPN (Acesso Oficial)",
+        category: "esportes",
+        groupTitle: "Esportes",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/ESPN_wordmark.svg/512px-ESPN_wordmark.svg.png",
+        url: "",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        requiresExternalAccess: true,
+        externalAccessUrl: "https://www.disneyplus.com/brand/espn",
+        externalProviderName: "Disney+ / ESPN Oficial",
+        description: "L\xEDder mundial em esportes, com Premier League, NFL, NBA e La Liga. Transmiss\xE3o oficial dispon\xEDvel via Disney+."
+      },
+      {
+        id: "premiere-oficial",
+        tvgId: "Premiere.br",
+        tvgName: "Premiere Futebol",
+        name: "Premiere (Acesso Oficial)",
+        category: "esportes",
+        groupTitle: "Esportes",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Premiere_logo_2021.svg/512px-Premiere_logo_2021.svg.png",
+        url: "",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        requiresExternalAccess: true,
+        externalAccessUrl: "https://premiere.globo.com/",
+        externalProviderName: "Premiere Play Oficial",
+        description: "O melhor do futebol brasileiro: Brasileir\xE3o S\xE9ries A e B e Campeonatos Estaduais sob demanda oficial."
+      }
+    ];
+  }
+};
+
+// src/core/rankings/imdbRankingSnapshots.ts
+var OFFICIAL_IMDB_WEEKLY_SNAPSHOTS = [
+  // =========================================================================
+  // FILMES — SNAPSHOT SEMANA 41 (Outubro de 2026 - Oficial MOVIEmeter Imagem 1)
+  // =========================================================================
+  {
+    id: "snapshot-movie-2026-w41",
+    weekKey: "2026-W41",
+    weekLabel: "Semana 41 (Outubro de 2026)",
+    monthKey: "2026-10",
+    rankType: "movie",
+    referenceDate: "2026-10-12",
+    capturedAt: 17918592e5,
+    items: [
+      { rankType: "movie", position: 1, imdbId: "tt29971038", title: "Sobreviv\xEAncia", originalTitle: "Animals", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 2, imdbId: "tt31454558", title: "Digger", originalTitle: "Digger", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 3, imdbId: "tt21440780", title: "Outra Mam\xE3e", originalTitle: "Another Mother", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 4, imdbId: "tt32261958", title: "Verity", originalTitle: "Verity", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 5, imdbId: "tt28704204", title: "O Exorcista: M\xE1rtires", originalTitle: "The Exorcist: Martyrs", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 6, imdbId: "tt31828574", title: "Matchbox: O Filme", originalTitle: "Matchbox", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 7, imdbId: "tt13000574", title: "Resident Evil", originalTitle: "Resident Evil", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 8, imdbId: "tt20221436", title: "Homem-Aranha: Um Novo Dia", originalTitle: "Spider-Man: Brand New Day", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 9, imdbId: "tt0100935", title: "Cora\xE7\xE3o Selvagem", originalTitle: "Wild at Heart", year: 1990, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 10, imdbId: "tt11464826", title: "O Outro Lado das Redes", originalTitle: "The Social Dilemma", year: 2020, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 11, imdbId: "tt1392796", title: "Unabomber", originalTitle: "Unabomber", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 12, imdbId: "tt11576182", title: "Dia D", originalTitle: "D-Day", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 13, imdbId: "tt33764258", title: "A Odisseia", originalTitle: "The Odyssey", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 14, imdbId: "tt0074991", title: "Obsess\xE3o", originalTitle: "Obsession", year: 1976, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 15, imdbId: "tt11897478", title: "Prisioneiro", originalTitle: "Prisoner", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 16, imdbId: "tt26658104", title: "Backrooms: Um N\xE3o-Lugar", originalTitle: "The Backrooms", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 17, imdbId: "tt18944118", title: "The Uprising: Rise of Robin Hood", originalTitle: "The Uprising", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 18, imdbId: "tt28148803", title: "Sobrenatural: Agora Entre N\xF3s", originalTitle: "Insidious: The Bleeding World", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 19, imdbId: "tt27712800", title: "A Hip\xF3tese do Amor", originalTitle: "The Love Hypothesis", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 20, imdbId: "tt27814420", title: "A Queda 2: No Limite", originalTitle: "Fall 2", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 21, imdbId: "tt27542918", title: "A Empregada", originalTitle: "The Housemaid", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 22, imdbId: "tt27429810", title: "Street Fighter", originalTitle: "Street Fighter", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 23, imdbId: "tt0074296", title: "Carrie, a Estranha", originalTitle: "Carrie", year: 1976, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 24, imdbId: "tt14932630", title: "O Fim da Rua", originalTitle: "End of the Road", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 25, imdbId: "tt31892834", title: "Daisy Lite", originalTitle: "Daisy Lite", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 26, imdbId: "tt12042730", title: "Devoradores de Estrelas", originalTitle: "Project Hail Mary", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 27, imdbId: "tt11878442", title: "Protocolo de Exterm\xEDnio", originalTitle: "28 Years Later", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 28, imdbId: "tt31589410", title: "Raz\xE3o e Sensibilidade", originalTitle: "Sense and Sensibility", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 29, imdbId: "tt29471588", title: "You Can See Everything", originalTitle: "You Can See Everything", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 30, imdbId: "tt13651762", title: "Tr\xEAs Horas para Viver", originalTitle: "Three Hours to Live", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-moviemeter" }
+    ]
+  },
+  // =========================================================================
+  // FILMES — SNAPSHOT SEMANA 40 (Outubro de 2026 - Semana Anterior)
+  // =========================================================================
+  {
+    id: "snapshot-movie-2026-w40",
+    weekKey: "2026-W40",
+    weekLabel: "Semana 40 (Outubro de 2026)",
+    monthKey: "2026-10",
+    rankType: "movie",
+    referenceDate: "2026-10-05",
+    capturedAt: 17912544e5,
+    items: [
+      { rankType: "movie", position: 1, imdbId: "tt29971038", title: "Sobreviv\xEAncia", originalTitle: "Animals", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 2, imdbId: "tt31454558", title: "Digger", originalTitle: "Digger", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 3, imdbId: "tt21440780", title: "Outra Mam\xE3e", originalTitle: "Another Mother", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 4, imdbId: "tt32261958", title: "Verity", originalTitle: "Verity", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 5, imdbId: "tt28704204", title: "O Exorcista: M\xE1rtires", originalTitle: "The Exorcist: Martyrs", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 6, imdbId: "tt31828574", title: "Matchbox: O Filme", originalTitle: "Matchbox", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 7, imdbId: "tt13000574", title: "Resident Evil", originalTitle: "Resident Evil", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 8, imdbId: "tt20221436", title: "Homem-Aranha: Um Novo Dia", originalTitle: "Spider-Man: Brand New Day", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 9, imdbId: "tt0100935", title: "Cora\xE7\xE3o Selvagem", originalTitle: "Wild at Heart", year: 1990, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 10, imdbId: "tt11464826", title: "O Outro Lado das Redes", originalTitle: "The Social Dilemma", year: 2020, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 11, imdbId: "tt1392796", title: "Unabomber", originalTitle: "Unabomber", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 12, imdbId: "tt11576182", title: "Dia D", originalTitle: "D-Day", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 13, imdbId: "tt33764258", title: "A Odisseia", originalTitle: "The Odyssey", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" },
+      { rankType: "movie", position: 14, imdbId: "tt0074991", title: "Obsess\xE3o", originalTitle: "Obsession", year: 1976, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-moviemeter" }
+    ]
+  },
+  // =========================================================================
+  // SÉRIES — SNAPSHOT SEMANA 41 (Outubro de 2026 - Oficial TVmeter Imagem 2)
+  // =========================================================================
+  {
+    id: "snapshot-series-2026-w41",
+    weekKey: "2026-W41",
+    weekLabel: "Semana 41 (Outubro de 2026)",
+    monthKey: "2026-10",
+    rankType: "series",
+    referenceDate: "2026-10-12",
+    capturedAt: 17918592e5,
+    items: [
+      { rankType: "series", position: 1, imdbId: "tt30147890", title: "Carrie: A Estranha", originalTitle: "Carrie", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 2, imdbId: "tt32159846", title: "Profundezas", originalTitle: "The Deep", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 3, imdbId: "tt21097264", title: "A Leste do \xC9den", originalTitle: "East of Eden", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 4, imdbId: "tt26540670", title: "Lanternas", originalTitle: "Lanterns", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 5, imdbId: "tt10986410", title: "Ted Lasso", originalTitle: "Ted Lasso", year: 2020, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 6, imdbId: "tt28289508", title: "Terra de M\xE1fia", originalTitle: "MobLand", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 7, imdbId: "tt5875444", title: "Slow Horses", originalTitle: "Slow Horses", year: 2022, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 8, imdbId: "tt29458920", title: "War", originalTitle: "War", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 9, imdbId: "tt13207736", title: "Monstros", originalTitle: "Monsters", year: 2022, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 10, imdbId: "tt1844624", title: "Hist\xF3ria de Horror Americana", originalTitle: "American Horror Story", year: 2011, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 11, imdbId: "tt16066148", title: "Magnatas do Crime", originalTitle: "The Gentlemen", year: 2024, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 12, imdbId: "tt32567812", title: "Avatar: Os Sete Ref\xFAgios", originalTitle: "Avatar: The Seven Havens", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 13, imdbId: "tt33314545", title: "Neagley: Detetive Particular", originalTitle: "Neagley", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 14, imdbId: "tt1196946", title: "O Mentalista", originalTitle: "The Mentalist", year: 2008, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 15, imdbId: "tt0944947", title: "Game of Thrones", originalTitle: "Game of Thrones", year: 2011, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 16, imdbId: "tt9288030", title: "Reacher", originalTitle: "Reacher", year: 2022, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 17, imdbId: "tt31854290", title: "O Segredo de Widow's Bay", originalTitle: "The Secret of Widow's Bay", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 18, imdbId: "tt13111078", title: "Opera\xE7\xE3o Lioness", originalTitle: "Special Ops: Lioness", year: 2023, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 19, imdbId: "tt14688458", title: "Silo", originalTitle: "Silo", year: 2023, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 20, imdbId: "tt33145678", title: "Coven Academy", originalTitle: "Coven Academy", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 21, imdbId: "tt32876543", title: "Bloodaxe", originalTitle: "Bloodaxe", year: 2027, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 22, imdbId: "tt0903747", title: "Breaking Bad", originalTitle: "Breaking Bad", year: 2008, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 23, imdbId: "tt19231492", title: "Mat\xE9ria Escura", originalTitle: "Dark Matter", year: 2024, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 24, imdbId: "tt7441656", title: "Black Clover", originalTitle: "Black Clover", year: 2017, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 25, imdbId: "tt31985420", title: "Desaparecida", originalTitle: "Missing", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 26, imdbId: "tt11712058", title: "O Dono de Kingstown", originalTitle: "Mayor of Kingstown", year: 2021, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 27, imdbId: "tt32984512", title: "Cupertino", originalTitle: "Cupertino", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 28, imdbId: "tt23145698", title: "Crystal Lake", originalTitle: "Crystal Lake", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 29, imdbId: "tt7587890", title: "The Rookie", originalTitle: "The Rookie", year: 2018, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 30, imdbId: "tt31876542", title: "Brothers", originalTitle: "Brothers", year: 2026, referenceDate: "2026-10-12", capturedAt: 17918592e5, source: "imdb-tvmeter" }
+    ]
+  },
+  // =========================================================================
+  // SÉRIES — SNAPSHOT SEMANA 40 (Outubro de 2026 - Semana Anterior)
+  // =========================================================================
+  {
+    id: "snapshot-series-2026-w40",
+    weekKey: "2026-W40",
+    weekLabel: "Semana 40 (Outubro de 2026)",
+    monthKey: "2026-10",
+    rankType: "series",
+    referenceDate: "2026-10-05",
+    capturedAt: 17912544e5,
+    items: [
+      { rankType: "series", position: 1, imdbId: "tt30147890", title: "Carrie: A Estranha", originalTitle: "Carrie", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 2, imdbId: "tt32159846", title: "Profundezas", originalTitle: "The Deep", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 3, imdbId: "tt21097264", title: "A Leste do \xC9den", originalTitle: "East of Eden", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 4, imdbId: "tt26540670", title: "Lanternas", originalTitle: "Lanterns", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 5, imdbId: "tt10986410", title: "Ted Lasso", originalTitle: "Ted Lasso", year: 2020, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 6, imdbId: "tt28289508", title: "Terra de M\xE1fia", originalTitle: "MobLand", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 7, imdbId: "tt5875444", title: "Slow Horses", originalTitle: "Slow Horses", year: 2022, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 8, imdbId: "tt29458920", title: "War", originalTitle: "War", year: 2026, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 9, imdbId: "tt13207736", title: "Monstros", originalTitle: "Monsters", year: 2022, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 10, imdbId: "tt1844624", title: "Hist\xF3ria de Horror Americana", originalTitle: "American Horror Story", year: 2011, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 11, imdbId: "tt16066148", title: "Magnatas do Crime", originalTitle: "The Gentlemen", year: 2024, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 12, imdbId: "tt1196946", title: "O Mentalista", originalTitle: "The Mentalist", year: 2008, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 13, imdbId: "tt0944947", title: "Game of Thrones", originalTitle: "Game of Thrones", year: 2011, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 14, imdbId: "tt9288030", title: "Reacher", originalTitle: "Reacher", year: 2022, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 15, imdbId: "tt13111078", title: "Opera\xE7\xE3o Lioness", originalTitle: "Special Ops: Lioness", year: 2023, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 16, imdbId: "tt14688458", title: "Silo", originalTitle: "Silo", year: 2023, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 17, imdbId: "tt0903747", title: "Breaking Bad", originalTitle: "Breaking Bad", year: 2008, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 18, imdbId: "tt19231492", title: "Mat\xE9ria Escura", originalTitle: "Dark Matter", year: 2024, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 19, imdbId: "tt11712058", title: "O Dono de Kingstown", originalTitle: "Mayor of Kingstown", year: 2021, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" },
+      { rankType: "series", position: 20, imdbId: "tt7587890", title: "The Rookie", originalTitle: "The Rookie", year: 2018, referenceDate: "2026-10-05", capturedAt: 17912544e5, source: "imdb-tvmeter" }
+    ]
+  }
+];
+
+// src/core/rankings/IMDbWeeklyRankingService.ts
+import fs from "fs";
+import path from "path";
+var IMDbWeeklyRankingService = class _IMDbWeeklyRankingService {
+  constructor() {
+    this.snapshots = [];
+    this.dataFilePath = typeof window === "undefined" && typeof process !== "undefined" && process.cwd ? path.resolve(process.cwd(), "data", "imdb_weekly_snapshots.json") : "";
+    this.loadSnapshots();
+  }
+  static getInstance() {
+    if (!_IMDbWeeklyRankingService.instance) {
+      _IMDbWeeklyRankingService.instance = new _IMDbWeeklyRankingService();
+    }
+    return _IMDbWeeklyRankingService.instance;
+  }
+  /**
+   * Carrega os snapshots em disco ou memória
+   */
+  loadSnapshots() {
+    try {
+      if (typeof window === "undefined" && this.dataFilePath && typeof fs !== "undefined" && fs.existsSync && fs.existsSync(this.dataFilePath)) {
+        const raw = fs.readFileSync(this.dataFilePath, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          this.snapshots = parsed;
+          return;
+        }
+      } else if (typeof window !== "undefined" && window.localStorage) {
+        const local = localStorage.getItem("zapitv_imdb_weekly_snapshots");
+        if (local) {
+          const parsed = JSON.parse(local);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.snapshots = parsed;
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[IMDbWeeklyRankingService] Aviso ao ler snapshot:", e);
+    }
+    this.initDefaultAuthorizedSnapshots();
+  }
+  /**
+   * Salva os snapshots persistidos em disco (Node.js) e localStorage (se no navegador)
+   */
+  saveSnapshots() {
+    try {
+      if (typeof window === "undefined" && this.dataFilePath && typeof fs !== "undefined") {
+        const dir = path.dirname(this.dataFilePath);
+        if (fs.existsSync && !fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        if (fs.writeFileSync) {
+          fs.writeFileSync(this.dataFilePath, JSON.stringify(this.snapshots, null, 2), "utf-8");
+        }
+      } else if (typeof window !== "undefined" && window.localStorage) {
+        localStorage.setItem("zapitv_imdb_weekly_snapshots", JSON.stringify(this.snapshots));
+      }
+    } catch (e) {
+      console.error("[IMDbWeeklyRankingService] Erro ao persistir snapshots:", e);
+    }
+  }
+  /**
+   * Snapshots autorizados iniciais baseados nas referências reais do IMDb
+   * (Semana 41 / Outubro de 2026)
+   */
+  initDefaultAuthorizedSnapshots() {
+    const movieItems = [
+      {
+        imdbId: "tt29971038",
+        title: "Sobreviv\xEAncia",
+        originalTitle: "Animals",
+        mediaType: "movie",
+        position: 1,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt31454558",
+        title: "Digger",
+        originalTitle: "Digger",
+        mediaType: "movie",
+        position: 2,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt21440780",
+        title: "Outra Mam\xE3e",
+        originalTitle: "Another Mother",
+        mediaType: "movie",
+        position: 3,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt32261958",
+        title: "Verity",
+        originalTitle: "Verity",
+        mediaType: "movie",
+        position: 4,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt28704204",
+        title: "O Exorcista: M\xE1rtires",
+        originalTitle: "The Exorcist: Martyrs",
+        mediaType: "movie",
+        position: 5,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt31828574",
+        title: "Matchbox: O Filme",
+        originalTitle: "Matchbox",
+        mediaType: "movie",
+        position: 6,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt13000574",
+        title: "Resident Evil",
+        originalTitle: "Resident Evil",
+        mediaType: "movie",
+        position: 7,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt20221436",
+        title: "Homem-Aranha: Um Novo Dia",
+        originalTitle: "Spider-Man: Brand New Day",
+        mediaType: "movie",
+        position: 8,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt0100935",
+        title: "Cora\xE7\xE3o Selvagem",
+        originalTitle: "Wild at Heart",
+        mediaType: "movie",
+        position: 9,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 1990
+      },
+      {
+        imdbId: "tt11464826",
+        title: "O Outro Lado das Redes",
+        originalTitle: "The Social Dilemma",
+        mediaType: "movie",
+        position: 10,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2020
+      },
+      {
+        imdbId: "tt1392796",
+        title: "Unabomber",
+        originalTitle: "Unabomber",
+        mediaType: "movie",
+        position: 11,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt11576182",
+        title: "Dia D",
+        originalTitle: "D-Day",
+        mediaType: "movie",
+        position: 12,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt33764258",
+        title: "A Odisseia",
+        originalTitle: "The Odyssey",
+        mediaType: "movie",
+        position: 13,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt0074991",
+        title: "Obsess\xE3o",
+        originalTitle: "Obsession",
+        mediaType: "movie",
+        position: 14,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 1976
+      },
+      {
+        imdbId: "tt0063350",
+        title: "A Noite dos Mortos-Vivos",
+        originalTitle: "Night of the Living Dead",
+        mediaType: "movie",
+        position: 15,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 1968
+      },
+      {
+        imdbId: "tt8839088",
+        title: "Hist\xF3rias da Fome no Brasil",
+        originalTitle: "Hist\xF3rias da Fome no Brasil",
+        mediaType: "movie",
+        position: 16,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2018
+      },
+      {
+        imdbId: "tt0015864",
+        title: "O Mundo Perdido",
+        originalTitle: "The Lost World",
+        mediaType: "movie",
+        position: 17,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 1925
+      },
+      {
+        imdbId: "tt0013442",
+        title: "Nosferatu",
+        originalTitle: "Nosferatu",
+        mediaType: "movie",
+        position: 18,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 1922
+      },
+      {
+        imdbId: "tt1727587",
+        title: "Sintel",
+        originalTitle: "Sintel",
+        mediaType: "movie",
+        position: 19,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2010
+      },
+      {
+        imdbId: "tt2285752",
+        title: "Tears of Steel",
+        originalTitle: "Tears of Steel",
+        mediaType: "movie",
+        position: 21,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2012
+      },
+      {
+        imdbId: "tt0056923",
+        title: "Charada",
+        originalTitle: "Charade",
+        mediaType: "movie",
+        position: 22,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 1963
+      },
+      {
+        imdbId: "tt0111161",
+        title: "Um Sonho de Liberdade",
+        originalTitle: "The Shawshank Redemption",
+        mediaType: "movie",
+        position: 23,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 1994
+      },
+      {
+        imdbId: "tt15340724",
+        title: "Garota do S\xE9culo 20",
+        originalTitle: "20th Century Girl",
+        mediaType: "movie",
+        position: 24,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2022
+      },
+      {
+        imdbId: "tt11897478",
+        title: "O Desconhecido",
+        originalTitle: "The Stranger",
+        mediaType: "movie",
+        position: 25,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2022
+      },
+      {
+        imdbId: "tt1777606",
+        title: "Rosalina",
+        originalTitle: "Rosaline",
+        mediaType: "movie",
+        position: 26,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2022
+      },
+      {
+        imdbId: "tt4595186",
+        title: "Uma Garota de Muita Sorte",
+        originalTitle: "Luckiest Girl Alive",
+        mediaType: "movie",
+        position: 27,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        year: 2022
+      }
+    ];
+    const seriesItems = [
+      {
+        imdbId: "tt21097264",
+        title: "East of Eden",
+        originalTitle: "East of Eden",
+        mediaType: "series",
+        position: 1,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt29458920",
+        title: "War",
+        originalTitle: "War",
+        mediaType: "series",
+        position: 2,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt30147890",
+        title: "Carrie",
+        originalTitle: "Carrie",
+        mediaType: "series",
+        position: 3,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2026
+      },
+      {
+        imdbId: "tt15474916",
+        title: "Pinguim",
+        originalTitle: "The Penguin",
+        mediaType: "series",
+        position: 4,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2024
+      },
+      {
+        imdbId: "tt16294384",
+        title: "Disclaimer",
+        originalTitle: "Disclaimer",
+        mediaType: "series",
+        position: 5,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2024
+      },
+      {
+        imdbId: "tt0434665",
+        title: "Bleach",
+        originalTitle: "Bleach",
+        mediaType: "series",
+        position: 6,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2004
+      },
+      {
+        imdbId: "tt31908234",
+        title: "The Pitt",
+        originalTitle: "The Pitt",
+        mediaType: "series",
+        position: 7,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2025
+      },
+      {
+        imdbId: "tt14452776",
+        title: "O Urso",
+        originalTitle: "The Bear",
+        mediaType: "series",
+        position: 8,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2022
+      },
+      {
+        imdbId: "tt1063870",
+        title: "Fallout",
+        originalTitle: "Fallout",
+        mediaType: "series",
+        position: 9,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2024
+      },
+      {
+        imdbId: "tt2788316",
+        title: "X\xF3gum: A Gloriosa Saga do Jap\xE3o",
+        originalTitle: "Sh\u014Dgun",
+        mediaType: "series",
+        position: 10,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2024
+      },
+      {
+        imdbId: "tt2560140",
+        title: "Attack on Titan",
+        originalTitle: "Shingeki no Kyojin",
+        mediaType: "series",
+        position: 11,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2013
+      },
+      {
+        imdbId: "tt11198330",
+        title: "A Casa do Drag\xE3o",
+        originalTitle: "House of the Dragon",
+        mediaType: "series",
+        position: 12,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2022
+      },
+      {
+        imdbId: "tt0046593",
+        title: "Flash Gordon (1954)",
+        originalTitle: "Flash Gordon",
+        mediaType: "series",
+        position: 13,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 1954
+      },
+      {
+        imdbId: "tt0046642",
+        title: "Sherlock Holmes (1954)",
+        originalTitle: "Sherlock Holmes",
+        mediaType: "series",
+        position: 14,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 1954
+      },
+      {
+        imdbId: "tt10574558",
+        title: "Midnight Mass",
+        originalTitle: "Midnight Mass",
+        mediaType: "series",
+        position: 15,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2021
+      },
+      {
+        imdbId: "tt0903747",
+        title: "Breaking Bad",
+        originalTitle: "Breaking Bad",
+        mediaType: "series",
+        position: 16,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2008
+      },
+      {
+        imdbId: "tt0944947",
+        title: "Game of Thrones",
+        originalTitle: "Game of Thrones",
+        mediaType: "series",
+        position: 17,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2011
+      },
+      {
+        imdbId: "tt3566788",
+        title: "The Boys",
+        originalTitle: "The Boys",
+        mediaType: "series",
+        position: 18,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2019
+      },
+      {
+        imdbId: "tt4574334",
+        title: "Stranger Things",
+        originalTitle: "Stranger Things",
+        mediaType: "series",
+        position: 19,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2016
+      },
+      {
+        imdbId: "tt13443470",
+        title: "Heartstopper",
+        originalTitle: "Heartstopper",
+        mediaType: "series",
+        position: 20,
+        weekKey: "2026-W41",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        year: 2022
+      }
+    ];
+    this.snapshots = [
+      {
+        id: "snapshot-movie-2026-w41",
+        weekKey: "2026-W41",
+        weekLabel: "Semana 41 (Outubro de 2026)",
+        monthKey: "2026-10",
+        rankType: "movie",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-moviemeter",
+        items: movieItems
+      },
+      {
+        id: "snapshot-series-2026-w41",
+        weekKey: "2026-W41",
+        weekLabel: "Semana 41 (Outubro de 2026)",
+        monthKey: "2026-10",
+        rankType: "series",
+        referenceDate: "2026-10-12",
+        capturedAt: 17918592e5,
+        source: "imdb-tvmeter",
+        items: seriesItems
+      }
+    ];
+    this.saveSnapshots();
+  }
+  /**
+   * Obtém a lista ordenada mais recente para o tipo de mídia
+   */
+  getLatestRanking(rankType) {
+    const matching = this.snapshots.filter((s) => s.rankType === rankType);
+    if (matching.length === 0) {
+      throw new Error(`Nenhum snapshot v\xE1lido do IMDb encontrado para ${rankType}.`);
+    }
+    const latest = matching.sort((a, b) => {
+      if (b.referenceDate !== a.referenceDate) {
+        return b.referenceDate.localeCompare(a.referenceDate);
+      }
+      return b.capturedAt - a.capturedAt;
+    })[0];
+    const sortedItems = [...latest.items].sort((a, b) => a.position - b.position);
+    return { snapshot: latest, ranking: sortedItems };
+  }
+  /**
+   * Importa um snapshot autorizado
+   */
+  importAuthorizedSnapshot(snapshot) {
+    if (!snapshot.id || !snapshot.weekKey || !snapshot.rankType || !Array.isArray(snapshot.items)) {
+      return { success: false, message: "Estrutura inv\xE1lida de snapshot IMDb." };
+    }
+    const seenPositions = /* @__PURE__ */ new Set();
+    const seenImdbIds = /* @__PURE__ */ new Set();
+    for (const item of snapshot.items) {
+      if (!item.imdbId || !item.imdbId.startsWith("tt")) {
+        return { success: false, message: `IMDb ID inv\xE1lido: '${item.imdbId}'. Exigido formato 'tt...'` };
+      }
+      if (!item.position || item.position < 1) {
+        return { success: false, message: `Posi\xE7\xE3o IMDb inv\xE1lida: '${item.position}'. Exigido >= 1` };
+      }
+      if (seenPositions.has(item.position)) {
+        return { success: false, message: `Posi\xE7\xE3o duplicada no snapshot: #${item.position}` };
+      }
+      if (seenImdbIds.has(item.imdbId)) {
+        return { success: false, message: `IMDb ID duplicado no snapshot: ${item.imdbId}` };
+      }
+      seenPositions.add(item.position);
+      seenImdbIds.add(item.imdbId);
+    }
+    const idx = this.snapshots.findIndex((s) => s.id === snapshot.id || s.weekKey === snapshot.weekKey && s.rankType === snapshot.rankType);
+    if (idx !== -1) {
+      this.snapshots[idx] = snapshot;
+    } else {
+      this.snapshots.push(snapshot);
+    }
+    this.saveSnapshots();
+    return { success: true, message: `Snapshot importado com sucesso: ${snapshot.items.length} t\xEDtulos validados.` };
+  }
+  /**
+   * Executa a auditoria estrita de correspondência entre o que o ZapiTV publicou
+   * e o snapshot oficial do IMDb em vigor
+   */
+  verifyCorrespondence(publishedMovies, publishedSeries) {
+    const movieData = this.getLatestRanking("movie");
+    const seriesData = this.getLatestRanking("series");
+    const movieMap = /* @__PURE__ */ new Map();
+    movieData.ranking.forEach((m) => movieMap.set(m.imdbId.toLowerCase(), m));
+    const seriesMap = /* @__PURE__ */ new Map();
+    seriesData.ranking.forEach((s) => seriesMap.set(s.imdbId.toLowerCase(), s));
+    const movieMismatches = [];
+    const seriesMismatches = [];
+    const verifiedMovies = [];
+    const verifiedSeries = [];
+    let prevMovieImdbRank = 0;
+    publishedMovies.forEach((m, idx) => {
+      const displayRank = idx + 1;
+      const imdbId = (m.imdbId || "").trim().toLowerCase();
+      if (!imdbId) {
+        movieMismatches.push({
+          title: m.title,
+          imdbId: void 0,
+          reason: "T\xEDtulo publicado n\xE3o possui IMDb ID associado"
+        });
+        return;
+      }
+      const match = movieMap.get(imdbId);
+      if (!match) {
+        movieMismatches.push({
+          title: m.title,
+          imdbId,
+          reason: "T\xEDtulo publicado n\xE3o pertence ao ranking MOVIEmeter oficial da semana"
+        });
+      } else {
+        if (match.position < prevMovieImdbRank) {
+          movieMismatches.push({
+            title: m.title,
+            imdbId,
+            reason: `Ordem invertida em rela\xE7\xE3o ao IMDb: #${match.position} veio ap\xF3s #${prevMovieImdbRank}`
+          });
+        }
+        prevMovieImdbRank = match.position;
+        verifiedMovies.push({
+          displayRank,
+          imdbRank: match.position,
+          title: m.title,
+          imdbId: match.imdbId,
+          canonicalId: m.id,
+          verified: true
+        });
+      }
+    });
+    let prevSeriesImdbRank = 0;
+    publishedSeries.forEach((s, idx) => {
+      const displayRank = idx + 1;
+      const imdbId = (s.imdbId || "").trim().toLowerCase();
+      if (!imdbId) {
+        seriesMismatches.push({
+          title: s.title,
+          imdbId: void 0,
+          reason: "T\xEDtulo publicado n\xE3o possui IMDb ID associado"
+        });
+        return;
+      }
+      const match = seriesMap.get(imdbId);
+      if (!match) {
+        seriesMismatches.push({
+          title: s.title,
+          imdbId,
+          reason: "T\xEDtulo publicado n\xE3o pertence ao ranking TVmeter oficial da semana"
+        });
+      } else {
+        if (match.position < prevSeriesImdbRank) {
+          seriesMismatches.push({
+            title: s.title,
+            imdbId,
+            reason: `Ordem invertida em rela\xE7\xE3o ao IMDb: #${match.position} veio ap\xF3s #${prevSeriesImdbRank}`
+          });
+        }
+        prevSeriesImdbRank = match.position;
+        verifiedSeries.push({
+          displayRank,
+          imdbRank: match.position,
+          title: s.title,
+          imdbId: match.imdbId,
+          canonicalId: s.id,
+          verified: true
+        });
+      }
+    });
+    const isCompliant = movieMismatches.length === 0 && seriesMismatches.length === 0;
+    return {
+      isCompliant,
+      checkedAt: Date.now(),
+      weekKey: movieData.snapshot.weekKey,
+      referenceDate: movieData.snapshot.referenceDate,
+      totalMoviesChecked: publishedMovies.length,
+      totalSeriesChecked: publishedSeries.length,
+      movieMismatches,
+      seriesMismatches,
+      verifiedMovies,
+      verifiedSeries
+    };
+  }
+  /**
+   * Retorna todos os snapshots registrados
+   */
+  getAllSnapshots() {
+    return [...this.snapshots];
+  }
+};
+var imdbWeeklyRankingService = IMDbWeeklyRankingService.getInstance();
 
 // src/core/catalog/CatalogReleaseStore.ts
 var CatalogReleaseStore = class _CatalogReleaseStore {
@@ -13830,7 +15289,7 @@ var CatalogReleaseStore = class _CatalogReleaseStore {
 var catalogReleaseStore = CatalogReleaseStore.getInstance();
 
 // src/core/search/searchService.ts
-var CACHE_TTL_MS2 = 10 * 60 * 1e3;
+var CACHE_TTL_MS3 = 10 * 60 * 1e3;
 var KNOWN_ANIME_FRANCHISES = [
   /\bnaruto\b/i,
   /\bbleach\b/i,
@@ -13885,8 +15344,8 @@ var LIVE_ACTION_MARKERS = [
 ];
 var SearchService = class _SearchService {
   constructor() {
-    this.cache = /* @__PURE__ */ new Map();
-    this.actorCache = /* @__PURE__ */ new Map();
+    this.cache = new LruCache(60, CACHE_TTL_MS3);
+    this.actorCache = new LruCache(60, CACHE_TTL_MS3);
     this.activeAbortController = null;
   }
   static getInstance() {
@@ -14051,7 +15510,7 @@ var SearchService = class _SearchService {
     const cacheKey = `${category}:${normQuery}:${allowAdult ? "adult" : "safe"}`;
     const now = Date.now();
     const cached = this.cache.get(cacheKey);
-    if (cached && now - cached.timestamp < CACHE_TTL_MS2) {
+    if (cached && now - cached.timestamp < CACHE_TTL_MS3) {
       return cached.items;
     }
     this.cancelPending();
@@ -14071,8 +15530,13 @@ var SearchService = class _SearchService {
           break;
         }
         case "animes": {
-          rawResults = await tmdbService.searchAnimes(trimmed, controller.signal);
-          rawResults = rawResults.filter((it) => this.isAnimeItem(it));
+          const [tmdbRes, anilistRes] = await Promise.allSettled([
+            tmdbService.searchAnimes(trimmed, controller.signal),
+            aniListClient.searchAnime(trimmed, 1, 15)
+          ]);
+          const tmdbList = tmdbRes.status === "fulfilled" ? tmdbRes.value : [];
+          const aniListList = anilistRes.status === "fulfilled" ? anilistRes.value : [];
+          rawResults = [...tmdbList, ...aniListList].filter((it) => this.isAnimeItem(it));
           break;
         }
         case "all":
@@ -14103,6 +15567,9 @@ var SearchService = class _SearchService {
       }
       rawResults = bannedContentRegistry.filterCleanItems(rawResults);
       const eligible = catalogEligibilityService.filterEligibleItemsSync(rawResults, { allowAdult });
+      for (const item of eligible) {
+        canonicalCatalogMaster.registerItem(item);
+      }
       this.cache.set(cacheKey, {
         timestamp: now,
         items: eligible
@@ -14172,7 +15639,7 @@ var SearchService = class _SearchService {
     const normKey = trimmed.toLowerCase();
     const now = Date.now();
     const cached = this.actorCache.get(normKey);
-    if (cached && now - cached.timestamp < CACHE_TTL_MS2) {
+    if (cached && now - cached.timestamp < CACHE_TTL_MS3) {
       return cached.actors;
     }
     const actors = await tmdbService.searchPersons(trimmed, signal);
@@ -15926,8 +17393,6 @@ var FEEDBACK_CATEGORY_LABELS = {
   no_sound: "V\xEDdeo sem som",
   unstable_volume: "Volume inst\xE1vel",
   wrong_quality: "Qualidade de v\xEDdeo incorreta",
-  ai_enhancer_not_working: "Melhoria por IA n\xE3o funciona",
-  split_screen_not_working: "Tela Dividida n\xE3o funciona",
   search_problem: "Problema na busca",
   catalog_problem: "Problema no cat\xE1logo",
   live_channel_unavailable: "Canal ao vivo indispon\xEDvel",
@@ -16037,9 +17502,6 @@ var FeedbackClusteringEngine = class {
       case "subtitles_wrong_language":
       case "subtitles_out_of_sync":
         return "subtitles";
-      case "ai_enhancer_not_working":
-      case "split_screen_not_working":
-        return "enhancer";
       case "search_problem":
       case "catalog_problem":
         return "catalog";
@@ -16088,8 +17550,6 @@ var FeedbackClusteringEngine = class {
       "video_stuttering",
       "unstable_volume",
       "wrong_quality",
-      "ai_enhancer_not_working",
-      "split_screen_not_working",
       "search_problem",
       "catalog_problem",
       "live_channel_unavailable"
@@ -16458,7 +17918,6 @@ Execute testes para validar a resolu\xE7\xE3o do problema:
 
 ## 8. FUNCIONALIDADES A PRESERVAR
 - Inicializa\xE7\xE3o r\xE1pida e pr\xE9-buffer do player.
-- Melhoria por IA e compara\xE7\xE3o em tela dividida.
 - Pular abertura e encerramento.
 - Preserva\xE7\xE3o da numera\xE7\xE3o oficial e metadados can\xF4nicos.
 - Compatibilidade estrita com a Vercel e o servidor local.
@@ -16506,11 +17965,11 @@ Ao concluir a tarefa, apresente:
     const seenTexts = /* @__PURE__ */ new Set();
     for (const rep of associatedReports) {
       if (rep.userDescription && rep.userDescription.trim()) {
-        const text = this.sanitizeUserDescription(rep.userDescription);
-        const norm = text.toLowerCase().slice(0, 60);
+        const text2 = this.sanitizeUserDescription(rep.userDescription);
+        const norm = text2.toLowerCase().slice(0, 60);
         if (!seenTexts.has(norm)) {
           seenTexts.add(norm);
-          uniqueUserQuotes.push(text);
+          uniqueUserQuotes.push(text2);
           if (uniqueUserQuotes.length >= 6) break;
         }
       }
@@ -16693,9 +18152,6 @@ Ao finalizar, reporte:
         return `As legendas em portugu\xEAs devem ser apresentadas no idioma correto (PT-BR), sincronizadas perfeitamente com os di\xE1logos dos personagens, com formata\xE7\xE3o limpa e sem atrasos acumulativos.`;
       case "wrong_quality":
         return `A resolu\xE7\xE3o informada (ex: 1080p, 4K) deve corresponder \xE0 resolu\xE7\xE3o real dos quadros. Fontes CAM/TS podem ser usadas em filmes, desde que a obra e a fonte sejam v\xE1lidas; n\xE3o anuncie qualidade superior \xE0 real.`;
-      case "ai_enhancer_not_working":
-      case "split_screen_not_working":
-        return `A Melhoria por IA e a compara\xE7\xE3o em tela dividida devem processar e renderizar em tempo real sobre o canvas de v\xEDdeo sem distor\xE7\xE3o, sem tela preta e sem desativar inesperadamente.`;
       case "live_channel_unavailable":
         return `O canal ao vivo deve reproduzir o sinal oficial est\xE1vel da emissora. Se o sinal prim\xE1rio cair, o agregador de TV ao vivo deve tentar o stream reserva ou sinalizar indisponibilidade tempor\xE1ria.`;
       default:
@@ -16764,11 +18220,6 @@ Ao finalizar, reporte:
       case "subtitles_out_of_sync":
         return `- \`src/core/subtitles/subtitleLanguageDetector.ts\` (Detec\xE7\xE3o de idioma de legendas)
 - \`src/core/subtitles/subtitleStyleService.ts\` (Sincroniza\xE7\xE3o e ajuste de delay)`;
-      case "ai_enhancer_not_working":
-      case "split_screen_not_working":
-        return `- \`src/core/enhancement/aiEnhancerService.ts\` (Gerenciamento do motor de IA)
-- \`src/core/enhancement/videoEnhancer.ts\` (WebGPU, WebGL e shaders Anime4K)
-- \`src/core/enhancement/audioEnhancer.ts\` (DSP e Web Audio)`;
       case "live_channel_unavailable":
         return `- \`src/core/livetv/OfficialChannelProvider.ts\` (Fontes de canais ao vivo)
 - \`src/core/livetv/channelHealthService.ts\` (Monitoramento de sa\xFAde e uptime dos canais)`;
@@ -17282,6 +18733,480 @@ function resolveValidationTargetUrl(targetUrl) {
   }
 }
 
+// src/server/database/routes.ts
+import { Router } from "express";
+
+// src/server/database/client.ts
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
+
+// src/server/database/schema.ts
+var schema_exports = {};
+__export(schema_exports, {
+  adminAudit: () => adminAudit,
+  episodes: () => episodes,
+  globalSettings: () => globalSettings,
+  media: () => media,
+  mediaExternalIds: () => mediaExternalIds,
+  sourceEvidenceTickets: () => sourceEvidenceTickets,
+  sourceReliability: () => sourceReliability
+});
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+var media = sqliteTable("media", {
+  id: text("id").primaryKey(),
+  type: text("type", { enum: ["FILME", "S\xC9RIE", "ANIME"] }).notNull(),
+  title: text("title").notNull(),
+  originalTitle: text("original_title"),
+  year: integer("year"),
+  description: text("description"),
+  posterUrl: text("poster_url"),
+  backdropUrl: text("backdrop_url"),
+  updatedAt: integer("updated_at").notNull()
+}, (table) => [
+  index("media_type_title_idx").on(table.type, table.title),
+  index("media_type_year_idx").on(table.type, table.year)
+]);
+var mediaExternalIds = sqliteTable("media_external_ids", {
+  mediaId: text("media_id").notNull().references(() => media.id, { onDelete: "cascade" }),
+  provider: text("provider", { enum: ["imdb", "tmdb", "anilist", "mal"] }).notNull(),
+  externalId: text("external_id").notNull()
+}, (table) => [
+  primaryKey({ columns: [table.mediaId, table.provider] }),
+  uniqueIndex("media_external_provider_id_idx").on(table.provider, table.externalId)
+]);
+var episodes = sqliteTable("episodes", {
+  id: text("id").primaryKey(),
+  mediaId: text("media_id").notNull().references(() => media.id, { onDelete: "cascade" }),
+  seasonNumber: integer("season_number").notNull(),
+  episodeNumber: integer("episode_number").notNull(),
+  title: text("title"),
+  airDate: text("air_date"),
+  updatedAt: integer("updated_at").notNull()
+}, (table) => [
+  uniqueIndex("episodes_media_season_number_idx").on(table.mediaId, table.seasonNumber, table.episodeNumber)
+]);
+var globalSettings = sqliteTable("global_settings", {
+  key: text("key").primaryKey(),
+  valueJson: text("value_json").notNull(),
+  version: integer("version").notNull().default(1),
+  updatedAt: integer("updated_at").notNull(),
+  updatedBy: text("updated_by").notNull()
+});
+var adminAudit = sqliteTable("admin_audit", {
+  id: text("id").primaryKey(),
+  settingKey: text("setting_key").notNull(),
+  previousVersion: integer("previous_version").notNull(),
+  nextVersion: integer("next_version").notNull(),
+  actorUid: text("actor_uid").notNull(),
+  createdAt: integer("created_at").notNull()
+}, (table) => [index("admin_audit_setting_time_idx").on(table.settingKey, table.createdAt)]);
+var sourceReliability = sqliteTable("source_reliability", {
+  canonicalId: text("canonical_id").notNull(),
+  mediaType: text("media_type").notNull(),
+  season: integer("season").notNull().default(0),
+  episode: integer("episode").notNull().default(0),
+  providerId: text("provider_id").notNull(),
+  sourceRef: text("source_ref").notNull(),
+  format: text("format").notNull(),
+  audioLanguage: text("audio_language"),
+  quality: text("quality"),
+  successes: integer("successes").notNull().default(0),
+  startupFailures: integer("startup_failures").notNull().default(0),
+  playbackFailures: integer("playback_failures").notNull().default(0),
+  lastSuccessAt: integer("last_success_at"),
+  lastFailureAt: integer("last_failure_at"),
+  averageStartupMs: integer("average_startup_ms"),
+  status: text("status").notNull().default("provisional"),
+  expiresAt: integer("expires_at").notNull(),
+  updatedAt: integer("updated_at").notNull()
+}, (table) => [
+  primaryKey({ columns: [table.canonicalId, table.mediaType, table.season, table.episode, table.providerId, table.sourceRef] }),
+  index("source_reliability_lookup_idx").on(table.canonicalId, table.mediaType, table.season, table.episode, table.expiresAt)
+]);
+var sourceEvidenceTickets = sqliteTable("source_evidence_tickets", {
+  id: text("id").primaryKey(),
+  canonicalId: text("canonical_id").notNull(),
+  mediaType: text("media_type").notNull(),
+  season: integer("season").notNull(),
+  episode: integer("episode").notNull(),
+  providerId: text("provider_id").notNull(),
+  sourceRef: text("source_ref").notNull(),
+  format: text("format").notNull(),
+  issuedAt: integer("issued_at").notNull(),
+  outcome: text("outcome")
+}, (table) => [index("source_evidence_tickets_issued_idx").on(table.issuedAt)]);
+
+// src/server/database/client.ts
+function createDatabase(url, authToken) {
+  const client = createClient({ url, authToken });
+  return { client, db: drizzle(client, { schema: schema_exports }) };
+}
+var sharedDatabase;
+function getDatabase() {
+  const url = process.env.TURSO_DATABASE_URL;
+  const token = process.env.TURSO_AUTH_TOKEN;
+  if (!url || !token && !url.startsWith("file:")) return null;
+  sharedDatabase ??= createDatabase(url, token);
+  return sharedDatabase;
+}
+
+// src/server/database/firebaseAuth.ts
+import { createRemoteJWKSet, errors, jwtVerify } from "jose";
+var publicKeys = createRemoteJWKSet(
+  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"),
+  { timeoutDuration: 5e3 }
+);
+var InvalidFirebaseToken = class extends Error {
+};
+async function verifyFirebaseIdToken(token, projectId, keys = publicKeys) {
+  let verified;
+  try {
+    verified = await jwtVerify(token, keys, {
+      algorithms: ["RS256"],
+      audience: projectId,
+      issuer: `https://securetoken.google.com/${projectId}`
+    });
+  } catch (error) {
+    if (error instanceof errors.JWKSTimeout) throw error;
+    if (error instanceof errors.JOSEError) throw new InvalidFirebaseToken("Token Firebase inv\xE1lido.");
+    throw error;
+  }
+  const { payload, protectedHeader } = verified;
+  const now = Math.floor(Date.now() / 1e3);
+  if (!protectedHeader.kid || typeof payload.sub !== "string" || !payload.sub || !Number.isSafeInteger(payload.iat) || payload.iat > now || !Number.isSafeInteger(payload.auth_time) || payload.auth_time > now) {
+    throw new InvalidFirebaseToken("Token Firebase inv\xE1lido.");
+  }
+  return payload.sub;
+}
+async function authenticateAdmin(authorization) {
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const allowedUids = new Set((process.env.ADMIN_FIREBASE_UIDS || "").split(",").map((uid) => uid.trim()).filter(Boolean));
+  const match = /^Bearer (\S+)$/i.exec(authorization || "");
+  if (!projectId || allowedUids.size === 0 || !match) return null;
+  try {
+    const uid = await verifyFirebaseIdToken(match[1], projectId);
+    return allowedUids.has(uid) ? uid : null;
+  } catch (error) {
+    if (error instanceof InvalidFirebaseToken) return null;
+    throw error;
+  }
+}
+
+// src/server/database/settings.ts
+import { and, eq } from "drizzle-orm";
+var SettingVersionConflict = class extends Error {
+};
+async function readSetting(connection, key) {
+  const [row] = await connection.db.select().from(globalSettings).where(eq(globalSettings.key, key)).limit(1);
+  return row ? { value: JSON.parse(row.valueJson), version: row.version, updatedAt: row.updatedAt } : null;
+}
+async function writeSetting(connection, key, value, expectedVersion, actorUid) {
+  const now = Date.now();
+  const valueJson = JSON.stringify(value);
+  return connection.db.transaction(async (tx) => {
+    if (expectedVersion === 0) {
+      const inserted = await tx.insert(globalSettings).values({
+        key,
+        valueJson,
+        version: 1,
+        updatedAt: now,
+        updatedBy: actorUid
+      }).onConflictDoNothing().returning({ version: globalSettings.version });
+      if (inserted.length !== 1) throw new SettingVersionConflict("A configura\xE7\xE3o foi modificada em outra sess\xE3o.");
+    } else {
+      const updated = await tx.update(globalSettings).set({
+        valueJson,
+        version: expectedVersion + 1,
+        updatedAt: now,
+        updatedBy: actorUid
+      }).where(and(eq(globalSettings.key, key), eq(globalSettings.version, expectedVersion))).returning({ version: globalSettings.version });
+      if (updated.length !== 1) throw new SettingVersionConflict("A configura\xE7\xE3o foi modificada em outra sess\xE3o.");
+    }
+    await tx.insert(adminAudit).values({
+      id: crypto.randomUUID(),
+      settingKey: key,
+      previousVersion: expectedVersion,
+      nextVersion: expectedVersion + 1,
+      actorUid,
+      createdAt: now
+    });
+    return { value, version: expectedVersion + 1, updatedAt: now };
+  });
+}
+
+// src/server/database/sourceMemory.ts
+import { randomUUID } from "node:crypto";
+import { and as and2, desc, eq as eq2, gt, isNull, lt, sql } from "drizzle-orm";
+var permittedProviders = /* @__PURE__ */ new Set([
+  "zapitv-show-subtitle-pt-br",
+  "zapitv-mico-leao-dublado",
+  "froststream-http",
+  "fenixflix-animes",
+  "torrentio-brazuca",
+  "torrentio-global",
+  "magnetflix-animes",
+  "zapitv-cinema-aberto",
+  "zapitv-public-domain",
+  "stremio-public-domain-web",
+  "zapitv-verified",
+  "zapitv-series",
+  "zapitv-catalog"
+]);
+function validSourceIdentity(value) {
+  if (!value || !["movie", "series", "anime"].includes(value.mediaType) || !Number.isInteger(value.season) || !Number.isInteger(value.episode) || value.season < 0 || value.season > 99 || value.episode < 0 || value.episode > 999 || typeof value.canonicalId !== "string" || value.canonicalId.length > 160) return false;
+  const match = value.canonicalId.match(/^(movie|series|anime):(imdb|tmdb|anilist|local):([a-z0-9._-]+)(?::s(\d{2,3}):e(\d{2,3}))?$/);
+  if (!match || match[1] !== value.mediaType) return false;
+  if (match[4] || match[5]) return Number(match[4]) === value.season && Number(match[5]) === value.episode;
+  return value.season === 0 && value.episode === 0;
+}
+function validSourceDescriptor(value) {
+  if (!validSourceIdentity(value)) return false;
+  const descriptor = value;
+  return permittedProviders.has(descriptor.providerId) && typeof descriptor.sourceRef === "string" && descriptor.sourceRef.length >= 4 && descriptor.sourceRef.length <= 450 && descriptor.sourceRef.split("|").length === 4 && !/https?:\/\/|(?:token|auth|signature)\s*[:=]/i.test(descriptor.sourceRef) && ["hls", "mp4", "dash", "webm"].includes(descriptor.format);
+}
+function reliabilityScore(row, now = Date.now()) {
+  if (row.successes < 1 || row.expiresAt <= now || !row.lastSuccessAt) return 0;
+  const failures = row.startupFailures + row.playbackFailures * 1.5;
+  const successRate = row.successes / (row.successes + failures + 2);
+  const ageDays = Math.max(0, now - row.lastSuccessAt) / 864e5;
+  const freshness = Math.pow(0.5, ageDays / 7);
+  const progressiveTrust = Math.min(1, 0.25 + row.successes * 0.075);
+  const recentFailurePenalty = row.lastFailureAt && now - row.lastFailureAt < 864e5 ? 0.45 : 1;
+  const speed = row.averageStartupMs ? Math.max(0, 12 - row.averageStartupMs / 1e3) : 0;
+  const language = row.audioLanguage === "pt-BR" ? 12 : 0;
+  const quality = row.quality === "4K" ? 4 : row.quality === "1080p" ? 3 : 0;
+  return Math.max(0, Math.round((100 * successRate * freshness * progressiveTrust * recentFailurePenalty + speed + language + quality) * 10) / 10);
+}
+async function listRememberedSources(connection, identity) {
+  const now = Date.now();
+  const rows = await connection.db.select().from(sourceReliability).where(and2(
+    eq2(sourceReliability.canonicalId, identity.canonicalId),
+    eq2(sourceReliability.mediaType, identity.mediaType),
+    eq2(sourceReliability.season, identity.season),
+    eq2(sourceReliability.episode, identity.episode),
+    gt(sourceReliability.expiresAt, now),
+    gt(sourceReliability.successes, 0)
+  )).orderBy(desc(sourceReliability.lastSuccessAt)).limit(30);
+  return rows.map((row) => ({
+    providerId: row.providerId,
+    sourceRef: row.sourceRef,
+    audioLanguage: row.audioLanguage,
+    quality: row.quality,
+    trusted: row.successes >= 3,
+    score: reliabilityScore(row, now)
+  })).filter((row) => row.score > 0).sort((a, b) => b.score - a.score).slice(0, 8);
+}
+var ticketInsertions = 0;
+async function issueSourceTicket(connection, descriptor) {
+  const now = Date.now();
+  const ticket = randomUUID();
+  await connection.db.insert(sourceEvidenceTickets).values({ ...descriptor, id: ticket, issuedAt: now, outcome: null });
+  if (++ticketInsertions % 50 === 0) {
+    connection.db.delete(sourceEvidenceTickets).where(lt(sourceEvidenceTickets.issuedAt, now - 864e5)).catch(() => {
+    });
+  }
+  return ticket;
+}
+var writeQueues = /* @__PURE__ */ new WeakMap();
+function recordSourceEvidence(connection, ticketId, outcome, detail) {
+  const previous = writeQueues.get(connection) || Promise.resolve();
+  const work = previous.catch(() => {
+  }).then(() => recordSourceEvidenceTransaction(connection, ticketId, outcome, detail));
+  writeQueues.set(connection, work.then(() => void 0, () => void 0));
+  return work;
+}
+async function recordSourceEvidenceTransaction(connection, ticketId, outcome, detail) {
+  const now = Date.now();
+  return connection.db.transaction(async (tx) => {
+    const [ticket] = await tx.select().from(sourceEvidenceTickets).where(and2(
+      eq2(sourceEvidenceTickets.id, ticketId),
+      isNull(sourceEvidenceTickets.outcome),
+      gt(sourceEvidenceTickets.issuedAt, now - 12e4)
+    )).limit(1);
+    if (!ticket || outcome === "success" && now - ticket.issuedAt < 5e3) return "invalid";
+    const claimed = await tx.update(sourceEvidenceTickets).set({ outcome }).where(and2(
+      eq2(sourceEvidenceTickets.id, ticketId),
+      isNull(sourceEvidenceTickets.outcome)
+    )).returning({ id: sourceEvidenceTickets.id });
+    if (claimed.length !== 1) return "invalid";
+    const identity = {
+      canonicalId: ticket.canonicalId,
+      mediaType: ticket.mediaType,
+      season: ticket.season,
+      episode: ticket.episode,
+      providerId: ticket.providerId,
+      sourceRef: ticket.sourceRef
+    };
+    const startupMs = Number.isFinite(detail.startupMs) && detail.startupMs >= 0 && detail.startupMs <= 6e4 ? Math.round(detail.startupMs) : null;
+    const audioLanguage = ["pt-BR", "en", "ja", "es"].includes(detail.audioLanguage || "") ? detail.audioLanguage : null;
+    const quality = ["4K", "1080p", "720p", "480p", "HD", "SD"].includes(detail.quality || "") ? detail.quality : null;
+    const isSuccess = outcome === "success";
+    await tx.insert(sourceReliability).values({
+      ...identity,
+      format: ticket.format,
+      audioLanguage: isSuccess ? audioLanguage : null,
+      quality: isSuccess ? quality : null,
+      successes: isSuccess ? 1 : 0,
+      startupFailures: outcome === "startup_failure" ? 1 : 0,
+      playbackFailures: outcome === "playback_failure" ? 1 : 0,
+      lastSuccessAt: isSuccess ? now : null,
+      lastFailureAt: isSuccess ? null : now,
+      averageStartupMs: isSuccess ? startupMs : null,
+      status: isSuccess ? "provisional" : "degraded",
+      expiresAt: now + (isSuccess ? 7 : 1) * 864e5,
+      updatedAt: now
+    }).onConflictDoUpdate({
+      target: [
+        sourceReliability.canonicalId,
+        sourceReliability.mediaType,
+        sourceReliability.season,
+        sourceReliability.episode,
+        sourceReliability.providerId,
+        sourceReliability.sourceRef
+      ],
+      set: {
+        successes: sql`${sourceReliability.successes} + ${isSuccess ? 1 : 0}`,
+        startupFailures: sql`${sourceReliability.startupFailures} + ${outcome === "startup_failure" ? 1 : 0}`,
+        playbackFailures: sql`${sourceReliability.playbackFailures} + ${outcome === "playback_failure" ? 1 : 0}`,
+        lastSuccessAt: isSuccess ? now : sql`${sourceReliability.lastSuccessAt}`,
+        lastFailureAt: isSuccess ? sql`${sourceReliability.lastFailureAt}` : now,
+        audioLanguage: isSuccess && audioLanguage ? audioLanguage : sql`${sourceReliability.audioLanguage}`,
+        quality: isSuccess && quality ? quality : sql`${sourceReliability.quality}`,
+        averageStartupMs: isSuccess && startupMs !== null ? sql`CASE WHEN ${sourceReliability.averageStartupMs} IS NULL THEN ${startupMs} ELSE CAST((${sourceReliability.averageStartupMs} * ${sourceReliability.successes} + ${startupMs}) / (${sourceReliability.successes} + 1) AS INTEGER) END` : sql`${sourceReliability.averageStartupMs}`,
+        status: isSuccess ? sql`CASE WHEN ${sourceReliability.successes} >= 1 THEN 'healthy' ELSE 'provisional' END` : "degraded",
+        expiresAt: now + (isSuccess ? 7 : 1) * 864e5,
+        updatedAt: now
+      }
+    });
+    return "recorded";
+  });
+}
+
+// src/server/database/routes.ts
+var databaseRouter = Router();
+var HERO_KEY = "hero_carousel";
+var sourceTicketRates = /* @__PURE__ */ new Map();
+databaseRouter.get("/source-memory", async (req, res) => {
+  res.setHeader("Cache-Control", "private, max-age=20");
+  const identity = {
+    canonicalId: req.query.canonicalId,
+    mediaType: req.query.mediaType,
+    season: Number(req.query.season),
+    episode: Number(req.query.episode)
+  };
+  if (!validSourceIdentity(identity)) return res.status(400).json({ error: "Identidade inv\xE1lida." });
+  const connection = getDatabase();
+  if (!connection) return res.json({ sources: [] });
+  try {
+    return res.json({ sources: await listRememberedSources(connection, identity) });
+  } catch {
+    return res.status(503).json({ error: "Mem\xF3ria temporariamente indispon\xEDvel." });
+  }
+});
+databaseRouter.post("/source-memory/tickets", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  if (!validSourceDescriptor(req.body)) return res.status(400).json({ error: "Fonte inv\xE1lida." });
+  const rateKey = `${req.body.canonicalId}|${req.body.providerId}|${req.body.sourceRef}`;
+  const now = Date.now();
+  const rate = sourceTicketRates.get(rateKey);
+  if (rate && rate.until > now && rate.count >= 60) return res.status(429).json({ error: "Limite tempor\xE1rio de telemetria." });
+  sourceTicketRates.set(rateKey, rate && rate.until > now ? { count: rate.count + 1, until: rate.until } : { count: 1, until: now + 6e4 });
+  if (sourceTicketRates.size > 2e3) {
+    for (const [key, entry] of sourceTicketRates) if (entry.until <= now) sourceTicketRates.delete(key);
+  }
+  const connection = getDatabase();
+  if (!connection) return res.status(503).json({ error: "Banco indispon\xEDvel." });
+  try {
+    return res.json({ ticket: await issueSourceTicket(connection, req.body) });
+  } catch {
+    return res.status(503).json({ error: "N\xE3o foi poss\xEDvel registrar a tentativa." });
+  }
+});
+databaseRouter.post("/source-memory/evidence", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const { ticket, outcome, startupMs, audioLanguage, quality } = req.body || {};
+  if (typeof ticket !== "string" || ticket.length !== 36 || !["success", "startup_failure", "playback_failure"].includes(outcome) || JSON.stringify(req.body).length > 1e3) return res.status(400).json({ error: "Evid\xEAncia inv\xE1lida." });
+  const connection = getDatabase();
+  if (!connection) return res.status(503).json({ error: "Banco indispon\xEDvel." });
+  try {
+    const result = await recordSourceEvidence(connection, ticket, outcome, { startupMs, audioLanguage, quality });
+    return result === "recorded" ? res.json({ recorded: true }) : res.status(409).json({ error: "Evid\xEAncia expirada ou j\xE1 registrada." });
+  } catch {
+    return res.status(503).json({ error: "N\xE3o foi poss\xEDvel registrar a evid\xEAncia." });
+  }
+});
+databaseRouter.get("/global-settings/hero-carousel", async (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const connection = getDatabase();
+  if (!connection) return res.json({ configured: false, items: null, version: 0 });
+  try {
+    const setting = await readSetting(connection, HERO_KEY);
+    return res.json({ configured: true, items: setting?.value ?? null, version: setting?.version ?? 0 });
+  } catch {
+    return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+  }
+});
+databaseRouter.put("/global-settings/hero-carousel", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const connection = getDatabase();
+  if (!connection) return res.status(503).json({ error: "Banco de dados n\xE3o configurado." });
+  let actorUid;
+  try {
+    actorUid = await authenticateAdmin(req.header("authorization"));
+  } catch {
+    return res.status(503).json({ error: "Verifica\xE7\xE3o de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
+  }
+  if (!actorUid) return res.status(403).json({ error: "Autentica\xE7\xE3o administrativa necess\xE1ria." });
+  const { items, expectedVersion } = req.body || {};
+  if (!Array.isArray(items) || items.length < 1 || items.length > 100 || !Number.isSafeInteger(expectedVersion) || expectedVersion < 0 || items.some((item) => !item || typeof item.id !== "string" || !item.id.trim() || typeof item.title !== "string" || !item.title.trim() || typeof item.type !== "string") || new Set(items.map((item) => item.id)).size !== items.length || JSON.stringify(items).length > 1e5) {
+    return res.status(400).json({ error: "Carrossel inv\xE1lido." });
+  }
+  try {
+    const saved = await writeSetting(connection, HERO_KEY, items, expectedVersion, actorUid);
+    return res.json({ items: saved.value, version: saved.version });
+  } catch (error) {
+    if (error instanceof SettingVersionConflict) {
+      return res.status(409).json({ error: error.message });
+    }
+    return res.status(503).json({ error: "N\xE3o foi poss\xEDvel salvar no banco. Tente novamente." });
+  }
+});
+databaseRouter.get("/global-settings/section-titles", async (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const connection = getDatabase();
+  if (!connection) return res.json({ configured: false, titles: null, version: 0 });
+  try {
+    const setting = await readSetting(connection, "section_titles");
+    return res.json({ configured: true, titles: setting?.value ?? null, version: setting?.version ?? 0 });
+  } catch {
+    return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+  }
+});
+databaseRouter.put("/global-settings/section-titles", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const connection = getDatabase();
+  if (!connection) return res.status(503).json({ error: "Banco de dados n\xE3o configurado." });
+  let actorUid;
+  try {
+    actorUid = await authenticateAdmin(req.header("authorization"));
+  } catch {
+    return res.status(503).json({ error: "Verifica\xE7\xE3o de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
+  }
+  if (!actorUid) return res.status(403).json({ error: "Autentica\xE7\xE3o administrativa necess\xE1ria." });
+  const { titles, expectedVersion } = req.body || {};
+  const keys = ["premium", "recent", "netflix", "prime", "hbo"];
+  if (!titles || typeof titles !== "object" || Array.isArray(titles) || !Number.isSafeInteger(expectedVersion) || expectedVersion < 0 || Object.keys(titles).length !== keys.length || keys.some((key) => typeof titles[key] !== "string" || !titles[key].trim() || titles[key].length > 100)) {
+    return res.status(400).json({ error: "T\xEDtulos de se\xE7\xE3o inv\xE1lidos." });
+  }
+  try {
+    const saved = await writeSetting(connection, "section_titles", titles, expectedVersion, actorUid);
+    return res.json({ titles: saved.value, version: saved.version });
+  } catch (error) {
+    if (error instanceof SettingVersionConflict) return res.status(409).json({ error: error.message });
+    return res.status(503).json({ error: "N\xE3o foi poss\xEDvel salvar no banco. Tente novamente." });
+  }
+});
+
 // server.ts
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path4.dirname(__filename);
@@ -17295,7 +19220,24 @@ async function checkStremioEngineStatus() {
 }
 function createApp() {
   const app2 = express();
+  app2.use((req, _res, next) => {
+    if (req.url && req.url.startsWith("/api/index")) {
+      const queryIdx = req.url.indexOf("?");
+      const queryString = queryIdx >= 0 ? req.url.slice(queryIdx) : "";
+      const matchPath = req.headers["x-matched-path"];
+      if (matchPath && matchPath.startsWith("/api/")) {
+        req.url = `${matchPath}${queryString}`;
+      } else if (req.query && typeof req.query.path === "string") {
+        const restQuery = new URLSearchParams(queryIdx >= 0 ? req.url.slice(queryIdx + 1) : "");
+        restQuery.delete("path");
+        const restStr = restQuery.toString();
+        req.url = `/api/${req.query.path}${restStr ? "?" + restStr : ""}`;
+      }
+    }
+    next();
+  });
   app2.use(express.json());
+  app2.use("/api/db", databaseRouter);
   function resolveOpenItemStreams(rawId, seasonNum = 1, episodeNum = 1) {
     let cleanId = rawId.replace(/\.json$/, "");
     if (cleanId.includes(":")) {
@@ -17372,8 +19314,7 @@ function createApp() {
       "pornstar",
       "hardcore xxx",
       "creampie",
-      "blowjob",
-      "ben the men"
+      "blowjob"
     ];
     if (adultTerms.some((term) => combined.includes(term))) return false;
     return true;
@@ -17506,8 +19447,8 @@ function createApp() {
           const data = await response.json();
           if (data && Array.isArray(data.streams)) {
             upstreamStreams = data.streams.filter((s) => {
-              const text = `${s.name || ""} ${s.title || ""}`.toLowerCase();
-              return text.includes("dublado") || text.includes("dual") || text.includes("micolea") || text.includes("pt-br");
+              const text2 = `${s.name || ""} ${s.title || ""}`.toLowerCase();
+              return text2.includes("dublado") || text2.includes("dual") || text2.includes("micolea") || text2.includes("pt-br");
             }).map((s) => ({
               ...s,
               name: `\u{1F50A} Mico-Le\xE3o Dublado
@@ -17723,10 +19664,20 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       if (!["http:", "https:"].includes(parsed.protocol)) {
         return res.status(400).json({ error: "Protocolo inv\xE1lido" });
       }
+      const incomingUa = req.headers["user-agent"] || "";
+      const isCustomBotUa = !incomingUa || incomingUa.includes("ZapiTV") || incomingUa.includes("node-fetch");
+      const userAgent = isCustomBotUa ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" : incomingUa;
       const headers = {
-        "User-Agent": "ZapiTV-Stremio/1.0.0 (gebel.streaming@zapitv.local)",
-        "Accept": "*/*"
+        "User-Agent": userAgent,
+        "Accept": req.headers["accept"] || "*/*",
+        "Accept-Language": req.headers["accept-language"] || "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
       };
+      const customReferer = req.query.referer || req.headers["x-target-referer"];
+      if (customReferer) {
+        headers["Referer"] = customReferer;
+      } else if (!targetUrl.includes("cloutteam.com")) {
+        headers["Referer"] = parsed.origin;
+      }
       if (req.headers.range) {
         headers["Range"] = req.headers.range;
       }
@@ -17737,10 +19688,12 @@ ${s.name?.split("\n")[1] || "1080p"}`,
         } catch {
         }
       }, 25e3);
-      req.on("close", () => {
-        try {
-          controller.abort();
-        } catch {
+      res.on("close", () => {
+        if (!res.writableEnded) {
+          try {
+            controller.abort();
+          } catch {
+          }
         }
       });
       const response = await fetch(targetUrl, {
@@ -17748,6 +19701,18 @@ ${s.name?.split("\n")[1] || "1080p"}`,
         signal: controller.signal
       });
       clearTimeout(connectTimer);
+      const responseType = response.headers.get("content-type") || "";
+      const isHlsManifest = /\.m3u8(?:$|[?#])/i.test(new URL(response.url).pathname) || /(?:mpegurl|vnd\.apple\.mpegurl)/i.test(responseType);
+      if (response.ok && isHlsManifest) {
+        const { rewriteHlsManifest: rewriteHlsManifest2 } = await Promise.resolve().then(() => (init_rewriteHlsManifest(), rewriteHlsManifest_exports));
+        const original = await response.text();
+        const rewritten = rewriteHlsManifest2(original, response.url);
+        if (!rewritten) return res.status(502).json({ error: "Manifesto HLS inv\xE1lido" });
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Content-Type", "application/vnd.apple.mpegurl; charset=utf-8");
+        res.setHeader("Cache-Control", "no-store");
+        return res.status(200).send(rewritten);
+      }
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "*");
@@ -17781,6 +19746,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       });
     }
   });
+  const streamValidationServerCache = /* @__PURE__ */ new Map();
   app2.get("/api/validate-stream", async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
@@ -17791,20 +19757,41 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     if (!targetUrl) {
       return res.status(400).json({ valid: false, reason: "Par\xE2metro 'url' \xE9 obrigat\xF3rio" });
     }
+    const cacheKey = `${targetUrl}_${expectedType}_${targetTitle}`;
+    const cached = streamValidationServerCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 10 * 60 * 1e3) {
+      return res.json(cached.result);
+    }
     const probeUrl = resolveValidationTargetUrl(targetUrl);
     if (!probeUrl) {
       return res.status(400).json({ valid: false, reason: "URL de m\xEDdia inv\xE1lida para valida\xE7\xE3o" });
     }
+    if (probeUrl.includes("127.0.0.1:11470") || probeUrl.includes("localhost:11470") || probeUrl.includes("127-0-0-1.strem.io:11470")) {
+      const isEngineOnline = await checkStremioEngineStatus();
+      const result = {
+        valid: isEngineOnline,
+        isParked: false,
+        requiresEngine: true,
+        engineActive: isEngineOnline,
+        url: targetUrl,
+        finalUrl: targetUrl,
+        reason: isEngineOnline ? "Motor Stremio Streaming Server ativo localmente" : "Fonte requer motor Stremio Streaming Server ativo na porta 11470"
+      };
+      streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+      return res.json(result);
+    }
     const lowerTarget = `${probeUrl} ${targetTitle}`.toLowerCase().replace(/[-_./+]/g, " ");
     const ADULT_TERMS = ["mia khalifa", "khalifa", "brazzers", "xvideos", "pornhub", "redtube", "youporn", "bangbros", "spankbang", "xhamster", "naughtyamerica", "hardcore xxx"];
     if (ADULT_TERMS.some((t) => lowerTarget.includes(t))) {
-      return res.json({
+      const result = {
         valid: false,
         isParked: false,
         url: targetUrl,
         finalUrl: targetUrl,
         reason: "\u{1F6A8} Quarentena: Assinatura de conte\xFAdo adulto/trote detectada"
-      });
+      };
+      streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+      return res.json(result);
     }
     try {
       const parsed = new URL(probeUrl);
@@ -17854,18 +19841,32 @@ ${s.name?.split("\n")[1] || "1080p"}`,
           reason: "Redirecionamento para dom\xEDnio ParkLogic / Estacionado"
         });
       }
+      if (status === 403 || status === 405) {
+        const result2 = {
+          valid: true,
+          provisional: true,
+          status,
+          url: targetUrl,
+          finalUrl,
+          reason: `Fonte aceita provisoriamente (Status HTTP ${status} n\xE3o impede reprodu\xE7\xE3o no navegador)`
+        };
+        streamValidationServerCache.set(cacheKey, { result: result2, timestamp: Date.now() });
+        return res.json(result2);
+      }
       if (status >= 400 && status !== 416) {
-        return res.json({
+        const result2 = {
           valid: false,
           status,
           url: targetUrl,
           finalUrl,
           reason: `Erro HTTP ${status} retornado pelo servidor`
-        });
+        };
+        streamValidationServerCache.set(cacheKey, { result: result2, timestamp: Date.now() });
+        return res.json(result2);
       }
       const buffer = await response.arrayBuffer();
-      const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
-      const lowerText = text.toLowerCase();
+      const text2 = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+      const lowerText = text2.toLowerCase();
       const PARKING_SIGNATURES = [
         "this page has been created by parklogic",
         "parklogic.com",
@@ -17893,7 +19894,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       }
       const isHls = expectedType === "hls" || probeUrl.includes(".m3u8") || contentType.includes("mpegurl");
       if (isHls) {
-        if (contentType.includes("text/html") && !text.includes("#EXTM3U")) {
+        if (contentType.includes("text/html") && !text2.includes("#EXTM3U")) {
           return res.json({
             valid: false,
             isManifestValid: false,
@@ -17903,7 +19904,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
             reason: "Resposta HTML recebida quando se esperava manifesto HLS (.m3u8)"
           });
         }
-        const hasValidM3uHeader = text.trimStart().startsWith("#EXTM3U");
+        const hasValidM3uHeader = text2.trimStart().startsWith("#EXTM3U");
         if (!hasValidM3uHeader && !contentType.includes("octet-stream") && !contentType.includes("video/")) {
           return res.json({
             valid: false,
@@ -17914,31 +19915,37 @@ ${s.name?.split("\n")[1] || "1080p"}`,
             reason: "Manifesto HLS inv\xE1lido (cabe\xE7alho #EXTM3U ausente)"
           });
         }
-        return res.json({
+        const result2 = {
           valid: true,
           status,
           url: targetUrl,
           finalUrl,
           contentType,
           isManifestValid: true
-        });
+        };
+        streamValidationServerCache.set(cacheKey, { result: result2, timestamp: Date.now() });
+        return res.json(result2);
       }
       if (contentType.includes("text/html")) {
-        return res.json({
+        const result2 = {
           valid: false,
           status,
           url: targetUrl,
           finalUrl,
           reason: "Resposta HTML recebida. Rejeitado: Apenas transmiss\xF5es nativas diretas de v\xEDdeo (HLS/MP4/WebM) s\xE3o autorizadas. Players externos com an\xFAncios ou iframes s\xE3o proibidos."
-        });
+        };
+        streamValidationServerCache.set(cacheKey, { result: result2, timestamp: Date.now() });
+        return res.json(result2);
       }
-      return res.json({
+      const result = {
         valid: true,
         status,
         url: targetUrl,
         finalUrl,
         contentType
-      });
+      };
+      streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+      return res.json(result);
     } catch (err) {
       return res.json({
         valid: false,

@@ -17,7 +17,7 @@ interface ContentCardProps {
 }
 
 // Singleton IntersectionObserver compartilhado entre todos os ContentCards (evita criar centenas de instâncias)
-const viewportCallbacks = new WeakMap<Element, () => void>();
+const viewportCallbacks = new WeakMap<Element, (isIntersecting: boolean) => void>();
 let sharedViewportObserver: IntersectionObserver | null = null;
 
 function getSharedViewportObserver(): IntersectionObserver | null {
@@ -26,13 +26,9 @@ function getSharedViewportObserver(): IntersectionObserver | null {
     sharedViewportObserver = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const cb = viewportCallbacks.get(entry.target);
-            if (cb) {
-              viewportCallbacks.delete(entry.target);
-              sharedViewportObserver?.unobserve(entry.target);
-              cb();
-            }
+          const cb = viewportCallbacks.get(entry.target);
+          if (cb) {
+            cb(entry.isIntersecting);
           }
         }
       },
@@ -93,7 +89,6 @@ const ContentCard: React.FC<ContentCardProps> = ({
   // Detecção de Visibilidade no Viewport com observer único compartilhado
   useEffect(() => {
     retryCountRef.current = 0;
-    if (isInViewport) return;
 
     const currentCard = cardRef.current;
     const observer = getSharedViewportObserver();
@@ -102,14 +97,16 @@ const ContentCard: React.FC<ContentCardProps> = ({
       return;
     }
 
-    viewportCallbacks.set(currentCard, () => setIsInViewport(true));
+    viewportCallbacks.set(currentCard, (intersecting: boolean) => {
+      setIsInViewport(intersecting);
+    });
     observer.observe(currentCard);
 
     return () => {
       viewportCallbacks.delete(currentCard);
       observer.unobserve(currentCard);
     };
-  }, [item.id, isInViewport]);
+  }, [item.id]);
 
   useEffect(() => {
     setContinuity(storageService.getPlaybackContinuity(item));
@@ -252,7 +249,7 @@ const ContentCard: React.FC<ContentCardProps> = ({
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className={`w-full h-full ${isDarkMode ? 'bg-gray-800/20' : 'bg-slate-200/40'} animate-pulse`} />
+              <div className={`w-full h-full ${isDarkMode ? 'bg-gray-800/20' : 'bg-slate-200/40'}`} />
             )}
             
             {/* Badges de Áudio e Ranking Oficial */}

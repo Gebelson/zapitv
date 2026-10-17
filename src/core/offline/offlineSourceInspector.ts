@@ -256,7 +256,7 @@ export class OfflineSourceInspector {
       const isDubbed = Boolean(
         s.isDubbed ||
         s.isPtBr ||
-        /dublado|dub\b|pt[-_]?br/i.test(`${s.name || ''} ${s.title || ''}`)
+        /dublado|dub\b|pt[-_]?br|portugu[êe]s|🌎\s*portugu[êe]s/i.test(`${s.name || ''} ${s.title || ''}`)
       );
 
       eligibleStreams.push({

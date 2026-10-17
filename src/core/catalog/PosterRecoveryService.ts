@@ -1,12 +1,13 @@
 import { ContentItem, ContentType } from '../../../types';
 import { tmdbService, sameCatalogWork, TMDB_IMAGE_BASE } from '../tmdb/tmdbClient';
+import { LruCache } from '../cache/LruCache';
 
 const POSTER_CACHE_KEY = 'zapitv_poster_recovery_cache_v2';
 export const NO_IMAGE_SENTINEL = '__NO_IMAGE__';
 
 export class PosterRecoveryService {
   private static instance: PosterRecoveryService;
-  private memoryCache = new Map<string, string>();
+  private memoryCache = new LruCache<string, string>(500);
   private inFlight = new Map<string, Promise<string | null>>();
 
   private constructor() {

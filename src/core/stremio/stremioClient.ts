@@ -45,9 +45,9 @@ export class StremioClient {
       return await res.json();
     }
 
-    // Provedores externos: tentar direto com timeout de 4s
+    // Provedores externos: tentar direto com timeout completo antes do fallback
     try {
-      const res = await fetch(directUrl, { signal: AbortSignal.timeout(Math.min(timeoutMs, 4000)) });
+      const res = await fetch(directUrl, { signal: AbortSignal.timeout(timeoutMs) });
       if (res.ok) {
         const text = await res.text();
         if (text.startsWith('{') || text.startsWith('[')) {

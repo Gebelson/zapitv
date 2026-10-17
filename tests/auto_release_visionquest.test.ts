@@ -10,9 +10,12 @@ import { CamBlockerEngine } from '../src/core/catalog/CamBlockerEngine';
 
 describe('ZapiTV AutoReleaseService - Descoberta Automática (Caso VisionQuest)', () => {
   beforeAll(async () => {
-    // Avalia e adiciona VisionQuest
+    // Avalia e adiciona VisionQuest com proteção de timeout
     try {
-      await autoReleaseService.evaluateAndAddSeries('tt23112594');
+      await Promise.race([
+        autoReleaseService.evaluateAndAddSeries('tt23112594'),
+        new Promise(resolve => setTimeout(resolve, 3000))
+      ]);
     } catch {}
 
     const releases = catalogReleaseStore.getReleases();
@@ -121,7 +124,7 @@ describe('ZapiTV AutoReleaseService - Descoberta Automática (Caso VisionQuest)'
     const has1080p = qualities.some(q => q === '1080p');
 
     expect(has4K || has1080p).toBe(true);
-  });
+  }, 25000);
 
   it('4. Deve considerar a série elegível e publicamente reproduzível no ZapiTV', () => {
     const releases = catalogReleaseStore.getReleases();

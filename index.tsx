@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { initializeDatabase, db as localDb } from './db';
 import './index.css';
@@ -17,7 +18,9 @@ async function loadInitialState() {
           'zapitv_theme',
           'zapitv_last_email',
           'zapitv_local_favorites',
-          'zapitv_local_mylist'
+          'zapitv_local_mylist',
+          'zapitv_section_titles',
+          'zapitv_section_titles_manual_v1'
         ])
       ]);
 
@@ -72,7 +75,7 @@ async function loadInitialState() {
         currentUser: defaultUser,
         activeProfile: defaultProfile,
         theme,
-        sectionTitles,
+        sectionTitles: kvEntries[5]?.value === true && kvEntries[4]?.value ? kvEntries[4].value : sectionTitles,
         myList: savedList,
         favorites: savedFavs,
         lastEmail: defaultUser.email
@@ -192,10 +195,13 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } });
 root.render(
   <React.StrictMode>
-    <BrowserRouter>
-      <RootComponent />
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <RootComponent />
+      </BrowserRouter>
+    </QueryClientProvider>
   </React.StrictMode>
 );

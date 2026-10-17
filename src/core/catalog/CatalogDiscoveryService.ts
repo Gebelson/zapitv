@@ -7,6 +7,8 @@ import { catalogEligibilityService } from './CatalogEligibilityService';
 import { catalogReleaseStore } from './CatalogReleaseStore';
 import { adultContentService } from '../adult/AdultContentService';
 import { getCanonicalKeysForItem, deduplicateContentItems } from './catalogDeduplication';
+import { canonicalCatalogMaster } from './CanonicalCatalogMaster';
+import { aniListClient } from '../anilist/aniListClient';
 
 export interface DiscoveryResult {
   items: ContentItem[];
@@ -181,16 +183,19 @@ export class CatalogDiscoveryService {
         continue;
       }
 
+      // Registra e enriquece no Catálogo Mestre Canônico
+      const masterItem = canonicalCatalogMaster.registerItem(item);
+
       for (const k of keys) {
-        this.dedupeCache.set(k, item);
+        this.dedupeCache.set(k, masterItem);
       }
-      unique.push(item);
+      unique.push(masterItem);
 
       // 1. Registra no MediaAvailabilityIndex como DISCOVERED (caso ainda não esteja catalogado)
-      const canonicalId = item.imdbId || item.id;
+      const canonicalId = masterItem.canonicalId || masterItem.imdbId || masterItem.id;
       const currentStatus = mediaAvailabilityIndex.getStatus(canonicalId);
       if (!currentStatus) {
-        mediaAvailabilityIndex.recordDiscovery(canonicalId, item.title, item.type);
+        mediaAvailabilityIndex.recordDiscovery(canonicalId, masterItem.title, masterItem.type);
       }
 
       // 2. Atualiza diagnóstico
@@ -386,8 +391,10 @@ export class CatalogDiscoveryService {
         const movieAnimePromise = page <= 500 ? tmdbService.getAnimeMoviesWithMeta(page) : Promise.resolve({ items: [], total: 0 });
         // 3. Suporte contínuo via Cinemeta além da página 500
         const cinemetaPromise = page > 500 ? tmdbService.getCinemetaCatalog('series', 'Animation', (page - 501) * 20) : Promise.resolve([]);
+        // 4. Integração oficial e enriquecimento com AniList
+        const anilistPromise = page <= 10 ? aniListClient.getPopularAnimes(page, 20) : Promise.resolve([]);
 
-        const [tvRes, movieRes, cineRes] = await Promise.allSettled([tvAnimePromise, movieAnimePromise, cinemetaPromise]);
+        const [tvRes, movieRes, cineRes, aniRes] = await Promise.allSettled([tvAnimePromise, movieAnimePromise, cinemetaPromise, anilistPromise]);
 
         if (tvRes.status === 'fulfilled') {
           rawResults.push(...tvRes.value.items);
@@ -397,6 +404,9 @@ export class CatalogDiscoveryService {
         }
         if (cineRes.status === 'fulfilled') {
           rawResults.push(...cineRes.value);
+        }
+        if (aniRes.status === 'fulfilled') {
+          rawResults.push(...aniRes.value);
         }
       }
 

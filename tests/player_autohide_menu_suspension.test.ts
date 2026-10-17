@@ -78,7 +78,7 @@ describe('ZapiPlayer - Regras de Suspensão de Auto-Hide com Menus Abertos', () 
 
   it('deve manter as barras superior e inferior visíveis na classe CSS quando hasOpenMenu for verdadeiro', () => {
     // Top bar
-    expect(playerSource).toContain('(showControls || !isPlaying || hasOpenMenu || isSplitComparing || isDraggingDivider) && !showNonDubbedPrompt ? \'opacity-100\' : \'opacity-0 pointer-events-none\'');
+    expect(playerSource).toContain('(showControls || !isPlaying || hasOpenMenu) && !showNonDubbedPrompt ? \'opacity-100\' : \'opacity-0 pointer-events-none\'');
     // Bottom bar
     expect(playerSource).toContain('(showControls || !isPlaying || hasOpenMenu) && !showNonDubbedPrompt ? \'opacity-100\' : \'opacity-0 pointer-events-none\'');
   });

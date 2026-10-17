@@ -11,7 +11,12 @@ import {
   WatchPartyPlaybackState,
   PeerParticipantStateMessage,
   PeerEpisodeChangeMessage,
-  PeerRoomAnnounceMessage
+  PeerRoomAnnounceMessage,
+  PeerStartTransmissionMessage,
+  PeerPermissionsUpdateMessage,
+  PeerAdminMuteMessage,
+  PeerHostTransferMessage,
+  PeerRemoteControlRequestMessage
 } from './watchPartyTypes';
 
 export interface TransportCallbacks {
@@ -20,9 +25,14 @@ export interface TransportCallbacks {
   onPlaybackSync: (state: WatchPartyPlaybackState, senderId: string) => void;
   onRequestSync: (senderId: string) => void;
   onParticipantState: (state: PeerParticipantStateMessage, senderId: string) => void;
-  onChatMessage: (message: WatchPartyChatMessage) => void;
+  onChatMessage: (message: WatchPartyChatMessage, senderId: string) => void;
   onEpisodeChange: (change: PeerEpisodeChangeMessage, senderId: string) => void;
   onRoomAnnouncement: (announcement: PeerRoomAnnounceMessage, senderId: string) => void;
+  onStartTransmission?: (message: PeerStartTransmissionMessage, senderId: string) => void;
+  onPermissionsUpdate?: (message: PeerPermissionsUpdateMessage, senderId: string) => void;
+  onAdminMute?: (message: PeerAdminMuteMessage, senderId: string) => void;
+  onHostTransfer?: (message: PeerHostTransferMessage, senderId: string) => void;
+  onRemoteControlRequest?: (request: PeerRemoteControlRequestMessage, senderId: string) => void;
   onRemoteAudioStream?: (stream: MediaStream, peerId: string) => void;
 }
 
@@ -41,10 +51,18 @@ export interface IWatchPartyTransport {
   sendChatMessage(message: WatchPartyChatMessage): void;
   broadcastEpisodeChange(change: PeerEpisodeChangeMessage): void;
   broadcastRoomAnnouncement(announcement: PeerRoomAnnounceMessage): void;
+
+  broadcastStartTransmission?(message: PeerStartTransmissionMessage): void;
+  broadcastPermissionsUpdate?(message: PeerPermissionsUpdateMessage): void;
+  broadcastAdminMute?(message: PeerAdminMuteMessage): void;
+  broadcastHostTransfer?(message: PeerHostTransferMessage): void;
+  sendRemoteControlRequest?(targetHostId: string, request: PeerRemoteControlRequestMessage): void;
   
   // Áudio / WebRTC de Voz Opcional
   addLocalAudioStream?(stream: MediaStream): void;
   removeLocalAudioStream?(stream: MediaStream): void;
+  addLocalMediaStream?(stream: MediaStream, targetPeerId?: string): void;
+  removeLocalMediaStream?(stream: MediaStream): void;
   
   getPing?(peerId: string): Promise<number>;
   getConnectedPeers(): string[];

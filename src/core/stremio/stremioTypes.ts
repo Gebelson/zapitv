@@ -65,6 +65,9 @@ export interface StremioStream {
   providerName?: string;
   providerId?: string;
   sourceType?: 'hls' | 'mp4' | 'dash' | 'webm';
+  isTorrent?: boolean;
+  isDirectVideo?: boolean;
+  requiresEngine?: boolean;
 }
 
 export interface StremioMetaVideo {

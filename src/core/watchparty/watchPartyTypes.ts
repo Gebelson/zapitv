@@ -9,6 +9,21 @@ import { ContentType } from '../../../types';
 
 export type ParticipantStatus = 'connected' | 'buffering' | 'ready' | 'disconnected';
 
+export type RoomLifecycleState = 'LOBBY' | 'PREPARING' | 'READY' | 'STARTING' | 'PLAYING' | 'PAUSED' | 'ENDED';
+
+export interface ParticipantPermissions {
+  canPlayPause: boolean;
+  canSeek: boolean;
+  canChangeEpisode: boolean;
+  canSkip: boolean;
+}
+
+export interface WatchPartyPermissions {
+  allowChat: boolean;
+  allowVoice: boolean;
+  participantPermissions: Record<string, ParticipantPermissions>;
+}
+
 export interface WatchPartyMediaMetadata {
   id: string;
   title: string;
@@ -21,6 +36,12 @@ export interface WatchPartyMediaMetadata {
   year?: number;
   image?: string;
   backdrop?: string;
+  // Aliases compatíveis com outros módulos
+  contentId?: string;
+  posterUrl?: string;
+  backdropUrl?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
 }
 
 export interface WatchPartyParticipant {
@@ -33,6 +54,8 @@ export interface WatchPartyParticipant {
   isSpeaking?: boolean;
   audioVolume?: number; // 0.0 a 1.0
   isLocallyMuted?: boolean;
+  isAdminMuted?: boolean;
+  permissions?: ParticipantPermissions;
 }
 
 export interface WatchPartyPlaybackState {
@@ -41,6 +64,7 @@ export interface WatchPartyPlaybackState {
   season?: number;
   episode?: number;
   positionSeconds: number;
+  currentTime?: number;
   isPlaying: boolean;
   playbackRate: number;
   eventTimestamp: number;
@@ -57,12 +81,18 @@ export interface WatchPartyChatMessage {
   timestamp: number;
 }
 
+export type TransmissionMode = 'source' | 'host_broadcast' | 'screen';
+
 export interface WatchPartyRoomInfo {
   roomId: string;
   hostPeerId: string;
+  hostNickname?: string;
   media: WatchPartyMediaMetadata;
   createdAt: number;
   maxParticipants: number;
+  lifecycleState: RoomLifecycleState;
+  transmissionMode?: TransmissionMode;
+  permissions: WatchPartyPermissions;
 }
 
 export interface PeerSyncMessage {
@@ -81,6 +111,7 @@ export interface PeerParticipantStateMessage {
   status: ParticipantStatus;
   isAudioMuted?: boolean;
   isSpeaking?: boolean;
+  isAdminMuted?: boolean;
 }
 
 export interface PeerEpisodeChangeMessage {
@@ -102,3 +133,45 @@ export interface PeerHostTransferMessage {
   newHostPeerId: string;
   authSignature?: string;
 }
+
+export interface PeerStartTransmissionMessage {
+  type: 'start_transmission';
+  hostPeerId: string;
+  timestamp: number;
+  media: WatchPartyMediaMetadata;
+  mode?: TransmissionMode;
+}
+
+export interface PeerPermissionsUpdateMessage {
+  type: 'permissions_update';
+  permissions: WatchPartyPermissions;
+}
+
+export interface PeerAdminMuteMessage {
+  type: 'admin_mute';
+  targetPeerId: string;
+  isMuted: boolean;
+}
+
+export interface PeerRemoteControlRequestMessage {
+  type: 'remote_control_request';
+  action: 'play' | 'pause' | 'seek' | 'next_episode';
+  payload?: {
+    positionSeconds?: number;
+    season?: number;
+    episode?: number;
+  };
+  senderPeerId: string;
+  senderNickname?: string;
+  timestamp: number;
+}
+
+export interface HostBroadcastStatus {
+  isBroadcasting: boolean;
+  mode: TransmissionMode;
+  captureMethod?: 'captureStream' | 'getDisplayMedia';
+  videoTracks: number;
+  audioTracks: number;
+  connectionQuality?: 'good' | 'fair' | 'poor';
+}
+

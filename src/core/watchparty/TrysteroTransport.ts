@@ -13,7 +13,12 @@ import {
   WatchPartyPlaybackState,
   PeerParticipantStateMessage,
   PeerEpisodeChangeMessage,
-  PeerRoomAnnounceMessage
+  PeerRoomAnnounceMessage,
+  PeerStartTransmissionMessage,
+  PeerPermissionsUpdateMessage,
+  PeerAdminMuteMessage,
+  PeerHostTransferMessage,
+  PeerRemoteControlRequestMessage
 } from './watchPartyTypes';
 
 const ZAPITV_APP_ID = 'zapitv-watchparty-v1';
@@ -50,6 +55,11 @@ export class TrysteroTransport implements IWatchPartyTransport {
   private sendChatMessageAction?: (data: WatchPartyChatMessage, targetPeerId?: string) => Promise<any>;
   private sendEpisodeChangeAction?: (data: PeerEpisodeChangeMessage, targetPeerId?: string) => Promise<any>;
   private sendRoomAnnouncementAction?: (data: PeerRoomAnnounceMessage, targetPeerId?: string) => Promise<any>;
+  private sendStartTransmissionAction?: (data: PeerStartTransmissionMessage, targetPeerId?: string) => Promise<any>;
+  private sendPermissionsUpdateAction?: (data: PeerPermissionsUpdateMessage, targetPeerId?: string) => Promise<any>;
+  private sendAdminMuteAction?: (data: PeerAdminMuteMessage, targetPeerId?: string) => Promise<any>;
+  private sendHostTransferAction?: (data: PeerHostTransferMessage, targetPeerId?: string) => Promise<any>;
+  private sendRemoteControlAction?: (data: PeerRemoteControlRequestMessage, targetPeerId?: string) => Promise<any>;
 
   public async joinRoom(roomId: string, callbacks: TransportCallbacks): Promise<void> {
     if (this.room) {
@@ -65,7 +75,7 @@ export class TrysteroTransport implements IWatchPartyTransport {
           appId: ZAPITV_APP_ID,
           relayUrls: NOSTR_RELAYS,
           rtcConfig: RTC_CONFIG
-        },
+        } as any,
         roomId
       );
 
@@ -82,8 +92,8 @@ export class TrysteroTransport implements IWatchPartyTransport {
         this.callbacks?.onParticipantState(data, peerId);
       });
 
-      this.sendChatMessageAction = this.registerAction<WatchPartyChatMessage>('chat_msg', (data) => {
-        this.callbacks?.onChatMessage(data);
+      this.sendChatMessageAction = this.registerAction<WatchPartyChatMessage>('chat_msg', (data, peerId) => {
+        this.callbacks?.onChatMessage(data, peerId);
       });
 
       this.sendEpisodeChangeAction = this.registerAction<PeerEpisodeChangeMessage>('change_episode', (data, peerId) => {
@@ -92,6 +102,26 @@ export class TrysteroTransport implements IWatchPartyTransport {
 
       this.sendRoomAnnouncementAction = this.registerAction<PeerRoomAnnounceMessage>('room_announce', (data, peerId) => {
         this.callbacks?.onRoomAnnouncement(data, peerId);
+      });
+
+      this.sendStartTransmissionAction = this.registerAction<PeerStartTransmissionMessage>('start_transmission', (data, peerId) => {
+        this.callbacks?.onStartTransmission?.(data, peerId);
+      });
+
+      this.sendPermissionsUpdateAction = this.registerAction<PeerPermissionsUpdateMessage>('permissions_update', (data, peerId) => {
+        this.callbacks?.onPermissionsUpdate?.(data, peerId);
+      });
+
+      this.sendAdminMuteAction = this.registerAction<PeerAdminMuteMessage>('admin_mute', (data, peerId) => {
+        this.callbacks?.onAdminMute?.(data, peerId);
+      });
+
+      this.sendHostTransferAction = this.registerAction<PeerHostTransferMessage>('host_transfer', (data, peerId) => {
+        this.callbacks?.onHostTransfer?.(data, peerId);
+      });
+
+      this.sendRemoteControlAction = this.registerAction<PeerRemoteControlRequestMessage>('remote_ctrl', (data, peerId) => {
+        this.callbacks?.onRemoteControlRequest?.(data, peerId);
       });
 
       // 2. Eventos de Conexão de Peers
@@ -105,8 +135,12 @@ export class TrysteroTransport implements IWatchPartyTransport {
         this.callbacks?.onPeerLeave(peerId);
       };
 
-      // 3. Suporte a Áudio / Voz P2P Opcional
+      // 3. Suporte a Áudio / Voz P2P e Transmissão de Vídeo
       this.room.onPeerStream = (stream, peerId) => {
+        this.callbacks?.onRemoteAudioStream?.(stream, peerId);
+      };
+
+      this.room.onPeerTrack = (_track, stream, peerId) => {
         this.callbacks?.onRemoteAudioStream?.(stream, peerId);
       };
     } catch (err) {
@@ -170,6 +204,36 @@ export class TrysteroTransport implements IWatchPartyTransport {
     }
   }
 
+  public broadcastStartTransmission(message: PeerStartTransmissionMessage): void {
+    if (this.sendStartTransmissionAction) {
+      this.sendStartTransmissionAction(message).catch(e => console.warn('[Trystero] Erro ao transmitir início:', e));
+    }
+  }
+
+  public broadcastPermissionsUpdate(message: PeerPermissionsUpdateMessage): void {
+    if (this.sendPermissionsUpdateAction) {
+      this.sendPermissionsUpdateAction(message).catch(e => console.warn('[Trystero] Erro ao transmitir permissões:', e));
+    }
+  }
+
+  public broadcastAdminMute(message: PeerAdminMuteMessage): void {
+    if (this.sendAdminMuteAction) {
+      this.sendAdminMuteAction(message).catch(e => console.warn('[Trystero] Erro ao transmitir mute admin:', e));
+    }
+  }
+
+  public broadcastHostTransfer(message: PeerHostTransferMessage): void {
+    if (this.sendHostTransferAction) {
+      this.sendHostTransferAction(message).catch(e => console.warn('[Trystero] Erro ao transferir liderança:', e));
+    }
+  }
+
+  public sendRemoteControlRequest(targetHostId: string, request: PeerRemoteControlRequestMessage): void {
+    if (this.sendRemoteControlAction) {
+      this.sendRemoteControlAction(request, targetHostId).catch(e => console.warn('[Trystero] Erro ao enviar comando remoto:', e));
+    }
+  }
+
   public addLocalAudioStream(stream: MediaStream): void {
     if (this.room) {
       this.room.addStream(stream);
@@ -180,6 +244,14 @@ export class TrysteroTransport implements IWatchPartyTransport {
     if (this.room) {
       this.room.removeStream(stream);
     }
+  }
+
+  public addLocalMediaStream(stream: MediaStream, targetPeerId?: string): void {
+    this.room?.addStream(stream, targetPeerId ? { target: targetPeerId } : undefined);
+  }
+
+  public removeLocalMediaStream(stream: MediaStream): void {
+    this.room?.removeStream(stream);
   }
 
   public async getPing(peerId: string): Promise<number> {
@@ -209,13 +281,17 @@ export class TrysteroTransport implements IWatchPartyTransport {
     }
 
     if (rawAction && typeof rawAction === 'object') {
-      if ('onReceive' in rawAction) {
-        rawAction.onReceive = onReceiveCallback;
-      } else if ('onMessage' in rawAction) {
-        rawAction.onMessage = onReceiveCallback;
+      if ('onMessage' in rawAction) {
+        // Trystero 0.26 passes { peerId } as message context. onReceive is only
+        // an admission hook for incoming transfers, not the message handler.
+        rawAction.onMessage = (data: T, context: { peerId: string }) => {
+          if (typeof context?.peerId === 'string') onReceiveCallback(data, context.peerId);
+        };
       }
       if (typeof rawAction.send === 'function') {
-        return rawAction.send.bind(rawAction);
+        return (data: T, targetPeerId?: string) => rawAction.send(
+          data, targetPeerId ? { target: targetPeerId } : undefined
+        );
       }
     }
 

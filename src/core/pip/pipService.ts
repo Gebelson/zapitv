@@ -263,6 +263,47 @@ class PipService {
   }
 
   /**
+   * Limpa completamente metadados, handlers de ação e estado do MediaSession,
+   * liberando closures e referências de memória quando a reprodução é encerrada.
+   */
+  public clearMediaSession(): void {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+    try {
+      navigator.mediaSession.metadata = null;
+      navigator.mediaSession.playbackState = 'none';
+
+      const actions: MediaSessionAction[] = [
+        'play',
+        'pause',
+        'seekto',
+        'seekbackward',
+        'seekforward',
+        'previoustrack',
+        'nexttrack',
+        'stop'
+      ];
+
+      actions.forEach((action) => {
+        try {
+          navigator.mediaSession.setActionHandler(action, null);
+        } catch {
+          // ignore action if not supported in this browser version
+        }
+      });
+
+      if ('setPositionState' in navigator.mediaSession) {
+        try {
+          navigator.mediaSession.setPositionState();
+        } catch {
+          // ignore
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao limpar MediaSession:', err);
+    }
+  }
+
+  /**
    * Sincroniza legendas ativas com uma TextTrack nativa no elemento <video>.
    * Quando o PiP é aberto, o navegador renderiza nativamente as legendas na janela flutuante!
    */

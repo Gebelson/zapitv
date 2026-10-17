@@ -18,6 +18,7 @@ import { catalogEligibilityService } from '../catalog/CatalogEligibilityService'
 import { deduplicateContentItems } from '../catalog/catalogDeduplication';
 import { adultContentService } from '../adult/AdultContentService';
 import { bannedContentRegistry } from '../catalog/BannedContentRegistry';
+import { LruCache } from '../cache/LruCache';
 
 export interface ScoredSimilarItem {
   item: ContentItem;
@@ -70,7 +71,7 @@ const HIGH_IMPACT_THEMES = [
 ];
 
 export class SimilarTitlesService {
-  private cache = new Map<string, { timestamp: number; items: ContentItem[] }>();
+  private cache = new LruCache<string, { timestamp: number; items: ContentItem[] }>(50, 20 * 60 * 1000);
   private readonly CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutos
   private readonly MIN_RELEVANCE_THRESHOLD = 30; // Pontuação mínima obrigatória para ser considerado semelhante
 

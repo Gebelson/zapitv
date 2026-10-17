@@ -82,7 +82,8 @@ export const DEFAULT_HERO_BANNER_SEEDS: ContentItem[] = [
     backdrop: 'https://image.tmdb.org/t/p/original/6Qf3sylInJeyK0fFTfjprnGIXCF.jpg',
     description: 'Uma escritora em dificuldades financeiras aceita a proposta de concluir a série de sucesso de uma famosa autora incapacitada, descobrindo segredos aterrorizantes em seus manuscritos.',
     genres: ['Romance', 'Mistério', 'Drama'],
-    imdbId: 'tt15888806',
+    imdbId: 'tt32261958',
+    tmdbId: '1283515',
     isFeatured: true,
     heroTags: [
       { id: 'tag-ver-1', text: 'Mais Votado', style: 'solid', color: '#dc2626' },

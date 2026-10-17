@@ -1,0 +1,1291 @@
+{
+  "weekKey": "2026-W43",
+  "weekLabel": "Semana 43 (Outubro de 2026)",
+  "monthKey": "2026-10",
+  "monthLabel": "Outubro de 2026",
+  "referenceDate": "2026-10-19",
+  "lastUpdatedAt": 1792128087831,
+  "lastCheckedAt": 1792128087831,
+  "nextScheduledUpdate": 1792400400000,
+  "nextScheduledUpdateFormatted": "Segunda-feira, 19/10/2026 às 06:00 (BRT)",
+  "sourceReference": "IMDb MOVIEmeter & TVmeter (Ranking Semanal)",
+  "updateStatus": "SUCCESS",
+  "isProvisionalWeekly": false,
+  "featuredMovies": [
+    {
+      "id": "movie-digger-2026",
+      "title": "Digger",
+      "originalTitle": "Digger",
+      "type": "FILME",
+      "rating": 7.8,
+      "year": 2026,
+      "image": "https://image.tmdb.org/t/p/w500/1ATXKrIPJyKNwnJ6lcG088Sa6zi.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/b7t3r39Oll5qPxBKzLZ8eHMBD7l.jpg",
+      "description": "Em uma região montanhosa e remota, um homem solitário se vê diante de conflitos do passado quando seu filho reaparece inesperadamente.",
+      "genres": [
+        "Aventura",
+        "Drama",
+        "Ação"
+      ],
+      "imdbId": "tt31454558",
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "imdbRank": 2,
+      "displayRank": 1,
+      "heroTags": [
+        {
+          "id": "rank-1",
+          "text": "#1 Em Destaque (IMDb #2)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "movie-outra-mamae-2026",
+      "title": "Outra Mamãe",
+      "originalTitle": "Another Mother",
+      "type": "FILME",
+      "rating": 7.4,
+      "year": 2026,
+      "image": "https://images.metahub.space/poster/medium/tt21440780/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt21440780/img",
+      "description": "Após uma perda devastadora, uma mulher descobre verdades perturbadoras sobre a nova família que tenta acolhê-la.",
+      "genres": [
+        "Suspense",
+        "Mistério",
+        "Drama"
+      ],
+      "imdbId": "tt21440780",
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "imdbRank": 3,
+      "displayRank": 2,
+      "heroTags": [
+        {
+          "id": "rank-2",
+          "text": "#2 Em Destaque (IMDb #3)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "movie-verity-2026",
+      "title": "Verity",
+      "originalTitle": "Verity",
+      "type": "FILME",
+      "rating": 8.1,
+      "year": 2026,
+      "image": "https://image.tmdb.org/t/p/w500/6Qf3sylInJeyK0fFTfjprnGIXCF.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/6Qf3sylInJeyK0fFTfjprnGIXCF.jpg",
+      "description": "Uma escritora em dificuldades financeiras aceita a proposta de concluir a série de sucesso de uma famosa autora incapacitada, descobrindo segredos aterrorizantes em seus manuscritos.",
+      "genres": [
+        "Romance",
+        "Mistério",
+        "Drama"
+      ],
+      "imdbId": "tt15888806",
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "imdbRank": 4,
+      "displayRank": 3,
+      "heroTags": [
+        {
+          "id": "rank-3",
+          "text": "#3 Em Destaque (IMDb #4)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "movie-exorcista-martires-2026",
+      "title": "O Exorcista: Mártires",
+      "originalTitle": "The Exorcist: Martyrs",
+      "type": "FILME",
+      "rating": 7.2,
+      "year": 2026,
+      "image": "https://image.tmdb.org/t/p/w500/i3kvS445sWWIhuxgXywPuUcsoP0.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/ePIY6b8TlIjqFzK1JKANPhxUIPn.jpg",
+      "description": "Capítulo aterrorizante da saga onde padres e especialistas espirituais enfrentam manifestações demoníacas em comunidades isoladas.",
+      "genres": [
+        "Terror",
+        "Mistério"
+      ],
+      "imdbId": "tt28704204",
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "imdbRank": 5,
+      "displayRank": 4,
+      "heroTags": [
+        {
+          "id": "rank-4",
+          "text": "#4 Em Destaque (IMDb #5)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "movie-matchbox-2026",
+      "title": "Matchbox: O Filme",
+      "originalTitle": "Matchbox",
+      "type": "FILME",
+      "rating": 7.5,
+      "year": 2026,
+      "image": "https://image.tmdb.org/t/p/w500/lFKA4GMz36dImEy3DQPdPF7G4V9.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/y6RIuwuxLG3Nsb37KUj5yatnTIp.jpg",
+      "description": "Ação em alta velocidade inspirada na lendária linha de veículos e pistas radicais, com perseguições cinematográficas alucinantes.",
+      "genres": [
+        "Ação",
+        "Aventura"
+      ],
+      "imdbId": "tt31828574",
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "imdbRank": 6,
+      "displayRank": 5,
+      "heroTags": [
+        {
+          "id": "rank-5",
+          "text": "#5 Em Destaque (IMDb #6)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "movie-resident-evil-2026",
+      "title": "Resident Evil",
+      "originalTitle": "Resident Evil",
+      "type": "FILME",
+      "rating": 7.6,
+      "year": 2026,
+      "image": "https://image.tmdb.org/t/p/w500/gQ76UL64RQe3oHwiwHwODTC23g4.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/3icyRAqgakNcQn6aDVz9libFmBA.jpg",
+      "description": "Nova adaptação cinematográfica da icônica franquia de terror e sobrevivência da Capcom com fidelidade máxima à atmosfera sombria.",
+      "genres": [
+        "Ação",
+        "Terror",
+        "Ficção Científica"
+      ],
+      "tmdbId": "1423191",
+      "imdbId": "tt13000574",
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "imdbRank": 7,
+      "displayRank": 6,
+      "heroTags": [
+        {
+          "id": "rank-6",
+          "text": "#6 Em Destaque (IMDb #7)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "movie-wild-at-heart-1990",
+      "title": "Coração Selvagem",
+      "originalTitle": "Wild at Heart",
+      "type": "FILME",
+      "rating": 7.2,
+      "year": 1990,
+      "image": "https://images.metahub.space/poster/medium/tt0100935/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt0100935/img",
+      "description": "Jovens amantes fogem pela estrada enquanto a mãe controladora da garota contrata assassinos e detetives para caçá-los. Clássico cult de David Lynch com Nicolas Cage e Laura Dern.",
+      "genres": [
+        "Crime",
+        "Drama",
+        "Romance"
+      ],
+      "imdbId": "tt0100935",
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "imdbRank": 9,
+      "displayRank": 7,
+      "heroTags": [
+        {
+          "id": "rank-7",
+          "text": "#7 Em Destaque (IMDb #9)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "movie-social-dilemma-2020",
+      "title": "O Outro Lado das Redes",
+      "originalTitle": "The Social Dilemma",
+      "type": "FILME",
+      "rating": 7.6,
+      "year": 2020,
+      "image": "https://images.metahub.space/poster/medium/tt11464826/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt11464826/img",
+      "description": "Especialistas em tecnologia e ex-executivos do Vale do Silício revelam o impacto perigoso e manipulador das redes sociais sobre a psicologia humana e a sociedade.",
+      "genres": [
+        "Documentário",
+        "Drama"
+      ],
+      "imdbId": "tt11464826",
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "imdbRank": 10,
+      "displayRank": 8,
+      "heroTags": [
+        {
+          "id": "rank-8",
+          "text": "#8 Em Destaque (IMDb #10)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "movie-unabomber-2026",
+      "title": "Unabomber",
+      "originalTitle": "Unabomber",
+      "type": "FILME",
+      "rating": 7.7,
+      "year": 2026,
+      "image": "https://image.tmdb.org/t/p/w500/39aMkR8Y5vhCG9dTkjiqRl8AVqp.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/58D9nalUYW5L5K0guw7hcpsEJBH.jpg",
+      "description": "A história real da caçada do FBI ao terrorista matemático Ted Kaczynski e a revolução dos métodos de análise linguística forense.",
+      "genres": [
+        "Biografia",
+        "Crime",
+        "Drama"
+      ],
+      "imdbId": "tt1392796",
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "imdbRank": 11,
+      "displayRank": 9,
+      "heroTags": [
+        {
+          "id": "rank-9",
+          "text": "#9 Em Destaque (IMDb #11)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "movie-dia-d-2026",
+      "title": "Dia D",
+      "originalTitle": "D-Day",
+      "type": "FILME",
+      "rating": 7.5,
+      "year": 2026,
+      "image": "https://image.tmdb.org/t/p/w500/2EjUTEnnoC0sK5j5FS7dC3vOZcl.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/2EjUTEnnoC0sK5j5FS7dC3vOZcl.jpg",
+      "description": "A reconstituição cinematográfica da Operação Overlord e o desembarque dos aliados na Normandia durante a Segunda Guerra Mundial.",
+      "genres": [
+        "Guerra",
+        "História",
+        "Drama"
+      ],
+      "imdbId": "tt11576182",
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "imdbRank": 12,
+      "displayRank": 10,
+      "heroTags": [
+        {
+          "id": "rank-10",
+          "text": "#10 Em Destaque (IMDb #12)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    }
+  ],
+  "featuredSeries": [
+    {
+      "id": "series-ted-lasso",
+      "title": "Ted Lasso",
+      "originalTitle": "Ted Lasso",
+      "type": "SÉRIE",
+      "rating": 8.8,
+      "year": 2020,
+      "image": "https://images.metahub.space/poster/medium/tt10986410/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt10986410/img",
+      "description": "O treinador de futebol americano Ted Lasso é contratado para comandar um time de futebol britânico na Premier League com muito otimismo e empatia.",
+      "genres": [
+        "Comédia",
+        "Drama",
+        "Esporte"
+      ],
+      "imdbId": "tt10986410",
+      "seasonsCount": 3,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "ted-lasso-s1e1",
+          "number": 1,
+          "title": "Piloto",
+          "description": "Ted Lasso chega à Inglaterra para treinar o AFC Richmond, surpreendendo os torcedores e a mídia cética.",
+          "image": "https://images.metahub.space/poster/medium/tt10986410/img"
+        },
+        {
+          "id": "ted-lasso-s1e2",
+          "number": 2,
+          "title": "Biscoitos",
+          "description": "Ted tenta conquistar Rebecca com doces caseiros enquanto resolve conflitos no vestiário.",
+          "image": "https://images.metahub.space/poster/medium/tt10986410/img"
+        }
+      ],
+      "imdbRank": 5,
+      "displayRank": 1,
+      "heroTags": [
+        {
+          "id": "rank-1",
+          "text": "#1 Em Destaque (IMDb #5)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "series-slow-horses",
+      "title": "Slow Horses",
+      "originalTitle": "Slow Horses",
+      "type": "SÉRIE",
+      "rating": 8.3,
+      "year": 2022,
+      "image": "https://images.metahub.space/poster/medium/tt5875444/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt5875444/img",
+      "description": "Uma equipe disfuncional de agentes do MI5 que cometeram erros em suas carreiras tenta proteger o Reino Unido sob a liderança do beberrão e brilhante Jackson Lamb.",
+      "genres": [
+        "Suspense",
+        "Drama",
+        "Crime"
+      ],
+      "imdbId": "tt5875444",
+      "seasonsCount": 4,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "slow-horses-s1e1",
+          "number": 1,
+          "title": "Slough House",
+          "description": "Após um exercício de treinamento fracassado, River Cartwright é banido para a Slough House.",
+          "image": "https://images.metahub.space/poster/medium/tt5875444/img"
+        },
+        {
+          "id": "slow-horses-s1e2",
+          "number": 2,
+          "title": "Work Drinks",
+          "description": "A equipe se envolve no caso do sequestro de um estudante universitário.",
+          "image": "https://images.metahub.space/poster/medium/tt5875444/img"
+        }
+      ],
+      "imdbRank": 7,
+      "displayRank": 2,
+      "heroTags": [
+        {
+          "id": "rank-2",
+          "text": "#2 Em Destaque (IMDb #7)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "series-monstros",
+      "title": "Monstros",
+      "originalTitle": "Monsters",
+      "type": "SÉRIE",
+      "rating": 7.9,
+      "year": 2022,
+      "image": "https://images.metahub.space/poster/medium/tt13207736/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt13207736/img",
+      "description": "Série antológica sobre crimes reais que chocaram a sociedade, explorando a psicologia e a dinâmica dos julgamentos.",
+      "genres": [
+        "Biografia",
+        "Crime",
+        "Drama"
+      ],
+      "imdbId": "tt13207736",
+      "seasonsCount": 2,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "monsters-s1e1",
+          "number": 1,
+          "title": "Episódio 1",
+          "description": "O início das investigações de um caso que paralisou a opinião pública.",
+          "image": "https://images.metahub.space/poster/medium/tt13207736/img"
+        }
+      ],
+      "imdbRank": 9,
+      "displayRank": 3,
+      "heroTags": [
+        {
+          "id": "rank-3",
+          "text": "#3 Em Destaque (IMDb #9)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "series-ahs",
+      "title": "História de Horror Americana",
+      "originalTitle": "American Horror Story",
+      "type": "SÉRIE",
+      "rating": 8,
+      "year": 2011,
+      "image": "https://images.metahub.space/poster/medium/tt1844624/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt1844624/img",
+      "description": "Série antológica criada por Ryan Murphy que explora diferentes mitos, casas assombradas, asilos, covens e lendas urbanas de horror.",
+      "genres": [
+        "Terror",
+        "Drama",
+        "Mistério"
+      ],
+      "imdbId": "tt1844624",
+      "seasonsCount": 12,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "ahs-s1e1",
+          "number": 1,
+          "title": "Piloto: Murder House",
+          "description": "A família Harmon muda-se de Boston para Los Angeles para recomeçar suas vidas em uma mansão com passado macabro.",
+          "image": "https://images.metahub.space/poster/medium/tt1844624/img"
+        }
+      ],
+      "imdbRank": 10,
+      "displayRank": 4,
+      "heroTags": [
+        {
+          "id": "rank-4",
+          "text": "#4 Em Destaque (IMDb #10)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "series-the-gentlemen",
+      "title": "Magnatas do Crime",
+      "originalTitle": "The Gentlemen",
+      "type": "SÉRIE",
+      "rating": 8.1,
+      "year": 2024,
+      "image": "https://image.tmdb.org/t/p/w500/e5enRsAImbGcsT0BksqwurjA6CZ.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/l6PSAWVLyaZzwviMwBgYQOPVJ6Y.jpg",
+      "description": "Eddie Horniman herda inesperadamente a vasta propriedade rural do pai, descobrindo que ela faz parte de um império bilionário da cannabis.",
+      "genres": [
+        "Ação",
+        "Comédia",
+        "Crime"
+      ],
+      "imdbId": "tt16066148",
+      "tmdbId": "125244",
+      "seasonsCount": 1,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "gentlemen-s1e1",
+          "number": 1,
+          "title": "Refinado e Perigoso",
+          "description": "Eddie descobre que o negócio secreto da família vem acompanhado de gângsteres excêntricos e perigosos.",
+          "image": "https://image.tmdb.org/t/p/w500/e5enRsAImbGcsT0BksqwurjA6CZ.jpg"
+        }
+      ],
+      "imdbRank": 11,
+      "displayRank": 5,
+      "heroTags": [
+        {
+          "id": "rank-5",
+          "text": "#5 Em Destaque (IMDb #11)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "series-the-mentalist",
+      "title": "O Mentalista",
+      "originalTitle": "The Mentalist",
+      "type": "SÉRIE",
+      "rating": 8.2,
+      "year": 2008,
+      "image": "https://images.metahub.space/poster/medium/tt1196946/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt1196946/img",
+      "description": "Patrick Jane, um ex-falso médium com impressionante poder de observação e dedução, atua como consultor do CBI enquanto busca vingança contra o serial killer Red John.",
+      "genres": [
+        "Crime",
+        "Drama",
+        "Mistério"
+      ],
+      "imdbId": "tt1196946",
+      "seasonsCount": 7,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "mentalist-s1e1",
+          "number": 1,
+          "title": "Piloto",
+          "description": "Patrick Jane ajuda a equipe do CBI liderada por Teresa Lisbon a investigar o homicídio da esposa de um jogador de golfe.",
+          "image": "https://images.metahub.space/poster/medium/tt1196946/img"
+        }
+      ],
+      "imdbRank": 14,
+      "displayRank": 6,
+      "heroTags": [
+        {
+          "id": "rank-6",
+          "text": "#6 Em Destaque (IMDb #14)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "series-game-of-thrones-2011",
+      "title": "Game of Thrones",
+      "originalTitle": "Game of Thrones",
+      "type": "SÉRIE",
+      "rating": 9.2,
+      "year": 2011,
+      "image": "https://images.metahub.space/poster/medium/tt0944947/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt0944947/img",
+      "description": "Nove famílias nobres lutam pelo controle do Trono de Ferro de Westeros enquanto um inimigo ancestral desperta além da Muralha.",
+      "genres": [
+        "Ação",
+        "Aventura",
+        "Drama",
+        "Fantasia"
+      ],
+      "imdbId": "tt0944947",
+      "seasonsCount": 8,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "got-s1e1",
+          "number": 1,
+          "title": "O Inverno Está Chegando",
+          "description": "Lorde Ned Stark recebe a visita do Rei Robert Baratheon em Winterfell para assumir o cargo de Mão do Rei.",
+          "image": "https://images.metahub.space/poster/medium/tt0944947/img"
+        }
+      ],
+      "imdbRank": 15,
+      "displayRank": 7,
+      "heroTags": [
+        {
+          "id": "rank-7",
+          "text": "#7 Em Destaque (IMDb #15)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "series-reacher",
+      "title": "Reacher",
+      "originalTitle": "Reacher",
+      "type": "SÉRIE",
+      "rating": 8.1,
+      "year": 2022,
+      "image": "https://images.metahub.space/poster/medium/tt9288030/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt9288030/img",
+      "description": "O veterano da polícia militar Jack Reacher viaja sem rumo pelos Estados Unidos e resolve mistérios violentos usando inteligência e força bruta.",
+      "genres": [
+        "Ação",
+        "Crime",
+        "Drama"
+      ],
+      "imdbId": "tt9288030",
+      "seasonsCount": 2,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "reacher-s1e1",
+          "number": 1,
+          "title": "Bem-vindo a Margrave",
+          "description": "Reacher é preso logo após desembarcar em uma pacata cidade da Geórgia acusado de um assassinato brutal.",
+          "image": "https://images.metahub.space/poster/medium/tt9288030/img"
+        }
+      ],
+      "imdbRank": 16,
+      "displayRank": 8,
+      "heroTags": [
+        {
+          "id": "rank-8",
+          "text": "#8 Em Destaque (IMDb #16)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "series-lioness",
+      "title": "Operação Lioness",
+      "originalTitle": "Special Ops: Lioness",
+      "type": "SÉRIE",
+      "rating": 7.8,
+      "year": 2023,
+      "image": "https://images.metahub.space/poster/medium/tt13111078/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt13111078/img",
+      "description": "Criada por Taylor Sheridan, a série acompanha o programa de agentes secretas da CIA que se infiltram em círculos terroristas globais.",
+      "genres": [
+        "Ação",
+        "Drama",
+        "Suspense"
+      ],
+      "imdbId": "tt13111078",
+      "seasonsCount": 2,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "lioness-s1e1",
+          "number": 1,
+          "title": "Soldados Sacrificiais",
+          "description": "Joe recruta uma jovem fuzileira naval para se aproximar da filha de um financista do terrorismo.",
+          "image": "https://images.metahub.space/poster/medium/tt13111078/img"
+        }
+      ],
+      "imdbRank": 18,
+      "displayRank": 9,
+      "heroTags": [
+        {
+          "id": "rank-9",
+          "text": "#9 Em Destaque (IMDb #18)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "series-silo",
+      "title": "Silo",
+      "originalTitle": "Silo",
+      "type": "SÉRIE",
+      "rating": 8.1,
+      "year": 2023,
+      "image": "https://images.metahub.space/poster/medium/tt14688458/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt14688458/img",
+      "description": "Em um futuro tóxico e devastado, uma comunidade de milhares de pessoas vive em um gigantesco silo subterrâneo de 144 andares com regras rigorosas.",
+      "genres": [
+        "Ficção Científica",
+        "Drama",
+        "Mistério"
+      ],
+      "imdbId": "tt14688458",
+      "seasonsCount": 2,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "silo-s1e1",
+          "number": 1,
+          "title": "Dia da Liberdade",
+          "description": "O xerife Holston toma uma decisão fatídica após anos desconfiando das narrativas oficiais sobre a superfície.",
+          "image": "https://images.metahub.space/poster/medium/tt14688458/img"
+        }
+      ],
+      "imdbRank": 19,
+      "displayRank": 10,
+      "heroTags": [
+        {
+          "id": "rank-10",
+          "text": "#10 Em Destaque (IMDb #19)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    }
+  ],
+  "totalCandidatesEvaluated": {
+    "movies": 30,
+    "series": 30
+  },
+  "auditTrail": {
+    "approvedMovies": [
+      {
+        "imdbId": "tt31454558",
+        "title": "Digger",
+        "imdbTitle": "Digger",
+        "canonicalTitle": "Digger",
+        "year": 2026,
+        "mediaType": "movie",
+        "imdbRank": 2,
+        "displayRank": 1,
+        "rankPosition": 2,
+        "finalPosition": 1,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "movie-digger-2026",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt21440780",
+        "title": "Outra Mamãe",
+        "imdbTitle": "Outra Mamãe",
+        "canonicalTitle": "Outra Mamãe",
+        "year": 2026,
+        "mediaType": "movie",
+        "imdbRank": 3,
+        "displayRank": 2,
+        "rankPosition": 3,
+        "finalPosition": 2,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "movie-outra-mamae-2026",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt15888806",
+        "title": "Verity",
+        "imdbTitle": "Verity",
+        "canonicalTitle": "Verity",
+        "year": 2026,
+        "mediaType": "movie",
+        "imdbRank": 4,
+        "displayRank": 3,
+        "rankPosition": 4,
+        "finalPosition": 3,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "movie-verity-2026",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt28704204",
+        "title": "O Exorcista: Mártires",
+        "imdbTitle": "O Exorcista: Mártires",
+        "canonicalTitle": "O Exorcista: Mártires",
+        "year": 2026,
+        "mediaType": "movie",
+        "imdbRank": 5,
+        "displayRank": 4,
+        "rankPosition": 5,
+        "finalPosition": 4,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "movie-exorcista-martires-2026",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt31828574",
+        "title": "Matchbox: O Filme",
+        "imdbTitle": "Matchbox: O Filme",
+        "canonicalTitle": "Matchbox: O Filme",
+        "year": 2026,
+        "mediaType": "movie",
+        "imdbRank": 6,
+        "displayRank": 5,
+        "rankPosition": 6,
+        "finalPosition": 5,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "movie-matchbox-2026",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt13000574",
+        "title": "Resident Evil",
+        "imdbTitle": "Resident Evil",
+        "canonicalTitle": "Resident Evil",
+        "year": 2026,
+        "mediaType": "movie",
+        "imdbRank": 7,
+        "displayRank": 6,
+        "rankPosition": 7,
+        "finalPosition": 6,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "movie-resident-evil-2026",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt0100935",
+        "title": "Coração Selvagem",
+        "imdbTitle": "Coração Selvagem",
+        "canonicalTitle": "Coração Selvagem",
+        "year": 1990,
+        "mediaType": "movie",
+        "imdbRank": 9,
+        "displayRank": 7,
+        "rankPosition": 9,
+        "finalPosition": 7,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "movie-wild-at-heart-1990",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt11464826",
+        "title": "O Outro Lado das Redes",
+        "imdbTitle": "O Outro Lado das Redes",
+        "canonicalTitle": "O Outro Lado das Redes",
+        "year": 2020,
+        "mediaType": "movie",
+        "imdbRank": 10,
+        "displayRank": 8,
+        "rankPosition": 10,
+        "finalPosition": 8,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "movie-social-dilemma-2020",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt1392796",
+        "title": "Unabomber",
+        "imdbTitle": "Unabomber",
+        "canonicalTitle": "Unabomber",
+        "year": 2026,
+        "mediaType": "movie",
+        "imdbRank": 11,
+        "displayRank": 9,
+        "rankPosition": 11,
+        "finalPosition": 9,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "movie-unabomber-2026",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt11576182",
+        "title": "Dia D",
+        "imdbTitle": "Dia D",
+        "canonicalTitle": "Dia D",
+        "year": 2026,
+        "mediaType": "movie",
+        "imdbRank": 12,
+        "displayRank": 10,
+        "rankPosition": 12,
+        "finalPosition": 10,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "movie-dia-d-2026",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      }
+    ],
+    "rejectedMovies": [
+      {
+        "imdbId": "tt29971038",
+        "title": "Sobrevivência",
+        "imdbTitle": "Sobrevivência",
+        "canonicalTitle": "Sobrevivência",
+        "year": 2026,
+        "mediaType": "movie",
+        "imdbRank": 1,
+        "rankPosition": 1,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "movie-sobrevivencia-2026",
+        "availabilityStatus": "theatrical_window",
+        "rejectionReason": "Filme em cartaz nos cinemas brasileiros ou aguarda lançamento digital oficial"
+      },
+      {
+        "imdbId": "tt20221436",
+        "title": "Homem-Aranha: Um Novo Dia",
+        "imdbTitle": "Homem-Aranha: Um Novo Dia",
+        "canonicalTitle": "Homem-Aranha: Um Novo Dia",
+        "year": 2026,
+        "mediaType": "movie",
+        "imdbRank": 8,
+        "rankPosition": 8,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "movie-spiderman-new-day-2026",
+        "availabilityStatus": "theatrical_window",
+        "rejectionReason": "Filme em cartaz nos cinemas brasileiros ou aguarda lançamento digital oficial"
+      }
+    ],
+    "approvedSeries": [
+      {
+        "imdbId": "tt10986410",
+        "title": "Ted Lasso",
+        "imdbTitle": "Ted Lasso",
+        "canonicalTitle": "Ted Lasso",
+        "year": 2020,
+        "mediaType": "series",
+        "imdbRank": 5,
+        "displayRank": 1,
+        "rankPosition": 5,
+        "finalPosition": 1,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "series-ted-lasso",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt5875444",
+        "title": "Slow Horses",
+        "imdbTitle": "Slow Horses",
+        "canonicalTitle": "Slow Horses",
+        "year": 2022,
+        "mediaType": "series",
+        "imdbRank": 7,
+        "displayRank": 2,
+        "rankPosition": 7,
+        "finalPosition": 2,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "series-slow-horses",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt13207736",
+        "title": "Monstros",
+        "imdbTitle": "Monstros",
+        "canonicalTitle": "Monstros",
+        "year": 2022,
+        "mediaType": "series",
+        "imdbRank": 9,
+        "displayRank": 3,
+        "rankPosition": 9,
+        "finalPosition": 3,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "series-monstros",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt1844624",
+        "title": "História de Horror Americana",
+        "imdbTitle": "História de Horror Americana",
+        "canonicalTitle": "História de Horror Americana",
+        "year": 2011,
+        "mediaType": "series",
+        "imdbRank": 10,
+        "displayRank": 4,
+        "rankPosition": 10,
+        "finalPosition": 4,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "series-ahs",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt16066148",
+        "title": "Magnatas do Crime",
+        "imdbTitle": "Magnatas do Crime",
+        "canonicalTitle": "Magnatas do Crime",
+        "year": 2024,
+        "mediaType": "series",
+        "imdbRank": 11,
+        "displayRank": 5,
+        "rankPosition": 11,
+        "finalPosition": 5,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "series-the-gentlemen",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt1196946",
+        "title": "O Mentalista",
+        "imdbTitle": "O Mentalista",
+        "canonicalTitle": "O Mentalista",
+        "year": 2008,
+        "mediaType": "series",
+        "imdbRank": 14,
+        "displayRank": 6,
+        "rankPosition": 14,
+        "finalPosition": 6,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "series-the-mentalist",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt0944947",
+        "title": "Game of Thrones",
+        "imdbTitle": "Game of Thrones",
+        "canonicalTitle": "Game of Thrones",
+        "year": 2011,
+        "mediaType": "series",
+        "imdbRank": 15,
+        "displayRank": 7,
+        "rankPosition": 15,
+        "finalPosition": 7,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "series-game-of-thrones-2011",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt9288030",
+        "title": "Reacher",
+        "imdbTitle": "Reacher",
+        "canonicalTitle": "Reacher",
+        "year": 2022,
+        "mediaType": "series",
+        "imdbRank": 16,
+        "displayRank": 8,
+        "rankPosition": 16,
+        "finalPosition": 8,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "series-reacher",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt13111078",
+        "title": "Operação Lioness",
+        "imdbTitle": "Operação Lioness",
+        "canonicalTitle": "Operação Lioness",
+        "year": 2023,
+        "mediaType": "series",
+        "imdbRank": 18,
+        "displayRank": 9,
+        "rankPosition": 18,
+        "finalPosition": 9,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "series-lioness",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      },
+      {
+        "imdbId": "tt14688458",
+        "title": "Silo",
+        "imdbTitle": "Silo",
+        "canonicalTitle": "Silo",
+        "year": 2023,
+        "mediaType": "series",
+        "imdbRank": 19,
+        "displayRank": 10,
+        "rankPosition": 19,
+        "finalPosition": 10,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "series-silo",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1
+      }
+    ],
+    "rejectedSeries": [
+      {
+        "imdbId": "tt30147890",
+        "title": "Carrie: A Estranha",
+        "imdbTitle": "Carrie: A Estranha",
+        "canonicalTitle": "Carrie: A Estranha",
+        "year": 2026,
+        "mediaType": "series",
+        "imdbRank": 1,
+        "rankPosition": 1,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "series-carrie-2026",
+        "availabilityStatus": "no_source",
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+      },
+      {
+        "imdbId": "tt32159846",
+        "title": "Profundezas",
+        "imdbTitle": "Profundezas",
+        "canonicalTitle": "Profundezas",
+        "year": 2026,
+        "mediaType": "series",
+        "imdbRank": 2,
+        "rankPosition": 2,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "series-profundezas-2026",
+        "availabilityStatus": "no_source",
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+      },
+      {
+        "imdbId": "tt22020214",
+        "title": "A Leste do Éden",
+        "imdbTitle": "A Leste do Éden",
+        "canonicalTitle": "A Leste do Éden",
+        "year": 2026,
+        "mediaType": "series",
+        "imdbRank": 3,
+        "rankPosition": 3,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "series-a-leste-do-eden-2026",
+        "availabilityStatus": "no_source",
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+      },
+      {
+        "imdbId": "tt26540670",
+        "title": "Lanternas",
+        "imdbTitle": "Lanternas",
+        "canonicalTitle": "Lanternas",
+        "year": 2026,
+        "mediaType": "series",
+        "imdbRank": 4,
+        "rankPosition": 4,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "series-lanternas-2026",
+        "availabilityStatus": "no_source",
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+      },
+      {
+        "imdbId": "tt28289508",
+        "title": "Terra de Máfia",
+        "imdbTitle": "Terra de Máfia",
+        "canonicalTitle": "Terra de Máfia",
+        "year": 2026,
+        "mediaType": "series",
+        "imdbRank": 6,
+        "rankPosition": 6,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "series-terra-de-mafia-2026",
+        "availabilityStatus": "no_source",
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+      },
+      {
+        "imdbId": "tt29458920",
+        "title": "War",
+        "imdbTitle": "War",
+        "canonicalTitle": "War",
+        "year": 2026,
+        "mediaType": "series",
+        "imdbRank": 8,
+        "rankPosition": 8,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "series-war-2026",
+        "availabilityStatus": "no_source",
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+      },
+      {
+        "imdbId": "tt32567812",
+        "title": "Avatar: Os Sete Refúgios",
+        "imdbTitle": "Avatar: Os Sete Refúgios",
+        "canonicalTitle": "Avatar: Os Sete Refúgios",
+        "year": 2026,
+        "mediaType": "series",
+        "imdbRank": 12,
+        "rankPosition": 12,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "series-avatar-sete-refugios-2026",
+        "availabilityStatus": "no_source",
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+      },
+      {
+        "imdbId": "tt33314545",
+        "title": "Neagley: Detetive Particular",
+        "imdbTitle": "Neagley: Detetive Particular",
+        "canonicalTitle": "Neagley: Detetive Particular",
+        "year": 2026,
+        "mediaType": "series",
+        "imdbRank": 13,
+        "rankPosition": 13,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "series-neagley-2026",
+        "availabilityStatus": "no_source",
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+      },
+      {
+        "imdbId": "tt31854290",
+        "title": "O Segredo de Widow's Bay",
+        "imdbTitle": "O Segredo de Widow's Bay",
+        "canonicalTitle": "O Segredo de Widow's Bay",
+        "year": 2026,
+        "mediaType": "series",
+        "imdbRank": 17,
+        "rankPosition": 17,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "series-widows-bay-2026",
+        "availabilityStatus": "no_source",
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+      }
+    ]
+  }
+}

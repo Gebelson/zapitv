@@ -13,7 +13,7 @@ interface HeroProps {
   isAdmin?: boolean;
   onUpdateItem?: (item: ContentItem) => void;
   onAddContent?: (item: ContentItem) => void;
-  onSaveCarousel?: (items: ContentItem[]) => void;
+  onSaveCarousel?: (items: ContentItem[]) => Promise<void> | void;
 }
 
 // Cores disponíveis para as tags
@@ -49,6 +49,9 @@ const Hero: React.FC<HeroProps> = ({
   const [isPaused, setIsPaused] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const isAnimatingRef = useRef(false);
+  const heroContainerRef = useRef<HTMLDivElement | null>(null);
+  const [isHeroInViewport, setIsHeroInViewport] = useState(true);
+  const [isTabVisible, setIsTabVisible] = useState(true);
 
   // Limite estrito a 6 conteúdos exibidos simultaneamente no Carrossel da Home
   const displayedFeaturedItems = useMemo(() => {
@@ -95,6 +98,8 @@ const Hero: React.FC<HeroProps> = ({
   
   // Lista local de itens para edição em massa antes de salvar
   const [localItems, setLocalItems] = useState<ContentItem[]>([]);
+  const [saveError, setSaveError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const [selectedLocalIndex, setSelectedLocalIndex] = useState<number>(0);
   
   // Estados para Adicionar Nova Tag
@@ -149,18 +154,50 @@ const Hero: React.FC<HeroProps> = ({
 
   const navigateRef = useRef<(direction: 'prev' | 'next') => void>(() => {});
 
+  // Monitora visibilidade da aba do navegador para pausar o carrossel em segundo plano
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsTabVisible(!document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // Monitora se o Hero está visível no viewport (evita ciclos de renderização ao rolar a página)
+  useEffect(() => {
+    const el = heroContainerRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry) {
+          setIsHeroInViewport(entry.isIntersecting);
+        }
+      },
+      { threshold: 0.05 }
+    );
+
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   // Gerenciamento robusto do temporizador com reinício automático em qualquer interação
   const startTimer = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    if (isPaused || totalOriginal <= 1 || isEditModalOpen) return;
+    if (isPaused || totalOriginal <= 1 || isEditModalOpen || !isTabVisible || !isHeroInViewport) return;
 
     timerRef.current = setInterval(() => {
       navigateRef.current('next');
     }, 6000);
-  }, [isPaused, totalOriginal, isEditModalOpen]);
+  }, [isPaused, totalOriginal, isEditModalOpen, isTabVisible, isHeroInViewport]);
 
   const navigate = useCallback((direction: 'prev' | 'next') => {
     if (totalOriginal <= 1) return;
@@ -340,27 +377,35 @@ const Hero: React.FC<HeroProps> = ({
     handleUpdateLocalItem(updatedItem);
   };
 
-  const handleSaveAll = (e: React.FormEvent) => {
+  const handleSaveAll = async (e: React.MouseEvent) => {
     e.preventDefault();
+    if (isSaving) return;
+    setSaveError('');
+    setIsSaving(true);
+
+    try {
+      const savedItems = localItems.map(item => item.id.startsWith('new-')
+        ? { ...item, id: crypto.randomUUID() }
+        : item);
 
     // 1. Salva a lista ordenada no store dedicado do Carrossel
     if (onSaveCarousel) {
-      onSaveCarousel(localItems);
+      await onSaveCarousel(savedItems);
     }
 
     // 2. Notifica o catálogo principal com as alterações de itens
     if (onUpdateItem) {
-      const localIds = new Set(localItems.map(i => i.id));
+      const localIds = new Set(savedItems.map(i => i.id));
       const removedItems = featuredItems.filter(i => !localIds.has(i.id));
       
       removedItems.forEach(item => {
         onUpdateItem({ ...item, isFeatured: false });
       });
 
-      localItems.forEach(item => {
-        if (item.id.startsWith('new-')) {
+      savedItems.forEach((item, index) => {
+        if (localItems[index].id.startsWith('new-')) {
           if (onAddContent) {
-            onAddContent({ ...item, id: Date.now().toString() + Math.random().toString().slice(2, 5) });
+            onAddContent(item);
           }
         } else {
           onUpdateItem({ ...item, isFeatured: true });
@@ -371,6 +416,11 @@ const Hero: React.FC<HeroProps> = ({
     setIsEditModalOpen(false);
     setIsPaused(false);
     startTimer();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Não foi possível salvar o carrossel.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const renderTag = (tag: HeroTag) => {
@@ -419,12 +469,14 @@ const Hero: React.FC<HeroProps> = ({
               <button 
                 type="button"
                 onClick={handleSaveAll} 
+                disabled={isSaving}
                 className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black shadow-lg shadow-blue-600/20 hover:scale-105 transition-all flex items-center gap-2 cursor-pointer"
               >
-                <Save className="w-4 h-4" /> SALVAR TUDO
+                <Save className="w-4 h-4" /> {isSaving ? 'SALVANDO...' : 'SALVAR TUDO'}
               </button>
             </div>
           </div>
+          {saveError && <p role="alert" className="px-6 py-2 text-sm text-red-400">{saveError}</p>}
           
           <div className="flex-1 flex overflow-hidden">
             
@@ -676,6 +728,7 @@ const Hero: React.FC<HeroProps> = ({
 
   return (
     <div 
+      ref={heroContainerRef}
       className={`relative min-h-[380px] max-h-[720px] h-[55vh] sm:h-[60vh] md:h-[520px] lg:h-[650px] 2xl:h-[750px] w-full rounded-2xl md:rounded-3xl overflow-hidden mb-6 md:mb-12 group select-none ${
         isDarkMode ? 'border border-white/5' : 'border-0'
       }`}

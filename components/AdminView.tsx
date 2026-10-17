@@ -378,6 +378,11 @@ const AdminView: React.FC<AdminViewProps> = ({
     }
   };
 
+  const handleUpdatePriority = (id: string, newPriority: number) => {
+    providerRegistry.updateProvider(id, { priority: newPriority });
+    setProviders(providerRegistry.getProviders());
+  };
+
   const handleRemoveProvider = (id: string) => {
     providerRegistry.removeProvider(id);
     setProviders(providerRegistry.getProviders());
@@ -459,10 +464,15 @@ const AdminView: React.FC<AdminViewProps> = ({
   const exportDatabase = async () => {
     const { db } = await import('../db');
     const notifications = await db.notifications.toArray();
+    const sectionTitles = await db.keyValueStore.get('zapitv_section_titles');
+    const heroCarouselRaw = localStorage.getItem('zapitv_hero_carousel_v1');
     const data = {
-      users,
+      users: users.map(({ password, ...safeUser }) => safeUser),
       content,
       notifications,
+      customSections: await db.customSections.toArray(),
+      sectionTitles: sectionTitles?.value ?? null,
+      heroCarouselRaw,
       timestamp: new Date().toISOString()
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -857,12 +867,33 @@ const AdminView: React.FC<AdminViewProps> = ({
                             <span className={`w-1.5 h-1.5 rounded-full ${p.status === 'online' ? 'bg-green-400' : 'bg-red-400'}`} />
                             {p.status}
                           </span>
+                          {p.errorMessage && (
+                            <span className="text-[10px] text-red-400 block max-w-xs truncate mt-1" title={p.errorMessage}>
+                              {p.errorMessage}
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4 font-mono font-bold text-gray-300">
                           {p.latencyMs ? `${p.latencyMs}ms` : '—'}
                         </td>
                         <td className="px-6 py-4 font-bold text-gray-400">
-                          #{p.priority}
+                          <div className="flex items-center gap-1">
+                            <span className="text-gray-500 text-xs font-mono">#</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={99}
+                              value={p.priority}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                if (!isNaN(val)) {
+                                  handleUpdatePriority(p.id, val);
+                                }
+                              }}
+                              className="w-12 px-1.5 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white font-mono text-xs font-bold text-center focus:border-orange-500 outline-none"
+                              title="Alterar prioridade de resolução do provedor"
+                            />
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">

@@ -3,6 +3,7 @@ import { CatalogSortOption } from '../../../components/SortDropdown';
 import { hybridRecommendationEngine } from '../recommendations/hybridRecommendationEngine';
 import { bannedContentRegistry } from './BannedContentRegistry';
 import { deduplicateContentItems, getCanonicalKeysForItem } from './catalogDeduplication';
+import { LruCache } from '../cache/LruCache';
 
 export interface SnapshotContext {
   profileId: string;
@@ -42,9 +43,15 @@ export class CatalogSnapshotManager {
       genreFilter: context?.genreFilter
     };
 
+    const tieBreaker = (a: ContentItem, b: ContentItem): number => {
+      const idA = a.canonicalId || a.imdbId || a.tmdbId || a.id || a.title || '';
+      const idB = b.canonicalId || b.imdbId || b.tmdbId || b.id || b.title || '';
+      return idA.localeCompare(idB);
+    };
+
     switch (sortOption) {
       case 'popularity': {
-        // Mais populares primeiro
+        // Mais populares primeiro com desempate determinístico único
         return [...clean].sort((a, b) => {
           if (a.isFeatured && !b.isFeatured) return -1;
           if (!a.isFeatured && b.isFeatured) return 1;
@@ -55,34 +62,44 @@ export class CatalogSnapshotManager {
           const rankA = a.imdbRank && a.imdbRank > 0 ? a.imdbRank : 9999;
           const rankB = b.imdbRank && b.imdbRank > 0 ? b.imdbRank : 9999;
           if (rankA !== rankB) return rankA - rankB;
-          return (b.rating || 0) - (a.rating || 0);
+
+          const diffRating = (b.rating || 0) - (a.rating || 0);
+          if (Math.abs(diffRating) > 0.01) return diffRating;
+
+          return tieBreaker(a, b);
         });
       }
 
       case 'release_date': {
-        // Mais recentes primeiro (Lançamentos)
+        // Mais recentes primeiro (Lançamentos) com desempate determinístico único
         return [...clean].sort((a, b) => {
           const yearA = Number(a.year) || (a.releaseDate ? parseInt(a.releaseDate.substring(0, 4), 10) : 0);
           const yearB = Number(b.year) || (b.releaseDate ? parseInt(b.releaseDate.substring(0, 4), 10) : 0);
           if (yearB !== yearA) return yearB - yearA;
-          if (b.releaseDate && a.releaseDate) return b.releaseDate.localeCompare(a.releaseDate);
-          return (b.rating || 0) - (a.rating || 0);
+          if (b.releaseDate && a.releaseDate) {
+            const cmp = b.releaseDate.localeCompare(a.releaseDate);
+            if (cmp !== 0) return cmp;
+          }
+          const diffRating = (b.rating || 0) - (a.rating || 0);
+          if (Math.abs(diffRating) > 0.01) return diffRating;
+          return tieBreaker(a, b);
         });
       }
 
       case 'rating': {
-        // Melhores avaliados primeiro
+        // Melhores avaliados primeiro com desempate determinístico único
         return [...clean].sort((a, b) => {
           const diff = (b.rating || 0) - (a.rating || 0);
           if (Math.abs(diff) > 0.05) return diff;
           const yearA = Number(a.year) || (a.releaseDate ? parseInt(a.releaseDate.substring(0, 4), 10) : 0);
           const yearB = Number(b.year) || (b.releaseDate ? parseInt(b.releaseDate.substring(0, 4), 10) : 0);
-          return yearB - yearA;
+          if (yearB !== yearA) return yearB - yearA;
+          return tieBreaker(a, b);
         });
       }
 
       case 'recently_added': {
-        // Adicionados recentemente ao catálogo
+        // Adicionados recentemente ao catálogo com desempate determinístico único
         return [...clean].sort((a, b) => {
           const timeA = (a as any).addedAt || (a as any).createdAt || (a as any).timestamp;
           const timeB = (b as any).addedAt || (b as any).createdAt || (b as any).timestamp;
@@ -96,37 +113,51 @@ export class CatalogSnapshotManager {
           const yearA = Number(a.year) || (a.releaseDate ? parseInt(a.releaseDate.substring(0, 4), 10) : 0);
           const yearB = Number(b.year) || (b.releaseDate ? parseInt(b.releaseDate.substring(0, 4), 10) : 0);
           if (yearB !== yearA) return yearB - yearA;
-          if (b.releaseDate && a.releaseDate) return b.releaseDate.localeCompare(a.releaseDate);
-          return (b.rating || 0) - (a.rating || 0);
+          if (b.releaseDate && a.releaseDate) {
+            const cmp = b.releaseDate.localeCompare(a.releaseDate);
+            if (cmp !== 0) return cmp;
+          }
+          const diffRating = (b.rating || 0) - (a.rating || 0);
+          if (Math.abs(diffRating) > 0.01) return diffRating;
+          return tieBreaker(a, b);
         });
       }
 
       case 'oldest': {
-        // Mais antigos primeiro (obras clássicas)
+        // Mais antigos primeiro (obras clássicas) com desempate determinístico único
         return [...clean].sort((a, b) => {
           const yearA = Number(a.year) || (a.releaseDate ? parseInt(a.releaseDate.substring(0, 4), 10) : 9999);
           const yearB = Number(b.year) || (b.releaseDate ? parseInt(b.releaseDate.substring(0, 4), 10) : 9999);
           if (yearA !== yearB) return yearA - yearB;
-          if (a.releaseDate && b.releaseDate) return a.releaseDate.localeCompare(b.releaseDate);
-          return (a.rating || 0) - (b.rating || 0);
+          if (a.releaseDate && b.releaseDate) {
+            const cmp = a.releaseDate.localeCompare(b.releaseDate);
+            if (cmp !== 0) return cmp;
+          }
+          const diffRating = (a.rating || 0) - (b.rating || 0);
+          if (Math.abs(diffRating) > 0.01) return diffRating;
+          return tieBreaker(a, b);
         });
       }
 
       case 'title_az': {
-        // Alfabético A-Z
+        // Alfabético A-Z com desempate determinístico único
         return [...clean].sort((a, b) => {
           const tA = (a.title || '').trim().toLowerCase();
           const tB = (b.title || '').trim().toLowerCase();
-          return tA.localeCompare(tB, 'pt-BR', { sensitivity: 'base', numeric: true });
+          const cmp = tA.localeCompare(tB, 'pt-BR', { sensitivity: 'base', numeric: true });
+          if (cmp !== 0) return cmp;
+          return tieBreaker(a, b);
         });
       }
 
       case 'title_za': {
-        // Alfabético Z-A
+        // Alfabético Z-A com desempate determinístico único
         return [...clean].sort((a, b) => {
           const tA = (a.title || '').trim().toLowerCase();
           const tB = (b.title || '').trim().toLowerCase();
-          return tB.localeCompare(tA, 'pt-BR', { sensitivity: 'base', numeric: true });
+          const cmp = tB.localeCompare(tA, 'pt-BR', { sensitivity: 'base', numeric: true });
+          if (cmp !== 0) return cmp;
+          return tieBreaker(a, b);
         });
       }
 
@@ -204,11 +235,11 @@ export class CatalogSnapshotManager {
     // Ordena o novo lote internamente preservando a opção de ordenação
     const sortedBatch = this.sortItemsByOption(uniqueNewItems, sortOption, context);
 
-    // Anexa estritamente ao final preservando todo o histórico anterior
-    return [...currentSnapshot, ...sortedBatch];
+    // Anexa estritamente ao final preservando todo o histórico anterior com garantia de unicidade canônica
+    return deduplicateContentItems([...currentSnapshot, ...sortedBatch]);
   }
 
-  private snapshots: Map<string, ContentItem[]> = new Map();
+  private snapshots = new LruCache<string, ContentItem[]>(25, 30 * 60 * 1000);
 
   public getCachedSnapshot(key: string): ContentItem[] | undefined {
     return this.snapshots.get(key);

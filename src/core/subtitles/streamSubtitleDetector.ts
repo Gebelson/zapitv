@@ -41,19 +41,19 @@ const SOFTSUB_PATTERNS = [
 ];
 
 const HARDSUB_FOREIGN_PATTERNS = [
-  /\b(?:spanish|espa[nñ]ol|espanhol|castellano|latino|spa|esp|es)[-_\s]*(?:hard[-_\s]?subs?|burned[-_\s]?in|legendas?[-_\s]?(?:fixas?|embutidas?))\b/i,
-  /\b(?:hard[-_\s]?subs?|hardcoded[-_\s]*subs?|legendas?[-_\s]?(?:fixas?|embutidas?))[-_\s]*(?:spanish|espa[nñ]ol|espanhol|castellano|latino|spa|esp|es)\b/i,
-  /\b(eng(?:lish)?[-_\s]*hardsubs?|hardsubs?[-_\s]*eng(?:lish)?|hardcoded[-_\s]*(?:eng|english|spa|spanish|esp|fre|french|ita|italian))\b/i,
+  /\b(?:spanish|espa[nñ]ol|espanhol|castellano|latino|spa|esp|es)[-_.\s]*(?:hard[-_.\s]?subs?|burned[-_.\s]?in|legendas?[-_.\s]?(?:fixas?|embutidas?))\b/i,
+  /\b(?:hard[-_.\s]?subs?|hardcoded[-_.\s]*subs?|legendas?[-_.\s]?(?:fixas?|embutidas?))[-_.\s]*(?:spanish|espa[nñ]ol|espanhol|castellano|latino|spa|esp|es)\b/i,
+  /\b(eng(?:lish)?[-_.\s]*hardsubs?|hardsubs?[-_.\s]*eng(?:lish)?|hardcoded[-_.\s]*(?:eng|english|spa|spanish|esp|fre|french|ita|italian))\b/i,
   /\b(hardsub\s*\[(?:eng|en|es|spa|fre|ita)\]|subbed\s*\[(?:eng|en|es|spa|fre|ita)\])\b/i,
-  /\b(subs?\s*burned\s*in\s*eng(?:lish)?|burned[-_\s]*in\s*eng(?:lish)?)\b/i,
+  /\b(subs?\s*burned\s*in\s*eng(?:lish)?|burned[-_.\s]*in\s*eng(?:lish)?)\b/i,
   /\b(legendado\s*em\s*(?:ingl[eê]s|espanhol|franc[eê]s))\b/i,
   /\[(?:eng|en|spa|es|english|spanish)\s*hardsubs?\]/i,
   /\[hardcoded\s*subs?\]/i
 ];
 
 const HARDSUB_PTBR_PATTERNS = [
-  /\b(hardsub[-_]?pt[-_]?br|pt[-_]?br[-_]?hardsub|hardsub\s*\[pt[-_]?br\]|hardsub\s*pt|hardsub[-_]?br)\b/i,
-  /\b(?:legendas?[-_\s]?(?:fixas?|embutidas?|gravadas?)|burned[-_\s]?in[-_\s]?subs?)[-_\s]*(?:pt[-_]?br|portugu[eê]s(?:[-_\s]*brasileiro)?)\b/i
+  /\b(hardsub[-_.]?pt[-_.]?br|pt[-_.]?br[-_.]?hardsub|hardsub\s*\[pt[-_.]?br\]|hardsub\s*pt|hardsub[-_.]?br)\b/i,
+  /\b(?:legendas?[-_.\s]?(?:fixas?|embutidas?|gravadas?)|burned[-_.\s]?in[-_.\s]?subs?)[-_.\s]*(?:pt[-_.]?br|portugu[eê]s(?:[-_.\s]*brasileiro)?)\b/i
 ];
 
 const QUALITY_SCORES: Record<string, number> = {
@@ -163,7 +163,9 @@ export function analyzeStreamSubtitleFormat(stream: StremioStream): StreamSubtit
   // Release expressamente dublado em português sem menção a hardsub
   const isDubbed = Boolean(
     stream.isDubbed ||
-    /\b(dublado|dual[-_]?audio|dual|brazuca)\b/i.test(combined)
+    stream.isPtBr ||
+    /\b(dublado|dual[-_]?audio|dual|brazuca|audio\s*pt|áudio\s*pt)\b/i.test(combined) ||
+    /🌎\s*portugu[eê]s/i.test(combined)
   );
 
   if (isDubbed && !hasHardsubPtBrKeyword) {

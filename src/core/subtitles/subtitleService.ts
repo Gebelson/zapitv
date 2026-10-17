@@ -477,6 +477,25 @@ export class SubtitleService {
   }
 
   /**
+   * Obtém síncronamente as legendas em cache se já foram carregadas previamente,
+   * permitindo aplicação instantânea antes do início de episódios subsequentes.
+   */
+  public getCachedSubtitles(
+    item: ContentItem,
+    season?: number,
+    episode?: number,
+    stream?: StremioStream
+  ): SubtitleTrack[] | null {
+    const streamSig = stream?.title || stream?.name || 'def';
+    const cacheKey = `${item.id || item.imdbId || item.tmdbId}_${season || 0}_${episode || 0}_${streamSig.slice(0, 30)}`;
+    const cached = this.subtitleCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < SubtitleService.CACHE_TTL_MS) {
+      return cached.tracks;
+    }
+    return null;
+  }
+
+  /**
    * Fetches, normalizes, labels and prioritizes subtitles from OpenSubtitles v3
    * com correspondência inteligente com o release do stream de vídeo atual.
    */

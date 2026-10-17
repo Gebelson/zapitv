@@ -3,7 +3,7 @@ import {
   ArrowLeft, Play, Pause, RotateCcw, RotateCw, Volume2, VolumeX,
   Maximize, Minimize, Settings, SkipForward, AlertCircle, RefreshCw,
   Subtitles, Check, Sliders, Search, Globe, Languages, FastForward,
-  Sparkles, X, PictureInPicture2, ShieldAlert, Columns2
+  Sparkles, X, PictureInPicture2, ShieldAlert, Radio
 } from 'lucide-react';
 import Hls from 'hls.js';
 import { ReportFeedbackModal } from '../feedback/ReportFeedbackModal';
@@ -12,16 +12,16 @@ import { StremioStream } from '../../core/stremio/stremioTypes';
 import { storageService } from '../../core/storage/storageService';
 import { ContentItem, ContentType } from '../../../types';
 import { streamValidator } from '../../core/providers/streamValidator';
+import { providerRegistry } from '../../core/providers/providerRegistry';
 import { SubtitleTrack, subtitleService, sanitizeSubtitleText } from '../../core/subtitles/subtitleService';
 import { validateSubtitleContentMatch } from '../../core/subtitles/subtitleLanguageDetector';
 import { subtitleAutoSyncService } from '../../core/subtitles/subtitleAutoSyncService';
+import { subtitlePreferenceService } from '../../core/subtitles/subtitlePreferenceService';
 import { classifyStream } from '../../core/audio/audioDetector';
 import { skipService, SkipInterval, SkipType } from '../../core/skip/skipService';
 import { videoAdBlocker } from '../../core/security/videoAdBlocker';
 import { streamQuarantineService } from '../../core/security/streamQuarantineService';
 import { ZapiLoader } from '../common/ZapiLoader';
-import { aiEnhancerService } from '../../core/enhancement/aiEnhancerService';
-import { audioEnhancer } from '../../core/enhancement/audioEnhancer';
 import { ZapiSkipButton } from './ZapiSkipButton';
 import { ZapiStreamDiagnosticsModal } from '../dev/ZapiStreamDiagnosticsModal';
 import { playbackSessionService, NavigationType } from '../../core/session/playbackSessionService';
@@ -39,6 +39,7 @@ import { analyzeStreamSubtitleFormat } from '../../core/subtitles/streamSubtitle
 import { pipService } from '../../core/pip/pipService';
 import { mediaLoadingTracker } from '../../core/tracking/mediaLoadingTracker';
 import { mediaSourceValidationService } from '../../core/providers/mediaSourceValidationService';
+import { reportSourceEvidence, startSourceEvidence } from '../../core/providers/sourceMemory';
 import { audioSelectionManager, AudioOption } from '../../core/audio/audioSelectionManager';
 import { playbackOptimizerService } from '../../core/playback/PlaybackOptimizerService';
 import { mediaAvailabilityIndex } from '../../core/catalog/MediaAvailabilityIndex';
@@ -46,6 +47,7 @@ import { watchPartyService } from '../../core/watchparty/WatchPartyService';
 import { WatchPartyOverlay } from '../watchparty/WatchPartyOverlay';
 
 import { OfflineSubtitleTrack } from '../../core/offline/offlineTypes';
+import { VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../../core/providers/sourceVerificationService';
 
 export interface NextEpisodeInfo {
   season: number;
@@ -58,6 +60,7 @@ interface ZapiPlayerProps {
   streams: StremioStream[];
   isLoadingStreams?: boolean;
   streamResolutionError?: string | null;
+  verificationState?: VerificationState;
   onRetrySources?: () => void;
   initialSeason?: number;
   initialEpisode?: number;
@@ -129,6 +132,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   streams,
   isLoadingStreams = false,
   streamResolutionError,
+  verificationState = 'IDLE',
   onRetrySources,
   initialSeason,
   initialEpisode,
@@ -146,6 +150,32 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 }) => {
   const [selectedStreamIndex, setSelectedStreamIndex] = useState(0);
   const currentStream = streams[selectedStreamIndex] || streams[0];
+  const sourceEvidenceRef = useRef<{
+    key: string; ticket: Promise<string | null>; selectedAt: number;
+    playingAt: number | null; positionAt: number | null; reported: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!currentStream?.url || isLoadingStreams || isOfflineMode) {
+      sourceEvidenceRef.current = null;
+      return;
+    }
+    const identity = canonicalIdentityService.buildIdentity(item,
+      initialSeason && initialEpisode ? { season: initialSeason, episode: initialEpisode } : undefined);
+    const key = `${identity.canonicalId}|${currentStream.providerId}|${currentStream.url}`;
+    if (sourceEvidenceRef.current?.key === key) return;
+    sourceEvidenceRef.current = {
+      key, selectedAt: Date.now(), playingAt: null, positionAt: null, reported: false,
+      ticket: startSourceEvidence({
+        canonicalId: identity.canonicalId || '',
+        mediaType: (identity.canonicalId?.split(':')[0] as 'movie' | 'series' | 'anime') ||
+          (item.type === ContentType.MOVIE ? 'movie' : item.type === ContentType.ANIME ? 'anime' : 'series'),
+        season: initialSeason || 0, episode: initialEpisode || 0,
+      }, currentStream),
+    };
+  }, [currentStream?.url, currentStream?.providerId, isLoadingStreams, isOfflineMode,
+    item.id, item.canonicalId, item.imdbId, item.tmdbId, item.aniListId,
+    item.type, item.mediaFormat, initialSeason, initialEpisode]);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -219,6 +249,15 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const [isSeeking, setIsSeeking] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const latestProgressRef = useRef({
+    currentTime: 0,
+    duration: 0
+  });
+
+  useEffect(() => {
+    latestProgressRef.current = { currentTime, duration };
+  }, [currentTime, duration]);
+
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [isAutoplayAudioBlocked, setIsAutoplayAudioBlocked] = useState(false);
@@ -227,12 +266,21 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Transmissão do Host via WebRTC (Watch Party)
+  const isHostBroadcastMode = watchPartyService.isConnected && watchPartyService.isHostBroadcastMode();
+  const isBroadcastGuest = isHostBroadcastMode && !watchPartyService.isHost();
+  const isBroadcastHost = isHostBroadcastMode && watchPartyService.isHost();
+
+  const [remoteBroadcastStream, setRemoteBroadcastStream] = useState<MediaStream | null>(() => watchPartyService.getHostStream());
+  const [streamConnectionState, setStreamConnectionState] = useState<'good' | 'fair' | 'poor'>('good');
+  const [isHostCapturing, setIsHostCapturing] = useState(false);
+  const [hostNeedsDisplayMediaPrompt, setHostNeedsDisplayMediaPrompt] = useState(false);
+
   // Recuperação transparente de áudio: desmuta no primeiro gesto sem perder o volume original
   const handlePlayerUserInteraction = useCallback(() => {
     if (isAutoplayAudioBlocked && videoRef.current) {
       videoRef.current.muted = isMuted;
       videoRef.current.volume = volume;
-      audioEnhancer.resumeAudioContext();
       setIsAutoplayAudioBlocked(false);
     }
   }, [isAutoplayAudioBlocked, isMuted, volume]);
@@ -248,6 +296,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   // Determina se deve iniciar com a vinheta oficial da sessão
   const shouldStartWithIntro = useMemo(() => {
+    if (isBroadcastGuest) {
+      return false;
+    }
     if (isOfflineMode) {
       return false;
     }
@@ -261,32 +312,42 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       return initialPlayIntro;
     }
     return !playbackSessionService.isIntroPlayed();
-  }, [navigationType, playbackSessionId, initialPlayIntro]);
+  }, [isBroadcastGuest, navigationType, playbackSessionId, initialPlayIntro]);
 
   // ZapiTV Intro state & Smooth Media Transition
-  const [isPlayingIntro, setIsPlayingIntro] = useState(() => shouldStartWithIntro);
+  // REGRA OBRIGATÓRIA: A intro NUNCA começa no mount. Ela só inicia após validação de fontes e preparação completa da mídia.
+  const [isPlayingIntro, setIsPlayingIntro] = useState(false);
   const [isIntroEnded, setIsIntroEnded] = useState(() => !shouldStartWithIntro);
   const [isIntroFading, setIsIntroFading] = useState(false);
   const [isMediaReady, setIsMediaReady] = useState(false);
+  const [allSourcesFailed, setAllSourcesFailed] = useState(false);
+  const [failureCategory, setFailureCategory] = useState<'NO_SOURCES_FOUND' | 'VERIFICATION_ERROR' | 'PLAYBACK_FAILURE' | 'UNAVAILABLE'>('UNAVAILABLE');
   const [userSkippedIntro, setUserSkippedIntro] = useState(false);
 
-  useEffect(() => {
-    if (navigationType === 'retry_playback') {
-      setIsPlayingIntro(false);
-      setIsIntroEnded(true);
-    }
-  }, [navigationType]);
-
+  const hasStartedIntroRef = useRef(false);
+  const isIntroEndedRef = useRef(!shouldStartWithIntro);
+  const userSkippedIntroRef = useRef(false);
   const introVideoRef = useRef<HTMLVideoElement | null>(null);
   const isMediaReadyRef = useRef(false);
-  const isPlayingIntroRef = useRef(shouldStartWithIntro);
+  const isPlayingIntroRef = useRef(false);
   const showNonDubbedPromptRef = useRef(false);
   const isIntroTransitioningRef = useRef(false);
 
-  // Subtitles state
+  // Subtitles state — Integrado com persistência via SubtitlePreferenceService
   const [subtitlesList, setSubtitlesList] = useState<SubtitleTrack[]>([]);
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(true);
-  const [selectedSubtitleId, setSelectedSubtitleId] = useState<string>('off');
+  const [selectedSubtitleId, setSelectedSubtitleId] = useState<string>(() => {
+    // Se o usuário selecionou "Sem legenda", inicia estritamente como 'off'
+    if (!subtitlePreferenceService.isSubtitlesEnabled()) {
+      return 'off';
+    }
+    const cached = subtitleService.getCachedSubtitles(item, initialSeason, initialEpisode, currentStream);
+    if (cached && cached.length > 0) {
+      const desired = subtitlePreferenceService.resolveDesiredSubtitleTrack(cached, currentStream);
+      return desired.track?.id || 'off';
+    }
+    return 'off';
+  });
   const [appliedSubtitleId, setAppliedSubtitleId] = useState<string>('off');
   const [subtitleStatus, setSubtitleStatus] = useState<'idle' | 'loading' | 'applied' | 'error' | 'unavailable'>('idle');
   const [subtitleErrorToast, setSubtitleErrorToast] = useState<string | null>(null);
@@ -303,6 +364,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     return false;
   });
   const [forcedNonDubbedPrompt, setForcedNonDubbedPrompt] = useState<boolean>(false);
+  const [hasDynamicallyConfirmedPtBr, setHasDynamicallyConfirmedPtBr] = useState<boolean>(false);
+  const ptBrConfirmedOnceRef = useRef<boolean>(false);
+  const isSeekingRef = useRef<boolean>(false);
+  const selectedHlsAudioTrackRef = useRef<number>(-1);
+  const stallTimerRef = useRef<number>(0);
+  const lastPlaybackPositionRef = useRef<number>(0);
+  const audioCheckTicksRef = useRef<number>(0);
 
   // Skip Times state (AniSkip & IntroDB)
   const [skipIntervals, setSkipIntervals] = useState<SkipInterval[]>([]);
@@ -356,6 +424,55 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     });
   }, [skipIntervals, currentTime]);
 
+  // Tratamento dinâmico de avanço e retrocesso na barra de tempo com blindagem de seek
+  const handleSeek = useCallback((targetTime: number) => {
+    if (isPlayingIntroRef.current) return;
+
+    if (isBroadcastGuest) {
+      if (!watchPartyService.canLocalControl('canSeek')) {
+        return;
+      }
+      watchPartyService.requestHostPlaybackAction('seek', { positionSeconds: targetTime });
+      return;
+    }
+
+    const video = videoRef.current;
+    const clampedTime = Math.max(0, Math.min(duration || targetTime, targetTime));
+
+    // Blindagem ativa contra falsos diagnósticos de áudio e travamento durante seek
+    isSeekingRef.current = true;
+    setIsSeeking(true);
+    setIsLoading(true);
+    stallTimerRef.current = 0;
+    audioCheckTicksRef.current = 0;
+    lastPlaybackPositionRef.current = clampedTime;
+
+    // Atualiza imediatamente o estado para que a UI e os botões respondam em tempo real
+    setCurrentTime(clampedTime);
+    latestProgressRef.current = { currentTime: clampedTime, duration: duration || 0 };
+
+    if (video) {
+      try {
+        video.currentTime = clampedTime;
+        if (watchPartyService.isHost() || watchPartyService.canLocalControl('canSeek')) {
+          watchPartyService.updatePlaybackState(clampedTime, !video.paused, video.playbackRate);
+        }
+      } catch {}
+    }
+
+    // Se o usuário retrocedeu para antes do final do vídeo, reseta flags de autoplay
+    const remaining = (duration || 0) - clampedTime;
+    if (remaining > 15) {
+      setIsAutoPlayCancelled(false);
+      hasAutoAdvancedRef.current = false;
+      setShowAutoPlayCountdown(false);
+      if (autoPlayTimerRef.current) {
+        clearInterval(autoPlayTimerRef.current);
+        autoPlayTimerRef.current = null;
+      }
+    }
+  }, [duration, isBroadcastGuest]);
+
   // Executa o avanço até o término do intervalo (usando API de seek existente ou avançando de episódio se for créditos)
   const handleExecuteSkip = useCallback((interval: SkipInterval) => {
     // Se for créditos ('ed') e houver próximo episódio disponível, avança diretamente para o próximo episódio
@@ -393,52 +510,128 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
 
     try {
-      video.currentTime = targetTime;
-      setCurrentTime(targetTime);
+      handleSeek(targetTime);
     } catch (err) {
       console.error('[ZapiSkip] Falha ao avançar vídeo:', err);
     }
-  }, [duration, onNextEpisode, isLoadingStreams]);
+  }, [duration, onNextEpisode, isLoadingStreams, handleSeek]);
 
   useEffect(() => {
+    setHasDynamicallyConfirmedPtBr(false);
+    ptBrConfirmedOnceRef.current = false;
     if (playbackSessionId && playbackSessionService.isNonDubbedConfirmed(playbackSessionId)) {
       setHasUserConfirmedNonDubbed(true);
     } else {
       setHasUserConfirmedNonDubbed(false);
     }
+
+    // Requisito 4: Aplica preferência de legendas ANTES de iniciar o próximo episódio
+    setCues([]);
+    setAppliedSubtitleId('off');
+    setSubtitleErrorToast(null);
+
+    if (!subtitlePreferenceService.isSubtitlesEnabled()) {
+      setSelectedSubtitleId('off');
+      setSubtitleStatus('idle');
+    } else {
+      const cached = subtitleService.getCachedSubtitles(item, initialSeason, initialEpisode, currentStream);
+      if (cached && cached.length > 0) {
+        setSubtitlesList(cached);
+        const desired = subtitlePreferenceService.resolveDesiredSubtitleTrack(cached, currentStream);
+        if (desired.track) {
+          setSelectedSubtitleId(desired.track.id);
+        } else {
+          setSelectedSubtitleId('off');
+        }
+      } else {
+        setSelectedSubtitleId('off');
+      }
+    }
   }, [item.id, initialSeason, initialEpisode, playbackSessionId]);
+
+  // Avaliação estrita dos 3 estados de disponibilidade de PT-BR (Requisitos 5 e 6):
+  // 1. 'confirmed'   -> Dublagem ou áudio original em PT-BR confirmado nas fontes ou no player
+  // 2. 'unknown'     -> Idioma não declarado/desconhecido nos metadados (NÃO exibe modal ou aviso de indisponível)
+  // 3. 'unavailable' -> Todas as fontes declaram explicitamente idiomas estrangeiros sem PT-BR
+  const ptBrAvailabilityState = useMemo<'confirmed' | 'unknown' | 'unavailable'>(() => {
+    // 1. Catálogo ou metadado informa áudio PT-BR nativo/dublado
+    if (item.audioStatus === 'pt-br-original' || item.audioStatus === 'pt-br-dubbed') {
+      return 'confirmed';
+    }
+
+    // 2. Player confirmou dinamicamente trilha real de áudio PT-BR (ou já foi confirmada anteriormente na sessão)
+    if (hasDynamicallyConfirmedPtBr || ptBrConfirmedOnceRef.current) {
+      return 'confirmed';
+    }
+
+    // 3. Streams em carregamento ou ausentes
+    if (!streams || streams.length === 0) {
+      return isLoadingStreams ? 'unknown' : 'unavailable';
+    }
+
+    // 4. Inspeciona cada stream recebido
+    let hasUnknownStream = false;
+    for (const s of streams) {
+      const cls = classifyStream(s);
+      if (cls.isDubbed || cls.isPtBr || s.isDubbed || s.isPtBr) {
+        return 'confirmed';
+      }
+      if (cls.language === 'unknown' || (!cls.language && !cls.isSubtitled)) {
+        hasUnknownStream = true;
+      }
+    }
+
+    // 5. Se nenhuma fonte confirmou PT-BR mas há fontes com idioma desconhecido:
+    // Diferenciação obrigatória: NÃO declarar indisponível até inspecionar as trilhas reais da mídia
+    if (hasUnknownStream) {
+      return 'unknown';
+    }
+
+    // 6. Todas as fontes declaram expressamente outros idiomas sem PT-BR
+    return 'unavailable';
+  }, [item.audioStatus, hasDynamicallyConfirmedPtBr, streams, isLoadingStreams]);
 
   // Verifica se existe dublagem em Português Brasileiro confirmada nas fontes
   const hasPtBrDubbingAvailable = useMemo(() => {
-    if (item.audioStatus === 'pt-br-original') return true;
-    if (!streams || streams.length === 0) return false;
-    return streams.some(s => {
-      const cls = classifyStream(s);
-      return cls.isDubbed;
-    });
-  }, [streams, item.audioStatus]);
+    return ptBrAvailabilityState === 'confirmed';
+  }, [ptBrAvailabilityState]);
 
-  // Verifica se há legendas em português ou hardsub compatível
-  const hasPtBrSubtitlesAvailable = useMemo(() => {
-    if (currentStream) {
-      const formatAnalysis = analyzeStreamSubtitleFormat(currentStream);
-      if (formatAnalysis.format === 'hardsub_ptbr') return true;
-    }
-    if (subtitlesList.length > 0) {
-      return subtitlesList.some(s => s.isPtBr || /^(pob|pt-br|bra|por-br|por|pt|pt-pt)$/i.test(s.lang));
-    }
-    return false;
-  }, [currentStream, subtitlesList]);
-
-  // Verifica se há fonte com áudio original disponível
-  const hasOriginalAudioAvailable = useMemo(() => {
-    return Boolean(streams && streams.length > 0);
-  }, [streams]);
-
-  // Modal para perguntar se o usuário deseja assistir sem dublagem brasileira
+  // Modal para perguntar se o usuário deseja assistir sem dublagem brasileira:
+  // REGRA FUNDAMENTAL E INEGOCIÁVEL: NUNCA exibir antes de confirmar uma fonte reproduzível (isMediaReady === true).
+  // Exibido APENAS se houver mídia pronta mas PT-BR for comprovadamente indisponível ('unavailable'), NUNCA em 'unknown' ou 'confirmed'.
+  // BLINDAGEM OBRIGATÓRIA: Nunca exibir durante seeks, buffering inicial, falhas gerais de playback ou se PT-BR já foi confirmado nesta sessão.
   const showNonDubbedPrompt = useMemo(() => {
-    return forcedNonDubbedPrompt || (!isLoadingStreams && streams.length > 0 && !hasPtBrDubbingAvailable && !hasUserConfirmedNonDubbed);
-  }, [forcedNonDubbedPrompt, isLoadingStreams, streams.length, hasPtBrDubbingAvailable, hasUserConfirmedNonDubbed]);
+    if (isBroadcastGuest) {
+      return false;
+    }
+    if (hasDynamicallyConfirmedPtBr || ptBrConfirmedOnceRef.current) {
+      return false;
+    }
+    if (isSeeking || isSeekingRef.current || isLoadingStreams || allSourcesFailed || hasError) {
+      return false;
+    }
+    // REGRA DE OURO: Somente exibe APÓS a fonte estar tecnicamente pronta e reproduzível
+    if (!isMediaReady) {
+      return false;
+    }
+    if (hasUserConfirmedNonDubbed) {
+      return false;
+    }
+    return forcedNonDubbedPrompt || (Boolean(streams && streams.length > 0) && ptBrAvailabilityState === 'unavailable');
+  }, [
+    isBroadcastGuest,
+    hasDynamicallyConfirmedPtBr,
+    isSeeking,
+    isLoadingStreams,
+    allSourcesFailed,
+    hasError,
+    isMediaReady,
+    hasUserConfirmedNonDubbed,
+    forcedNonDubbedPrompt,
+    streams,
+    ptBrAvailabilityState
+  ]);
+  showNonDubbedPromptRef.current = showNonDubbedPrompt;
 
   // Salto automático se habilitado nas configurações (Requisito 9)
   useEffect(() => {
@@ -585,10 +778,19 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   }, [isPlayingIntro]);
 
   useEffect(() => {
+    isIntroEndedRef.current = isIntroEnded;
+  }, [isIntroEnded]);
+
+  useEffect(() => {
+    userSkippedIntroRef.current = userSkippedIntro;
+  }, [userSkippedIntro]);
+
+  useEffect(() => {
     if (navigationType === 'continuous_playback' || navigationType === 'retry_playback' || (playbackSessionId && !playbackSessionService.shouldPlayIntro(playbackSessionId))) {
       setIsPlayingIntro(false);
       setIsIntroEnded(true);
       isPlayingIntroRef.current = false;
+      isIntroEndedRef.current = true;
     }
   }, [navigationType, playbackSessionId]);
 
@@ -617,7 +819,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     // 1. Inicia a reprodução do vídeo principal sob a camada da intro com áudio sincronizado
     video.muted = isMuted;
     video.volume = volume;
-    audioEnhancer.resumeAudioContext();
     video.play()
       .then(() => {
         setIsPlaying(true);
@@ -660,6 +861,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Quando o vídeo da intro chega ao final
   const handleIntroEnded = useCallback(() => {
     setIsIntroEnded(true);
+    isIntroEndedRef.current = true;
 
     // Pausa exatamente no último frame da intro
     if (introVideoRef.current) {
@@ -668,18 +870,15 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       } catch {}
     }
 
-    // Se a mídia já estiver carregada e pronta para tocar, inicia a transição suave imediatamente!
-    if (isMediaReadyRef.current && !showNonDubbedPromptRef.current) {
-      transitionFromIntroToMedia();
-    }
-    // Caso a mídia NÃO tenha carregado ainda:
-    // Permanece pausado no último frame da intro até que a mídia fique pronta!
+    // Como a mídia já foi pré-bufferizada e preparada ANTES da intro, inicia a transição suave imediatamente!
+    transitionFromIntroToMedia();
   }, [transitionFromIntroToMedia]);
 
   // Quando o usuário clica em "Pular Intro"
   const handleSkipIntro = useCallback(() => {
     if (showNonDubbedPromptRef.current) return;
     setUserSkippedIntro(true);
+    userSkippedIntroRef.current = true;
 
     if (introVideoRef.current) {
       try {
@@ -687,12 +886,94 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       } catch {}
     }
 
-    // Se a mídia já está pronta, transiciona suavemente agora
-    if (isMediaReadyRef.current) {
-      transitionFromIntroToMedia();
-    }
-    // Se ainda não estiver pronta, congela a imagem no frame atual e transiciona assim que a mídia carregar
+    // Mídia já preparada: transiciona instantaneamente
+    transitionFromIntroToMedia();
   }, [transitionFromIntroToMedia]);
+
+  // Instant Fallback & Failure Tracking
+  const triedIndicesRef = useRef<Set<number>>(new Set());
+  const isSwitchingStreamRef = useRef(false);
+  const startupTimedOutRef = useRef(false);
+  const attemptIdRef = useRef<number>(0);
+
+  // Inicia a reprodução da vinheta institucional ZapiTV com a mídia principal já pré-bufferizada em background
+  const startIntroIfReady = useCallback(() => {
+    if (!isMountedRef.current) return;
+    const isPtBrAbsent = !hasDynamicallyConfirmedPtBr &&
+      !ptBrConfirmedOnceRef.current &&
+      item.audioStatus !== 'pt-br-original' &&
+      item.audioStatus !== 'pt-br-dubbed' &&
+      !currentStream?.isDubbed &&
+      !currentStream?.isPtBr &&
+      (ptBrAvailabilityState === 'unavailable' || forcedNonDubbedPrompt);
+
+    // Nunca toca a vinheta enquanto a busca de fontes estiver pendente, se não houver fontes ou se o aviso de dublagem estiver pendente
+    if (isLoadingStreams || allSourcesFailed || showNonDubbedPromptRef.current || !streams || streams.length === 0) return;
+    if (isPtBrAbsent && !hasUserConfirmedNonDubbed) return;
+    // Nunca toca a vinheta se a mídia principal ainda não concluiu o pré-buffer
+    if (!isMediaReadyRef.current) return;
+
+    // Se a vinheta não deve ser tocada nesta sessão (ex: reprodução contínua ou já assistida):
+    if (!shouldStartWithIntro || isIntroEndedRef.current || userSkippedIntroRef.current) {
+      const video = videoRef.current;
+      if (video && video.paused && !showNonDubbedPromptRef.current) {
+        video.muted = isMuted;
+        video.volume = volume;
+        video.play().then(() => setIsPlaying(true)).catch((err) => {
+          if (err && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
+            console.warn('[ZapiPlayer] Autoplay com som bloqueado pelo navegador. Ativando recuperação por 1 toque:', err.name);
+            video.muted = true;
+            setIsAutoplayAudioBlocked(true);
+            video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+          } else {
+            setIsPlaying(false);
+          }
+        });
+      }
+      return;
+    }
+
+    // Inicia a intro com o vídeo principal devidamente pausado e sem som em background
+    if (hasStartedIntroRef.current) return;
+    hasStartedIntroRef.current = true;
+    setIsPlayingIntro(true);
+    isPlayingIntroRef.current = true;
+
+    const video = videoRef.current;
+    if (video) {
+      try {
+        video.pause();
+        video.muted = true;
+      } catch {}
+    }
+
+    if (introVideoRef.current) {
+      try {
+        introVideoRef.current.currentTime = 0;
+        introVideoRef.current.muted = isMuted;
+        introVideoRef.current.volume = volume;
+        introVideoRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch(() => handleIntroEnded());
+      } catch {
+        handleIntroEnded();
+      }
+    }
+  }, [
+    isLoadingStreams,
+    allSourcesFailed,
+    shouldStartWithIntro,
+    isMuted,
+    volume,
+    handleIntroEnded,
+    streams,
+    hasDynamicallyConfirmedPtBr,
+    item.audioStatus,
+    currentStream,
+    ptBrAvailabilityState,
+    forcedNonDubbedPrompt,
+    hasUserConfirmedNonDubbed
+  ]);
 
   // Notifica que o stream principal foi carregado e está pronto para tocar
   const markMediaAsReady = useCallback(() => {
@@ -700,17 +981,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     setIsMediaReady(true);
     isMediaReadyRef.current = true;
 
-    // Se a intro não estiver ativa (reprodução contínua ou intro finalizada), inicia o vídeo principal
-    if (!isPlayingIntroRef.current && !showNonDubbedPromptRef.current) {
-      const video = videoRef.current;
-      if (video && video.paused) {
-        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-      }
-    } else if ((isIntroEnded || userSkippedIntro) && isPlayingIntroRef.current && !isIntroTransitioningRef.current && !showNonDubbedPromptRef.current) {
-      // Se a intro já tiver chegado ao fim (ou o usuário clicou em pular) e ainda está na intro:
-      transitionFromIntroToMedia();
+    // Se o modal de dublagem estiver ativo, aguarda a confirmação do usuário antes de tocar a vinheta
+    if (showNonDubbedPromptRef.current) {
+      return;
     }
-  }, [isIntroEnded, userSkippedIntro, transitionFromIntroToMedia]);
+
+    startIntroIfReady();
+  }, [startIntroIfReady]);
 
   // Reação automática: assim que a mídia estiver pronta, se a intro já terminou ou foi pulada, transiciona!
   useEffect(() => {
@@ -718,6 +995,18 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       transitionFromIntroToMedia();
     }
   }, [isMediaReady, isIntroEnded, userSkippedIntro, isPlayingIntro, showNonDubbedPrompt, transitionFromIntroToMedia]);
+
+  // Se a mídia estiver pronta e a intro já foi concluída (ex: recuperação automática pós-falha), inicia a reprodução direta sem reiniciar a vinheta
+  useEffect(() => {
+    if (isMediaReady && (isIntroEnded || userSkippedIntro) && !isPlayingIntro && !showNonDubbedPrompt) {
+      const video = videoRef.current;
+      if (video && video.paused) {
+        video.muted = isMuted;
+        video.volume = volume;
+        video.play().then(() => setIsPlaying(true)).catch(() => {});
+      }
+    }
+  }, [isMediaReady, isIntroEnded, userSkippedIntro, isPlayingIntro, showNonDubbedPrompt, isMuted, volume]);
 
   // Fallback de segurança (15 segundos) caso o navegador trave a decodificação da vinheta
   useEffect(() => {
@@ -751,13 +1040,15 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       video.volume = volume;
     }
   }, [isPlayingIntro, isMuted, volume]);
-  
-  // Instant Fallback & Failure Tracking
-  const [allSourcesFailed, setAllSourcesFailed] = useState(false);
-  const triedIndicesRef = useRef<Set<number>>(new Set());
-  const isSwitchingStreamRef = useRef(false);
-  const startupTimedOutRef = useRef(false);
 
+  // Sincroniza áudio da vinheta com as preferências de volume e mute em tempo real
+  useEffect(() => {
+    const intro = introVideoRef.current;
+    if (!intro || !isPlayingIntro) return;
+    intro.muted = isMuted;
+    intro.volume = volume;
+  }, [isPlayingIntro, isMuted, volume]);
+  
   // Máquina de estados explícita do ciclo de vida da reprodução
   const playbackPhase: PlaybackPhase = useMemo(() => {
     if (allSourcesFailed) return 'error';
@@ -780,193 +1071,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const [feedbackDefaultCategory, setFeedbackDefaultCategory] = useState<FeedbackCategory>('video_not_loading');
   const [availableQualities, setAvailableQualities] = useState<string[]>([]);
   const [selectedQuality, setSelectedQuality] = useState('auto');
-
-  // AI Enhancer state & canvas
-  const aiCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [aiSettings, setAiSettings] = useState(() => aiEnhancerService.getSettings());
-  const [enhancerStatus, setEnhancerStatus] = useState<'off' | 'initializing' | 'active' | 'unavailable'>(() => aiEnhancerService.getStatus());
-  const [isEnhancerRendering, setIsEnhancerRendering] = useState(() => aiEnhancerService.isRendering());
-  const [isHoldingOriginal, setIsHoldingOriginal] = useState(false);
-  const [showActivatedToast, setShowActivatedToast] = useState(false);
-  const [showUnavailableToast, setShowUnavailableToast] = useState(false);
-  const holdTimerRef = useRef<any>(null);
-  const isHeldLongRef = useRef(false);
-
-  // Split-Screen Image Comparison State (Tela Dividida)
-  const [isSplitComparing, setIsSplitComparing] = useState(false);
-  const [splitPosition, setSplitPosition] = useState(50);
-  const [isDraggingDivider, setIsDraggingDivider] = useState(false);
-  const splitContainerRef = useRef<HTMLDivElement | null>(null);
-
-  // Status de ativação real da IA (pipeline processando e renderizando)
-  const isAiActive = Boolean(
-    aiSettings.enabled && 
-    aiSettings.videoEnabled && 
-    enhancerStatus === 'active' && 
-    isEnhancerRendering
-  );
-
-  // Regras obrigatórias:
-  // 1. Quando IA estiver desativada ou processamento falhar, encerra comparação em tela dividida
-  useEffect(() => {
-    if (isSplitComparing && !isAiActive) {
-      setIsSplitComparing(false);
-      aiEnhancerService.setComparisonMode('off');
-    }
-  }, [isAiActive, isSplitComparing]);
-
-  const handleToggleSplit = useCallback(() => {
-    if (!isAiActive) {
-      setShowUnavailableToast(true);
-      setTimeout(() => setShowUnavailableToast(false), 2500);
-      return;
-    }
-
-    setIsSplitComparing(prev => {
-      const next = !prev;
-      aiEnhancerService.setComparisonMode(next ? 'split' : 'off');
-      return next;
-    });
-  }, [isAiActive]);
-
-  const handleToggleAiEnhancer = useCallback(() => {
-    if (enhancerStatus === 'unavailable') {
-      setShowUnavailableToast(true);
-      setTimeout(() => setShowUnavailableToast(false), 2500);
-      return;
-    }
-
-    const nextState = aiEnhancerService.toggleEnabled();
-    if (!nextState) {
-      setIsSplitComparing(false);
-      aiEnhancerService.setComparisonMode('off');
-    } else {
-      setShowActivatedToast(true);
-      setTimeout(() => setShowActivatedToast(false), 2500);
-    }
-  }, [enhancerStatus]);
-
-  const updateSplitPosition = useCallback((clientX: number) => {
-    const container = splitContainerRef.current || containerRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    if (rect.width <= 0) return;
-    const rawPos = ((clientX - rect.left) / rect.width) * 100;
-    const clamped = Math.max(5, Math.min(95, Math.round(rawPos)));
-    setSplitPosition(clamped);
-    aiEnhancerService.setSplitPosition(clamped);
-  }, []);
-
-  useEffect(() => {
-    if (!isDraggingDivider) return;
-
-    const handlePointerMove = (e: PointerEvent) => {
-      updateSplitPosition(e.clientX);
-    };
-
-    const handlePointerUp = () => {
-      setIsDraggingDivider(false);
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, [isDraggingDivider, updateSplitPosition]);
-
-  useEffect(() => {
-    const unsub = aiEnhancerService.subscribe(setAiSettings);
-    return unsub;
-  }, []);
-
-  useEffect(() => {
-    const unsub = aiEnhancerService.onStatusChange(setEnhancerStatus);
-    return unsub;
-  }, []);
-
-  useEffect(() => {
-    const unsub = aiEnhancerService.onRenderingChange(setIsEnhancerRendering);
-    return unsub;
-  }, []);
-
-  const syncCanvasDimensions = useCallback(() => {
-    const video = videoRef.current;
-    const canvas = aiCanvasRef.current;
-    if (video && canvas && video.videoWidth > 0 && video.videoHeight > 0) {
-      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    const canvas = aiCanvasRef.current;
-    if (!video || !canvas) return;
-
-    const isAnime = item.type === ContentType.ANIME || Boolean(item.genres?.some(g => /anime|animação/i.test(g))) || Boolean(item.title && /anime/i.test(item.title));
-    aiEnhancerService.setContentCategory(isAnime ? 'anime' : 'live-action');
-    aiEnhancerService.attachPlayer(video, canvas);
-
-    return () => {
-      aiEnhancerService.detachPlayer();
-    };
-  }, [item, selectedStreamIndex, initialSeason, initialEpisode, isMediaReady]);
-
-  const handleEnhancerPointerDown = (e: React.PointerEvent) => {
-    if (enhancerStatus === 'unavailable') return;
-    if (!aiSettings.enabled) {
-      return;
-    }
-    // Quando a melhoria estiver ativa, segurar pressionado ativa comparação com vídeo original
-    isHeldLongRef.current = false;
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    holdTimerRef.current = setTimeout(() => {
-      isHeldLongRef.current = true;
-      setIsHoldingOriginal(true);
-      aiEnhancerService.setHoldComparison(true);
-    }, 150);
-  };
-
-  const handleEnhancerPointerUp = (e: React.PointerEvent) => {
-    if (enhancerStatus === 'unavailable') {
-      setShowUnavailableToast(true);
-      setTimeout(() => setShowUnavailableToast(false), 2500);
-      return;
-    }
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    if (isHeldLongRef.current) {
-      // Estava segurando: ao soltar o botão, volta instantaneamente para a versão melhorada
-      isHeldLongRef.current = false;
-      setIsHoldingOriginal(false);
-      aiEnhancerService.setHoldComparison(false);
-    } else {
-      // Clique rápido (<150ms): liga ou desliga normalmente
-      const nextState = aiEnhancerService.toggleEnabled();
-      if (nextState) {
-        setShowActivatedToast(true);
-        setTimeout(() => setShowActivatedToast(false), 2500);
-      }
-    }
-  };
-
-  const handleEnhancerPointerLeave = () => {
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    if (isHeldLongRef.current) {
-      isHeldLongRef.current = false;
-      setIsHoldingOriginal(false);
-      aiEnhancerService.setHoldComparison(false);
-    }
-  };
   
   // Cursor & Controls Auto-Hide State (Oculta cursor e controles após 2 segundos parado)
   const [isCursorVisible, setIsCursorVisible] = useState(true);
@@ -1067,18 +1171,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     showDevDiagnostics ||
     showAutoPlayCountdown ||
     showNonDubbedPrompt ||
-    showFeedbackModal ||
-    isSplitComparing ||
-    isDraggingDivider ||
-    isHoldingOriginal
+    showFeedbackModal
   );
 
   const shouldKeepControlsVisible = Boolean(
     hasOpenMenu ||
     !isPlaying ||
-    isLoading ||
-    isDraggingDivider ||
-    isHoldingOriginal
+    isLoading
   );
 
   const shouldKeepControlsVisibleRef = useRef(shouldKeepControlsVisible);
@@ -1249,15 +1348,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
   }, []);
 
-  // Keep latest progress in ref for instant flushing on unmount / pause
-  const latestProgressRef = useRef({
-    currentTime: 0,
-    duration: 0
-  });
-
-  useEffect(() => {
-    latestProgressRef.current = { currentTime, duration };
-  }, [currentTime, duration]);
 
   const flushProgress = useCallback(() => {
     // Protege contra sobrescrever o progresso do usuário caso o seek inicial ainda não tenha sido aplicado
@@ -1400,7 +1490,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       watchPartyService.executeRemoteActionSafely(() => {
         // Sincroniza Play / Pause
         if (sync.isPlaying && video.paused) {
-          audioEnhancer.resumeAudioContext();
           video.play().then(() => setIsPlaying(true)).catch(console.warn);
         } else if (!sync.isPlaying && !video.paused) {
           video.pause();
@@ -1433,88 +1522,251 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     };
   }, [onNextEpisode]);
 
+  // Conexão do Fluxo Audiovisual do Anfitrião via WebRTC para Convidados
+  useEffect(() => {
+    if (!isBroadcastGuest) return;
+
+    setIsLoading(false);
+    setHasError(false);
+    setAllSourcesFailed(false);
+    setIsMediaReady(true);
+    isMediaReadyRef.current = true;
+    setIsPlayingIntro(false);
+    setIsIntroEnded(true);
+
+    const video = videoRef.current;
+    const initialStream = watchPartyService.getHostStream();
+    if (initialStream && video) {
+      setRemoteBroadcastStream(initialStream);
+      video.srcObject = initialStream;
+      video.play().then(() => setIsPlaying(true)).catch(() => {});
+    }
+
+    const unsubStream = watchPartyService.onHostStreamReceived((stream) => {
+      setRemoteBroadcastStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        if (stream) {
+          videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+        }
+      }
+    });
+
+    const unsubQuality = watchPartyService.onStreamConnectionChange((data) => {
+      setStreamConnectionState(data.status);
+    });
+
+    return () => {
+      unsubStream();
+      unsubQuality();
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    };
+  }, [isBroadcastGuest]);
+
+  // Inicialização e gerenciamento de transmissão WebRTC do Host
+  useEffect(() => {
+    if (!isBroadcastHost) return;
+
+    const setupHostBroadcast = async () => {
+      if (watchPartyService.getBroadcastStatus().isBroadcasting) {
+        setIsHostCapturing(true);
+        setHostNeedsDisplayMediaPrompt(false);
+        return;
+      }
+
+      const video = videoRef.current;
+      if (!video || !isMediaReady) return;
+
+      try {
+        await watchPartyService.startHostBroadcast(video);
+        setIsHostCapturing(true);
+        setHostNeedsDisplayMediaPrompt(false);
+      } catch (err: any) {
+        console.warn('[ZapiPlayer] Captura automática de vídeo/áudio pendente de autorização explícita do host:', err);
+        setHostNeedsDisplayMediaPrompt(true);
+        setIsHostCapturing(false);
+      }
+    };
+
+    if (isMediaReady) {
+      setupHostBroadcast();
+    }
+
+    const unsubStart = watchPartyService.onHostBroadcastStart(() => {
+      setIsHostCapturing(true);
+      setHostNeedsDisplayMediaPrompt(false);
+    });
+
+    const unsubStop = watchPartyService.onHostBroadcastStop(() => {
+      setIsHostCapturing(false);
+    });
+
+    const unsubRemote = watchPartyService.onRemoteControlReceived((req) => {
+      const video = videoRef.current;
+      if (!video) return;
+
+      if (req.action === 'play') {
+        video.play().then(() => setIsPlaying(true)).catch(console.warn);
+      } else if (req.action === 'pause') {
+        video.pause();
+        setIsPlaying(false);
+      } else if (req.action === 'seek' && typeof req.payload?.positionSeconds === 'number') {
+        video.currentTime = req.payload.positionSeconds;
+        setCurrentTime(req.payload.positionSeconds);
+      } else if (req.action === 'next_episode') {
+        if (onNextEpisode) {
+          onNextEpisode();
+        }
+      }
+    });
+
+    return () => {
+      unsubStart();
+      unsubStop();
+      unsubRemote();
+    };
+  }, [isBroadcastHost, isMediaReady, onNextEpisode]);
+
   const handlePlayerClose = useCallback(() => {
+    if (watchPartyService.isHost()) {
+      watchPartyService.stopHostBroadcast();
+    }
     flushProgress();
     if (playbackSessionId) {
       playbackSessionService.endSession(playbackSessionId);
     } else {
       playbackSessionService.endSession();
     }
+    // Liberar MediaSession API e remover action handlers
+    pipService.clearMediaSession();
+    // Destruir e desanexar HLS
+    if (hlsRef.current) {
+      try {
+        hlsRef.current.stopLoad();
+        hlsRef.current.detachMedia();
+        hlsRef.current.destroy();
+      } catch {}
+      hlsRef.current = null;
+    }
+    // Liberar buffers de decodificação de vídeo do hardware Chromium
+    if (videoRef.current) {
+      try {
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
+        videoRef.current.removeAttribute('src');
+        videoRef.current.load();
+      } catch {}
+    }
+    // Liberar elemento de introdução
+    if (introVideoRef.current) {
+      try {
+        introVideoRef.current.pause();
+        introVideoRef.current.removeAttribute('src');
+        introVideoRef.current.load();
+      } catch {}
+    }
+    // Limpar timers ativos
+    if (activityTimeoutRef.current) {
+      clearTimeout(activityTimeoutRef.current);
+      activityTimeoutRef.current = null;
+    }
+    if (autoPlayTimerRef.current) {
+      clearInterval(autoPlayTimerRef.current);
+      autoPlayTimerRef.current = null;
+    }
     onClose();
   }, [flushProgress, playbackSessionId, onClose]);
 
-  const handleConfirmNonDubbedSubtitled = useCallback(() => {
-    setForcedNonDubbedPrompt(false);
-    setHasUserConfirmedNonDubbed(true);
-    if (playbackSessionId) {
-      playbackSessionService.markNonDubbedConfirmed(playbackSessionId);
-    }
-    if (subtitlesList.length > 0) {
-      const ptSub = subtitlesList.find(s => s.isPtBr) ||
-                    subtitlesList.find(s => /^(pob|pt-br|bra|por-br)$/i.test(s.lang)) ||
-                    subtitlesList.find(s => /^(por|pt|pt-pt)$/i.test(s.lang));
-      if (ptSub) {
-        setSelectedSubtitleId(ptSub.id);
-      } else if (subtitlesList[0]) {
-        setSelectedSubtitleId(subtitlesList[0].id);
+  // Limpeza profunda garantida ao desmontar o componente do player
+  useEffect(() => {
+    return () => {
+      if (watchPartyService.isHost()) {
+        watchPartyService.stopHostBroadcast();
       }
-    }
-    if (isPlayingIntro) {
-      if (isIntroEnded) {
-        if (isMediaReadyRef.current) {
-          transitionFromIntroToMedia();
-        }
-      } else if (introVideoRef.current) {
-        introVideoRef.current.play().catch(() => handleIntroEnded());
+      pipService.clearMediaSession();
+      if (hlsRef.current) {
+        try {
+          hlsRef.current.stopLoad();
+          hlsRef.current.detachMedia();
+          hlsRef.current.destroy();
+        } catch {}
+        hlsRef.current = null;
       }
-    } else {
       if (videoRef.current) {
-        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+        try {
+          videoRef.current.pause();
+          videoRef.current.srcObject = null;
+          videoRef.current.removeAttribute('src');
+          videoRef.current.load();
+        } catch {}
       }
-    }
-  }, [isPlayingIntro, isIntroEnded, handleIntroEnded, transitionFromIntroToMedia, subtitlesList, playbackSessionId]);
+      if (introVideoRef.current) {
+        try {
+          introVideoRef.current.pause();
+          introVideoRef.current.removeAttribute('src');
+          introVideoRef.current.load();
+        } catch {}
+      }
+      if (activityTimeoutRef.current) {
+        clearTimeout(activityTimeoutRef.current);
+        activityTimeoutRef.current = null;
+      }
+      if (autoPlayTimerRef.current) {
+        clearInterval(autoPlayTimerRef.current);
+        autoPlayTimerRef.current = null;
+      }
+    };
+  }, []);
 
-  const handleConfirmNonDubbedOriginal = useCallback(() => {
+  const handleConfirmNonDubbed = useCallback(() => {
     setForcedNonDubbedPrompt(false);
     setHasUserConfirmedNonDubbed(true);
+    showNonDubbedPromptRef.current = false;
     if (playbackSessionId) {
       playbackSessionService.markNonDubbedConfirmed(playbackSessionId);
     }
-    userManuallyChangedSubRef.current = true;
-    setSelectedSubtitleId('off');
-    if (isPlayingIntro) {
-      if (isIntroEnded) {
-        if (isMediaReadyRef.current) {
-          transitionFromIntroToMedia();
-        }
-      } else if (introVideoRef.current) {
-        introVideoRef.current.play().catch(() => handleIntroEnded());
-      }
-    } else {
-      if (videoRef.current) {
-        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-      }
+    // A fonte já está pronta e bufferizada em background (Requisitos 8, 9 e 10):
+    // Inicia imediatamente a vinheta institucional (ou o conteúdo se a intro estiver dispensada)
+    if (isMediaReadyRef.current) {
+      startIntroIfReady();
     }
-  }, [isPlayingIntro, isIntroEnded, handleIntroEnded, transitionFromIntroToMedia, playbackSessionId]);
+  }, [playbackSessionId, startIntroIfReady]);
 
   const handleRejectNonDubbed = useCallback(() => {
     handlePlayerClose();
   }, [handlePlayerClose]);
+
+  const handleConfirmNonDubbedSubtitled = useCallback(() => {
+    subtitlePreferenceService.setSubtitlesEnabled(true);
+    const desired = subtitlePreferenceService.resolveDesiredSubtitleTrack(subtitlesList, currentStream, false);
+    if (desired.track) {
+      setSelectedSubtitleId(desired.track.id);
+    }
+    handleConfirmNonDubbed();
+  }, [handleConfirmNonDubbed, subtitlesList, currentStream]);
+
+  const handleConfirmNonDubbedOriginal = useCallback(() => {
+    handleConfirmNonDubbed();
+  }, [handleConfirmNonDubbed]);
 
   // Flag para rastrear se o usuário alterou/desativou legendas manualmente na sessão
   const userManuallyChangedSubRef = useRef(false);
 
   // Determina se o conteúdo atual possui áudio dublado ou original em Português Brasileiro
   const hasBrazilianAudio = useMemo(() => {
-    // 1. Verifica classificação do stream em reprodução
+    // 1. Verifica audioStatus do metadado do item
+    if (item.audioStatus === 'pt-br-original' || item.audioStatus === 'pt-br-dubbed') return true;
+    // 2. Confirmação dinâmica no player
+    if (hasDynamicallyConfirmedPtBr) return true;
+    // 3. Verifica classificação do stream em reprodução
     if (currentStream) {
       const classification = classifyStream(currentStream);
-      return classification.isDubbed;
+      if (classification.isDubbed || classification.isPtBr || currentStream.isDubbed || currentStream.isPtBr) return true;
     }
-    // 2. Verifica audioStatus do metadado do item
-    if (item.audioStatus === 'pt-br-original') return true;
-    return false;
-  }, [currentStream, item.audioStatus]);
+    return ptBrAvailabilityState === 'confirmed';
+  }, [item.audioStatus, hasDynamicallyConfirmedPtBr, currentStream, ptBrAvailabilityState]);
 
   // Fetch subtitles via subtitleService (automatic IMDb resolution, flags, PT-BR top priority, stream-aware)
   useEffect(() => {
@@ -1556,30 +1808,43 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     return () => { active = false; };
   }, [item, initialSeason, initialEpisode, currentStream]);
 
-  // Ativa automaticamente legenda em português para todo conteúdo sem dublagem brasileira,
-  // evitando rigorosamente legendas duplicadas em fontes que já possuam Hardsub (gravadas na imagem)
+  // Aplicação estrita da preferência do usuário de legendas (Requisitos 1 a 10):
   useEffect(() => {
-    if (userManuallyChangedSubRef.current) return;
-    if (subtitlesList.length === 0) return;
+    // Requisito 2 e 9: Se o usuário selecionou "Sem legenda", NUNCA ativa faixas automaticamente
+    if (!subtitlePreferenceService.isSubtitlesEnabled()) {
+      if (selectedSubtitleId !== 'off') {
+        setSelectedSubtitleId('off');
+        setAppliedSubtitleId('off');
+        setCues([]);
+      }
+      return;
+    }
 
-    // Se a fonte atual for Hardsub (legendas gravadas na imagem), NÃO ativa legendas externas
+    // Requisito 10: Se a fonte atual possuir Hardsub (gravadas na imagem), NÃO ativa legendas externas
     if (currentStream) {
       const formatAnalysis = analyzeStreamSubtitleFormat(currentStream);
       if (formatAnalysis.isHardsub) {
         if (selectedSubtitleId !== 'off') {
           setSelectedSubtitleId('off');
+          setAppliedSubtitleId('off');
+          setCues([]);
         }
         return;
       }
     }
 
-    if (!hasBrazilianAudio) {
-      const ptSub = subtitlesList.find(s => s.isPtBr) ||
-                    subtitlesList.find(s => /^(pob|pt-br|bra|por-br)$/i.test(s.lang)) ||
-                    subtitlesList.find(s => /^(por|pt|pt-pt)$/i.test(s.lang));
-      if (ptSub && selectedSubtitleId !== ptSub.id) {
-        setSelectedSubtitleId(ptSub.id);
-      }
+    if (subtitlesList.length === 0) return;
+
+    // Se o usuário selecionou manualmente uma legenda específica nesta lista durante a sessão, mantém
+    const isCurrentTrackInList = subtitlesList.some(s => s.id === selectedSubtitleId);
+    if (userManuallyChangedSubRef.current && isCurrentTrackInList && selectedSubtitleId !== 'off') {
+      return;
+    }
+
+    // Requisito 3 e 9: Resolve a melhor faixa para o idioma preferido (ou alternativa se não houver o preferido)
+    const desired = subtitlePreferenceService.resolveDesiredSubtitleTrack(subtitlesList, currentStream, hasBrazilianAudio);
+    if (desired.track && selectedSubtitleId !== desired.track.id) {
+      setSelectedSubtitleId(desired.track.id);
     }
   }, [subtitlesList, hasBrazilianAudio, selectedSubtitleId, currentStream]);
 
@@ -1782,10 +2047,19 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Instant Fallback Algorithm (<50ms)
   const handleStreamFallback = useCallback((reason: string) => {
     if (!isMountedRef.current) return;
+    if (allSourcesFailed) return;
     if (startupTimedOutRef.current) return;
     if (isLoadingStreams) return;
     if (isSwitchingStreamRef.current) return;
     isSwitchingStreamRef.current = true;
+    const evidence = sourceEvidenceRef.current;
+    if (evidence && !evidence.reported && navigator.onLine &&
+        /decodific|sem áudio funcional|sem faixa de áudio|não corresponde à obra|fonte isolada|domínio na lista|propaganda embutida|arquivo de vídeo inválido|HTTP 40[34]/i.test(reason)) {
+      evidence.reported = true;
+      evidence.ticket.then(ticket => {
+        if (ticket) reportSourceEvidence(ticket, evidence.playingAt === null ? 'startup_failure' : 'playback_failure');
+      });
+    }
     triedIndicesRef.current.add(selectedStreamIndex);
 
     // Invalida a fonte com falha no serviço centralizado de validação
@@ -1807,25 +2081,36 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           ? audioSelectionManager.inspectStreamAudioLanguage(s, originalLanguage) === requiredLanguage
           : true));
 
-    // Se as fontes no idioma específico esgotarem, tenta outras fontes válidas da MESMA obra
+    // Se as fontes no idioma específico esgotarem, tenta silenciosamente outras fontes válidas da MESMA obra
     let nextCandidate = remaining[0];
     if (!nextCandidate) {
-      // REGRA OBRIGATÓRIA: NUNCA substituir silenciosamente o áudio selecionado por outro idioma!
-      // Se não houver mais fontes com dublagem brasileira, pausa e oferece a escolha ao usuário
+      // REGRA FUNDAMENTAL: O fallback entre fontes deve ser silencioso até que uma fonte funcione ou todas falhem.
+      // NUNCA disparar aviso de dublagem antes de confirmar que a próxima fonte é reproduzível!
       const anyRemaining = streams
         .map((s, idx) => ({ s, idx }))
         .filter(({ idx }) => !triedIndicesRef.current.has(idx));
-      if (requiredLanguage.toLowerCase() === 'pt-br' && anyRemaining.length > 0) {
-        isSwitchingStreamRef.current = false;
-        setForcedNonDubbedPrompt(true);
-        if (videoRef.current && !videoRef.current.paused) {
-          videoRef.current.pause();
-        }
-        return;
-      }
       if (anyRemaining.length > 0) {
         nextCandidate = anyRemaining[0];
       }
+    }
+
+    // Limpeza profunda dos recursos da tentativa atual
+    if (hlsRef.current) {
+      try {
+        hlsRef.current.destroy();
+      } catch {}
+      hlsRef.current = null;
+    }
+    const video = videoRef.current;
+    if (video) {
+      try {
+        video.onloadedmetadata = null;
+        video.onloadeddata = null;
+        video.oncanplay = null;
+        video.onerror = null;
+        video.removeAttribute('src');
+        video.load();
+      } catch {}
     }
 
     if (nextCandidate) {
@@ -1854,10 +2139,21 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         isSwitchingStreamRef.current = false;
       }, 50);
     } else {
+      if (videoRef.current && !videoRef.current.paused) {
+        videoRef.current.pause();
+      }
       setAllSourcesFailed(true);
       setHasError(true);
       setIsLoading(false);
-      setErrorMessage(`Nenhuma fonte disponível funcionou agora. Última falha: ${reason}`);
+      setForcedNonDubbedPrompt(false);
+      setFailureCategory('PLAYBACK_FAILURE');
+
+      const allAreTorrents = streams.length > 0 && streams.every(s => s.isTorrent || s.url?.includes('127.0.0.1:11470') || s.url?.includes('localhost:11470'));
+      if (allAreTorrents) {
+        setErrorMessage('As fontes encontradas dependem do aplicativo de streaming local Stremio Engine (porta 11470), que não está ativo neste momento.');
+      } else {
+        setErrorMessage('Não foi possível reproduzir este conteúdo agora. Tente novamente mais tarde.');
+      }
       try {
         if (mediaAvailabilityIndex && item) {
           mediaAvailabilityIndex.markTemporaryError(
@@ -1868,6 +2164,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             [],
             false
           );
+        }
+        if (item) {
+          providerRegistry.invalidateCache(item);
         }
       } catch (availabilityErr) {
         console.warn('[ZapiPlayer] Falha ao registrar status temporário de disponibilidade:', availabilityErr);
@@ -1881,11 +2180,19 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         } catch {}
       }
     }
-  }, [selectedStreamIndex, streams, isLoadingStreams, currentStream, item, activeAudioId]);
+  }, [selectedStreamIndex, streams, isLoadingStreams, currentStream, item, activeAudioId, allSourcesFailed, hasUserConfirmedNonDubbed]);
 
   // Monitor loading of streams from parent modal
   useEffect(() => {
-    if (isLoadingStreams) {
+    if (isBroadcastGuest) {
+      startupTimedOutRef.current = false;
+      setIsLoading(false);
+      setAllSourcesFailed(false);
+      setHasError(false);
+      return;
+    }
+
+    if (isLoadingStreams || verificationState === 'SEARCHING' || verificationState === 'RETRYING') {
       startupTimedOutRef.current = false;
       setIsLoading(true);
       setAllSourcesFailed(false);
@@ -1897,9 +2204,24 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
 
     if (streams.length === 0) {
+      if (videoRef.current && !videoRef.current.paused) {
+        videoRef.current.pause();
+      }
       setAllSourcesFailed(true);
       setHasError(true);
-      setErrorMessage(streamResolutionError || 'Não foi possível encontrar uma fonte verificada agora. Tente novamente.');
+      if (verificationState === 'INCONCLUSIVE') {
+        setFailureCategory('VERIFICATION_ERROR');
+        setErrorMessage(
+          streamResolutionError ||
+          'Não foi possível verificar a disponibilidade agora. Tente novamente.'
+        );
+      } else {
+        setFailureCategory('NO_SOURCES_FOUND');
+        setErrorMessage(
+          streamResolutionError ||
+          'Conteúdo indisponível no momento. Não foi possível encontrar uma fonte verificada agora. Tente novamente.'
+        );
+      }
       setIsLoading(false);
       setIsPlayingIntro(false);
       setIsIntroEnded(true);
@@ -1912,12 +2234,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       setAllSourcesFailed(false);
       setHasError(false);
     }
-  }, [isLoadingStreams, streams.length, streamResolutionError]);
+  }, [isBroadcastGuest, isLoadingStreams, verificationState, streams.length, streamResolutionError]);
 
-  // Um provedor pode falhar sem emitir um erro final, mesmo após o watchdog de
-  // cada fonte. Encerra a tentativa inteira para não deixar o player preso.
+  // Proteção global inteligente contra esperas infinitas na preparação de reprodução:
+  // Se após múltiplas tentativas nenhuma fonte concluir o buffer, encerra com falha de reprodução descritiva.
   useEffect(() => {
-    if (isLoadingStreams || streams.length === 0 || isMediaReady || allSourcesFailed) return;
+    if (isBroadcastGuest || isLoadingStreams || streams.length === 0 || isMediaReady || allSourcesFailed) return;
+    const maxPlaybackPreparationTime = Math.min(Math.max(streams.length * 8000, 20000), 45000);
     const timer = setTimeout(() => {
       if (!isMountedRef.current || isMediaReadyRef.current) return;
       startupTimedOutRef.current = true;
@@ -1927,16 +2250,21 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       setIsLoading(false);
       setIsPlayingIntro(false);
       setIsIntroEnded(true);
-      setErrorMessage('As fontes encontradas não iniciaram a reprodução em 30 segundos. Pode ser uma falha temporária do provedor. Tente novamente mais tarde.');
+      setFailureCategory('PLAYBACK_FAILURE');
+      setErrorMessage(
+        streams.every(s => s.isTorrent || s.url?.includes('127.0.0.1:11470') || s.url?.includes('localhost:11470'))
+          ? 'As fontes encontradas dependem do aplicativo de streaming local Stremio Engine (porta 11470), que não está ativo neste momento.'
+          : 'Não foi possível reproduzir este conteúdo agora. Tente novamente mais tarde.'
+      );
       introVideoRef.current?.pause();
       videoRef.current?.pause();
-    }, 30000);
+    }, maxPlaybackPreparationTime);
     return () => clearTimeout(timer);
-  }, [isLoadingStreams, streams.length, isMediaReady, allSourcesFailed]);
+  }, [isBroadcastGuest, isLoadingStreams, streams.length, isMediaReady, allSourcesFailed]);
 
   // Pre-flight instant probe of candidate stream
   useEffect(() => {
-    if (isLoadingStreams || !currentStream?.url) return;
+    if (isBroadcastGuest || isLoadingStreams || !currentStream?.url) return;
     triedIndicesRef.current.add(selectedStreamIndex);
 
     // Validação estrita de correspondência de identidade da obra e episódio (Impede obras trocadas)
@@ -1983,10 +2311,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     let isMounted = true;
     streamValidator.validateStream(currentStream, 6000).then((res) => {
       if (!isMounted) return;
-      // Falhas HTTP definitivas e respostas HTML não são arquivos de vídeo.
-      // Timeouts e falhas de rede sem resposta seguem pelo watchdog do player.
-      if (!res.valid && (res.isParked || [401, 403, 404, 410].includes(res.status || 0) || /resposta html/i.test(res.reason || ''))) {
-        handleStreamFallback(res.reason || 'A fonte não retornou um arquivo de vídeo.');
+      // Falhas definitivas: motor Stremio ausente, erros de servidor (502, 503), erros de cliente (401, 403, 404, 410) ou páginas HTML
+      if (!res.valid && (res.requiresEngine || res.isParked || [401, 403, 404, 410, 500, 502, 503].includes(res.status || 0) || /resposta html/i.test(res.reason || ''))) {
+        handleStreamFallback(res.reason || 'A fonte não retornou um arquivo de vídeo válido.');
       }
     }).catch(() => {});
 
@@ -2057,7 +2384,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   // Initialize Video Playback (HLS or Native MP4) — Re-executa APENAS quando a URL da fonte mudar
   useEffect(() => {
-    if (isLoadingStreams) return;
+    if (isBroadcastGuest || isLoadingStreams) return;
     if (!currentStream?.url) return;
     setHasError(false);
     setIsLoading(true);
@@ -2073,6 +2400,57 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
 
     const videoUrl = currentStream.url;
+    attemptIdRef.current += 1;
+    const currentAttempt = attemptIdRef.current;
+
+    let initTimer: NodeJS.Timeout | null = null;
+    let segmentTimer: NodeJS.Timeout | null = null;
+    let watchdogTimer: NodeJS.Timeout | null = null;
+
+    const triggerAttemptFallback = (phaseReason: string) => {
+      if (currentAttempt !== attemptIdRef.current || !isMountedRef.current || isMediaReadyRef.current) return;
+      console.warn(`[ZapiPlayer] Fallback da tentativa #${currentAttempt} (${phaseReason}) na fonte: ${currentStream?.title}`);
+      handleStreamFallbackRef.current(phaseReason);
+    };
+
+    // 1. Timeout de inicialização/metadados (8s): se os metadados ou manifest demorarem demais
+    initTimer = setTimeout(() => {
+      triggerAttemptFallback('Tempo limite de obtenção dos metadados esgotado (8s)');
+    }, 8000);
+
+    // Watchdog de segurança geral por fonte (15s): proteção se nenhum dado for armazenado em buffer
+    watchdogTimer = setTimeout(() => {
+      triggerAttemptFallback('Tempo limite total de resposta do stream esgotado (15s)');
+    }, 15000);
+
+    const onMetadataReceived = () => {
+      if (initTimer) {
+        clearTimeout(initTimer);
+        initTimer = null;
+      }
+      // 2. Timeout para buffering de segmentos após metadados confirmados (10s)
+      if (!segmentTimer && !isMediaReadyRef.current) {
+        segmentTimer = setTimeout(() => {
+          triggerAttemptFallback('Tempo limite ao aguardar primeiro segmento de vídeo (10s)');
+        }, 10000);
+      }
+    };
+
+    const handleMediaBuffered = () => {
+      if (initTimer) {
+        clearTimeout(initTimer);
+        initTimer = null;
+      }
+      if (segmentTimer) {
+        clearTimeout(segmentTimer);
+        segmentTimer = null;
+      }
+      if (watchdogTimer) {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = null;
+      }
+      markMediaAsReadyRef.current();
+    };
 
     if (videoUrl.includes('.m3u8') && Hls.isSupported()) {
       playbackOptimizerService.notifyLoadStart('hls');
@@ -2084,8 +2462,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
-        markMediaAsReadyRef.current();
+        onMetadataReceived();
         applyTargetResumeTime();
+
+        // Requisito 7: Garante que o HLS nunca reative legendas nativas se desativadas pelo usuário
+        if (!subtitlePreferenceService.isSubtitlesEnabled()) {
+          hls.subtitleTrack = -1;
+        }
+
         const levels = data.levels.map(l => (l.height >= 2160 ? '4K' : `${l.height}p`));
         const unique = Array.from(new Set(levels));
         setAvailableQualities(['auto', ...unique]);
@@ -2107,28 +2491,37 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           }));
           setHlsAudioTracks(tracks);
 
-          // Seleciona a faixa correta de acordo com a preferência do usuário (PT-BR, JA, EN, ES, etc.)
-          const matchedTrack = pickMatchingHlsAudioTrack(tracks, preferredAudioLang);
-          if (matchedTrack && hls.audioTrack !== matchedTrack.id) {
-            hls.audioTrack = matchedTrack.id;
-            setSelectedHlsAudioTrack(matchedTrack.id);
-            setActiveAudioId(`hls-${matchedTrack.id}`);
-          } else {
-            setSelectedHlsAudioTrack(hls.audioTrack);
-            setActiveAudioId(`hls-${hls.audioTrack}`);
+          // Sincronização dinâmica: detecta se alguma faixa real é em Português
+          const hasPtTrack = tracks.some(t => 
+            /^(por|pt|pob|bra)$/i.test(t.lang) || 
+            /portugu[eê]s|dublado|brazil|brasil/i.test(t.name)
+          );
+          if (hasPtTrack) {
+            setHasDynamicallyConfirmedPtBr(true);
+            ptBrConfirmedOnceRef.current = true;
           }
-        }
-        if (!isPlayingIntroRef.current && !showNonDubbedPromptRef.current) {
-          video.play().then(() => setIsPlaying(true)).catch((err) => {
-            if (err && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
-              console.warn('[ZapiPlayer] Autoplay com som bloqueado pelo navegador no HLS. Ativando recuperação por 1 toque:', err.name);
-              video.muted = true;
-              setIsAutoplayAudioBlocked(true);
-              video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-            } else {
-              setIsPlaying(false);
+
+          // Se o usuário já tiver selecionado uma faixa, preserva-a
+          if (selectedHlsAudioTrackRef.current >= 0 && tracks.some(t => t.id === selectedHlsAudioTrackRef.current)) {
+            if (hls.audioTrack !== selectedHlsAudioTrackRef.current) {
+              hls.audioTrack = selectedHlsAudioTrackRef.current;
             }
-          });
+            setSelectedHlsAudioTrack(selectedHlsAudioTrackRef.current);
+            setActiveAudioId(`hls-${selectedHlsAudioTrackRef.current}`);
+          } else {
+            // Seleciona a faixa de acordo com a preferência do usuário (PT-BR, JA, EN, ES, etc.)
+            const matchedTrack = pickMatchingHlsAudioTrack(tracks, preferredAudioLang);
+            if (matchedTrack && hls.audioTrack !== matchedTrack.id) {
+              hls.audioTrack = matchedTrack.id;
+              setSelectedHlsAudioTrack(matchedTrack.id);
+              selectedHlsAudioTrackRef.current = matchedTrack.id;
+              setActiveAudioId(`hls-${matchedTrack.id}`);
+            } else {
+              setSelectedHlsAudioTrack(hls.audioTrack);
+              selectedHlsAudioTrackRef.current = hls.audioTrack;
+              setActiveAudioId(`hls-${hls.audioTrack}`);
+            }
+          }
         }
       });
 
@@ -2141,7 +2534,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       });
 
       hls.on(Hls.Events.FRAG_LOADED, (_, data: any) => {
-        markMediaAsReadyRef.current();
+        handleMediaBuffered();
         const stats = data.frag?.stats || data.stats;
         if (stats?.loading) {
           const durationMs = stats.loading.end - stats.loading.start;
@@ -2150,11 +2543,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       });
 
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
-        markMediaAsReadyRef.current();
+        handleMediaBuffered();
       });
 
       hls.on(Hls.Events.BUFFER_APPENDED, () => {
-        markMediaAsReadyRef.current();
+        handleMediaBuffered();
       });
 
       hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_, data) => {
@@ -2166,22 +2559,50 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           }));
           setHlsAudioTracks(tracks);
 
-          const matchedTrack = pickMatchingHlsAudioTrack(tracks, preferredAudioLang);
-          if (matchedTrack && hls.audioTrack !== matchedTrack.id) {
-            hls.audioTrack = matchedTrack.id;
-            setSelectedHlsAudioTrack(matchedTrack.id);
-            setActiveAudioId(`hls-${matchedTrack.id}`);
+          // Sincronização dinâmica: detecta se alguma faixa real é em Português
+          const hasPtTrack = tracks.some(t => 
+            /^(por|pt|pob|bra)$/i.test(t.lang) || 
+            /portugu[eê]s|dublado|brazil|brasil/i.test(t.name)
+          );
+          if (hasPtTrack) {
+            setHasDynamicallyConfirmedPtBr(true);
+            ptBrConfirmedOnceRef.current = true;
+          }
+
+          // Se o usuário já tiver selecionado uma faixa, preserva-a através de seeks e atualizações
+          if (selectedHlsAudioTrackRef.current >= 0 && tracks.some(t => t.id === selectedHlsAudioTrackRef.current)) {
+            if (hls.audioTrack !== selectedHlsAudioTrackRef.current) {
+              hls.audioTrack = selectedHlsAudioTrackRef.current;
+            }
+            setSelectedHlsAudioTrack(selectedHlsAudioTrackRef.current);
+            setActiveAudioId(`hls-${selectedHlsAudioTrackRef.current}`);
           } else {
-            setSelectedHlsAudioTrack(hls.audioTrack);
-            setActiveAudioId(`hls-${hls.audioTrack}`);
+            const matchedTrack = pickMatchingHlsAudioTrack(tracks, preferredAudioLang);
+            if (matchedTrack && hls.audioTrack !== matchedTrack.id) {
+              hls.audioTrack = matchedTrack.id;
+              setSelectedHlsAudioTrack(matchedTrack.id);
+              selectedHlsAudioTrackRef.current = matchedTrack.id;
+              setActiveAudioId(`hls-${matchedTrack.id}`);
+            } else {
+              setSelectedHlsAudioTrack(hls.audioTrack);
+              selectedHlsAudioTrackRef.current = hls.audioTrack;
+              setActiveAudioId(`hls-${hls.audioTrack}`);
+            }
           }
         }
       });
 
       hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_, data) => {
         setSelectedHlsAudioTrack(data.id);
+        selectedHlsAudioTrackRef.current = data.id;
         setActiveAudioId(`hls-${data.id}`);
         setIsSwitchingAudio(false);
+      });
+
+      hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, () => {
+        if (!subtitlePreferenceService.isSubtitlesEnabled()) {
+          hls.subtitleTrack = -1;
+        }
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -2196,8 +2617,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               hls.recoverMediaError();
               break;
             default:
+              if (initTimer) clearTimeout(initTimer);
+              if (segmentTimer) clearTimeout(segmentTimer);
+              if (watchdogTimer) clearTimeout(watchdogTimer);
               hls.destroy();
-              handleStreamFallbackRef.current('Erro fatal no stream HLS.');
+              hlsRef.current = null;
+              triggerAttemptFallback('Erro fatal no stream HLS.');
               break;
           }
         }
@@ -2209,24 +2634,40 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       video.src = videoUrl;
       video.load();
       video.onloadedmetadata = () => {
-        markMediaAsReadyRef.current();
+        onMetadataReceived();
         applyTargetResumeTime();
         if (video.videoHeight > 0) {
           const actualQ = video.videoHeight >= 2160 ? '4K' : (video.videoHeight >= 1440 ? '1440p' : (video.videoHeight >= 1080 ? '1080p' : (video.videoHeight >= 720 ? '720p' : `${video.videoHeight}p`)));
           setAvailableQualities(prev => ['auto', ...new Set([...prev.filter(q => q !== 'auto'), actualQ])]);
         }
+        const html5AudioTracks = (video as any).audioTracks;
+        if (html5AudioTracks && html5AudioTracks.length > 0) {
+          for (let i = 0; i < html5AudioTracks.length; i++) {
+            const trk = html5AudioTracks[i];
+            if (/^(por|pt|pob|bra)$/i.test(trk.language) || /portugu[eê]s|dublado|brasil/i.test(trk.label)) {
+              setHasDynamicallyConfirmedPtBr(true);
+              break;
+            }
+          }
+        }
       };
       video.onloadeddata = () => {
-        markMediaAsReadyRef.current();
-        applyTargetResumeTime();
-        if (!isPlayingIntroRef.current && !showNonDubbedPromptRef.current) {
-          video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+        if (video.buffered && video.buffered.length > 0 && video.buffered.end(0) > 0.05) {
+          handleMediaBuffered();
         }
+        applyTargetResumeTime();
+      };
+      video.oncanplay = () => {
+        handleMediaBuffered();
+        applyTargetResumeTime();
       };
       video.onerror = () => {
         if (!isMountedRef.current || !video.getAttribute('src')) return;
+        if (initTimer) clearTimeout(initTimer);
+        if (segmentTimer) clearTimeout(segmentTimer);
+        if (watchdogTimer) clearTimeout(watchdogTimer);
         try {
-          handleStreamFallbackRef.current('Falha ao reproduzir HLS nativo no Safari/iOS.');
+          triggerAttemptFallback('Falha ao reproduzir HLS nativo no Safari/iOS.');
         } catch (err) {
           console.warn('[ZapiPlayer] Erro capturado em video.onerror (HLS nativo):', err);
         }
@@ -2237,13 +2678,35 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       video.preload = 'auto';
       video.src = videoUrl;
       video.load();
+      video.onloadedmetadata = () => {
+        onMetadataReceived();
+        applyTargetResumeTime();
+      };
       video.onloadeddata = () => {
         if (!isMountedRef.current) return;
-        markMediaAsReadyRef.current();
+        if (video.buffered && video.buffered.length > 0 && video.buffered.end(0) > 0.05) {
+          handleMediaBuffered();
+        }
         applyTargetResumeTime();
         // Confirma que a nova fonte carregou e desliga transição de áudio
         setIsSwitchingAudio(false);
         previousStreamIndexRef.current = selectedStreamIndex;
+        // Sincronização dinâmica: se a fonte em reprodução for PT-BR
+        if (currentStream && (currentStream.isDubbed || currentStream.isPtBr || classifyStream(currentStream).isDubbed || classifyStream(currentStream).isPtBr)) {
+          setHasDynamicallyConfirmedPtBr(true);
+          ptBrConfirmedOnceRef.current = true;
+        }
+        const html5AudioTracks = (video as any).audioTracks;
+        if (html5AudioTracks && html5AudioTracks.length > 0) {
+          for (let i = 0; i < html5AudioTracks.length; i++) {
+            const trk = html5AudioTracks[i];
+            if (/^(por|pt|pob|bra)$/i.test(trk.language) || /portugu[eê]s|dublado|brasil/i.test(trk.label)) {
+              setHasDynamicallyConfirmedPtBr(true);
+              ptBrConfirmedOnceRef.current = true;
+              break;
+            }
+          }
+        }
         // Inspeciona resolução real a partir dos pixels do contêiner de vídeo nativo
         if (video.videoHeight > 0) {
           const actualQ = video.videoHeight >= 2160 ? '4K' : (video.videoHeight >= 1440 ? '1440p' : (video.videoHeight >= 1080 ? '1080p' : (video.videoHeight >= 720 ? '720p' : `${video.videoHeight}p`)));
@@ -2253,45 +2716,41 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             return ['auto', ...filtered];
           });
         }
-        if (!isPlayingIntroRef.current && !showNonDubbedPromptRef.current) {
-          video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-        }
       };
       video.oncanplay = () => {
         if (!isMountedRef.current) return;
-        markMediaAsReadyRef.current();
+        handleMediaBuffered();
         applyTargetResumeTime();
         setIsSwitchingAudio(false);
       };
+      video.onprogress = () => {
+        if (video.buffered && video.buffered.length > 0 && video.buffered.end(0) > 0.1) {
+          handleMediaBuffered();
+        }
+      };
       video.onerror = () => {
         if (!isMountedRef.current || !video.getAttribute('src')) return;
+        if (initTimer) clearTimeout(initTimer);
+        if (segmentTimer) clearTimeout(segmentTimer);
+        if (watchdogTimer) clearTimeout(watchdogTimer);
         try {
           setIsSwitchingAudio(false);
-          handleStreamFallbackRef.current('Falha ao carregar arquivo de vídeo.');
+          triggerAttemptFallback('Falha ao carregar arquivo de vídeo.');
         } catch (err) {
           console.warn('[ZapiPlayer] Erro capturado em video.onerror:', err);
         }
       };
     }
 
-    // Watchdog de segurança (15 segundos): se a fonte não disparar nenhum evento de reprodução, tenta a próxima fonte
-    const watchdogTimer = setTimeout(() => {
-      if (!isMountedRef.current) return;
-      if (!isMediaReadyRef.current && !allSourcesFailed) {
-        console.warn(`[ZapiPlayer] Watchdog disparado (15s sem resposta da fonte: ${currentStream?.title})`);
-        mediaLoadingTracker.transition(item.id, 'TIMEOUT', {
-          reason: 'Tempo limite de inicialização do stream esgotado (15s)'
-        });
-        handleStreamFallbackRef.current('Tempo limite de resposta do stream esgotado (15s).');
-      }
-    }, 15000);
-
     return () => {
-      clearTimeout(watchdogTimer);
+      if (initTimer) clearTimeout(initTimer);
+      if (segmentTimer) clearTimeout(segmentTimer);
+      if (watchdogTimer) clearTimeout(watchdogTimer);
       if (video) {
         video.onloadedmetadata = null;
         video.onloadeddata = null;
         video.oncanplay = null;
+        video.onprogress = null;
         video.onerror = null;
       }
       if (hlsRef.current) {
@@ -2302,14 +2761,31 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   }, [currentStream?.url, isLoadingStreams]);
 
   // REGRA 2 — ÁUDIO OBRIGATÓRIO: Monitor contínuo de áudio funcional (bloqueia vídeos sem som)
-  const audioCheckTicksRef = useRef<number>(0);
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !isPlaying || isMuted || volume <= 0) return;
+    if (!video || !isPlaying || isMuted || volume <= 0 || allSourcesFailed) return;
 
     audioCheckTicksRef.current = 0;
     const interval = setInterval(() => {
-      if (video.paused || video.ended || video.currentTime < 5) return;
+      // Blindagem estrita: durante seek, buffer, carregamento ou antes de 5s, não inspeciona áudio
+      if (
+        video.paused ||
+        video.ended ||
+        video.seeking ||
+        isSeeking ||
+        isSeekingRef.current ||
+        isLoading ||
+        video.readyState < 3 ||
+        video.currentTime < 5
+      ) {
+        audioCheckTicksRef.current = 0;
+        return;
+      }
+
+      // Se PT-BR já foi confirmado nesta sessão e o vídeo está rodando, não rebaixa nem aciona fallback por soluço temporário
+      if (hasDynamicallyConfirmedPtBr || ptBrConfirmedOnceRef.current) {
+        return;
+      }
 
       // 1. mozHasAudio (Firefox)
       const mozHasAudio = (video as any).mozHasAudio;
@@ -2343,12 +2819,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, isMuted, volume]);
+  }, [isPlaying, isMuted, volume, allSourcesFailed, isLoading, isSeeking, hasDynamicallyConfirmedPtBr]);
 
   // Loop de monitoramento de saúde de reprodução, ABR dinâmico e recuperação ativa de travamentos (Stall Watchdog)
-  const stallTimerRef = useRef<number>(0);
-  const lastPlaybackPositionRef = useRef<number>(0);
-
   useEffect(() => {
     const interval = setInterval(() => {
       const video = videoRef.current;
@@ -2364,6 +2837,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       playbackOptimizerService.updateVideoMetrics(video, activeQ);
 
       // 2. Apenas monitora travamentos se o vídeo estiver em reprodução ativa (não pausado, não em intro, não buscando)
+      const isBufferingOrSeeking = isSeeking || isSeekingRef.current || video.seeking || video.readyState < 3 || isLoading;
+      if (isBufferingOrSeeking) {
+        stallTimerRef.current = 0;
+        lastPlaybackPositionRef.current = video.currentTime;
+        return;
+      }
+
       if (isPlaying && !isLoading && !isSwitchingAudio && !isSeeking && !isPlayingIntro) {
         const curPos = video.currentTime;
         const diff = Math.abs(curPos - lastPlaybackPositionRef.current);
@@ -2461,11 +2941,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           handleRejectNonDubbed();
         } else if (e.key === 'Enter') {
           e.preventDefault();
-          if (hasPtBrSubtitlesAvailable) {
-            handleConfirmNonDubbedSubtitled();
-          } else if (hasOriginalAudioAvailable) {
-            handleConfirmNonDubbedOriginal();
-          }
+          handleConfirmNonDubbed();
         }
         return;
       }
@@ -2485,11 +2961,15 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           break;
         case 'ArrowRight':
           e.preventDefault();
-          skipTime(10);
+          if (!isPlayingIntroRef.current) {
+            skipTime(10);
+          }
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          skipTime(-10);
+          if (!isPlayingIntroRef.current) {
+            skipTime(-10);
+          }
           break;
         case 'ArrowUp':
           e.preventDefault();
@@ -2511,6 +2991,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           break;
         case 's':
         case 'S':
+          if (isPlayingIntroRef.current) {
+            e.preventDefault();
+            handleSkipIntro();
+            break;
+          }
           if (activeSkipInterval) {
             e.preventDefault();
             handleExecuteSkip(activeSkipInterval);
@@ -2518,7 +3003,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           break;
         case 'n':
         case 'N':
-          if (onNextEpisode && !isLoadingStreams) {
+          if (onNextEpisode && !isLoadingStreams && !isPlayingIntroRef.current) {
             e.preventDefault();
             onNextEpisode();
           }
@@ -2527,6 +3012,24 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         case 'P':
           e.preventDefault();
           handleTogglePip();
+          break;
+        case 'c':
+        case 'C':
+          e.preventDefault();
+          if (selectedSubtitleId !== 'off') {
+            userManuallyChangedSubRef.current = true;
+            subtitlePreferenceService.setSubtitlesEnabled(false);
+            setSelectedSubtitleId('off');
+            setAppliedSubtitleId('off');
+            setCues([]);
+          } else if (subtitlesList.length > 0) {
+            userManuallyChangedSubRef.current = true;
+            subtitlePreferenceService.setSubtitlesEnabled(true);
+            const desired = subtitlePreferenceService.resolveDesiredSubtitleTrack(subtitlesList, currentStream, hasBrazilianAudio);
+            if (desired.track) {
+              setSelectedSubtitleId(desired.track.id);
+            }
+          }
           break;
         case 'Escape':
           if (showFeedbackModal) {
@@ -2554,63 +3057,59 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    volume, isPlaying, isFullscreen, showNonDubbedPrompt, handleConfirmNonDubbedSubtitled,
-    handleRejectNonDubbed, activeSkipInterval, handleExecuteSkip, onNextEpisode, isLoadingStreams,
+    volume, isPlaying, isFullscreen, showNonDubbedPrompt, handleConfirmNonDubbed,
+    handleRejectNonDubbed, activeSkipInterval, handleExecuteSkip, handleSkipIntro, onNextEpisode, isLoadingStreams,
     handleTogglePip, showAudioMenu, showQualityMenu, showSubtitlesMenu, showStyleEditor,
-    showDevDiagnostics, showManualSkipModal, showFeedbackModal
+    showDevDiagnostics, showManualSkipModal, showFeedbackModal,
+    selectedSubtitleId, subtitlesList, currentStream, hasBrazilianAudio
   ]);
 
   const togglePlay = () => {
+    if (isPlayingIntroRef.current) {
+      const intro = introVideoRef.current;
+      if (!intro) return;
+      if (intro.paused) {
+        intro.play().then(() => {
+          setIsPlaying(true);
+        }).catch(console.error);
+      } else {
+        intro.pause();
+        setIsPlaying(false);
+      }
+      return;
+    }
+
+    if (isBroadcastGuest) {
+      if (!watchPartyService.canLocalControl('canPlayPause')) {
+        return;
+      }
+      const newPlayState = !isPlaying;
+      setIsPlaying(newPlayState);
+      watchPartyService.requestHostPlaybackAction(newPlayState ? 'play' : 'pause');
+      return;
+    }
+
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
-      audioEnhancer.resumeAudioContext();
       video.play().then(() => {
         setIsPlaying(true);
-        if (watchPartyService.isHost()) {
+        if (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) {
           watchPartyService.updatePlaybackState(video.currentTime, true, video.playbackRate);
         }
       }).catch(console.error);
     } else {
       video.pause();
       setIsPlaying(false);
-      if (watchPartyService.isHost()) {
+      if (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) {
         watchPartyService.updatePlaybackState(video.currentTime, false, video.playbackRate);
       }
     }
   };
 
-  // Tratamento dinâmico de avanço e retrocesso na barra de tempo
-  const handleSeek = useCallback((targetTime: number) => {
-    const video = videoRef.current;
-    const clampedTime = Math.max(0, Math.min(duration || targetTime, targetTime));
-
-    // Atualiza imediatamente o estado para que a UI e os botões respondam em tempo real
-    setCurrentTime(clampedTime);
-
-    if (video) {
-      try {
-        video.currentTime = clampedTime;
-        if (watchPartyService.isHost()) {
-          watchPartyService.updatePlaybackState(clampedTime, !video.paused, video.playbackRate);
-        }
-      } catch {}
-    }
-
-    // Se o usuário retrocedeu para antes do final do vídeo, reseta flags de autoplay
-    const remaining = (duration || 0) - clampedTime;
-    if (remaining > 15) {
-      setIsAutoPlayCancelled(false);
-      hasAutoAdvancedRef.current = false;
-      setShowAutoPlayCountdown(false);
-      if (autoPlayTimerRef.current) {
-        clearInterval(autoPlayTimerRef.current);
-        autoPlayTimerRef.current = null;
-      }
-    }
-  }, [duration]);
 
   const skipTime = useCallback((seconds: number) => {
+    if (isPlayingIntroRef.current) return;
     const video = videoRef.current;
     if (!video) return;
     const target = Math.max(0, Math.min(duration, video.currentTime + seconds));
@@ -2619,30 +3118,39 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   const changeVolume = (val: number) => {
     const video = videoRef.current;
-    if (!video) return;
-    video.volume = val;
-    video.muted = val === 0;
+    if (video) {
+      video.volume = val;
+      video.muted = val === 0;
+    }
+    const intro = introVideoRef.current;
+    if (intro && isPlayingIntroRef.current) {
+      intro.volume = val;
+      intro.muted = val === 0;
+    }
     setVolume(val);
     setIsMuted(val === 0);
-    audioEnhancer.setUserVolume(val, val === 0);
-    audioEnhancer.resumeAudioContext();
   };
 
   const toggleMute = () => {
     const video = videoRef.current;
-    if (!video) return;
-    if (isMuted || video.muted) {
-      video.muted = false;
+    const intro = introVideoRef.current;
+    const currentlyMuted = isMuted || (video ? video.muted : false) || (intro ? intro.muted : false);
+    if (currentlyMuted) {
       const targetVol = volume > 0 ? volume : 0.8;
-      video.volume = targetVol;
+      if (video) {
+        video.muted = false;
+        video.volume = targetVol;
+      }
+      if (intro && isPlayingIntroRef.current) {
+        intro.muted = false;
+        intro.volume = targetVol;
+      }
       setVolume(targetVol);
       setIsMuted(false);
-      audioEnhancer.setUserVolume(targetVol, false);
-      audioEnhancer.resumeAudioContext();
     } else {
-      video.muted = true;
+      if (video) video.muted = true;
+      if (intro && isPlayingIntroRef.current) intro.muted = true;
       setIsMuted(true);
-      audioEnhancer.setUserVolume(0, true);
     }
   };
 
@@ -2656,7 +3164,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   };
 
   const formatTime = (secs: number) => {
-    if (isNaN(secs) || secs < 0) return '00:00';
+    if (isNaN(secs) || secs < 0 || !isFinite(secs)) return '00:00';
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
     return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
@@ -2755,9 +3263,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     // SITUAÇÃO A: Troca de faixa embutida no manifesto HLS (sem trocar de arquivo)
     if (opt.kind === 'hls-rendition' && opt.hlsTrackIndex !== undefined && hlsRef.current) {
       setIsSwitchingAudio(true);
-      audioEnhancer.resetLevelerState(false);
       hlsRef.current.audioTrack = opt.hlsTrackIndex;
       setSelectedHlsAudioTrack(opt.hlsTrackIndex);
+      selectedHlsAudioTrackRef.current = opt.hlsTrackIndex;
       setActiveAudioId(opt.id);
       setIsSwitchingAudio(false);
       return;
@@ -2766,7 +3274,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     // SITUAÇÃO B: Troca de fonte separada (arquivo de vídeo diferente)
     if (opt.kind === 'separate-source' && opt.streamIndex !== undefined && opt.streamIndex !== selectedStreamIndex) {
       setIsSwitchingAudio(true);
-      audioEnhancer.resetLevelerState(false);
       previousStreamIndexRef.current = selectedStreamIndex;
       previousActiveAudioIdRef.current = activeAudioId;
 
@@ -2785,14 +3292,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       return;
     }
 
-    // Se o usuário selecionou um idioma original (não dublado), garante legendas em português ativas
-    if (opt.langCode && opt.langCode !== 'pt-BR') {
+    // Requisito 9: Ativa legendas em idioma original APENAS se o usuário não tiver escolhido "Sem legenda"
+    if (opt.langCode && opt.langCode !== 'pt-BR' && subtitlePreferenceService.isSubtitlesEnabled()) {
       if (selectedSubtitleId === 'off' && subtitlesList.length > 0) {
-        const ptSub = subtitlesList.find(s => s.lang === 'pt' || s.lang === 'pt-BR' || s.lang === 'pob' || s.label.toLowerCase().includes('portugu'));
-        if (ptSub) {
-          setSelectedSubtitleId(ptSub.id);
-        } else if (subtitlesList.length > 0) {
-          setSelectedSubtitleId(subtitlesList[0].id);
+        const desired = subtitlePreferenceService.resolveDesiredSubtitleTrack(subtitlesList, currentStream, false);
+        if (desired.track) {
+          setSelectedSubtitleId(desired.track.id);
         }
       }
     }
@@ -2826,41 +3331,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         </button>
       )}
 
-      {/* Vinheta Oficial ZapiTV (Intro Video com Preenchimento Total e Fade Suave) */}
-      {isPlayingIntro && (
-        <div
-          className={`absolute inset-0 z-[3000] bg-black flex items-center justify-center select-none transition-opacity duration-700 ease-in-out ${
-            isIntroFading ? 'opacity-0 pointer-events-none' : 'opacity-100'
-          }`}
-        >
-          <video
-            ref={introVideoRef}
-            src="/intro.mp4"
-            autoPlay
-            playsInline
-            onEnded={handleIntroEnded}
-            onError={handleIntroEnded}
-            className="w-full h-full object-cover bg-black"
-          />
-
-          {/* Indicador discreto caso a intro termine e ainda esteja aguardando o carregamento da mídia */}
-          {(isIntroEnded || userSkippedIntro) && !isMediaReady && (
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center z-[3005] animate-in fade-in duration-300 pointer-events-none select-none">
-              <ZapiLoader size="lg" />
-            </div>
-          )}
-
-          {/* Botão Pular Intro */}
-          {(!isIntroEnded || !isMediaReady) && (
-            <button
-              onClick={handleSkipIntro}
-              className="absolute bottom-8 right-8 z-[3010] flex items-center gap-2 px-5 py-2.5 bg-black/70 hover:bg-black/90 text-white rounded-full border border-white/20 backdrop-blur-md text-xs font-bold uppercase tracking-wider transition-all hover:scale-105 shadow-2xl cursor-pointer"
-            >
-              <span>Pular Intro</span> <SkipForward className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Modal de Confirmação: Conteúdo indisponível no seu idioma (REGRA 5 e Seção 10) */}
       {showNonDubbedPrompt && (
@@ -2871,11 +3341,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             </div>
 
             <h3 className="text-xl sm:text-2xl font-black text-white mb-2 leading-tight">
-              Conteúdo indisponível no seu idioma
+              Dublagem indisponível
             </h3>
-
-            <p className="text-gray-300 text-xs sm:text-sm leading-relaxed mb-6 sm:mb-8 max-w-sm">
-              Não encontramos uma versão com áudio em português brasileiro para este conteúdo. Você pode assistir em outro idioma disponível.
+            <p className="text-gray-300 text-xs sm:text-sm mb-6 leading-relaxed">
+              Não encontramos uma versão com áudio em português brasileiro para este conteúdo.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3 w-full">
@@ -2884,26 +3353,22 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                 onClick={handleRejectNonDubbed}
                 className="w-full sm:flex-1 py-3 px-3 bg-white/10 hover:bg-white/20 active:scale-95 text-gray-300 hover:text-white rounded-xl font-bold text-xs uppercase tracking-wider border border-white/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                Cancelar
+                Voltar
               </button>
-              {hasOriginalAudioAvailable && (
-                <button
-                  type="button"
-                  onClick={handleConfirmNonDubbedOriginal}
-                  className="w-full sm:flex-1 py-3 px-3 bg-white/15 hover:bg-white/25 active:scale-95 text-white rounded-xl font-bold text-xs uppercase tracking-wider border border-white/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  Assistir no idioma original
-                </button>
-              )}
-              {hasPtBrSubtitlesAvailable && (
-                <button
-                  type="button"
-                  onClick={handleConfirmNonDubbedSubtitled}
-                  className="w-full sm:flex-1 py-3 px-3 bg-[#007df7] hover:bg-[#0069d9] active:scale-95 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-[#007df7]/30 flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  Assistir legendado
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleConfirmNonDubbedSubtitled}
+                className="w-full sm:flex-1 py-3 px-3 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-xl font-bold text-xs uppercase tracking-wider border border-white/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                Legendado
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmNonDubbedOriginal}
+                className="w-full sm:flex-1 py-3 px-3 bg-[#007df7] hover:bg-[#0069d9] active:scale-95 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-[#007df7]/30 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                Áudio original
+              </button>
             </div>
           </div>
         </div>
@@ -3014,7 +3479,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       )}
 
       {/* Top Header Bar */}
-      <div className={`absolute top-0 inset-x-0 p-4 md:p-6 bg-gradient-to-b from-black/90 via-black/40 to-transparent z-50 flex items-center justify-between transition-opacity duration-300 ${(showControls || !isPlaying || hasOpenMenu || isSplitComparing || isDraggingDivider) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <div className={`absolute top-0 inset-x-0 p-4 md:p-6 bg-gradient-to-b from-black/90 via-black/40 to-transparent z-50 flex items-center justify-between transition-opacity duration-300 ${(showControls || !isPlaying || hasOpenMenu) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-3 md:gap-4 max-w-[65%] sm:max-w-[70%]">
           <button
             onClick={handlePlayerClose}
@@ -3034,72 +3499,26 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           </div>
         </div>
 
-        {/* Canto Superior Direito: [ Ícone Tela Dividida ] [ Melhoria por IA ] */}
-        <div className="flex items-center gap-2 pointer-events-auto shrink-0">
-          {/* Botão Tela Dividida (Comparar imagem - apenas ícone) */}
-          <button
-            type="button"
-            onClick={handleToggleSplit}
-            disabled={!isAiActive}
-            className={`w-9 h-9 md:w-10 md:h-10 rounded-xl backdrop-blur-md border transition-all duration-200 flex items-center justify-center select-none ${
-              !isAiActive
-                ? 'opacity-40 cursor-not-allowed bg-white/5 border-white/5 text-gray-500'
-                : isSplitComparing
-                ? 'bg-[#007df7] border-[#007df7] text-white shadow-lg shadow-[#007df7]/30 hover:bg-[#006ee0] active:scale-95 cursor-pointer'
-                : 'bg-black/60 hover:bg-white/20 text-white/80 hover:text-white border-white/10 active:scale-95 cursor-pointer'
-            }`}
-            title={
-              !isAiActive
-                ? 'Ative a Melhoria por IA para comparar a imagem'
-                : isSplitComparing
-                ? 'Encerrar comparação de imagem'
-                : 'Comparar imagem'
-            }
-            aria-label="Comparar imagem"
-          >
-            <Columns2 className="w-4 h-4 md:w-5 md:h-5" />
-          </button>
+        {/* Canto Superior Direito: [ Status Broadcast / Reportar Problema ] */}
+        <div className="flex items-center gap-2 sm:gap-3 pointer-events-auto shrink-0">
+          {/* Badge Convidado: Transmissão do Host • Ao Vivo */}
+          {isBroadcastGuest && (
+            <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 bg-red-500/20 border border-red-500/40 rounded-full text-red-400 text-[11px] sm:text-xs font-bold backdrop-blur-md">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span>Transmissão do Host • Ao Vivo</span>
+              <span className="text-[10px] text-gray-300 font-mono hidden md:inline">
+                ({streamConnectionState === 'good' ? 'Excelente' : streamConnectionState === 'fair' ? 'Estável' : 'Oscilando'})
+              </span>
+            </div>
+          )}
 
-          {/* Botão Melhoria por IA */}
-          <button
-            type="button"
-            onClick={handleToggleAiEnhancer}
-            disabled={enhancerStatus === 'unavailable'}
-            className={`h-9 md:h-10 px-3 md:px-4 rounded-xl backdrop-blur-md border transition-all duration-200 flex items-center gap-1.5 md:gap-2 select-none ${
-              enhancerStatus === 'unavailable'
-                ? 'opacity-40 cursor-not-allowed bg-white/5 border-white/5 text-gray-500'
-                : isAiActive
-                ? 'bg-[#007df7] border-[#007df7] text-white shadow-lg shadow-[#007df7]/30 hover:bg-[#006ee0] active:scale-95 cursor-pointer'
-                : enhancerStatus === 'initializing'
-                ? 'cursor-wait bg-[#007df7]/20 border-[#007df7]/40 text-[#38bdf8]'
-                : 'bg-black/60 hover:bg-white/20 text-white/80 hover:text-white border-white/10 active:scale-95 cursor-pointer'
-            }`}
-            title={
-              enhancerStatus === 'unavailable'
-                ? 'Melhoria indisponível para este vídeo'
-                : isAiActive
-                ? 'Melhoria por IA Ativa (Clique para desativar)'
-                : enhancerStatus === 'initializing'
-                ? 'Melhorando imagem...'
-                : 'Ativar Melhoria por IA'
-            }
-            aria-label="Melhoria por IA"
-          >
-            {enhancerStatus === 'initializing' ? (
-              <RefreshCw className="w-4 h-4 animate-spin text-[#38bdf8]" />
-            ) : (
-              <Sparkles
-                className={`w-4 h-4 ${
-                  isAiActive ? 'fill-current text-white animate-pulse' : 'text-gray-300'
-                }`}
-              />
-            )}
-            <span className="text-xs md:text-sm font-bold whitespace-nowrap">
-              {enhancerStatus === 'initializing'
-                ? 'Processando...'
-                : 'Melhoria por IA'}
-            </span>
-          </button>
+          {/* Badge Host: Transmitindo para a Sala • WebRTC */}
+          {isBroadcastHost && (
+            <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 bg-[#007df7]/20 border border-[#007df7]/40 rounded-full text-[#007df7] text-[11px] sm:text-xs font-bold backdrop-blur-md">
+              <span className={`w-2 h-2 rounded-full ${isHostCapturing ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+              <span>{isHostCapturing ? 'Transmitindo para a Sala' : 'Transmissão Pronta'}</span>
+            </div>
+          )}
 
           {/* Botão Reportar Problema */}
           <button
@@ -3117,6 +3536,45 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         </div>
       </div>
 
+      {/* Banner de Autorização de Compartilhamento do Host (quando captureStream requer fallback) */}
+      {isBroadcastHost && hostNeedsDisplayMediaPrompt && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[3400] bg-black/95 border border-amber-500/60 rounded-3xl p-5 shadow-2xl backdrop-blur-xl max-w-md w-[92%] sm:w-full text-center flex flex-col items-center gap-3 animate-in fade-in zoom-in-95">
+          <div className="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+            <Radio className="w-6 h-6 animate-pulse" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-white font-bold text-sm sm:text-base">Autorizar Transmissão para os Convidados</h3>
+            <p className="text-gray-300 text-xs leading-relaxed">
+              Para transmitir áudio e vídeo com máxima fluidez, autorize a captura da guia. Na janela do navegador, selecione esta guia e certifique-se de marcar <strong>"Compartilhar áudio da guia"</strong>.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 w-full pt-2">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await watchPartyService.startHostBroadcast(videoRef.current);
+                  setHostNeedsDisplayMediaPrompt(false);
+                  setIsHostCapturing(true);
+                } catch (err: any) {
+                  console.warn('[ZapiPlayer] Falha ao autorizar captura da tela:', err);
+                }
+              }}
+              className="flex-1 py-2.5 px-4 bg-[#007df7] hover:bg-[#0069d9] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#007df7]/30 cursor-pointer active:scale-95"
+            >
+              Autorizar Transmissão
+            </button>
+            <button
+              type="button"
+              onClick={() => setHostNeedsDisplayMediaPrompt(false)}
+              className="py-2.5 px-3 bg-white/10 hover:bg-white/20 text-gray-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+            >
+              Dispensar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Screen when all sources have failed */}
       {allSourcesFailed && (
         <div
@@ -3126,9 +3584,23 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(239,68,68,0.2)]">
             <AlertCircle className="w-10 h-10 text-red-500" />
           </div>
-          <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Não foi possível reproduzir este conteúdo.</h2>
+          {failureCategory === 'PLAYBACK_FAILURE' || (streams.length > 0 && allSourcesFailed) ? (
+            <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Não foi possível reproduzir este conteúdo agora</h2>
+          ) : failureCategory === 'VERIFICATION_ERROR' || verificationState === 'INCONCLUSIVE' ? (
+            <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Não foi possível verificar a disponibilidade</h2>
+          ) : failureCategory === 'NO_SOURCES_FOUND' || streams.length === 0 ? (
+            <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Conteúdo indisponível no momento</h2>
+          ) : (
+            <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Conteúdo indisponível</h2>
+          )}
           <p className="text-gray-300 text-sm max-w-lg mb-6 leading-relaxed">
-            {errorMessage || 'Nenhum provedor retornou uma fonte verificada e reproduzível no momento. Você pode tentar novamente ou voltar aos detalhes do título.'}
+            {errorMessage || (
+              failureCategory === 'PLAYBACK_FAILURE'
+                ? 'Não foi possível reproduzir este conteúdo agora. Tente novamente mais tarde.'
+                : verificationState === 'INCONCLUSIVE'
+                  ? 'Não foi possível verificar a disponibilidade agora. Tente novamente.'
+                  : 'Conteúdo indisponível no momento. Não foi possível encontrar uma fonte verificada agora. Tente novamente.'
+            )}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
@@ -3183,18 +3655,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             onLoadedMetadata={() => {
               markMediaAsReadyRef.current();
               applyTargetResumeTime();
-              syncCanvasDimensions();
-              audioEnhancer.setUserVolume(volume, isMuted);
-              if (videoRef.current && aiCanvasRef.current) {
-                const isAnime = item.type === ContentType.ANIME || Boolean(item.genres?.some(g => /anime|animação/i.test(g))) || Boolean(item.title && /anime/i.test(item.title));
-                aiEnhancerService.setContentCategory(isAnime ? 'anime' : 'live-action');
-                aiEnhancerService.attachPlayer(videoRef.current, aiCanvasRef.current);
-              }
             }}
             onCanPlay={() => {
               markMediaAsReadyRef.current();
               applyTargetResumeTime();
-              syncCanvasDimensions();
+              if (videoRef.current && videoRef.current.readyState >= 3) {
+                setIsLoading(false);
+                stallTimerRef.current = 0;
+              }
             }}
             onCanPlayThrough={() => {
               markMediaAsReadyRef.current();
@@ -3205,25 +3673,68 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             }}
             onTimeUpdate={() => {
               if (videoRef.current) {
-                const cur = videoRef.current.currentTime;
+                const video = videoRef.current;
+                const cur = video.currentTime;
                 setCurrentTime(cur);
+                const evidence = sourceEvidenceRef.current;
+                if (evidence && !evidence.reported && !isPlayingIntro && isIntroEnded &&
+                    !video.paused && !video.seeking && video.readyState >= 3) {
+                  if (evidence.playingAt === null) {
+                    evidence.playingAt = Date.now();
+                    evidence.positionAt = cur;
+                  }
+                  const decodedAudio = (video as any).webkitAudioDecodedByteCount;
+                  const hasAudio = (video as any).mozHasAudio !== false &&
+                    ((video as any).audioTracks?.length ?? 1) > 0 &&
+                    (typeof decodedAudio !== 'number' || decodedAudio > 0);
+                  if (Date.now() - evidence.playingAt >= 5_000 &&
+                      cur - (evidence.positionAt || 0) >= 5 && hasAudio) {
+                    evidence.reported = true;
+                    const actualQuality = video.videoHeight >= 2160 ? '4K' : video.videoHeight >= 1080 ? '1080p'
+                      : video.videoHeight >= 720 ? '720p' : video.videoHeight >= 480 ? '480p' : undefined;
+                    const actualTrack = hlsRef.current?.audioTracks?.[hlsRef.current.audioTrack];
+                    const trackLang = actualTrack?.lang?.toLowerCase();
+                    const audioLanguage = /^(pt|por|pob|bra)/.test(trackLang || '') || hasDynamicallyConfirmedPtBr
+                      ? 'pt-BR' : /^(en|eng)/.test(trackLang || '') ? 'en'
+                      : /^(ja|jpn)/.test(trackLang || '') ? 'ja'
+                      : /^(es|spa)/.test(trackLang || '') ? 'es' : undefined;
+                    evidence.ticket.then(ticket => {
+                      if (ticket) reportSourceEvidence(ticket, 'success', {
+                        startupMs: evidence.playingAt! - evidence.selectedAt,
+                        audioLanguage, quality: actualQuality,
+                      });
+                    });
+                  }
+                }
                 if (targetResumeTimeRef.current > 0 && Math.abs(cur - targetResumeTimeRef.current) <= 2) {
                   targetResumeTimeRef.current = 0;
                 }
               }
             }}
             onSeeking={() => {
+              isSeekingRef.current = true;
               setIsSeeking(true);
+              setIsLoading(true);
+              stallTimerRef.current = 0;
+              audioCheckTicksRef.current = 0;
               if (videoRef.current) {
                 const cur = videoRef.current.currentTime;
+                lastPlaybackPositionRef.current = cur;
                 setCurrentTime(cur);
               }
             }}
             onSeeked={() => {
+              isSeekingRef.current = false;
               setIsSeeking(false);
+              stallTimerRef.current = 0;
+              audioCheckTicksRef.current = 0;
               if (videoRef.current) {
                 const cur = videoRef.current.currentTime;
+                lastPlaybackPositionRef.current = cur;
                 setCurrentTime(cur);
+                if (videoRef.current.readyState >= 3) {
+                  setIsLoading(false);
+                }
                 if (watchPartyService.isHost()) {
                   watchPartyService.updatePlaybackState(cur, !videoRef.current.paused, videoRef.current.playbackRate || 1);
                 }
@@ -3252,9 +3763,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               setIsPlaying(true);
               playbackOptimizerService.notifyBufferingEnd();
               playbackOptimizerService.notifyFirstFrame();
-              syncCanvasDimensions();
               watchPartyService.setBuffering(false);
-              if (watchPartyService.isHost()) {
+              if (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) {
                 watchPartyService.updatePlaybackState(videoRef.current?.currentTime || 0, true, videoRef.current?.playbackRate || 1);
               }
               mediaLoadingTracker.transition(item.id, 'PLAYING', {
@@ -3268,8 +3778,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             }}
             onError={(e) => {
               if (!isMountedRef.current || !currentStream?.url) return;
+              const video = videoRef.current;
+              // Erro com código 1 é MEDIA_ERR_ABORTED (gerado naturalmente por cancelamento de requisição durante seek)
+              if (video?.error?.code === 1) {
+                console.warn('[ZapiPlayer] Requisição de mídia abortada normalmente pelo navegador (seek ou troca). Ignorando.');
+                return;
+              }
               try {
-                console.warn('[ZapiPlayer] Erro disparado pelo elemento de vídeo nativo:', e);
+                console.warn('[ZapiPlayer] Erro disparado pelo elemento de vídeo nativo:', e, video?.error);
                 handleStreamFallbackRef.current('Erro ao decodificar fluxo de vídeo.');
               } catch (err) {
                 console.warn('[ZapiPlayer] Erro capturado no handler onError do vídeo:', err);
@@ -3277,7 +3793,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             }}
             onPause={() => {
               setIsPlaying(false);
-              if (watchPartyService.isHost()) {
+              if (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) {
                 watchPartyService.updatePlaybackState(videoRef.current?.currentTime || 0, false, videoRef.current?.playbackRate || 1);
               }
             }}
@@ -3299,90 +3815,35 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             }}
           />
 
-          {/* Canvas de Aceleração por Shaders WebGPU / WebGL / Anime4K */}
-          <canvas
-            ref={aiCanvasRef}
-            className="absolute inset-0 w-full h-full object-contain pointer-events-none transition-opacity duration-150"
-            style={{
-              opacity: (aiSettings.enabled && aiSettings.videoEnabled && !isHoldingOriginal && isEnhancerRendering) ? 1 : 0,
-              display: (aiSettings.enabled && aiSettings.videoEnabled && !isHoldingOriginal && isEnhancerRendering) ? 'block' : 'none',
-              clipPath: (isSplitComparing && isAiActive)
-                ? `polygon(${splitPosition}% 0%, 100% 0%, 100% 100%, ${splitPosition}% 100%)`
-                : undefined,
-              WebkitClipPath: (isSplitComparing && isAiActive)
-                ? `polygon(${splitPosition}% 0%, 100% 0%, 100% 100%, ${splitPosition}% 100%)`
-                : undefined
-            }}
-          />
-
-          {/* Divisor de Comparação em Tela Dividida (Arraste Interativo) */}
-          {isSplitComparing && isAiActive && (
+          {/* Vinheta Oficial ZapiTV (Intro Video no Palco do Player com Fade Suave) */}
+          {isPlayingIntro && (
             <div
-              ref={splitContainerRef}
-              className="absolute inset-0 pointer-events-auto select-none overflow-hidden z-25"
-              onClick={(e) => e.stopPropagation()}
+              className={`absolute inset-0 z-20 bg-black flex items-center justify-center select-none transition-opacity duration-700 ease-in-out ${
+                isIntroFading ? 'opacity-0 pointer-events-none' : 'opacity-100'
+              }`}
             >
-              {/* Linha Divisória Vertical com Handle */}
-              <div
-                className="absolute top-0 bottom-0 w-0.5 bg-white/90 shadow-[0_0_12px_rgba(0,125,247,0.8)] flex items-center justify-center -translate-x-1/2 cursor-ew-resize group"
-                style={{ left: `${splitPosition}%` }}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  setIsDraggingDivider(true);
-                  updateSplitPosition(e.clientX);
+              <video
+                ref={introVideoRef}
+                src="/intro.mp4"
+                autoPlay
+                playsInline
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => {
+                  if (isPlayingIntroRef.current && !isIntroTransitioningRef.current) {
+                    setIsPlaying(false);
+                  }
                 }}
-              >
-                {/* Handle central com ícone Columns2 */}
-                <div 
-                  className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#0f121a]/95 border border-white/40 text-white shadow-2xl backdrop-blur-md flex items-center justify-center cursor-ew-resize hover:scale-110 active:scale-95 transition-transform hover:border-[#007df7] group-hover:border-[#007df7]"
-                  title="Arraste para comparar"
-                >
-                  <Columns2 className="w-4 h-4 text-white pointer-events-none" />
+                onEnded={handleIntroEnded}
+                onError={handleIntroEnded}
+                className="w-full h-full object-cover bg-black"
+              />
+
+              {/* Indicador discreto caso a intro termine e ainda esteja aguardando o carregamento da mídia */}
+              {(isIntroEnded || userSkippedIntro) && !isMediaReady && (
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center z-25 animate-in fade-in duration-300 pointer-events-none select-none">
+                  <ZapiLoader size="lg" />
                 </div>
-              </div>
-
-              {/* Badges sutis de identificação */}
-              <div className="absolute top-20 left-4 md:left-8 pointer-events-none animate-in fade-in duration-300">
-                <span className="px-3 py-1 rounded-full text-[10px] md:text-xs font-black uppercase tracking-wider bg-black/75 border border-white/20 text-gray-300 shadow-xl backdrop-blur-md">
-                  Original
-                </span>
-              </div>
-              <div className="absolute top-20 right-4 md:right-8 pointer-events-none animate-in fade-in duration-300">
-                <span className="px-3 py-1 rounded-full text-[10px] md:text-xs font-black uppercase tracking-wider bg-[#007df7]/85 border border-[#007df7] text-white shadow-xl backdrop-blur-md flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 fill-current" />
-                  <span>Melhoria por IA</span>
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Badge Visual: Original (Segurando) */}
-          {isHoldingOriginal && (
-            <div className="absolute top-16 inset-x-0 flex justify-center pointer-events-none z-50 animate-in fade-in duration-100">
-              <div className="bg-black/90 border border-amber-400 text-white px-5 py-2 rounded-full text-xs font-black tracking-widest uppercase shadow-2xl backdrop-blur-md flex items-center gap-2.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-                <span>Original (Segurando)</span>
-              </div>
-            </div>
-          )}
-
-          {/* Notificação Discreta: Melhoria por IA Indisponível */}
-          {showUnavailableToast && (
-            <div className="absolute top-16 inset-x-0 flex justify-center pointer-events-none z-50 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="bg-[#0f121a]/95 border border-amber-500/40 text-amber-300 px-5 py-2 rounded-full text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2.5 shadow-amber-500/10">
-                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Melhoria de imagem indisponível para este vídeo.</span>
-              </div>
-            </div>
-          )}
-
-          {/* Notificação Discreta: Melhoria por IA Ativada */}
-          {showActivatedToast && (
-            <div className="absolute top-16 inset-x-0 flex justify-center pointer-events-none z-50 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="bg-[#0f121a]/95 border border-[#007df7] text-white px-5 py-2 rounded-full text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2.5 shadow-[#007df7]/20">
-                <Sparkles className="w-4 h-4 fill-current text-[#007df7] animate-pulse" />
-                <span>Melhoria por IA Ativada</span>
-              </div>
+              )}
             </div>
           )}
 
@@ -3432,6 +3893,19 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               onSkip={handleExecuteSkip}
               className={showAutoPlayCountdown ? '!bottom-56 sm:!bottom-60' : ''}
             />
+          )}
+
+          {/* Botão Pular Intro durante a vinheta institucional */}
+          {isPlayingIntro && (!isIntroEnded || !isMediaReady) && !showNonDubbedPrompt && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSkipIntro();
+              }}
+              className="absolute bottom-24 sm:bottom-28 right-4 sm:right-8 z-50 flex items-center gap-2 px-5 py-2.5 bg-black/70 hover:bg-black/90 active:scale-95 text-white rounded-full border border-white/20 backdrop-blur-md text-xs font-bold uppercase tracking-wider transition-all hover:scale-105 shadow-2xl cursor-pointer"
+            >
+              <span>Pular Intro</span> <SkipForward className="w-3.5 h-3.5" />
+            </button>
           )}
 
           {/* Card Flutuante de Reprodução Automática (Contagem Regressiva de 10s) */}
@@ -3534,9 +4008,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             </div>
           )}
 
-          {/* Buffering/Loading Spinner — Carregamento Oficial ZapiTV */}
-          {(isLoading || isLoadingStreams) && !showNonDubbedPrompt && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 pointer-events-none select-none">
+          {/* Indicador discreto de preparação antes da vinheta (Requisito Obrigatório) */}
+          {!isPlayingIntro && (!isMediaReady || isLoadingStreams || isLoading) && !showNonDubbedPrompt && !allSourcesFailed && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-20 select-none animate-in fade-in duration-300">
+              <ZapiLoader size="lg" />
+            </div>
+          )}
+
+          {/* Buffering durante a reprodução ativa (após início da mídia) */}
+          {!isPlayingIntro && isMediaReady && isLoading && !showNonDubbedPrompt && !allSourcesFailed && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[2px] z-20 pointer-events-none select-none">
               <ZapiLoader size="lg" />
             </div>
           )}
@@ -3564,32 +4045,35 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         className={`absolute bottom-0 inset-x-0 p-3 sm:p-4 md:p-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] bg-gradient-to-t from-black/95 via-black/60 to-transparent z-40 transition-opacity duration-300 ${(showControls || !isPlaying || hasOpenMenu) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       >
         {/* Progress Scrubber */}
-        <div className="relative w-full py-2 cursor-pointer mb-2 sm:mb-3 group flex items-center select-none">
+        <div className={`relative w-full py-2 mb-2 sm:mb-3 group flex items-center select-none ${(isPlayingIntro || (isBroadcastGuest && !watchPartyService.canLocalControl('canSeek'))) ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}>
           {/* Linha Cinza de Fundo (Track) */}
           <div className="w-full h-1.5 sm:h-2 bg-white/20 rounded-full relative flex items-center">
             {/* Linha Azul de Progresso — Cresce centralizada verticalmente com a linha cinza */}
             <div
               className="absolute left-0 top-1/2 -translate-y-1/2 h-1.5 sm:h-2 group-hover:h-2.5 sm:group-hover:h-3 bg-[#007df7] rounded-full transition-all duration-150 flex items-center pointer-events-none"
-              style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+              style={{ width: `${((isPlayingIntro ? 0 : currentTime) / (duration || 1)) * 100}%` }}
             >
               {/* Bolinha Branca (Thumb) perfeitamente centralizada na ponta da linha azul */}
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-white rounded-full shadow-lg transition-opacity ${isPlayingIntro ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'}`} />
             </div>
           </div>
           <input
             type="range"
             min={0}
             max={duration || 100}
-            value={currentTime}
+            value={isPlayingIntro ? 0 : currentTime}
+            disabled={isPlayingIntro || (isBroadcastGuest && !watchPartyService.canLocalControl('canSeek'))}
             onChange={(e) => {
+              if (isPlayingIntro) return;
               const val = Number(e.target.value);
               handleSeek(val);
             }}
             onInput={(e) => {
+              if (isPlayingIntro) return;
               const val = Number((e.target as HTMLInputElement).value);
               handleSeek(val);
             }}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+            className={`absolute inset-0 w-full h-full opacity-0 z-10 ${(isPlayingIntro || (isBroadcastGuest && !watchPartyService.canLocalControl('canSeek'))) ? 'cursor-not-allowed' : 'cursor-pointer'}`}
           />
         </div>
 
@@ -3598,16 +4082,19 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           <div className="flex items-center gap-1.5 sm:gap-3 md:gap-5 min-w-0">
             <button
               onClick={togglePlay}
-              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all hover:scale-105 shrink-0"
+              disabled={isBroadcastGuest && !watchPartyService.canLocalControl('canPlayPause')}
+              className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all hover:scale-105 shrink-0 ${(isBroadcastGuest && !watchPartyService.canLocalControl('canPlayPause')) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
               aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
+              title={(isBroadcastGuest && !watchPartyService.canLocalControl('canPlayPause')) ? 'Permissão necessária do anfitrião' : undefined}
             >
               {isPlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5 fill-current" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />}
             </button>
 
             <button
               onClick={() => skipTime(-10)}
-              className="text-gray-300 hover:text-white transition-colors p-1"
-              title="Retroceder 10s"
+              disabled={isPlayingIntro || (isBroadcastGuest && !watchPartyService.canLocalControl('canSeek'))}
+              className={`text-gray-300 hover:text-white transition-colors p-1 ${(isPlayingIntro || (isBroadcastGuest && !watchPartyService.canLocalControl('canSeek'))) ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+              title={isPlayingIntro ? 'Aguarde o término da intro' : (isBroadcastGuest && !watchPartyService.canLocalControl('canSeek')) ? 'Permissão necessária do anfitrião' : 'Retroceder 10s'}
               aria-label="Retroceder 10 segundos"
             >
               <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -3615,8 +4102,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
             <button
               onClick={() => skipTime(10)}
-              className="text-gray-300 hover:text-white transition-colors p-1"
-              title="Avançar 10s"
+              disabled={isPlayingIntro || (isBroadcastGuest && !watchPartyService.canLocalControl('canSeek'))}
+              className={`text-gray-300 hover:text-white transition-colors p-1 ${(isPlayingIntro || (isBroadcastGuest && !watchPartyService.canLocalControl('canSeek'))) ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+              title={isPlayingIntro ? 'Aguarde o término da intro' : (isBroadcastGuest && !watchPartyService.canLocalControl('canSeek')) ? 'Permissão necessária do anfitrião' : 'Avançar 10s'}
               aria-label="Avançar 10 segundos"
             >
               <RotateCw className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -3641,7 +4129,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
             {/* Time display */}
             <span className="text-[10px] sm:text-xs text-gray-300 font-bold ml-1 sm:ml-2 whitespace-nowrap">
-              {formatTime(currentTime)} / {formatTime(duration)}
+              {formatTime(isPlayingIntro ? 0 : currentTime)} / {isBroadcastGuest && (!isFinite(duration) || duration <= 0) ? 'Ao Vivo' : formatTime(duration)}
             </span>
           </div>
 
@@ -3651,13 +4139,19 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (isPlayingIntro) return;
+                  if (isBroadcastGuest) {
+                    if (!watchPartyService.canLocalControl('canChangeEpisode')) return;
+                    watchPartyService.requestHostPlaybackAction('next_episode');
+                    return;
+                  }
                   onNextEpisode();
                 }}
-                disabled={isLoadingStreams}
+                disabled={isLoadingStreams || isPlayingIntro || (isBroadcastGuest && !watchPartyService.canLocalControl('canChangeEpisode'))}
                 className={`flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold transition-all ${
-                  isLoadingStreams ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'
+                  isLoadingStreams || isPlayingIntro || (isBroadcastGuest && !watchPartyService.canLocalControl('canChangeEpisode')) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'
                 }`}
-                title="Próximo Episódio (N)"
+                title={isPlayingIntro ? 'Aguarde o término da intro' : (isBroadcastGuest && !watchPartyService.canLocalControl('canChangeEpisode')) ? 'Permissão necessária do anfitrião' : 'Próximo Episódio (N)'}
               >
                 <SkipForward className="w-4 h-4 text-[#007df7]" />
                 <span className="hidden sm:inline">Próximo</span>
@@ -3665,92 +4159,114 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             )}
 
             {/* Audio / Dubbing Language Menu Button */}
-            <div className="relative">
-              <button
-                ref={audioButtonRef}
-                onClick={() => {
-                  setShowAudioMenu(!showAudioMenu);
-                  setShowSubtitlesMenu(false);
-                  setShowQualityMenu(false);
-                }}
-                className={`p-2 rounded-lg transition-colors flex items-center gap-1.5 ${
-                  showAudioMenu ? 'bg-white/20 text-white' : 'text-gray-300 hover:text-white hover:bg-white/10'
-                }`}
-                title="Áudio e Dublagem"
-              >
-                <Languages className="w-5 h-5" />
-                <span className="text-[11px] font-bold hidden xl:inline">
-                  {availableAudioOptions.find(o => o.isCurrent)?.flag || '🌐'}
-                </span>
-              </button>
+            {!isBroadcastGuest && (
+              <div className="relative">
+                <button
+                  ref={audioButtonRef}
+                  onClick={() => {
+                    setShowAudioMenu(!showAudioMenu);
+                    setShowSubtitlesMenu(false);
+                    setShowQualityMenu(false);
+                  }}
+                  className={`p-2 rounded-lg transition-colors flex items-center gap-1.5 ${
+                    showAudioMenu ? 'bg-white/20 text-white' : 'text-gray-300 hover:text-white hover:bg-white/10'
+                  }`}
+                  title="Áudio e Dublagem"
+                >
+                  <Languages className="w-5 h-5" />
+                  <span className="text-[11px] font-bold hidden xl:inline">
+                    {availableAudioOptions.find(o => o.isCurrent)?.flag || '🌐'}
+                  </span>
+                </button>
 
-              {showAudioMenu && (
-                <div
-                  ref={audioMenuRef}
-                  onClick={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                  className="absolute bottom-12 right-0 bg-[#0f1115] border border-white/10 rounded-2xl p-3 w-[calc(100vw-1.5rem)] max-w-xs sm:w-72 shadow-2xl space-y-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                    <span className="text-xs uppercase font-black text-gray-300">Áudio e Dublagem</span>
-                    <span className="text-[10px] text-gray-400 font-bold">
-                      {availableAudioOptions.length} {availableAudioOptions.length === 1 ? 'opção' : 'opções'}
-                    </span>
+                {showAudioMenu && (
+                  <div
+                    ref={audioMenuRef}
+                    onClick={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    className="absolute bottom-12 right-0 bg-[#0f1115] border border-white/10 rounded-2xl p-3 w-[calc(100vw-1.5rem)] max-w-xs sm:w-72 shadow-2xl space-y-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                      <span className="text-xs uppercase font-black text-gray-300">Áudio e Dublagem</span>
+                      <span className="text-[10px] text-gray-400 font-bold">
+                        {availableAudioOptions.length} {availableAudioOptions.length === 1 ? 'opção' : 'opções'}
+                      </span>
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto space-y-1 custom-scrollbar pr-1">
+                      {availableAudioOptions.map(opt => (
+                        <button
+                          key={opt.id}
+                          onClick={() => handleSelectAudio(opt)}
+                          className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg transition-colors flex items-center justify-between ${
+                            opt.isCurrent
+                              ? 'bg-[#007df7] text-white shadow-md shadow-[#007df7]/20'
+                              : 'text-gray-300 hover:bg-white/10'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate pr-2 min-w-0">
+                            <span className="text-sm shrink-0">{opt.flag}</span>
+                            <span className="truncate">{opt.label}</span>
+                            <span
+                              className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${
+                                opt.isCurrent ? 'bg-white/20 text-white' : 'bg-white/10 text-gray-400'
+                              }`}
+                            >
+                              {opt.badge}
+                            </span>
+                          </div>
+                          {opt.isCurrent && <Check className="w-3.5 h-3.5 shrink-0" />}
+                        </button>
+                      ))}
+
+                      {availableAudioOptions.length === 0 ? (
+                        <p className="text-[11px] text-gray-400 py-2 px-1 text-center leading-relaxed">
+                          Nenhuma faixa de áudio disponível nesta fonte.
+                        </p>
+                      ) : availableAudioOptions.length === 1 && (
+                        <p className="text-[11px] text-gray-400 py-2 px-1 text-center leading-relaxed">
+                          Áudio atual em reprodução direta.
+                        </p>
+                      )}
+                    </div>
                   </div>
-
-                  <div className="max-h-64 overflow-y-auto space-y-1 custom-scrollbar pr-1">
-                    {availableAudioOptions.map(opt => (
-                      <button
-                        key={opt.id}
-                        onClick={() => handleSelectAudio(opt)}
-                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-lg transition-colors flex items-center justify-between ${
-                          opt.isCurrent
-                            ? 'bg-[#007df7] text-white shadow-md shadow-[#007df7]/20'
-                            : 'text-gray-300 hover:bg-white/10'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 truncate pr-2 min-w-0">
-                          <span className="text-sm shrink-0">{opt.flag}</span>
-                          <span className="truncate">{opt.label}</span>
-                          <span
-                            className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shrink-0 ${
-                              opt.isCurrent ? 'bg-white/20 text-white' : 'bg-white/10 text-gray-400'
-                            }`}
-                          >
-                            {opt.badge}
-                          </span>
-                        </div>
-                        {opt.isCurrent && <Check className="w-3.5 h-3.5 shrink-0" />}
-                      </button>
-                    ))}
-
-                    {availableAudioOptions.length === 0 ? (
-                      <p className="text-[11px] text-gray-400 py-2 px-1 text-center leading-relaxed">
-                        Nenhuma faixa de áudio disponível nesta fonte.
-                      </p>
-                    ) : availableAudioOptions.length === 1 && (
-                      <p className="text-[11px] text-gray-400 py-2 px-1 text-center leading-relaxed">
-                        Áudio atual em reprodução direta.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Subtitles Menu Button */}
             <div className="relative">
-              <button
-                ref={subtitlesButtonRef}
-                onClick={() => {
-                  setShowSubtitlesMenu(!showSubtitlesMenu);
-                  setShowQualityMenu(false);
-                  setShowAudioMenu(false);
-                }}
-                className={`p-2 rounded-lg transition-colors ${selectedSubtitleId !== 'off' ? 'bg-[#007df7] text-white' : 'text-gray-300 hover:text-white hover:bg-white/10'}`}
-                title="Legendas"
-              >
-                <Subtitles className="w-5 h-5" />
-              </button>
+              {(() => {
+                const streamSubAnalysis = currentStream ? analyzeStreamSubtitleFormat(currentStream) : null;
+                const isHardsub = Boolean(streamSubAnalysis?.isHardsub);
+                const isSubtitlesActive = appliedSubtitleId !== 'off';
+
+                return (
+                  <button
+                    ref={subtitlesButtonRef}
+                    onClick={() => {
+                      setShowSubtitlesMenu(!showSubtitlesMenu);
+                      setShowQualityMenu(false);
+                      setShowAudioMenu(false);
+                    }}
+                    className={`p-2 rounded-lg transition-colors ${
+                      isSubtitlesActive
+                        ? 'bg-[#007df7] text-white shadow-sm'
+                        : isHardsub
+                        ? 'text-[#007df7] hover:text-white hover:bg-white/10'
+                        : 'text-gray-300 hover:text-white hover:bg-white/10'
+                    }`}
+                    title={
+                      isSubtitlesActive
+                        ? 'Legendas ativadas'
+                        : isHardsub
+                        ? 'Legendas incorporadas na imagem (Hardsub)'
+                        : 'Legendas'
+                    }
+                  >
+                    <Subtitles className="w-5 h-5" />
+                  </button>
+                );
+              })()}
 
               {showSubtitlesMenu && (
                 <div
@@ -3784,17 +4300,32 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                       )}
 
                       {/* Aviso se a fonte contiver hardsub (legendas gravadas na imagem) */}
-                      {currentStream && analyzeStreamSubtitleFormat(currentStream).format === 'hardsub_foreign' && (
-                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 text-[10px] text-amber-300 flex items-start gap-1.5 leading-tight">
-                          <ShieldAlert className="w-3.5 h-3.5 shrink-0 text-amber-400 mt-0.5" />
-                          <span>Este vídeo possui legendas embutidas nos frames (Hardsub em outro idioma).</span>
-                        </div>
-                      )}
+                      {currentStream && (() => {
+                        const analysis = analyzeStreamSubtitleFormat(currentStream);
+                        if (analysis.format === 'hardsub_foreign') {
+                          return (
+                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2 text-[10px] text-amber-300 flex items-start gap-1.5 leading-tight">
+                              <ShieldAlert className="w-3.5 h-3.5 shrink-0 text-amber-400 mt-0.5" />
+                              <span>Este vídeo possui legendas embutidas nos frames (Hardsub em outro idioma).</span>
+                            </div>
+                          );
+                        }
+                        if (analysis.format === 'hardsub_ptbr') {
+                          return (
+                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2 text-[10px] text-blue-300 flex items-start gap-1.5 leading-tight">
+                              <ShieldAlert className="w-3.5 h-3.5 shrink-0 text-[#007df7] mt-0.5" />
+                              <span>Este vídeo possui legendas em português incorporadas à imagem (Hardsub). Não é possível desligá-las.</span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
 
                       <div className="max-h-64 overflow-y-auto space-y-1 custom-scrollbar pr-1">
                         <button
                           onClick={() => {
                             userManuallyChangedSubRef.current = true;
+                            subtitlePreferenceService.setSubtitlesEnabled(false);
                             setSelectedSubtitleId('off');
                             setAppliedSubtitleId('off');
                             setCues([]);
@@ -3804,7 +4335,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-sm">🚫</span>
-                            <span>Desativada</span>
+                            <span>Sem legenda</span>
                           </div>
                           {appliedSubtitleId === 'off' && <Check className="w-3.5 h-3.5" />}
                         </button>
@@ -3820,6 +4351,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                               key={sub.id}
                               onClick={() => {
                                 userManuallyChangedSubRef.current = true;
+                                subtitlePreferenceService.setSubtitlesEnabled(true);
+                                if (sub.lang) {
+                                  subtitlePreferenceService.setPreferredLanguage(sub.lang);
+                                }
                                 setSelectedSubtitleId(sub.id);
                                 setShowSubtitlesMenu(false);
                               }}
@@ -4242,20 +4777,27 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                   {/* Qualidade de Vídeo */}
                   <div>
                     <span className="text-[10px] uppercase font-black text-gray-400 block mb-1.5">Qualidade de Vídeo</span>
-                    <div className="grid grid-cols-3 gap-1">
-                      {availableQualities.map(q => (
-                        <button
-                          key={q}
-                          onClick={() => handleSelectQuality(q)}
-                          className={`py-1 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 ${
-                            selectedQuality === q ? 'bg-[#007df7] text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'
-                          }`}
-                        >
-                          <span>{q.toUpperCase()}</span>
-                          {selectedQuality === q && <Check className="w-3 h-3" />}
-                        </button>
-                      ))}
-                    </div>
+                    {isBroadcastGuest ? (
+                      <div className="py-2 px-3 bg-white/5 border border-white/10 rounded-xl text-xs text-gray-300 font-bold flex items-center justify-between">
+                        <span>WebRTC Adaptativo</span>
+                        <span className="text-[10px] text-emerald-400 uppercase font-black">Ao Vivo</span>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-1">
+                        {availableQualities.map(q => (
+                          <button
+                            key={q}
+                            onClick={() => handleSelectQuality(q)}
+                            className={`py-1 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 ${
+                              selectedQuality === q ? 'bg-[#007df7] text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'
+                            }`}
+                          >
+                            <span>{q.toUpperCase()}</span>
+                            {selectedQuality === q && <Check className="w-3 h-3" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Reprodução Automática de Episódios */}

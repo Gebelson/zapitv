@@ -1,6 +1,7 @@
 import { StremioStream } from '../stremio/stremioTypes';
 import { videoAdBlocker } from '../security/videoAdBlocker';
 import { streamQuarantineService } from '../security/streamQuarantineService';
+import { LruCache } from '../cache/LruCache';
 
 export interface StreamValidationResult {
   valid: boolean;
@@ -10,6 +11,7 @@ export interface StreamValidationResult {
   contentType?: string;
   isParked?: boolean;
   isManifestValid?: boolean;
+  requiresEngine?: boolean;
   reason?: string;
   latencyMs?: number;
 }
@@ -113,7 +115,6 @@ export const KNOWN_UPSTREAM_MISMATCHES: Array<{
       if (
         text.includes('f9a842dfe9f5b2e7fda509f2306e0700b97a4036') ||
         text.includes('d0eacddff07a24173d8f7dc11a18ef3ed32b886a') ||
-        text.includes('ben the men') ||
         text.includes('khalifa') ||
         text.includes('mia khalifa')
       ) {
@@ -126,8 +127,12 @@ export const KNOWN_UPSTREAM_MISMATCHES: Array<{
 
 class StreamValidator {
   private blacklist: Set<string> = new Set(KNOWN_PARKED_DOMAINS);
-  private cache: Map<string, { result: StreamValidationResult; timestamp: number }> = new Map();
+  private cache = new LruCache<string, { result: StreamValidationResult; timestamp: number }>(400, 5 * 60 * 1000);
   private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos de cache
+
+  public clearCache(): void {
+    this.cache.clear();
+  }
 
   /**
    * Verifica rapidamente se a URL pertence a um domínio comprovadamente estacionado ou na lista negra.
@@ -227,11 +232,14 @@ class StreamValidator {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
+        const isProvisional = res.status === 403 || res.status === 405;
         const result: StreamValidationResult = {
-          valid: false,
+          valid: isProvisional,
           url,
           status: res.status,
-          reason: errorData.reason || `Falha na validação HTTP: status ${res.status}`,
+          reason: isProvisional
+            ? `Fonte aceita provisoriamente (Status HTTP ${res.status} não impede reprodução no navegador)`
+            : (errorData.reason || `Falha na validação HTTP: status ${res.status}`),
           latencyMs: Date.now() - start
         };
         this.cache.set(url, { result, timestamp: Date.now() });
@@ -251,10 +259,12 @@ class StreamValidator {
       this.cache.set(url, { result: data, timestamp: Date.now() });
       return data;
     } catch (err: any) {
+      // Não tratar falhas de HEAD/CORS/Timeout temporário como prova definitiva de indisponibilidade
+      const isMediaExtension = url.includes('.m3u8') || url.includes('.mp4') || url.includes('.webm') || url.includes('.mpd');
       const result: StreamValidationResult = {
-        valid: false,
+        valid: isMediaExtension,
         url,
-        reason: `Tempo limite ou erro de rede ao validar: ${err.message}`,
+        reason: `Verificação leve em segundo plano pendente (${err.message})`,
         latencyMs: Date.now() - start
       };
       this.cache.set(url, { result, timestamp: Date.now() });
@@ -266,7 +276,12 @@ class StreamValidator {
    * Verifica se o stream realmente corresponde ao título do conteúdo requisitado,
    * prevenindo que animes/séries sejam trocados por conteúdos corrompidos em addons de terceiros.
    */
-  public isStreamMatchingTargetTitle(stream: StremioStream, targetTitle?: string): boolean {
+  public isStreamMatchingTargetTitle(
+    stream: StremioStream,
+    targetTitle?: string,
+    originalTitle?: string,
+    alternateTitles?: string[]
+  ): boolean {
     const sTitle = (stream.title || '').trim();
     const sName = (stream.name || '').trim();
     const sUrl = (stream.url || '').trim();
@@ -280,7 +295,7 @@ class StreamValidator {
     if (/🐉\s*Malfoy/i.test(`${sName} ${sTitle}`)) return false;
 
     // 0. Quarentena permanente imediata (bloqueia hashes banidos, atrizes adultas, trotes)
-    const quarantine = streamQuarantineService.evaluateQuarantine(stream, targetTitle);
+    const quarantine = streamQuarantineService.evaluateQuarantine(stream, targetTitle || originalTitle);
     if (quarantine.isQuarantined) {
       console.warn(`[StreamValidator] Stream bloqueado em quarentena: ${sTitle || sUrl} (Motivo: ${quarantine.reason})`);
       return false;
@@ -292,7 +307,7 @@ class StreamValidator {
       return false;
     }
 
-    const adEval = videoAdBlocker.evaluateStream(stream, targetTitle);
+    const adEval = videoAdBlocker.evaluateStream(stream, targetTitle || originalTitle);
     if (adEval.status === 'bloqueado por propaganda embutida') {
       console.warn(`[StreamValidator] Stream rejeitado por propaganda embutida (1xBet / Apostas): ${sTitle || sUrl} (Motivo: ${adEval.reason})`);
       return false;
@@ -334,60 +349,75 @@ class StreamValidator {
       return false;
     }
 
-    if (!targetTitle || !targetTitle.trim()) return true;
+    const rawCandidates = [targetTitle, originalTitle, ...(alternateTitles || [])]
+      .filter((t): t is string => Boolean(t && t.trim()));
+
+    if (rawCandidates.length === 0) return true;
 
     // 2. Aplica regras de bloqueio de desvios conhecidos (ex: Doraemon -> Sparks of Tomorrow)
     for (const rule of KNOWN_UPSTREAM_MISMATCHES) {
-      if (rule.targetPattern.test(targetTitle)) {
+      if (rawCandidates.some(cand => rule.targetPattern.test(cand))) {
         if (rule.rejectStream(stream)) {
-          console.warn(`[StreamValidator] Stream rejeitado por desvio conhecido para '${targetTitle}': ${sTitle || sUrl}`);
+          console.warn(`[StreamValidator] Stream rejeitado por desvio conhecido para '[${rawCandidates.join(', ')}]': ${sTitle || sUrl}`);
           return false;
         }
       }
     }
 
+    const normalizeTitle = (str: string) => {
+      return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
+    const cleanCandidates = rawCandidates.map(normalizeTitle).filter(Boolean);
+
     // 3. Validação de título declarado em streams estruturados (ex: '🐦‍🔥 Nome da Obra ⏸️')
     const fenixMatch = sTitle.match(/🐦‍🔥\s*([^\n⏸️]+)/i);
     if (fenixMatch) {
-      const declaredTitle = fenixMatch[1].trim().toLowerCase();
-      const cleanTarget = targetTitle.toLowerCase()
-        .replace(/[^\w\s\u00C0-\u00FF]/gi, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      
-      const targetWords = cleanTarget.split(' ').filter(w => w.length >= 3);
-      const declaredWords = declaredTitle
-        .replace(/[^\w\s\u00C0-\u00FF]/gi, ' ')
-        .split(' ')
-        .filter(w => w.length >= 3);
-      
-      if (targetWords.length > 0 && declaredWords.length > 0) {
-        const hasOverlap = targetWords.some(tw => declaredTitle.includes(tw)) ||
-                           declaredWords.some(dw => cleanTarget.includes(dw));
-        if (!hasOverlap) {
-          console.warn(`[StreamValidator] Título do stream '${declaredTitle}' não corresponde ao título solicitado '${targetTitle}'`);
-          return false;
+      const declaredTitle = normalizeTitle(fenixMatch[1]);
+      const declaredWords = declaredTitle.split(' ').filter(w => w.length >= 3);
+
+      let matchesAny = false;
+      for (const cand of cleanCandidates) {
+        if (declaredTitle.includes(cand) || cand.includes(declaredTitle)) {
+          matchesAny = true;
+          break;
         }
+        const candWords = cand.split(' ').filter(w => w.length >= 3);
+        if (candWords.length > 0 && declaredWords.length > 0) {
+          const hasOverlap = candWords.some(tw => declaredTitle.includes(tw)) ||
+                             declaredWords.some(dw => cand.includes(dw));
+          if (hasOverlap) {
+            matchesAny = true;
+            break;
+          }
+        }
+      }
+
+      if (!matchesAny && cleanCandidates.length > 0) {
+        console.warn(`[StreamValidator] Título do stream '${declaredTitle}' não corresponde aos títulos solicitados [${cleanCandidates.join(', ')}]`);
+        return false;
       }
     }
 
     // 4. Validação de torrents com releases claramente de outras obras
     if (sTitle.length > 5 && (sTitle.includes('1080p') || sTitle.includes('720p') || sTitle.includes('.mkv') || sTitle.includes('.mp4') || sTitle.includes('NyaaSi') || sTitle.includes('TorrentGalaxy') || sTitle.includes('1337x'))) {
-      const cleanSTitle = sTitle.replace(/\[[^\]]+\]/g, ' ')
-        .replace(/[^\w\s\u00C0-\u00FF]/gi, ' ')
-        .toLowerCase();
-      
-      const cleanTarget = targetTitle.toLowerCase()
-        .replace(/[^\w\s\u00C0-\u00FF]/gi, ' ')
-        .trim();
-      
-      const mainTargetWord = cleanTarget.split(' ').find(w => w.length >= 4);
-      if (mainTargetWord && !cleanSTitle.includes(mainTargetWord)) {
-        const otherKnownSeries = ['ultraman', 'aseria', 'angel heart', 'sparks of tomorrow', 'black clover', 'murai in love', 'saving 80,000 gold'];
-        if (otherKnownSeries.some(t => cleanSTitle.includes(t))) {
-          console.warn(`[StreamValidator] Release torrent com título trocado rejeitada: '${sTitle}' para '${targetTitle}'`);
-          return false;
-        }
+      const cleanSTitle = normalizeTitle(sTitle.replace(/\[[^\]]+\]/g, ' '));
+      const otherKnownSeries = ['ultraman', 'aseria', 'angel heart', 'sparks of tomorrow', 'black clover', 'murai in love', 'saving 80,000 gold'];
+
+      const matchesTarget = cleanCandidates.some(cand => {
+        const words = cand.split(' ').filter(w => w.length >= 4);
+        return words.some(w => cleanSTitle.includes(w));
+      });
+
+      if (!matchesTarget && otherKnownSeries.some(t => cleanSTitle.includes(t))) {
+        console.warn(`[StreamValidator] Release torrent com título trocado rejeitada: '${sTitle}' para '[${cleanCandidates.join(', ')}]'`);
+        return false;
       }
     }
 
@@ -432,12 +462,17 @@ class StreamValidator {
    * Filtra uma lista de streams, eliminando imediatamente fontes de domínios parked/inválidos
    * e streams que pertencem a conteúdos trocados/diferentes do solicitado.
    */
-  public filterCleanStreams(streams: StremioStream[], targetTitle?: string): StremioStream[] {
+  public filterCleanStreams(
+    streams: StremioStream[],
+    targetTitle?: string,
+    originalTitle?: string,
+    alternateTitles?: string[]
+  ): StremioStream[] {
     return streams.filter(s => {
       if (!s.url) return false;
       if (this.isUrlBlacklisted(s.url)) return false;
       if (videoAdBlocker.isStreamBlocked(s.url)) return false;
-      return this.isStreamMatchingTargetTitle(s, targetTitle);
+      return this.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles);
     });
   }
 }

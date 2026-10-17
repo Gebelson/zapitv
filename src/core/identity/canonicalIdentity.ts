@@ -6,11 +6,15 @@
 
 import { ContentItem, ContentType } from '../../../types';
 import { theatricalFilterService } from '../catalog/theatricalFilterService';
+import { canonicalCatalogMaster } from '../catalog/CanonicalCatalogMaster';
 
 export interface CanonicalMediaIdentity {
   id: string;
+  canonicalId?: string;
   tmdbId?: string;
   imdbId?: string;
+  aniListId?: number;
+  malId?: number;
   title: string;
   originalTitle?: string;
   year: number;
@@ -95,12 +99,29 @@ export class CanonicalIdentityService {
     if (/bleach.*thousand|bleach.*sennen/i.test(item.title) || /bleach.*thousand|bleach.*sennen/i.test(item.originalTitle || '')) {
       aliases.push('bleach sennen kessen hen', 'bleach sennen kessen-hen', 'bleach thousand-year blood war', 'bleach: sennen kessen-hen', 'bleach: thousand-year blood war');
     }
+    if (/verity/i.test(item.title) || /verity/i.test(item.originalTitle || '')) {
+      aliases.push('verity', 'the verity');
+    }
+    if (/odisseia|odyssey/i.test(item.title) || /odisseia|odyssey/i.test(item.originalTitle || '')) {
+      aliases.push('odyssey', 'the odyssey', 'odisseia', 'a odisseia', 'odyssea');
+    }
+
+    const canonicalId = item.canonicalId || canonicalCatalogMaster.buildCanonicalId(
+      item.type,
+      item.imdbId ? 'imdb' : (item.aniListId ? 'anilist' : (item.tmdbId ? 'tmdb' : 'local')),
+      item.imdbId || item.aniListId || item.tmdbId || item.id,
+      epParams
+    );
 
     return {
       id: item.id,
+      canonicalId,
       tmdbId: item.tmdbId ? String(item.tmdbId) : undefined,
       imdbId: item.imdbId,
+      aniListId: item.aniListId,
+      malId: item.malId,
       title: item.title,
+      originalTitle: item.originalTitle,
       year: item.year || currentYear,
       type: item.type,
       season: epParams?.season,

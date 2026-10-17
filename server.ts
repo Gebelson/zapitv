@@ -14,6 +14,7 @@ import { collaborativeTrainer } from "./src/core/recommendations/CollaborativeTr
 import { bannedContentRegistry } from "./src/core/catalog/BannedContentRegistry.ts";
 import { feedbackStore } from "./src/core/feedback/FeedbackStore.ts";
 import { resolveValidationTargetUrl } from "./src/core/providers/validationTargetUrl.ts";
+import { databaseRouter } from "./src/server/database/routes.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,8 +33,28 @@ async function checkStremioEngineStatus(): Promise<boolean> {
 function createApp() {
   const app = express();
 
+  // Normalização de rotas em ambientes serverless da Vercel (rewrites para /api/index)
+  app.use((req, _res, next) => {
+    if (req.url && req.url.startsWith('/api/index')) {
+      const queryIdx = req.url.indexOf('?');
+      const queryString = queryIdx >= 0 ? req.url.slice(queryIdx) : '';
+      const matchPath = req.headers['x-matched-path'] as string;
+
+      if (matchPath && matchPath.startsWith('/api/')) {
+        req.url = `${matchPath}${queryString}`;
+      } else if (req.query && typeof req.query.path === 'string') {
+        const restQuery = new URLSearchParams(queryIdx >= 0 ? req.url.slice(queryIdx + 1) : '');
+        restQuery.delete('path');
+        const restStr = restQuery.toString();
+        req.url = `/api/${req.query.path}${restStr ? '?' + restStr : ''}`;
+      }
+    }
+    next();
+  });
+
   // Enable JSON parsing
   app.use(express.json());
+  app.use('/api/db', databaseRouter);
 
   // Helper function to resolve open items to Stremio streams
   function resolveOpenItemStreams(rawId: string, seasonNum = 1, episodeNum = 1) {
@@ -117,8 +138,7 @@ function createApp() {
     const adultTerms = [
       'khalifa', 'mia khalifa', 'brazzers', 'xvideos', 'pornhub', 
       'redtube', 'youporn', 'bangbros', 'naughtyamerica', 'spankbang',
-      'xhamster', 'pornstar', 'hardcore xxx', 'creampie', 'blowjob',
-      'ben the men'
+      'xhamster', 'pornstar', 'hardcore xxx', 'creampie', 'blowjob'
     ];
     if (adultTerms.some(term => combined.includes(term))) return false;
 
@@ -531,10 +551,25 @@ function createApp() {
         return res.status(400).json({ error: "Protocolo inválido" });
       }
 
+      const incomingUa = (req.headers["user-agent"] as string) || "";
+      const isCustomBotUa = !incomingUa || incomingUa.includes("ZapiTV") || incomingUa.includes("node-fetch");
+      const userAgent = isCustomBotUa
+        ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        : incomingUa;
+
       const headers: Record<string, string> = {
-        "User-Agent": "ZapiTV-Stremio/1.0.0 (gebel.streaming@zapitv.local)",
-        "Accept": "*/*",
+        "User-Agent": userAgent,
+        "Accept": (req.headers["accept"] as string) || "*/*",
+        "Accept-Language": (req.headers["accept-language"] as string) || "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
       };
+
+      // Suporte a referer explícito (ex: streams do MagnetFlix / CDN que exigem domínio de origem)
+      const customReferer = (req.query.referer as string) || (req.headers["x-target-referer"] as string);
+      if (customReferer) {
+        headers["Referer"] = customReferer;
+      } else if (!targetUrl.includes('cloutteam.com')) {
+        headers["Referer"] = parsed.origin;
+      }
 
       if (req.headers.range) {
         headers["Range"] = req.headers.range;
@@ -544,8 +579,12 @@ function createApp() {
       const connectTimer = setTimeout(() => {
         try { controller.abort(new Error("Timeout de conexão com servidor de origem")); } catch {}
       }, 25000);
-      req.on("close", () => {
-        try { controller.abort(); } catch {}
+      // `req.close` also fires after an ordinary GET request has been read.
+      // Only cancel the upstream stream when the response/client actually closes.
+      res.on("close", () => {
+        if (!res.writableEnded) {
+          try { controller.abort(); } catch {}
+        }
       });
 
       const response = await fetch(targetUrl, {
@@ -553,6 +592,20 @@ function createApp() {
         signal: controller.signal
       });
       clearTimeout(connectTimer);
+
+      const responseType = response.headers.get("content-type") || "";
+      const isHlsManifest = /\.m3u8(?:$|[?#])/i.test(new URL(response.url).pathname) ||
+        /(?:mpegurl|vnd\.apple\.mpegurl)/i.test(responseType);
+      if (response.ok && isHlsManifest) {
+        const { rewriteHlsManifest } = await import("./src/server/rewriteHlsManifest");
+        const original = await response.text();
+        const rewritten = rewriteHlsManifest(original, response.url);
+        if (!rewritten) return res.status(502).json({ error: "Manifesto HLS inválido" });
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Content-Type", "application/vnd.apple.mpegurl; charset=utf-8");
+        res.setHeader("Cache-Control", "no-store");
+        return res.status(200).send(rewritten);
+      }
 
       // Set CORS and forward media headers
       res.setHeader("Access-Control-Allow-Origin", "*");
@@ -592,6 +645,9 @@ function createApp() {
     }
   });
 
+  // Cache em memória de validação de stream (TTL: 10 minutos)
+  const streamValidationServerCache = new Map<string, { result: any; timestamp: number }>();
+
   // Stream & Domain Validation Endpoint (ParkLogic, Expired Domains, 404/5xx, Invalid Manifests)
   app.get("/api/validate-stream", async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -606,21 +662,47 @@ function createApp() {
       return res.status(400).json({ valid: false, reason: "Parâmetro 'url' é obrigatório" });
     }
 
+    // Cache hit: resposta imediata em 0ms
+    const cacheKey = `${targetUrl}_${expectedType}_${targetTitle}`;
+    const cached = streamValidationServerCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < 10 * 60 * 1000)) {
+      return res.json(cached.result);
+    }
+
     const probeUrl = resolveValidationTargetUrl(targetUrl);
     if (!probeUrl) {
       return res.status(400).json({ valid: false, reason: 'URL de mídia inválida para validação' });
     }
 
+    if (probeUrl.includes("127.0.0.1:11470") || probeUrl.includes("localhost:11470") || probeUrl.includes("127-0-0-1.strem.io:11470")) {
+      const isEngineOnline = await checkStremioEngineStatus();
+      const result = {
+        valid: isEngineOnline,
+        isParked: false,
+        requiresEngine: true,
+        engineActive: isEngineOnline,
+        url: targetUrl,
+        finalUrl: targetUrl,
+        reason: isEngineOnline
+          ? "Motor Stremio Streaming Server ativo localmente"
+          : "Fonte requer motor Stremio Streaming Server ativo na porta 11470"
+      };
+      streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+      return res.json(result);
+    }
+
     const lowerTarget = `${probeUrl} ${targetTitle}`.toLowerCase().replace(/[-_./+]/g, ' ');
     const ADULT_TERMS = ['mia khalifa', 'khalifa', 'brazzers', 'xvideos', 'pornhub', 'redtube', 'youporn', 'bangbros', 'spankbang', 'xhamster', 'naughtyamerica', 'hardcore xxx'];
     if (ADULT_TERMS.some(t => lowerTarget.includes(t))) {
-      return res.json({
+      const result = {
         valid: false,
         isParked: false,
         url: targetUrl,
         finalUrl: targetUrl,
         reason: "🚨 Quarentena: Assinatura de conteúdo adulto/trote detectada"
-      });
+      };
+      streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+      return res.json(result);
     }
 
     try {
@@ -680,15 +762,32 @@ function createApp() {
         });
       }
 
-      // Verificar status de erro HTTP (404, 403, 5xx)
+      // Verificar status de erro HTTP (404, 5xx)
+      // Nota: muitos CDNs de streaming (Cloudflare, Akamai, Bunny) rejeitam probes com 405 (Method Not Allowed)
+      // ou 403 (anti-probe/anti-hotlink de IP de servidor), mas reproduzem normalmente no navegador do usuário.
+      if (status === 403 || status === 405) {
+        const result = {
+          valid: true,
+          provisional: true,
+          status,
+          url: targetUrl,
+          finalUrl,
+          reason: `Fonte aceita provisoriamente (Status HTTP ${status} não impede reprodução no navegador)`
+        };
+        streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+        return res.json(result);
+      }
+
       if (status >= 400 && status !== 416) {
-        return res.json({
+        const result = {
           valid: false,
           status,
           url: targetUrl,
           finalUrl,
           reason: `Erro HTTP ${status} retornado pelo servidor`
-        });
+        };
+        streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+        return res.json(result);
       }
 
       // Inspecionar corpo da resposta
@@ -749,35 +848,41 @@ function createApp() {
           });
         }
 
-        return res.json({
+        const result = {
           valid: true,
           status,
           url: targetUrl,
           finalUrl,
           contentType,
           isManifestValid: true
-        });
+        };
+        streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+        return res.json(result);
       }
 
       // Rejeitar terminantemente qualquer resposta HTML ou embed publicitário
       if (contentType.includes("text/html")) {
-        return res.json({
+        const result = {
           valid: false,
           status,
           url: targetUrl,
           finalUrl,
           reason: "Resposta HTML recebida. Rejeitado: Apenas transmissões nativas diretas de vídeo (HLS/MP4/WebM) são autorizadas. Players externos com anúncios ou iframes são proibidos."
-        });
+        };
+        streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+        return res.json(result);
       }
 
       // Stream de vídeo nativo direto validado com sucesso
-      return res.json({
+      const result = {
         valid: true,
         status,
         url: targetUrl,
         finalUrl,
         contentType
-      });
+      };
+      streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+      return res.json(result);
     } catch (err: any) {
       return res.json({
         valid: false,

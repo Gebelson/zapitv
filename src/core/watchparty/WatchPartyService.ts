@@ -21,7 +21,17 @@ import {
   WatchPartyMediaMetadata,
   PeerParticipantStateMessage,
   PeerEpisodeChangeMessage,
-  PeerRoomAnnounceMessage
+  PeerRoomAnnounceMessage,
+  RoomLifecycleState,
+  ParticipantPermissions,
+  WatchPartyPermissions,
+  PeerStartTransmissionMessage,
+  PeerPermissionsUpdateMessage,
+  PeerAdminMuteMessage,
+  PeerHostTransferMessage,
+  PeerRemoteControlRequestMessage,
+  TransmissionMode,
+  HostBroadcastStatus
 } from './watchPartyTypes';
 
 export type WatchPartyEventListener = (event: string, data?: any) => void;
@@ -36,6 +46,14 @@ export class WatchPartyService {
   private chatMessages: WatchPartyChatMessage[] = [];
   private listeners: Set<WatchPartyEventListener> = new Set();
 
+  // Ciclo de Vida da Sala & Permissões
+  private lifecycleState: RoomLifecycleState = 'LOBBY';
+  private permissions: WatchPartyPermissions = {
+    allowChat: true,
+    allowVoice: true,
+    participantPermissions: {}
+  };
+
   // Estado de Reprodução
   private lastKnownSequence: number = 0;
   private isApplyingRemoteAction: boolean = false;
@@ -44,6 +62,10 @@ export class WatchPartyService {
 
   // Voz em Tempo Real & Detecção de Atividade de Voz (VAD)
   private localAudioStream: MediaStream | null = null;
+  private localScreenStream: MediaStream | null = null;
+  private remoteScreenStream: MediaStream | null = null;
+  private screenSharedPeers: Set<string> = new Set();
+  private hostBroadcastCaptureMethod: 'captureStream' | 'getDisplayMedia' | null = null;
   private remoteAudioElements: Map<string, HTMLAudioElement> = new Map();
   private audioContext: AudioContext | null = null;
   private localAnalyser: AnalyserNode | null = null;
@@ -114,6 +136,54 @@ export class WatchPartyService {
     return [...this.chatMessages];
   }
 
+  /**
+   * Normaliza os metadados de mídia para garantir identidade canônica imutável
+   */
+  public static normalizeMedia(raw: any): WatchPartyMediaMetadata {
+    if (!raw) {
+      return {
+        id: 'filme',
+        contentId: 'filme',
+        title: 'Watch Party',
+        type: 'movie',
+        season: 1,
+        seasonNumber: 1,
+        episode: 1,
+        episodeNumber: 1
+      };
+    }
+    const id = String(raw.id || raw.contentId || '').trim();
+    const title = String(raw.title || 'Conteúdo ZapiTV').trim();
+    const type = raw.type || 'movie';
+    const season = raw.season !== undefined ? Number(raw.season) : (raw.seasonNumber !== undefined ? Number(raw.seasonNumber) : 1);
+    const episode = raw.episode !== undefined ? Number(raw.episode) : (raw.episodeNumber !== undefined ? Number(raw.episodeNumber) : 1);
+    const image = raw.image || raw.posterUrl || '';
+    const backdrop = raw.backdrop || raw.backdropUrl || '';
+    const tmdbId = raw.tmdbId ? String(raw.tmdbId) : undefined;
+    const imdbId = raw.imdbId ? String(raw.imdbId) : undefined;
+    const mediaFormat = raw.mediaFormat || (type === 'movie' ? 'movie' : 'series');
+    const year = raw.year ? Number(raw.year) : undefined;
+
+    return {
+      id,
+      contentId: id,
+      title,
+      type,
+      mediaFormat,
+      tmdbId,
+      imdbId,
+      season,
+      seasonNumber: season,
+      episode,
+      episodeNumber: episode,
+      year,
+      image,
+      posterUrl: image,
+      backdrop,
+      backdropUrl: backdrop
+    };
+  }
+
   public getRoomState() {
     const list = this.getParticipantList();
     const selfP = this.participants.get(this.transport.selfId) || {
@@ -123,17 +193,22 @@ export class WatchPartyService {
       status: 'ready',
       joinedAt: Date.now(),
       isAudioMuted: !this.localAudioStream || !this.localAudioStream.getAudioTracks()[0]?.enabled,
-      isSpeaking: this.isSpeakingLocal
+      isSpeaking: this.isSpeakingLocal,
+      permissions: this.getParticipantPermissions(this.transport.selfId)
     };
 
     return {
       isActive: this.isConnected,
       roomId: this.currentRoom?.roomId || '',
       mediaMetadata: this.currentRoom?.media,
+      lifecycleState: this.lifecycleState,
+      permissions: this.permissions,
+      hostPeerId: this.currentRoom?.hostPeerId || '',
       participants: list,
       localParticipant: {
         ...selfP,
-        id: this.transport.selfId
+        id: this.transport.selfId,
+        permissions: this.getParticipantPermissions(this.transport.selfId)
       }
     };
   }
@@ -145,32 +220,41 @@ export class WatchPartyService {
   public async createRoom(
     arg1: string | WatchPartyMediaMetadata,
     arg2?: string | WatchPartyMediaMetadata,
-    customRoomId?: string
+    customRoomId?: string,
+    transmissionMode: TransmissionMode = 'source'
   ): Promise<string> {
-    let media: WatchPartyMediaMetadata;
+    let rawMedia: any;
     let nickname: string;
 
     if (typeof arg1 === 'string') {
       nickname = arg1;
-      media = (arg2 as WatchPartyMediaMetadata) || {
-        id: 'filme',
-        title: 'Watch Party',
-        type: 'movie'
-      };
+      rawMedia = arg2;
     } else {
-      media = arg1;
+      rawMedia = arg1;
       nickname = (arg2 as string) || 'Anfitrião';
     }
 
+    const media = WatchPartyService.normalizeMedia(rawMedia);
     const roomId = customRoomId || this.generateSecureRoomId();
     this.localNickname = (nickname || 'Anfitrião').trim().slice(0, 24);
+
+    this.lifecycleState = 'LOBBY';
+    this.permissions = {
+      allowChat: true,
+      allowVoice: true,
+      participantPermissions: {}
+    };
 
     const roomInfo: WatchPartyRoomInfo = {
       roomId,
       hostPeerId: this.transport.selfId,
+      hostNickname: this.localNickname,
       media,
       createdAt: Date.now(),
-      maxParticipants: 6
+      maxParticipants: 6,
+      lifecycleState: 'LOBBY',
+      transmissionMode,
+      permissions: this.permissions
     };
 
     this.transport.isHost = true;
@@ -186,7 +270,13 @@ export class WatchPartyService {
       joinedAt: Date.now(),
       isAudioMuted: true,
       isSpeaking: false,
-      audioVolume: 1.0
+      audioVolume: 1.0,
+      permissions: {
+        canPlayPause: true,
+        canSeek: true,
+        canChangeEpisode: true,
+        canSkip: true
+      }
     });
 
     this.notify('room_created', roomInfo);
@@ -202,18 +292,34 @@ export class WatchPartyService {
     this.localNickname = (nickname || 'Amigo').trim().slice(0, 24);
     this.transport.isHost = false;
 
+    this.lifecycleState = 'LOBBY';
+    this.permissions = {
+      allowChat: true,
+      allowVoice: true,
+      participantPermissions: {}
+    };
+
     await this.connectTransport(roomId, false);
+
+    const normMedia = fallbackMedia ? WatchPartyService.normalizeMedia(fallbackMedia) : {
+      id: 'carregando',
+      contentId: 'carregando',
+      title: 'Aguardando sincronização da sala...',
+      type: 'movie',
+      season: 1,
+      seasonNumber: 1,
+      episode: 1,
+      episodeNumber: 1
+    };
 
     this.currentRoom = {
       roomId,
       hostPeerId: '',
-      media: fallbackMedia || {
-        id: 'carregando',
-        title: 'Aguardando sincronização da sala...',
-        type: 'movie'
-      },
+      media: normMedia,
       createdAt: Date.now(),
-      maxParticipants: 6
+      maxParticipants: 6,
+      lifecycleState: 'LOBBY',
+      permissions: this.permissions
     };
 
     this.lastKnownSequence = 0;
@@ -225,7 +331,13 @@ export class WatchPartyService {
       joinedAt: Date.now(),
       isAudioMuted: true,
       isSpeaking: false,
-      audioVolume: 1.0
+      audioVolume: 1.0,
+      permissions: {
+        canPlayPause: false,
+        canSeek: false,
+        canChangeEpisode: false,
+        canSkip: false
+      }
     });
 
     setTimeout(() => {
@@ -238,6 +350,9 @@ export class WatchPartyService {
   }
 
   public async leaveRoom(): Promise<void> {
+    this.stopScreenShare();
+    this.remoteScreenStream = null;
+    this.notify('screen_stream_changed', null);
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
@@ -255,6 +370,12 @@ export class WatchPartyService {
     this.chatMessages = [];
     this.lastKnownSequence = 0;
     this.isApplyingRemoteAction = false;
+    this.lifecycleState = 'LOBBY';
+    this.permissions = {
+      allowChat: true,
+      allowVoice: true,
+      participantPermissions: {}
+    };
 
     this.notify('room_left');
     this.notify('state_changed', this.getRoomState());
@@ -304,6 +425,10 @@ export class WatchPartyService {
         if (this.localAudioStream && this.transport.addLocalAudioStream) {
           this.transport.addLocalAudioStream(this.localAudioStream);
         }
+        if (this.localScreenStream && this.transport.addLocalMediaStream && !this.screenSharedPeers.has(peerId)) {
+          this.transport.addLocalMediaStream(this.localScreenStream, peerId);
+          this.screenSharedPeers.add(peerId);
+        }
 
         this.notify('peer_connected', peerId);
         this.notify('participants_updated', this.getParticipantList());
@@ -312,6 +437,11 @@ export class WatchPartyService {
 
       onPeerLeave: (peerId) => {
         const leaving = this.participants.get(peerId);
+        this.screenSharedPeers.delete(peerId);
+        if (leaving?.isHost && this.remoteScreenStream) {
+          this.remoteScreenStream = null;
+          this.notify('screen_stream_changed', null);
+        }
         this.participants.delete(peerId);
 
         if (leaving?.isHost) {
@@ -336,7 +466,11 @@ export class WatchPartyService {
       },
 
       onPlaybackSync: (state, senderId) => {
-        if (this.currentRoom && this.currentRoom.hostPeerId && senderId !== this.currentRoom.hostPeerId) {
+        const isFromHost = Boolean(this.currentRoom && (senderId === this.currentRoom.hostPeerId || !this.currentRoom.hostPeerId));
+        const hasPermission = this.canPeerControl(senderId, 'canPlayPause');
+
+        if (!isFromHost && !hasPermission) {
+          console.warn(`[WatchParty] Comando de reprodução ignorado de peer sem autorização: ${senderId}`);
           return;
         }
 
@@ -361,6 +495,10 @@ export class WatchPartyService {
             roomInfo: this.currentRoom
           });
           this.notify('host_sync_requested', senderId);
+          if (this.localScreenStream && this.transport.addLocalMediaStream && !this.screenSharedPeers.has(senderId)) {
+            this.transport.addLocalMediaStream(this.localScreenStream, senderId);
+            this.screenSharedPeers.add(senderId);
+          }
         }
       },
 
@@ -373,6 +511,7 @@ export class WatchPartyService {
           existing.status = state.status;
           if (state.isAudioMuted !== undefined) existing.isAudioMuted = state.isAudioMuted;
           if (state.isSpeaking !== undefined) existing.isSpeaking = state.isSpeaking;
+          if (state.isAdminMuted !== undefined) existing.isAdminMuted = state.isAdminMuted;
         } else {
           this.participants.set(senderId, {
             peerId: senderId,
@@ -382,8 +521,10 @@ export class WatchPartyService {
             joinedAt: Date.now(),
             isAudioMuted: state.isAudioMuted,
             isSpeaking: state.isSpeaking,
+            isAdminMuted: state.isAdminMuted,
             audioVolume: this.participantVolumes.get(senderId) ?? 1.0,
-            isLocallyMuted: this.localMutedPeers.has(senderId)
+            isLocallyMuted: this.localMutedPeers.has(senderId),
+            permissions: this.getParticipantPermissions(senderId)
           });
         }
 
@@ -397,13 +538,20 @@ export class WatchPartyService {
         this.notify('state_changed', this.getRoomState());
       },
 
-      onChatMessage: (message) => {
+      onChatMessage: (message, senderId) => {
+        if (!message || typeof message.text !== 'string' || !message.text.trim() ||
+            this.chatMessages.some(existing => existing.id === message.id)) return;
+        const sender = this.participants.get(senderId);
+        if (!this.permissions.allowChat && !sender?.isHost) {
+          return;
+        }
+
         const cleanMsg: WatchPartyChatMessage = {
           id: message.id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          senderId: message.senderId,
-          senderNickname: String(message.senderNickname || 'Anônimo').slice(0, 24),
-          isHost: Boolean(message.isHost),
-          text: String(message.text || '').slice(0, 280),
+          senderId,
+          senderNickname: String(sender?.nickname || message.senderNickname || 'Convidado').slice(0, 24),
+          isHost: Boolean(sender?.isHost),
+          text: message.text.trim().slice(0, 280),
           timestamp: message.timestamp || Date.now()
         };
 
@@ -415,14 +563,19 @@ export class WatchPartyService {
       },
 
       onEpisodeChange: (change, senderId) => {
-        if (this.currentRoom && this.currentRoom.hostPeerId && senderId !== this.currentRoom.hostPeerId) {
+        const isFromHost = Boolean(this.currentRoom && (senderId === this.currentRoom.hostPeerId || !this.currentRoom.hostPeerId));
+        const hasPermission = this.canPeerControl(senderId, 'canChangeEpisode');
+
+        if (!isFromHost && !hasPermission) {
+          console.warn(`[WatchParty] Troca de episódio rejeitada de peer sem autorização: ${senderId}`);
           return;
         }
+
         if (change.sequence <= this.lastKnownSequence) return;
         this.lastKnownSequence = change.sequence;
 
         if (this.currentRoom) {
-          this.currentRoom.media = change.media;
+          this.currentRoom.media = WatchPartyService.normalizeMedia(change.media);
         }
         this.notify('episode_changed', change);
         this.notify('state_changed', this.getRoomState());
@@ -430,19 +583,167 @@ export class WatchPartyService {
 
       onRoomAnnouncement: (announcement, senderId) => {
         if (!this.transport.isHost && announcement.roomInfo) {
-          this.currentRoom = announcement.roomInfo;
-          this.currentRoom.hostPeerId = announcement.roomInfo.hostPeerId || senderId;
+          const rawInfo = announcement.roomInfo;
+          const media = WatchPartyService.normalizeMedia(rawInfo.media);
+
+          this.currentRoom = {
+            ...rawInfo,
+            media,
+            hostPeerId: rawInfo.hostPeerId || senderId,
+            lifecycleState: rawInfo.lifecycleState || 'LOBBY',
+            permissions: rawInfo.permissions || {
+              allowChat: true,
+              allowVoice: true,
+              participantPermissions: {}
+            }
+          };
+
+          this.lifecycleState = this.currentRoom.lifecycleState;
+          this.permissions = this.currentRoom.permissions;
 
           const hostP = this.participants.get(this.currentRoom.hostPeerId);
-          if (hostP) hostP.isHost = true;
+          if (hostP) {
+            hostP.isHost = true;
+            if (rawInfo.hostNickname) hostP.nickname = rawInfo.hostNickname;
+          }
 
-          this.notify('room_announced', announcement.roomInfo);
+          // Atualiza permissões dos participantes
+          this.participants.forEach((p, peerId) => {
+            p.permissions = this.getParticipantPermissions(peerId);
+          });
+
+          this.notify('room_announced', this.currentRoom);
+          this.notify('permissions_updated', this.permissions);
+          this.notify('state_changed', this.getRoomState());
+
+          if (this.lifecycleState === 'PLAYING' || this.lifecycleState === 'STARTING') {
+            this.notify('transmission_started', { media: this.currentRoom.media, mode: this.currentRoom.transmissionMode || 'source' });
+          }
+        }
+      },
+
+      onStartTransmission: (message, senderId) => {
+        if (this.currentRoom && this.currentRoom.hostPeerId && senderId !== this.currentRoom.hostPeerId) {
+          return;
+        }
+        this.lifecycleState = 'PLAYING';
+        if (this.currentRoom) {
+          this.currentRoom.lifecycleState = 'PLAYING';
+          this.currentRoom.transmissionMode = message.mode || 'source';
+          if (message.media) {
+            this.currentRoom.media = WatchPartyService.normalizeMedia(message.media);
+          }
+        }
+        this.notify('transmission_started', { media: this.currentRoom?.media, mode: message.mode || 'source' });
+        this.notify('state_changed', this.getRoomState());
+      },
+
+      onPermissionsUpdate: (message, senderId) => {
+        if (this.currentRoom && this.currentRoom.hostPeerId && senderId !== this.currentRoom.hostPeerId) {
+          return;
+        }
+        if (message.permissions) {
+          this.permissions = message.permissions;
+          if (this.currentRoom) {
+            this.currentRoom.permissions = message.permissions;
+          }
+          this.participants.forEach((p, peerId) => {
+            p.permissions = this.getParticipantPermissions(peerId);
+          });
+          this.notify('permissions_updated', this.permissions);
+          this.notify('participants_updated', this.getParticipantList());
           this.notify('state_changed', this.getRoomState());
         }
       },
 
+      onAdminMute: (message, senderId) => {
+        if (this.currentRoom && this.currentRoom.hostPeerId && senderId !== this.currentRoom.hostPeerId) {
+          return;
+        }
+        if (message.targetPeerId === this.transport.selfId) {
+          if (message.isMuted) {
+            if (this.localAudioStream) {
+              const track = this.localAudioStream.getAudioTracks()[0];
+              if (track) track.enabled = false;
+            }
+            this.setLocalSpeaking(false);
+            const selfP = this.participants.get(this.transport.selfId);
+            if (selfP) {
+              selfP.isAudioMuted = true;
+              selfP.isAdminMuted = true;
+            }
+            this.notify('voice_state_changed', { isVoiceActive: this.isVoiceActive(), isMuted: true });
+            this.notify('admin_muted', { isMuted: true });
+          }
+        }
+        const targetP = this.participants.get(message.targetPeerId);
+        if (targetP) {
+          targetP.isAdminMuted = message.isMuted;
+          if (message.isMuted) targetP.isAudioMuted = true;
+        }
+        this.notify('participants_updated', this.getParticipantList());
+        this.notify('state_changed', this.getRoomState());
+      },
+
+      onHostTransfer: (message, senderId) => {
+        if (this.currentRoom && this.currentRoom.hostPeerId && senderId !== this.currentRoom.hostPeerId) {
+          return;
+        }
+        const oldHost = this.participants.get(message.previousHostPeerId);
+        if (oldHost) oldHost.isHost = false;
+        const newHost = this.participants.get(message.newHostPeerId);
+        if (newHost) newHost.isHost = true;
+        if (this.currentRoom) {
+          this.currentRoom.hostPeerId = message.newHostPeerId;
+        }
+        if (message.newHostPeerId === this.transport.selfId) {
+          this.transport.isHost = true;
+        } else if (message.previousHostPeerId === this.transport.selfId) {
+          this.transport.isHost = false;
+        }
+        this.notify('host_transferred', message);
+        this.notify('participants_updated', this.getParticipantList());
+        this.notify('state_changed', this.getRoomState());
+      },
+
       onRemoteAudioStream: (stream, peerId) => {
-        this.attachRemoteAudio(peerId, stream);
+        if (stream.getVideoTracks().length > 0) {
+          if (!this.transport.isHost && (!this.currentRoom?.hostPeerId || this.currentRoom.hostPeerId === peerId)) {
+            this.remoteScreenStream = stream;
+            
+            // Monitora estabilidade da conexão da transmissão
+            const vt = stream.getVideoTracks()[0];
+            if (vt) {
+              vt.onmute = () => {
+                this.notify('stream_connection_changed', { status: 'poor', message: 'Conexão oscilando...' });
+              };
+              vt.onunmute = () => {
+                this.notify('stream_connection_changed', { status: 'good', message: 'Conexão restabelecida' });
+              };
+            }
+
+            this.notify('screen_stream_changed', stream);
+            this.notify('host_stream_received', stream);
+          }
+        } else {
+          this.attachRemoteAudio(peerId, stream);
+        }
+      },
+
+      onRemoteControlRequest: (request, senderId) => {
+        if (!this.transport.isHost) return;
+
+        let permNeeded: keyof ParticipantPermissions = 'canPlayPause';
+        if (request.action === 'seek') permNeeded = 'canSeek';
+        if (request.action === 'next_episode') permNeeded = 'canChangeEpisode';
+
+        if (!this.canPeerControl(senderId, permNeeded)) {
+          console.warn(`[WatchParty] Comando remoto ${request.action} rejeitado de ${senderId}: sem permissão ${permNeeded}`);
+          return;
+        }
+
+        console.log(`[WatchParty] Executando comando remoto ${request.action} autorizado para participante ${senderId}`);
+        this.notify('remote_control_received', { ...request, senderId });
       }
     });
   }
@@ -499,7 +800,12 @@ export class WatchPartyService {
   // ==========================================
 
   public broadcastHostPlayback(positionSeconds: number, isPlaying: boolean, playbackRate: number = 1.0): void {
-    if (!this.transport.isHost || !this.currentRoom || this.isApplyingRemoteAction) return;
+    if (!this.currentRoom || this.isApplyingRemoteAction) return;
+
+    // Apenas Host ou participantes com permissão explícita podem transmitir
+    const isHost = this.transport.isHost;
+    const canControl = isHost || this.canLocalControl('canPlayPause') || this.canLocalControl('canSeek');
+    if (!canControl) return;
 
     this.lastKnownSequence += 1;
     const state: WatchPartyPlaybackState = {
@@ -512,7 +818,7 @@ export class WatchPartyService {
       playbackRate,
       eventTimestamp: Date.now(),
       sequence: this.lastKnownSequence,
-      hostPeerId: this.transport.selfId
+      hostPeerId: this.currentRoom.hostPeerId || this.transport.selfId
     };
 
     this.transport.broadcastPlaybackState(state);
@@ -557,12 +863,20 @@ export class WatchPartyService {
       nickname: this.localNickname,
       status,
       isAudioMuted: !this.localAudioStream || !this.localAudioStream.getAudioTracks()[0]?.enabled,
-      isSpeaking: this.isSpeakingLocal
+      isSpeaking: this.isSpeakingLocal,
+      isAdminMuted: selfParticipant?.isAdminMuted
     });
   }
 
   public changeEpisode(newMediaOrSeason: WatchPartyMediaMetadata | number, episodeNumber?: number): void {
-    if (!this.transport.isHost || !this.currentRoom) return;
+    if (!this.currentRoom) return;
+
+    const isHost = this.transport.isHost;
+    const canControl = isHost || this.canLocalControl('canChangeEpisode');
+    if (!canControl) {
+      console.warn('[WatchParty] Permissão negada para troca de episódios.');
+      return;
+    }
 
     let newMedia: WatchPartyMediaMetadata;
     if (typeof newMediaOrSeason === 'number') {
@@ -572,7 +886,7 @@ export class WatchPartyService {
         episode: episodeNumber || 1
       };
     } else {
-      newMedia = newMediaOrSeason;
+      newMedia = WatchPartyService.normalizeMedia(newMediaOrSeason);
     }
 
     this.currentRoom.media = newMedia;
@@ -604,6 +918,11 @@ export class WatchPartyService {
   public sendChatMessage(text: string): void {
     const trimmed = text.trim();
     if (!trimmed) return;
+
+    if (!this.permissions.allowChat && !this.transport.isHost) {
+      console.warn('[WatchParty] Envio de mensagens bloqueado pelo anfitrião.');
+      return;
+    }
 
     const message: WatchPartyChatMessage = {
       id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -654,6 +973,15 @@ export class WatchPartyService {
   public async startVoiceChat(): Promise<boolean> {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       throw new Error('Microfone não suportado neste navegador.');
+    }
+
+    const selfP = this.participants.get(this.transport.selfId);
+    if (selfP?.isAdminMuted) {
+      throw new Error('Seu microfone foi silenciado pelo anfitrião da sala.');
+    }
+
+    if (!this.permissions.allowVoice && !this.transport.isHost) {
+      throw new Error('O chat de voz foi desativado pelo anfitrião.');
     }
 
     try {
@@ -963,6 +1291,420 @@ export class WatchPartyService {
   }
 
   // ==========================================
+  // CONTROLE DE TRANSMISSÃO & MÁQUINA DE ESTADOS
+  // ==========================================
+
+  public getLifecycleState(): RoomLifecycleState {
+    return this.lifecycleState;
+  }
+
+  public isHostBroadcastMode(): boolean {
+    return this.currentRoom?.transmissionMode === 'host_broadcast' || this.currentRoom?.transmissionMode === 'screen';
+  }
+
+  public getTransmissionMode(): TransmissionMode {
+    return this.currentRoom?.transmissionMode || 'source';
+  }
+
+  public setTransmissionMode(mode: TransmissionMode): void {
+    if (this.currentRoom) {
+      this.currentRoom.transmissionMode = mode;
+      this.notify('transmission_mode_changed', mode);
+      this.notify('state_changed', this.getRoomState());
+    }
+  }
+
+  public async startHostBroadcast(videoEl?: HTMLVideoElement | null): Promise<MediaStream> {
+    if (!this.transport.isHost || !this.currentRoom) {
+      throw new Error('Apenas o anfitrião pode iniciar a transmissão da sala.');
+    }
+
+    let stream: MediaStream | null = null;
+    let captureMethod: 'captureStream' | 'getDisplayMedia' = 'captureStream';
+
+    // 1. Tentar captura direta de vídeo e áudio via captureStream() no elemento <video>
+    if (videoEl) {
+      try {
+        const captureFn = (videoEl as any).captureStream || (videoEl as any).mozCaptureStream;
+        if (typeof captureFn === 'function') {
+          const directStream = captureFn.call(videoEl, 30) as MediaStream;
+          if (directStream && directStream.getVideoTracks().length > 0) {
+            const vt = directStream.getVideoTracks()[0];
+            // Validar se o track está ativo e funcional
+            if (vt && vt.readyState === 'live') {
+              // Validar se tem trilha de áudio
+              if (directStream.getAudioTracks().length > 0) {
+                stream = directStream;
+                captureMethod = 'captureStream';
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[WatchParty] captureStream() direto falhou (CORS ou restrição de origem), tentando fallback getDisplayMedia:', err);
+      }
+    }
+
+    // 2. Se captureStream não retornou stream completo com áudio, usar getDisplayMedia
+    if (!stream) {
+      if (!navigator.mediaDevices?.getDisplayMedia) {
+        throw new Error('Este navegador não suporta compartilhamento WebRTC de vídeo e áudio.');
+      }
+
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            frameRate: { ideal: 30, max: 30 },
+            width: { ideal: 1920, max: 1920 },
+            height: { ideal: 1080, max: 1080 }
+          },
+          audio: true,
+          preferCurrentTab: true,
+          selfBrowserSurface: 'include'
+        } as any);
+        captureMethod = 'getDisplayMedia';
+      } catch (err: any) {
+        if (err.name === 'NotAllowedError') {
+          throw new Error('Compartilhamento cancelado pelo anfitrião. Para transmitir, selecione a aba e marque "Compartilhar áudio da guia".');
+        }
+        throw err;
+      }
+
+      if (!stream.getAudioTracks().length) {
+        stream.getTracks().forEach(t => t.stop());
+        throw new Error('Para transmitir com som, selecione esta aba e marque "Compartilhar áudio da guia".');
+      }
+    }
+
+    if (!stream.getVideoTracks().length) {
+      stream.getTracks().forEach(t => t.stop());
+      throw new Error('Nenhuma faixa de vídeo encontrada na captura.');
+    }
+
+    // Configuração de qualidade e desempenho (fluidez com motion hint)
+    const videoTrack = stream.getVideoTracks()[0];
+    if (videoTrack) {
+      (videoTrack as any).contentHint = 'motion';
+    }
+
+    this.localScreenStream = stream;
+    this.hostBroadcastCaptureMethod = captureMethod;
+    this.screenSharedPeers.clear();
+
+    try {
+      for (const peerId of this.transport.getConnectedPeers()) {
+        if (this.transport.addLocalMediaStream) {
+          this.transport.addLocalMediaStream(stream, peerId);
+          this.screenSharedPeers.add(peerId);
+        }
+      }
+
+      videoTrack.addEventListener('ended', () => {
+        this.stopHostBroadcast();
+      }, { once: true });
+
+      this.startTransmission('host_broadcast');
+      this.notify('host_broadcast_started', { mode: 'host_broadcast', captureMethod, stream });
+      return stream;
+    } catch (err) {
+      this.stopHostBroadcast();
+      throw err;
+    }
+  }
+
+  public stopHostBroadcast(): void {
+    const stream = this.localScreenStream;
+    if (!stream) return;
+    this.localScreenStream = null;
+    this.hostBroadcastCaptureMethod = null;
+    this.screenSharedPeers.clear();
+    this.transport.removeLocalMediaStream?.(stream);
+    stream.getTracks().forEach(track => {
+      try { track.stop(); } catch {}
+    });
+    this.notify('host_broadcast_stopped');
+  }
+
+  // Compatibilidade com código anterior
+  public async startScreenShare(): Promise<void> {
+    await this.startHostBroadcast(null);
+  }
+
+  public stopScreenShare(): void {
+    this.stopHostBroadcast();
+  }
+
+  public getScreenStream(): MediaStream | null {
+    return this.getHostStream();
+  }
+
+  public getHostStream(): MediaStream | null {
+    return this.remoteScreenStream || this.localScreenStream;
+  }
+
+  public getBroadcastStatus(): HostBroadcastStatus {
+    const stream = this.localScreenStream || this.remoteScreenStream;
+    return {
+      isBroadcasting: Boolean(stream && stream.active),
+      mode: this.getTransmissionMode(),
+      captureMethod: this.hostBroadcastCaptureMethod || undefined,
+      videoTracks: stream ? stream.getVideoTracks().length : 0,
+      audioTracks: stream ? stream.getAudioTracks().length : 0,
+      connectionQuality: 'good'
+    };
+  }
+
+  public requestScreenStream(): void {
+    this.transport.requestSync();
+  }
+
+  public requestHostPlaybackAction(
+    action: 'play' | 'pause' | 'seek' | 'next_episode',
+    payload?: { positionSeconds?: number; season?: number; episode?: number }
+  ): void {
+    if (this.transport.isHost) {
+      this.notify('remote_control_received', {
+        type: 'remote_control_request',
+        action,
+        payload,
+        senderPeerId: this.transport.selfId,
+        senderNickname: this.localNickname,
+        timestamp: Date.now()
+      });
+      return;
+    }
+
+    const hostId = this.currentRoom?.hostPeerId;
+    if (!hostId) {
+      console.warn('[WatchParty] Não foi possível solicitar ação: ID do anfitrião não identificado.');
+      return;
+    }
+
+    let permNeeded: keyof ParticipantPermissions = 'canPlayPause';
+    if (action === 'seek') permNeeded = 'canSeek';
+    if (action === 'next_episode') permNeeded = 'canChangeEpisode';
+
+    if (!this.canLocalControl(permNeeded)) {
+      console.warn(`[WatchParty] Ação ${action} não permitida: você não possui permissão ${permNeeded}`);
+      return;
+    }
+
+    const req: PeerRemoteControlRequestMessage = {
+      type: 'remote_control_request',
+      action,
+      payload,
+      senderPeerId: this.transport.selfId,
+      senderNickname: this.localNickname,
+      timestamp: Date.now()
+    };
+
+    if (this.transport.sendRemoteControlRequest) {
+      this.transport.sendRemoteControlRequest(hostId, req);
+    }
+  }
+
+  public startTransmission(mode: TransmissionMode = 'source'): void {
+    if (!this.transport.isHost || !this.currentRoom) {
+      console.warn('[WatchParty] Apenas o anfitrião pode iniciar a transmissão da sala.');
+      return;
+    }
+
+    this.lifecycleState = 'PLAYING';
+    this.currentRoom.lifecycleState = 'PLAYING';
+    this.currentRoom.transmissionMode = mode;
+
+    const msg: PeerStartTransmissionMessage = {
+      type: 'start_transmission',
+      hostPeerId: this.transport.selfId,
+      timestamp: Date.now(),
+      media: this.currentRoom.media,
+      mode
+    };
+
+    if (this.transport.broadcastStartTransmission) {
+      this.transport.broadcastStartTransmission(msg);
+    }
+
+    this.notify('transmission_started', { media: this.currentRoom.media, mode });
+    this.notify('state_changed', this.getRoomState());
+  }
+
+  // ==========================================
+  // GESTÃO DE PERMISSÕES DA SALA (ANFITRIÃO)
+  // ==========================================
+
+  public getPermissions(): WatchPartyPermissions {
+    return { ...this.permissions };
+  }
+
+  public getParticipantPermissions(peerId: string): ParticipantPermissions {
+    if (this.currentRoom && peerId === this.currentRoom.hostPeerId) {
+      return {
+        canPlayPause: true,
+        canSeek: true,
+        canChangeEpisode: true,
+        canSkip: true
+      };
+    }
+    return this.permissions.participantPermissions[peerId] || {
+      canPlayPause: false,
+      canSeek: false,
+      canChangeEpisode: false,
+      canSkip: false
+    };
+  }
+
+  public canLocalControl(perm: keyof ParticipantPermissions): boolean {
+    if (this.transport.isHost) return true;
+    return Boolean(this.getParticipantPermissions(this.transport.selfId)[perm]);
+  }
+
+  public canPeerControl(peerId: string, perm: keyof ParticipantPermissions): boolean {
+    if (this.currentRoom && peerId === this.currentRoom.hostPeerId) return true;
+    return Boolean(this.getParticipantPermissions(peerId)[perm]);
+  }
+
+  public setParticipantPermission(peerId: string, permission: keyof ParticipantPermissions, value: boolean): void {
+    if (!this.transport.isHost) {
+      console.warn('[WatchParty] Apenas o anfitrião pode alterar permissões de participantes.');
+      return;
+    }
+
+    const current = this.getParticipantPermissions(peerId);
+    this.permissions.participantPermissions[peerId] = {
+      ...current,
+      [permission]: value
+    };
+
+    const target = this.participants.get(peerId);
+    if (target) {
+      target.permissions = this.permissions.participantPermissions[peerId];
+    }
+
+    if (this.currentRoom) {
+      this.currentRoom.permissions = this.permissions;
+    }
+
+    if (this.transport.broadcastPermissionsUpdate) {
+      this.transport.broadcastPermissionsUpdate({
+        type: 'permissions_update',
+        permissions: this.permissions
+      });
+    }
+
+    this.notify('permissions_updated', this.permissions);
+    this.notify('participants_updated', this.getParticipantList());
+    this.notify('state_changed', this.getRoomState());
+  }
+
+  public updateParticipantPermissions(peerId: string, perms: Partial<ParticipantPermissions>): void {
+    if (!this.transport.isHost) {
+      console.warn('[WatchParty] Apenas o anfitrião pode alterar permissões de participantes.');
+      return;
+    }
+
+    const current = this.getParticipantPermissions(peerId);
+    this.permissions.participantPermissions[peerId] = {
+      ...current,
+      ...perms
+    };
+
+    const target = this.participants.get(peerId);
+    if (target) {
+      target.permissions = this.permissions.participantPermissions[peerId];
+    }
+
+    if (this.currentRoom) {
+      this.currentRoom.permissions = this.permissions;
+    }
+
+    if (this.transport.broadcastPermissionsUpdate) {
+      this.transport.broadcastPermissionsUpdate({
+        type: 'permissions_update',
+        permissions: this.permissions
+      });
+    }
+
+    this.notify('permissions_updated', this.permissions);
+    this.notify('participants_updated', this.getParticipantList());
+    this.notify('state_changed', this.getRoomState());
+  }
+
+  public setRoomConfig(config: { allowChat?: boolean; allowVoice?: boolean }): void {
+    if (!this.transport.isHost) {
+      console.warn('[WatchParty] Apenas o anfitrião pode configurar as opções globais da sala.');
+      return;
+    }
+
+    if (config.allowChat !== undefined) {
+      this.permissions.allowChat = config.allowChat;
+    }
+    if (config.allowVoice !== undefined) {
+      this.permissions.allowVoice = config.allowVoice;
+    }
+
+    if (this.currentRoom) {
+      this.currentRoom.permissions = this.permissions;
+    }
+
+    if (this.transport.broadcastPermissionsUpdate) {
+      this.transport.broadcastPermissionsUpdate({
+        type: 'permissions_update',
+        permissions: this.permissions
+      });
+    }
+
+    this.notify('permissions_updated', this.permissions);
+    this.notify('state_changed', this.getRoomState());
+  }
+
+  public setAdminMute(peerId: string, isMuted: boolean): void {
+    if (!this.transport.isHost) return;
+
+    if (this.transport.broadcastAdminMute) {
+      this.transport.broadcastAdminMute({
+        type: 'admin_mute',
+        targetPeerId: peerId,
+        isMuted
+      });
+    }
+
+    const targetP = this.participants.get(peerId);
+    if (targetP) {
+      targetP.isAdminMuted = isMuted;
+      if (isMuted) targetP.isAudioMuted = true;
+    }
+
+    this.notify('participants_updated', this.getParticipantList());
+    this.notify('state_changed', this.getRoomState());
+  }
+
+  public transferHost(newHostPeerId: string): void {
+    if (!this.transport.isHost || !this.currentRoom || !newHostPeerId) return;
+
+    const oldHostId = this.transport.selfId;
+    this.transport.isHost = false;
+    this.currentRoom.hostPeerId = newHostPeerId;
+
+    const oldHostP = this.participants.get(oldHostId);
+    if (oldHostP) oldHostP.isHost = false;
+    const newHostP = this.participants.get(newHostPeerId);
+    if (newHostP) newHostP.isHost = true;
+
+    if (this.transport.broadcastHostTransfer) {
+      this.transport.broadcastHostTransfer({
+        type: 'host_transfer',
+        previousHostPeerId: oldHostId,
+        newHostPeerId
+      });
+    }
+
+    this.notify('host_transferred', { previousHostPeerId: oldHostId, newHostPeerId });
+    this.notify('participants_updated', this.getParticipantList());
+    this.notify('state_changed', this.getRoomState());
+  }
+
+  // ==========================================
   // ASSINATURAS DE EVENTOS & CONVENIENCE API
   // ==========================================
 
@@ -980,11 +1722,31 @@ export class WatchPartyService {
     return this.subscribe(fn);
   }
 
+  public onTransmissionStart(callback: (data: { media?: WatchPartyMediaMetadata }) => void): () => void {
+    const fn: WatchPartyEventListener = (event, data) => {
+      if (event === 'transmission_started') callback(data);
+    };
+    return this.subscribe(fn);
+  }
+
+  public onPermissionsChange(callback: (perms: WatchPartyPermissions) => void): () => void {
+    const fn: WatchPartyEventListener = (event, data) => {
+      if (event === 'permissions_updated') callback(data);
+    };
+    return this.subscribe(fn);
+  }
+
   public onChatMessage(callback: (msg: WatchPartyChatMessage) => void): () => void {
     const fn: WatchPartyEventListener = (event, data) => {
       if (event === 'chat_message') callback(data);
     };
     return this.subscribe(fn);
+  }
+
+  public onScreenStreamChange(callback: (stream: MediaStream | null) => void): () => void {
+    return this.subscribe((event, data) => {
+      if (event === 'screen_stream_changed') callback(data);
+    });
   }
 
   public onParticipantChange(callback: (participants: (WatchPartyParticipant & { id: string })[]) => void): () => void {
@@ -1024,6 +1786,48 @@ export class WatchPartyService {
     return this.subscribe(fn);
   }
 
+  public onHostStreamReceived(callback: (stream: MediaStream | null) => void): () => void {
+    const fn: WatchPartyEventListener = (event, data) => {
+      if (event === 'host_stream_received' || event === 'screen_stream_changed') callback(data);
+    };
+    return this.subscribe(fn);
+  }
+
+  public onStreamConnectionChange(callback: (data: { status: 'good' | 'fair' | 'poor'; message: string }) => void): () => void {
+    const fn: WatchPartyEventListener = (event, data) => {
+      if (event === 'stream_connection_changed') callback(data);
+    };
+    return this.subscribe(fn);
+  }
+
+  public onRemoteControlReceived(callback: (request: PeerRemoteControlRequestMessage) => void): () => void {
+    const fn: WatchPartyEventListener = (event, data) => {
+      if (event === 'remote_control_received') callback(data);
+    };
+    return this.subscribe(fn);
+  }
+
+  public onHostBroadcastStart(callback: (data: { mode: TransmissionMode; captureMethod: string; stream: MediaStream }) => void): () => void {
+    const fn: WatchPartyEventListener = (event, data) => {
+      if (event === 'host_broadcast_started') callback(data);
+    };
+    return this.subscribe(fn);
+  }
+
+  public onHostBroadcastStop(callback: () => void): () => void {
+    const fn: WatchPartyEventListener = (event) => {
+      if (event === 'host_broadcast_stopped') callback();
+    };
+    return this.subscribe(fn);
+  }
+
+  public on(targetEvent: string, callback: (data?: any) => void): () => void {
+    const fn: WatchPartyEventListener = (event, data) => {
+      if (event === targetEvent) callback(data);
+    };
+    return this.subscribe(fn);
+  }
+
   private notify(event: string, data?: any): void {
     this.listeners.forEach(fn => {
       try {
@@ -1035,12 +1839,19 @@ export class WatchPartyService {
   }
 
   /**
-   * Constrói a URL canônica compartilhável do convite
+   * Constrói a URL canônica compartilhável do convite sem depender de localhost
    */
   public getInviteUrl(roomId?: string): string {
     const targetId = roomId || this.currentRoom?.roomId;
     if (!targetId) return '';
-    const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'https://zapitv-kappa.vercel.app';
+    
+    let origin = 'https://zapitv-stream.vercel.app';
+    if (typeof window !== 'undefined' && window.location) {
+      const locOrigin = window.location.origin;
+      if (locOrigin && !locOrigin.includes('localhost') && !locOrigin.includes('127.0.0.1') && !locOrigin.includes('0.0.0.0')) {
+        origin = locOrigin;
+      }
+    }
     return `${origin}/sala/${targetId}`;
   }
 }

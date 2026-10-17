@@ -184,7 +184,7 @@ export class IMDbWeeklyRankingService {
         year: 2026
       },
       {
-        imdbId: 'tt15888806',
+        imdbId: 'tt32261958',
         title: 'Verity',
         originalTitle: 'Verity',
         mediaType: 'movie',
@@ -292,7 +292,7 @@ export class IMDbWeeklyRankingService {
         year: 2026
       },
       {
-        imdbId: 'tt2788314',
+        imdbId: 'tt33764258',
         title: 'A Odisseia',
         originalTitle: 'The Odyssey',
         mediaType: 'movie',
@@ -463,7 +463,7 @@ export class IMDbWeeklyRankingService {
 
     const seriesItems: ImdbRankingEntry[] = [
       {
-        imdbId: 'tt22020214',
+        imdbId: 'tt21097264',
         title: 'East of Eden',
         originalTitle: 'East of Eden',
         mediaType: 'series',

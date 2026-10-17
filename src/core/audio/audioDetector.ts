@@ -17,17 +17,22 @@ export interface AudioClassification {
 }
 
 const DUBBED_PATTERNS = [
-  /\b(dublado|audio\s*pt|dual[-_]?audio|dual|multi|brazuca|nacional)\b/i,
+  /\b(dublado|audio\s*pt|áudio\s*pt|dual[-_]?audio|dual|multi|brazuca|nacional)\b/i,
   /\[dublado\]/i,
   /\[dual[-_]?audio\]/i,
   /\b(comando|bludv|mico[-_]?le[aã]o|lapumia|rede[-_]?canais|wolverdon)\b/i,
   /🇧🇷\s*dublado/i,
-  /\b(dub\b|\/dub\/)/i
+  /\b(dub\b|\/dub\/)/i,
+  /🌎\s*portugu[eê]s/i,
+  /🌎\s*pt[-_]?br/i,
+  /\b(portugu[eê]s|pt[-_]?br)\b/i
 ];
 
 const PT_BR_GENERAL_PATTERNS = [
   /\b(pt[-_]?br|portugu[eê]s[-_]?br|portugu[eê]s)\b/i,
-  /\[pt[-_]?br\]/i
+  /\[pt[-_]?br\]/i,
+  /🌎\s*portugu[eê]s/i,
+  /🌎\s*pt[-_]?br/i
 ];
 
 const PT_PT_PATTERNS = [
@@ -99,7 +104,7 @@ export function classifyStream(stream: StremioStream, hasExternalPtSub = false):
   // Idioma
   let language: AudioClassification['language'] = 'unknown';
   if (evaluation.audioAnalysis.tier === 'dual_audio') language = 'dual';
-  else if (isDubbed) language = 'pt-BR';
+  else if (isDubbed || isPtBr) language = 'pt-BR';
   else if (evaluation.audioAnalysis.language === 'ja') language = 'ja';
   else if (evaluation.audioAnalysis.language === 'en') language = 'en';
   else if (evaluation.audioAnalysis.language === 'es') language = 'es';
@@ -110,15 +115,18 @@ export function classifyStream(stream: StremioStream, hasExternalPtSub = false):
   let badge: AudioClassification['badge'] = '❌';
   let badgeLabel = 'Sem PT-BR';
 
-  if (isDubbed && (isSubtitled || hasExternalPtSub)) {
+  if ((isDubbed || isPtBr) && (isSubtitled || hasExternalPtSub)) {
     badge = '🔊💬';
-    badgeLabel = 'Dublado + Legenda PT-BR';
-  } else if (isDubbed) {
+    badgeLabel = isDubbed ? 'Dublado + Legenda PT-BR' : 'Áudio PT-BR + Legenda';
+  } else if (isDubbed || isPtBr) {
     badge = '🔊';
-    badgeLabel = 'Áudio Dublado PT-BR';
+    badgeLabel = isDubbed ? 'Áudio Dublado PT-BR' : 'Áudio PT-BR';
   } else if (isSubtitled || hasExternalPtSub) {
     badge = '💬';
     badgeLabel = subFormat === 'hardsub_ptbr' ? 'Hardsub PT-BR' : 'Legenda PT-BR';
+  } else if (language === 'unknown' || evaluation.audioAnalysis.language === 'unknown') {
+    badge = '❌';
+    badgeLabel = 'Idioma não declarado';
   }
 
   return {

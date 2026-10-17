@@ -34,8 +34,21 @@ export const WatchPartyOverlay: React.FC<WatchPartyOverlayProps> = ({
   const [isMuted, setIsMuted] = useState(() => watchPartyService.isMicrophoneMuted());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const chatBottomRef = useRef<HTMLDivElement>(null);
+  const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
   const toastTimeoutRef = useRef<any>(null);
+
+  const scrollChatToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    const el = chatMessagesContainerRef.current;
+    if (!el) return;
+    try {
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior
+      });
+    } catch {
+      el.scrollTop = el.scrollHeight;
+    }
+  };
 
   const showToast = (text: string) => {
     setToastMessage(text);
@@ -77,12 +90,18 @@ export const WatchPartyOverlay: React.FC<WatchPartyOverlayProps> = ({
       setIsMuted(data.isMuted);
     });
 
+    const unsubscribeRemoteControl = watchPartyService.onRemoteControlReceived((req) => {
+      const actionName = req.action === 'play' ? 'iniciou a reprodução' : req.action === 'pause' ? 'pausou a reprodução' : req.action === 'seek' ? 'ajustou a linha do tempo' : 'avançou para o próximo episódio';
+      showToast(`${req.senderNickname || 'Um participante'} ${actionName}`);
+    });
+
     return () => {
       unsubscribeState();
       unsubscribeChat();
       unsubscribeParticipants();
       unsubscribeBuffering();
       unsubscribeVoice();
+      unsubscribeRemoteControl();
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     };
   }, [isChatOpen]);
@@ -90,7 +109,7 @@ export const WatchPartyOverlay: React.FC<WatchPartyOverlayProps> = ({
   useEffect(() => {
     if (isChatOpen) {
       setUnreadCount(0);
-      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      scrollChatToBottom('smooth');
     }
   }, [isChatOpen, messages.length]);
 
@@ -106,8 +125,7 @@ export const WatchPartyOverlay: React.FC<WatchPartyOverlayProps> = ({
 
   const handleCopyInvite = async () => {
     try {
-      const origin = window.location.origin;
-      const link = `${origin}/sala/${roomState.roomId}`;
+      const link = watchPartyService.getInviteUrl(roomState.roomId);
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(link);
       } else {
@@ -210,6 +228,11 @@ export const WatchPartyOverlay: React.FC<WatchPartyOverlayProps> = ({
             <span className="bg-white/15 px-2 py-0.5 rounded-full text-[10px] text-cyan-300 font-mono">
               {participantCount}/6
             </span>
+            {watchPartyService.isHostBroadcastMode() && (
+              <span className="bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
+                {isHost ? 'Transmitindo' : 'Ao Vivo'}
+              </span>
+            )}
           </button>
 
           {/* Botão Copiar Convite */}
@@ -504,7 +527,10 @@ export const WatchPartyOverlay: React.FC<WatchPartyOverlayProps> = ({
           </div>
 
           {/* Histórico de Mensagens */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+          <div 
+            ref={chatMessagesContainerRef}
+            className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar"
+          >
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-4 text-gray-400 space-y-2">
                 <MessageSquare className="w-8 h-8 text-gray-600 stroke-1" />
@@ -514,62 +540,62 @@ export const WatchPartyOverlay: React.FC<WatchPartyOverlayProps> = ({
                 </p>
               </div>
             ) : (
-              messages.map((m) => {
-                const isMe = m.senderId === roomState.localParticipant.peerId || m.senderId === (roomState.localParticipant as any).id;
-                const timeStr = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                return (
-                  <div 
-                    key={m.id}
-                    className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
-                  >
-                    <div className="flex items-center gap-1.5 mb-1 text-[10px] text-gray-400">
-                      <span className="font-bold text-gray-300">{m.senderNickname}</span>
-                      {m.isHost && (
-                        <Crown className="w-3 h-3 text-amber-400 fill-amber-400 inline" />
-                      )}
-                      <span>•</span>
-                      <span>{timeStr}</span>
-                    </div>
-
-                    <div 
-                      className={`max-w-[85%] px-3.5 py-2 rounded-2xl text-xs leading-relaxed break-words ${
-                        isMe 
-                          ? 'bg-[#007df7] text-white rounded-tr-none shadow-md shadow-[#007df7]/20' 
-                          : 'bg-white/10 text-gray-100 rounded-tl-none border border-white/5'
-                      }`}
-                    >
-                      {m.text}
-                    </div>
+              messages.map((m) => (
+                <div 
+                  key={m.id}
+                  className={`flex flex-col ${m.senderId === roomState.localParticipant.peerId || m.senderId === (roomState.localParticipant as any).id ? 'items-end' : 'items-start'}`}
+                >
+                  <div className="flex items-center gap-1.5 mb-1 text-[10px] text-gray-400">
+                    <span className="font-bold text-gray-300">{m.senderNickname}</span>
+                    {m.isHost && (
+                      <Crown className="w-3 h-3 text-amber-400 fill-amber-400 inline" />
+                    )}
+                    <span>•</span>
+                    <span>{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
-                );
-              })
+
+                  <div 
+                    className={`max-w-[85%] px-3.5 py-2 rounded-2xl text-xs leading-relaxed break-words ${
+                      m.senderId === roomState.localParticipant.peerId || m.senderId === (roomState.localParticipant as any).id 
+                        ? 'bg-[#007df7] text-white rounded-tr-none shadow-md shadow-[#007df7]/20' 
+                        : 'bg-white/10 text-gray-100 rounded-tl-none border border-white/5'
+                    }`}
+                  >
+                    {m.text}
+                  </div>
+                </div>
+              ))
             )}
-            <div ref={chatBottomRef} />
           </div>
 
           {/* Barra de Entrada de Mensagem */}
-          <form 
-            onSubmit={handleSendMessage}
-            className="p-3 border-t border-white/10 bg-white/5 flex items-center gap-2"
-          >
-            <input
-              type="text"
-              maxLength={280}
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Digite uma mensagem..."
-              className="flex-1 px-3.5 py-2.5 bg-black/50 border border-white/15 focus:border-[#007df7] rounded-xl text-xs text-white placeholder-gray-500 outline-none transition-colors"
-            />
-            <button
-              type="submit"
-              disabled={!chatInput.trim()}
-              className="p-2.5 bg-[#007df7] hover:bg-[#0069d9] active:scale-95 disabled:opacity-40 text-white rounded-xl transition-all shadow-md shadow-[#007df7]/30"
-              title="Enviar"
+          {roomState.permissions.allowChat || isHost ? (
+            <form 
+              onSubmit={handleSendMessage}
+              className="p-3 border-t border-white/10 bg-white/5 flex items-center gap-2"
             >
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
+              <input
+                type="text"
+                maxLength={280}
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Digite uma mensagem..."
+                className="flex-1 px-3.5 py-2.5 bg-black/50 border border-white/15 focus:border-[#007df7] rounded-xl text-xs text-white placeholder-gray-500 outline-none transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={!chatInput.trim()}
+                className="p-2.5 bg-[#007df7] hover:bg-[#0069d9] active:scale-95 disabled:opacity-40 text-white rounded-xl transition-all shadow-md shadow-[#007df7]/30"
+                title="Enviar"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          ) : (
+            <div className="p-3 border-t border-white/10 bg-white/5 text-center text-xs text-red-300">
+              O anfitrião desativou o envio de mensagens.
+            </div>
+          )}
         </div>
       )}
     </>

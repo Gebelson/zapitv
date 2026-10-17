@@ -31,14 +31,19 @@ const DUBBED_PTBR_PATTERNS = [
   /\b(fhd[-_]?dublado|hd[-_]?dublado|web[-_]?dl[-_]?dublado)\b/i,
   /🇧🇷\s*dublado/i,
   /🇧🇷.*?(dublado|dual|áudio|audio)/i,
-  /\b(dublagem\s*brasileira)\b/i
+  /\b(dublagem\s*brasileira)\b/i,
+  /🌎\s*portugu[eê]s/i,
+  /🌎\s*pt[-_]?br/i,
+  /\b(portugu[eê]s|pt[-_]?br)\b/i
 ];
 
 const PTBR_GENERAL_PATTERNS = [
   /\b(pt[-_]?br|portugu[eê]s[-_]?br|portugu[eê]s)\b/i,
   /\[pt[-_]?br\]/i,
   /\b(pob|por)\b/i,
-  /🇧🇷/
+  /🇧🇷/,
+  /🌎\s*portugu[eê]s/i,
+  /🌎\s*pt[-_]?br/i
 ];
 
 const SUBTITLED_ONLY_PATTERNS = [
@@ -72,12 +77,25 @@ export class AudioPreferenceService {
     // Nome do provedor, resolução e flags derivadas por addons não comprovam a faixa de áudio.
     const hasDubbedPattern = DUBBED_PTBR_PATTERNS.some(p => p.test(combinedText));
     const hasPtBrGeneral = PTBR_GENERAL_PATTERNS.some(p => p.test(combinedText));
+    const hasExplicitBrazilianAudio = hasPtBrGeneral ||
+      /\b(audio|áudio)\s*pt(?:[-_]?br)?\b|\bdublagem\s*brasileira\b|\bbrazuca\b/i.test(combinedText);
+    // "Dublado" sozinho não identifica o idioma: "Áudio Latino Dublado"
+    // continua sendo espanhol, mesmo que o addon tenha marcado isPtBr.
+    const isExplicitSpanishAudio = /\b(latino|espa[nñ]ol|espanhol|castellano)\b/i.test(combinedText) &&
+      !hasExplicitBrazilianAudio;
+    if (isExplicitSpanishAudio) {
+      return {
+        tier: 'foreign', isPtBr: false, isDubbed: false, isDualAudio: false,
+        language: 'es', confidence: 0.9,
+        reason: 'Áudio espanhol indicado explicitamente pela fonte'
+      };
+    }
     const isExplicitlySubtitledOnly = SUBTITLED_ONLY_PATTERNS.some(p => p.test(combinedText)) && 
                                      !hasDubbedPattern && 
                                      !isDualAudio;
 
     // Se o stream já vier com flags pré-definidas ou marcadores brasileiros
-    const explicitlyBrazilian = hasDubbedPattern || hasPtBrGeneral || /\b(pt[-_]?br|pob|por[-_]?br|brazilian)\b/i.test(combinedText);
+    const explicitlyBrazilian = hasDubbedPattern || hasPtBrGeneral || stream.isDubbed === true || stream.isPtBr === true || /\b(pt[-_]?br|pob|por[-_]?br|brazilian)\b/i.test(combinedText);
 
     // Avaliação: DUAL AUDIO (contém PT-BR)
     if (isDualAudio && explicitlyBrazilian && !isExplicitlySubtitledOnly) {
@@ -92,10 +110,15 @@ export class AudioPreferenceService {
       };
     }
 
-    // Avaliação: DUBLADO PT-BR DEDICADO
+    // Avaliação: DUBLADO PT-BR DEDICADO / ÁUDIO PT-BR
+    const isForeignOnly = /\b(latino|espa[nñ]ol|espanhol|castellano)\b/i.test(combinedText) && !hasDubbedPattern && !hasPtBrGeneral && !stream.isDubbed && !stream.isPtBr;
+    const isPtPtOnly = /\b(pt[-_]?pt|portugu[eê]s[-_]?pt)\b/i.test(combinedText) && !/\b(pt[-_]?br|dublado|brazuca)\b/i.test(combinedText) && !/🇧🇷/.test(combinedText);
+
     if (
-      !isExplicitlySubtitledOnly && !/\b(latino|espa[nñ]ol|espanhol|castellano|pt[-_]?pt)\b/i.test(combinedText) &&
-      (hasDubbedPattern || (explicitlyBrazilian && stream.isDubbed === true))
+      !isExplicitlySubtitledOnly &&
+      !isForeignOnly &&
+      !isPtPtOnly &&
+      (hasDubbedPattern || explicitlyBrazilian || stream.isDubbed === true || stream.isPtBr === true)
     ) {
       return {
         tier: 'dubbed_ptbr',

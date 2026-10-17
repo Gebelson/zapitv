@@ -1,0 +1,6 @@
+# Local verification images are not application assets.
+/*.png
+
+# Runtime feedback and backups must not be bundled into deployments.
+/data/feedback_store.json
+/backups/

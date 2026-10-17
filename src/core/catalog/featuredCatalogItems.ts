@@ -70,7 +70,7 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     audioStatus: 'pt-br-dubbed'
   },
 
-  // 4. VERITY (2026 - tt15888806) — disponibilidade e áudio dependem das fontes resolvidas
+  // 4. VERITY (2026 - tt32261958) — disponibilidade e áudio dependem das fontes resolvidas
   {
     id: 'movie-verity-2026',
     title: 'Verity',
@@ -82,7 +82,8 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     backdrop: 'https://image.tmdb.org/t/p/original/6Qf3sylInJeyK0fFTfjprnGIXCF.jpg',
     description: 'Uma escritora em dificuldades financeiras aceita a proposta de concluir a série de sucesso de uma famosa autora incapacitada, descobrindo segredos aterrorizantes em seus manuscritos.',
     genres: ['Romance', 'Mistério', 'Drama'],
-    imdbId: 'tt15888806',
+    imdbId: 'tt32261958',
+    tmdbId: '1283515',
     isFeatured: true
   },
 
@@ -230,7 +231,7 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     audioStatus: 'pt-br-dubbed'
   },
 
-  // 13. A ODISSEIA (2026 - tt2788314) — disponibilidade e áudio dependem das fontes resolvidas
+  // 13. A ODISSEIA (2026 - tt33764258) — disponibilidade e áudio dependem das fontes resolvidas
   {
     id: 'movie-a-odisseia-2026',
     title: 'A Odisseia',
@@ -242,7 +243,8 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     backdrop: 'https://image.tmdb.org/t/p/original/muMwJAiMtReEHLKpKMWt2rMkYF7.jpg',
     description: 'A épica jornada de Ulisses narrada em uma superprodução visual, enfrentando monstros mitológicos e a ira dos deuses gregos para retornar a Ítaca.',
     genres: ['Aventura', 'Fantasia', 'Drama'],
-    imdbId: 'tt2788314',
+    imdbId: 'tt33764258',
+    tmdbId: '1368337',
     isFeatured: true
   },
 
@@ -381,7 +383,7 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     episodes: []
   },
 
-  // 3. A LESTE DO ÉDEN (2026- - tt22020214) — Ainda não lançada
+  // 3. A LESTE DO ÉDEN (2026- - tt21097264) — DISPONÍVEL (TVmeter #3)
   {
     id: 'series-a-leste-do-eden-2026',
     title: 'A Leste do Éden',
@@ -393,12 +395,21 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     backdrop: 'https://image.tmdb.org/t/p/original/70RZX7kNjA0Qjn6HigB1oMvFJ8R.jpg',
     description: 'Adaptação do épico clássico de John Steinbeck sobre duas famílias cujas histórias se entrelaçam no vale de Salinas.',
     genres: ['Drama', 'Histórico'],
-    imdbId: 'tt22020214',
+    imdbId: 'tt21097264',
     tmdbId: '258165',
     isFeatured: true,
-    availabilityStatus: 'unreleased',
-    audioStatus: 'other',
-    episodes: []
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    seasonsCount: 1,
+    episodes: [
+      {
+        id: 'eden-s1e1',
+        number: 1,
+        title: 'Irmãos',
+        description: 'Depois que o acaso coloca Cathy Ames na vida dos irmãos Trask, todos precisam lidar com uma batalha interna entre o bem e o mal.',
+        image: 'https://images.metahub.space/poster/medium/tt21097264/img'
+      }
+    ]
   },
 
   // 4. LANTERNAS (2026- - tt26540670) — Ainda não lançada

@@ -418,7 +418,17 @@ export class MediaSourceValidationService {
     let detectedAudioOk = true;
 
     // Se for URL HTTP externa, faz uma verificação leve de cabeçalhos
-    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+    // ATENÇÃO: NÃO faz probe via proxy para endereços locais de engine (127.0.0.1:11470 ou localhost:11470)
+    // nem para torrents/infoHash, evitando requisições com 502 Bad Gateway que congestionam a rede.
+    const isTorrentEngineUrl = rawUrl.includes('127.0.0.1:11470') ||
+      rawUrl.includes('localhost:11470') ||
+      Boolean(stream.infoHash) ||
+      Boolean((stream as any).isTorrent);
+
+    if (isTorrentEngineUrl) {
+      isAccessible = true;
+      probeReason = 'Stream via Stremio Streaming Server / Torrent';
+    } else if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
       try {
         const probeUrl = rawUrl.startsWith('http://localhost') || rawUrl.startsWith('/api/')
           ? rawUrl

@@ -27,6 +27,9 @@ export interface ContentItem {
   heroTags?: HeroTag[]; // Nova propriedade para tags personalizadas
   tmdbId?: string; // ID numérico do TMDB
   imdbId?: string; // ID do IMDB (ex: tt1234567)
+  aniListId?: number; // ID oficial do AniList
+  malId?: number; // ID oficial do MyAnimeList
+  canonicalId?: string; // Identificador canônico unificado (ex: movie:imdb:tt0109830 ou anime:anilist:20)
   imdbRank?: number; // Posição oficial no ranking IMDb (ex: #14)
   displayRank?: number; // Posição filtrada entre títulos disponíveis no ZapiTV (ex: #1)
   videoUrl?: string; // Custom video URL
@@ -112,4 +115,4 @@ export interface ActorPerson {
   placeOfBirth?: string;
 }
 
-export type AppView = 'home' | 'featured' | 'movies' | 'series' | 'animes' | 'programas' | 'live' | 'mylist' | 'profile' | 'settings' | 'help' | 'admin' | 'login' | 'signup' | 'profile-selector' | 'television' | 'downloads' | 'history' | 'notfound' | 'actor' | 'dev-lab' | 'dev-player-test';
+export type AppView = 'home' | 'featured' | 'movies' | 'series' | 'animes' | 'programas' | 'live' | 'mylist' | 'profile' | 'settings' | 'help' | 'admin' | 'login' | 'signup' | 'profile-selector' | 'television' | 'downloads' | 'history' | 'notfound' | 'actor';

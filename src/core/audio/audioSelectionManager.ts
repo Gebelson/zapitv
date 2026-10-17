@@ -183,12 +183,14 @@ export class AudioSelectionManager {
       return analysis.language;
     }
 
-    // 2. Tags explícitas de dublagem PT-BR
-    const isSubtitledOnly = /\b(legendado|legendada|softsub|hardsub|sub\b|leg\b)\b/i.test(combined);
+    // 2. Tags explícitas de dublagem ou áudio PT-BR
+    const isSubtitledOnly = /\b(legendado|legendada|softsub|hardsub|sub\b|leg\b)\b/i.test(combined) && !/dublado|dual|áudio|audio/i.test(combined);
     if (
-      (!isSubtitledOnly && /🇧🇷/i.test(combined)) ||
+      (!isSubtitledOnly && (/🇧🇷/i.test(combined) || /🌎\s*portugu[eê]s/i.test(combined) || /\b(portugu[eê]s|pt[-_]?br)\b/i.test(combined))) ||
       /\b(dublado|dublada|dublados|audio\s*pt[-_]?br|áudio\s*pt[-_]?br|pt[-_]?br\s*dub|fhd[-_]?dub|hd[-_]?dub)\b/i.test(combined) ||
-      /\[dublado\]|\[dub\]/i.test(combined)
+      /\[dublado\]|\[dub\]/i.test(combined) ||
+      stream.isDubbed === true ||
+      (stream.isPtBr === true && !isSubtitledOnly)
     ) {
       return 'pt-BR';
     }
@@ -290,9 +292,10 @@ export class AudioSelectionManager {
     const webReadyStreamsWithIndices: Array<{ stream: StremioStream; index: number }> = [];
 
     (streams || []).forEach((st, idx) => {
-      // Rejeita streams marcados expressamente como notWebReady ou URLs torrent sem streaming HTTP
-      const isNotWeb = st.behaviorHints?.notWebReady === true;
+      // Rejeita streams marcados expressamente como notWebReady APENAS se não tiverem URL HTTP/HTTPS direta
       const isTorrentUrl = st.url?.startsWith('magnet:') || (!st.url && (st as any).infoHash);
+      const isPlayableUrl = Boolean(st.url && (st.url.startsWith('http://') || st.url.startsWith('https://') || st.url.startsWith('/')));
+      const isNotWeb = st.behaviorHints?.notWebReady === true && !isPlayableUrl;
       if (!isNotWeb && !isTorrentUrl && st.url) {
         webReadyStreamsWithIndices.push({ stream: st, index: idx });
       }

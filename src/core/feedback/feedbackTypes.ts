@@ -17,8 +17,6 @@ export type FeedbackCategory =
   | 'no_sound'                     // Vídeo sem som
   | 'unstable_volume'              // Volume instável
   | 'wrong_quality'                // Qualidade de vídeo incorreta
-  | 'ai_enhancer_not_working'      // Melhoria por IA não funciona
-  | 'split_screen_not_working'     // Tela Dividida não funciona
   | 'search_problem'               // Problema na busca
   | 'catalog_problem'              // Problema no catálogo
   | 'live_channel_unavailable'     // Canal ao vivo indisponível
@@ -38,8 +36,6 @@ export const FEEDBACK_CATEGORY_LABELS: Record<FeedbackCategory, string> = {
   no_sound: 'Vídeo sem som',
   unstable_volume: 'Volume instável',
   wrong_quality: 'Qualidade de vídeo incorreta',
-  ai_enhancer_not_working: 'Melhoria por IA não funciona',
-  split_screen_not_working: 'Tela Dividida não funciona',
   search_problem: 'Problema na busca',
   catalog_problem: 'Problema no catálogo',
   live_channel_unavailable: 'Canal ao vivo indisponível',
