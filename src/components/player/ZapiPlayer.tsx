@@ -2506,7 +2506,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (isBroadcastGuest || isLoadingStreams || !currentStream?.url) return;
     // O blob já foi obtido do download identificado por item/temporada/episódio.
     // Validadores de provedores rejeitam URLs blob e não se aplicam ao arquivo local.
-    if (isOfflineMode && currentStream.url.startsWith('blob:')) return;
+    if (isOfflineMode && (currentStream.url.startsWith('blob:') || currentStream.url.startsWith('http://127.0.0.1:19573/media/'))) return;
     triedIndicesRef.current.add(selectedStreamIndex);
 
     // Validação estrita de correspondência de identidade da obra e episódio (Impede obras trocadas)

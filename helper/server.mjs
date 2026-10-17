@@ -11,6 +11,7 @@ const PORT = Number(process.env.ZAPITV_HELPER_PORT || 19573);
 const ROOT = path.resolve(process.env.ZAPITV_HELPER_DIR || path.join(os.homedir(), 'Videos', 'ZapiTV'));
 const ORIGINS = DEFAULT_ORIGINS;
 const DB_FILE = path.join(ROOT, '.zapitv-helper.json');
+const JOBS_FILE = path.join(ROOT, '.zapitv-jobs.json');
 const jobs = new Map();
 const mediaTickets = new Map();
 const pairingCode = String(100000 + Math.floor(Math.random() * 900000));
@@ -18,6 +19,7 @@ let pairFailures = 0;
 let token = randomBytes(32).toString('hex');
 let library = [];
 let active = 0;
+let jobsSave = Promise.resolve();
 
 const json = (res, status, value) => {
   const data = Buffer.from(JSON.stringify(value));
@@ -39,6 +41,15 @@ const saveLibrary = async () => {
   await rename(tmp, DB_FILE);
 };
 const publicJob = job => ({ id: job.id, itemId: job.itemId, title: job.title, type: job.type, season: job.season, episode: job.episode, quality: job.quality, format: job.format, status: job.status, bytes: job.bytes, total: job.total, error: job.error || null, createdAt: job.createdAt });
+const saveJobs = () => {
+  const snapshot = JSON.stringify({ version: 1, jobs: [...jobs.values()].filter(job => job.status !== 'cancelled').map(publicJob) });
+  jobsSave = jobsSave.catch(() => {}).then(async () => {
+    const tmp = JOBS_FILE + '.tmp';
+    await writeFile(tmp, snapshot, { mode: 0o600 });
+    await rename(tmp, JOBS_FILE);
+  });
+  return jobsSave;
+};
 
 async function requestSource(raw, headers = {}, signal, redirects = 0) {
   if (redirects > 3) throw new Error('Redirecionamentos demais.');
@@ -119,6 +130,7 @@ async function transfer(job) {
   } finally {
     job.controller = null;
     active--;
+    await saveJobs();
     pump();
   }
 }
@@ -204,10 +216,21 @@ async function handle(req, res) {
       if ((season && !episode) || (!season && episode) || season < 0 || episode < 0) return json(res, 400, { error: 'Episódio inválido.' });
       const quality = safeName(body.quality || 'Original');
       const existing = [...jobs.values()].find(x => x.itemId === body.itemId && x.season === season && x.episode === episode && x.quality === quality && x.status !== 'cancelled');
-      if (existing) return json(res, 200, { job: publicJob(existing) });
+      if (existing) {
+        if (existing.format !== body.format) return json(res, 409, { error: 'Formato diferente de uma tarefa existente.' });
+        if (['paused', 'error'].includes(existing.status)) {
+          existing.url = body.url;
+          existing.status = 'pending';
+          existing.error = null;
+          await saveJobs();
+          pump();
+        }
+        return json(res, 200, { job: publicJob(existing) });
+      }
       const id = randomBytes(12).toString('hex');
       const job = { id, itemId: String(body.itemId).slice(0, 100), title: String(body.title).slice(0, 200), type: ['FILME', 'SÉRIE', 'ANIME'].includes(body.type) ? body.type : undefined, season, episode, quality, format: body.format, url: body.url, status: 'pending', bytes: 0, total: 0, createdAt: Date.now() };
       jobs.set(id, job);
+      await saveJobs();
       pump();
       return json(res, 201, { job: publicJob(job) });
     }
@@ -219,13 +242,16 @@ async function handle(req, res) {
       if (req.method === 'DELETE') {
         job.controller?.abort(); job.status = 'cancelled';
         await rm(path.join(ROOT, `${job.id}.${job.format}.part`), { force: true });
+        await saveJobs();
         return json(res, 200, { job: publicJob(job) });
       }
       if (req.method === 'POST') {
         const body = await readJson(req);
+        if (body.action === 'resume' && !job.url) return json(res, 409, { error: 'Abra os detalhes e clique em Baixar para revalidar a fonte.' });
         if (body.action === 'pause' && job.status === 'downloading') { job.controller.abort(); job.status = 'paused'; }
-        else if (body.action === 'resume' && ['paused', 'error'].includes(job.status)) { job.status = 'pending'; job.error = null; pump(); }
+        else if (body.action === 'resume' && ['paused', 'error'].includes(job.status) && job.url) { job.status = 'pending'; job.error = null; pump(); }
         else return json(res, 409, { error: 'Transição inválida.' });
+        await saveJobs();
         return json(res, 200, { job: publicJob(job) });
       }
     }
@@ -245,6 +271,13 @@ async function handle(req, res) {
 
 await mkdir(ROOT, { recursive: true });
 try { library = JSON.parse(await readFile(DB_FILE, 'utf8')).library || []; } catch {}
+try {
+  const saved = JSON.parse(await readFile(JOBS_FILE, 'utf8')).jobs || [];
+  for (const entry of saved) {
+    if (!/^[a-f0-9]{24}$/.test(entry.id)) continue;
+    jobs.set(entry.id, { ...entry, status: entry.status === 'completed' ? 'completed' : 'paused', url: null, controller: null });
+  }
+} catch {}
 const server = http.createServer(handle);
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`ZapiTV Helper em http://127.0.0.1:${PORT}`);

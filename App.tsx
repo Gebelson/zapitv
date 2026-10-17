@@ -60,6 +60,7 @@ const WatchPartyModal = React.lazy(() => import('./src/components/watchparty/Wat
 import { offlineStorageDriver } from './src/core/offline/offlineStorageDriver';
 import { offlineDb } from './src/core/offline/offlineDb';
 import { OfflineDownload } from './src/core/offline/offlineTypes';
+import { HelperJob } from './src/core/offline/helperClient';
 import { StremioStream } from './src/core/stremio/stremioTypes';
 
 const GENRES_LIST = [
@@ -1345,8 +1346,25 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
   }, []);
 
+  const handlePlayHelper = useCallback((job: HelperJob, url: string) => {
+    const type = job.type === ContentType.ANIME ? ContentType.ANIME : job.type === ContentType.SERIES || job.episode ? ContentType.SERIES : ContentType.MOVIE;
+    const download: OfflineDownload = {
+      id: `helper_${job.id}`, itemId: job.itemId, title: job.title, type,
+      season: job.season, episode: job.episode, image: '', genres: [],
+      quality: job.quality, format: job.format, sourceUrl: url,
+      audioTrack: { name: 'Áudio não identificado', language: 'und', isDubbed: false, isOriginal: false },
+      subtitles: [], storagePath: '', storageDriver: 'file', totalBytes: job.total || job.bytes,
+      downloadedBytes: job.bytes, speedBytesPerSec: 0, status: 'completed',
+      createdAt: Date.now(), lastPlaybackPosition: 0, duration: 0
+    };
+    setOfflinePlaybackStreams([{ name: `Download Offline (${job.quality})`, url, sourceType: job.format }]);
+    setOfflineBlobUrl(url);
+    setActiveOfflineDownload(download);
+    setOfflinePlaybackItem({ id: job.itemId, title: job.title, type, image: '', year: new Date().getFullYear(), rating: 0, genres: [], description: job.title });
+  }, []);
+
   const handleCloseOfflinePlayer = useCallback(() => {
-    if (offlineBlobUrl) {
+    if (offlineBlobUrl?.startsWith('blob:')) {
       URL.revokeObjectURL(offlineBlobUrl);
     }
     setOfflineBlobUrl(null);
@@ -2610,6 +2628,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             <DownloadsPage
               isDarkMode={isDarkMode}
               onPlayOffline={handlePlayOffline}
+              onPlayHelper={handlePlayHelper}
               onNavigateHome={() => setCurrentView('home')}
             />
           </ViewWrapper>
@@ -2888,7 +2907,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               offlineSubtitles={activeOfflineDownload.subtitles}
               initialResumeTime={activeOfflineDownload.lastPlaybackPosition}
               onUpdatePlaybackPosition={(pos) => {
-                offlineDb.updatePlaybackPosition(activeOfflineDownload.id, pos);
+                if (!activeOfflineDownload.id.startsWith('helper_')) offlineDb.updatePlaybackPosition(activeOfflineDownload.id, pos);
               }}
               initialSeason={activeOfflineDownload.season}
               initialEpisode={activeOfflineDownload.episode}

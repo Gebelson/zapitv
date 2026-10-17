@@ -20,7 +20,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem(TOKEN_KEY);
   const response = await fetch(`${BASE}${path}`, {
     ...init,
-    targetAddressSpace: 'local',
+    ...(location.protocol === 'https:' ? { targetAddressSpace: 'local' } : {}),
     headers: { ...(init.body ? { 'content-type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers },
     signal: init.signal || AbortSignal.timeout(5000),
     cache: 'no-store'

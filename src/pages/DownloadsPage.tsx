@@ -14,12 +14,14 @@ import { helperClient, HelperJob } from '../core/offline/helperClient';
 interface DownloadsPageProps {
   isDarkMode?: boolean;
   onPlayOffline?: (download: OfflineDownload) => void;
+  onPlayHelper?: (download: HelperJob, url: string) => void;
   onNavigateHome?: () => void;
 }
 
 export const DownloadsPage: React.FC<DownloadsPageProps> = ({
   isDarkMode = true,
   onPlayOffline,
+  onPlayHelper,
   onNavigateHome
 }) => {
   const [downloads, setDownloads] = useState<OfflineDownload[]>([]);
@@ -39,7 +41,6 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
   const [helperError, setHelperError] = useState('');
   const [helperJobs, setHelperJobs] = useState<HelperJob[]>([]);
   const [helperLibrary, setHelperLibrary] = useState<HelperJob[]>([]);
-  const [helperVideo, setHelperVideo] = useState<string | null>(null);
 
   useEffect(() => {
     // Subscreve às atualizações reativas do banco de downloads
@@ -200,12 +201,11 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
         {helperConnected && <div className="mt-4 space-y-2">
           {helperJobs.filter(job => job.status !== 'completed' && job.status !== 'cancelled').map(job => <div key={job.id} className="flex items-center justify-between gap-2 rounded-xl bg-white/5 p-3 text-xs">
             <div className="min-w-0"><p className="font-bold truncate">{job.title}{job.episode ? ` · T${job.season}E${job.episode}` : ''}</p><p className="text-gray-400">{job.status} · {formatBytes(job.bytes)}{job.total ? ` / ${formatBytes(job.total)}` : ''}{job.error ? ` · ${job.error}` : ''}</p></div>
-            <div className="flex gap-2 shrink-0">{job.status === 'downloading' && <button onClick={() => helperClient.action(job.id, 'pause')} aria-label="Pausar">Pausar</button>}{['paused', 'error'].includes(job.status) && <button onClick={() => helperClient.action(job.id, 'resume')} aria-label="Retomar">Retomar</button>}<button onClick={() => helperClient.cancel(job.id)} aria-label="Cancelar">Cancelar</button></div>
+            <div className="flex gap-2 shrink-0">{job.status === 'downloading' && <button onClick={() => helperClient.action(job.id, 'pause').catch(error => setHelperError(error.message))} aria-label="Pausar">Pausar</button>}{['paused', 'error'].includes(job.status) && <button onClick={() => helperClient.action(job.id, 'resume').catch(error => setHelperError(error.message))} aria-label="Retomar">Retomar</button>}<button onClick={() => helperClient.cancel(job.id).catch(error => setHelperError(error.message))} aria-label="Cancelar">Cancelar</button></div>
           </div>)}
-          {visibleHelperLibrary.map(entry => <div key={entry.id} className="flex items-center justify-between gap-2 rounded-xl bg-white/5 p-3 text-xs"><span className="truncate">{entry.title}{entry.episode ? ` · T${entry.season}E${entry.episode}` : ''} · {entry.quality}</span><button type="button" className="font-bold text-[#007df7]" onClick={async () => { try { setHelperVideo(await helperClient.mediaUrl(entry.id)); } catch (error) { setHelperError(error instanceof Error ? error.message : 'Arquivo indisponível.'); } }}>Assistir offline</button></div>)}
+          {visibleHelperLibrary.map(entry => <div key={entry.id} className="flex items-center justify-between gap-2 rounded-xl bg-white/5 p-3 text-xs"><span className="truncate">{entry.title}{entry.episode ? ` · T${entry.season}E${entry.episode}` : ''} · {entry.quality}</span><button type="button" className="font-bold text-[#007df7]" onClick={async () => { try { onPlayHelper?.(entry, await helperClient.mediaUrl(entry.id)); } catch (error) { setHelperError(error instanceof Error ? error.message : 'Arquivo indisponível.'); } }}>Assistir offline</button></div>)}
         </div>}
       </section>
-      {helperVideo && <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black/95 p-4" role="dialog" aria-modal="true" aria-label="Reprodução offline"><button type="button" onClick={() => setHelperVideo(null)} className="absolute right-5 top-5 text-white">Fechar</button><video src={helperVideo} controls autoPlay className="max-h-full max-w-full" /></div>}
 
       {/* Filtros por Categoria e Quadro de Armazenamento */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/5 pb-4 mb-8">
