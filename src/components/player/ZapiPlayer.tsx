@@ -282,9 +282,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (isAutoplayAudioBlocked && videoRef.current) {
       videoRef.current.muted = isMuted;
       videoRef.current.volume = volume;
+      if (isBroadcastGuest) {
+        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsAutoplayAudioBlocked(true));
+      }
       setIsAutoplayAudioBlocked(false);
     }
-  }, [isAutoplayAudioBlocked, isMuted, volume]);
+  }, [isAutoplayAudioBlocked, isBroadcastGuest, isMuted, volume]);
 
   // Picture-in-Picture State & Auto PiP
   const [isPipActive, setIsPipActive] = useState(false);
@@ -1744,7 +1747,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (initialStream && video) {
       setRemoteBroadcastStream(initialStream);
       video.srcObject = initialStream;
-      video.play().then(() => setIsPlaying(true)).catch(() => {});
+      video.play().then(() => setIsPlaying(true)).catch(() => setIsAutoplayAudioBlocked(true));
     }
 
     const unsubStream = watchPartyService.onHostStreamReceived((stream) => {
@@ -1752,7 +1755,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         if (stream) {
-          videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+          videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsAutoplayAudioBlocked(true));
         }
       }
     });

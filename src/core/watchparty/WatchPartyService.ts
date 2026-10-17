@@ -776,6 +776,12 @@ export class WatchPartyService {
       onRemoteAudioStream: (stream, peerId) => {
         if (stream.getVideoTracks().length > 0) {
           if (!this.transport.isHost && (!this.currentRoom?.hostPeerId || this.currentRoom.hostPeerId === peerId)) {
+            const audio = this.remoteAudioElements.get(peerId);
+            if (audio?.srcObject === stream) {
+              audio.pause();
+              audio.srcObject = null;
+              this.remoteAudioElements.delete(peerId);
+            }
             this.remoteScreenStream = stream;
             
             // Monitora estabilidade da conexão da transmissão
