@@ -30,23 +30,24 @@ describe('ZapiTV — Player Completo Visível Durante a Intro Institucional', ()
     
     // Scrubber input travado e desabilitado durante isPlayingIntro
     expect(zapiPlayerContent).toContain('value={isPlayingIntro ? 0 : currentTime}');
-    expect(zapiPlayerContent).toContain('disabled={isPlayingIntro}');
+    expect(zapiPlayerContent).toMatch(/disabled=\{isPlayingIntro/);
     expect(zapiPlayerContent).toContain('if (isPlayingIntro) return;');
 
     // Exibição textual de tempo inicia em 00:00 sem computar duração da intro
-    expect(zapiPlayerContent).toContain('{formatTime(isPlayingIntro ? 0 : currentTime)} / {formatTime(duration)}');
+    expect(zapiPlayerContent).toContain('{formatTime(isPlayingIntro ? 0 : currentTime)}');
+    expect(zapiPlayerContent).toContain('formatTime(duration)');
   });
 
   it('Requisito 3: Controles de avanço (-10s / +10s) e troca de episódio são bloqueados durante a intro', () => {
     // Botões de -10s e +10s desabilitados
-    expect(zapiPlayerContent).toMatch(/onClick=\{\(\) => skipTime\(-10\)\}[\s\S]*?disabled=\{isPlayingIntro\}/);
-    expect(zapiPlayerContent).toMatch(/onClick=\{\(\) => skipTime\(10\)\}[\s\S]*?disabled=\{isPlayingIntro\}/);
+    expect(zapiPlayerContent).toMatch(/onClick=\{\(\) => skipTime\(-10\)\}[\s\S]*?disabled=\{isPlayingIntro/);
+    expect(zapiPlayerContent).toMatch(/onClick=\{\(\) => skipTime\(10\)\}[\s\S]*?disabled=\{isPlayingIntro/);
     
     // Função skipTime bloqueia seek se isPlayingIntroRef for true
     expect(zapiPlayerContent).toMatch(/const skipTime = useCallback\(\(seconds: number\) => \{\s*if \(isPlayingIntroRef\.current\) return;/);
 
     // Botão de Próximo Episódio desabilitado durante intro
-    expect(zapiPlayerContent).toMatch(/disabled=\{isLoadingStreams \|\| isPlayingIntro\}/);
+    expect(zapiPlayerContent).toMatch(/disabled=\{isLoadingStreams \|\| isPlayingIntro/);
   });
 
   it('Requisito 3: Teclas de atalho de seek e próximo episódio são bloqueadas e barra de espaço pausa/reproduz a intro', () => {

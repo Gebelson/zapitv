@@ -976,7 +976,16 @@ class ProviderRegistryService {
             const combinedInterim = [...streams, ...collectedFromAddons];
             const cleanInterim = streamValidator.filterCleanStreams(combinedInterim, targetTitle, originalTitle);
             if (cleanInterim.length > 0) {
-              notifyProgressive(prioritizeRememberedSources(cleanInterim, remembered));
+              const engineOnline = localEngineCache.active;
+              const hasWebReady = cleanInterim.some(s => (!s.isTorrent && !s.url?.includes('127.0.0.1:11470') && !s.url?.includes('localhost:11470')) || engineOnline);
+              if (hasWebReady) {
+                const rankedInterim = sourceSelectionService.rankStreams(cleanInterim, {
+                  hasExternalPtSub: false,
+                  preferDubbed: true,
+                  identity
+                });
+                notifyProgressive(prioritizeRememberedSources(rankedInterim, remembered));
+              }
             }
             // Na 1ª verificação: interrompe se já encontrou fontes limpas e comprovadamente reproduzíveis na Web com PT-BR
             // Na 2ª verificação (isRetryAttempt): NUNCA interrompe prematuramente, busca exaustiva (Requisito 4)

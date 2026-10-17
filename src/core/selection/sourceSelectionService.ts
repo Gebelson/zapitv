@@ -160,9 +160,10 @@ export class SourceSelectionService {
 
     // Penalidade para transmissões que requerem motor externo (ex: torrents sem motor local ativo)
     // Garante que qualquer transmissão web direta reproduzível seja priorizada quando o motor local estiver offline
+    const isEngineTorrent = Boolean(stream.isTorrent || stream.url?.includes('127.0.0.1:11470') || stream.url?.includes('localhost:11470'));
     const isNotWebReady = stream.behaviorHints?.notWebReady === true;
-    const webReadyPenalty = isNotWebReady ? -20000 : 0;
-    const webReadyExplanation = isNotWebReady ? ' (Requer motor externo)' : '';
+    const webReadyPenalty = isEngineTorrent ? -80000 : (isNotWebReady ? -15000 : 0);
+    const webReadyExplanation = isEngineTorrent ? ' (Requer motor externo)' : (isNotWebReady ? ' (Web-ready restrito)' : '');
 
     const performanceModifiers = providerBonus + networkBonus;
 

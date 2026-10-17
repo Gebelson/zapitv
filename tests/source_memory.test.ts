@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { describe, it } from 'vitest';
 import express from 'express';
 import { migrate } from 'drizzle-orm/libsql/migrator';
 import { createDatabase } from '../src/server/database/client';
@@ -100,4 +101,8 @@ async function main() {
   console.log('source memory: migration, validation, idempotency, concurrent updates, expiry, episode isolation and audio order passed');
 }
 
-main().catch(error => { console.error(error); process.exitCode = 1; });
+describe('source_memory', () => {
+  it('executes cleanly with SQLite migration, validation, and routes', async () => {
+    await main();
+  }, 30000);
+});

@@ -653,14 +653,17 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       const handleProgressive = (progressive: StremioStream[]) => {
         if (currentRequestId !== playbackRequestIdRef.current || playbackAbort.signal.aborted) return;
         if (progressive && progressive.length > 0) {
-          progressiveStreamsFound = progressive;
-          setResolvedStreams(progressive);
-          setIsLoadingStreams(false);
-          mediaLoadingTracker.transition(currentTargetItem.id, 'BUFFERING', {
-            streamCount: progressive.length,
-            bestStream: progressive[0]?.title,
-            progressive: true
-          });
+          const hasWebReady = progressive.some(s => !s.isTorrent && !s.url?.includes('127.0.0.1:11470') && !s.url?.includes('localhost:11470'));
+          if (hasWebReady) {
+            progressiveStreamsFound = progressive;
+            setResolvedStreams(progressive);
+            setIsLoadingStreams(false);
+            mediaLoadingTracker.transition(currentTargetItem.id, 'BUFFERING', {
+              streamCount: progressive.length,
+              bestStream: progressive[0]?.title,
+              progressive: true
+            });
+          }
         }
       };
 

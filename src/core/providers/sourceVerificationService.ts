@@ -179,10 +179,13 @@ class SourceVerificationService {
           onProgressiveStreams: (progressive) => {
             if (options?.signal?.aborted) return;
             if (progressive && progressive.length > 0) {
+              const hasWebReady = progressive.some(s => !s.isTorrent && !s.url?.includes('127.0.0.1:11470') && !s.url?.includes('localhost:11470'));
               diagnostic.approvedStreamsCount = progressive.length;
               options?.onProgressiveStreams?.(progressive);
-              // Notifica imediatamente AVAILABLE para preparar o vídeo sem aguardar os demais provedores
-              options?.onStateChange?.('AVAILABLE');
+              if (hasWebReady) {
+                // Notifica imediatamente AVAILABLE para preparar o vídeo sem aguardar os demais provedores
+                options?.onStateChange?.('AVAILABLE');
+              }
             }
           },
           forceRefresh: options?.forceRefresh,

@@ -74,19 +74,28 @@ export class CanonicalIdentityService {
     const aliases: string[] = [item.title.toLowerCase()];
     if (item.originalTitle) {
       aliases.push(item.originalTitle.toLowerCase());
-      if (item.originalTitle.includes(':')) {
-        item.originalTitle.split(':').forEach(p => {
-          const clean = p.trim().toLowerCase();
-          if (clean.length >= 3) aliases.push(clean);
-        });
-      }
-    }
-    if (item.title.includes(':')) {
-      const parts = item.title.split(':');
-      parts.forEach(p => {
+      const origParts = item.originalTitle.split(/[:\-\–\—/|()]/);
+      origParts.forEach(p => {
         const clean = p.trim().toLowerCase();
         if (clean.length >= 3) aliases.push(clean);
       });
+    }
+    const titleParts = item.title.split(/[:\-\–\—/|()]/);
+    titleParts.forEach(p => {
+      const clean = p.trim().toLowerCase();
+      if (clean.length >= 3) aliases.push(clean);
+    });
+
+    // Extrai o primeiro token significativo distintivo (ex: "Frieren", "Westworld", "Matrix")
+    const mainToken = this.extractSignificantTokens(item.title)[0];
+    if (mainToken && mainToken.length >= 4) {
+      aliases.push(mainToken.toLowerCase());
+    }
+    if (item.originalTitle) {
+      const origMainToken = this.extractSignificantTokens(item.originalTitle)[0];
+      if (origMainToken && origMainToken.length >= 4) {
+        aliases.push(origMainToken.toLowerCase());
+      }
     }
 
     // Aliases específicos conhecidos

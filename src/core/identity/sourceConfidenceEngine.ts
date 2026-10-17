@@ -174,6 +174,7 @@ export class SourceConfidenceEngine {
 
     // 5. VALIDAÇÃO DE SOBREPOSIÇÃO DE TÍTULO (Positive Title Overlap)
     const targetTokens = canonicalIdentityService.extractSignificantTokens(identity.title);
+    const origTokens = identity.originalTitle ? canonicalIdentityService.extractSignificantTokens(identity.originalTitle) : [];
     const cleanStreamTitle = canonicalIdentityService.normalizeTitle(streamTitle);
     const titleWords = new Set(canonicalIdentityService.extractSignificantTokens(`${streamName} ${streamTitle}`));
 
@@ -187,11 +188,18 @@ export class SourceConfidenceEngine {
       }
     }
 
-    // Verifica sobreposição de tokens
-    const matchingTokens = targetTokens.filter(token => titleWords.has(token));
-    const tokenOverlapRatio = targetTokens.length > 0 ? (matchingTokens.length / targetTokens.length) : 0;
+    // Verifica sobreposição de tokens de título nacional ou original
+    const matchingTarget = targetTokens.filter(token => titleWords.has(token));
+    const matchingOrig = origTokens.filter(token => titleWords.has(token));
+    const tokenOverlapRatio = targetTokens.length > 0 ? (matchingTarget.length / targetTokens.length) : 0;
+    const origOverlapRatio = origTokens.length > 0 ? (matchingOrig.length / origTokens.length) : 0;
 
-    if (!aliasMatched && tokenOverlapRatio < 0.75) {
+    // Se qualquer token distintivo (comprimento >= 4) do título nacional ou original estiver presente no stream
+    const hasDistinctiveToken = [...matchingTarget, ...matchingOrig].some(t => t.length >= 4);
+
+    const hasTitleCorrespondence = aliasMatched || tokenOverlapRatio >= 0.3 || origOverlapRatio >= 0.3 || hasDistinctiveToken;
+
+    if (!hasTitleCorrespondence) {
       reasons.push(`Título do stream não possui correspondência com "${identity.title}"`);
       return {
         stream,
@@ -205,7 +213,7 @@ export class SourceConfidenceEngine {
     // 6. REGRA CONSERVADORA PARA CONTEÚDO INFANTIL / FAMILIAR
     if (identity.isChildFriendly) {
       // Para produções infantis, a correspondência deve ser explícita
-      if (!aliasMatched && tokenOverlapRatio < 0.5) {
+      if (!aliasMatched && tokenOverlapRatio < 0.3 && origOverlapRatio < 0.3 && !hasDistinctiveToken) {
         reasons.push('Conteúdo infantil exige confirmação rigorosa de identidade');
         return {
           stream,

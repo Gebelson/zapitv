@@ -2233,6 +2233,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     } else {
       setAllSourcesFailed(false);
       setHasError(false);
+      if (triedIndicesRef.current.size >= streams.length) {
+        triedIndicesRef.current.clear();
+        setSelectedStreamIndex(0);
+        isSwitchingStreamRef.current = false;
+        startupTimedOutRef.current = false;
+        setIsLoading(true);
+      }
     }
   }, [isBroadcastGuest, isLoadingStreams, verificationState, streams.length, streamResolutionError]);
 
@@ -3651,7 +3658,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             className="w-full h-full object-contain"
             playsInline
             muted={isPlayingIntro || isMuted}
-            crossOrigin={currentStream?.url?.startsWith('/') || currentStream?.sourceType === 'hls' ? 'anonymous' : undefined}
             onLoadedMetadata={() => {
               markMediaAsReadyRef.current();
               applyTargetResumeTime();
