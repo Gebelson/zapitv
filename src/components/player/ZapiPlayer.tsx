@@ -2204,6 +2204,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
 
     if (streams.length === 0) {
+      if (verificationState === 'AVAILABLE') {
+        // Fontes validadas em transição para o estado do componente; aguarda sem disparar erro
+        setIsLoading(true);
+        setAllSourcesFailed(false);
+        setHasError(false);
+        return;
+      }
       if (videoRef.current && !videoRef.current.paused) {
         videoRef.current.pause();
       }

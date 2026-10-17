@@ -192,14 +192,11 @@ export class MediaAvailabilityIndex {
 
   /**
    * Determina se o título pode ser exibido publicamente no catálogo de obras reproduzíveis
-   * Regra estrita: apenas itens confirmados como UNAVAILABLE_CONFIRMED são excluídos.
-   * Novos itens e checagens em segundo plano permanecem visíveis.
+   * Regra P0: falhas temporárias de provedores ou verificações NUNCA devem ocultar
+   * conteúdos do catálogo. Apenas conteúdos banidos são excluídos.
    */
   public isPubliclyPlayable(key: string): boolean {
     if (bannedContentRegistry.isBannedKeyOrId(key)) return false;
-    const record = this.getRecord(key);
-    if (!record) return true;
-    if (record.status === 'UNAVAILABLE_CONFIRMED') return false;
     return true;
   }
 

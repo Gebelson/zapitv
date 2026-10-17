@@ -237,9 +237,16 @@ class ProviderRegistryService {
   private negativeCache = new LruCache<string, { timestamp: number; reason: string; inconclusive: boolean }>(100, 15 * 1000); // 15s de expiração rápida para cache negativo
   private pending = new Map<string, Promise<StremioStream[]>>();
   private progressiveListeners = new Map<string, Set<(streams: StremioStream[]) => void>>();
+  private inFlightConsumers = new Map<string, Set<AbortSignal | null>>();
   private cacheGeneration = 0;
   private readonly CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutos de retenção em cache
   private readonly STALE_TTL_MS = 3 * 60 * 1000; // 3 minutos de fresh (stale-while-revalidate após isso)
+
+  private isCancelled(cacheKey: string): boolean {
+    const consumers = this.inFlightConsumers.get(cacheKey);
+    if (!consumers || consumers.size === 0) return false;
+    return Array.from(consumers).every(s => s !== null && s.aborted);
+  }
 
   constructor() {
     this.loadProviders();
@@ -419,6 +426,20 @@ class ProviderRegistryService {
       }
     }
 
+    // Registro de consumidor in-flight (para cancelamento compartilhado seguro)
+    const activeSignal = options?.signal || null;
+    let consumers = this.inFlightConsumers.get(cacheKey);
+    if (!consumers) {
+      consumers = new Set();
+      this.inFlightConsumers.set(cacheKey, consumers);
+    }
+    consumers.add(activeSignal);
+    if (activeSignal) {
+      activeSignal.addEventListener('abort', () => {
+        consumers?.delete(activeSignal);
+      }, { once: true });
+    }
+
     // 2. Cache inteligente com separação estrita de positivo vs negativo (Requisito 7)
     if (options?.forceRefresh || options?.bypassNegativeCache) {
       this.negativeCache.delete(cacheKey);
@@ -433,7 +454,10 @@ class ProviderRegistryService {
           if (age >= this.STALE_TTL_MS && !this.pending.has(cacheKey)) {
             const bgRequest = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration, options)
               .finally(() => {
-                if (this.pending.get(cacheKey) === bgRequest) this.pending.delete(cacheKey);
+                if (this.pending.get(cacheKey) === bgRequest) {
+                  this.pending.delete(cacheKey);
+                  this.inFlightConsumers.delete(cacheKey);
+                }
               });
             this.pending.set(cacheKey, bgRequest);
           }
@@ -459,7 +483,10 @@ class ProviderRegistryService {
     }
 
     const request = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration, options).finally(() => {
-      if (this.pending.get(cacheKey) === request) this.pending.delete(cacheKey);
+      if (this.pending.get(cacheKey) === request) {
+        this.pending.delete(cacheKey);
+        this.inFlightConsumers.delete(cacheKey);
+      }
       if (options?.onProgressiveStreams) {
         const listeners = this.progressiveListeners.get(cacheKey);
         if (listeners) {
@@ -484,7 +511,6 @@ class ProviderRegistryService {
     const effectiveGen = generation ?? this.cacheGeneration;
 
     const notifyProgressive = (currentStreams: StremioStream[]) => {
-      if (options?.signal?.aborted) return;
       const listeners = this.progressiveListeners.get(effectiveCacheKey);
       if (listeners && listeners.size > 0) {
         for (const cb of listeners) {
@@ -966,7 +992,7 @@ class ProviderRegistryService {
 
       const runWorker = async () => {
         while (activeIndex < sortedAddons.length && !stopSpawning) {
-          if (options?.signal?.aborted) return;
+          if (this.isCancelled(effectiveCacheKey)) return;
           const currentIndex = activeIndex++;
           const addon = sortedAddons[currentIndex];
           const result = await executeAddon(addon);
@@ -1021,7 +1047,7 @@ class ProviderRegistryService {
         }),
         new Promise<void>((resolve) => {
           interval = setInterval(() => {
-            if (options?.signal?.aborted) {
+            if (this.isCancelled(effectiveCacheKey)) {
               if (interval) clearInterval(interval);
               resolve();
               return;

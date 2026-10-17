@@ -287,11 +287,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     }
   }, [item.id]);
 
-  // Abertura segura e estável dos detalhes: não fecha automaticamente o modal nem o player
-  useEffect(() => {
-    // Avalia silenciosamente os metadados sem encerrar a interface do usuário
-    catalogEligibilityService.evaluateItem(item).catch(() => {});
-  }, [item]);
+  // Abertura segura e estável dos detalhes: metadados já carregados e fontes gerenciadas por prefetchSources
 
   const getEpisodeProgress = useCallback((season: number, episode: number): number => {
     return storageService.getSyncEpisodeProgress(item.id, season, episode);

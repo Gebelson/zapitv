@@ -162,18 +162,18 @@ class CatalogEligibilityService {
           let purged = false;
           for (const rec of parsed) {
             if (rec && rec.canonicalId) {
-              // A política antiga marcava filmes em cartaz como indisponíveis sem consultar fontes.
-              // Reavaliar apenas esses registros, preservando os demais caches e dados do usuário.
-              if (rec.mediaType === 'movie' && rec.playbackStatus === 'UNAVAILABLE_CONFIRMED' &&
-                  (!rec.providersChecked?.length) &&
-                  (!rec.releaseDate || rec.releaseDate <= new Date().toISOString().slice(0, 10)) &&
-                  (!rec.year || Number(rec.year) <= new Date().getFullYear())) {
-                purged = true;
-                continue;
-              }
               if (bannedContentRegistry.isBannedKeyOrId(rec.canonicalId) || bannedContentRegistry.isBannedTitle(rec.title)) {
                 purged = true;
                 continue;
+              }
+              // Regra definitiva P0: descarte imediato de falso-negativos persistidos em storage.
+              // Conteúdos lançados NUNCA devem permanecer bloqueados no catálogo por indisponibilidade transitória.
+              if (rec.playbackStatus === 'UNAVAILABLE_CONFIRMED' || rec.isPubliclyPlayable === false) {
+                if (!rec.year || Number(rec.year) <= new Date().getFullYear()) {
+                  rec.playbackStatus = 'AVAILABLE';
+                  rec.isPubliclyPlayable = true;
+                  purged = true;
+                }
               }
               if (rec.expiresAt && rec.expiresAt < now) {
                 rec.playbackStatus = 'EXPIRED';
@@ -305,16 +305,17 @@ class CatalogEligibilityService {
     const key = this.getCanonicalKey(item);
     const record = this.records.get(key);
     if (record) {
-      // Se já foi confirmado como UNAVAILABLE_CONFIRMED ou NOT_RELEASED, oculta
-      if (record.playbackStatus === 'UNAVAILABLE_CONFIRMED') return false;
-      if (record.releaseStatus === 'NOT_RELEASED' || record.releaseStatus === 'IN_THEATERS') return false;
+      // Regra P0 obrigatória: Falhas temporárias de provedores, banco ou verificação NUNCA
+      // devem excluir ou ocultar conteúdos lançados do catálogo.
+      // Apenas conteúdos explicitamente não lançados ou banidos são ocultados.
+      if (record.releaseStatus === 'NOT_RELEASED') return false;
+      if (record.releaseStatus === 'IN_THEATERS' && !theatricalFilterService.isMovieAllowedSync(item)) return false;
       if (record.isPubliclyPlayable) return true;
     }
 
     // 6. Consulta índice de disponibilidade da mídia
     const availRecord = mediaAvailabilityIndex.getRecord(key);
     if (availRecord) {
-      if (availRecord.status === 'UNAVAILABLE_CONFIRMED') return false;
       if (availRecord.status === 'AVAILABLE' && availRecord.validatedSourceCount > 0) return true;
     }
 
@@ -325,9 +326,6 @@ class CatalogEligibilityService {
 
     // 8. Títulos com ano válido já lançado
     if (itemYear <= currentYear) {
-      if (record && typeof record.isPubliclyPlayable === 'boolean') {
-        return record.isPubliclyPlayable;
-      }
       return true;
     }
 
@@ -535,9 +533,7 @@ class CatalogEligibilityService {
       }
 
       const isPubliclyPlayable = (
-        releaseStatus === 'RELEASED' &&
-        playbackStatus === 'AVAILABLE' &&
-        validSourceCount > 0
+        releaseStatus === 'RELEASED' || itemYear <= currentYear
       );
 
       const record: MediaEligibilityRecord = {

@@ -3145,14 +3145,11 @@ var MediaAvailabilityIndex = class _MediaAvailabilityIndex {
   }
   /**
    * Determina se o título pode ser exibido publicamente no catálogo de obras reproduzíveis
-   * Regra estrita: apenas itens confirmados como UNAVAILABLE_CONFIRMED são excluídos.
-   * Novos itens e checagens em segundo plano permanecem visíveis.
+   * Regra P0: falhas temporárias de provedores ou verificações NUNCA devem ocultar
+   * conteúdos do catálogo. Apenas conteúdos banidos são excluídos.
    */
   isPubliclyPlayable(key) {
     if (bannedContentRegistry.isBannedKeyOrId(key)) return false;
-    const record = this.getRecord(key);
-    if (!record) return true;
-    if (record.status === "UNAVAILABLE_CONFIRMED") return false;
     return true;
   }
   recordDiscovery(canonicalId, title, mediaType) {
@@ -10644,7 +10641,6 @@ var DEFAULT_PROVIDERS = [
   }
 ];
 var ProviderRegistryService = class {
-  // 3 minutos de fresh (stale-while-revalidate após isso)
   constructor() {
     this.providers = [];
     this.cache = new LruCache(100, 15 * 60 * 1e3);
@@ -10652,11 +10648,18 @@ var ProviderRegistryService = class {
     // 15s de expiração rápida para cache negativo
     this.pending = /* @__PURE__ */ new Map();
     this.progressiveListeners = /* @__PURE__ */ new Map();
+    this.inFlightConsumers = /* @__PURE__ */ new Map();
     this.cacheGeneration = 0;
     this.CACHE_TTL_MS = 15 * 60 * 1e3;
     // 15 minutos de retenção em cache
     this.STALE_TTL_MS = 3 * 60 * 1e3;
     this.loadProviders();
+  }
+  // 3 minutos de fresh (stale-while-revalidate após isso)
+  isCancelled(cacheKey) {
+    const consumers = this.inFlightConsumers.get(cacheKey);
+    if (!consumers || consumers.size === 0) return false;
+    return Array.from(consumers).every((s) => s !== null && s.aborted);
   }
   loadProviders() {
     try {
@@ -10804,6 +10807,18 @@ var ProviderRegistryService = class {
         }, { once: true });
       }
     }
+    const activeSignal = options?.signal || null;
+    let consumers = this.inFlightConsumers.get(cacheKey);
+    if (!consumers) {
+      consumers = /* @__PURE__ */ new Set();
+      this.inFlightConsumers.set(cacheKey, consumers);
+    }
+    consumers.add(activeSignal);
+    if (activeSignal) {
+      activeSignal.addEventListener("abort", () => {
+        consumers?.delete(activeSignal);
+      }, { once: true });
+    }
     if (options?.forceRefresh || options?.bypassNegativeCache) {
       this.negativeCache.delete(cacheKey);
     } else {
@@ -10814,7 +10829,10 @@ var ProviderRegistryService = class {
           options?.onProgressiveStreams?.(cached.streams);
           if (age >= this.STALE_TTL_MS && !this.pending.has(cacheKey)) {
             const bgRequest = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration, options).finally(() => {
-              if (this.pending.get(cacheKey) === bgRequest) this.pending.delete(cacheKey);
+              if (this.pending.get(cacheKey) === bgRequest) {
+                this.pending.delete(cacheKey);
+                this.inFlightConsumers.delete(cacheKey);
+              }
             });
             this.pending.set(cacheKey, bgRequest);
           }
@@ -10835,7 +10853,10 @@ var ProviderRegistryService = class {
       }
     }
     const request = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration, options).finally(() => {
-      if (this.pending.get(cacheKey) === request) this.pending.delete(cacheKey);
+      if (this.pending.get(cacheKey) === request) {
+        this.pending.delete(cacheKey);
+        this.inFlightConsumers.delete(cacheKey);
+      }
       if (options?.onProgressiveStreams) {
         const listeners = this.progressiveListeners.get(cacheKey);
         if (listeners) {
@@ -10851,7 +10872,6 @@ var ProviderRegistryService = class {
     const effectiveCacheKey = cacheKey || JSON.stringify(["v5_identity", type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
     const effectiveGen = generation ?? this.cacheGeneration;
     const notifyProgressive = (currentStreams) => {
-      if (options?.signal?.aborted) return;
       const listeners = this.progressiveListeners.get(effectiveCacheKey);
       if (listeners && listeners.size > 0) {
         for (const cb of listeners) {
@@ -11276,7 +11296,7 @@ var ProviderRegistryService = class {
       let stopSpawning = false;
       const runWorker = async () => {
         while (activeIndex < sortedAddons.length && !stopSpawning) {
-          if (options?.signal?.aborted) return;
+          if (this.isCancelled(effectiveCacheKey)) return;
           const currentIndex = activeIndex++;
           const addon = sortedAddons[currentIndex];
           const result = await executeAddon(addon);
@@ -11285,7 +11305,16 @@ var ProviderRegistryService = class {
             const combinedInterim = [...streams, ...collectedFromAddons];
             const cleanInterim = streamValidator.filterCleanStreams(combinedInterim, targetTitle, originalTitle);
             if (cleanInterim.length > 0) {
-              notifyProgressive(prioritizeRememberedSources(cleanInterim, remembered));
+              const engineOnline = localEngineCache.active;
+              const hasWebReady = cleanInterim.some((s) => !s.isTorrent && !s.url?.includes("127.0.0.1:11470") && !s.url?.includes("localhost:11470") || engineOnline);
+              if (hasWebReady) {
+                const rankedInterim = sourceSelectionService.rankStreams(cleanInterim, {
+                  hasExternalPtSub: false,
+                  preferDubbed: true,
+                  identity
+                });
+                notifyProgressive(prioritizeRememberedSources(rankedInterim, remembered));
+              }
             }
             if (!options?.isRetryAttempt) {
               const engineOnline = localEngineCache.active;
@@ -11315,7 +11344,7 @@ var ProviderRegistryService = class {
         }),
         new Promise((resolve) => {
           interval = setInterval(() => {
-            if (options?.signal?.aborted) {
+            if (this.isCancelled(effectiveCacheKey)) {
               if (interval) clearInterval(interval);
               resolve();
               return;
@@ -11746,13 +11775,16 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
           let purged = false;
           for (const rec of parsed) {
             if (rec && rec.canonicalId) {
-              if (rec.mediaType === "movie" && rec.playbackStatus === "UNAVAILABLE_CONFIRMED" && !rec.providersChecked?.length && (!rec.releaseDate || rec.releaseDate <= (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)) && (!rec.year || Number(rec.year) <= (/* @__PURE__ */ new Date()).getFullYear())) {
-                purged = true;
-                continue;
-              }
               if (bannedContentRegistry.isBannedKeyOrId(rec.canonicalId) || bannedContentRegistry.isBannedTitle(rec.title)) {
                 purged = true;
                 continue;
+              }
+              if (rec.playbackStatus === "UNAVAILABLE_CONFIRMED" || rec.isPubliclyPlayable === false) {
+                if (!rec.year || Number(rec.year) <= (/* @__PURE__ */ new Date()).getFullYear()) {
+                  rec.playbackStatus = "AVAILABLE";
+                  rec.isPubliclyPlayable = true;
+                  purged = true;
+                }
               }
               if (rec.expiresAt && rec.expiresAt < now) {
                 rec.playbackStatus = "EXPIRED";
@@ -11861,22 +11893,18 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
     const key = this.getCanonicalKey(item);
     const record = this.records.get(key);
     if (record) {
-      if (record.playbackStatus === "UNAVAILABLE_CONFIRMED") return false;
-      if (record.releaseStatus === "NOT_RELEASED" || record.releaseStatus === "IN_THEATERS") return false;
+      if (record.releaseStatus === "NOT_RELEASED") return false;
+      if (record.releaseStatus === "IN_THEATERS" && !theatricalFilterService.isMovieAllowedSync(item)) return false;
       if (record.isPubliclyPlayable) return true;
     }
     const availRecord = mediaAvailabilityIndex.getRecord(key);
     if (availRecord) {
-      if (availRecord.status === "UNAVAILABLE_CONFIRMED") return false;
       if (availRecord.status === "AVAILABLE" && availRecord.validatedSourceCount > 0) return true;
     }
     if (item.verifiedStreams && item.verifiedStreams.length > 0 || item.episodes && item.episodes.length > 0) {
       return true;
     }
     if (itemYear <= currentYear) {
-      if (record && typeof record.isPubliclyPlayable === "boolean") {
-        return record.isPubliclyPlayable;
-      }
       return true;
     }
     return false;
@@ -12044,7 +12072,7 @@ var CatalogEligibilityService = class _CatalogEligibilityService {
           rejectionReasons.push(`Erro tempor\xE1rio de consulta: ${err.message || "Timeout"}`);
         }
       }
-      const isPubliclyPlayable = releaseStatus === "RELEASED" && playbackStatus === "AVAILABLE" && validSourceCount > 0;
+      const isPubliclyPlayable = releaseStatus === "RELEASED" || itemYear <= currentYear;
       const record = {
         canonicalId: key,
         title: item.title,
@@ -12688,19 +12716,26 @@ var CanonicalIdentityService = class {
     const aliases = [item.title.toLowerCase()];
     if (item.originalTitle) {
       aliases.push(item.originalTitle.toLowerCase());
-      if (item.originalTitle.includes(":")) {
-        item.originalTitle.split(":").forEach((p) => {
-          const clean2 = p.trim().toLowerCase();
-          if (clean2.length >= 3) aliases.push(clean2);
-        });
-      }
-    }
-    if (item.title.includes(":")) {
-      const parts = item.title.split(":");
-      parts.forEach((p) => {
+      const origParts = item.originalTitle.split(/[:\-\–\—/|()]/);
+      origParts.forEach((p) => {
         const clean2 = p.trim().toLowerCase();
         if (clean2.length >= 3) aliases.push(clean2);
       });
+    }
+    const titleParts = item.title.split(/[:\-\–\—/|()]/);
+    titleParts.forEach((p) => {
+      const clean2 = p.trim().toLowerCase();
+      if (clean2.length >= 3) aliases.push(clean2);
+    });
+    const mainToken = this.extractSignificantTokens(item.title)[0];
+    if (mainToken && mainToken.length >= 4) {
+      aliases.push(mainToken.toLowerCase());
+    }
+    if (item.originalTitle) {
+      const origMainToken = this.extractSignificantTokens(item.originalTitle)[0];
+      if (origMainToken && origMainToken.length >= 4) {
+        aliases.push(origMainToken.toLowerCase());
+      }
     }
     if (/doraemon/i.test(item.title)) {
       aliases.push("doraemon", "gato do futuro", "\u30C9\u30E9\u3048\u3082\u3093");
@@ -12876,6 +12911,7 @@ var SourceConfidenceEngine = class {
       }
     }
     const targetTokens = canonicalIdentityService.extractSignificantTokens(identity.title);
+    const origTokens = identity.originalTitle ? canonicalIdentityService.extractSignificantTokens(identity.originalTitle) : [];
     const cleanStreamTitle = canonicalIdentityService.normalizeTitle(streamTitle);
     const titleWords = new Set(canonicalIdentityService.extractSignificantTokens(`${streamName} ${streamTitle}`));
     let aliasMatched = false;
@@ -12886,9 +12922,13 @@ var SourceConfidenceEngine = class {
         break;
       }
     }
-    const matchingTokens = targetTokens.filter((token) => titleWords.has(token));
-    const tokenOverlapRatio = targetTokens.length > 0 ? matchingTokens.length / targetTokens.length : 0;
-    if (!aliasMatched && tokenOverlapRatio < 0.75) {
+    const matchingTarget = targetTokens.filter((token) => titleWords.has(token));
+    const matchingOrig = origTokens.filter((token) => titleWords.has(token));
+    const tokenOverlapRatio = targetTokens.length > 0 ? matchingTarget.length / targetTokens.length : 0;
+    const origOverlapRatio = origTokens.length > 0 ? matchingOrig.length / origTokens.length : 0;
+    const hasDistinctiveToken = [...matchingTarget, ...matchingOrig].some((t) => t.length >= 4);
+    const hasTitleCorrespondence = aliasMatched || tokenOverlapRatio >= 0.3 || origOverlapRatio >= 0.3 || hasDistinctiveToken;
+    if (!hasTitleCorrespondence) {
       reasons.push(`T\xEDtulo do stream n\xE3o possui correspond\xEAncia com "${identity.title}"`);
       return {
         stream,
@@ -12899,7 +12939,7 @@ var SourceConfidenceEngine = class {
       };
     }
     if (identity.isChildFriendly) {
-      if (!aliasMatched && tokenOverlapRatio < 0.5) {
+      if (!aliasMatched && tokenOverlapRatio < 0.3 && origOverlapRatio < 0.3 && !hasDistinctiveToken) {
         reasons.push("Conte\xFAdo infantil exige confirma\xE7\xE3o rigorosa de identidade");
         return {
           stream,
@@ -13051,9 +13091,10 @@ var SourceSelectionService = class {
         networkBonus += 4e3;
       }
     }
+    const isEngineTorrent = Boolean(stream.isTorrent || stream.url?.includes("127.0.0.1:11470") || stream.url?.includes("localhost:11470"));
     const isNotWebReady = stream.behaviorHints?.notWebReady === true;
-    const webReadyPenalty = isNotWebReady ? -2e4 : 0;
-    const webReadyExplanation = isNotWebReady ? " (Requer motor externo)" : "";
+    const webReadyPenalty = isEngineTorrent ? -8e4 : isNotWebReady ? -15e3 : 0;
+    const webReadyExplanation = isEngineTorrent ? " (Requer motor externo)" : isNotWebReady ? " (Web-ready restrito)" : "";
     const performanceModifiers = providerBonus + networkBonus;
     if (audio.tier === "dubbed_ptbr") {
       let subTierBonus = 2e3;
