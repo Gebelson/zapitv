@@ -45,6 +45,7 @@ import { playbackOptimizerService } from '../../core/playback/PlaybackOptimizerS
 import { mediaAvailabilityIndex } from '../../core/catalog/MediaAvailabilityIndex';
 import { watchPartyService } from '../../core/watchparty/WatchPartyService';
 import { WatchPartyOverlay } from '../watchparty/WatchPartyOverlay';
+import { RoomLifecycleState } from '../../core/watchparty/watchPartyTypes';
 
 import { OfflineSubtitleTrack } from '../../core/offline/offlineTypes';
 import { VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../../core/providers/sourceVerificationService';
@@ -301,10 +302,42 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (isBroadcastGuest) {
       return false;
     }
-    // Em Watch Party sincronizada (convidado), o vídeo inicia diretamente na linha do tempo do anfitrião
-    if (watchPartyService.isConnected && !watchPartyService.isHost()) {
-      return false;
+    // Em Watch Party sincronizada, a vinheta é compartilhada por todos os participantes
+    if (watchPartyService.isConnected) {
+      const roomState = watchPartyService.getRoomState();
+      const lifecycle = roomState?.lifecycleState || watchPartyService.getLifecycleState();
+
+      // Se a sala já iniciou o conteúdo principal ou pausou durante o filme, não repete a vinheta (entrada tardia)
+      if (lifecycle === 'PLAYING_CONTENT' || lifecycle === 'PAUSED' || lifecycle === 'ENDED') {
+        return false;
+      }
+
+      // Se o anfitrião já transmitiu posição avançada do filme (> 2 segundos), entrar direto no conteúdo
+      const lastHostState = watchPartyService.getLastPlaybackState();
+      if (lastHostState) {
+        const expectedPos = watchPartyService.calculateExpectedPosition(lastHostState);
+        if (expectedPos > 2) {
+          return false;
+        }
+      }
+
+      // Se a sala está em PLAYING_INTRO, verifica se a vinheta ainda está em andamento
+      if (lifecycle === 'PLAYING_INTRO') {
+        const startTs = roomState?.introStartTimestamp || 0;
+        const dur = roomState?.introDuration || 5.0;
+        if (startTs > 0) {
+          const elapsed = (Date.now() - startTs) / 1000;
+          if (elapsed >= dur) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      // Em LOBBY, PREPARING ou READY, a vinheta deve ser exibida ao iniciar
+      return true;
     }
+
     if (isOfflineMode) {
       return false;
     }
@@ -329,6 +362,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const [allSourcesFailed, setAllSourcesFailed] = useState(false);
   const [failureCategory, setFailureCategory] = useState<'NO_SOURCES_FOUND' | 'VERIFICATION_ERROR' | 'PLAYBACK_FAILURE' | 'UNAVAILABLE'>('UNAVAILABLE');
   const [userSkippedIntro, setUserSkippedIntro] = useState(false);
+  const [isIntroAutoplayBlocked, setIsIntroAutoplayBlocked] = useState(false);
 
   const hasStartedIntroRef = useRef(false);
   const isIntroEndedRef = useRef(!shouldStartWithIntro);
@@ -826,6 +860,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
     onIntroCompleted?.();
 
+    if (watchPartyService.isConnected && watchPartyService.isHost()) {
+      watchPartyService.setLifecycleState('PLAYING_CONTENT');
+      watchPartyService.updatePlaybackState(0, true, 1.0, duration);
+    }
+
     // 1. Inicia a reprodução do vídeo principal sob a camada da intro com áudio sincronizado
     video.muted = isMuted;
     video.volume = volume;
@@ -876,7 +915,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         } catch {}
       }
     }, 700);
-  }, [playbackSessionId, onIntroCompleted]);
+  }, [playbackSessionId, onIntroCompleted, duration]);
 
   // Quando o vídeo da intro chega ao final
   const handleIntroEnded = useCallback(() => {
@@ -897,6 +936,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Quando o usuário clica em "Pular Intro"
   const handleSkipIntro = useCallback(() => {
     if (showNonDubbedPromptRef.current) return;
+
+    if (watchPartyService.isConnected && !watchPartyService.isHost()) {
+      if (!watchPartyService.canLocalControl('canSkip')) {
+        console.warn('[ZapiPlayer] Apenas o anfitrião tem permissão para pular a vinheta.');
+        return;
+      }
+    }
+
     setUserSkippedIntro(true);
     userSkippedIntroRef.current = true;
 
@@ -967,18 +1014,65 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       } catch {}
     }
 
-    if (introVideoRef.current) {
+    const startLocalIntro = (seekTime = 0) => {
+      if (!introVideoRef.current) return;
       try {
-        introVideoRef.current.currentTime = 0;
+        introVideoRef.current.currentTime = seekTime;
         introVideoRef.current.muted = isMuted;
         introVideoRef.current.volume = volume;
         introVideoRef.current.play().then(() => {
           setIsPlaying(true);
-        }).catch(() => handleIntroEnded());
+        }).catch((err) => {
+          if (err && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
+            console.warn('[ZapiPlayer] Autoplay de áudio da intro bloqueado pelo navegador. Exibindo solicitação de áudio.');
+            setIsIntroAutoplayBlocked(true);
+            if (introVideoRef.current) {
+              introVideoRef.current.muted = true;
+              introVideoRef.current.play().then(() => {
+                setIsPlaying(true);
+              }).catch(() => {});
+            }
+          } else {
+            handleIntroEnded();
+          }
+        });
       } catch {
         handleIntroEnded();
       }
+    };
+
+    if (watchPartyService.isConnected) {
+      const roomState = watchPartyService.getRoomState();
+      const startTimestamp = roomState?.introStartTimestamp;
+      const introDuration = roomState?.introDuration || 5.0;
+
+      if (startTimestamp) {
+        const now = Date.now();
+        const diffMs = startTimestamp - now;
+
+        if (diffMs > 25) {
+          // Início sincronizado no futuro (ex: +350ms para compensar trânsito de rede)
+          setTimeout(() => {
+            if (isMountedRef.current && isPlayingIntroRef.current) {
+              startLocalIntro(0);
+            }
+          }, diffMs);
+          return;
+        } else {
+          // Vinheta já iniciada (ex: participante entrou durante a intro)
+          const elapsed = (now - startTimestamp) / 1000;
+          if (elapsed >= introDuration) {
+            handleIntroEnded();
+            return;
+          } else if (elapsed > 0.1) {
+            startLocalIntro(elapsed);
+            return;
+          }
+        }
+      }
     }
+
+    startLocalIntro(0);
   }, [
     isLoadingStreams,
     allSourcesFailed,
@@ -1343,10 +1437,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
     // Entrada tardia / reconexão na Watch Party: o host é a autoridade absoluta
     if (watchPartyService.isConnected && !watchPartyService.isHost()) {
+      const roomState = watchPartyService.getRoomState();
+      const lifecycle = roomState?.lifecycleState || watchPartyService.getLifecycleState();
       const hostState = watchPartyService.getLastPlaybackState();
+
       if (hostState) {
         const expectedPos = watchPartyService.calculateExpectedPosition(hostState);
-        if (expectedPos > 0) {
+        // Só encerra a vinheta prematuramente se a sala já estiver reproduzindo o conteúdo principal (> 2 segundos)
+        if ((lifecycle === 'PLAYING_CONTENT' || lifecycle === 'PAUSED' || lifecycle === 'ENDED') && expectedPos > 2) {
           savedTime = expectedPos;
           setIsPlayingIntro(false);
           setIsIntroEnded(true);
@@ -1535,14 +1633,17 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       watchPartyService.executeRemoteActionSafely(() => {
         isHandlingRemoteSyncRef.current = true;
 
-        // Se o convidado ainda estiver com a vinheta/intro aberta, finaliza imediatamente para alinhar ao host
+        // Se o participante ainda estiver assistindo à vinheta/intro:
         if (isPlayingIntroRef.current) {
-          setIsPlayingIntro(false);
-          setIsIntroEnded(true);
-          isPlayingIntroRef.current = false;
-          if (introVideoRef.current) {
-            try { introVideoRef.current.pause(); } catch {}
+          const roomState = watchPartyService.getRoomState();
+          const lifecycle = roomState?.lifecycleState || watchPartyService.getLifecycleState();
+          // Não interrompe a vinheta se a sala estiver em PLAYING_INTRO ou se o filme estiver apenas no início (<= 1.5s)
+          if (lifecycle === 'PLAYING_INTRO' && sync.positionSeconds <= 1.5) {
+            return;
           }
+          // Caso contrário (ex: host pulou a vinheta ou já avançou no filme > 1.5s), transiciona suavemente para o filme
+          transitionFromIntroToMedia();
+          return;
         }
 
         // Posição temporal esperada considerando latência de trânsito e relógio (Disney+ GroupWatch style)
@@ -1598,11 +1699,33 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       }
     });
 
+    const unsubLifecycle = watchPartyService.on('lifecycle_changed', (state: RoomLifecycleState) => {
+      if (state === 'PLAYING_CONTENT') {
+        if (isPlayingIntroRef.current && !isIntroTransitioningRef.current) {
+          transitionFromIntroToMedia();
+        }
+      } else if (state === 'PLAYING_INTRO') {
+        if (!hasStartedIntroRef.current && isMediaReadyRef.current) {
+          startIntroIfReady();
+        }
+      }
+    });
+
+    const unsubTransmission = watchPartyService.onTransmissionStart((data: any) => {
+      if (data?.lifecycleState === 'PLAYING_INTRO') {
+        if (!hasStartedIntroRef.current && isMediaReadyRef.current) {
+          startIntroIfReady();
+        }
+      }
+    });
+
     return () => {
       unsubPlayback();
       unsubEpisode();
+      unsubLifecycle();
+      unsubTransmission();
     };
-  }, [onNextEpisode]);
+  }, [onNextEpisode, transitionFromIntroToMedia, startIntroIfReady]);
 
   // Conexão do Fluxo Audiovisual do Anfitrião via WebRTC para Convidados
   useEffect(() => {
@@ -3988,6 +4111,31 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                 className="w-full h-full object-cover bg-black"
               />
 
+              {/* Banner de Autorização de Áudio se o navegador tiver bloqueado som da intro */}
+              {isIntroAutoplayBlocked && (
+                <div 
+                  onClick={() => {
+                    if (introVideoRef.current) {
+                      introVideoRef.current.muted = false;
+                      introVideoRef.current.volume = volume;
+                      introVideoRef.current.play().catch(() => {});
+                    }
+                    setIsIntroAutoplayBlocked(false);
+                  }}
+                  className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm cursor-pointer p-4 text-center"
+                >
+                  <div className="p-4 bg-[#007df7]/20 border border-[#007df7]/50 rounded-2xl flex flex-col items-center gap-3 shadow-2xl max-w-sm">
+                    <Volume2 className="w-8 h-8 text-[#007df7] animate-bounce" />
+                    <span className="text-white text-sm font-bold">
+                      Clique para ativar o áudio da vinheta
+                    </span>
+                    <span className="text-gray-300 text-xs">
+                      Seu navegador pausou o som da introdução sincronizada.
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Indicador discreto caso a intro termine e ainda esteja aguardando o carregamento da mídia */}
               {(isIntroEnded || userSkippedIntro) && !isMediaReady && (
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center z-25 animate-in fade-in duration-300 pointer-events-none select-none">
@@ -4047,15 +4195,17 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
           {/* Botão Pular Intro durante a vinheta institucional */}
           {isPlayingIntro && (!isIntroEnded || !isMediaReady) && !showNonDubbedPrompt && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSkipIntro();
-              }}
-              className="absolute bottom-24 sm:bottom-28 right-4 sm:right-8 z-50 flex items-center gap-2 px-5 py-2.5 bg-black/70 hover:bg-black/90 active:scale-95 text-white rounded-full border border-white/20 backdrop-blur-md text-xs font-bold uppercase tracking-wider transition-all hover:scale-105 shadow-2xl cursor-pointer"
-            >
-              <span>Pular Intro</span> <SkipForward className="w-3.5 h-3.5" />
-            </button>
+            (!watchPartyService.isConnected || watchPartyService.isHost() || watchPartyService.canLocalControl('canSkip')) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSkipIntro();
+                }}
+                className="absolute bottom-24 sm:bottom-28 right-4 sm:right-8 z-50 flex items-center gap-2 px-5 py-2.5 bg-black/70 hover:bg-black/90 active:scale-95 text-white rounded-full border border-white/20 backdrop-blur-md text-xs font-bold uppercase tracking-wider transition-all hover:scale-105 shadow-2xl cursor-pointer"
+              >
+                <span>Pular Intro</span> <SkipForward className="w-3.5 h-3.5" />
+              </button>
+            )
           )}
 
           {/* Card Flutuante de Reprodução Automática (Contagem Regressiva de 10s) */}

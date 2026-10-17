@@ -152,10 +152,11 @@ describe('ZapiTV — Watch Party Host Broadcast (WebRTC) Suite', () => {
         hostPeerId: 'host-peer-123',
         timestamp: Date.now(),
         media: sampleMedia,
-        mode: 'host_broadcast'
+        mode: 'host_broadcast',
+        lifecycleState: 'PLAYING_INTRO'
       }, 'host-peer-123');
 
-      expect(service.getLifecycleState()).toBe('PLAYING');
+      expect(service.getLifecycleState()).toBe('PLAYING_INTRO');
       expect(service.isHostBroadcastMode()).toBe(true);
       expect(transmissionStartedPayload?.mode).toBe('host_broadcast');
     });

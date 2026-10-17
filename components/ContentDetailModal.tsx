@@ -1242,6 +1242,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
             episode={hasEpisodes ? (currentEpisodeParams?.episode || playbackContinuity.nextEpisodeNumber || 1) : undefined}
             onStartWatchPartyPlayback={(targetItem, targetSeason, targetEpisode) => {
               setShowWatchPartyModal(false);
+              setSessionIntroPlayed(false);
               startPlayback(targetSeason, targetEpisode, 'manual_start');
             }}
           />

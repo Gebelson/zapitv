@@ -47,6 +47,7 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedTransmissionMode, setSelectedTransmissionMode] = useState<TransmissionMode>('host_broadcast');
+  const [isMediaAuthorized, setIsMediaAuthorized] = useState(false);
 
   // Estado da Sala de Espera
   const [roomState, setRoomState] = useState(() => watchPartyService.getRoomState());
@@ -1017,16 +1018,51 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
                   )}
                 </div>
               ) : (
-                <div className="p-3.5 bg-[#007df7]/10 border border-[#007df7]/30 rounded-2xl text-center space-y-1">
-                  <div className="inline-flex items-center gap-2 text-cyan-400 font-bold text-xs">
-                    <Radio className="w-4 h-4 animate-pulse" />
-                    <span>Aguardando o anfitrião iniciar a transmissão...</span>
+                <div className="space-y-2.5">
+                  <div className="p-3.5 bg-[#007df7]/10 border border-[#007df7]/30 rounded-2xl text-center space-y-1">
+                    <div className="inline-flex items-center gap-2 text-cyan-400 font-bold text-xs">
+                      <Radio className="w-4 h-4 animate-pulse" />
+                      <span>Aguardando o anfitrião iniciar a transmissão...</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">
+                      {watchPartyService.roomInfo?.transmissionMode === 'host_broadcast'
+                        ? 'Modo: Transmissão do Host (WebRTC). Você assistirá ao fluxo direto do anfitrião.'
+                        : 'Modo: Sincronizado. A intro do ZapiTV e o vídeo começarão juntos para todos.'}
+                    </p>
                   </div>
-                  <p className="text-[11px] text-gray-400">
-                    {watchPartyService.roomInfo?.transmissionMode === 'host_broadcast'
-                      ? 'Modo: Transmissão do Host (WebRTC). Você assistirá ao fluxo direto do anfitrião.'
-                      : 'Modo: Sincronização. O vídeo começará sincronizado assim que o anfitrião der o sinal.'}
-                  </p>
+
+                  {/* Pré-autorização explícita de áudio e vídeo pelo convidado no lobby */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+                        if (AudioCtx) {
+                          const ctx = new AudioCtx();
+                          ctx.resume().catch(() => {});
+                        }
+                      } catch {}
+                      setIsMediaAuthorized(true);
+                      watchPartyService.reportLocalStatus('ready');
+                    }}
+                    className={`w-full py-2.5 px-4 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                      isMediaAuthorized
+                        ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 cursor-default'
+                        : 'bg-white/5 hover:bg-white/10 border-white/20 text-white cursor-pointer active:scale-98'
+                    }`}
+                  >
+                    {isMediaAuthorized ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-400" />
+                        <span>Áudio e vídeo autorizados para início sincronizado</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="w-4 h-4 text-[#007df7]" />
+                        <span>Clique aqui para autorizar reprodução com som no navegador</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
             </div>

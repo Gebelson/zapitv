@@ -9,7 +9,16 @@ import { ContentType } from '../../../types';
 
 export type ParticipantStatus = 'connected' | 'buffering' | 'ready' | 'disconnected';
 
-export type RoomLifecycleState = 'LOBBY' | 'PREPARING' | 'READY' | 'STARTING' | 'PLAYING' | 'PAUSED' | 'ENDED';
+export type RoomLifecycleState =
+  | 'LOBBY'
+  | 'PREPARING'
+  | 'READY'
+  | 'PLAYING_INTRO'
+  | 'PLAYING_CONTENT'
+  | 'PAUSED'
+  | 'ENDED'
+  | 'STARTING'
+  | 'PLAYING';
 
 export interface ParticipantPermissions {
   canPlayPause: boolean;
@@ -98,6 +107,8 @@ export interface WatchPartyRoomInfo {
   lifecycleState: RoomLifecycleState;
   transmissionMode?: TransmissionMode;
   permissions: WatchPartyPermissions;
+  introStartTimestamp?: number;
+  introDuration?: number;
 }
 
 export interface PeerSyncMessage {
@@ -117,6 +128,7 @@ export interface PeerParticipantStateMessage {
   isAudioMuted?: boolean;
   isSpeaking?: boolean;
   isAdminMuted?: boolean;
+  isMediaReady?: boolean;
 }
 
 export interface PeerEpisodeChangeMessage {
@@ -145,6 +157,9 @@ export interface PeerStartTransmissionMessage {
   timestamp: number;
   media: WatchPartyMediaMetadata;
   mode?: TransmissionMode;
+  lifecycleState?: RoomLifecycleState;
+  introStartTimestamp?: number;
+  introDuration?: number;
 }
 
 export interface PeerPermissionsUpdateMessage {

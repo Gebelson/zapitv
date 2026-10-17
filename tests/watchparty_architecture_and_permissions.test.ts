@@ -212,13 +212,13 @@ describe('ZapiTV — Watch Party Architecture & Permissions Suite', () => {
       });
 
       service.startTransmission();
-      expect(service.getLifecycleState()).toBe('PLAYING');
-      expect(service.getRoomState().lifecycleState).toBe('PLAYING');
+      expect(service.getLifecycleState()).toBe('PLAYING_INTRO');
+      expect(service.getRoomState().lifecycleState).toBe('PLAYING_INTRO');
       expect(transport.broadcastedTransmissions.length).toBe(1);
       expect(transmissionFired).toBe(true);
     });
 
-    it('quando o convidado recebe start_transmission do host, transiciona imediatamente para PLAYING', async () => {
+    it('quando o convidado recebe start_transmission do host, transiciona imediatamente para PLAYING_INTRO', async () => {
       transport.selfId = 'guest-peer-456';
       await service.joinRoom('sala-123', 'Guest');
       service.roomInfo!.hostPeerId = 'host-peer-123';
@@ -232,10 +232,11 @@ describe('ZapiTV — Watch Party Architecture & Permissions Suite', () => {
         type: 'start_transmission',
         hostPeerId: 'host-peer-123',
         timestamp: Date.now(),
+        lifecycleState: 'PLAYING_INTRO',
         media: WatchPartyService.normalizeMedia({ id: 'anime-frieren', title: 'Frieren', type: 'anime' })
       }, 'host-peer-123');
 
-      expect(service.getLifecycleState()).toBe('PLAYING');
+      expect(service.getLifecycleState()).toBe('PLAYING_INTRO');
       expect(guestTransmissionFired).toBe(true);
     });
   });

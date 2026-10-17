@@ -206,6 +206,8 @@ export class WatchPartyService {
       permissions: this.permissions,
       hostPeerId: this.currentRoom?.hostPeerId || '',
       participants: list,
+      introStartTimestamp: this.currentRoom?.introStartTimestamp,
+      introDuration: this.currentRoom?.introDuration,
       localParticipant: {
         ...selfP,
         id: this.transport.selfId,
@@ -657,11 +659,23 @@ export class WatchPartyService {
           });
 
           this.notify('room_announced', this.currentRoom);
+          this.notify('lifecycle_changed', this.lifecycleState);
           this.notify('permissions_updated', this.permissions);
           this.notify('state_changed', this.getRoomState());
 
-          if (this.lifecycleState === 'PLAYING' || this.lifecycleState === 'STARTING') {
-            this.notify('transmission_started', { media: this.currentRoom.media, mode: this.currentRoom.transmissionMode || 'source' });
+          if (
+            this.lifecycleState === 'PLAYING_INTRO' ||
+            this.lifecycleState === 'PLAYING_CONTENT' ||
+            this.lifecycleState === 'PLAYING' ||
+            this.lifecycleState === 'STARTING'
+          ) {
+            this.notify('transmission_started', {
+              media: this.currentRoom.media,
+              mode: this.currentRoom.transmissionMode || 'source',
+              lifecycleState: this.lifecycleState,
+              startTimestamp: this.currentRoom.introStartTimestamp,
+              introDuration: this.currentRoom.introDuration
+            });
           }
         }
       },
@@ -670,15 +684,24 @@ export class WatchPartyService {
         if (this.currentRoom && this.currentRoom.hostPeerId && senderId !== this.currentRoom.hostPeerId) {
           return;
         }
-        this.lifecycleState = 'PLAYING';
+        const state: RoomLifecycleState = message.lifecycleState || 'PLAYING_INTRO';
+        this.lifecycleState = state;
         if (this.currentRoom) {
-          this.currentRoom.lifecycleState = 'PLAYING';
+          this.currentRoom.lifecycleState = state;
           this.currentRoom.transmissionMode = message.mode || 'source';
+          this.currentRoom.introStartTimestamp = message.introStartTimestamp || message.timestamp;
+          this.currentRoom.introDuration = message.introDuration || 5.0;
           if (message.media) {
             this.currentRoom.media = WatchPartyService.normalizeMedia(message.media);
           }
         }
-        this.notify('transmission_started', { media: this.currentRoom?.media, mode: message.mode || 'source' });
+        this.notify('transmission_started', {
+          media: this.currentRoom?.media,
+          mode: message.mode || 'source',
+          lifecycleState: state,
+          startTimestamp: this.currentRoom?.introStartTimestamp,
+          introDuration: this.currentRoom?.introDuration
+        });
         this.notify('state_changed', this.getRoomState());
       },
 
@@ -1618,23 +1641,57 @@ export class WatchPartyService {
       return;
     }
 
-    this.lifecycleState = 'PLAYING';
-    this.currentRoom.lifecycleState = 'PLAYING';
+    const startTimestamp = Date.now() + 350;
+    const introDuration = 5.0;
+
+    this.lifecycleState = 'PLAYING_INTRO';
+    this.currentRoom.lifecycleState = 'PLAYING_INTRO';
     this.currentRoom.transmissionMode = mode;
+    this.currentRoom.introStartTimestamp = startTimestamp;
+    this.currentRoom.introDuration = introDuration;
 
     const msg: PeerStartTransmissionMessage = {
       type: 'start_transmission',
       hostPeerId: this.transport.selfId,
-      timestamp: Date.now(),
+      timestamp: startTimestamp,
       media: this.currentRoom.media,
-      mode
+      mode,
+      lifecycleState: 'PLAYING_INTRO',
+      introStartTimestamp: startTimestamp,
+      introDuration
     };
 
     if (this.transport.broadcastStartTransmission) {
       this.transport.broadcastStartTransmission(msg);
     }
 
-    this.notify('transmission_started', { media: this.currentRoom.media, mode });
+    this.transport.broadcastRoomAnnouncement({
+      type: 'room_announcement',
+      roomInfo: this.currentRoom
+    });
+
+    this.notify('transmission_started', {
+      media: this.currentRoom.media,
+      mode,
+      lifecycleState: 'PLAYING_INTRO',
+      startTimestamp,
+      introDuration
+    });
+    this.notify('state_changed', this.getRoomState());
+  }
+
+  public setLifecycleState(state: RoomLifecycleState): void {
+    this.lifecycleState = state;
+    if (this.currentRoom) {
+      this.currentRoom.lifecycleState = state;
+    }
+    if (this.transport.isHost && this.currentRoom) {
+      this.transport.broadcastRoomAnnouncement({
+        type: 'room_announcement',
+        roomInfo: this.currentRoom
+      });
+    }
+    this.notify('lifecycle_changed', state);
     this.notify('state_changed', this.getRoomState());
   }
 
@@ -1831,9 +1888,16 @@ export class WatchPartyService {
     return this.subscribe(fn);
   }
 
-  public onTransmissionStart(callback: (data: { media?: WatchPartyMediaMetadata }) => void): () => void {
+  public onTransmissionStart(callback: (data: { media?: WatchPartyMediaMetadata; mode?: TransmissionMode; lifecycleState?: RoomLifecycleState; startTimestamp?: number; introDuration?: number }) => void): () => void {
     const fn: WatchPartyEventListener = (event, data) => {
       if (event === 'transmission_started') callback(data);
+    };
+    return this.subscribe(fn);
+  }
+
+  public onLifecycleChange(callback: (state: RoomLifecycleState) => void): () => void {
+    const fn: WatchPartyEventListener = (event, data) => {
+      if (event === 'lifecycle_changed') callback(data);
     };
     return this.subscribe(fn);
   }
