@@ -20,16 +20,18 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem(TOKEN_KEY);
   const response = await fetch(`${BASE}${path}`, {
     ...init,
+    targetAddressSpace: 'local',
     headers: { ...(init.body ? { 'content-type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers },
     signal: init.signal || AbortSignal.timeout(5000),
     cache: 'no-store'
-  });
+  } as RequestInit);
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || `Helper HTTP ${response.status}`);
   return data as T;
 }
 
 export const helperClient = {
+  hasStoredToken(): boolean { return Boolean(localStorage.getItem(TOKEN_KEY)); },
   async probe(): Promise<boolean> {
     try { await request('/health'); return true; } catch { return false; }
   },

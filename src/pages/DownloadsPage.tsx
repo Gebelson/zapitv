@@ -71,7 +71,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
         } catch (error) { if (alive) setHelperError(error instanceof Error ? error.message : 'Falha no Helper.'); }
       }
     };
-    void refresh();
+    if (helperConnected || helperClient.hasStoredToken() || (location.hostname === 'localhost' || location.hostname === '127.0.0.1')) void refresh();
     const timer = helperConnected ? setInterval(refresh, 4000) : null;
     return () => { alive = false; if (timer) clearInterval(timer); };
   }, [helperConnected]);
@@ -182,8 +182,8 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
       <section className={`mb-6 rounded-3xl border p-4 ${isDarkMode ? 'border-white/10 bg-[#0f121a] text-white' : 'border-gray-200 bg-white text-gray-900'}`} aria-label="ZapiTV Helper">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h3 className="text-sm font-bold">ZapiTV Helper <span className="text-xs font-normal text-gray-400">{helperConnected ? 'conectado' : helperRunning ? 'aguardando pareamento' : 'não encontrado'}</span></h3>
-            <p className="text-xs text-gray-400 mt-1">Downloads locais autorizados ficam no seu computador. O Helper é opcional.</p>
+            <h3 className="text-sm font-bold">ZapiTV Helper <span className="text-xs font-normal text-gray-400">{helperConnected ? 'conectado' : helperRunning ? 'aguardando pareamento' : 'desconectado'}</span></h3>
+            <p className="text-xs text-gray-400 mt-1">Downloads locais autorizados ficam no seu computador. Para conectar no Chrome/Edge, permita o acesso à rede local quando o navegador solicitar.</p>
           </div>
           {!helperRunning && <div className="flex gap-2"><a href="/downloads/zapitv-helper-windows.zip" download className="rounded-xl bg-white/10 px-3 py-2 text-xs font-bold hover:bg-white/15">Baixar Helper para Windows</a><button type="button" onClick={async () => setHelperRunning(await helperClient.probe())} className="rounded-xl bg-white/10 px-3 py-2 text-xs">Verificar novamente</button></div>}
           {helperConnected && <button type="button" onClick={async () => { await helperClient.disconnect(); setHelperConnected(false); setHelperJobs([]); setHelperLibrary([]); }} className="rounded-xl bg-white/10 px-3 py-2 text-xs">Desconectar</button>}
