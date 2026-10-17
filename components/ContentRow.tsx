@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Edit2, Trash2 } from 'lucide-react';
 import { ContentItem } from '../types';
 import ContentCard from './ContentCard';
 import { deduplicateContentItems } from '../src/core/catalog/catalogDeduplication';
+import { uiSoundService } from '../src/core/audio/uiSoundService';
 
 interface ContentRowProps {
   title: string;
@@ -56,6 +57,8 @@ const ContentRow: React.FC<ContentRowProps> = ({
   const isDown = useRef(false);
   const lastX = useRef(0);
   const startX = useRef(0); // Armazena a posição inicial do clique para calcular o limiar de arrasto
+  const dragSoundPlayed = useRef(false);
+  const touchStart = useRef<{ x: number; y: number; scrollLeft: number } | null>(null);
   
   // Estado visual
   const [isActive, setIsActive] = useState(false);
@@ -150,6 +153,7 @@ const ContentRow: React.FC<ContentRowProps> = ({
 
     lastX.current = e.pageX;
     startX.current = e.pageX; // Salva o ponto inicial exato
+    dragSoundPlayed.current = false;
     
     sliderRef.current.style.scrollSnapType = 'none';
     sliderRef.current.style.scrollBehavior = 'auto';
@@ -184,6 +188,7 @@ const ContentRow: React.FC<ContentRowProps> = ({
     lastX.current = currentX;
 
     // Velocidade 1:1 para um arraste mais natural e fluido
+    const previousScroll = sliderRef.current.scrollLeft;
     sliderRef.current.scrollLeft -= delta;
 
     // Só considera como arraste se mover mais de 5 pixels do ponto inicial
@@ -191,6 +196,10 @@ const ContentRow: React.FC<ContentRowProps> = ({
     const totalMove = Math.abs(currentX - startX.current);
     if (totalMove > 5 && !dragMoved) {
       setDragMoved(true);
+    }
+    if (totalMove > 5 && !dragSoundPlayed.current && Math.abs(sliderRef.current.scrollLeft - previousScroll) > 0.5) {
+      dragSoundPlayed.current = true;
+      uiSoundService.play('slide');
     }
   };
 
@@ -210,6 +219,10 @@ const ContentRow: React.FC<ContentRowProps> = ({
     if (sliderRef.current) {
       const container = sliderRef.current;
       const moveAmount = container.offsetWidth * 0.8; 
+      const canMove = isInfinite || (direction === 'left' ? container.scrollLeft > 1 :
+        container.scrollLeft < container.scrollWidth - container.clientWidth - 1);
+      if (!canMove) return;
+      uiSoundService.play(direction === 'left' ? 'slideLeft' : 'slideRight');
       
       container.style.scrollBehavior = 'smooth';
       container.scrollLeft = direction === 'left' ? container.scrollLeft - moveAmount : container.scrollLeft + moveAmount;
@@ -263,6 +276,21 @@ const ContentRow: React.FC<ContentRowProps> = ({
         {shouldRenderCards && (
         <div 
           ref={sliderRef}
+          onTouchStart={e => {
+            const touch = e.touches[0];
+            const container = sliderRef.current;
+            touchStart.current = touch && container
+              ? { x: touch.clientX, y: touch.clientY, scrollLeft: container.scrollLeft } : null;
+          }}
+          onTouchEnd={e => {
+            const start = touchStart.current;
+            const end = e.changedTouches[0];
+            const container = sliderRef.current;
+            if (start && end && container && Math.abs(end.clientX - start.x) > 25 &&
+              Math.abs(end.clientX - start.x) > Math.abs(end.clientY - start.y) &&
+              Math.abs(container.scrollLeft - start.scrollLeft) > 1) uiSoundService.play('slide');
+            touchStart.current = null;
+          }}
           onMouseDown={handleMouseDown}
           onMouseLeave={handleMouseLeave}
           onMouseUp={handleMouseUp}

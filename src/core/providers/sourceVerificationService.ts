@@ -97,6 +97,7 @@ class SourceVerificationService {
 
     // Ordem de consulta pela prioridade configurada (1, 2, 3...)
     const queryOrder = eligibleProviders.map(p => `${p.name} (P${p.priority})`);
+    const latestProviderOutcome = new Map<string, boolean>();
 
     const diagnostic: VerificationDiagnosticLog = {
       contentTitle: targetTitle,
@@ -120,6 +121,7 @@ class SourceVerificationService {
 
     // Callback para coletar telemetria detalhada de cada tentativa de provedor
     const handleProviderAttempt = (detail: ProviderAttemptDetail) => {
+      latestProviderOutcome.set(detail.providerId, detail.success && !detail.isTimeout);
       if (!diagnostic.queriedProviders.includes(detail.providerId)) {
         diagnostic.queriedProviders.push(detail.providerId);
       }
@@ -322,23 +324,16 @@ class SourceVerificationService {
     // =========================================================================
     // ETAPA 3: CLASSIFICAÇÃO RIGOROSA DO RESULTADO (Requisito 5)
     // =========================================================================
-    // O estado INCONCLUSIVE só deve ser atribuído quando houver real falha impeditiva de infraestrutura
-    // onde provedores sofreram falhas/timeouts E nenhuma resposta de sucesso pôde ser obtida.
-    const hasFailures = diagnostic.timeouts.length > 0 || diagnostic.networkErrors.filter(e => !e.providerId.includes('canonical')).length > 0;
-    const totalQueried = diagnostic.queriedProviders.length;
-    const failedProvidersSet = new Set([
-      ...diagnostic.timeouts,
-      ...diagnostic.networkErrors.filter(e => !e.providerId.includes('canonical')).map(e => e.providerId)
-    ]);
-    const successfulResponses = Math.max(0, totalQueried - failedProvidersSet.size);
-
-    const isFatalInfrastructureFailure = hasFailures && successfulResponses === 0;
-
-    if (isFatalInfrastructureFailure) {
+    // Sem fonte, qualquer provedor ainda em erro deixa a conclusão parcial.
+    // Respostas vazias simuladas, cache negativo e ausência de provedores consultados
+    // também não comprovam indisponibilidade.
+    const unresolvedProviders = [...latestProviderOutcome].filter(([, success]) => !success).map(([id]) => id);
+    const registryFailed = diagnostic.networkErrors.some(e => e.providerId.startsWith('registry-'));
+    if (unresolvedProviders.length > 0 || registryFailed || latestProviderOutcome.size === 0) {
       diagnostic.finalState = 'INCONCLUSIVE';
-      diagnostic.inconclusiveReason = diagnostic.timeouts.length > 0
-        ? `Todos os provedores consultados sofreram tempo limite: ${diagnostic.timeouts.join(', ')}`
-        : `Falha geral de comunicação em todos os provedores: ${diagnostic.networkErrors.map(e => `${e.providerId}: ${e.error}`).join('; ')}`;
+      diagnostic.inconclusiveReason = unresolvedProviders.length > 0
+        ? `Provedores sem resposta conclusiva: ${unresolvedProviders.join(', ')}`
+        : registryFailed ? 'Falha no registro de provedores' : 'Nenhum provedor confirmou a ausência de fontes';
       this.recordLog(diagnostic);
       options?.onStateChange?.('INCONCLUSIVE', MSG_INCONCLUSIVE);
       return {

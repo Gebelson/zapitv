@@ -184,8 +184,10 @@ describe('ZAPITV — SISTEMA INTELIGENTE DE VERIFICAÇÃO DUPLA DE FONTES', () =
 
   describe('4. Classificação Rigorosa de Estados e Mensagens', () => {
     it('deve classificar como UNAVAILABLE apenas quando todos os provedores responderem sem fontes (ausência confirmada)', async () => {
-      // Ambas as fases retornam vazio sem erro de rede ou timeout
-      vi.spyOn(providerRegistry, 'resolveStreams').mockResolvedValue([]);
+      vi.spyOn(providerRegistry, 'resolveStreams').mockImplementation(async (_type, _id, _ep, options) => {
+        options?.onProviderResult?.({ providerId: 'froststream', providerName: 'FrostStream', durationMs: 10, success: true, streamCount: 0 });
+        return [];
+      });
 
       const result = await sourceVerificationService.verifySources(dummyMovie);
 
@@ -194,6 +196,23 @@ describe('ZAPITV — SISTEMA INTELIGENTE DE VERIFICAÇÃO DUPLA DE FONTES', () =
       expect(result.errorMessage).toContain('Conteúdo indisponível no momento');
       expect(result.diagnosticLog.timeouts).toHaveLength(0);
       expect(result.diagnosticLog.networkErrors).toHaveLength(0);
+    });
+
+    it('não declara indisponibilidade quando um provedor falha e outro responde vazio', async () => {
+      vi.spyOn(providerRegistry, 'resolveStreams').mockImplementation(async (_type, _id, _ep, options) => {
+        options?.onProviderResult?.({ providerId: 'a', providerName: 'A', durationMs: 10, success: true, streamCount: 0 });
+        options?.onProviderResult?.({ providerId: 'b', providerName: 'B', durationMs: 5000, success: false, streamCount: 0, isTimeout: true, error: 'Timeout' });
+        return [];
+      });
+      const result = await sourceVerificationService.verifySources(dummyMovie);
+      expect(result.state).toBe('INCONCLUSIVE');
+      expect(result.diagnosticLog.inconclusiveReason).toContain('b');
+    });
+
+    it('não declara indisponibilidade quando nenhum provedor foi consultado', async () => {
+      vi.spyOn(providerRegistry, 'resolveStreams').mockResolvedValue([]);
+      const result = await sourceVerificationService.verifySources(dummyMovie);
+      expect(result.state).toBe('INCONCLUSIVE');
     });
 
     it('NUNCA deve exibir "Conteúdo indisponível" se o resultado for INCONCLUSIVE (timeout ou erro de infraestrutura)', async () => {
@@ -235,6 +254,38 @@ describe('ZAPITV — SISTEMA INTELIGENTE DE VERIFICAÇÃO DUPLA DE FONTES', () =
 
       expect(result.state).toBe('AVAILABLE');
       expect(result.streams.length).toBe(1);
+    });
+
+    it('libera listeners de progresso após resposta do cache', async () => {
+      const registry = providerRegistry as any;
+      const target = { id: dummyMovie.id, title: dummyMovie.title };
+      const key = JSON.stringify(['v5_identity', 'movie', target.id, undefined, undefined, target.title, undefined, undefined, undefined, undefined]);
+      registry.cache.set(key, { streams: [{ name: 'A', title: 'A', url: 'https://example.test/a.mp4' }], timestamp: Date.now() });
+      const onProgressiveStreams = vi.fn();
+      await providerRegistry.resolveStreams('movie', target, undefined, { onProgressiveStreams });
+      expect(onProgressiveStreams).toHaveBeenCalledTimes(1);
+      expect(registry.progressiveListeners.has(key)).toBe(false);
+      expect(registry.inFlightConsumers.has(key)).toBe(false);
+    });
+
+    it('remove callbacks abortados e não retém ouvintes de uma busca compartilhada', async () => {
+      const registry = providerRegistry as any;
+      const target = { id: dummyMovie.id, title: dummyMovie.title };
+      const key = JSON.stringify(['v5_identity', 'movie', target.id, undefined, undefined, target.title, undefined, undefined, undefined, undefined]);
+      let finish!: () => void;
+      const gate = new Promise<void>(resolve => { finish = resolve; });
+      vi.spyOn(providerRegistry, 'resolveStreamsFresh').mockImplementation(async () => { await gate; return []; });
+      const first = new AbortController();
+      const second = new AbortController();
+      const a = providerRegistry.resolveStreams('movie', target, undefined, { signal: first.signal, onProgressiveStreams: vi.fn() });
+      const b = providerRegistry.resolveStreams('movie', target, undefined, { signal: second.signal, onProgressiveStreams: vi.fn() });
+      expect(registry.progressiveListeners.get(key)?.size).toBe(2);
+      first.abort();
+      expect(registry.progressiveListeners.get(key)?.size).toBe(1);
+      finish();
+      await Promise.all([a, b]);
+      expect(registry.progressiveListeners.has(key)).toBe(false);
+      expect(registry.inFlightConsumers.has(key)).toBe(false);
     });
   });
 

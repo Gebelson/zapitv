@@ -21,6 +21,7 @@ import { userPreferenceStore } from '../src/core/recommendations/userPreferenceS
 import { episodeAvailabilityService } from '../src/core/episodes/episodeAvailabilityService';
 import { sourceVerificationService, VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../src/core/providers/sourceVerificationService';
 import { watchPartyService } from '../src/core/watchparty/WatchPartyService';
+import { uiSoundService } from '../src/core/audio/uiSoundService';
 import { getRememberedSources, prioritizeRememberedSources, RememberedSource } from '../src/core/providers/sourceMemory';
 
 const ZapiPlayer = lazy(() => import('../src/components/player/ZapiPlayer').then(m => ({ default: m.ZapiPlayer })));
@@ -299,6 +300,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   }, [item, totalSeasons, episodes.length, progressVersion]);
 
   const handleClose = useCallback(() => {
+    uiSoundService.play('detailClose');
     playbackRequestIdRef.current++;
     cancelAllPendingRequests();
     setIsClosing(true);
@@ -1081,7 +1083,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                   <span className="text-gray-300 text-xs sm:text-sm">{item.type}</span>
                   {resolvedStreams.some(stream => audioPreferenceService.analyzeAudio(stream).tier === 'dubbed_ptbr') && (
                     <span className="px-2 py-0.5 rounded text-xs font-black bg-green-500/20 text-green-400 border border-green-500/30">
-                      🇧🇷 Fonte informa áudio dublado PT-BR
+                      Dublado PT-BR
                     </span>
                   )}
                 </div>

@@ -407,37 +407,21 @@ class ProviderRegistryService {
     const cacheKey = JSON.stringify(['v5_identity', type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
 
     // 1. Registro de listener progressivo para este cacheKey
+    const releaseListener = () => {
+      const callback = options?.onProgressiveStreams;
+      if (!callback) return;
+      const listeners = this.progressiveListeners.get(cacheKey);
+      listeners?.delete(callback);
+      if (listeners?.size === 0) this.progressiveListeners.delete(cacheKey);
+      options?.signal?.removeEventListener('abort', releaseListener);
+    };
     if (options?.onProgressiveStreams) {
       if (!this.progressiveListeners.has(cacheKey)) {
         this.progressiveListeners.set(cacheKey, new Set());
       }
       this.progressiveListeners.get(cacheKey)!.add(options.onProgressiveStreams);
 
-      if (options.signal) {
-        options.signal.addEventListener('abort', () => {
-          const listeners = this.progressiveListeners.get(cacheKey);
-          if (listeners && options.onProgressiveStreams) {
-            listeners.delete(options.onProgressiveStreams);
-            if (listeners.size === 0) {
-              this.progressiveListeners.delete(cacheKey);
-            }
-          }
-        }, { once: true });
-      }
-    }
-
-    // Registro de consumidor in-flight (para cancelamento compartilhado seguro)
-    const activeSignal = options?.signal || null;
-    let consumers = this.inFlightConsumers.get(cacheKey);
-    if (!consumers) {
-      consumers = new Set();
-      this.inFlightConsumers.set(cacheKey, consumers);
-    }
-    consumers.add(activeSignal);
-    if (activeSignal) {
-      activeSignal.addEventListener('abort', () => {
-        consumers?.delete(activeSignal);
-      }, { once: true });
+      options.signal?.addEventListener('abort', releaseListener, { once: true });
     }
 
     // 2. Cache inteligente com separação estrita de positivo vs negativo (Requisito 7)
@@ -452,7 +436,8 @@ class ProviderRegistryService {
           options?.onProgressiveStreams?.(cached.streams);
           // Se estiver na janela stale, dispara revalidação em segundo plano sem bloquear
           if (age >= this.STALE_TTL_MS && !this.pending.has(cacheKey)) {
-            const bgRequest = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration, options)
+            const bgRequest = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration)
+              .catch(() => [])
               .finally(() => {
                 if (this.pending.get(cacheKey) === bgRequest) {
                   this.pending.delete(cacheKey);
@@ -461,6 +446,7 @@ class ProviderRegistryService {
               });
             this.pending.set(cacheKey, bgRequest);
           }
+          releaseListener();
           return Promise.resolve(cached.streams);
         }
       }
@@ -469,16 +455,26 @@ class ProviderRegistryService {
       if (!options?.bypassNegativeCache) {
         const cachedNeg = this.negativeCache.get(cacheKey);
         if (cachedNeg && !cachedNeg.inconclusive && (Date.now() - cachedNeg.timestamp) < 15000) {
+          releaseListener();
           return Promise.resolve([]);
         }
       }
     }
 
+    // Mantém sinais abortados até a operação compartilhada terminar, para que
+    // todos os consumidores cancelados realmente interrompam a descoberta.
+    let consumers = this.inFlightConsumers.get(cacheKey);
+    if (!consumers) {
+      consumers = new Set();
+      this.inFlightConsumers.set(cacheKey, consumers);
+    }
+    consumers.add(options?.signal || null);
+
     // 3. Deduplicação de requisições simultâneas em voo (in-flight deduplication)
     if (!options?.forceRefresh && !options?.bypassNegativeCache) {
       const existing = this.pending.get(cacheKey);
       if (existing) {
-        return existing;
+        return existing.finally(releaseListener);
       }
     }
 
@@ -487,13 +483,7 @@ class ProviderRegistryService {
         this.pending.delete(cacheKey);
         this.inFlightConsumers.delete(cacheKey);
       }
-      if (options?.onProgressiveStreams) {
-        const listeners = this.progressiveListeners.get(cacheKey);
-        if (listeners) {
-          listeners.delete(options.onProgressiveStreams);
-          if (listeners.size === 0) this.progressiveListeners.delete(cacheKey);
-        }
-      }
+      releaseListener();
     });
     this.pending.set(cacheKey, request);
     return request;

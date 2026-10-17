@@ -44,6 +44,7 @@ import { audioSelectionManager, AudioOption } from '../../core/audio/audioSelect
 import { playbackOptimizerService } from '../../core/playback/PlaybackOptimizerService';
 import { mediaAvailabilityIndex } from '../../core/catalog/MediaAvailabilityIndex';
 import { watchPartyService } from '../../core/watchparty/WatchPartyService';
+import { uiSoundService } from '../../core/audio/uiSoundService';
 import { WatchPartyOverlay } from '../watchparty/WatchPartyOverlay';
 import { RoomLifecycleState } from '../../core/watchparty/watchPartyTypes';
 
@@ -149,6 +150,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   initialResumeTime,
   onUpdatePlaybackPosition
 }) => {
+  useEffect(() => uiSoundService.beginPlayback(), []);
   const [selectedStreamIndex, setSelectedStreamIndex] = useState(0);
   const currentStream = streams[selectedStreamIndex] || streams[0];
   const sourceEvidenceRef = useRef<{
@@ -372,9 +374,15 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const userSkippedIntroRef = useRef(false);
   const introVideoRef = useRef<HTMLVideoElement | null>(null);
   const isMediaReadyRef = useRef(false);
+  const watchSoundPlayedRef = useRef(false);
   const isPlayingIntroRef = useRef(false);
   const showNonDubbedPromptRef = useRef(false);
   const isIntroTransitioningRef = useRef(false);
+
+  useEffect(() => { watchSoundPlayedRef.current = false; }, [playbackSessionId]);
+  useEffect(() => {
+    if (allSourcesFailed) uiSoundService.play('error');
+  }, [allSourcesFailed]);
 
   // Subtitles state — Integrado com persistência via SubtitlePreferenceService
   const [subtitlesList, setSubtitlesList] = useState<SubtitleTrack[]>([]);
@@ -1103,8 +1111,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       return;
     }
 
+    if (!watchSoundPlayedRef.current && navigationType === 'manual_start' && !isBroadcastGuest) {
+      watchSoundPlayedRef.current = true;
+      uiSoundService.play('watch');
+    }
+
     startIntroIfReady();
-  }, [startIntroIfReady]);
+  }, [startIntroIfReady, navigationType, isBroadcastGuest]);
 
   // Reação automática: assim que a mídia estiver pronta, se a intro já terminou ou foi pulada, transiciona!
   useEffect(() => {
@@ -1938,9 +1951,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     // A fonte já está pronta e bufferizada em background (Requisitos 8, 9 e 10):
     // Inicia imediatamente a vinheta institucional (ou o conteúdo se a intro estiver dispensada)
     if (isMediaReadyRef.current) {
+      if (!watchSoundPlayedRef.current && navigationType === 'manual_start' && !isBroadcastGuest) {
+        watchSoundPlayedRef.current = true;
+        uiSoundService.play('watch');
+      }
       startIntroIfReady();
     }
-  }, [playbackSessionId, startIntroIfReady]);
+  }, [playbackSessionId, startIntroIfReady, navigationType, isBroadcastGuest]);
 
   const handleRejectNonDubbed = useCallback(() => {
     handlePlayerClose();
@@ -3538,6 +3555,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   return (
     <div
       ref={containerRef}
+      data-ui-sound-player=""
       onMouseMove={handleUserActivity}
       onMouseDown={handleUserActivity}
       onClick={handleUserActivity}

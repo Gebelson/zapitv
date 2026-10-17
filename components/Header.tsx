@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { createPortal, flushSync } from 'react-dom';
 import { Search, Bell, Sun, Moon, User as UserIcon, X, Info, AlertTriangle, Star, Settings, LogOut, Menu, Edit3, HelpCircle, ChevronRight, RefreshCw, Lock, Activity, Clock, MessageSquarePlus } from 'lucide-react';
 import { AppView, User, SiteNotification, Profile, ContentItem, ContentType, ActorPerson } from '../types';
+import { uiSoundService } from '../src/core/audio/uiSoundService';
 import { searchService } from '../src/core/search/searchService';
 import { searchHistoryService } from '../src/core/search/searchHistoryService';
 import { ReportFeedbackModal } from '../src/components/feedback/ReportFeedbackModal';
@@ -254,6 +255,7 @@ const Header: React.FC<HeaderProps> = ({
 
   const handleToggleTheme = (event: React.MouseEvent<HTMLButtonElement>) => {
     const nextMode = !isDarkMode;
+    uiSoundService.play('toggle');
 
     const isAppearanceTransition =
       typeof document !== 'undefined' &&

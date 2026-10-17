@@ -5,6 +5,7 @@ import { ContentItem, HeroTag, ContentType } from '../types';
 import { ZapiLoader } from '../src/components/common/ZapiLoader';
 import { theatricalFilterService } from '../src/core/catalog/theatricalFilterService';
 import { heroCarouselStore, MAX_HERO_DISPLAY_COUNT } from '../src/core/catalog/heroCarouselStore';
+import { uiSoundService } from '../src/core/audio/uiSoundService';
 
 interface HeroProps {
   featuredItems: ContentItem[];
@@ -152,7 +153,7 @@ const Hero: React.FC<HeroProps> = ({
     return () => clearTimeout(timeout);
   }, [renderIndex, totalOriginal, handleTransitionEnd]);
 
-  const navigateRef = useRef<(direction: 'prev' | 'next') => void>(() => {});
+  const navigateRef = useRef<(direction: 'prev' | 'next', automatic?: boolean) => void>(() => {});
 
   // Monitora visibilidade da aba do navegador para pausar o carrossel em segundo plano
   useEffect(() => {
@@ -195,14 +196,15 @@ const Hero: React.FC<HeroProps> = ({
     if (isPaused || totalOriginal <= 1 || isEditModalOpen || !isTabVisible || !isHeroInViewport) return;
 
     timerRef.current = setInterval(() => {
-      navigateRef.current('next');
+      navigateRef.current('next', true);
     }, 6000);
   }, [isPaused, totalOriginal, isEditModalOpen, isTabVisible, isHeroInViewport]);
 
-  const navigate = useCallback((direction: 'prev' | 'next') => {
+  const navigate = useCallback((direction: 'prev' | 'next', automatic = false) => {
     if (totalOriginal <= 1) return;
     // Previne conflitos e travamentos em cliques simultâneos ou rápidos durante a animação
     if (isAnimatingRef.current) return;
+    uiSoundService.play(direction === 'next' ? 'slideRight' : 'slideLeft', { automatic });
 
     setWithTransition(true);
     isAnimatingRef.current = true;
@@ -231,6 +233,7 @@ const Hero: React.FC<HeroProps> = ({
     if (isAnimatingRef.current) return;
     if (index === activeDotIndex) return;
     if (index >= 0 && index < totalOriginal) {
+      uiSoundService.play(index > activeDotIndex ? 'slideRight' : 'slideLeft');
       setWithTransition(true);
       isAnimatingRef.current = true;
       setRenderIndex(index + 1);

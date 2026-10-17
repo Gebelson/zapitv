@@ -5,6 +5,7 @@ import {
   SlidersHorizontal, Sparkles
 } from 'lucide-react';
 import { watchPartyService } from '../../core/watchparty/WatchPartyService';
+import { uiSoundService } from '../../core/audio/uiSoundService';
 import { 
   WatchPartyChatMessage, 
   WatchPartyParticipant 
@@ -65,6 +66,7 @@ export const WatchPartyOverlay: React.FC<WatchPartyOverlayProps> = ({
 
     const unsubscribeChat = watchPartyService.onChatMessage((msg) => {
       setMessages(prev => [...prev, msg]);
+      if (msg.senderId !== watchPartyService.selfId) uiSoundService.play('message');
       if (!isChatOpen) {
         setUnreadCount(prev => prev + 1);
       }

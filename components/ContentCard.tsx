@@ -33,7 +33,7 @@ function getSharedViewportObserver(): IntersectionObserver | null {
         }
       },
       {
-        rootMargin: '800px 0px',
+        rootMargin: '800px 800px',
         threshold: 0.01
       }
     );
@@ -194,11 +194,13 @@ const ContentCard: React.FC<ContentCardProps> = ({
   return (
     <div 
       ref={cardRef}
+      data-ui-sound-card=""
       onClick={() => onItemClick(item)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`flex-none w-full max-w-full min-w-0 group/card cursor-pointer transition-all duration-300 hover:scale-105 hover:z-30 relative transform-gpu will-change-transform ${className}`}
+      className={`flex-none w-full max-w-full min-w-0 group/card cursor-pointer transition-all duration-300 hover:scale-105 hover:z-30 relative ${isInViewport ? 'transform-gpu will-change-transform' : ''} ${className}`}
     >
+      {isInViewport ? <>
       {/* Brilho Azul no Hover - hardware accelerated */}
           <div className="absolute inset-x-0 inset-y-[35%] rounded-full opacity-0 group-hover/card:opacity-100 transition-all duration-500 blur-2xl pointer-events-none transform-gpu translate-z-0" style={{ backgroundColor: '#007df7', zIndex: -1 }} />
           
@@ -341,6 +343,11 @@ const ContentCard: React.FC<ContentCardProps> = ({
               </div>
             )}
           </div>
+      </> : (
+        <div aria-hidden="true" className={`w-full aspect-[2/3] rounded-xl md:rounded-2xl ${
+          isDarkMode ? 'bg-gray-900 border border-white/10' : 'bg-slate-200/40'
+        }`} />
+      )}
     </div>
   );
 };

@@ -61,8 +61,12 @@ describe('ZapiPlayer — Ordem de Carregamento, Avisos e Intro Institucional', (
     });
 
     it('REGRA 4: markMediaAsReady deve respeitar o aviso de dublagem antes de disparar startIntroIfReady', () => {
-      const markMediaRegex = /markMediaAsReady = useCallback\(\(\) => \{\s*setIsLoading\(false\);\s*setIsMediaReady\(true\);\s*isMediaReadyRef\.current = true;\s*\/\/[^\n]*\s*if \(showNonDubbedPromptRef\.current\) \{\s*return;\s*\}\s*startIntroIfReady\(\);/s;
-      expect(markMediaRegex.test(playerSource)).toBe(true);
+      const markMedia = playerSource.match(/markMediaAsReady = useCallback\(\(\) => \{([\s\S]*?)\n  \}, \[startIntroIfReady/);
+      expect(markMedia).not.toBeNull();
+      const body = markMedia![1];
+      expect(body.indexOf('isMediaReadyRef.current = true;')).toBeLessThan(body.indexOf('if (showNonDubbedPromptRef.current)'));
+      expect(body.indexOf('if (showNonDubbedPromptRef.current)')).toBeLessThan(body.indexOf('startIntroIfReady();'));
+      expect(body).toMatch(/if \(showNonDubbedPromptRef\.current\) \{\s*return;\s*\}/);
     });
 
     it('REGRA 5: Quando não houver fontes, deve exibir "Conteúdo indisponível" ANTES e SEM tocar a intro', () => {

@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Home, CreditCard, Shield, Monitor, User, ChevronRight, 
   ArrowLeft, Plus, Smartphone, Key, Mail, Phone, 
-  AlertCircle, PlayCircle, Lock, Users, HelpCircle, Settings, Edit3, Clock, Trash2, Info, Download, ShieldCheck, Smile, Sun, Moon, Bell, X, Star, LogOut, Check, Copy, AlertTriangle, Gift, FileText
+  AlertCircle, PlayCircle, Lock, Users, HelpCircle, Settings, Edit3, Clock, Trash2, Info, Download, ShieldCheck, Smile, Sun, Moon, Bell, X, Star, LogOut, Check, Copy, AlertTriangle, Gift, FileText, Volume2
 } from 'lucide-react';
 import { User as UserType, AppView, SiteNotification } from '../types';
 import { skipService } from '../src/core/skip/skipService';
@@ -12,6 +12,7 @@ import { subtitleStyleService, SubtitleStyle } from '../src/core/subtitles/subti
 import { userPreferenceStore } from '../src/core/recommendations/userPreferenceStore';
 import { recommendationEngine } from '../src/core/recommendations/recommendationEngine';
 import { consentManager } from '../src/core/recommendations/consentManager';
+import { uiSoundService } from '../src/core/audio/uiSoundService';
 
 interface SettingsViewProps {
   isDarkMode: boolean;
@@ -32,6 +33,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [activeTab, setActiveTab] = useState<SettingsTab>('overview');
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [soundPreferences, setSoundPreferences] = useState(() => uiSoundService.getPreferences());
+  useEffect(() => uiSoundService.subscribe(() => {
+    setSoundPreferences(uiSoundService.getPreferences());
+  }), []);
+  const updateSoundPreferences = (changes: Partial<typeof soundPreferences>) => {
+    uiSoundService.updatePreferences(changes);
+  };
   
   // Preferências de reprodução
   const [autoSkip, setAutoSkip] = useState<boolean>(() => skipService.isAutoSkipEnabled());
@@ -39,6 +47,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     const newVal = !autoSkip;
     setAutoSkip(newVal);
     skipService.setAutoSkipEnabled(newVal);
+    uiSoundService.play('toggle');
     showToast(newVal ? "Salto automático de aberturas ativado." : "Salto automático desativado.");
   };
 
@@ -54,6 +63,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     const newVal = !autoPlayNext;
     setAutoPlayNext(newVal);
     autoPlayService.setAutoPlayEnabled(newVal);
+    uiSoundService.play('toggle');
     showToast(newVal ? "Reprodução automática ativada." : "Reprodução automática desativada.");
   };
 
@@ -68,6 +78,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const handleUpdateSubtitleStyle = (updates: Partial<SubtitleStyle>) => {
     const next = subtitleStyleService.updateSubtitleStyle(updates);
     setSubtitleStyle(next);
+    uiSoundService.play('toggle');
   };
 
   const handleResetSubtitleStyle = () => {
@@ -91,6 +102,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     const next = !collabOptIn;
     setCollabOptIn(next);
     consentManager.setCollaborativeOptIn(next);
+    uiSoundService.play('toggle');
     if (!next) {
       await consentManager.revokeConsentAndPurge();
       showToast("Participação colaborativa revogada e dados purgados.");
@@ -559,6 +571,77 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   <div className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform ${
                     collabOptIn ? 'translate-x-6' : 'translate-x-0'
                   }`} />
+                </button>
+              </div>
+            </div>
+
+            <h2 className={`text-xs font-black uppercase tracking-widest mb-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+              Sons da Interface
+            </h2>
+            <div className={`border rounded-xl overflow-hidden shadow-sm mb-10 backdrop-blur-xl ${
+              isDarkMode ? 'bg-[#151C26]/85 border-white/5' : 'bg-white/80 border-gray-200'
+            }`}>
+              <div className="p-6 md:p-8 flex items-center justify-between gap-4 border-b border-white/5">
+                <div>
+                  <h3 className={`text-[16px] font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Ativar sons da interface</h3>
+                  <p className="text-xs text-gray-500 mt-1">Efeitos discretos na interface, com controles suaves no player.</p>
+                </div>
+                <button type="button" role="switch" aria-checked={soundPreferences.enabled}
+                  aria-label="Ativar sons da interface"
+                  onClick={() => {
+                    updateSoundPreferences({ enabled: !soundPreferences.enabled });
+                    if (!soundPreferences.enabled) uiSoundService.play('toggle');
+                  }}
+                  className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors shrink-0 ${soundPreferences.enabled ? 'bg-[#007df7]' : 'bg-gray-600/40'}`}>
+                  <span className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform ${soundPreferences.enabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                </button>
+              </div>
+              <div className="p-6 md:p-8 border-b border-white/5">
+                <div className="flex items-center justify-between gap-4 mb-3">
+                  <label htmlFor="ui-sound-volume" className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Volume dos efeitos
+                  </label>
+                  <span className="text-xs font-bold text-[#007df7]">{soundPreferences.volume}%</span>
+                </div>
+                <input id="ui-sound-volume" type="range" min="0" max="100" step="1"
+                  value={soundPreferences.volume}
+                  onChange={event => updateSoundPreferences({ volume: Number(event.target.value) })}
+                  className="w-full accent-[#007df7]" />
+                <button type="button" disabled={!soundPreferences.enabled} onClick={() => uiSoundService.play('detailOpen', { preview: true })}
+                  className="mt-4 px-4 py-2 text-xs font-bold rounded-lg border border-[#007df7]/30 text-[#007df7] hover:bg-[#007df7]/10 flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                  <Volume2 className="w-4 h-4" /> Testar efeito sonoro
+                </button>
+              </div>
+              <div className="p-6 md:p-8 border-b border-white/5 space-y-5">
+                {([
+                  ['hoverEnabled', 'Sons ao passar o mouse', 'Toques suaves em capas e botões.'],
+                  ['navigationEnabled', 'Sons de navegação', 'Transições manuais de banners e carrosséis.'],
+                  ['autoCarouselSounds', 'Sons nas transições automáticas', 'Desativado por padrão para evitar repetições.']
+                ] as const).map(([key, label, description]) => (
+                  <div key={key} className="flex items-center justify-between gap-4">
+                    <div>
+                      <h3 className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{label}</h3>
+                      <p className="text-xs text-gray-500 mt-1">{description}</p>
+                    </div>
+                    <button type="button" role="switch" aria-checked={soundPreferences[key]}
+                      aria-label={label}
+                      onClick={() => updateSoundPreferences({ [key]: !soundPreferences[key] })}
+                      className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors shrink-0 ${soundPreferences[key] ? 'bg-[#007df7]' : 'bg-gray-600/40'}`}>
+                      <span className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform ${soundPreferences[key] ? 'translate-x-6' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="p-6 md:p-8 flex items-center justify-between gap-4">
+                <div>
+                  <h3 className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Mensagens da Watch Party</h3>
+                  <p className="text-xs text-gray-500 mt-1">Notificação suave ao receber mensagens, inclusive durante a transmissão.</p>
+                </div>
+                <button type="button" role="switch" aria-checked={soundPreferences.watchPartyNotifications}
+                  aria-label="Notificações sonoras da Watch Party"
+                  onClick={() => updateSoundPreferences({ watchPartyNotifications: !soundPreferences.watchPartyNotifications })}
+                  className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors shrink-0 ${soundPreferences.watchPartyNotifications ? 'bg-[#007df7]' : 'bg-gray-600/40'}`}>
+                  <span className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform ${soundPreferences.watchPartyNotifications ? 'translate-x-6' : 'translate-x-0'}`} />
                 </button>
               </div>
             </div>

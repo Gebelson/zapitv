@@ -34,6 +34,7 @@ import { adultContentService } from './src/core/adult/AdultContentService';
 import { AgeVerificationModal } from './components/AgeVerificationModal';
 import { recommendationEngine } from './src/core/recommendations/recommendationEngine';
 import { userPreferenceStore } from './src/core/recommendations/userPreferenceStore';
+import { uiSoundService } from './src/core/audio/uiSoundService';
 import { hybridRecommendationEngine } from './src/core/recommendations/hybridRecommendationEngine';
 import { bannedContentRegistry } from './src/core/catalog/BannedContentRegistry';
 import { catalogSnapshotManager } from './src/core/catalog/CatalogSnapshotManager';
@@ -157,6 +158,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   }, [location.pathname]);
 
   const [previousView, setPreviousView] = useState<AppView>('home');
+  useEffect(() => uiSoundService.bindInteractions(document), []);
   useEffect(() => {
     if (currentView !== 'admin' && currentView !== 'notfound') {
       setPreviousView(currentView);
@@ -1368,6 +1370,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       }
     }
     setSelectedContent(item);
+    uiSoundService.play('detailOpen');
   }, [activeProfile]);
 
   const handleCloseDetailModal = useCallback(() => {
@@ -1788,6 +1791,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const toggleMyList = useCallback(async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (!currentUser) return;
+    uiSoundService.prime();
     const isAdding = !myList.includes(id);
     const newList = isAdding ? [...myList, id] : myList.filter(i => i !== id);
     setMyList(newList);
@@ -1803,6 +1807,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       const { doc, setDoc } = await import('firebase/firestore');
       const { db: firestoreDb } = await import('./firebase');
       await setDoc(doc(firestoreDb, 'keyValueStore', `zapitv_mylist_${currentUser.id}`), { value: newList });
+      uiSoundService.play(isAdding ? 'listAdd' : 'listRemove');
     } catch (error) {
       console.error("Error saving myList:", error);
     }
@@ -2671,9 +2676,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         }} 
         isDarkMode={isDarkMode} 
         isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onToggleCollapse={() => {
+          uiSoundService.play(isSidebarCollapsed ? 'sidebarOpen' : 'sidebarClose');
+          setIsSidebarCollapsed(!isSidebarCollapsed);
+        }}
         isMobileMenuOpen={isMobileMenuOpen}
-        onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        onToggleMobileMenu={() => {
+          uiSoundService.play(isMobileMenuOpen ? 'sidebarClose' : 'sidebarOpen');
+          setIsMobileMenuOpen(!isMobileMenuOpen);
+        }}
         activeProfile={activeProfile}
       />
       
@@ -2707,7 +2718,10 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           allContent={content}
           notifications={siteNotifications}
           onLogout={handleLogout}
-          onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
+          onToggleMobileMenu={() => {
+            if (!isMobileMenuOpen) uiSoundService.play('sidebarOpen');
+            setIsMobileMenuOpen(true);
+          }}
           onOpenDiagnostics={() => setIsDiagnosticModalOpen(true)}
         />
         

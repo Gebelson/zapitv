@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { ContentItem } from '../../../types';
 import { watchPartyService, WatchPartyService } from '../../core/watchparty/WatchPartyService';
+import { uiSoundService } from '../../core/audio/uiSoundService';
 import { 
   WatchPartyMediaMetadata, 
   WatchPartyChatMessage, 
@@ -119,6 +120,7 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
 
     const unsubChat = watchPartyService.onChatMessage((msg) => {
       setMessages(prev => [...prev, msg]);
+      if (msg.senderId !== watchPartyService.selfId) uiSoundService.play('message');
     });
 
     const unsubVoice = watchPartyService.onVoiceStateChange((data) => {
@@ -239,6 +241,7 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
       return;
     }
 
+    uiSoundService.prime();
     try {
       setIsCreating(true);
       setErrorMessage(null);
@@ -266,6 +269,7 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
         mediaMetadata,
         nickname.trim() || 'Anfitrião'
       );
+      uiSoundService.play('partyConnect');
     } catch (err: any) {
       console.error('Falha ao criar sala:', err);
       setErrorMessage(err.message || 'Falha ao conectar à rede P2P. Tente novamente.');
@@ -281,6 +285,7 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
       return;
     }
 
+    uiSoundService.prime();
     try {
       setIsJoining(true);
       setErrorMessage(null);
@@ -289,6 +294,7 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
         cleanRoomId,
         nickname.trim() || 'Convidado'
       );
+      uiSoundService.play('partyConnect');
     } catch (err: any) {
       console.error('Falha ao entrar na sala:', err);
       setErrorMessage(err.message || 'Não foi possível entrar na sala. Verifique o código e tente novamente.');

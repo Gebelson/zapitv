@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Flame, Film, Tv, List, ChevronLeft, ChevronRight, Sparkles, MonitorPlay, DownloadCloud } from 'lucide-react';
+import { Home, Flame, Film, Tv, List, ChevronLeft, ChevronRight, Sparkles, MonitorPlay, DownloadCloud, Volume2, VolumeX } from 'lucide-react';
 import { AppView, Profile } from '../types';
+import { uiSoundService } from '../src/core/audio/uiSoundService';
 
 // Ícone de Séries - Refinado para strokeWidth 2.2
 const SeriesIcon = (props: any) => <Tv {...props} strokeWidth={2.2} />;
@@ -24,6 +25,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const pathname = location.pathname;
+  const [soundsEnabled, setSoundsEnabled] = useState(() => uiSoundService.getPreferences().enabled);
+  useEffect(() => uiSoundService.subscribe(() => {
+    setSoundsEnabled(uiSoundService.getPreferences().enabled);
+  }), []);
+  const toggleSounds = () => {
+    uiSoundService.updatePreferences({ enabled: !soundsEnabled });
+    if (!soundsEnabled) uiSoundService.prime();
+  };
 
   const menuItems = [
     { id: 'home', path: '/', label: 'Home', icon: Home },
@@ -69,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }`} 
       />
 
-      <aside className={`${sidebarClasses} ${
+      <aside data-ui-sound-sidebar="" className={`${sidebarClasses} ${
         isMobileMenuOpen ? 'translate-x-0 w-[280px] max-w-[85vw]' : '-translate-x-full w-[280px] max-w-[85vw] lg:translate-x-0'
       } ${
         isCollapsed ? 'lg:w-20' : 'lg:w-64'
@@ -183,6 +192,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
         </nav>
+
+        <div className="px-4 py-2 shrink-0 relative z-10">
+          <button type="button" role="switch" aria-checked={soundsEnabled}
+            aria-label={isCollapsed ? (soundsEnabled ? 'Desativar sons da interface' : 'Ativar sons da interface') : 'Sons da interface'}
+            title={soundsEnabled ? 'Sons ativados — clique para desativar' : 'Sons desativados — clique para ativar'}
+            onClick={toggleSounds}
+            className={`w-full h-11 flex items-center rounded-xl overflow-hidden text-left transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#007df7] ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}>
+            <span className="w-12 h-11 shrink-0 flex items-center justify-center" aria-hidden="true">
+              {soundsEnabled ? <Volume2 className="w-5 h-5 text-[#007df7]" /> : <VolumeX className="w-5 h-5 text-gray-500" />}
+            </span>
+            <span aria-hidden="true" className={`text-sm font-medium flex-1 min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+              isCollapsed ? 'lg:max-w-0 lg:opacity-0 lg:-translate-x-2' : 'max-w-[150px] opacity-100 translate-x-0'
+            } ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Sons da interface
+            </span>
+            <span aria-hidden="true" className={`h-6 rounded-full flex items-center shrink-0 overflow-hidden transition-[width,opacity,transform,background-color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+              isCollapsed ? 'lg:w-0 lg:opacity-0 lg:scale-75' : 'w-10 opacity-100 scale-100'
+            } ${soundsEnabled ? 'bg-[#007df7]' : 'bg-gray-600/40'}`}>
+              <span className={`bg-white w-5 h-5 ml-0.5 rounded-full shadow-sm transform transition-transform duration-200 ${soundsEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+            </span>
+          </button>
+        </div>
 
         <div className={`p-4 mt-auto relative z-10 flex items-center justify-center border-t transition-colors duration-300 ${
           isDarkMode ? 'border-white/5' : 'border-gray-200'
