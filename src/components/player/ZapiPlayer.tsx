@@ -293,10 +293,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Continuidade de reprodução entre trocas de stream, qualidade, áudio e recarga de página
   const targetResumeTimeRef = useRef<number>(0);
   const isInitialTimeAppliedRef = useRef<boolean>(false);
+  const isHandlingRemoteSyncRef = useRef<boolean>(false);
+  const lastHostBroadcastTimeRef = useRef<number>(0);
 
   // Determina se deve iniciar com a vinheta oficial da sessão
   const shouldStartWithIntro = useMemo(() => {
     if (isBroadcastGuest) {
+      return false;
+    }
+    // Em Watch Party sincronizada (convidado), o vídeo inicia diretamente na linha do tempo do anfitrião
+    if (watchPartyService.isConnected && !watchPartyService.isHost()) {
       return false;
     }
     if (isOfflineMode) {
@@ -454,8 +460,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (video) {
       try {
         video.currentTime = clampedTime;
-        if (watchPartyService.isHost() || watchPartyService.canLocalControl('canSeek')) {
-          watchPartyService.updatePlaybackState(clampedTime, !video.paused, video.playbackRate);
+        if (
+          (watchPartyService.isHost() || watchPartyService.canLocalControl('canSeek')) &&
+          !isHandlingRemoteSyncRef.current &&
+          !watchPartyService.isRemoteActionApplying
+        ) {
+          watchPartyService.updatePlaybackState(clampedTime, !video.paused, video.playbackRate, duration || video.duration);
         }
       } catch {}
     }
@@ -819,27 +829,37 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     // 1. Inicia a reprodução do vídeo principal sob a camada da intro com áudio sincronizado
     video.muted = isMuted;
     video.volume = volume;
-    video.play()
-      .then(() => {
-        setIsPlaying(true);
-        applyTargetResumeTime();
-      })
-      .catch((err) => {
-        // Fallback de segurança contra bloqueio estrito de autoplay com áudio do navegador pós-intro
-        if (err && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
-          console.warn('[ZapiPlayer] Autoplay com som bloqueado pelo navegador pós-intro. Preservando preferência do usuário e ativando recuperação por 1 toque:', err.name);
-          video.muted = true;
-          setIsAutoplayAudioBlocked(true);
-          video.play()
-            .then(() => {
-              setIsPlaying(true);
-              applyTargetResumeTime();
-            })
-            .catch(() => setIsPlaying(false));
-        } else {
-          setIsPlaying(false);
-        }
-      });
+
+    const isWpGuest = watchPartyService.isConnected && !watchPartyService.isHost();
+    const wpState = isWpGuest ? watchPartyService.getLastPlaybackState() : null;
+
+    if (wpState && !wpState.isPlaying) {
+      applyTargetResumeTime();
+      video.pause();
+      setIsPlaying(false);
+    } else {
+      video.play()
+        .then(() => {
+          setIsPlaying(true);
+          applyTargetResumeTime();
+        })
+        .catch((err) => {
+          // Fallback de segurança contra bloqueio estrito de autoplay com áudio do navegador pós-intro
+          if (err && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
+            console.warn('[ZapiPlayer] Autoplay com som bloqueado pelo navegador pós-intro. Preservando preferência do usuário e ativando recuperação por 1 toque:', err.name);
+            video.muted = true;
+            setIsAutoplayAudioBlocked(true);
+            video.play()
+              .then(() => {
+                setIsPlaying(true);
+                applyTargetResumeTime();
+              })
+              .catch(() => setIsPlaying(false));
+          } else {
+            setIsPlaying(false);
+          }
+        });
+    }
 
     // 2. Dispara o fade out suave (700ms)
     setIsIntroFading(true);
@@ -999,6 +1019,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Se a mídia estiver pronta e a intro já foi concluída (ex: recuperação automática pós-falha), inicia a reprodução direta sem reiniciar a vinheta
   useEffect(() => {
     if (isMediaReady && (isIntroEnded || userSkippedIntro) && !isPlayingIntro && !showNonDubbedPrompt) {
+      const isWpGuest = watchPartyService.isConnected && !watchPartyService.isHost();
+      const wpState = isWpGuest ? watchPartyService.getLastPlaybackState() : null;
+      if (wpState && !wpState.isPlaying) {
+        return;
+      }
       const video = videoRef.current;
       if (video && video.paused) {
         video.muted = isMuted;
@@ -1316,6 +1341,20 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       savedTime = initialResumeTime;
     }
 
+    // Entrada tardia / reconexão na Watch Party: o host é a autoridade absoluta
+    if (watchPartyService.isConnected && !watchPartyService.isHost()) {
+      const hostState = watchPartyService.getLastPlaybackState();
+      if (hostState) {
+        const expectedPos = watchPartyService.calculateExpectedPosition(hostState);
+        if (expectedPos > 0) {
+          savedTime = expectedPos;
+          setIsPlayingIntro(false);
+          setIsIntroEnded(true);
+          isPlayingIntroRef.current = false;
+        }
+      }
+    }
+
     if (savedTime > 2 && (dur <= 0 || savedTime < dur - 15)) {
       targetResumeTimeRef.current = savedTime;
       // Se o elemento de vídeo já possuir metadados carregados, aplica imediatamente
@@ -1330,15 +1369,21 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     } else {
       targetResumeTimeRef.current = 0;
     }
-  }, [item, initialSeason, initialEpisode]);
+  }, [item, initialSeason, initialEpisode, initialResumeTime]);
 
   // Aplica com precisão a posição salva quando o player carrega ou troca de fonte/qualidade/áudio
   const applyTargetResumeTime = useCallback(() => {
-    const target = targetResumeTimeRef.current;
+    let target = targetResumeTimeRef.current;
+    if (watchPartyService.isConnected && !watchPartyService.isHost()) {
+      const hostState = watchPartyService.getLastPlaybackState();
+      if (hostState) {
+        target = watchPartyService.calculateExpectedPosition(hostState);
+      }
+    }
     const video = videoRef.current;
     if (target > 0 && video && video.readyState >= 1) {
       try {
-        if (Math.abs(video.currentTime - target) > 0.8) {
+        if (Math.abs(video.currentTime - target) > 0.5) {
           video.currentTime = target;
         }
         isInitialTimeAppliedRef.current = true;
@@ -1488,25 +1533,62 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       if (!video) return;
 
       watchPartyService.executeRemoteActionSafely(() => {
-        // Sincroniza Play / Pause
-        if (sync.isPlaying && video.paused) {
-          video.play().then(() => setIsPlaying(true)).catch(console.warn);
-        } else if (!sync.isPlaying && !video.paused) {
-          video.pause();
-          setIsPlaying(false);
+        isHandlingRemoteSyncRef.current = true;
+
+        // Se o convidado ainda estiver com a vinheta/intro aberta, finaliza imediatamente para alinhar ao host
+        if (isPlayingIntroRef.current) {
+          setIsPlayingIntro(false);
+          setIsIntroEnded(true);
+          isPlayingIntroRef.current = false;
+          if (introVideoRef.current) {
+            try { introVideoRef.current.pause(); } catch {}
+          }
         }
 
-        // Sincroniza Posição Temporal
-        const drift = Math.abs(video.currentTime - sync.currentTime);
-        if (drift > 2.5) {
-          video.currentTime = sync.currentTime;
-          setCurrentTime(sync.currentTime);
-        } else if (drift > 0.4 && sync.isPlaying) {
-          // Ajuste sutil na velocidade para convergir sem congelamento perceptível
-          video.playbackRate = video.currentTime < sync.currentTime ? 1.05 : 0.95;
-        } else {
+        // Posição temporal esperada considerando latência de trânsito e relógio (Disney+ GroupWatch style)
+        const expectedPos = watchPartyService.calculateExpectedPosition(sync);
+        const cur = video.currentTime;
+        const drift = Math.abs(cur - expectedPos);
+
+        // 1. Sincroniza Play / Pause e Alinhamento de Posição
+        if (!sync.isPlaying) {
+          if (!video.paused) {
+            video.pause();
+            setIsPlaying(false);
+          }
+          // Quando pausado, alinha diretamente se a diferença for perceptível (> 300ms)
+          if (drift > 0.3) {
+            video.currentTime = expectedPos;
+            setCurrentTime(expectedPos);
+            lastPlaybackPositionRef.current = expectedPos;
+          }
           video.playbackRate = sync.playbackRate || 1.0;
+        } else {
+          // Host está reproduzindo
+          if (video.paused) {
+            video.play().then(() => setIsPlaying(true)).catch(console.warn);
+          }
+
+          // Correção progressiva inteligente:
+          // - Drift > 1.5s: Seek direto para a posição esperada
+          // - Drift entre 300ms e 1.5s: Pequeno ajuste sutil de velocidade (±5%)
+          // - Drift < 300ms: Dentro da tolerância (não corrigir / mantém velocidade padrão)
+          if (drift > 1.5) {
+            video.currentTime = expectedPos;
+            setCurrentTime(expectedPos);
+            lastPlaybackPositionRef.current = expectedPos;
+            video.playbackRate = sync.playbackRate || 1.0;
+          } else if (drift > 0.3) {
+            const baseRate = sync.playbackRate || 1.0;
+            video.playbackRate = cur < expectedPos ? baseRate * 1.05 : baseRate * 0.95;
+          } else {
+            video.playbackRate = sync.playbackRate || 1.0;
+          }
         }
+
+        setTimeout(() => {
+          isHandlingRemoteSyncRef.current = false;
+        }, 500);
       });
     });
 
@@ -3108,15 +3190,23 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (video.paused) {
       video.play().then(() => {
         setIsPlaying(true);
-        if (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) {
-          watchPartyService.updatePlaybackState(video.currentTime, true, video.playbackRate);
+        if (
+          (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) &&
+          !isHandlingRemoteSyncRef.current &&
+          !watchPartyService.isRemoteActionApplying
+        ) {
+          watchPartyService.updatePlaybackState(video.currentTime, true, video.playbackRate, duration || video.duration);
         }
       }).catch(console.error);
     } else {
       video.pause();
       setIsPlaying(false);
-      if (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) {
-        watchPartyService.updatePlaybackState(video.currentTime, false, video.playbackRate);
+      if (
+        (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) &&
+        !isHandlingRemoteSyncRef.current &&
+        !watchPartyService.isRemoteActionApplying
+      ) {
+        watchPartyService.updatePlaybackState(video.currentTime, false, video.playbackRate, duration || video.duration);
       }
     }
   };
@@ -3722,6 +3812,26 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                 if (targetResumeTimeRef.current > 0 && Math.abs(cur - targetResumeTimeRef.current) <= 2) {
                   targetResumeTimeRef.current = 0;
                 }
+
+                // Heartbeat temporal contínuo do Anfitrião da Watch Party (a cada 2.5s)
+                if (
+                  watchPartyService.isConnected &&
+                  watchPartyService.isHost() &&
+                  !isPlayingIntroRef.current &&
+                  !isHandlingRemoteSyncRef.current &&
+                  !video.paused
+                ) {
+                  const now = Date.now();
+                  if (now - lastHostBroadcastTimeRef.current >= 2500) {
+                    lastHostBroadcastTimeRef.current = now;
+                    watchPartyService.updatePlaybackState(
+                      cur,
+                      true,
+                      video.playbackRate || 1.0,
+                      duration || video.duration
+                    );
+                  }
+                }
               }
             }}
             onSeeking={() => {
@@ -3748,8 +3858,17 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                 if (videoRef.current.readyState >= 3) {
                   setIsLoading(false);
                 }
-                if (watchPartyService.isHost()) {
-                  watchPartyService.updatePlaybackState(cur, !videoRef.current.paused, videoRef.current.playbackRate || 1);
+                if (
+                  watchPartyService.isHost() &&
+                  !isHandlingRemoteSyncRef.current &&
+                  !watchPartyService.isRemoteActionApplying
+                ) {
+                  watchPartyService.updatePlaybackState(
+                    cur,
+                    !videoRef.current.paused,
+                    videoRef.current.playbackRate || 1,
+                    duration || videoRef.current.duration
+                  );
                 }
                 const remaining = (duration || 0) - cur;
                 if (remaining > 15) {
@@ -3777,8 +3896,17 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               playbackOptimizerService.notifyBufferingEnd();
               playbackOptimizerService.notifyFirstFrame();
               watchPartyService.setBuffering(false);
-              if (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) {
-                watchPartyService.updatePlaybackState(videoRef.current?.currentTime || 0, true, videoRef.current?.playbackRate || 1);
+              if (
+                (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) &&
+                !isHandlingRemoteSyncRef.current &&
+                !watchPartyService.isRemoteActionApplying
+              ) {
+                watchPartyService.updatePlaybackState(
+                  videoRef.current?.currentTime || 0,
+                  true,
+                  videoRef.current?.playbackRate || 1,
+                  duration || videoRef.current?.duration
+                );
               }
               mediaLoadingTracker.transition(item.id, 'PLAYING', {
                 streamTitle: currentStream?.title,
@@ -3806,8 +3934,17 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             }}
             onPause={() => {
               setIsPlaying(false);
-              if (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) {
-                watchPartyService.updatePlaybackState(videoRef.current?.currentTime || 0, false, videoRef.current?.playbackRate || 1);
+              if (
+                (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) &&
+                !isHandlingRemoteSyncRef.current &&
+                !watchPartyService.isRemoteActionApplying
+              ) {
+                watchPartyService.updatePlaybackState(
+                  videoRef.current?.currentTime || 0,
+                  false,
+                  videoRef.current?.playbackRate || 1,
+                  duration || videoRef.current?.duration
+                );
               }
             }}
             onEnded={() => {

@@ -763,6 +763,28 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     }
   }, [autoPlayInitialEpisode, initialSeason, initialEpisode, hasEpisodes]);
 
+  // Sincronização de troca de episódio na Watch Party
+  useEffect(() => {
+    const unsub = watchPartyService.onChangeEpisode((change: any) => {
+      const targetSeason = change?.season ?? change?.media?.season;
+      const targetEpisode = change?.episode ?? change?.media?.episode;
+      if (typeof targetSeason === 'number' && typeof targetEpisode === 'number') {
+        if (
+          currentEpisodeParams?.season === targetSeason &&
+          currentEpisodeParams?.episode === targetEpisode &&
+          isPlaying
+        ) {
+          return;
+        }
+        if (targetSeason !== currentSeason) {
+          setCurrentSeason(targetSeason);
+        }
+        startPlayback(targetSeason, targetEpisode, 'remote_sync');
+      }
+    });
+    return () => unsub();
+  }, [currentSeason, currentEpisodeParams, isPlaying]);
+
   const handleDownloadSeason = useCallback(async () => {
     if (!episodes || episodes.length === 0) return;
     try {
@@ -797,6 +819,9 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   }, [episodes, item, currentSeason, resolvedStreams]);
 
   const handleEpisodeClick = (season: number, episode: number) => {
+    if (watchPartyService.isConnected && (watchPartyService.isHost() || watchPartyService.canLocalControl('canChangeEpisode'))) {
+      watchPartyService.changeEpisode(season, episode);
+    }
     startPlayback(season, episode, 'manual_start');
   };
 

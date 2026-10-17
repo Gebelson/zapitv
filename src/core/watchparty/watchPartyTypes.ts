@@ -64,12 +64,17 @@ export interface WatchPartyPlaybackState {
   season?: number;
   episode?: number;
   positionSeconds: number;
-  currentTime?: number;
+  currentTime: number; // alias para positionSeconds garantindo compatibilidade total
   isPlaying: boolean;
+  playbackState?: 'playing' | 'paused' | 'buffering';
   playbackRate: number;
   eventTimestamp: number;
+  referenceTimestamp?: number;
   sequence: number;
   hostPeerId: string;
+  duration?: number;
+  sessionId?: string;
+  roomId?: string;
 }
 
 export interface WatchPartyChatMessage {

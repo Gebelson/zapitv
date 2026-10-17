@@ -59,6 +59,7 @@ export class WatchPartyService {
   private isApplyingRemoteAction: boolean = false;
   private hostGraceTimer: any = null;
   private pingInterval: any = null;
+  private latestPlaybackState: WatchPartyPlaybackState | null = null;
 
   // Voz em Tempo Real & Detecção de Atividade de Voz (VAD)
   private localAudioStream: MediaStream | null = null;
@@ -433,6 +434,24 @@ export class WatchPartyService {
         this.notify('peer_connected', peerId);
         this.notify('participants_updated', this.getParticipantList());
         this.notify('state_changed', this.getRoomState());
+
+        // Se somos o anfitrião, anuncia a sala e envia imediatamente a posição atual ao novo participante
+        if (this.transport.isHost && this.currentRoom) {
+          this.transport.broadcastRoomAnnouncement({
+            type: 'room_announcement',
+            roomInfo: this.currentRoom
+          });
+          if (this.latestPlaybackState) {
+            const currentEstTime = this.calculateExpectedPosition(this.latestPlaybackState);
+            this.sendPlaybackToPeer(
+              peerId,
+              currentEstTime,
+              this.latestPlaybackState.isPlaying,
+              this.latestPlaybackState.playbackRate,
+              this.latestPlaybackState.duration
+            );
+          }
+        }
       },
 
       onPeerLeave: (peerId) => {
@@ -467,7 +486,7 @@ export class WatchPartyService {
 
       onPlaybackSync: (state, senderId) => {
         const isFromHost = Boolean(this.currentRoom && (senderId === this.currentRoom.hostPeerId || !this.currentRoom.hostPeerId));
-        const hasPermission = this.canPeerControl(senderId, 'canPlayPause');
+        const hasPermission = this.canPeerControl(senderId, 'canPlayPause') || this.canPeerControl(senderId, 'canSeek');
 
         if (!isFromHost && !hasPermission) {
           console.warn(`[WatchParty] Comando de reprodução ignorado de peer sem autorização: ${senderId}`);
@@ -485,7 +504,22 @@ export class WatchPartyService {
         }
         this.lastKnownSequence = state.sequence;
 
-        this.notify('playback_sync', state);
+        // Normalização de campos garantindo compatibilidade total (positionSeconds e currentTime)
+        const normPos = typeof state.positionSeconds === 'number'
+          ? state.positionSeconds
+          : (typeof state.currentTime === 'number' ? state.currentTime : 0);
+
+        const normalizedState: WatchPartyPlaybackState = {
+          ...state,
+          positionSeconds: normPos,
+          currentTime: normPos,
+          playbackRate: state.playbackRate || 1.0,
+          eventTimestamp: state.eventTimestamp || Date.now(),
+          referenceTimestamp: state.referenceTimestamp || state.eventTimestamp || Date.now()
+        };
+
+        this.latestPlaybackState = normalizedState;
+        this.notify('playback_sync', normalizedState);
       },
 
       onRequestSync: (senderId) => {
@@ -494,6 +528,16 @@ export class WatchPartyService {
             type: 'room_announcement',
             roomInfo: this.currentRoom
           });
+          if (this.latestPlaybackState) {
+            const currentEstTime = this.calculateExpectedPosition(this.latestPlaybackState);
+            this.sendPlaybackToPeer(
+              senderId,
+              currentEstTime,
+              this.latestPlaybackState.isPlaying,
+              this.latestPlaybackState.playbackRate,
+              this.latestPlaybackState.duration
+            );
+          }
           this.notify('host_sync_requested', senderId);
           if (this.localScreenStream && this.transport.addLocalMediaStream && !this.screenSharedPeers.has(senderId)) {
             this.transport.addLocalMediaStream(this.localScreenStream, senderId);
@@ -799,7 +843,38 @@ export class WatchPartyService {
   // COMANDOS DE REPRODUÇÃO (ANFITRIÃO COMANDA)
   // ==========================================
 
-  public broadcastHostPlayback(positionSeconds: number, isPlaying: boolean, playbackRate: number = 1.0): void {
+  public getLastPlaybackState(): WatchPartyPlaybackState | null {
+    return this.latestPlaybackState;
+  }
+
+  /**
+   * Calcula a posição esperada do vídeo considerando o tempo decorrido desde o timestamp de referência
+   * e a velocidade de reprodução do anfitrião (Disney+ GroupWatch style).
+   */
+  public calculateExpectedPosition(state: WatchPartyPlaybackState): number {
+    const basePos = typeof state.positionSeconds === 'number'
+      ? state.positionSeconds
+      : (typeof state.currentTime === 'number' ? state.currentTime : 0);
+
+    if (!state.isPlaying) {
+      return Math.max(0, basePos);
+    }
+
+    const now = Date.now();
+    const refTime = state.referenceTimestamp || state.eventTimestamp || now;
+    const elapsedMs = Math.max(0, now - refTime);
+    // Limite superior de 30s de extrapolação para proteção contra relógios muito dessincronizados
+    const safeElapsed = Math.min(Math.max(0, elapsedMs / 1000), 30);
+    const pos = basePos + (safeElapsed * (state.playbackRate || 1.0));
+    return Math.max(0, pos);
+  }
+
+  public broadcastHostPlayback(
+    positionSeconds: number,
+    isPlaying: boolean,
+    playbackRate: number = 1.0,
+    duration?: number
+  ): void {
     if (!this.currentRoom || this.isApplyingRemoteAction) return;
 
     // Apenas Host ou participantes com permissão explícita podem transmitir
@@ -808,46 +883,76 @@ export class WatchPartyService {
     if (!canControl) return;
 
     this.lastKnownSequence += 1;
+    const now = Date.now();
+    const safePos = Math.max(0, positionSeconds || 0);
     const state: WatchPartyPlaybackState = {
       mediaId: this.currentRoom.media.id,
       mediaType: String(this.currentRoom.media.type),
       season: this.currentRoom.media.season,
       episode: this.currentRoom.media.episode,
-      positionSeconds,
+      positionSeconds: safePos,
+      currentTime: safePos,
       isPlaying,
-      playbackRate,
-      eventTimestamp: Date.now(),
+      playbackState: isPlaying ? 'playing' : 'paused',
+      playbackRate: playbackRate || 1.0,
+      eventTimestamp: now,
+      referenceTimestamp: now,
       sequence: this.lastKnownSequence,
-      hostPeerId: this.currentRoom.hostPeerId || this.transport.selfId
+      hostPeerId: this.currentRoom.hostPeerId || this.transport.selfId,
+      duration: duration || undefined,
+      sessionId: this.currentRoom.roomId,
+      roomId: this.currentRoom.roomId
     };
 
+    this.latestPlaybackState = state;
     this.transport.broadcastPlaybackState(state);
   }
 
-  public updatePlaybackState(positionSeconds: number, isPlaying: boolean, playbackRate: number = 1.0): void {
-    this.broadcastHostPlayback(positionSeconds, isPlaying, playbackRate);
+  public updatePlaybackState(
+    positionSeconds: number,
+    isPlaying: boolean,
+    playbackRate: number = 1.0,
+    duration?: number
+  ): void {
+    this.broadcastHostPlayback(positionSeconds, isPlaying, playbackRate, duration);
   }
 
   public setBuffering(isBuffering: boolean): void {
     this.reportLocalStatus(isBuffering ? 'buffering' : 'ready');
   }
 
-  public sendPlaybackToPeer(peerId: string, positionSeconds: number, isPlaying: boolean): void {
+  public sendPlaybackToPeer(
+    peerId: string,
+    positionSeconds: number,
+    isPlaying: boolean,
+    playbackRate: number = 1.0,
+    duration?: number
+  ): void {
     if (!this.transport.isHost || !this.currentRoom) return;
 
+    this.lastKnownSequence += 1;
+    const now = Date.now();
+    const safePos = Math.max(0, positionSeconds || 0);
     const state: WatchPartyPlaybackState = {
       mediaId: this.currentRoom.media.id,
       mediaType: String(this.currentRoom.media.type),
       season: this.currentRoom.media.season,
       episode: this.currentRoom.media.episode,
-      positionSeconds,
+      positionSeconds: safePos,
+      currentTime: safePos,
       isPlaying,
-      playbackRate: 1.0,
-      eventTimestamp: Date.now(),
+      playbackState: isPlaying ? 'playing' : 'paused',
+      playbackRate: playbackRate || 1.0,
+      eventTimestamp: now,
+      referenceTimestamp: now,
       sequence: this.lastKnownSequence,
-      hostPeerId: this.transport.selfId
+      hostPeerId: this.transport.selfId,
+      duration: duration || undefined,
+      sessionId: this.currentRoom.roomId,
+      roomId: this.currentRoom.roomId
     };
 
+    this.latestPlaybackState = state;
     this.transport.sendPlaybackState(peerId, state);
   }
 
@@ -904,15 +1009,19 @@ export class WatchPartyService {
     this.notify('state_changed', this.getRoomState());
   }
 
-  public executeRemoteActionSafely(action: () => void): void {
+  public executeRemoteActionSafely(action: () => void, windowMs: number = 400): void {
     this.isApplyingRemoteAction = true;
     try {
       action();
     } finally {
       setTimeout(() => {
         this.isApplyingRemoteAction = false;
-      }, 80);
+      }, windowMs);
     }
+  }
+
+  public get isRemoteActionApplying(): boolean {
+    return this.isApplyingRemoteAction;
   }
 
   public sendChatMessage(text: string): void {
