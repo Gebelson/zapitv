@@ -60,6 +60,7 @@ const WatchPartyModal = React.lazy(() => import('./src/components/watchparty/Wat
 import { offlineStorageDriver } from './src/core/offline/offlineStorageDriver';
 import { offlineDb } from './src/core/offline/offlineDb';
 import { OfflineDownload } from './src/core/offline/offlineTypes';
+import { StremioStream } from './src/core/stremio/stremioTypes';
 
 const GENRES_LIST = [
   'Ação', 'Adulto', 'Animação', 'Anime', 'Aventura', 'Biografia', 'Comédia', 
@@ -1307,38 +1308,38 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const [activeOfflineDownload, setActiveOfflineDownload] = useState<OfflineDownload | null>(null);
   const [offlineBlobUrl, setOfflineBlobUrl] = useState<string | null>(null);
   const [offlinePlaybackItem, setOfflinePlaybackItem] = useState<ContentItem | null>(null);
+  const [offlinePlaybackStreams, setOfflinePlaybackStreams] = useState<StremioStream[]>([]);
 
   const handlePlayOffline = useCallback(async (download: OfflineDownload) => {
     try {
-      const file = await offlineStorageDriver.getFile(download.storagePath, download.storageDriver);
+      const file = await offlineStorageDriver.getFile(download.storagePath, download.storageDriver, download.fileHandle, true);
       if (!file) {
         alert('Arquivo de vídeo não encontrado no armazenamento local.');
         return;
       }
       const blobUrl = URL.createObjectURL(file);
-      const mockItem: ContentItem = {
-        id: download.contentId,
+      const localItem: ContentItem = {
+        id: download.itemId,
         title: download.title,
         type: download.type,
         image: download.image,
         backdrop: download.image,
         year: new Date(download.createdAt).getFullYear(),
-        rating: 10,
-        genres: ['Offline'],
-        duration: 'Offline',
-        description: `Reprodução offline local • Armazenamento ZapiTV (${download.quality})`,
-        streams: [{
-          id: `offline-${download.id}`,
-          name: `Download Offline (${download.quality})`,
-          url: blobUrl,
-          type: 'mp4',
-          quality: download.quality,
-          headers: {}
-        }]
+        rating: 0,
+        genres: download.genres,
+        duration: download.duration || undefined,
+        description: download.episodeTitle || download.title
       };
+      setOfflinePlaybackStreams([{
+        name: `Download Offline (${download.quality})`,
+        url: blobUrl,
+        sourceType: download.format === 'webm' ? 'webm' : 'mp4',
+        isDubbed: download.audioTrack.isDubbed,
+        isPtBr: download.audioTrack.language === 'pt-BR'
+      }]);
       setOfflineBlobUrl(blobUrl);
       setActiveOfflineDownload(download);
-      setOfflinePlaybackItem(mockItem);
+      setOfflinePlaybackItem(localItem);
     } catch (err) {
       console.error('Erro ao iniciar reprodução offline:', err);
     }
@@ -1351,6 +1352,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     setOfflineBlobUrl(null);
     setActiveOfflineDownload(null);
     setOfflinePlaybackItem(null);
+    setOfflinePlaybackStreams([]);
   }, [offlineBlobUrl]);
 
   // Abertura in-loco de detalhes: abre o modal preservando a rota, página atual, scroll e contexto
@@ -2877,11 +2879,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       {/* Player de Reprodução Offline Integrado (Experiência Netflix) */}
       {activeOfflineDownload && offlinePlaybackItem && offlineBlobUrl && (
         <div className="fixed inset-0 z-[500] bg-black">
-          <React.Suspense fallback={<div className="fixed inset-0 z-[500] bg-black flex items-center justify-center"><ZapiLoader size="xl" message="Abrindo vídeo do armazenamento local..." /></div>}>
+          <React.Suspense fallback={<div className="fixed inset-0 z-[500] bg-black flex items-center justify-center"><ZapiLoader size="xl" text="Abrindo vídeo do armazenamento local..." showText /></div>}>
             <ZapiPlayer
               key={activeOfflineDownload.id}
               item={offlinePlaybackItem}
-              streams={offlinePlaybackItem.streams || []}
+              streams={offlinePlaybackStreams}
               isOfflineMode={true}
               offlineSubtitles={activeOfflineDownload.subtitles}
               initialResumeTime={activeOfflineDownload.lastPlaybackPosition}

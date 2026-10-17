@@ -1999,7 +1999,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     userManuallyChangedSubRef.current = false;
     setIsLoadingSubtitles(true);
 
-    if (offlineSubtitles && offlineSubtitles.length > 0) {
+    if (isOfflineMode) {
       const offlineList = offlineSubtitles.map(s => ({
         id: s.id,
         lang: s.languageCode || 'pt',
@@ -2031,7 +2031,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     };
     fetchSubs();
     return () => { active = false; };
-  }, [item, initialSeason, initialEpisode, currentStream]);
+  }, [item, initialSeason, initialEpisode, currentStream, isOfflineMode, offlineSubtitles]);
 
   // Aplicação estrita da preferência do usuário de legendas (Requisitos 1 a 10):
   useEffect(() => {
@@ -2504,6 +2504,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Pre-flight instant probe of candidate stream
   useEffect(() => {
     if (isBroadcastGuest || isLoadingStreams || !currentStream?.url) return;
+    // O blob já foi obtido do download identificado por item/temporada/episódio.
+    // Validadores de provedores rejeitam URLs blob e não se aplicam ao arquivo local.
+    if (isOfflineMode && currentStream.url.startsWith('blob:')) return;
     triedIndicesRef.current.add(selectedStreamIndex);
 
     // Validação estrita de correspondência de identidade da obra e episódio (Impede obras trocadas)
@@ -2559,7 +2562,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [selectedStreamIndex, currentStream, handleStreamFallback, isLoadingStreams, item, initialSeason, initialEpisode]);
+  }, [selectedStreamIndex, currentStream, handleStreamFallback, isLoadingStreams, item, initialSeason, initialEpisode, isOfflineMode]);
 
   const markMediaAsReadyRef = useRef(markMediaAsReady);
   useEffect(() => {

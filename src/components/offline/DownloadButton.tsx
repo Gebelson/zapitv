@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Download, CheckCircle2, RefreshCw, AlertCircle, Pause, Play } from 'lucide-react';
 import { ContentItem, ContentType } from '../../../types';
 import { StremioStream } from '../../core/stremio/stremioTypes';
 import { offlineDb } from '../../core/offline/offlineDb';
 import { offlineDownloadManager } from '../../core/offline/offlineDownloadManager';
 import { offlineSourceInspector } from '../../core/offline/offlineSourceInspector';
-import { providerRegistry } from '../../core/providers/providerRegistry';
-import { subtitleService } from '../../core/subtitles/subtitleService';
+import { sourceVerificationService } from '../../core/providers/sourceVerificationService';
+import { subtitleService, parseSRT } from '../../core/subtitles/subtitleService';
+import { validateSubtitleContentMatch } from '../../core/subtitles/subtitleLanguageDetector';
 import { DownloadQualityModal } from './DownloadQualityModal';
 import { DownloadQualityOption, OfflineDownload, OfflineSubtitleTrack } from '../../core/offline/offlineTypes';
+import { helperClient } from '../../core/offline/helperClient';
 
 interface DownloadButtonProps {
   item: ContentItem;
@@ -34,6 +36,10 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
   const [downloadOptions, setDownloadOptions] = useState<DownloadQualityOption[]>([]);
   const [unavailableReason, setUnavailableReason] = useState<string | undefined>();
   const [isInspecting, setIsInspecting] = useState(false);
+  const inspectedStreamsRef = useRef<StremioStream[]>([]);
+  const inspectionControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => inspectionControllerRef.current?.abort(), []);
 
   // Monitora o estado do download para este item e episódio
   useEffect(() => {
@@ -59,49 +65,67 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
     }
 
     setIsInspecting(true);
+    inspectionControllerRef.current?.abort();
+    const controller = new AbortController();
+    inspectionControllerRef.current = controller;
     try {
-      let candidateStreams = Array.isArray(streams) ? [...streams] : [];
+      // As fontes recebidas pelo modal podem pertencer ao episódio em pré-carregamento.
+      // Para séries, a resolução sempre precisa usar a temporada e o episódio deste botão.
+      let candidateStreams = season !== undefined && episode !== undefined
+        ? []
+        : (Array.isArray(streams) ? [...streams] : []);
 
-      // 1. Se candidateStreams estiver vazio, consulta dinamicamente o providerRegistry
+      // Usa a mesma resolução canônica e segunda verificação do player online.
+      // Os streams recebidos para filmes já podem vir do prefetch do modal.
+      let discoveryReason: string | undefined;
       if (candidateStreams.length === 0) {
-        const isMovie = item.mediaFormat === 'movie' || item.type === ContentType.MOVIE;
-        const targetType = isMovie ? 'movie' : (item.type === ContentType.ANIME ? 'anime' : 'series');
         const epParams = (season !== undefined && episode !== undefined) ? { season, episode } : undefined;
         try {
-          candidateStreams = await providerRegistry.resolveStreams(
-            targetType,
-            {
-              tmdbId: item.tmdbId,
-              imdbId: item.imdbId,
-              id: item.id,
-              title: item.title,
-              originalTitle: item.originalTitle,
-              year: item.year
-            },
-            epParams
-          );
+          const result = await sourceVerificationService.verifySources(item, epParams, { signal: controller.signal });
+          candidateStreams = result.streams;
+          if (result.state === 'INCONCLUSIVE') discoveryReason = 'A busca de fontes falhou temporariamente. Tente novamente.';
         } catch (err) {
-          console.warn('[DownloadButton] Falha ao consultar fontes no providerRegistry:', err);
+          discoveryReason = 'A busca de fontes falhou temporariamente. Tente novamente.';
         }
       }
 
+      if (controller.signal.aborted) return;
+
       // 2. Se ainda estiver vazio, verifica se há verifiedStreams no próprio item
-      if (candidateStreams.length === 0 && item.verifiedStreams && item.verifiedStreams.length > 0) {
+      if (candidateStreams.length === 0 && season === undefined && item.verifiedStreams && item.verifiedStreams.length > 0) {
         candidateStreams = [...item.verifiedStreams];
       }
+
+      inspectedStreamsRef.current = candidateStreams;
 
       const durationMins = parseInt(String(item.duration || '').replace(/\D/g, ''), 10) || 90;
       const diagnosis = await offlineSourceInspector.inspectDownloadOptionsDetailed({
         item,
         streams: candidateStreams,
+        skipDiscovery: true,
         season,
         episode,
         preferredLanguage: 'pt-BR',
         durationMinutes: durationMins
       });
 
-      setDownloadOptions(diagnosis.options);
-      setUnavailableReason(diagnosis.reason);
+      if (controller.signal.aborted) return;
+      const options = [...diagnosis.options];
+      if (await helperClient.connected()) {
+        const existing = new Set(options.map(option => option.sourceUrl));
+        for (const stream of candidateStreams) {
+          if (!stream.offlineAllowed || !stream.url || existing.has(stream.url) || stream.behaviorHints?.proxyHeaders?.request || stream.behaviorHints?.headers) continue;
+          let parsed: URL;
+          try { parsed = new URL(stream.url); } catch { continue; }
+          if (!['http:', 'https:'].includes(parsed.protocol) || !/\.(mp4|webm)$/i.test(parsed.pathname)) continue;
+          const format = parsed.pathname.toLowerCase().endsWith('.webm') ? 'webm' : 'mp4';
+          const declaredQuality = String(stream.quality || '').match(/(?:2160|1440|1080|720|480|360)p/i)?.[0] || 'Original';
+          options.push({ quality: declaredQuality, estimatedBytes: 0, sourceUrl: stream.url, sourceType: format, isDubbed: Boolean(stream.isDubbed), audioLanguage: stream.isPtBr ? 'pt-BR' : 'original', isAuthorized: true, method: 'helper' });
+          existing.add(stream.url);
+        }
+      }
+      setDownloadOptions(options);
+      setUnavailableReason(candidateStreams.length === 0 ? discoveryReason || diagnosis.reason : options.length ? undefined : diagnosis.reason);
       setIsModalOpen(true);
     } catch (e: any) {
       console.warn('[DownloadButton] Erro ao inspecionar opções:', e);
@@ -113,36 +137,66 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
     }
   };
 
-  const handleConfirmDownload = async (option: DownloadQualityOption) => {
+  const handleConfirmDownload = async (option: DownloadQualityOption): Promise<boolean> => {
     try {
-      const baseStream = streams?.find(s => s.url === option.sourceUrl);
+      if (option.method === 'helper') {
+        await helperClient.start({ itemId: item.id, title: item.title, type: item.type, season, episode, quality: option.quality, format: option.sourceType === 'webm' ? 'webm' : 'mp4', url: option.sourceUrl, offlineAllowed: true });
+        return true;
+      }
+      let fileHandle: FileSystemFileHandle | undefined;
+      const savePicker = (window as Window & {
+        showSaveFilePicker?: (options: { suggestedName: string; types: Array<{ description: string; accept: Record<string, string[]> }> }) => Promise<FileSystemFileHandle>;
+      }).showSaveFilePicker;
+      if (savePicker) {
+        const extension = option.sourceType === 'webm' ? 'webm' : 'mp4';
+        const episodeSuffix = season !== undefined && episode !== undefined ? ` - T${season}E${episode}` : '';
+        const suggestedName = `${item.title}${episodeSuffix} - ${option.quality}`.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim().slice(0, 120) + `.${extension}`;
+        try {
+          fileHandle = await savePicker.call(window, {
+            suggestedName,
+            types: [{ description: `Vídeo ${extension.toUpperCase()}`, accept: { [`video/${extension}`]: [`.${extension}`] } }]
+          });
+        } catch (error) {
+          if (error instanceof DOMException && error.name === 'AbortError') return false;
+          throw error;
+        }
+      }
+      const baseStream = inspectedStreamsRef.current.find(s => s.url === option.sourceUrl);
       const matchedStream: StremioStream = {
         ...(baseStream || {}),
         name: baseStream?.name || `ZapiTV Stream (${option.quality})`,
         title: baseStream?.title || `${item.title} - ${option.quality}`,
         url: option.sourceUrl,
         sourceType: option.sourceType,
-        quality: option.quality,
+        quality: option.quality as StremioStream['quality'],
         isDubbed: option.isDubbed,
-        isPtBr: option.isDubbed
+        isPtBr: option.audioLanguage === 'pt-BR',
+        offlineAllowed: option.isAuthorized
       };
 
-      // Tenta obter legendas disponíveis para salvar offline (máx 800ms para iniciar download imediatamente)
+      // Salva apenas legendas com falas reais; uma faixa vazia não funciona offline.
       let offlineSubtitles: OfflineSubtitleTrack[] = [];
       try {
         const tracks = await Promise.race([
           subtitleService.fetchSubtitles(item, season, episode, matchedStream),
-          new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 800))
+          new Promise<any[]>((resolve) => setTimeout(() => resolve([]), 1200))
         ]);
         if (tracks && tracks.length > 0) {
-          offlineSubtitles = tracks.slice(0, 3).map((t: any) => ({
-            id: t.id,
-            languageName: t.label || t.lang,
-            languageCode: t.lang,
-            isPtBr: Boolean(t.isPtBr),
-            format: 'vtt' as const,
-            cues: []
+          const candidates = await Promise.all(tracks.slice(0, 3).map(async (t: any) => {
+            if (!t.url) return null;
+            try {
+              const data = await Promise.race([
+                subtitleService.fetchAndDecodeSRT(t.url, t.lang),
+                new Promise<string>((resolve) => setTimeout(() => resolve(''), 1200))
+              ]);
+              const cues = parseSRT(data);
+              if (cues.length === 0 || !validateSubtitleContentMatch(cues, t.lang).isValid) return null;
+              return { id: t.id, languageName: t.label || t.lang,
+                languageCode: t.lang, isPtBr: Boolean(t.isPtBr),
+                format: 'vtt' as const, cues };
+            } catch { return null; }
           }));
+          offlineSubtitles = candidates.filter(track => track !== null) as OfflineSubtitleTrack[];
         }
       } catch {}
 
@@ -153,17 +207,37 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
         season,
         episode,
         episodeTitle,
-        subtitles: offlineSubtitles
+        subtitles: offlineSubtitles,
+        fileHandle
       });
       console.log('[DownloadButton] Download enfileirado com sucesso!');
+      return true;
     } catch (err: any) {
       alert(err.message || 'Não foi possível iniciar o download.');
+      return false;
     }
   };
 
+  const handleImportFile = async (file: File): Promise<boolean> => {
+    try {
+      await offlineDownloadManager.importLocalFile(file, {
+        itemId: item.id,
+        title: item.title,
+        type: item.type,
+        season,
+        episode
+      });
+      return true;
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Não foi possível importar o arquivo.');
+      return false;
+    }
+  };
+  const canImportHere = item.mediaFormat === 'movie' || item.type === ContentType.MOVIE || (season !== undefined && episode !== undefined);
+
   const status = downloadRecord?.status;
   const progressPercent = downloadRecord && downloadRecord.totalBytes > 0
-    ? Math.min(100, Math.round((downloadRecord.downloadedBytes / downloadRecord.totalBytes) * 100))
+    ? Math.min(downloadRecord.status === 'completed' ? 100 : 99, Math.round((downloadRecord.downloadedBytes / downloadRecord.totalBytes) * 100))
     : 0;
 
   // 1. Variante Ícone Circular (usado na lista de episódios)
@@ -174,6 +248,8 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
           type="button"
           onClick={handleOpenModal}
           disabled={isInspecting}
+          aria-label={status === 'completed' ? 'Download concluído' : isInspecting ? 'Verificando download' : 'Baixar este episódio para assistir offline'}
+          aria-busy={isInspecting}
           className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
             status === 'completed'
               ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
@@ -219,6 +295,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
           options={downloadOptions}
           unavailableReason={unavailableReason}
           onConfirm={handleConfirmDownload}
+          onImport={canImportHere ? handleImportFile : undefined}
           onClose={() => setIsModalOpen(false)}
         />
       </>
@@ -284,6 +361,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
         options={downloadOptions}
         unavailableReason={unavailableReason}
         onConfirm={handleConfirmDownload}
+        onImport={canImportHere ? handleImportFile : undefined}
         onClose={() => setIsModalOpen(false)}
       />
     </>

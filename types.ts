@@ -33,6 +33,7 @@ export interface ContentItem {
   imdbRank?: number; // Posição oficial no ranking IMDb (ex: #14)
   displayRank?: number; // Posição filtrada entre títulos disponíveis no ZapiTV (ex: #1)
   videoUrl?: string; // Custom video URL
+  offlineAllowed?: boolean; // Permissão explícita de armazenamento offline para videoUrl
   originalTitle?: string;
   duration?: number;
   overview?: string;
@@ -61,6 +62,8 @@ export interface ContentItem {
     description: string;
     image: string;
     videoUrl?: string;
+    offlineAllowed?: boolean;
+    quality?: '4K' | '1080p' | '720p' | '480p' | 'HD' | 'SD';
   }[];
 }
 

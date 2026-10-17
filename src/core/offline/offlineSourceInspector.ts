@@ -1,34 +1,20 @@
 /**
  * ZapiTV — OfflineSourceInspector
- * Inspeciona e valida a autorização e viabilidade de download das fontes de mídia reais.
- * 
- * Regras e Capacidades:
- * 1. Diagnóstico Real e Dificuldade Técnica:
- *    - Diferencia DRM comercial (Widevine, PlayReady, FairPlay) de criptografia de transporte (HLS AES-128) e CORS.
- *    - Nunca rotula HLS/DASH criptografado com AES-128 como DRM incompatível.
- * 2. Busca Automática de Alternativas:
- *    - Se uma fonte falhar ou for bloqueada, consulta ativamente todas as fontes autorizadas da obra.
- * 3. Qualidades Reais:
- *    - Extrai resoluções reais de streams diretos e variantes de Master Playlists HLS (4K, 1440p, 1080p, 720p, 480p, 360p).
- * 4. Resolução de CORS:
- *    - Converte URLs de fontes externas em URLs do proxy local (/api/proxy) quando necessário para garantir acesso sem bloqueio de navegador.
- * 5. Licenças EME Legítimas:
- *    - Avalia suporte oficial a licenças offline via browserCompatibilityService sem extrair chaves ou contornar proteções.
+ * Inspeciona fontes com permissão explícita de armazenamento offline.
+ * Aceita MP4/WebM diretos acessíveis pelo navegador. HLS, DASH e DRM exigem
+ * um mecanismo de licença/armazenamento próprio e não são anunciados como MP4.
  */
 
 import { StremioStream } from '../stremio/stremioTypes';
 import { DownloadQualityOption } from './offlineTypes';
-import { mediaSourceValidationService } from '../providers/mediaSourceValidationService';
 import { providerRegistry } from '../providers/providerRegistry';
-import { browserCompatibilityService } from './browserCompatibilityService';
-import { hlsDownloadService } from './hlsDownloadService';
 import { ContentItem, ContentType } from '../../../types';
 import { VERIFIED_OPEN_ITEMS } from '../catalog/verifiedCatalog';
-import { filmesData } from '../../../constants';
 
 export interface InspectionDiagnosisParams {
   item?: ContentItem;
   streams?: StremioStream[];
+  skipDiscovery?: boolean;
   season?: number;
   episode?: number;
   preferredLanguage?: 'pt-BR' | 'original';
@@ -61,12 +47,14 @@ export class OfflineSourceInspector {
     let episode: number | undefined;
     let preferredLanguage: 'pt-BR' | 'original' = preferredLangParam;
     let durationMinutes = durationParam;
+    let skipDiscovery = false;
 
     if (Array.isArray(streamsOrParams)) {
       initialStreams = [...streamsOrParams];
     } else if (streamsOrParams && typeof streamsOrParams === 'object') {
       item = streamsOrParams.item;
       initialStreams = Array.isArray(streamsOrParams.streams) ? [...streamsOrParams.streams] : [];
+      skipDiscovery = streamsOrParams.skipDiscovery === true;
       season = streamsOrParams.season;
       episode = streamsOrParams.episode;
       preferredLanguage = streamsOrParams.preferredLanguage || 'pt-BR';
@@ -76,8 +64,8 @@ export class OfflineSourceInspector {
     // 1. Coleta todas as fontes candidatas (incluindo busca de alternativas se necessário)
     let candidatePool = [...initialStreams];
 
-    // Se temos o item e a lista inicial de streams for pequena ou vazia, busca fontes em todos os provedores
-    if (item && candidatePool.length < 5) {
+    // Busca no provedor somente quando o chamador ainda não possui candidatas.
+    if (item && candidatePool.length === 0 && !skipDiscovery) {
       try {
         const isMovie = item.mediaFormat === 'movie' || item.type === ContentType.MOVIE;
         const targetType = isMovie ? 'movie' : (item.type === ContentType.ANIME ? 'anime' : 'series');
@@ -111,12 +99,12 @@ export class OfflineSourceInspector {
     }
 
     // Se ainda estiver vazio e o item tiver verifiedStreams
-    if (candidatePool.length === 0 && item?.verifiedStreams) {
+    if (candidatePool.length === 0 && season === undefined && item?.verifiedStreams) {
       candidatePool.push(...item.verifiedStreams);
     }
 
     // Procura no acervo aberto se ainda não tiver fontes
-    if (candidatePool.length === 0 && item) {
+    if (candidatePool.length === 0 && item && season === undefined) {
       const match = VERIFIED_OPEN_ITEMS.find(i => i.id === item.id || i.tmdbId === item.tmdbId || i.imdbId === item.imdbId);
       if (match?.verifiedStreams) {
         candidatePool.push(...match.verifiedStreams);
@@ -135,34 +123,32 @@ export class OfflineSourceInspector {
       };
     }
 
-    // 2. Verificação de status do Stremio Engine local (127.0.0.1:11470)
-    let isLocalEngineOnline = false;
-    try {
-      const probe = await fetch('http://127.0.0.1:11470/stats.json', { signal: AbortSignal.timeout(400) });
-      isLocalEngineOnline = probe.ok;
-    } catch {
-      isLocalEngineOnline = false;
-    }
-
-    // 3. Classificação e Diagnóstico Real de cada fonte
-    const capabilities = await browserCompatibilityService.getCapabilities();
-    
+    // 2. Classificação e diagnóstico das fontes
     let drmProtectedCount = 0;
     let torrentEngineRequiredCount = 0;
     let corsRestrictedCount = 0;
+    let onlineOnlyCount = 0;
+    let adaptiveCount = 0;
+    let authRequiredCount = 0;
     const eligibleStreams: Array<{
       stream: StremioStream;
       resolvedUrl: string;
       sourceType: 'mp4' | 'webm' | 'hls';
       qualities: string[];
       isDubbed: boolean;
-      isPtBr: boolean;
     }> = [];
 
     for (const s of candidatePool) {
       if (!s || !s.url) continue;
       const rawUrl = s.url.trim();
+      if (!s.offlineAllowed) { onlineOnlyCount++; continue; }
+      if (rawUrl.startsWith('/api/proxy?')) { corsRestrictedCount++; continue; }
+      if (s.behaviorHints?.proxyHeaders?.request || s.behaviorHints?.headers) {
+        authRequiredCount++;
+        continue; // Não copiar credenciais de addon para o navegador ou logs.
+      }
       const lower = rawUrl.toLowerCase();
+      const mediaPath = (() => { try { return new URL(rawUrl, 'https://zapitv.local').pathname.toLowerCase(); } catch { return ''; } })();
 
       // A) DRM Comercial Real (Widevine, PlayReady, FairPlay, SAMPLE-AES)
       const hasCommercialDrm = (
@@ -174,111 +160,71 @@ export class OfflineSourceInspector {
       );
 
       if (hasCommercialDrm) {
-        // Verifica se há licença offline persistente suportada legitimamente pelo dispositivo
-        const hasOfflineLicense = (
-          (lower.includes('widevine') && capabilities.supportsPersistentWidevine) ||
-          (lower.includes('playready') && capabilities.supportsPersistentPlayReady) ||
-          (lower.includes('fairplay') && capabilities.supportsPersistentFairPlay)
-        );
-
-        if (!hasOfflineLicense) {
-          drmProtectedCount++;
-          continue; // Não é permitido o download sem licença offline oficial do provedor
-        }
+        // Suporte EME do navegador não é uma licença offline concedida ao ZapiTV.
+        drmProtectedCount++;
+        continue;
       }
 
       // B) Fontes que requerem motor local do Stremio (127.0.0.1:11470)
       if (lower.includes('127.0.0.1:11470') || lower.includes('localhost:11470')) {
-        if (!isLocalEngineOnline) {
-          torrentEngineRequiredCount++;
-          continue; // Motor local não está ativo
-        }
+        torrentEngineRequiredCount++;
+        continue; // Motor local não estaria disponível durante a reprodução offline.
       }
 
-      // C) Resolução de URL para compatibilidade técnica com navegador (CORS)
-      // Se a URL for externa HTTP/HTTPS direta e não for da mesma origem, converte para proxy local
-      let resolvedUrl = rawUrl;
-      const isDirectHttp = rawUrl.startsWith('http://') || rawUrl.startsWith('https://');
-      const isSameOrigin = typeof window !== 'undefined' && rawUrl.startsWith(window.location.origin);
-      const isRelative = rawUrl.startsWith('/');
-
-      if (isDirectHttp && !isSameOrigin) {
-        // Para fontes FenixFlix ou outras CDNs diretas, usamos o proxy local /api/proxy para desobstruir CORS
-        resolvedUrl = `/api/proxy?url=${encodeURIComponent(rawUrl)}`;
-      }
+      // Download exige acesso direto permitido pela origem (sem contornar CORS).
+      const resolvedUrl = rawUrl;
 
       // D) Identificação do tipo de contêiner
-      const isHls = lower.includes('.m3u8') || s.sourceType === 'hls';
-      const isWebm = lower.includes('.webm') || s.sourceType === 'webm';
+      const isHls = mediaPath.endsWith('.m3u8') || s.sourceType === 'hls';
+      const isWebm = mediaPath.endsWith('.webm') || s.sourceType === 'webm';
+      // O downloader atual não remuxa segmentos HLS em um arquivo reproduzível.
+      // Não anuncie um download que terminaria como MP4 corrompido.
+      if (isHls || s.sourceType === 'dash') { adaptiveCount++; continue; }
+      if (!mediaPath.endsWith('.mp4') && !isWebm && s.sourceType !== 'mp4') continue;
       const sourceType: 'mp4' | 'webm' | 'hls' = isHls ? 'hls' : (isWebm ? 'webm' : 'mp4');
 
-      // E) Se for HLS, verifica se é compatível (sem DRM comercial, suporte a AES-128 de transporte)
-      let hlsVariants: string[] = [];
-      if (isHls) {
-        // Tenta inspecionar o manifesto HLS
-        try {
-          const hlsDiag = await hlsDownloadService.inspectHlsManifest(resolvedUrl);
-          if (hlsDiag.hasDrm && !hlsDiag.isDownloadable) {
-            drmProtectedCount++;
-            continue;
-          }
-          if (hlsDiag.variants.length > 0) {
-            hlsVariants = hlsDiag.variants.map(v => v.quality);
-          }
-        } catch {
-          // Mantém fallback caso a rede do manifesto oscile
-        }
-      }
-
-      // F) Extração de resoluções reais presentes na fonte
-      const streamResolutions = mediaSourceValidationService.extractStreamResolutions(s);
+      // F) O validador do player usa 1080p como padrão quando não há dado.
+      // Para download isso seria uma qualidade fictícia; usamos só declarações.
       let qualityList: string[] = [];
+      const text = `${s.quality || ''} ${s.name || ''} ${s.title || ''}`.toLowerCase();
+      if (/\b(2160p|4k|uhd)\b/i.test(text)) qualityList.push('4K');
+      else if (/\b(1440p|2k|qhd)\b/i.test(text)) qualityList.push('1440p');
+      else if (/\b(1080p|fhd|full[-_\s]?hd)\b/i.test(text)) qualityList.push('1080p');
+      else if (/\b(720p|hd)\b/i.test(text)) qualityList.push('720p');
+      else if (/\b(480p|sd)\b/i.test(text)) qualityList.push('480p');
+      else if (/\b(360p)\b/i.test(text)) qualityList.push('360p');
 
-      if (hlsVariants.length > 0) {
-        qualityList = Array.from(new Set(hlsVariants));
-      } else if (streamResolutions.length > 0) {
-        qualityList = streamResolutions;
-      } else if (s.quality) {
-        qualityList = [s.quality];
-      } else {
-        const text = `${s.name || ''} ${s.title || ''}`.toLowerCase();
-        if (/\b(2160p|4k|uhd)\b/i.test(text)) qualityList.push('4K');
-        else if (/\b(1440p|2k|qhd)\b/i.test(text)) qualityList.push('1440p');
-        else if (/\b(1080p|fhd|full[-_\s]?hd)\b/i.test(text)) qualityList.push('1080p');
-        else if (/\b(720p|hd)\b/i.test(text)) qualityList.push('720p');
-        else if (/\b(480p|sd)\b/i.test(text)) qualityList.push('480p');
-        else if (/\b(360p)\b/i.test(text)) qualityList.push('360p');
-        else {
-          qualityList.push(isHls ? '720p' : '1080p');
-        }
-      }
+      // Arquivo direto sem resolução declarada continua utilizável, mas não
+      // recebe uma qualidade inventada.
+      if (qualityList.length === 0) qualityList = ['Original'];
 
-      const isDubbed = Boolean(
-        s.isDubbed ||
-        s.isPtBr ||
-        /dublado|dub\b|pt[-_]?br|portugu[êe]s|🌎\s*portugu[êe]s/i.test(`${s.name || ''} ${s.title || ''}`)
-      );
+      const isDubbed = Boolean(s.isDubbed);
 
       eligibleStreams.push({
         stream: s,
         resolvedUrl,
         sourceType,
         qualities: qualityList,
-        isDubbed,
-        isPtBr: isDubbed
+        isDubbed
       });
     }
 
-    // 4. Se não houver fontes elegíveis após análise detalhada, constrói motivo transparente e preciso
+    // Se não houver fontes elegíveis, mostra o motivo disponível.
     if (eligibleStreams.length === 0) {
-      let specificReason = 'Nenhuma fonte autorizada compatível com gravação local no navegador está disponível no momento.';
+      let specificReason = 'Nenhuma fonte com permissão explícita para download offline, acesso direto e formato MP4/WebM foi encontrada.';
       
-      if (drmProtectedCount > 0 && candidatePool.length === drmProtectedCount) {
+      if (onlineOnlyCount === candidatePool.length) {
+        specificReason = `${onlineOnlyCount} fonte(s) encontrada(s) para assistir online, mas nenhuma informa permissão para armazenamento offline.`;
+      } else if (authRequiredCount > 0) {
+        specificReason = 'A fonte offline exige autenticação do provedor que ainda não pode ser renovada com segurança no navegador.';
+      } else if (adaptiveCount > 0) {
+        specificReason = 'A fonte autorizada usa HLS/DASH; ainda falta armazenamento e reprodução offline dos segmentos completos.';
+      } else if (drmProtectedCount > 0 && candidatePool.length === drmProtectedCount) {
         specificReason = 'As fontes disponíveis possuem proteção DRM comercial (Widevine/FairPlay) sem autorização de licença offline para este dispositivo.';
       } else if (torrentEngineRequiredCount > 0 && candidatePool.length === torrentEngineRequiredCount) {
         specificReason = 'As fontes disponíveis dependem do aplicativo de streaming local Stremio Engine (porta 11470), que não está ativo neste momento.';
       } else if (corsRestrictedCount > 0) {
-        specificReason = 'As fontes encontradas possuem restrições de permissão de rede (CORS) no servidor de origem.';
+        specificReason = 'As fontes encontradas passam pelo proxy do player; esse endereço não oferece uma transferência offline direta verificada.';
       }
 
       return {
@@ -303,90 +249,68 @@ export class OfflineSourceInspector {
       }
     }
 
-    // 6. Seleciona a melhor fonte para cada resolução disponível
-    const selectedOptions: DownloadQualityOption[] = [];
-    const orderedKeys = ['4K', '1440p', '1080p', '720p', '480p', '360p'].filter(k => streamsByQuality.has(k));
+    // 6. Testa as candidatas de cada qualidade em ordem; uma CDN inativa não
+    // deve esconder outra fonte autorizada para o mesmo episódio.
+    const orderedKeys = ['4K', '1440p', '1080p', '720p', '480p', '360p', 'Original'].filter(k => streamsByQuality.has(k));
 
-    for (const quality of orderedKeys) {
+    const optionResults = await Promise.all(orderedKeys.map(async quality => {
       const candidates = streamsByQuality.get(quality) || [];
-      if (candidates.length === 0) continue;
+      if (candidates.length === 0) return null;
 
       // Priorização de candidatos:
       // a) Prioriza Dublado PT-BR se preferredLanguage for pt-BR
-      // b) Prioriza URLs com proxy local (/api/proxy) para máxima estabilidade e zero CORS
-      // c) Prioriza MP4 direto sobre HLS para menor consumo de CPU
       candidates.sort((a, b) => {
         if (preferredLanguage === 'pt-BR') {
           if (a.isDubbed && !b.isDubbed) return -1;
           if (!a.isDubbed && b.isDubbed) return 1;
         }
 
-        const aIsLocalProxy = a.resolvedUrl.startsWith('/api/proxy') || a.resolvedUrl.startsWith('/');
-        const bIsLocalProxy = b.resolvedUrl.startsWith('/api/proxy') || b.resolvedUrl.startsWith('/');
-        if (aIsLocalProxy && !bIsLocalProxy) return -1;
-        if (!aIsLocalProxy && bIsLocalProxy) return 1;
-
-        if (a.sourceType === 'mp4' && b.sourceType === 'hls') return -1;
-        if (a.sourceType === 'hls' && b.sourceType === 'mp4') return 1;
-
         return 0;
       });
 
-      const best = candidates[0];
-      const mins = Math.max(15, durationMinutes);
-      let estimatedBytes = 0;
-      if (quality === '4K') estimatedBytes = Math.round(mins * 50 * 1024 * 1024);
-      else if (quality === '1440p') estimatedBytes = Math.round(mins * 28 * 1024 * 1024);
-      else if (quality === '1080p') estimatedBytes = Math.round(mins * 16 * 1024 * 1024);
-      else if (quality === '720p') estimatedBytes = Math.round(mins * 9 * 1024 * 1024);
-      else if (quality === '480p') estimatedBytes = Math.round(mins * 4 * 1024 * 1024);
-      else estimatedBytes = Math.round(mins * 2.5 * 1024 * 1024);
-
-      selectedOptions.push({
-        quality,
-        estimatedBytes,
-        sourceUrl: best.resolvedUrl,
-        sourceType: best.sourceType,
-        isDubbed: best.isDubbed,
-        audioLanguage: best.isDubbed ? 'pt-BR' : 'original',
-        isAuthorized: true
-      });
-    }
-
-    // 7. Probe de tamanho real (Content-Length) em paralelo para as qualidades finais
-    await Promise.all(
-      selectedOptions.map(async (opt) => {
-        if (opt.sourceType === 'mp4' || opt.sourceType === 'webm') {
-          try {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 1800);
-            const res = await fetch(opt.sourceUrl, {
-              method: 'HEAD',
-              signal: controller.signal
-            }).catch(() => null);
-            clearTimeout(timer);
-
-            if (res && res.ok) {
-              const cl = res.headers.get('content-length');
-              if (cl) {
-                const parsed = parseInt(cl, 10);
-                if (parsed > 10 * 1024 * 1024) {
-                  opt.estimatedBytes = parsed;
-                }
-              }
-            }
-          } catch {}
+      for (const candidate of candidates.slice(0, 4)) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2500);
+        try {
+          const response = await fetch(candidate.resolvedUrl, {
+            headers: { Range: 'bytes=0-0' }, signal: controller.signal
+          });
+          if (!response.ok || /text\/html|application\/json/i.test(response.headers.get('content-type') || '')) {
+            await response.body?.cancel();
+            continue;
+          }
+          let estimatedBytes = 0;
+          const range = response.headers.get('content-range');
+          const total = range?.match(/\/(\d+)$/)?.[1];
+          if (total) estimatedBytes = Number(total);
+          else if (response.status === 200) {
+            const length = Number(response.headers.get('content-length'));
+            if (Number.isFinite(length) && length > 0) estimatedBytes = length;
+          }
+          await response.body?.cancel();
+          return {
+            quality, estimatedBytes, sourceUrl: candidate.resolvedUrl,
+            sourceType: candidate.sourceType, isDubbed: candidate.isDubbed,
+            audioLanguage: candidate.stream.isPtBr ? 'pt-BR' : 'original',
+            isAuthorized: true
+          } satisfies DownloadQualityOption;
+        } catch {
+          // Tenta a próxima candidata da mesma obra e qualidade.
+        } finally {
+          clearTimeout(timeout);
         }
-      })
-    );
+      }
+      return null;
+    }));
+    const accessibleOptions = optionResults.filter(option => option !== null) as DownloadQualityOption[];
 
     return {
-      options: selectedOptions,
-      reason: selectedOptions.length === 0
-        ? 'As fontes disponíveis para este título possuem restrições de permissão ou não permitem transferência offline direta.'
+      options: accessibleOptions,
+      reason: accessibleOptions.length === 0
+        ? 'Nenhuma fonte com permissão de download e acesso direto respondeu com vídeo MP4/WebM compatível. Tente novamente mais tarde se o provedor estiver temporariamente indisponível.'
         : undefined,
       identifiedSourcesCount: candidatePool.length,
-      compatibleSourcesCount: selectedOptions.length,
+      compatibleSourcesCount: accessibleOptions.length,
       drmProtectedCount,
       torrentEngineRequiredCount,
       corsRestrictedCount
@@ -421,25 +345,24 @@ export class OfflineSourceInspector {
       let hasVideo = false;
       let hasAudio = false;
 
-      const ascii = new TextDecoder('latin1').decode(bytes);
-      if (ascii.includes('soun') || ascii.includes('mp4a') || ascii.includes('ac-3') || ascii.includes('opus') || ascii.includes('vorbis') || ascii.includes('G@')) {
+      const ascii = new TextDecoder('latin1').decode(bytes).toLowerCase();
+      if (ascii.includes('soun') || ascii.includes('mp4a') || ascii.includes('ac-3') || ascii.includes('opus') || ascii.includes('vorbis')) {
         hasAudio = true;
       }
-      if (ascii.includes('vide') || ascii.includes('avc1') || ascii.includes('hev1') || ascii.includes('vp09') || ascii.includes('av01')) {
+      if (ascii.includes('vide') || ascii.includes('avc1') || ascii.includes('hev1') || ascii.includes('vp09') || ascii.includes('av01') || ascii.includes('v_vp8') || ascii.includes('v_vp9')) {
         hasVideo = true;
       }
 
       if (!hasAudio && blob.size > 262144) {
         const trailerSlice = blob.slice(blob.size - 131072);
         const trailerBuffer = await trailerSlice.arrayBuffer();
-        const trailerAscii = new TextDecoder('latin1').decode(new Uint8Array(trailerBuffer));
+        const trailerAscii = new TextDecoder('latin1').decode(new Uint8Array(trailerBuffer)).toLowerCase();
         if (trailerAscii.includes('soun') || trailerAscii.includes('mp4a') || trailerAscii.includes('opus')) {
           hasAudio = true;
         }
-      }
-
-      if (!hasAudio && blob.size > 5 * 1024 * 1024) {
-        hasAudio = true;
+        if (trailerAscii.includes('vide') || trailerAscii.includes('avc1') || trailerAscii.includes('hev1') || trailerAscii.includes('vp09') || trailerAscii.includes('v_vp8') || trailerAscii.includes('v_vp9')) {
+          hasVideo = true;
+        }
       }
 
       if (!hasAudio) {
@@ -450,9 +373,9 @@ export class OfflineSourceInspector {
         };
       }
 
-      return { isValid: true, hasAudio: true };
+      return { isValid: hasVideo, hasAudio: true, error: hasVideo ? undefined : 'Arquivo sem faixa de vídeo reconhecida.' };
     } catch {
-      return { isValid: true, hasAudio: true };
+      return { isValid: false, hasAudio: false, error: 'Não foi possível validar o arquivo baixado.' };
     }
   }
 }

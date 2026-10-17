@@ -20,7 +20,7 @@ import {
   OfflineSubtitleTrack,
   DownloadStatus
 } from './offlineTypes';
-import { ContentItem } from '../../../types';
+import { ContentItem, ContentType } from '../../../types';
 import { StremioStream } from '../stremio/stremioTypes';
 
 const MAX_CONCURRENT_DOWNLOADS = 2;
@@ -119,25 +119,32 @@ export class OfflineDownloadManager {
     episode?: number;
     episodeTitle?: string;
     subtitles?: OfflineSubtitleTrack[];
+    fileHandle?: FileSystemFileHandle;
   }): Promise<string> {
-    const { item, selectedStream, season, episode, episodeTitle, subtitles = [] } = params;
+    const { item, selectedStream, season, episode, episodeTitle, subtitles = [], fileHandle } = params;
+    if (!selectedStream.offlineAllowed || selectedStream.url?.startsWith('/api/proxy?')) {
+      throw new Error('Esta fonte não possui permissão confirmada para armazenamento offline.');
+    }
 
-    const quality = selectedStream.quality || '720p';
-    const isDubbed = Boolean(selectedStream.isDubbed || selectedStream.isPtBr);
-    const audioLanguage = isDubbed ? 'pt-BR' : 'original';
+    const quality = selectedStream.quality || 'Original';
+    const isDubbed = Boolean(selectedStream.isDubbed);
+    const audioLanguage = selectedStream.isPtBr ? 'pt-BR' : 'original';
 
     const downloadId = `dl_${item.id}_s${season || 0}_e${episode || 0}_${quality}`;
 
     // Verifica se já existe um download deste mesmo episódio/obra
     const existing = offlineDb.getDownload(downloadId);
-    if (existing && existing.status === 'completed') {
+    if (existing && ['completed', 'pending', 'downloading'].includes(existing.status)) {
+      return downloadId;
+    }
+    if (existing && (existing.status === 'paused' || existing.status === 'error')) {
+      await this.resumeDownload(downloadId);
       return downloadId;
     }
 
     // 1. Verifica espaço em disco antes de iniciar
     const estimate = await this.getStorageEstimate();
-    const estimatedRequiredBytes = 500 * 1024 * 1024; // 500 MB de margem de segurança mínima
-    if (estimate.quotaBytes > 0 && estimate.availableBytes < estimatedRequiredBytes) {
+    if (!fileHandle && estimate.quotaBytes > 0 && estimate.availableBytes < 16 * 1024 * 1024) {
       throw new Error(`Espaço insuficiente no dispositivo. Disponível: ${Math.round(estimate.availableBytes / (1024 * 1024))} MB.`);
     }
 
@@ -147,9 +154,12 @@ export class OfflineDownloadManager {
     // 3. Define driver de armazenamento conforme compatibilidade real do navegador (iOS/Safari -> IDB, Chrome/Edge/Firefox -> OPFS)
     const capabilities = await browserCompatibilityService.getCapabilities();
     const opfsSupported = await offlineStorageDriver.checkOpfsSupport();
-    const storageDriver = (opfsSupported && capabilities.recommendedStorageDriver === 'opfs') ? 'opfs' : 'idb';
+    const storageDriver = fileHandle ? 'file' : ((opfsSupported && capabilities.recommendedStorageDriver === 'opfs') ? 'opfs' : 'idb');
     const isHls = selectedStream.url.includes('.m3u8') || selectedStream.sourceType === 'hls';
-    const format = isHls ? 'mp4' : (selectedStream.url.includes('.webm') ? 'webm' : 'mp4');
+    if (isHls || selectedStream.sourceType === 'dash') {
+      throw new Error('Esta fonte não pode ser salva como arquivo offline reproduzível.');
+    }
+    const format = selectedStream.sourceType === 'webm' || selectedStream.url.includes('.webm') ? 'webm' : 'mp4';
     const storagePath = `${downloadId}.${format}`;
 
     const downloadRecord: OfflineDownload = {
@@ -165,7 +175,7 @@ export class OfflineDownloadManager {
       backdrop: item.backdrop,
       genres: item.genres || [],
       quality,
-      format: 'mp4',
+      format,
       sourceUrl: selectedStream.url,
       audioTrack: {
         name: isDubbed ? 'Português (Brasil)' : 'Áudio Original',
@@ -176,6 +186,7 @@ export class OfflineDownloadManager {
       subtitles,
       storagePath,
       storageDriver,
+      fileHandle,
       totalBytes: 0,
       downloadedBytes: 0,
       speedBytesPerSec: 0,
@@ -189,6 +200,81 @@ export class OfflineDownloadManager {
     this.processQueue();
 
     return downloadId;
+  }
+
+  /** Importa um arquivo escolhido pelo usuário sem associá-lo por semelhança de nome. */
+  public async importLocalFile(file: File, metadata: {
+    title: string;
+    type: ContentType;
+    itemId?: string;
+    season?: number;
+    episode?: number;
+  }): Promise<string> {
+    const title = metadata.title.trim();
+    const format = file.name.toLowerCase().endsWith('.webm') ? 'webm' : 'mp4';
+    if (!title || !/\.(mp4|webm)$/i.test(file.name)) throw new Error('Selecione um arquivo MP4 ou WebM e informe o título.');
+    if ((metadata.season !== undefined || metadata.episode !== undefined) && (!metadata.season || !metadata.episode)) {
+      throw new Error('Informe a temporada e o episódio para associar esta mídia corretamente.');
+    }
+    const existing = offlineDb.getCompletedDownloads().find(download =>
+      (!metadata.itemId || download.itemId === metadata.itemId.trim()) &&
+      download.title === title && download.season === metadata.season &&
+      download.episode === metadata.episode && download.totalBytes === file.size
+    );
+    if (existing) return existing.id;
+    const integrity = await offlineSourceInspector.verifyMediaIntegrity(file);
+    if (!integrity.isValid) throw new Error(integrity.error || 'O arquivo selecionado não contém vídeo e áudio válidos.');
+    const estimate = await this.getStorageEstimate();
+    if (estimate.quotaBytes > 0 && estimate.availableBytes < file.size) throw new Error('Espaço insuficiente para importar o arquivo.');
+
+    const id = `local_${crypto.randomUUID()}`;
+    const storagePath = `${id}.${format}`;
+    const capabilities = await browserCompatibilityService.getCapabilities();
+    const storageDriver = (await offlineStorageDriver.checkOpfsSupport()) && capabilities.recommendedStorageDriver === 'opfs' ? 'opfs' : 'idb';
+    const record: OfflineDownload = {
+      id, itemId: metadata.itemId?.trim() || id, title, type: metadata.type,
+      season: metadata.season,
+      episode: metadata.episode,
+      image: '', genres: [], quality: 'Original', format, sourceUrl: '',
+      audioTrack: { name: 'Áudio não identificado', language: 'und', isDubbed: false, isOriginal: false },
+      subtitles: [], storagePath, storageDriver, totalBytes: file.size,
+      downloadedBytes: 0, speedBytesPerSec: 0, status: 'downloading',
+      createdAt: Date.now(), lastPlaybackPosition: 0, duration: 0
+    };
+    await offlineDb.saveDownload(record);
+    const controller = new AbortController();
+    this.activeControllers.set(id, controller);
+    let writer: Awaited<ReturnType<typeof offlineStorageDriver.createWriter>> | null = null;
+    try {
+      writer = await offlineStorageDriver.createWriter(storagePath, storageDriver);
+      const reader = file.stream().getReader();
+      let bytes = 0;
+      let lastUpdate = 0;
+      while (true) {
+        if (controller.signal.aborted) throw new DOMException('Importação cancelada.', 'AbortError');
+        const { done, value } = await reader.read();
+        if (done) break;
+        await writer.write(value);
+        bytes += value.byteLength;
+        if (Date.now() - lastUpdate > 400) {
+          await offlineDb.updateDownload(id, { downloadedBytes: bytes });
+          lastUpdate = Date.now();
+        }
+      }
+      await writer.close();
+      writer = null;
+      const stored = await offlineStorageDriver.getFile(storagePath, storageDriver);
+      if (stored.size !== file.size) throw new Error('O arquivo importado está incompleto.');
+      await offlineDb.updateDownload(id, { downloadedBytes: bytes, status: 'completed', completedAt: Date.now() });
+      return id;
+    } catch (error) {
+      if (writer) await writer.abort().catch(() => {});
+      await offlineStorageDriver.deleteFile(storagePath, storageDriver);
+      if (!controller.signal.aborted) await offlineDb.updateDownload(id, { status: 'error', errorReason: error instanceof Error ? error.message : 'Falha ao importar arquivo.' });
+      throw error;
+    } finally {
+      this.activeControllers.delete(id);
+    }
   }
 
   /**
@@ -238,9 +324,14 @@ export class OfflineDownloadManager {
   public async resumeDownload(id: string): Promise<void> {
     const item = offlineDb.getDownload(id);
     if (item && (item.status === 'paused' || item.status === 'error')) {
+      // O driver IndexedDB e a origem HTTP não garantem retomada por Range.
+      // Reiniciar evita juntar bytes repetidos ou completar um arquivo truncado.
+      await offlineStorageDriver.deleteFile(item.storagePath, item.storageDriver);
       await offlineDb.updateDownload(id, {
         status: 'pending',
-        errorReason: undefined
+        errorReason: undefined,
+        downloadedBytes: 0,
+        totalBytes: 0
       });
       this.processQueue();
     }
@@ -298,6 +389,7 @@ export class OfflineDownloadManager {
     const id = download.id;
     const controller = new AbortController();
     this.activeControllers.set(id, controller);
+    let writer: Awaited<ReturnType<typeof offlineStorageDriver.createWriter>> | null = null;
 
     await offlineDb.updateDownload(id, {
       status: 'downloading',
@@ -307,9 +399,10 @@ export class OfflineDownloadManager {
     try {
       const isHls = download.sourceUrl.includes('.m3u8') || download.format === 'hls';
       let currentDownloaded = download.downloadedBytes;
+      let expectedBytes = 0;
 
       if (isHls) {
-        const writer = await offlineStorageDriver.createWriter(download.storagePath, download.storageDriver);
+        writer = await offlineStorageDriver.createWriter(download.storagePath, download.storageDriver, download.fileHandle);
         try {
           const total = await hlsDownloadService.downloadHlsStream({
             mediaPlaylistUrl: download.sourceUrl,
@@ -324,24 +417,24 @@ export class OfflineDownloadManager {
             }
           });
           await writer.close();
+          writer = null;
           currentDownloaded = total;
         } catch (hlsErr) {
           await writer.abort();
+          writer = null;
           throw hlsErr;
         }
       } else {
-        const headers: Record<string, string> = {};
-        if (download.downloadedBytes > 0) {
-          headers['Range'] = `bytes=${download.downloadedBytes}-`;
-        }
-
         const response = await fetch(download.sourceUrl, {
-          headers,
           signal: controller.signal
         });
 
         if (!response.ok && response.status !== 206) {
           throw new Error(`Falha HTTP ao baixar vídeo: status ${response.status}`);
+        }
+        const contentType = response.headers.get('content-type') || '';
+        if (/text\/html|application\/json/i.test(contentType)) {
+          throw new Error('A fonte respondeu com uma página ou erro, não com um arquivo de vídeo.');
         }
 
         // Obtém tamanho total do arquivo
@@ -353,11 +446,18 @@ export class OfflineDownloadManager {
         } else {
           const contentLength = response.headers.get('content-length');
           if (contentLength) {
-            totalBytes = (download.downloadedBytes || 0) + parseInt(contentLength, 10);
+            totalBytes = parseInt(contentLength, 10);
           }
         }
 
         await offlineDb.updateDownload(id, { totalBytes });
+        expectedBytes = totalBytes;
+        if (totalBytes > 0 && download.storageDriver !== 'file') {
+          const estimate = await this.getStorageEstimate();
+          if (estimate.quotaBytes > 0 && estimate.availableBytes < totalBytes - currentDownloaded) {
+            throw new Error('Espaço insuficiente para armazenar este vídeo.');
+          }
+        }
 
         const body = response.body;
         if (!body) {
@@ -365,7 +465,7 @@ export class OfflineDownloadManager {
         }
 
         const reader = body.getReader();
-        const writer = await offlineStorageDriver.createWriter(download.storagePath, download.storageDriver);
+        writer = await offlineStorageDriver.createWriter(download.storagePath, download.storageDriver, download.fileHandle);
 
         this.speedTrackers.set(id, { lastBytes: currentDownloaded, lastTime: Date.now() });
 
@@ -403,12 +503,16 @@ export class OfflineDownloadManager {
         }
 
         await writer.close();
+        writer = null;
+      }
+      if (expectedBytes > 0 && currentDownloaded !== expectedBytes) {
+        throw new Error('A transferência terminou antes de receber o arquivo completo.');
       }
       this.activeControllers.delete(id);
       this.speedTrackers.delete(id);
 
       // Validação obrigatória pós-download (confirmar vídeo e áudio intactos)
-      const downloadedFile = await offlineStorageDriver.getFile(download.storagePath, download.storageDriver);
+      const downloadedFile = await offlineStorageDriver.getFile(download.storagePath, download.storageDriver, download.fileHandle);
       const integrity = await offlineSourceInspector.verifyMediaIntegrity(downloadedFile);
 
       if (!integrity.isValid || !integrity.hasAudio) {
@@ -425,6 +529,9 @@ export class OfflineDownloadManager {
         completedAt: Date.now()
       });
     } catch (err: any) {
+      if (writer) {
+        try { await writer.abort(); } catch {}
+      }
       this.activeControllers.delete(id);
       this.speedTrackers.delete(id);
 

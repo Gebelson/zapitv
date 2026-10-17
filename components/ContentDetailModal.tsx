@@ -3,6 +3,7 @@ import { X, Play, Bookmark, Heart, ChevronDown, ChevronUp, AlertCircle, Download
 import { ContentItem, ContentType } from '../types';
 import { DownloadButton } from '../src/components/offline/DownloadButton';
 import { offlineDownloadManager } from '../src/core/offline/offlineDownloadManager';
+import { offlineSourceInspector } from '../src/core/offline/offlineSourceInspector';
 import { tmdbService } from '../src/core/tmdb/tmdbClient';
 import { providerRegistry } from '../src/core/providers/providerRegistry';
 import { StremioStream } from '../src/core/stremio/stremioTypes';
@@ -74,6 +75,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [resolvedStreams, setResolvedStreams] = useState<StremioStream[]>([]);
   const [isLoadingStreams, setIsLoadingStreams] = useState(false);
+  const [isDownloadingSeason, setIsDownloadingSeason] = useState(false);
   const [streamResolutionError, setStreamResolutionError] = useState<string | null>(null);
   const [verificationState, setVerificationState] = useState<VerificationState>('IDLE');
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -334,6 +336,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (showFeedbackModal || showWatchPartyModal) return;
+      if (event.target instanceof Element && event.target.closest('[data-zapitv-download-modal]')) return;
 
       if (modalRef.current && !modalRef.current.contains(event.target as Node) && !isPlaying) {
         handleClose();
@@ -346,7 +349,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   // Tecla Escape: fecha a janela de detalhes apenas se nenhum modal flutuante e o player não estiverem abertos
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isPlaying && !showFeedbackModal && !showWatchPartyModal) {
+      if (e.key === 'Escape' && !isPlaying && !showFeedbackModal && !showWatchPartyModal && !document.querySelector('[data-zapitv-download-modal]')) {
         handleClose();
       }
     };
@@ -788,37 +791,52 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   }, [currentSeason, currentEpisodeParams, isPlaying]);
 
   const handleDownloadSeason = useCallback(async () => {
-    if (!episodes || episodes.length === 0) return;
+    if (!episodes || episodes.length === 0 || isDownloadingSeason) return;
+    setIsDownloadingSeason(true);
     try {
-      const episodesToDownload = episodes.map(ep => ({
-        number: ep.number,
-        title: ep.title,
-        stream: ep.videoUrl ? {
-          name: 'Fonte Local',
-          title: ep.title,
-          url: ep.videoUrl,
-          quality: '720p',
-          isDubbed: true,
-          isPtBr: true
-        } : (resolvedStreams[0] || (item.verifiedStreams && item.verifiedStreams[0]) || {
-          name: 'ZapiTV Stream',
-          title: ep.title,
-          url: `/api/proxy?url=${encodeURIComponent(item.id)}`,
-          quality: '720p',
-          isDubbed: true,
-          isPtBr: true
-        })
-      }));
-
-      await offlineDownloadManager.downloadSeason({
-        item,
-        season: currentSeason,
-        episodes: episodesToDownload
-      });
+      let queued = 0;
+      for (const ep of episodes) {
+        try {
+          const streams = await providerRegistry.resolveStreams(
+            item.type === ContentType.ANIME ? 'anime' : 'series',
+            { id: item.id, tmdbId: item.tmdbId, imdbId: item.imdbId, title: item.title,
+              originalTitle: item.originalTitle, year: item.year },
+            { season: currentSeason, episode: ep.number }
+          );
+          const diagnosis = await offlineSourceInspector.inspectDownloadOptionsDetailed({
+            item, streams, season: currentSeason, episode: ep.number,
+            preferredLanguage: 'pt-BR'
+          });
+          const option = diagnosis.options[0];
+          if (!option) continue;
+          await offlineDownloadManager.startDownload({
+            item,
+            selectedStream: {
+              ...streams.find(stream => stream.url === option.sourceUrl),
+              url: option.sourceUrl,
+              sourceType: option.sourceType,
+              quality: option.quality as StremioStream['quality'],
+              isDubbed: option.isDubbed,
+              isPtBr: option.audioLanguage === 'pt-BR',
+              offlineAllowed: option.isAuthorized
+            },
+            season: currentSeason,
+            episode: ep.number,
+            episodeTitle: ep.title
+          });
+          queued++;
+        } catch (error) {
+          console.warn(`[Downloads] Episódio T${currentSeason}E${ep.number} não pôde ser enfileirado:`, error);
+        }
+      }
+      if (queued === 0) alert('Nenhum episódio desta temporada possui uma fonte offline compatível no momento.');
+      else if (queued < episodes.length) alert(`${queued} de ${episodes.length} episódios foram adicionados aos Downloads. Os demais não têm fonte offline compatível.`);
     } catch (err: any) {
       alert(err.message || 'Erro ao iniciar download da temporada.');
+    } finally {
+      setIsDownloadingSeason(false);
     }
-  }, [episodes, item, currentSeason, resolvedStreams]);
+  }, [episodes, item, currentSeason, isDownloadingSeason]);
 
   const handleEpisodeClick = (season: number, episode: number) => {
     if (watchPartyService.isConnected && (watchPartyService.isHost() || watchPartyService.canLocalControl('canChangeEpisode'))) {
@@ -1107,11 +1125,12 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                       <button
                         type="button"
                         onClick={handleDownloadSeason}
+                        disabled={isDownloadingSeason}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/15 text-white rounded-xl font-bold text-xs transition-colors cursor-pointer"
                         title={`Baixar todos os episódios disponíveis da Temporada ${currentSeason}`}
                       >
-                        <Download className="w-3.5 h-3.5 text-[#007df7]" />
-                        <span className="hidden sm:inline">Baixar Temporada</span>
+                        <Download className={`w-3.5 h-3.5 text-[#007df7] ${isDownloadingSeason ? 'animate-pulse' : ''}`} />
+                        <span className="hidden sm:inline">{isDownloadingSeason ? 'Verificando episódios...' : 'Baixar Temporada'}</span>
                       </button>
                     )}
                   </div>
@@ -1175,7 +1194,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                           <div className="shrink-0 pl-2" onClick={(e) => e.stopPropagation()}>
                             <DownloadButton
                               item={item}
-                              streams={resolvedStreams.length > 0 ? resolvedStreams : (ep.videoUrl ? [{ name: 'Fonte Local', title: ep.title, url: ep.videoUrl, quality: '720p', isDubbed: true, isPtBr: true }] : (item.verifiedStreams || []))}
+                              streams={[]}
                               season={currentSeason}
                               episode={ep.number}
                               episodeTitle={ep.title}

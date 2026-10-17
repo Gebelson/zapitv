@@ -96,17 +96,26 @@ export class OfflineStorageDriver {
   /**
    * Abre um writer de stream para gravação progressiva (chunk por chunk) sem estourar memória.
    */
-  public async createWriter(storagePath: string, driver: StorageDriverType): Promise<{
+  public async createWriter(storagePath: string, driver: StorageDriverType, fileHandle?: FileSystemFileHandle): Promise<{
     write: (chunk: Uint8Array) => Promise<void>;
     close: () => Promise<void>;
     abort: () => Promise<void>;
   }> {
+    if (driver === 'file') {
+      if (!fileHandle) throw new Error('A permissão para salvar o arquivo não está disponível. Selecione o destino novamente.');
+      const writable = await fileHandle.createWritable({ keepExistingData: false });
+      return {
+        write: async (chunk: Uint8Array) => { await writable.write(chunk); },
+        close: async () => { await writable.close(); },
+        abort: async () => { await writable.abort(); }
+      };
+    }
     const isOpfs = driver === 'opfs' && (await this.checkOpfsSupport());
 
     if (isOpfs) {
       const mediaDir = await this.getMediaDir();
       const fileHandle = await mediaDir.getFileHandle(storagePath, { create: true });
-      const writable = await fileHandle.createWritable({ keepExistingData: true });
+      const writable = await fileHandle.createWritable({ keepExistingData: false });
 
       return {
         write: async (chunk: Uint8Array) => {
@@ -122,26 +131,36 @@ export class OfflineStorageDriver {
         }
       };
     } else {
-      // Fallback IndexedDB: acumula chunks como Blobs parciais
-      const chunks: BlobPart[] = [];
+      // Fallback IndexedDB: persiste cada parte imediatamente; não mantém
+      // um filme inteiro em RAM enquanto a transferência está em andamento.
       const db = await this.getIdb();
+      await this.deleteFile(storagePath, 'idb');
+      let chunkCount = 0;
+      const prefix = `${storagePath}::chunk::`;
 
       return {
         write: async (chunk: Uint8Array) => {
-          chunks.push(chunk);
+          const key = `${prefix}${String(chunkCount).padStart(8, '0')}`;
+          await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            tx.objectStore(IDB_STORE).put(new Blob([chunk]), key);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error);
+          });
+          chunkCount++;
         },
         close: async () => {
-          const finalBlob = new Blob(chunks, { type: 'video/mp4' });
           return new Promise<void>((resolve, reject) => {
             const tx = db.transaction(IDB_STORE, 'readwrite');
-            const store = tx.objectStore(IDB_STORE);
-            const req = store.put(finalBlob, storagePath);
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
+            tx.objectStore(IDB_STORE).put({ kind: 'chunked', count: chunkCount }, storagePath);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error);
           });
         },
         abort: async () => {
-          chunks.length = 0;
+          await this.deleteFile(storagePath, 'idb');
         }
       };
     }
@@ -151,7 +170,20 @@ export class OfflineStorageDriver {
    * Recupera o arquivo de mídia salvo para reprodução local.
    * Retorna um Blob/File pronto para createObjectURL ou range streaming.
    */
-  public async getFile(storagePath: string, driver: StorageDriverType): Promise<Blob> {
+  public async getFile(storagePath: string, driver: StorageDriverType, fileHandle?: FileSystemFileHandle, allowPermissionPrompt = false): Promise<Blob> {
+    if (driver === 'file') {
+      if (!fileHandle) throw new Error('Arquivo salvo fora do navegador. Selecione ou importe o arquivo novamente.');
+      const permissionHandle = fileHandle as FileSystemFileHandle & {
+        queryPermission?: (options: { mode: 'read' }) => Promise<PermissionState>;
+        requestPermission?: (options: { mode: 'read' }) => Promise<PermissionState>;
+      };
+      if (permissionHandle.queryPermission && await permissionHandle.queryPermission({ mode: 'read' }) !== 'granted') {
+        if (!allowPermissionPrompt || !permissionHandle.requestPermission || await permissionHandle.requestPermission({ mode: 'read' }) !== 'granted') {
+          throw new Error('Permita novamente o acesso ao arquivo salvo para reproduzi-lo.');
+        }
+      }
+      return fileHandle.getFile();
+    }
     const isOpfs = driver === 'opfs' && (await this.checkOpfsSupport());
 
     if (isOpfs) {
@@ -165,8 +197,24 @@ export class OfflineStorageDriver {
         const store = tx.objectStore(IDB_STORE);
         const req = store.get(storagePath);
         req.onsuccess = () => {
-          if (req.result) {
-            resolve(req.result as Blob);
+          if (req.result instanceof Blob) {
+            resolve(req.result); // Formato legado: preservar downloads já concluídos.
+          } else if (req.result?.kind === 'chunked') {
+            const count = req.result.count as number;
+            const parts: Blob[] = [];
+            if (count === 0) { reject(new Error('Arquivo offline vazio.')); return; }
+            const readTx = db.transaction(IDB_STORE, 'readonly');
+            const readStore = readTx.objectStore(IDB_STORE);
+            for (let i = 0; i < count; i++) {
+              const part = readStore.get(`${storagePath}::chunk::${String(i).padStart(8, '0')}`);
+              part.onsuccess = () => {
+                if (!(part.result instanceof Blob)) readTx.abort();
+                else parts[i] = part.result;
+              };
+            }
+            readTx.oncomplete = () => resolve(new Blob(parts, { type: storagePath.endsWith('.webm') ? 'video/webm' : 'video/mp4' }));
+            readTx.onerror = () => reject(readTx.error || new Error('Arquivo offline incompleto.'));
+            readTx.onabort = () => reject(new Error('Arquivo offline incompleto.'));
           } else {
             reject(new Error(`Arquivo offline não encontrado no IndexedDB: ${storagePath}`));
           }
@@ -180,6 +228,8 @@ export class OfflineStorageDriver {
    * Remove o arquivo do armazenamento privado.
    */
   public async deleteFile(storagePath: string, driver: StorageDriverType): Promise<void> {
+    // Um arquivo escolhido pelo usuário não deve ser apagado automaticamente.
+    if (driver === 'file') return;
     try {
       const isOpfs = driver === 'opfs' && (await this.checkOpfsSupport());
       if (isOpfs) {
@@ -190,9 +240,16 @@ export class OfflineStorageDriver {
         await new Promise<void>((resolve, reject) => {
           const tx = db.transaction(IDB_STORE, 'readwrite');
           const store = tx.objectStore(IDB_STORE);
-          const req = store.delete(storagePath);
-          req.onsuccess = () => resolve();
-          req.onerror = () => reject(req.error);
+          store.delete(storagePath);
+          const range = IDBKeyRange.bound(`${storagePath}::chunk::`, `${storagePath}::chunk::\uffff`);
+          const cursor = store.openKeyCursor(range);
+          cursor.onsuccess = () => {
+            const current = cursor.result;
+            if (current) { store.delete(current.primaryKey); current.continue(); }
+          };
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+          tx.onabort = () => reject(tx.error);
         });
       }
     } catch (e) {
@@ -218,6 +275,23 @@ export class OfflineStorageDriver {
       }
     } catch (e) {
       console.warn('[OfflineStorage] Erro ao calcular bytes no OPFS:', e);
+    }
+
+    try {
+      const db = await this.getIdb();
+      total += await new Promise<number>((resolve, reject) => {
+        let bytes = 0;
+        const request = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).openCursor();
+        request.onsuccess = () => {
+          const cursor = request.result;
+          if (!cursor) { resolve(bytes); return; }
+          bytes += (cursor.value as Blob)?.size || 0;
+          cursor.continue();
+        };
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.warn('[OfflineStorage] Erro ao calcular bytes no IndexedDB:', e);
     }
 
     return total;

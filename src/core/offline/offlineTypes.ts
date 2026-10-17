@@ -8,7 +8,7 @@ export type DownloadStatus =
   | 'error'
   | 'cancelled';
 
-export type StorageDriverType = 'opfs' | 'idb';
+export type StorageDriverType = 'opfs' | 'idb' | 'file';
 
 export interface OfflineAudioTrack {
   name: string;
@@ -52,6 +52,7 @@ export interface OfflineDownload {
   subtitles: OfflineSubtitleTrack[];
   storagePath: string; // Nome do arquivo no OPFS ou ID no IDB
   storageDriver: StorageDriverType;
+  fileHandle?: FileSystemFileHandle; // Concedido pelo usuário; permanece apenas no IndexedDB local.
   totalBytes: number;
   downloadedBytes: number;
   speedBytesPerSec: number;
@@ -73,6 +74,7 @@ export interface StorageEstimateResult {
 }
 
 export interface DownloadQualityOption {
+  method?: 'web' | 'helper';
   quality: string; // '480p' | '720p' | '1080p'
   estimatedBytes: number;
   sourceUrl: string;

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Download, HardDrive, AlertCircle, Check, Sparkles } from 'lucide-react';
 import { DownloadQualityOption, StorageEstimateResult } from '../../core/offline/offlineTypes';
 import { offlineDownloadManager } from '../../core/offline/offlineDownloadManager';
@@ -9,7 +10,8 @@ interface DownloadQualityModalProps {
   episodeInfo?: string;
   options: DownloadQualityOption[];
   unavailableReason?: string;
-  onConfirm: (option: DownloadQualityOption) => void;
+  onConfirm: (option: DownloadQualityOption) => Promise<boolean>;
+  onImport?: (file: File) => Promise<boolean>;
   onClose: () => void;
 }
 
@@ -20,10 +22,13 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
   options,
   unavailableReason,
   onConfirm,
+  onImport,
   onClose
 }) => {
-  const [selectedQuality, setSelectedQuality] = useState<string>(() => options[0]?.quality || '720p');
+  const [selectedQuality, setSelectedQuality] = useState<string>(() => options[0] ? `${options[0].quality}:${options[0].sourceUrl}` : '720p');
   const [storageEstimate, setStorageEstimate] = useState<StorageEstimateResult | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -31,14 +36,29 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
       if (options.length > 0) {
         // Seleciona a mais alta disponível por padrão
         const defaultOpt = options.find(o => o.quality === '1080p') || options.find(o => o.quality === '720p') || options[0];
-        setSelectedQuality(defaultOpt.quality);
+        setSelectedQuality(`${defaultOpt.quality}:${defaultOpt.sourceUrl}`);
       }
     }
   }, [isOpen, options]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    closeButtonRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      previousFocus?.focus();
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
-  const currentOption = options.find(o => o.quality === selectedQuality) || options[0];
+  const currentOption = options.find(o => `${o.quality}:${o.sourceUrl}` === selectedQuality) || options[0];
 
   const formatBytes = (bytes: number) => {
     if (!bytes) return 'Tamanho dinâmico';
@@ -49,12 +69,25 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
     return `${Math.round(mb)} MB`;
   };
 
-  const hasEnoughSpace = !storageEstimate || storageEstimate.availableBytes > (currentOption?.estimatedBytes || 0);
+  const hasEnoughSpace = currentOption?.method === 'helper' || !storageEstimate || storageEstimate.quotaBytes === 0 ||
+    currentOption?.estimatedBytes === 0 || storageEstimate.availableBytes > (currentOption?.estimatedBytes || 0);
 
-  return (
-    <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Download Offline ZapiTV"
+      data-zapitv-download-modal
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.stopPropagation();
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-[600] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overscroll-contain animate-in fade-in duration-200"
+    >
       <div 
-        className="w-full max-w-md bg-[#0f121a] border border-white/10 rounded-3xl p-6 shadow-2xl text-white relative animate-in zoom-in-95 duration-200"
+        className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-[#0f121a] border border-white/10 rounded-3xl p-6 shadow-2xl text-white relative animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabeçalho */}
@@ -69,6 +102,8 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
             )}
           </div>
           <button
+            ref={closeButtonRef}
+            aria-label="Fechar download offline"
             onClick={onClose}
             className="text-gray-400 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
           >
@@ -78,28 +113,44 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
 
         {/* Seleção de Qualidade Real ou Mensagem de Motivo */}
         {options.length === 0 ? (
-          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-3 mb-6">
+          <div className="mb-6">
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-3">
             <AlertCircle className="w-5 h-5 shrink-0 text-amber-400 mt-0.5" />
             <div>
-              <p className="font-bold text-amber-200 mb-1">Download offline indisponível no momento</p>
+              <p className="font-bold text-amber-200 mb-1">Sem fonte autorizada para download offline</p>
               <p className="text-gray-300 leading-relaxed text-[11px]">
                 {unavailableReason || 'As fontes disponíveis para este conteúdo não permitem gravação local direta no navegador ou exigem streaming online.'}
               </p>
             </div>
           </div>
+          {onImport && <label className={`mt-3 flex items-center justify-center p-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-bold cursor-pointer ${isConfirming ? 'pointer-events-none opacity-40' : ''}`}>
+            Importar arquivo que já tenho
+            <input type="file" disabled={isConfirming} accept="video/mp4,video/webm,.mp4,.webm" className="sr-only" onChange={async event => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (!file) return;
+              setIsConfirming(true);
+              try {
+                if (await onImport(file)) onClose();
+              } finally {
+                setIsConfirming(false);
+              }
+            }} />
+          </label>}
+          </div>
         ) : (
           <div className="space-y-2 mb-6">
             <label className="text-xs font-bold text-gray-400 block mb-1">
-              Selecione a qualidade real disponível:
+              Selecione a versão disponível:
             </label>
             <div className={`grid gap-2 ${options.length === 1 ? 'grid-cols-1' : (options.length === 2 ? 'grid-cols-2' : 'grid-cols-3')}`}>
               {options.map((opt) => {
-                const isSelected = opt.quality === selectedQuality;
+                const isSelected = `${opt.quality}:${opt.sourceUrl}` === selectedQuality;
                 return (
                   <button
-                    key={opt.quality}
+                    key={`${opt.quality}:${opt.sourceUrl}`}
                     type="button"
-                    onClick={() => setSelectedQuality(opt.quality)}
+                    onClick={() => setSelectedQuality(`${opt.quality}:${opt.sourceUrl}`)}
                     className={`p-3 rounded-2xl border text-center transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-[#007df7] border-[#007df7] text-white shadow-lg shadow-[#007df7]/25 scale-[1.02]'
@@ -107,6 +158,7 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
                     }`}
                   >
                     <span className="block text-sm font-black">{opt.quality}</span>
+                    {opt.method === 'helper' && <span className="block text-[10px] opacity-75">Helper</span>}
                     <span className="block text-[10px] opacity-75 mt-0.5 font-mono">
                       {formatBytes(opt.estimatedBytes)}
                     </span>
@@ -150,7 +202,7 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
                 Espaço livre no dispositivo
               </span>
               <span className="font-mono font-bold text-gray-300">
-                {formatBytes(storageEstimate.availableBytes)} livres
+                {storageEstimate.quotaBytes > 0 ? `${formatBytes(storageEstimate.availableBytes)} livres` : 'Estimativa indisponível'}
               </span>
             </div>
             {!hasEnoughSpace && (
@@ -173,11 +225,15 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
           </button>
           <button
             type="button"
-            disabled={!hasEnoughSpace || !currentOption || options.length === 0}
-            onClick={() => {
+            disabled={isConfirming || !hasEnoughSpace || !currentOption || options.length === 0}
+            onClick={async () => {
               if (currentOption) {
-                onConfirm(currentOption);
-                onClose();
+                setIsConfirming(true);
+                try {
+                  if (await onConfirm(currentOption)) onClose();
+                } finally {
+                  setIsConfirming(false);
+                }
               }
             }}
             className={`flex-1 py-3 font-bold rounded-2xl transition-all flex items-center justify-center gap-2 text-xs shadow-lg ${
@@ -191,6 +247,7 @@ export const DownloadQualityModal: React.FC<DownloadQualityModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

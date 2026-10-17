@@ -14,7 +14,15 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
       },
-      plugins: [react(), tailwindcss()],
+      plugins: [react(), tailwindcss(), {
+        name: 'offline-shell-assets',
+        generateBundle(_options, bundle) {
+          const assets = Object.keys(bundle)
+            .filter(file => /\.(?:js|css)$/.test(file))
+            .map(file => `/${file}`);
+          this.emitFile({ type: 'asset', fileName: 'offline-assets.json', source: JSON.stringify(assets) });
+        }
+      }],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
