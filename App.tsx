@@ -21,6 +21,7 @@ import { tmdbService } from './src/core/tmdb/tmdbClient';
 import { storageService, WatchProgress } from './src/core/storage/storageService';
 import { VERIFIED_OPEN_ITEMS } from './src/core/catalog/verifiedCatalog';
 import { ZapiLoader } from './src/components/common/ZapiLoader';
+import { FeatureErrorBoundary } from './src/components/common/FeatureErrorBoundary';
 import { catalogDiscoveryService } from './src/core/catalog/CatalogDiscoveryService';
 import { mediaAvailabilityIndex } from './src/core/catalog/MediaAvailabilityIndex';
 import { theatricalFilterService } from './src/core/catalog/theatricalFilterService';
@@ -2770,8 +2771,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
       {/* Modal de Entrada Direta em Watch Party por Link (/sala/:roomId) */}
       {showDirectWatchPartyModal && watchPartyRoomId && (
-        <React.Suspense fallback={null}>
-          <WatchPartyModal
+        <FeatureErrorBoundary featureName="a Watch Party" closeLabel="Voltar ao início" onClose={() => {
+          setShowDirectWatchPartyModal(false);
+          navigate('/', { replace: true });
+        }}>
+          <React.Suspense fallback={null}>
+            <WatchPartyModal
             isOpen={showDirectWatchPartyModal}
             initialRoomId={watchPartyRoomId}
             currentProfileName={activeProfile?.name || currentUser?.name || 'Convidado'}
@@ -2807,8 +2812,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               setDirectPartyEpisode({ season: targetSeason, episode: targetEpisode });
               setSelectedContent(resolvedItem);
             }}
-          />
-        </React.Suspense>
+            />
+          </React.Suspense>
+        </FeatureErrorBoundary>
       )}
 
     </div>

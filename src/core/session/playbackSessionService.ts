@@ -7,7 +7,7 @@
  * contínua, avanço automático ou troca de episódio/qualidade/fonte.
  */
 
-export type NavigationType = 'manual_start' | 'continuous_playback' | 'retry_playback';
+export type NavigationType = 'manual_start' | 'continuous_playback' | 'retry_playback' | 'remote_sync';
 
 export interface PlaybackSession {
   sessionId: string;
@@ -40,7 +40,7 @@ class PlaybackSessionService {
   ): PlaybackSession {
     const now = Date.now();
 
-    if ((navigationType === 'continuous_playback' || navigationType === 'retry_playback') && this.currentSession) {
+    if ((navigationType === 'continuous_playback' || navigationType === 'retry_playback' || navigationType === 'remote_sync') && this.currentSession) {
       // Preserva a sessão atual mantendo o mesmo sessionId e garantindo introPlayed = true
       this.currentSession = {
         ...this.currentSession,
@@ -55,7 +55,7 @@ class PlaybackSessionService {
       return this.currentSession;
     }
 
-    if (navigationType === 'retry_playback') {
+    if (navigationType === 'retry_playback' || navigationType === 'remote_sync') {
       this.sessionCounter += 1;
       const randomSuffix = Math.random().toString(36).substring(2, 9);
       const sessionId = `sess_${now}_${this.sessionCounter}_${randomSuffix}`;

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
+import { FeatureErrorBoundary } from './src/components/common/FeatureErrorBoundary';
 import { initializeDatabase, db as localDb } from './db';
 import './index.css';
 
@@ -200,7 +201,9 @@ root.render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <RootComponent />
+        <FeatureErrorBoundary featureName="o ZapiTV">
+          <RootComponent />
+        </FeatureErrorBoundary>
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>

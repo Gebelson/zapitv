@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --env-file-if-exists=.env.local --import tsx server.ts",
-    "build": "npm run build:api && vite build",
+    "build": "npm run test:stability && npm run build:api && vite build",
     "build:api": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=api/index.mjs",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
@@ -14,6 +14,10 @@
     "db:backup": "node --env-file-if-exists=.env.local --import tsx scripts/backup_database.ts",
     "test:database": "tsx tests/database_settings.test.ts",
     "test:auth": "tsx tests/firebase_auth.test.ts",
+    "test:watchparty-state": "tsx tests/watchparty_room_state_contract.test.ts",
+    "test:watchparty-smoke": "tsx tests/watchparty_modal_smoke.test.ts",
+    "test:playback-remote-sync": "tsx tests/playback_remote_sync.test.ts",
+    "test:stability": "npm run test:watchparty-state && npm run test:playback-remote-sync",
     "start": "node server.ts"
   },
   "dependencies": {

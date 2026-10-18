@@ -46,6 +46,7 @@ import { mediaAvailabilityIndex } from '../../core/catalog/MediaAvailabilityInde
 import { watchPartyService } from '../../core/watchparty/WatchPartyService';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { WatchPartyOverlay } from '../watchparty/WatchPartyOverlay';
+import { FeatureErrorBoundary } from '../common/FeatureErrorBoundary';
 import { RoomLifecycleState, TransmissionMode } from '../../core/watchparty/watchPartyTypes';
 import { VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../../core/providers/sourceVerificationService';
 
@@ -347,7 +348,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       return true;
     }
 
-    if (navigationType === 'continuous_playback' || navigationType === 'retry_playback') {
+    if (navigationType === 'continuous_playback' || navigationType === 'retry_playback' || navigationType === 'remote_sync') {
       return false;
     }
     if (playbackSessionId) {
@@ -842,7 +843,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   }, [userSkippedIntro]);
 
   useEffect(() => {
-    if (navigationType === 'continuous_playback' || navigationType === 'retry_playback' || (playbackSessionId && !playbackSessionService.shouldPlayIntro(playbackSessionId))) {
+    if (navigationType === 'continuous_playback' || navigationType === 'retry_playback' || navigationType === 'remote_sync' || (playbackSessionId && !playbackSessionService.shouldPlayIntro(playbackSessionId))) {
       setIsPlayingIntro(false);
       setIsIntroEnded(true);
       isPlayingIntroRef.current = false;
@@ -5308,9 +5309,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       />
 
       {/* Watch Party Overlay Flutuante (Barra de status, participantes e chat em tempo real) */}
-      <WatchPartyOverlay 
-        isPlayerControlsVisible={showControls}
-      />
+      <FeatureErrorBoundary featureName="controles da Watch Party" fallback={null}>
+        <WatchPartyOverlay isPlayerControlsVisible={showControls} />
+      </FeatureErrorBoundary>
     </div>
   );
 };

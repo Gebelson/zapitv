@@ -334,13 +334,30 @@ export class WatchPartyService {
   }
 
   public getRoomState() {
+    const participants = this.getParticipantList();
+    const localParticipant = participants.find(participant => participant.peerId === this.selfId) ?? {
+      id: this.selfId,
+      peerId: this.selfId,
+      nickname: this.currentNickname,
+      isHost: this.isHost(),
+      status: 'disconnected' as const,
+      joinedAt: 0,
+      permissions: this.getParticipantPermissions(this.selfId)
+    };
+    const mediaMetadata = this.roomManager.roomInfo?.media || null;
+
     return {
       roomId: this.roomManager.roomInfo?.roomId || '',
       roomInfo: this.roomManager.roomInfo,
-      media: this.roomManager.roomInfo?.media || null,
+      media: mediaMetadata,
+      mediaMetadata,
+      isActive: this.isConnected,
       isHost: this.isHost(),
-      participants: this.getParticipantList(),
+      localParticipant,
+      participants,
       lifecycleState: this.stateMachine.getState(),
+      introStartTimestamp: this.roomManager.roomInfo?.introStartTimestamp,
+      introDuration: this.roomManager.roomInfo?.introDuration,
       transmissionMode: this.getTransmissionMode(),
       permissions: this.getPermissions(),
       isVoiceActive: this.isVoiceActive(),

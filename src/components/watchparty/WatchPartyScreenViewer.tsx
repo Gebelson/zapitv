@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { watchPartyService } from '../../core/watchparty/WatchPartyService';
 import { WatchPartyOverlay } from './WatchPartyOverlay';
+import { FeatureErrorBoundary } from '../common/FeatureErrorBoundary';
 
 export const WatchPartyScreenViewer: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -60,7 +61,9 @@ export const WatchPartyScreenViewer: React.FC<{ onClose: () => void }> = ({ onCl
       )}
       <button onClick={leave} aria-label="Sair da Watch Party"
         className="absolute top-5 right-5 rounded-full bg-black/70 p-3 hover:bg-black"><X className="h-5 w-5" /></button>
-      <WatchPartyOverlay onLeaveRoom={leave} />
+      <FeatureErrorBoundary featureName="controles da Watch Party" fallback={null}>
+        <WatchPartyOverlay onLeaveRoom={leave} />
+      </FeatureErrorBoundary>
     </div>
   );
 };

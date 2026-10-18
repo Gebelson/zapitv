@@ -6,6 +6,7 @@ import { providerRegistry } from '../src/core/providers/providerRegistry';
 import { StremioStream } from '../src/core/stremio/stremioTypes';
 import { storageService } from '../src/core/storage/storageService';
 import { ZapiLoader } from '../src/components/common/ZapiLoader';
+import { FeatureErrorBoundary } from '../src/components/common/FeatureErrorBoundary';
 import { playbackSessionService, NavigationType } from '../src/core/session/playbackSessionService';
 import { catalogEligibilityService } from '../src/core/catalog/CatalogEligibilityService';
 import { theatricalFilterService } from '../src/core/catalog/theatricalFilterService';
@@ -1172,20 +1173,22 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
 
       {/* Modal Watch Party P2P Gratuita */}
       {showWatchPartyModal && (
-        <Suspense fallback={null}>
-          <WatchPartyModal
-            isOpen={showWatchPartyModal}
-            onClose={() => setShowWatchPartyModal(false)}
-            item={item}
-            season={hasEpisodes ? (currentEpisodeParams?.season || currentSeason || 1) : undefined}
-            episode={hasEpisodes ? (currentEpisodeParams?.episode || playbackContinuity.nextEpisodeNumber || 1) : undefined}
-            onStartWatchPartyPlayback={(targetItem, targetSeason, targetEpisode) => {
-              setShowWatchPartyModal(false);
-              setSessionIntroPlayed(false);
-              startPlayback(targetSeason, targetEpisode, 'manual_start');
-            }}
-          />
-        </Suspense>
+        <FeatureErrorBoundary featureName="a Watch Party" onClose={() => setShowWatchPartyModal(false)}>
+          <Suspense fallback={null}>
+            <WatchPartyModal
+              isOpen={showWatchPartyModal}
+              onClose={() => setShowWatchPartyModal(false)}
+              item={item}
+              season={hasEpisodes ? (currentEpisodeParams?.season || currentSeason || 1) : undefined}
+              episode={hasEpisodes ? (currentEpisodeParams?.episode || playbackContinuity.episode || 1) : undefined}
+              onStartWatchPartyPlayback={(targetItem, targetSeason, targetEpisode) => {
+                setShowWatchPartyModal(false);
+                setSessionIntroPlayed(false);
+                startPlayback(targetSeason, targetEpisode, 'manual_start');
+              }}
+            />
+          </Suspense>
+        </FeatureErrorBoundary>
       )}
     </div>
   );
