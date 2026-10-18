@@ -50,7 +50,7 @@ export function isAnimationOrKidsContent(item: ContentItem): boolean {
 
   // 3. Padrões textuais no título ou sinopse
   const title = (item.title || '').toLowerCase();
-  const desc = (item.description || item.synopsis || '').toLowerCase();
+  const desc = (item.description || item.overview || '').toLowerCase();
   const orig = (item.originalTitle || '').toLowerCase();
 
   const textMarkers = [

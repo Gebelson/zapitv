@@ -15254,7 +15254,7 @@ var CatalogReleaseStore = class _CatalogReleaseStore {
       (e) => e.number === episode.number && (e.season ?? 1) === (episode.season ?? 1)
     );
     if (epExists) return false;
-    target.episodes.push(episode);
+    target.episodes.push({ ...episode, description: episode.description || "", image: episode.image || "" });
     target.episodes.sort((a, b) => {
       const sA = a.season ?? 1;
       const sB = b.season ?? 1;
@@ -16925,6 +16925,7 @@ var AutoReleaseService = class _AutoReleaseService {
               title { romaji english userPreferred native }
               format
               episodes
+              averageScore
               genres
               description
               coverImage { extraLarge }
@@ -16944,15 +16945,18 @@ var AutoReleaseService = class _AutoReleaseService {
       const json = await res.json();
       const animeNodes = json.data?.Page?.media || [];
       for (const node of animeNodes) {
-        const title = node.title?.userPreferred || node.title?.english || node.title?.romaji || "Anime";
+        if (!node.coverImage?.extraLarge || !node.startDate?.year) continue;
+        const title = node.title?.userPreferred || node.title?.english || node.title?.romaji;
+        if (!title) continue;
         const candidate = {
           id: `anilist-${node.id}`,
           title,
           originalTitle: node.title?.romaji || node.title?.native,
           type: "ANIME" /* ANIME */,
           mediaFormat: node.format === "MOVIE" ? "movie" : "series",
-          year: node.startDate?.year || 2024,
-          image: node.coverImage?.extraLarge || "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500",
+          year: node.startDate.year,
+          rating: typeof node.averageScore === "number" ? node.averageScore / 10 : 0,
+          image: node.coverImage.extraLarge,
           backdrop: node.bannerImage || node.coverImage?.extraLarge,
           genres: [...node.genres || [], "Anime"],
           description: (node.description || "").replace(/<[^>]*>?/gm, "")
@@ -17036,14 +17040,19 @@ var AutoReleaseService = class _AutoReleaseService {
       );
       const cleanStreams = pending.type === "FILME" /* MOVIE */ ? streams : streams.filter((s) => !CamBlockerEngine.isCamStream(s));
       if (cleanStreams.length > 0) {
-        const item = {
-          id: pending.id,
-          imdbId: pending.imdbId,
-          tmdbId: pending.tmdbId,
-          title: pending.title,
-          type: pending.type,
-          year: pending.year || 2024
-        };
+        let metadata = null;
+        try {
+          if (pending.tmdbId) metadata = (await tmdbService.getDetails(pending.tmdbId, pending.type)).item;
+          else if (pending.imdbId) metadata = await tmdbService.findByImdb(pending.imdbId);
+        } catch (error) {
+          result.errors.push(`Falha ao revalidar metadados de ${pending.id}: ${String(error)}`);
+        }
+        const sameType = metadata?.type === pending.type || pending.type === "ANIME" /* ANIME */ && metadata?.type === "S\xC9RIE" /* SERIES */;
+        if (!metadata?.image || !sameType) {
+          catalogReleaseStore.recordPending({ ...pending, reason: "Metadados da obra ainda n\xE3o confirmados" });
+          continue;
+        }
+        const item = { ...metadata, id: pending.id, type: pending.type, imdbId: pending.imdbId || metadata.imdbId, tmdbId: pending.tmdbId || metadata.tmdbId };
         const added = catalogReleaseStore.addRelease(item);
         if (added) {
           if (pending.type === "FILME" /* MOVIE */) result.newMoviesAdded++;
@@ -17403,6 +17412,9 @@ var CollaborativeTrainer = class {
   }
 };
 var collaborativeTrainer = new CollaborativeTrainer();
+
+// src/server/feedback/repository.ts
+import { and, eq } from "drizzle-orm";
 
 // src/core/feedback/FeedbackStore.ts
 import * as fs3 from "fs";
@@ -18011,13 +18023,13 @@ Ao concluir a tarefa, apresente:
     const errorCodes = cluster.errorCodes || [];
     const isRegression = Boolean(cluster.isRegression);
     const regressionDetails = cluster.regressionDetails;
-    const mediaListStr = affectedMedia.length > 0 ? affectedMedia.map((m) => `- **${m.title}** (\`${m.id}\`, tipo: ${m.type})`).join("\n") : cluster.technicalFingerprint?.mediaTitle ? `- **${cluster.technicalFingerprint.mediaTitle}**` : "- M\xEDdia gen\xE9rica ou n\xE3o identificada.";
+    const mediaListStr = affectedMedia.length > 0 ? affectedMedia.map((m) => `- **${m.title}** (\`${m.id}\`, tipo: ${m.type})`).join("\n") : "- M\xEDdia gen\xE9rica ou n\xE3o identificada.";
     const isMovieCluster = affectedMedia.length > 0 && affectedMedia.every((m) => m.type === "movie");
     const episodesStr = !isMovieCluster && affectedEpisodes.length > 0 ? affectedEpisodes.slice(0, 8).map((e) => `T${e.season}:E${e.episode}`).join(", ") : isMovieCluster ? "N\xE3o aplic\xE1vel (Filme)" : "Todos / Obra Completa";
-    const providersStr = affectedProviders.length > 0 ? affectedProviders.join(", ") : cluster.technicalFingerprint?.providerId || "Desconhecido";
+    const providersStr = affectedProviders.length > 0 ? affectedProviders.join(", ") : cluster.fingerprintData.providerId || "Desconhecido";
     const sourcesStr = affectedSources.length > 0 ? affectedSources.slice(0, 6).join(", ") : "V\xE1rias";
     const versionsStr = affectedVersions.length > 0 ? affectedVersions.join(", ") : "Recente";
-    const errorCodesStr = errorCodes.length > 0 ? errorCodes.join(", ") : cluster.technicalFingerprint?.errorCode || "Nenhum c\xF3digo expl\xEDcito";
+    const errorCodesStr = errorCodes.length > 0 ? errorCodes.join(", ") : cluster.fingerprintData.errorCode || "Nenhum c\xF3digo expl\xEDcito";
     const regressionAlert = isRegression ? `
 > [!CAUTION] POSS\xCDVEL REGRESS\xC3O DETECTADA
 > Este problema j\xE1 havia sido marcado como **Resolvido** anteriormente (${new Date(regressionDetails?.previousResolvedAt || 0).toLocaleDateString("pt-BR")}), mas novos relatos continuam surgindo no app v${versionsStr}.
@@ -18285,6 +18297,15 @@ var FeedbackStore = class _FeedbackStore {
     }
     return _FeedbackStore.instance;
   }
+  restoreSnapshot(data) {
+    this.reports = Array.isArray(data?.reports) ? data.reports : [];
+    this.clusters = Array.isArray(data?.clusters) ? data.clusters : [];
+    this.prompts = Array.isArray(data?.prompts) ? data.prompts : [];
+    this.isLoaded = true;
+  }
+  getSnapshot() {
+    return { reports: this.reports, clusters: this.clusters, prompts: this.prompts, lastUpdated: Date.now() };
+  }
   /**
    * Carrega dados do arquivo persistente ou inicializa vazio
    */
@@ -18468,10 +18489,7 @@ var FeedbackStore = class _FeedbackStore {
     const offset = options.offset || 0;
     const limit = options.limit || 50;
     const sliced = filtered.slice(offset, offset + limit);
-    const result = sliced;
-    result.clusters = sliced;
-    result.total = total;
-    return result;
+    return { clusters: sliced, total };
   }
   /**
    * Obtém detalhes completos de um cluster com relatos associados e histórico
@@ -18483,12 +18501,7 @@ var FeedbackStore = class _FeedbackStore {
     const reports = this.reports.filter((r) => r.clusterId === clusterId);
     const prompts = this.prompts.filter((p) => p.clusterId === clusterId);
     return {
-      cluster: {
-        ...cluster,
-        reportCount: cluster.totalReports,
-        clusterLevel: cluster.clusterLevel || 1,
-        technicalFingerprint: cluster.technicalFingerprint || cluster.fingerprintData
-      },
+      cluster,
       reports,
       prompts: prompts.sort((a, b) => b.version - a.version)
     };
@@ -18746,24 +18759,6 @@ var FeedbackStore = class _FeedbackStore {
     };
   }
 };
-var feedbackStore = FeedbackStore.getInstance();
-
-// src/core/providers/validationTargetUrl.ts
-function resolveValidationTargetUrl(targetUrl) {
-  let candidate = targetUrl;
-  if (targetUrl.startsWith("/api/proxy?")) {
-    candidate = new URL(targetUrl, "https://zapitv.invalid").searchParams.get("url") || "";
-  }
-  try {
-    const parsed = new URL(candidate);
-    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
-  } catch {
-    return null;
-  }
-}
-
-// src/server/database/routes.ts
-import { Router } from "express";
 
 // src/server/database/client.ts
 import { createClient } from "@libsql/client";
@@ -18908,6 +18903,84 @@ function getDatabase() {
   return sharedDatabase;
 }
 
+// src/server/feedback/repository.ts
+var FEEDBACK_KEY = "feedback_store_v1";
+var MAX_SNAPSHOT_BYTES = 2e6;
+var FeedbackStorageUnavailable = class extends Error {
+};
+async function withFeedbackStore(operation, options = {}) {
+  const connection = getDatabase();
+  if (!connection) {
+    if (process.env.VERCEL) throw new FeedbackStorageUnavailable("Banco de feedback indispon\xEDvel.");
+    return operation(FeedbackStore.getInstance());
+  }
+  for (let attempt = 0; attempt < 8; attempt++) {
+    let row;
+    try {
+      [row] = await connection.db.select().from(globalSettings).where(eq(globalSettings.key, FEEDBACK_KEY)).limit(1);
+    } catch {
+      throw new FeedbackStorageUnavailable("N\xE3o foi poss\xEDvel ler o banco de feedback.");
+    }
+    const store = new FeedbackStore(false);
+    try {
+      store.restoreSnapshot(row ? JSON.parse(row.valueJson) : null);
+    } catch {
+      throw new FeedbackStorageUnavailable("Estado de feedback inv\xE1lido no banco.");
+    }
+    const result = await operation(store);
+    if (!options.write || options.shouldPersist && !options.shouldPersist(result)) return result;
+    try {
+      const saved = await saveSnapshot(connection, store.getSnapshot(), row?.version ?? 0, options.actor || "feedback");
+      if (saved) return result;
+    } catch (error) {
+      if (error instanceof FeedbackStorageUnavailable) throw error;
+      throw new FeedbackStorageUnavailable("N\xE3o foi poss\xEDvel gravar no banco de feedback.");
+    }
+  }
+  throw new FeedbackStorageUnavailable("O feedback foi alterado simultaneamente. Tente novamente.");
+}
+async function saveSnapshot(connection, snapshot, version, actor) {
+  const valueJson = JSON.stringify(snapshot);
+  if (Buffer.byteLength(valueJson, "utf8") > MAX_SNAPSHOT_BYTES) {
+    throw new FeedbackStorageUnavailable("Capacidade atual de feedback atingida.");
+  }
+  const updatedAt = Date.now();
+  if (version === 0) {
+    const inserted = await connection.db.insert(globalSettings).values({
+      key: FEEDBACK_KEY,
+      valueJson,
+      version: 1,
+      updatedAt,
+      updatedBy: actor
+    }).onConflictDoNothing().returning({ version: globalSettings.version });
+    return inserted.length === 1;
+  }
+  const updated = await connection.db.update(globalSettings).set({
+    valueJson,
+    version: version + 1,
+    updatedAt,
+    updatedBy: actor
+  }).where(and(eq(globalSettings.key, FEEDBACK_KEY), eq(globalSettings.version, version))).returning({ version: globalSettings.version });
+  return updated.length === 1;
+}
+
+// src/core/providers/validationTargetUrl.ts
+function resolveValidationTargetUrl(targetUrl) {
+  let candidate = targetUrl;
+  if (targetUrl.startsWith("/api/proxy?")) {
+    candidate = new URL(targetUrl, "https://zapitv.invalid").searchParams.get("url") || "";
+  }
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+// src/server/database/routes.ts
+import { Router } from "express";
+
 // src/server/database/firebaseAuth.ts
 import { createRemoteJWKSet, errors, jwtVerify } from "jose";
 var publicKeys = createRemoteJWKSet(
@@ -18951,11 +19024,11 @@ async function authenticateAdmin(authorization) {
 }
 
 // src/server/database/settings.ts
-import { and, eq } from "drizzle-orm";
+import { and as and2, eq as eq2 } from "drizzle-orm";
 var SettingVersionConflict = class extends Error {
 };
 async function readSetting(connection, key) {
-  const [row] = await connection.db.select().from(globalSettings).where(eq(globalSettings.key, key)).limit(1);
+  const [row] = await connection.db.select().from(globalSettings).where(eq2(globalSettings.key, key)).limit(1);
   return row ? { value: JSON.parse(row.valueJson), version: row.version, updatedAt: row.updatedAt } : null;
 }
 async function writeSetting(connection, key, value, expectedVersion, actorUid) {
@@ -18977,7 +19050,7 @@ async function writeSetting(connection, key, value, expectedVersion, actorUid) {
         version: expectedVersion + 1,
         updatedAt: now,
         updatedBy: actorUid
-      }).where(and(eq(globalSettings.key, key), eq(globalSettings.version, expectedVersion))).returning({ version: globalSettings.version });
+      }).where(and2(eq2(globalSettings.key, key), eq2(globalSettings.version, expectedVersion))).returning({ version: globalSettings.version });
       if (updated.length !== 1) throw new SettingVersionConflict("A configura\xE7\xE3o foi modificada em outra sess\xE3o.");
     }
     await tx.insert(adminAudit).values({
@@ -18994,7 +19067,7 @@ async function writeSetting(connection, key, value, expectedVersion, actorUid) {
 
 // src/server/database/sourceMemory.ts
 import { randomUUID } from "node:crypto";
-import { and as and2, desc, eq as eq2, gt, isNull, lt, sql } from "drizzle-orm";
+import { and as and3, desc, eq as eq3, gt, isNull, lt, sql } from "drizzle-orm";
 var permittedProviders = /* @__PURE__ */ new Set([
   "zapitv-show-subtitle-pt-br",
   "zapitv-mico-leao-dublado",
@@ -19037,11 +19110,11 @@ function reliabilityScore(row, now = Date.now()) {
 }
 async function listRememberedSources(connection, identity) {
   const now = Date.now();
-  const rows = await connection.db.select().from(sourceReliability).where(and2(
-    eq2(sourceReliability.canonicalId, identity.canonicalId),
-    eq2(sourceReliability.mediaType, identity.mediaType),
-    eq2(sourceReliability.season, identity.season),
-    eq2(sourceReliability.episode, identity.episode),
+  const rows = await connection.db.select().from(sourceReliability).where(and3(
+    eq3(sourceReliability.canonicalId, identity.canonicalId),
+    eq3(sourceReliability.mediaType, identity.mediaType),
+    eq3(sourceReliability.season, identity.season),
+    eq3(sourceReliability.episode, identity.episode),
     gt(sourceReliability.expiresAt, now),
     gt(sourceReliability.successes, 0)
   )).orderBy(desc(sourceReliability.lastSuccessAt)).limit(30);
@@ -19076,14 +19149,14 @@ function recordSourceEvidence(connection, ticketId, outcome, detail) {
 async function recordSourceEvidenceTransaction(connection, ticketId, outcome, detail) {
   const now = Date.now();
   return connection.db.transaction(async (tx) => {
-    const [ticket] = await tx.select().from(sourceEvidenceTickets).where(and2(
-      eq2(sourceEvidenceTickets.id, ticketId),
+    const [ticket] = await tx.select().from(sourceEvidenceTickets).where(and3(
+      eq3(sourceEvidenceTickets.id, ticketId),
       isNull(sourceEvidenceTickets.outcome),
       gt(sourceEvidenceTickets.issuedAt, now - 12e4)
     )).limit(1);
     if (!ticket || outcome === "success" && now - ticket.issuedAt < 5e3) return "invalid";
-    const claimed = await tx.update(sourceEvidenceTickets).set({ outcome }).where(and2(
-      eq2(sourceEvidenceTickets.id, ticketId),
+    const claimed = await tx.update(sourceEvidenceTickets).set({ outcome }).where(and3(
+      eq3(sourceEvidenceTickets.id, ticketId),
       isNull(sourceEvidenceTickets.outcome)
     )).returning({ id: sourceEvidenceTickets.id });
     if (claimed.length !== 1) return "invalid";
@@ -20741,27 +20814,42 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     try {
-      const response = await feedbackStore.submitFeedback(req.body);
+      const response = await withFeedbackStore((store) => store.submitFeedback(req.body), {
+        write: true,
+        actor: "anonymous-feedback",
+        shouldPersist: (result) => !result.isDuplicateIgnored
+      });
       return res.status(200).json(response);
     } catch (err) {
       console.error("[API Feedback] Erro ao submeter feedback:", err);
-      return res.status(400).json({ error: "Falha ao processar feedback", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 400).json({ error: "Falha ao processar feedback", details: err?.message });
+    }
+  });
+  app2.use("/api/feedback", async (req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      const actorUid = await authenticateAdmin(req.header("authorization"));
+      if (!actorUid) return res.status(403).json({ error: "Autentica\xE7\xE3o administrativa necess\xE1ria." });
+      res.locals.actorUid = actorUid;
+      next();
+    } catch {
+      return res.status(503).json({ error: "Verifica\xE7\xE3o de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
     }
   });
   app2.get("/api/feedback/stats", async (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
-      const stats = feedbackStore.getDashboardStats();
+      const stats = await withFeedbackStore((store) => store.getDashboardStats());
       return res.json(stats);
     } catch (err) {
-      return res.status(500).json({ error: "Erro ao obter estat\xEDsticas", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao obter estat\xEDsticas", details: err?.message });
     }
   });
   app2.get("/api/feedback/clusters", async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { status, category, priority, search, limit, offset, sortBy } = req.query;
-      const result = feedbackStore.getClusters({
+      const result = await withFeedbackStore((store) => store.getClusters({
         status,
         category,
         priority,
@@ -20769,105 +20857,122 @@ ${s.name?.split("\n")[1] || "1080p"}`,
         limit: limit ? parseInt(String(limit), 10) : 50,
         offset: offset ? parseInt(String(offset), 10) : 0,
         sortBy
-      });
+      }));
       return res.json(result);
     } catch (err) {
-      return res.status(500).json({ error: "Erro ao listar clusters de problemas", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao listar clusters de problemas", details: err?.message });
     }
   });
   app2.get("/api/feedback/clusters/:id", async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
-      const details = feedbackStore.getClusterDetails(req.params.id);
+      const details = await withFeedbackStore((store) => store.getClusterDetails(req.params.id));
       if (!details) {
         return res.status(404).json({ error: "Problema n\xE3o encontrado" });
       }
       return res.json(details);
     } catch (err) {
-      return res.status(500).json({ error: "Erro ao buscar detalhes do problema", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao buscar detalhes do problema", details: err?.message });
     }
   });
   app2.patch("/api/feedback/clusters/:id", async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { id } = req.params;
-      const { status, priority, adminNotes, adminName } = req.body;
-      const author = adminName || "Administrador";
-      let updated = null;
-      if (status) {
-        updated = feedbackStore.updateClusterStatus(id, status, author, adminNotes);
+      const { status, priority, adminNotes } = req.body || {};
+      if (status && !["new", "investigating", "fixing", "resolved", "reopened"].includes(status)) {
+        return res.status(400).json({ error: "Status inv\xE1lido." });
       }
-      if (priority) {
-        updated = feedbackStore.updateClusterPriority(id, priority, author);
+      if (priority && !["critical", "high", "medium", "low"].includes(priority)) {
+        return res.status(400).json({ error: "Prioridade inv\xE1lida." });
       }
-      if (adminNotes && !status) {
-        updated = feedbackStore.updateAdminNotes(id, adminNotes, author);
-      }
+      const author = res.locals.actorUid;
+      const updated = await withFeedbackStore((store) => {
+        let result = null;
+        if (status) result = store.updateClusterStatus(id, status, author, adminNotes);
+        if (priority) result = store.updateClusterPriority(id, priority, author);
+        if (adminNotes && !status) result = store.updateAdminNotes(id, adminNotes, author);
+        return result;
+      }, { write: true, actor: author, shouldPersist: (result) => Boolean(result) });
       if (!updated) {
         return res.status(404).json({ error: "Problema n\xE3o encontrado para atualiza\xE7\xE3o" });
       }
       return res.json({ success: true, cluster: updated });
     } catch (err) {
-      return res.status(500).json({ error: "Erro ao atualizar problema", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao atualizar problema", details: err?.message });
     }
   });
   app2.post("/api/feedback/clusters/:id/prompt", async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { id } = req.params;
-      const { adminName } = req.body;
-      const prompt = feedbackStore.regeneratePrompt(id, adminName || "Administrador");
+      const prompt = await withFeedbackStore((store) => store.regeneratePrompt(id, res.locals.actorUid), {
+        write: true,
+        actor: res.locals.actorUid,
+        shouldPersist: (result) => Boolean(result)
+      });
       if (!prompt) {
         return res.status(404).json({ error: "Cluster n\xE3o encontrado para gerar prompt" });
       }
       return res.json({ success: true, prompt });
     } catch (err) {
-      return res.status(500).json({ error: "Erro ao regenerar prompt", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao regenerar prompt", details: err?.message });
     }
   });
   app2.put("/api/feedback/clusters/:id/prompt", async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { id } = req.params;
-      const { markdownContent, adminName } = req.body;
+      const { markdownContent } = req.body || {};
       if (!markdownContent) {
         return res.status(400).json({ error: "Conte\xFAdo do prompt \xE9 obrigat\xF3rio" });
       }
-      const prompt = feedbackStore.saveEditedPrompt(id, markdownContent, adminName || "Administrador");
+      const prompt = await withFeedbackStore((store) => store.saveEditedPrompt(id, markdownContent, res.locals.actorUid), {
+        write: true,
+        actor: res.locals.actorUid,
+        shouldPersist: (result) => Boolean(result)
+      });
       if (!prompt) {
         return res.status(404).json({ error: "Cluster n\xE3o encontrado para salvar prompt" });
       }
       return res.json({ success: true, prompt });
     } catch (err) {
-      return res.status(500).json({ error: "Erro ao salvar prompt editado", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao salvar prompt editado", details: err?.message });
     }
   });
   app2.post("/api/feedback/clusters/:id/merge", async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { id } = req.params;
-      const { targetClusterId, adminName } = req.body;
+      const { targetClusterId } = req.body || {};
       if (!targetClusterId) {
         return res.status(400).json({ error: "targetClusterId \xE9 obrigat\xF3rio" });
       }
-      const ok = feedbackStore.mergeClustersManually(id, targetClusterId, adminName || "Administrador");
+      const ok = await withFeedbackStore((store) => store.mergeClustersManually(id, targetClusterId, res.locals.actorUid), {
+        write: true,
+        actor: res.locals.actorUid,
+        shouldPersist: (result) => Boolean(result)
+      });
       return res.json({ success: ok });
     } catch (err) {
-      return res.status(500).json({ error: "Erro ao mesclar clusters", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao mesclar clusters", details: err?.message });
     }
   });
   app2.post("/api/feedback/reports/:id/split", async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { id } = req.params;
-      const { adminName } = req.body;
-      const newCluster = feedbackStore.splitReportFromCluster(id, adminName || "Administrador");
+      const newCluster = await withFeedbackStore((store) => store.splitReportFromCluster(id, res.locals.actorUid), {
+        write: true,
+        actor: res.locals.actorUid,
+        shouldPersist: (result) => Boolean(result)
+      });
       if (!newCluster) {
         return res.status(404).json({ error: "Relato n\xE3o encontrado para desmembrar" });
       }
       return res.json({ success: true, newCluster });
     } catch (err) {
-      return res.status(500).json({ error: "Erro ao desmembrar relato", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao desmembrar relato", details: err?.message });
     }
   });
   return app2;

@@ -17,6 +17,8 @@ export interface ContentItem {
   type: ContentType;
   mediaFormat?: 'movie' | 'series'; // formato da obra, independente da categoria Anime
   rating: number;
+  popularity?: number;
+  tmdbPopularity?: number;
   year: number;
   image: string;
   backdrop?: string;
@@ -58,6 +60,7 @@ export interface ContentItem {
   episodes?: {
     id: string;
     number: number;
+    season?: number;
     title: string;
     description: string;
     image: string;

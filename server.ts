@@ -12,9 +12,10 @@ import { catalogReleaseScheduler } from "./src/core/catalog/CatalogReleaseSchedu
 import { catalogReleaseStore } from "./src/core/catalog/CatalogReleaseStore.ts";
 import { collaborativeTrainer } from "./src/core/recommendations/CollaborativeTrainer.ts";
 import { bannedContentRegistry } from "./src/core/catalog/BannedContentRegistry.ts";
-import { feedbackStore } from "./src/core/feedback/FeedbackStore.ts";
+import { FeedbackStorageUnavailable, withFeedbackStore } from "./src/server/feedback/repository.ts";
 import { resolveValidationTargetUrl } from "./src/core/providers/validationTargetUrl.ts";
 import { databaseRouter } from "./src/server/database/routes.ts";
+import { authenticateAdmin } from "./src/server/database/firebaseAuth.ts";
 import { watchPartyRouter } from "./src/server/watchparty/routes.ts";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1143,11 +1144,26 @@ function createApp() {
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     try {
-      const response = await feedbackStore.submitFeedback(req.body);
+      const response = await withFeedbackStore(store => store.submitFeedback(req.body), {
+        write: true, actor: 'anonymous-feedback', shouldPersist: result => !result.isDuplicateIgnored
+      });
       return res.status(200).json(response);
     } catch (err: any) {
       console.error("[API Feedback] Erro ao submeter feedback:", err);
-      return res.status(400).json({ error: "Falha ao processar feedback", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 400).json({ error: "Falha ao processar feedback", details: err?.message });
+    }
+  });
+
+  // Todos os demais endpoints de feedback expõem dados internos ou alteram o painel.
+  app.use("/api/feedback", async (req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      const actorUid = await authenticateAdmin(req.header("authorization"));
+      if (!actorUid) return res.status(403).json({ error: "Autenticação administrativa necessária." });
+      res.locals.actorUid = actorUid;
+      next();
+    } catch {
+      return res.status(503).json({ error: "Verificação de autenticação temporariamente indisponível." });
     }
   });
 
@@ -1155,10 +1171,10 @@ function createApp() {
   app.get("/api/feedback/stats", async (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
-      const stats = feedbackStore.getDashboardStats();
+      const stats = await withFeedbackStore(store => store.getDashboardStats());
       return res.json(stats);
     } catch (err: any) {
-      return res.status(500).json({ error: "Erro ao obter estatísticas", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao obter estatísticas", details: err?.message });
     }
   });
 
@@ -1167,7 +1183,7 @@ function createApp() {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { status, category, priority, search, limit, offset, sortBy } = req.query;
-      const result = feedbackStore.getClusters({
+      const result = await withFeedbackStore(store => store.getClusters({
         status: status as any,
         category: category as any,
         priority: priority as any,
@@ -1175,10 +1191,10 @@ function createApp() {
         limit: limit ? parseInt(String(limit), 10) : 50,
         offset: offset ? parseInt(String(offset), 10) : 0,
         sortBy: sortBy as any
-      });
+      }));
       return res.json(result);
     } catch (err: any) {
-      return res.status(500).json({ error: "Erro ao listar clusters de problemas", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao listar clusters de problemas", details: err?.message });
     }
   });
 
@@ -1186,13 +1202,13 @@ function createApp() {
   app.get("/api/feedback/clusters/:id", async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
-      const details = feedbackStore.getClusterDetails(req.params.id);
+      const details = await withFeedbackStore(store => store.getClusterDetails(req.params.id));
       if (!details) {
         return res.status(404).json({ error: "Problema não encontrado" });
       }
       return res.json(details);
     } catch (err: any) {
-      return res.status(500).json({ error: "Erro ao buscar detalhes do problema", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao buscar detalhes do problema", details: err?.message });
     }
   });
 
@@ -1201,26 +1217,29 @@ function createApp() {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { id } = req.params;
-      const { status, priority, adminNotes, adminName } = req.body;
-      const author = adminName || "Administrador";
+      const { status, priority, adminNotes } = req.body || {};
+      if (status && !['new', 'investigating', 'fixing', 'resolved', 'reopened'].includes(status)) {
+        return res.status(400).json({ error: "Status inválido." });
+      }
+      if (priority && !['critical', 'high', 'medium', 'low'].includes(priority)) {
+        return res.status(400).json({ error: "Prioridade inválida." });
+      }
+      const author = res.locals.actorUid;
 
-      let updated = null;
-      if (status) {
-        updated = feedbackStore.updateClusterStatus(id, status, author, adminNotes);
-      }
-      if (priority) {
-        updated = feedbackStore.updateClusterPriority(id, priority, author);
-      }
-      if (adminNotes && !status) {
-        updated = feedbackStore.updateAdminNotes(id, adminNotes, author);
-      }
+      const updated = await withFeedbackStore(store => {
+        let result = null;
+        if (status) result = store.updateClusterStatus(id, status, author, adminNotes);
+        if (priority) result = store.updateClusterPriority(id, priority, author);
+        if (adminNotes && !status) result = store.updateAdminNotes(id, adminNotes, author);
+        return result;
+      }, { write: true, actor: author, shouldPersist: result => Boolean(result) });
 
       if (!updated) {
         return res.status(404).json({ error: "Problema não encontrado para atualização" });
       }
       return res.json({ success: true, cluster: updated });
     } catch (err: any) {
-      return res.status(500).json({ error: "Erro ao atualizar problema", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao atualizar problema", details: err?.message });
     }
   });
 
@@ -1229,14 +1248,15 @@ function createApp() {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { id } = req.params;
-      const { adminName } = req.body;
-      const prompt = feedbackStore.regeneratePrompt(id, adminName || "Administrador");
+      const prompt = await withFeedbackStore(store => store.regeneratePrompt(id, res.locals.actorUid), {
+        write: true, actor: res.locals.actorUid, shouldPersist: result => Boolean(result)
+      });
       if (!prompt) {
         return res.status(404).json({ error: "Cluster não encontrado para gerar prompt" });
       }
       return res.json({ success: true, prompt });
     } catch (err: any) {
-      return res.status(500).json({ error: "Erro ao regenerar prompt", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao regenerar prompt", details: err?.message });
     }
   });
 
@@ -1245,17 +1265,19 @@ function createApp() {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { id } = req.params;
-      const { markdownContent, adminName } = req.body;
+      const { markdownContent } = req.body || {};
       if (!markdownContent) {
         return res.status(400).json({ error: "Conteúdo do prompt é obrigatório" });
       }
-      const prompt = feedbackStore.saveEditedPrompt(id, markdownContent, adminName || "Administrador");
+      const prompt = await withFeedbackStore(store => store.saveEditedPrompt(id, markdownContent, res.locals.actorUid), {
+        write: true, actor: res.locals.actorUid, shouldPersist: result => Boolean(result)
+      });
       if (!prompt) {
         return res.status(404).json({ error: "Cluster não encontrado para salvar prompt" });
       }
       return res.json({ success: true, prompt });
     } catch (err: any) {
-      return res.status(500).json({ error: "Erro ao salvar prompt editado", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao salvar prompt editado", details: err?.message });
     }
   });
 
@@ -1264,14 +1286,16 @@ function createApp() {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { id } = req.params;
-      const { targetClusterId, adminName } = req.body;
+      const { targetClusterId } = req.body || {};
       if (!targetClusterId) {
         return res.status(400).json({ error: "targetClusterId é obrigatório" });
       }
-      const ok = feedbackStore.mergeClustersManually(id, targetClusterId, adminName || "Administrador");
+      const ok = await withFeedbackStore(store => store.mergeClustersManually(id, targetClusterId, res.locals.actorUid), {
+        write: true, actor: res.locals.actorUid, shouldPersist: result => Boolean(result)
+      });
       return res.json({ success: ok });
     } catch (err: any) {
-      return res.status(500).json({ error: "Erro ao mesclar clusters", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao mesclar clusters", details: err?.message });
     }
   });
 
@@ -1280,14 +1304,15 @@ function createApp() {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { id } = req.params;
-      const { adminName } = req.body;
-      const newCluster = feedbackStore.splitReportFromCluster(id, adminName || "Administrador");
+      const newCluster = await withFeedbackStore(store => store.splitReportFromCluster(id, res.locals.actorUid), {
+        write: true, actor: res.locals.actorUid, shouldPersist: result => Boolean(result)
+      });
       if (!newCluster) {
         return res.status(404).json({ error: "Relato não encontrado para desmembrar" });
       }
       return res.json({ success: true, newCluster });
     } catch (err: any) {
-      return res.status(500).json({ error: "Erro ao desmembrar relato", details: err?.message });
+      return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 500).json({ error: "Erro ao desmembrar relato", details: err?.message });
     }
   });
 

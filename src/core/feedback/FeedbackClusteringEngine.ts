@@ -314,7 +314,7 @@ export class FeedbackClusteringEngine {
     existingClusters: IssueCluster[],
     report: FeedbackReport
   ): { matchedCluster: IssueCluster | null; matchLevel: 1 | 2 | 3 } {
-    const repFp = report.fingerprint || report.fingerprintHash;
+    const repFp = report.fingerprint || (report as FeedbackReport & { fingerprintHash?: string }).fingerprintHash;
     const repFpData = (report.fingerprintData || (report as any).technicalFingerprint || {}) as any;
     const category = report.category;
 

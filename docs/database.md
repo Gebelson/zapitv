@@ -2,7 +2,9 @@
 
 ## Estado atual e estratégia
 
-Em 16/10/2026, o projeto usa Dexie/IndexedDB para catálogo local e preferências, Firebase Auth/Firestore para parte das edições e `data/feedback_store.json` para feedback. O carrossel era salvo apenas em `localStorage`. A Vercel vinculada é `zapi-group/zapitv`.
+Em 16/10/2026, o projeto usava Dexie/IndexedDB para catálogo local e preferências, Firebase Auth/Firestore para parte das edições e `data/feedback_store.json` para feedback. O carrossel era salvo apenas em `localStorage`. A Vercel vinculada é `zapi-group/zapitv`.
+
+Desde 18/10/2026, a API usa a linha versionada `feedback_store_v1` em `global_settings` no Turso para relatos, clusters e prompts. O arquivo local continua disponível somente quando o banco não está configurado fora da Vercel. Na Vercel, a falta do banco retorna 503 para evitar sucesso sem persistência. Esta estrutura mantém o fluxo atual sem migração destrutiva; para volumes acima de 2 MB, os dados precisam ser divididos em tabelas relacionais.
 
 O banco `zapitv` foi criado na organização Turso `gebelson`, na região AWS US East (Virginia), correspondente à região `iad1` do projeto Vercel. A migração inicial foi aplicada e as tabelas foram conferidas no painel Turso. `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `FIREBASE_PROJECT_ID` e `ADMIN_FIREBASE_UIDS` estão configurados apenas em **Production** na Vercel; o token Turso e a lista de UIDs são Secrets. O token Turso tem acesso de leitura e gravação e expira em um ano. A implantação `dpl_ByaExL8iePpSb485aUWo9GY2BUT1` foi validada isoladamente e promovida para `zapitv-stream.vercel.app` após autorização do proprietário. Ainda não houve migração dos dados locais.
 

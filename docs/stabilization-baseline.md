@@ -40,9 +40,25 @@ Após essas mudanças, `npm run lint` ainda reporta 69 erros preexistentes em ou
 
 O teste de dois navegadores passou no localhost. Voz, compartilhamento de tela e reprodução real em múltiplos dispositivos ainda exigem validação própria; o teste não afirma cobri-los.
 
-## Próximos checkpoints
+## Checkpoints que ainda precisam de validação
 
 1. **Estabilização estrutural:** validar voz, compartilhamento de tela e reprodução real em múltiplos dispositivos; ampliar testes de recuperação.
-2. **Organização e produção:** reduzir os erros TypeScript restantes por módulo, consolidar testes executáveis, revisar duplicações comprovadas, cache, catálogo, banco e compatibilidade Vercel. Medir desempenho antes de otimizar.
+2. **Organização e produção:** testar catálogo automático entre instâncias, painel com login real, cache e Service Worker em atualizações de deployment; medir desempenho antes de otimizar.
 
 Evitar mudanças amplas até que cada fluxo afetado tenha um teste de regressão reproduzível.
+
+## Terceira entrega: contratos, persistência e gates
+
+- Corrigido o contrato JSON de listagem de feedback e os campos que o painel lia com nomes antigos. O painel mantém o layout e usa os campos reais de clusters, estatísticas, relatos e prompts.
+- Todas as rotas administrativas de feedback agora verificam o token Firebase e a lista de UIDs permitidos no servidor. O envio anônimo continua público. O UID verificado, em vez do nome enviado pelo navegador, identifica edições administrativas.
+- O feedback na Vercel passa a usar um snapshot versionado no Turso já existente. Gravações concorrentes fazem nova leitura e tentam novamente; indisponibilidade do banco retorna erro, sem declarar sucesso não persistido. O arquivo JSON local não foi apagado.
+- Corrigidos contratos de metadados do catálogo que permitiam inserir itens sem pôster/nota e acessos a campos inexistentes. Um título pendente só é publicado após recuperar metadados da identidade confirmada. Não foram inseridos dados fictícios.
+- `npm run build` agora executa `tsc --noEmit` e os testes de contratos, autenticação e persistência. O typecheck passou de **94 erros iniciais para 0**. O teste de Turso local gravou seis relatos concorrentes sem perda e verificou a atualização administrativa.
+
+### Medidas e limites
+
+- Bundle principal Vite: **565,50 kB / 159,29 kB gzip** no build anterior; **565,55 kB / 159,30 kB gzip** após esta etapa. Isso não constitui ganho de velocidade; nenhuma otimização ampla foi feita sem medição.
+- API empacotada: **798,4 kB → 803,8 kB**. O crescimento inclui o repositório de feedback.
+- O teste de dois navegadores verifica presença, nomes e chat. Ele não prova sincronização de vídeo, áudio da mídia, voice chat ou compartilhamento de tela em dispositivos reais.
+- O repositório de feedback usa um snapshot com limite de 2 MB para evitar gravação silenciosa excessiva. Volumes maiores exigirão tabelas relacionais e paginação no Turso. O catálogo de lançamentos automáticos ainda mantém estado em memória no servidor; sua persistência entre instâncias da Vercel precisa de migração específica.
+- A suíte antiga baseada em Vitest ainda não é executável porque o projeto não declara essa dependência. Os novos testes usam `tsx` e fazem parte do build. Lighthouse, voz/WebRTC real e painel com login Firebase real não foram medidos nesta entrega.

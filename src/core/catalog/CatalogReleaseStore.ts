@@ -101,7 +101,7 @@ export class CatalogReleaseStore {
 
     if (epExists) return false;
 
-    target.episodes.push(episode);
+    target.episodes.push({ ...episode, description: episode.description || '', image: episode.image || '' });
     target.episodes.sort((a, b) => {
       const sA = a.season ?? 1;
       const sB = b.season ?? 1;

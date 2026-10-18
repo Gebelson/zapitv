@@ -750,6 +750,7 @@ class TMDBClientService {
     item: ContentItem;
     imdbId?: string;
     seasonsCount?: number;
+    seasons?: Array<{ season_number: number; air_date?: string; episode_count?: number }>;
     cast?: string[];
     director?: string;
     similar?: ContentItem[];

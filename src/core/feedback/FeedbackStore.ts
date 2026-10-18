@@ -1,10 +1,7 @@
 /**
  * ZapiTV — FeedbackStore
- * Repositório central persistente de feedbacks, clusters de problemas e prompts de correção.
- * Suporta persistência multi-camadas:
- * 1. Arquivo JSON persistente em ambiente Node.js / Serverless (`data/feedback_store.json`).
- * 2. Suporte nativo ao Firebase Firestore quando configurado no ambiente.
- * 3. Cache em memória para desempenho instantâneo em requisições serverless na Vercel.
+ * Estado e regras de feedback. A API persiste snapshots versionados no Turso;
+ * o arquivo JSON existente permanece como armazenamento local sem Turso.
  */
 
 import * as fs from 'fs';
@@ -16,6 +13,7 @@ import {
   FeedbackSubmissionRequest,
   FeedbackSubmissionResponse,
   FeedbackDashboardStats,
+  FeedbackCategory,
   IssueStatus,
   IssuePriority,
   FEEDBACK_CATEGORY_LABELS
@@ -29,6 +27,8 @@ interface StoredData {
   prompts: GeneratedFixPrompt[];
   lastUpdated: number;
 }
+
+export type FeedbackSnapshot = StoredData;
 
 export class FeedbackStore {
   private static instance: FeedbackStore;
@@ -57,6 +57,17 @@ export class FeedbackStore {
       FeedbackStore.instance = new FeedbackStore(true);
     }
     return FeedbackStore.instance;
+  }
+
+  public restoreSnapshot(data: FeedbackSnapshot | null): void {
+    this.reports = Array.isArray(data?.reports) ? data.reports : [];
+    this.clusters = Array.isArray(data?.clusters) ? data.clusters : [];
+    this.prompts = Array.isArray(data?.prompts) ? data.prompts : [];
+    this.isLoaded = true;
+  }
+
+  public getSnapshot(): FeedbackSnapshot {
+    return { reports: this.reports, clusters: this.clusters, prompts: this.prompts, lastUpdated: Date.now() };
   }
 
   /**
@@ -294,12 +305,7 @@ export class FeedbackStore {
     const limit = options.limit || 50;
     const sliced = filtered.slice(offset, offset + limit);
 
-    // Retorna array híbrido que pode ser iterado diretamente ou desestruturado como { clusters, total }
-    const result: any = sliced;
-    result.clusters = sliced;
-    result.total = total;
-
-    return result;
+    return { clusters: sliced, total };
   }
 
   /**
@@ -319,12 +325,7 @@ export class FeedbackStore {
     const prompts = this.prompts.filter(p => p.clusterId === clusterId);
 
     return {
-      cluster: {
-        ...cluster,
-        reportCount: cluster.totalReports,
-        clusterLevel: (cluster as any).clusterLevel || 1,
-        technicalFingerprint: (cluster as any).technicalFingerprint || cluster.fingerprintData
-      },
+      cluster,
       reports,
       prompts: prompts.sort((a, b) => b.version - a.version)
     };
@@ -671,5 +672,3 @@ export class FeedbackStore {
     };
   }
 }
-
-export const feedbackStore = FeedbackStore.getInstance();

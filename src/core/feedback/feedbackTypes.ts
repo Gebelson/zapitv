@@ -148,6 +148,7 @@ export interface IssueHistoryEntry {
     | 'manual_merge'
     | 'manual_split'
     | 'reopened_regression'
+    | 'regression_detected'
     | 'admin_note';
   performedBy: string;
   details: string;

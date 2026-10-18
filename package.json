@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --env-file-if-exists=.env.local --import tsx server.ts",
-    "build": "npm run test:stability && npm run build:api && vite build",
+    "build": "npm run lint && npm run test:stability && npm run build:api && vite build",
     "build:api": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=api/index.mjs",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
@@ -18,8 +18,10 @@
     "test:watchparty-smoke": "tsx tests/watchparty_modal_smoke.test.ts",
     "test:watchparty-two-browsers": "tsx tests/watchparty_two_browsers.test.ts",
     "test:watchparty-intro": "tsx tests/watchparty_intro_state.test.ts",
+    "test:feedback-admin": "tsx tests/feedback_admin_contract.test.ts",
+    "test:feedback-persistence": "tsx tests/feedback_persistence.test.ts",
     "test:playback-remote-sync": "tsx tests/playback_remote_sync.test.ts",
-    "test:stability": "npm run test:watchparty-state && npm run test:watchparty-intro && npm run test:playback-remote-sync",
+    "test:stability": "npm run test:watchparty-state && npm run test:watchparty-intro && npm run test:playback-remote-sync && npm run test:feedback-admin && npm run test:feedback-persistence",
     "start": "node server.ts"
   },
   "dependencies": {

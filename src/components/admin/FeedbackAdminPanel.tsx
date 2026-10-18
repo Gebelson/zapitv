@@ -65,6 +65,18 @@ const CATEGORY_ICONS: Record<FeedbackCategory, React.ReactNode> = {
   other_problem: <AlertCircle className="w-3.5 h-3.5 text-gray-400" />
 };
 
+async function adminFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const { auth } = await import('../../../firebase');
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Entre com sua conta administrativa para consultar os relatos.');
+  return fetch(input, {
+    ...init,
+    headers: { ...init.headers, Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(10000)
+  });
+}
+
 export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMode = true }) => {
   const [stats, setStats] = useState<FeedbackDashboardStats | null>(null);
   const [clusters, setClusters] = useState<IssueCluster[]>([]);
@@ -102,7 +114,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
 
     try {
       // 1. Stats
-      const statsRes = await fetch('/api/feedback/stats');
+      const statsRes = await adminFetch('/api/feedback/stats');
       if (statsRes.ok) {
         const statsData = await statsRes.json();
         setStats(statsData);
@@ -115,10 +127,12 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
       if (categoryFilter !== 'all') queryParams.set('category', categoryFilter);
       if (searchQuery.trim()) queryParams.set('search', searchQuery.trim());
 
-      const clustersRes = await fetch(`/api/feedback/clusters?${queryParams.toString()}`);
+      const clustersRes = await adminFetch(`/api/feedback/clusters?${queryParams.toString()}`);
       if (clustersRes.ok) {
         const clustersData = await clustersRes.json();
         setClusters(clustersData.clusters || []);
+      } else {
+        throw new Error('Não foi possível carregar os relatos.');
       }
     } catch (err: any) {
       setError(err?.message || 'Falha ao carregar dados de feedback.');
@@ -136,17 +150,17 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
   const handleSelectCluster = async (cluster: IssueCluster) => {
     setSelectedCluster(cluster);
     setIsEditingPrompt(false);
-    setEditedPrompt(cluster.generatedPrompt?.consolidatedPrompt || '');
+    setEditedPrompt(cluster.activePromptMarkdown || '');
     setAdminNotes(cluster.adminNotes || '');
     setLoadingDetails(true);
 
     try {
-      const res = await fetch(`/api/feedback/clusters/${cluster.id}`);
+      const res = await adminFetch(`/api/feedback/clusters/${cluster.id}`);
       if (res.ok) {
         const data = await res.json();
         setSelectedCluster(data.cluster);
         setClusterReports(data.reports || []);
-        setEditedPrompt(data.cluster?.generatedPrompt?.consolidatedPrompt || '');
+        setEditedPrompt(data.cluster?.activePromptMarkdown || '');
         setAdminNotes(data.cluster?.adminNotes || '');
       }
     } catch (err) {
@@ -159,7 +173,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
   // Atualizar Status do Cluster
   const handleUpdateStatus = async (clusterId: string, newStatus: IssueStatus) => {
     try {
-      const res = await fetch(`/api/feedback/clusters/${clusterId}`, {
+      const res = await adminFetch(`/api/feedback/clusters/${clusterId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -180,7 +194,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
   // Atualizar Prioridade do Cluster
   const handleUpdatePriority = async (clusterId: string, newPriority: IssuePriority) => {
     try {
-      const res = await fetch(`/api/feedback/clusters/${clusterId}`, {
+      const res = await adminFetch(`/api/feedback/clusters/${clusterId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ priority: newPriority })
@@ -199,7 +213,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
 
   // Copiar Prompt Técnico para Área de Transferência
   const handleCopyPrompt = () => {
-    const textToCopy = isEditingPrompt ? editedPrompt : (selectedCluster?.generatedPrompt?.consolidatedPrompt || '');
+    const textToCopy = isEditingPrompt ? editedPrompt : (selectedCluster?.activePromptMarkdown || '');
     if (!textToCopy) return;
 
     navigator.clipboard.writeText(textToCopy).then(() => {
@@ -214,14 +228,14 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
     setRegeneratingPrompt(true);
 
     try {
-      const res = await fetch(`/api/feedback/clusters/${selectedCluster.id}/prompt`, {
+      const res = await adminFetch(`/api/feedback/clusters/${selectedCluster.id}/prompt`, {
         method: 'POST'
       });
 
       if (res.ok) {
         const data = await res.json();
-        setSelectedCluster(prev => prev ? { ...prev, generatedPrompt: data.prompt } : null);
-        setEditedPrompt(data.prompt.consolidatedPrompt);
+        setSelectedCluster(prev => prev ? { ...prev, activePromptMarkdown: data.prompt.markdownContent, promptVersion: data.prompt.version } : null);
+        setEditedPrompt(data.prompt.markdownContent);
       }
     } catch (err) {
       console.error('Erro ao regenerar prompt:', err);
@@ -236,15 +250,15 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
     setSavingPrompt(true);
 
     try {
-      const res = await fetch(`/api/feedback/clusters/${selectedCluster.id}/prompt`, {
+      const res = await adminFetch(`/api/feedback/clusters/${selectedCluster.id}/prompt`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ promptText: editedPrompt })
+        body: JSON.stringify({ markdownContent: editedPrompt })
       });
 
       if (res.ok) {
         const data = await res.json();
-        setSelectedCluster(prev => prev ? { ...prev, generatedPrompt: data.prompt } : null);
+        setSelectedCluster(prev => prev ? { ...prev, activePromptMarkdown: data.prompt.markdownContent, promptVersion: data.prompt.version } : null);
         setIsEditingPrompt(false);
       }
     } catch (err) {
@@ -260,7 +274,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
     setSavingNotes(true);
 
     try {
-      const res = await fetch(`/api/feedback/clusters/${selectedCluster.id}`, {
+      const res = await adminFetch(`/api/feedback/clusters/${selectedCluster.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminNotes })
@@ -281,7 +295,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
     if (!selectedCluster || !confirm('Deseja desmembrar este relato para um cluster próprio?')) return;
 
     try {
-      const res = await fetch(`/api/feedback/reports/${reportId}/split`, {
+      const res = await adminFetch(`/api/feedback/reports/${reportId}/split`, {
         method: 'POST'
       });
 
@@ -290,7 +304,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
         fetchData(true);
         setClusterReports(prev => prev.filter(r => r.id !== reportId));
         if (selectedCluster) {
-          setSelectedCluster(prev => prev ? { ...prev, reportCount: Math.max(1, prev.reportCount - 1) } : null);
+          setSelectedCluster(prev => prev ? { ...prev, totalReports: Math.max(1, prev.totalReports - 1) } : null);
         }
       }
     } catch (err) {
@@ -299,9 +313,9 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
   };
 
   // Formatador de Data Relativa
-  const formatTimeAgo = (isoDate: string) => {
+  const formatTimeAgo = (timestamp: number) => {
     try {
-      const diffMs = Date.now() - new Date(isoDate).getTime();
+      const diffMs = Date.now() - timestamp;
       const diffMin = Math.floor(diffMs / 60000);
       if (diffMin < 1) return 'agora mesmo';
       if (diffMin < 60) return `há ${diffMin} min`;
@@ -310,7 +324,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
       const diffDays = Math.floor(diffHours / 24);
       return `há ${diffDays}d`;
     } catch {
-      return isoDate;
+      return String(timestamp);
     }
   };
 
@@ -437,13 +451,13 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
       {/* Dashboard KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
         {[
-          { label: 'Novos', value: stats?.newCount || 0, color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' },
-          { label: 'Críticos', value: stats?.criticalCount || 0, color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/20' },
-          { label: 'Recorrentes', value: stats?.recurringCount || 0, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
+          { label: 'Novos', value: stats?.newIssuesCount || 0, color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/20' },
+          { label: 'Críticos', value: stats?.criticalIssuesCount || 0, color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/20' },
+          { label: 'Recorrentes', value: stats?.recurrentIssuesCount || 0, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
           { label: 'Investigando', value: stats?.investigatingCount || 0, color: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/20' },
           { label: 'Corrigindo', value: stats?.fixingCount || 0, color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20' },
           { label: 'Resolvidos', value: stats?.resolvedCount || 0, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
-          { label: 'Total Relatos', value: stats?.totalReports || 0, color: 'text-white', bg: 'bg-white/5 border-white/10' }
+          { label: 'Total Relatos', value: stats?.totalFeedbacksReceived || 0, color: 'text-white', bg: 'bg-white/5 border-white/10' }
         ].map((kpi, idx) => (
           <div key={idx} className={`p-4 rounded-2xl border ${kpi.bg} flex flex-col justify-between`}>
             <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">{kpi.label}</span>
@@ -453,7 +467,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
       </div>
 
       {/* Top 5 Problemas Mais Reportados */}
-      {stats?.topReportedIssues && stats.topReportedIssues.length > 0 && (
+      {stats?.topReportedClusters && stats.topReportedClusters.length > 0 && (
         <div className={`p-6 rounded-3xl border ${isDarkMode ? 'bg-[#151C26]/40 border-gray-800' : 'bg-white shadow-xl'}`}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-black text-white flex items-center gap-2">
@@ -464,11 +478,11 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {stats.topReportedIssues.slice(0, 6).map((issue, idx) => (
+            {stats.topReportedClusters.slice(0, 6).map((issue, idx) => (
               <div 
-                key={issue.clusterId}
+                key={issue.id}
                 onClick={() => {
-                  const target = clusters.find(c => c.id === issue.clusterId);
+                  const target = clusters.find(c => c.id === issue.id);
                   if (target) handleSelectCluster(target);
                 }}
                 className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#007df7]/40 transition-all cursor-pointer group"
@@ -489,7 +503,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
 
                 <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between text-xs text-white/60">
                   <span className="font-semibold text-white/80">
-                    <strong className="text-white font-black">{issue.reportCount}</strong> {issue.reportCount === 1 ? 'relato' : 'relatos'}
+                    <strong className="text-white font-black">{issue.totalReports}</strong> {issue.totalReports === 1 ? 'relato' : 'relatos'}
                   </span>
                   <span className="flex items-center gap-1 text-[11px] text-[#007df7] group-hover:underline font-semibold">
                     Ver detalhes <ChevronRight className="w-3.5 h-3.5" />
@@ -613,7 +627,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
                         {renderStatusBadge(cluster.status)}
                         {cluster.trend && renderTrendBadge(cluster.trend)}
                         <span className="text-[10px] font-bold text-white/40 uppercase tracking-wider bg-white/5 px-2 py-0.5 rounded">
-                          Nível {cluster.clusterLevel}: {cluster.clusterLevel === 1 ? 'Exato' : cluster.clusterLevel === 2 ? 'Obra' : 'Sistêmico'}
+                          Nível {cluster.fingerprintData.level}: {cluster.fingerprintData.level === 1 ? 'Exato' : cluster.fingerprintData.level === 2 ? 'Obra' : 'Sistêmico'}
                         </span>
                       </div>
 
@@ -622,26 +636,26 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
                       </h4>
 
                       <p className="text-xs text-white/60 line-clamp-1 mt-0.5">
-                        {cluster.summary}
+                        {cluster.categoryLabel}
                       </p>
 
                       <div className="flex items-center gap-3 text-[11px] text-white/40 mt-2 flex-wrap">
-                        {cluster.technicalFingerprint.mediaTitle && (
+                        {cluster.affectedMedia[0]?.title && (
                           <span className="text-white/70 font-semibold truncate max-w-[200px]">
-                            📺 {cluster.technicalFingerprint.mediaTitle}
+                            📺 {cluster.affectedMedia[0].title}
                           </span>
                         )}
-                        {cluster.technicalFingerprint.season !== undefined && cluster.technicalFingerprint.episode !== undefined && (
+                        {cluster.fingerprintData.season !== undefined && cluster.fingerprintData.episode !== undefined && (
                           <span className="text-amber-400/90 font-bold">
-                            T{cluster.technicalFingerprint.season}:E{cluster.technicalFingerprint.episode}
+                            T{cluster.fingerprintData.season}:E{cluster.fingerprintData.episode}
                           </span>
                         )}
-                        {cluster.technicalFingerprint.providerId && (
+                        {cluster.fingerprintData.providerId && (
                           <span className="text-sky-400/90 font-medium">
-                            Provedor: {cluster.technicalFingerprint.providerId}
+                            Provedor: {cluster.fingerprintData.providerId}
                           </span>
                         )}
-                        <span>Último relato: {formatTimeAgo(cluster.lastReportedAt)}</span>
+                        <span>Último relato: {formatTimeAgo(cluster.lastOccurrenceAt)}</span>
                       </div>
                     </div>
                   </div>
@@ -650,7 +664,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
                   <div className="flex items-center justify-between lg:justify-end gap-4 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-white/5">
                     <div className="text-left lg:text-right">
                       <span className="text-lg font-black text-white block">
-                        {cluster.reportCount} {cluster.reportCount === 1 ? 'relato' : 'relatos'}
+                        {cluster.totalReports} {cluster.totalReports === 1 ? 'relato' : 'relatos'}
                       </span>
                       <span className="text-[10px] text-white/40 block">
                         ID: {cluster.id.slice(0, 14)}...
@@ -711,14 +725,14 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
                     {renderStatusBadge(selectedCluster.status)}
                     {selectedCluster.trend && renderTrendBadge(selectedCluster.trend)}
                     <span className="text-xs text-white/50">
-                      • {selectedCluster.reportCount} {selectedCluster.reportCount === 1 ? 'relato' : 'relatos'}
+                      • {selectedCluster.totalReports} {selectedCluster.totalReports === 1 ? 'relato' : 'relatos'}
                     </span>
                   </div>
                   <h3 className="text-lg sm:text-xl font-bold text-white">
                     {selectedCluster.title}
                   </h3>
                   <p className="text-xs text-white/60 mt-0.5">
-                    Cluster ID: <span className="font-mono text-white/80">{selectedCluster.id}</span> • Criado {formatTimeAgo(selectedCluster.firstReportedAt)}
+                    Cluster ID: <span className="font-mono text-white/80">{selectedCluster.id}</span> • Criado {formatTimeAgo(selectedCluster.firstOccurrenceAt)}
                   </p>
                 </div>
               </div>
@@ -768,14 +782,14 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
                 <div>
                   <label className="block text-[10px] font-black uppercase text-white/50 tracking-wider mb-1">Nível de Agrupamento</label>
                   <div className="text-xs font-bold text-white py-2">
-                    Nível {selectedCluster.clusterLevel} ({selectedCluster.clusterLevel === 1 ? 'Específico' : selectedCluster.clusterLevel === 2 ? 'Obra' : 'Sistêmico'})
+                    Nível {selectedCluster.fingerprintData.level} ({selectedCluster.fingerprintData.level === 1 ? 'Específico' : selectedCluster.fingerprintData.level === 2 ? 'Obra' : 'Sistêmico'})
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-[10px] font-black uppercase text-white/50 tracking-wider mb-1">Última Ocorrência</label>
                   <div className="text-xs font-bold text-white py-2">
-                    {formatTimeAgo(selectedCluster.lastReportedAt)}
+                    {formatTimeAgo(selectedCluster.lastOccurrenceAt)}
                   </div>
                 </div>
               </div>
@@ -789,39 +803,39 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
                   <div>
                     <span className="text-white/40 block text-[10px] uppercase">Obra:</span>
                     <span className="font-semibold text-white truncate block">
-                      {selectedCluster.technicalFingerprint.mediaTitle || 'Não especificada'}
+                      {selectedCluster.affectedMedia[0]?.title || 'Não especificada'}
                     </span>
                   </div>
                   <div>
                     <span className="text-white/40 block text-[10px] uppercase">Episódio:</span>
                     <span className="font-semibold text-white">
-                      {selectedCluster.technicalFingerprint.season !== undefined && selectedCluster.technicalFingerprint.episode !== undefined
-                        ? `T${selectedCluster.technicalFingerprint.season} : E${selectedCluster.technicalFingerprint.episode}`
+                      {selectedCluster.fingerprintData.season !== undefined && selectedCluster.fingerprintData.episode !== undefined
+                        ? `T${selectedCluster.fingerprintData.season} : E${selectedCluster.fingerprintData.episode}`
                         : 'N/A (Filme/Geral)'}
                     </span>
                   </div>
                   <div>
                     <span className="text-white/40 block text-[10px] uppercase">Provedor / Fonte:</span>
                     <span className="font-semibold text-sky-400 truncate block">
-                      {selectedCluster.technicalFingerprint.providerId || 'Todos'}
+                      {selectedCluster.fingerprintData.providerId || 'Todos'}
                     </span>
                   </div>
                   <div>
                     <span className="text-white/40 block text-[10px] uppercase">Código de Erro:</span>
                     <span className="font-semibold text-rose-400">
-                      {selectedCluster.technicalFingerprint.errorCode || 'Nenhum'}
+                      {selectedCluster.fingerprintData.errorCode || 'Nenhum'}
                     </span>
                   </div>
                   <div>
                     <span className="text-white/40 block text-[10px] uppercase">Estágio de Falha:</span>
                     <span className="font-semibold text-amber-400">
-                      {selectedCluster.technicalFingerprint.failureStage || 'playback'}
+                      {selectedCluster.fingerprintData.failureStage || 'playback'}
                     </span>
                   </div>
                   <div>
                     <span className="text-white/40 block text-[10px] uppercase">Componente:</span>
                     <span className="font-semibold text-emerald-400">
-                      {selectedCluster.technicalFingerprint.component}
+                      {selectedCluster.fingerprintData.category}
                     </span>
                   </div>
                 </div>
@@ -905,7 +919,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
                 ) : (
                   <div className="relative">
                     <pre className="w-full bg-[#151921] border border-white/10 rounded-xl p-3.5 text-xs font-mono text-gray-200 overflow-x-auto max-h-72 leading-relaxed whitespace-pre-wrap select-all">
-                      {selectedCluster.generatedPrompt?.consolidatedPrompt || 'Nenhum prompt disponível.'}
+                      {selectedCluster.activePromptMarkdown || 'Nenhum prompt disponível.'}
                     </pre>
                   </div>
                 )}
@@ -939,7 +953,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 text-[11px] text-white/50 mb-1">
-                            <span className="font-semibold text-white/80">{formatTimeAgo(report.createdAt)}</span>
+                            <span className="font-semibold text-white/80">{formatTimeAgo(report.submissionTimestamp)}</span>
                             <span>•</span>
                             <span>{report.technicalContext?.browser || 'Browser'} / {report.technicalContext?.os || 'OS'} ({report.technicalContext?.deviceType || 'desktop'})</span>
                             {report.technicalContext?.currentTimeSeconds !== undefined && (
@@ -952,7 +966,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
                             )}
                           </div>
                           <p className="text-white/80 font-medium">
-                            {report.userComment ? `"${report.userComment}"` : <span className="text-white/40 italic">Sem comentário adicional</span>}
+                            {report.userDescription ? `"${report.userDescription}"` : <span className="text-white/40 italic">Sem comentário adicional</span>}
                           </p>
                         </div>
 
@@ -999,7 +1013,7 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
             {/* Rodapé com Fechamento */}
             <div className="p-4 sm:p-5 border-t border-white/10 bg-[#161a22] flex items-center justify-between">
               <span className="text-xs text-white/40 font-mono">
-                {selectedCluster.fingerprintHash}
+                {selectedCluster.fingerprint}
               </span>
               <button
                 onClick={() => setSelectedCluster(null)}

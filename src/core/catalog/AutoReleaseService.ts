@@ -391,6 +391,7 @@ export class AutoReleaseService {
               title { romaji english userPreferred native }
               format
               episodes
+              averageScore
               genres
               description
               coverImage { extraLarge }
@@ -413,15 +414,18 @@ export class AutoReleaseService {
       const animeNodes = json.data?.Page?.media || [];
 
       for (const node of animeNodes) {
-        const title = node.title?.userPreferred || node.title?.english || node.title?.romaji || 'Anime';
+        if (!node.coverImage?.extraLarge || !node.startDate?.year) continue;
+        const title = node.title?.userPreferred || node.title?.english || node.title?.romaji;
+        if (!title) continue;
         const candidate: ContentItem = {
           id: `anilist-${node.id}`,
           title,
           originalTitle: node.title?.romaji || node.title?.native,
           type: ContentType.ANIME,
           mediaFormat: node.format === 'MOVIE' ? 'movie' : 'series',
-          year: node.startDate?.year || 2024,
-          image: node.coverImage?.extraLarge || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500',
+          year: node.startDate.year,
+          rating: typeof node.averageScore === 'number' ? node.averageScore / 10 : 0,
+          image: node.coverImage.extraLarge,
           backdrop: node.bannerImage || node.coverImage?.extraLarge,
           genres: [...(node.genres || []), 'Anime'],
           description: (node.description || '').replace(/<[^>]*>?/gm, '')
@@ -524,15 +528,20 @@ export class AutoReleaseService {
         : streams.filter(s => !CamBlockerEngine.isCamStream(s));
 
       if (cleanStreams.length > 0) {
-        // Título que estava pendente agora tem fonte limpa disponível!
-        const item: ContentItem = {
-          id: pending.id,
-          imdbId: pending.imdbId,
-          tmdbId: pending.tmdbId,
-          title: pending.title,
-          type: pending.type,
-          year: pending.year || 2024
-        };
+        // Reobtém os metadados reais antes de publicar uma obra pendente.
+        let metadata: ContentItem | null = null;
+        try {
+          if (pending.tmdbId) metadata = (await tmdbService.getDetails(pending.tmdbId, pending.type)).item;
+          else if (pending.imdbId) metadata = await tmdbService.findByImdb(pending.imdbId);
+        } catch (error) {
+          result.errors.push(`Falha ao revalidar metadados de ${pending.id}: ${String(error)}`);
+        }
+        const sameType = metadata?.type === pending.type || (pending.type === ContentType.ANIME && metadata?.type === ContentType.SERIES);
+        if (!metadata?.image || !sameType) {
+          catalogReleaseStore.recordPending({ ...pending, reason: 'Metadados da obra ainda não confirmados' });
+          continue;
+        }
+        const item: ContentItem = { ...metadata, id: pending.id, type: pending.type, imdbId: pending.imdbId || metadata.imdbId, tmdbId: pending.tmdbId || metadata.tmdbId };
 
         const added = catalogReleaseStore.addRelease(item);
         if (added) {

@@ -10,7 +10,8 @@ import {
   IssueCluster,
   GeneratedFixPrompt,
   FEEDBACK_CATEGORY_LABELS,
-  FeedbackCategory
+  FeedbackCategory,
+  TechnicalContext
 } from './feedbackTypes';
 
 export class FeedbackPromptGenerator {
@@ -204,17 +205,17 @@ Ao concluir a tarefa, apresente:
 
     const mediaListStr = affectedMedia.length > 0
       ? affectedMedia.map(m => `- **${m.title}** (\`${m.id}\`, tipo: ${m.type})`).join('\n')
-      : (cluster.technicalFingerprint?.mediaTitle ? `- **${cluster.technicalFingerprint.mediaTitle}**` : '- Mídia genérica ou não identificada.');
+      : '- Mídia genérica ou não identificada.';
 
     const isMovieCluster = affectedMedia.length > 0 && affectedMedia.every(m => m.type === 'movie');
     const episodesStr = (!isMovieCluster && affectedEpisodes.length > 0)
       ? affectedEpisodes.slice(0, 8).map(e => `T${e.season}:E${e.episode}`).join(', ')
       : (isMovieCluster ? 'Não aplicável (Filme)' : 'Todos / Obra Completa');
 
-    const providersStr = affectedProviders.length > 0 ? affectedProviders.join(', ') : (cluster.technicalFingerprint?.providerId || 'Desconhecido');
+    const providersStr = affectedProviders.length > 0 ? affectedProviders.join(', ') : (cluster.fingerprintData.providerId || 'Desconhecido');
     const sourcesStr = affectedSources.length > 0 ? affectedSources.slice(0, 6).join(', ') : 'Várias';
     const versionsStr = affectedVersions.length > 0 ? affectedVersions.join(', ') : 'Recente';
-    const errorCodesStr = errorCodes.length > 0 ? errorCodes.join(', ') : (cluster.technicalFingerprint?.errorCode || 'Nenhum código explícito');
+    const errorCodesStr = errorCodes.length > 0 ? errorCodes.join(', ') : (cluster.fingerprintData.errorCode || 'Nenhum código explícito');
 
     const regressionAlert = isRegression
       ? `\n> [!CAUTION] POSSÍVEL REGRESSÃO DETECTADA
