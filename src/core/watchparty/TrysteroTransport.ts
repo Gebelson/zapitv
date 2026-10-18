@@ -139,13 +139,39 @@ export class TrysteroTransport implements IWatchPartyTransport {
         this.callbacks?.onPeerLeave(peerId);
       };
 
-      // 3. Suporte a Áudio / Voz P2P e Transmissão de Vídeo
-      this.room.onPeerStream = (stream, peerId) => {
-        this.callbacks?.onRemoteAudioStream?.(stream, peerId);
+      // 3. Suporte a Áudio / Voz P2P e Transmissão de Vídeo Desacoplados
+      const handledStreams = new Map<string, number>();
+
+      const handleIncomingStream = (stream: MediaStream, peerId: string) => {
+        if (!stream) return;
+        const streamId = stream.id || `${peerId}_stream_${Date.now()}`;
+        const hasVideo = stream.getVideoTracks().length > 0;
+        const hasAudio = stream.getAudioTracks().length > 0;
+
+        const lastSeen = handledStreams.get(streamId);
+        const now = Date.now();
+        if (lastSeen && (now - lastSeen < 400)) {
+          return;
+        }
+        handledStreams.set(streamId, now);
+
+        if (hasVideo) {
+          this.callbacks?.onRemoteMediaStream?.(stream, peerId);
+        } else if (hasAudio) {
+          this.callbacks?.onRemoteAudioStream?.(stream, peerId);
+        }
       };
 
-      this.room.onPeerTrack = (_track, stream, peerId) => {
-        this.callbacks?.onRemoteAudioStream?.(stream, peerId);
+      this.room.onPeerStream = (stream, peerId) => {
+        handleIncomingStream(stream, peerId);
+      };
+
+      this.room.onPeerTrack = (track, stream, peerId) => {
+        if (track && track.kind === 'video') {
+          this.callbacks?.onRemoteMediaStream?.(stream, peerId);
+        } else {
+          handleIncomingStream(stream, peerId);
+        }
       };
     } catch (err) {
       console.error('[TrysteroTransport] Erro ao conectar à sala P2P:', err);

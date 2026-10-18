@@ -46,7 +46,7 @@ import { mediaAvailabilityIndex } from '../../core/catalog/MediaAvailabilityInde
 import { watchPartyService } from '../../core/watchparty/WatchPartyService';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { WatchPartyOverlay } from '../watchparty/WatchPartyOverlay';
-import { RoomLifecycleState } from '../../core/watchparty/watchPartyTypes';
+import { RoomLifecycleState, TransmissionMode } from '../../core/watchparty/watchPartyTypes';
 import { VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../../core/providers/sourceVerificationService';
 
 export interface NextEpisodeInfo {
@@ -264,7 +264,17 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
 
   // Transmissão do Host via WebRTC (Watch Party)
-  const isHostBroadcastMode = watchPartyService.isConnected && watchPartyService.isHostBroadcastMode();
+  const [wpTransmissionMode, setWpTransmissionMode] = useState<TransmissionMode>(() => watchPartyService.getTransmissionMode());
+  useEffect(() => {
+    const unsub = watchPartyService.onStateChange((state) => {
+      if (state?.transmissionMode) {
+        setWpTransmissionMode(state.transmissionMode);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const isHostBroadcastMode = watchPartyService.isConnected && (wpTransmissionMode === 'host_broadcast' || watchPartyService.isHostBroadcastMode());
   const isBroadcastGuest = isHostBroadcastMode && !watchPartyService.isHost();
   const isBroadcastHost = isHostBroadcastMode && watchPartyService.isHost();
 
@@ -1771,7 +1781,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     return () => {
       unsubStream();
       unsubQuality();
-      if (videoRef.current) {
+      // Não limpa o srcObject prematuramente se a transmissão ainda estiver ativa
+      if (videoRef.current && !watchPartyService.isHostBroadcastMode()) {
         videoRef.current.srcObject = null;
       }
     };

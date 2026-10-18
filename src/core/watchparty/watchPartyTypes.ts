@@ -10,15 +10,41 @@ import { ContentType } from '../../../types';
 export type ParticipantStatus = 'connected' | 'buffering' | 'ready' | 'disconnected';
 
 export type RoomLifecycleState =
+  | 'CREATING'
   | 'LOBBY'
   | 'PREPARING'
   | 'READY'
+  | 'STARTING'
   | 'PLAYING_INTRO'
   | 'PLAYING_CONTENT'
   | 'PAUSED'
+  | 'RECONNECTING'
   | 'ENDED'
-  | 'STARTING'
+  | 'ERROR'
   | 'PLAYING';
+
+export type ConnectionDiagnosticStep =
+  | 'ROOM_CREATE'
+  | 'ROOM_REGISTER'
+  | 'ROOM_LOOKUP'
+  | 'PEER_DISCOVERY'
+  | 'ROOM_JOIN'
+  | 'JOIN_ACK'
+  | 'STATE_SYNC'
+  | 'SIGNALING_READY'
+  | 'MEDIA_NEGOTIATION'
+  | 'ICE_CONNECTED'
+  | 'REMOTE_TRACK_RECEIVED'
+  | 'REMOTE_MEDIA_PLAYING';
+
+export interface PeerConnectionHealth {
+  peerId: string;
+  iceState?: string;
+  connectionState?: string;
+  hasAudioTrack: boolean;
+  hasVideoTrack: boolean;
+  lastActivityTimestamp: number;
+}
 
 export interface ParticipantPermissions {
   canPlayPause: boolean;

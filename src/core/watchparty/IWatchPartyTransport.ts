@@ -34,6 +34,7 @@ export interface TransportCallbacks {
   onHostTransfer?: (message: PeerHostTransferMessage, senderId: string) => void;
   onRemoteControlRequest?: (request: PeerRemoteControlRequestMessage, senderId: string) => void;
   onRemoteAudioStream?: (stream: MediaStream, peerId: string) => void;
+  onRemoteMediaStream?: (stream: MediaStream, peerId: string) => void;
 }
 
 export interface IWatchPartyTransport {
