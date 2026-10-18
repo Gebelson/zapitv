@@ -15,6 +15,7 @@ import { bannedContentRegistry } from "./src/core/catalog/BannedContentRegistry.
 import { feedbackStore } from "./src/core/feedback/FeedbackStore.ts";
 import { resolveValidationTargetUrl } from "./src/core/providers/validationTargetUrl.ts";
 import { databaseRouter } from "./src/server/database/routes.ts";
+import { watchPartyRouter } from "./src/server/watchparty/routes.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,6 +56,7 @@ function createApp() {
   // Enable JSON parsing
   app.use(express.json());
   app.use('/api/db', databaseRouter);
+  app.use('/api/watchparty', watchPartyRouter);
 
   // Helper function to resolve open items to Stremio streams
   function resolveOpenItemStreams(rawId: string, seasonNum = 1, episodeNum = 1) {

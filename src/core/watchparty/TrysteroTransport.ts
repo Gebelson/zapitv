@@ -24,10 +24,10 @@ import {
 const ZAPITV_APP_ID = 'zapitv-watchparty-v1';
 
 const NOSTR_RELAYS = [
-  'wss://relay.damus.io',
   'wss://relay.snort.social',
   'wss://nos.lol',
   'wss://nostr.mom',
+  'wss://relay.primal.net',
   'wss://nostr.oxtr.dev'
 ];
 
@@ -74,6 +74,10 @@ export class TrysteroTransport implements IWatchPartyTransport {
         {
           appId: ZAPITV_APP_ID,
           relayUrls: NOSTR_RELAYS,
+          relayConfig: {
+            urls: NOSTR_RELAYS,
+            redundancy: NOSTR_RELAYS.length
+          },
           rtcConfig: RTC_CONFIG
         } as any,
         roomId

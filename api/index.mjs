@@ -19236,6 +19236,221 @@ databaseRouter.put("/global-settings/section-titles", async (req, res) => {
   }
 });
 
+// src/server/watchparty/routes.ts
+import { Router as Router2 } from "express";
+var activeRooms = /* @__PURE__ */ new Map();
+var roomSignals = /* @__PURE__ */ new Map();
+function pruneStaleState() {
+  const now = Date.now();
+  for (const [roomId, room] of activeRooms.entries()) {
+    if (now - room.updatedAt > 6e4) {
+      activeRooms.delete(roomId);
+      roomSignals.delete(roomId);
+    } else {
+      for (const [peerId, p] of room.participants.entries()) {
+        if (!p.isHost && now - p.lastSeen > 3e4) {
+          room.participants.delete(peerId);
+        }
+      }
+    }
+  }
+  for (const [roomId, signals] of roomSignals.entries()) {
+    const recent = signals.filter((s) => now - s.timestamp < 35e3);
+    if (recent.length === 0) {
+      roomSignals.delete(roomId);
+    } else {
+      roomSignals.set(roomId, recent.slice(-100));
+    }
+  }
+}
+var watchPartyRouter = Router2();
+if (typeof setInterval !== "undefined") {
+  const timer = setInterval(pruneStaleState, 1e4);
+  if (timer && typeof timer.unref === "function") {
+    timer.unref();
+  }
+}
+watchPartyRouter.post("/room/announce", (req, res) => {
+  pruneStaleState();
+  const {
+    roomId,
+    hostPeerId,
+    hostNickname,
+    media: media2,
+    transmissionMode,
+    lifecycleState,
+    introStartTimestamp,
+    introDuration
+  } = req.body || {};
+  if (!roomId || typeof roomId !== "string") {
+    return res.status(400).json({ ok: false, error: "roomId \xE9 obrigat\xF3rio." });
+  }
+  const now = Date.now();
+  let room = activeRooms.get(roomId);
+  if (!room) {
+    room = {
+      roomId,
+      hostPeerId: hostPeerId || "",
+      hostNickname: hostNickname || "Anfitri\xE3o",
+      media: media2 || null,
+      transmissionMode: transmissionMode || "host_broadcast",
+      lifecycleState: lifecycleState || "LOBBY",
+      introStartTimestamp,
+      introDuration,
+      createdAt: now,
+      updatedAt: now,
+      participants: /* @__PURE__ */ new Map()
+    };
+    activeRooms.set(roomId, room);
+  } else {
+    room.updatedAt = now;
+    if (hostPeerId) room.hostPeerId = hostPeerId;
+    if (hostNickname) room.hostNickname = hostNickname;
+    if (media2) room.media = media2;
+    if (transmissionMode) room.transmissionMode = transmissionMode;
+    if (lifecycleState) room.lifecycleState = lifecycleState;
+    if (introStartTimestamp !== void 0) room.introStartTimestamp = introStartTimestamp;
+    if (introDuration !== void 0) room.introDuration = introDuration;
+  }
+  if (room.hostPeerId) {
+    room.participants.set(room.hostPeerId, {
+      peerId: room.hostPeerId,
+      nickname: room.hostNickname,
+      isHost: true,
+      status: "ready",
+      lastSeen: now
+    });
+  }
+  res.json({
+    ok: true,
+    room: {
+      roomId: room.roomId,
+      hostPeerId: room.hostPeerId,
+      hostNickname: room.hostNickname,
+      media: room.media,
+      transmissionMode: room.transmissionMode,
+      lifecycleState: room.lifecycleState,
+      introStartTimestamp: room.introStartTimestamp,
+      introDuration: room.introDuration,
+      participants: Array.from(room.participants.values())
+    }
+  });
+});
+watchPartyRouter.get("/room/:roomId", (req, res) => {
+  pruneStaleState();
+  const roomId = req.params.roomId;
+  const room = activeRooms.get(roomId);
+  if (!room || Date.now() - room.updatedAt > 6e4) {
+    return res.status(404).json({
+      ok: false,
+      error: "Sala n\xE3o encontrada ou encerrada pelo anfitri\xE3o."
+    });
+  }
+  res.json({
+    ok: true,
+    room: {
+      roomId: room.roomId,
+      hostPeerId: room.hostPeerId,
+      hostNickname: room.hostNickname,
+      media: room.media,
+      transmissionMode: room.transmissionMode,
+      lifecycleState: room.lifecycleState,
+      introStartTimestamp: room.introStartTimestamp,
+      introDuration: room.introDuration,
+      participants: Array.from(room.participants.values())
+    }
+  });
+});
+watchPartyRouter.post("/room/:roomId/heartbeat", (req, res) => {
+  const roomId = req.params.roomId;
+  const room = activeRooms.get(roomId);
+  if (!room || Date.now() - room.updatedAt > 6e4) {
+    return res.status(404).json({
+      ok: false,
+      error: "Sala n\xE3o encontrada ou encerrada."
+    });
+  }
+  const { peerId, nickname, isHost, status } = req.body || {};
+  const now = Date.now();
+  if (isHost || peerId === room.hostPeerId) {
+    room.updatedAt = now;
+  }
+  if (peerId) {
+    const existing = room.participants.get(peerId);
+    room.participants.set(peerId, {
+      peerId,
+      nickname: nickname || existing?.nickname || (isHost ? room.hostNickname : "Convidado"),
+      isHost: Boolean(isHost || peerId === room.hostPeerId),
+      status: status || existing?.status || "ready",
+      lastSeen: now
+    });
+  }
+  res.json({
+    ok: true,
+    room: {
+      roomId: room.roomId,
+      hostPeerId: room.hostPeerId,
+      hostNickname: room.hostNickname,
+      media: room.media,
+      transmissionMode: room.transmissionMode,
+      lifecycleState: room.lifecycleState,
+      participants: Array.from(room.participants.values())
+    }
+  });
+});
+watchPartyRouter.post("/room/:roomId/signal", (req, res) => {
+  const roomId = req.params.roomId;
+  const { senderPeerId, targetPeerId, type, data } = req.body || {};
+  if (!senderPeerId || !type) {
+    return res.status(400).json({ ok: false, error: "senderPeerId e type s\xE3o obrigat\xF3rios." });
+  }
+  let signals = roomSignals.get(roomId);
+  if (!signals) {
+    signals = [];
+    roomSignals.set(roomId, signals);
+  }
+  const sig = {
+    id: `sig_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    senderPeerId,
+    targetPeerId,
+    type,
+    data,
+    timestamp: Date.now()
+  };
+  signals.push(sig);
+  if (signals.length > 100) signals.shift();
+  const room = activeRooms.get(roomId);
+  if (room && type === "join") {
+    room.participants.set(senderPeerId, {
+      peerId: senderPeerId,
+      nickname: data?.nickname || "Convidado",
+      isHost: false,
+      status: "ready",
+      lastSeen: Date.now()
+    });
+  }
+  res.json({ ok: true, id: sig.id });
+});
+watchPartyRouter.get("/room/:roomId/signals/:peerId", (req, res) => {
+  const { roomId, peerId } = req.params;
+  const since = Number(req.query.since) || 0;
+  const signals = roomSignals.get(roomId) || [];
+  const filtered = signals.filter(
+    (s) => s.timestamp > since && s.senderPeerId !== peerId && (!s.targetPeerId || s.targetPeerId === peerId)
+  );
+  res.json({ ok: true, signals: filtered, now: Date.now() });
+});
+watchPartyRouter.delete("/room/:roomId", (req, res) => {
+  const roomId = req.params.roomId;
+  const { peerId } = req.body || req.query || {};
+  const room = activeRooms.get(roomId);
+  if (room && (!peerId || peerId === room.hostPeerId)) {
+    activeRooms.delete(roomId);
+    roomSignals.delete(roomId);
+  }
+  res.json({ ok: true });
+});
+
 // server.ts
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path4.dirname(__filename);
@@ -19267,6 +19482,7 @@ function createApp() {
   });
   app2.use(express.json());
   app2.use("/api/db", databaseRouter);
+  app2.use("/api/watchparty", watchPartyRouter);
   function resolveOpenItemStreams(rawId, seasonNum = 1, episodeNum = 1) {
     let cleanId = rawId.replace(/\.json$/, "");
     if (cleanId.includes(":")) {

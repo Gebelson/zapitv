@@ -99,10 +99,16 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
     };
   }, [isOpen, onClose]);
 
+  const hasAutoJoinedRef = useRef(false);
+
   useEffect(() => {
     if (initialRoomId) {
       setJoinInput(initialRoomId);
       setMode('join');
+      if (!hasAutoJoinedRef.current && !watchPartyService.isConnected && !isJoining) {
+        hasAutoJoinedRef.current = true;
+        handleJoinRoom(initialRoomId);
+      }
     }
   }, [initialRoomId]);
 
@@ -116,6 +122,9 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
   useEffect(() => {
     const unsubState = watchPartyService.onStateChange((state) => {
       setRoomState(state);
+      if (watchPartyService.roomInfo?.transmissionMode) {
+        setSelectedTransmissionMode(watchPartyService.roomInfo.transmissionMode);
+      }
     });
 
     const unsubChat = watchPartyService.onChatMessage((msg) => {
@@ -267,7 +276,9 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
 
       await watchPartyService.createRoom(
         mediaMetadata,
-        nickname.trim() || 'Anfitrião'
+        nickname.trim() || 'Anfitrião',
+        undefined,
+        selectedTransmissionMode
       );
       uiSoundService.play('partyConnect');
     } catch (err: any) {
@@ -278,8 +289,9 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
     }
   };
 
-  const handleJoinRoom = async () => {
-    const cleanRoomId = extractRoomId(joinInput);
+  const handleJoinRoom = async (overrideRoomId?: string) => {
+    const rawTarget = typeof overrideRoomId === 'string' ? overrideRoomId : joinInput;
+    const cleanRoomId = extractRoomId(rawTarget);
     if (!cleanRoomId) {
       setErrorMessage('Informe o código ou link completo da sala.');
       return;
@@ -398,52 +410,86 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
         {/* ESTADO 1: ENTRANDO / CRIANDO SALA (NÃO CONECTADO AINDA)       */}
         {/* ============================================================ */}
         {!isConnected ? (
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1.5 custom-scrollbar">
-            {/* Cabeçalho */}
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#007df7] to-cyan-400 flex items-center justify-center shadow-lg shadow-[#007df7]/30">
-                <Users className="w-6 h-6 text-white" />
+          isJoining ? (
+            <div className="flex-1 min-h-0 flex flex-col items-center justify-center p-6 text-center space-y-4">
+              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-[#007df7]/20 to-cyan-400/20 border border-[#007df7]/40 flex items-center justify-center shadow-xl shadow-[#007df7]/20 animate-pulse">
+                <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl sm:text-2xl font-black text-white">Assistir Juntos</h2>
-                  <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                    P2P Gratuito
-                  </span>
-                </div>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Sala de espera sincronizada e chat integrado antes de iniciar
+              <div className="space-y-1.5 max-w-sm">
+                <h3 className="text-lg font-black text-white">Conectando à Sala de Espera...</h3>
+                <p className="text-xs text-gray-400">
+                  Localizando a sessão do anfitrião e sincronizando informações de transmissão.
                 </p>
               </div>
             </div>
-
-            {/* Informações da Mídia se selecionada */}
-            {item && (
-              <div className="p-3.5 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-3">
-                <img 
-                  src={item.image} 
-                  alt={item.title} 
-                  className="w-12 h-16 object-cover rounded-xl border border-white/10 shrink-0" 
-                />
-                <div className="min-w-0 flex-1">
-                  <span className="text-[10px] uppercase font-bold text-[#007df7] tracking-wider block">
-                    Conteúdo Selecionado
-                  </span>
-                  <h4 className="text-sm font-black text-white truncate">{item.title}</h4>
-                  <p className="text-xs text-gray-400">
-                    {season && episode ? `Temporada ${season} • Episódio ${episode}` : (item.year ? `${item.year}` : 'Filme completo')}
+          ) : (
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1.5 custom-scrollbar">
+              {/* Cabeçalho */}
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#007df7] to-cyan-400 flex items-center justify-center shadow-lg shadow-[#007df7]/30">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl sm:text-2xl font-black text-white">Assistir Juntos</h2>
+                    <span className="text-[10px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                      P2P Gratuito
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Sala de espera sincronizada e chat integrado antes de iniciar
                   </p>
                 </div>
               </div>
-            )}
 
-            {/* Notificação de Erro */}
-            {errorMessage && (
-              <div className="p-3.5 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start gap-2.5 text-xs text-red-300">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
-                <span>{errorMessage}</span>
-              </div>
-            )}
+              {/* Informações da Mídia se selecionada */}
+              {item && (
+                <div className="p-3.5 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-3">
+                  <img 
+                    src={item.image} 
+                    alt={item.title} 
+                    className="w-12 h-16 object-cover rounded-xl border border-white/10 shrink-0" 
+                  />
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] uppercase font-bold text-[#007df7] tracking-wider block">
+                      Conteúdo Selecionado
+                    </span>
+                    <h4 className="text-sm font-black text-white truncate">{item.title}</h4>
+                    <p className="text-xs text-gray-400">
+                      {season && episode ? `Temporada ${season} • Episódio ${episode}` : (item.year ? `${item.year}` : 'Filme completo')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Notificação de Erro */}
+              {errorMessage && (
+                <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex flex-col gap-2 text-xs text-red-300">
+                  <div className="flex items-center gap-2 font-bold text-red-400">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>Não foi possível conectar à sala</span>
+                  </div>
+                  <span>{errorMessage}</span>
+                  {initialRoomId && (
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleJoinRoom(initialRoomId)}
+                        className="px-3.5 py-1.5 bg-red-600/30 hover:bg-red-600/50 border border-red-500/40 rounded-xl text-white font-bold transition-all cursor-pointer"
+                      >
+                        Tentar Novamente
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-gray-300 font-bold transition-all cursor-pointer"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
             {/* Seletor de Abas Criar / Entrar */}
             <div className="grid grid-cols-2 p-1 bg-white/5 border border-white/10 rounded-2xl">
@@ -538,7 +584,7 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
                 <button
                   type="button"
                   disabled={isJoining || !joinInput.trim()}
-                  onClick={handleJoinRoom}
+                  onClick={() => handleJoinRoom()}
                   className="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-[#007df7] hover:from-cyan-600 hover:to-[#0069d9] active:scale-95 text-white font-black text-sm rounded-2xl shadow-xl shadow-cyan-500/25 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                 >
                   {isJoining ? (
@@ -556,7 +602,8 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
               </div>
             )}
           </div>
-        ) : (
+        )
+      ) : (
           /* ============================================================ */
           /* ESTADO 2: SALA DE ESPERA COMPARTILHADA (LOBBY EM TEMPO REAL)  */
           /* ============================================================ */
@@ -961,7 +1008,10 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
                   <div className="grid grid-cols-2 gap-2 p-1 bg-white/5 border border-white/10 rounded-2xl">
                     <button
                       type="button"
-                      onClick={() => setSelectedTransmissionMode('host_broadcast')}
+                      onClick={() => {
+                        setSelectedTransmissionMode('host_broadcast');
+                        watchPartyService.setTransmissionMode('host_broadcast');
+                      }}
                       className={`p-2.5 rounded-xl text-left transition-all flex items-start gap-2 ${
                         selectedTransmissionMode === 'host_broadcast'
                           ? 'bg-[#007df7] text-white shadow-md shadow-[#007df7]/30'
@@ -977,7 +1027,10 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => setSelectedTransmissionMode('source')}
+                      onClick={() => {
+                        setSelectedTransmissionMode('source');
+                        watchPartyService.setTransmissionMode('source');
+                      }}
                       className={`p-2.5 rounded-xl text-left transition-all flex items-start gap-2 ${
                         selectedTransmissionMode === 'source'
                           ? 'bg-[#007df7] text-white shadow-md shadow-[#007df7]/30'
