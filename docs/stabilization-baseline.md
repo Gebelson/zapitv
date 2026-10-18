@@ -29,11 +29,20 @@ O estado da sala pertence ao `WatchPartyRoomManager`. `WatchPartyService.getRoom
 - Corrigido o episódio passado ao modal, usando o campo real `playbackContinuity.episode`.
 - Testes automatizados sem novas dependências: `npm run test:stability` (executado também pelo build) e `npm run test:watchparty-smoke` com servidor local ativo.
 
-Após essas mudanças, `npm run lint` ainda reporta 69 erros preexistentes em outras áreas. O build e os três testes direcionados passam. A validação de dois navegadores conectados, voz e vídeo reais, além do site publicado, permanece para as próximas entregas; não há medição de performance antes/depois nesta etapa.
+Após essas mudanças, `npm run lint` ainda reporta 69 erros preexistentes em outras áreas. O build e os três testes direcionados passam. A correção da tela branca foi validada no site publicado com o teste de navegação em Chrome. Não há medição de performance antes/depois nesta etapa.
+
+## Segunda entrega: estado e conexão da Watch Party
+
+- Um convite agora preenche a sala e abre o formulário para o convidado escolher seu nome antes da entrada. O ingresso automático ignorava esse nome.
+- O horário de início e a duração da intro são mantidos no estado da sala do anfitrião e do convidado; antes eram enviados apenas na mensagem de início.
+- `npm run test:watchparty-two-browsers` cobre entrada por convite, nomes, presença sem duplicação, chat nos dois sentidos e saída. Usa dois navegadores reais e exige o servidor local.
+- `npm run test:watchparty-intro` cobre o contrato de tempo da intro, integrado ao build por `test:stability`.
+
+O teste de dois navegadores passou no localhost. Voz, compartilhamento de tela e reprodução real em múltiplos dispositivos ainda exigem validação própria; o teste não afirma cobri-los.
 
 ## Próximos checkpoints
 
-1. **Estabilização estrutural:** testar anfitrião e convidado em contextos separados, entrada por link, presença, chat, início, intro, troca de episódio, recuperação e saída; corrigir falhas comprovadas.
+1. **Estabilização estrutural:** validar voz, compartilhamento de tela e reprodução real em múltiplos dispositivos; ampliar testes de recuperação.
 2. **Organização e produção:** reduzir os erros TypeScript restantes por módulo, consolidar testes executáveis, revisar duplicações comprovadas, cache, catálogo, banco e compatibilidade Vercel. Medir desempenho antes de otimizar.
 
 Evitar mudanças amplas até que cada fluxo afetado tenha um teste de regressão reproduzível.

@@ -16,8 +16,10 @@
     "test:auth": "tsx tests/firebase_auth.test.ts",
     "test:watchparty-state": "tsx tests/watchparty_room_state_contract.test.ts",
     "test:watchparty-smoke": "tsx tests/watchparty_modal_smoke.test.ts",
+    "test:watchparty-two-browsers": "tsx tests/watchparty_two_browsers.test.ts",
+    "test:watchparty-intro": "tsx tests/watchparty_intro_state.test.ts",
     "test:playback-remote-sync": "tsx tests/playback_remote_sync.test.ts",
-    "test:stability": "npm run test:watchparty-state && npm run test:playback-remote-sync",
+    "test:stability": "npm run test:watchparty-state && npm run test:watchparty-intro && npm run test:playback-remote-sync",
     "start": "node server.ts"
   },
   "dependencies": {

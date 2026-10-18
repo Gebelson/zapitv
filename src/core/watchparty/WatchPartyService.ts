@@ -577,6 +577,8 @@ export class WatchPartyService {
         media: incoming.media,
         transmissionMode: incoming.transmissionMode,
         lifecycleState: incoming.lifecycleState,
+        ...(incoming.introStartTimestamp !== undefined ? { introStartTimestamp: incoming.introStartTimestamp } : {}),
+        ...(incoming.introDuration !== undefined ? { introDuration: incoming.introDuration } : {}),
         permissions: incoming.permissions
       });
 
@@ -591,6 +593,12 @@ export class WatchPartyService {
   private handleIncomingStartTransmission(message: PeerStartTransmissionMessage, _senderId: string): void {
     if (message.mode) {
       this.setTransmissionMode(message.mode);
+    }
+    if (this.roomManager.roomInfo && (message.introStartTimestamp !== undefined || message.introDuration !== undefined)) {
+      this.roomManager.updateRoomInfo({
+        ...(message.introStartTimestamp !== undefined ? { introStartTimestamp: message.introStartTimestamp } : {}),
+        ...(message.introDuration !== undefined ? { introDuration: message.introDuration } : {})
+      });
     }
     const targetState = message.lifecycleState || 'PLAYING_CONTENT';
     this.stateMachine.transitionTo(targetState, 'start_transmission_command', true);
@@ -975,6 +983,7 @@ export class WatchPartyService {
       introDuration
     };
 
+    this.roomManager.updateRoomInfo({ introStartTimestamp: startTimestamp, introDuration });
     this.stateMachine.transitionTo('PLAYING_INTRO', 'start_transmission');
 
     if (this.transport.broadcastStartTransmission) {

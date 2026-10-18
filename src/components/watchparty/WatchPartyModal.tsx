@@ -99,17 +99,11 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  const hasAutoJoinedRef = useRef(false);
-
   useEffect(() => {
     if (initialRoomId) {
       const clean = WatchPartyService.sanitizeRoomId(initialRoomId);
       setJoinInput(clean);
       setMode('join');
-      if (!hasAutoJoinedRef.current && !watchPartyService.isConnected && !isJoining) {
-        hasAutoJoinedRef.current = true;
-        handleJoinRoom(clean);
-      }
     }
   }, [initialRoomId]);
 
