@@ -460,6 +460,37 @@ export class EpisodeAvailabilityService {
       localStorage.setItem(STORAGE_CACHE_KEY, JSON.stringify(obj));
     } catch {}
   }
+
+  /**
+   * Invalida o cache de disponibilidade de um episódio ou temporada específica.
+   */
+  public invalidateEpisode(seriesId: string, season?: number, episode?: number): void {
+    if (season !== undefined && episode !== undefined) {
+      const key = this.getEpisodeCacheKey(seriesId, season, episode);
+      this.cache.delete(key);
+      this.inFlightVerifications.delete(key);
+    } else {
+      const prefix = `${seriesId.toLowerCase()}_`;
+      for (const k of Array.from(this.cache.keys())) {
+        if (k.startsWith(prefix)) {
+          this.cache.delete(k);
+          this.inFlightVerifications.delete(k);
+        }
+      }
+    }
+    this.saveToStorage();
+  }
+
+  /**
+   * Limpa integralmente o cache de episódios.
+   */
+  public clearCache(): void {
+    this.cache.clear();
+    this.inFlightVerifications.clear();
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try { localStorage.removeItem(STORAGE_CACHE_KEY); } catch {}
+    }
+  }
 }
 
 export const episodeAvailabilityService = EpisodeAvailabilityService.getInstance();

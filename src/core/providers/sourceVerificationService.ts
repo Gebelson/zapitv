@@ -322,7 +322,40 @@ class SourceVerificationService {
       };
     }
 
-    if (phase1Streams.length > 0 || phase2Streams.length > 0) {
+    // Coleta fontes candidatas compatíveis com a web de ambas as fases
+    const candidatePool = [...phase2Streams, ...phase1Streams];
+    const webReadyCandidates: StremioStream[] = [];
+    const seenCandidateKeys = new Set<string>();
+
+    for (const s of candidatePool) {
+      if (!s.url) continue;
+      const key = s.url || s.infoHash || `${s.name}-${s.title}`;
+      if (seenCandidateKeys.has(key)) continue;
+      seenCandidateKeys.add(key);
+
+      const u = s.url.toLowerCase();
+      // Descarta torrents e loopbacks sem motor local ativo
+      if (s.isTorrent || u.includes('127.0.0.1:11470') || u.includes('localhost:11470')) {
+        continue;
+      }
+      webReadyCandidates.push(s);
+    }
+
+    if (webReadyCandidates.length > 0) {
+      // Fontes candidatas compatíveis encontradas: permite reprodução com fallback controlado
+      diagnostic.approvedStreamsCount = webReadyCandidates.length;
+      diagnostic.finalState = 'AVAILABLE';
+      this.recordLog(diagnostic);
+      options?.onStateChange?.('AVAILABLE');
+      return {
+        state: 'AVAILABLE',
+        streams: webReadyCandidates,
+        diagnosticLog: diagnostic
+      };
+    }
+
+    if (candidatePool.length > 0) {
+      // Apenas torrents que dependem de motor local foram encontrados
       diagnostic.finalState = 'INCONCLUSIVE';
       diagnostic.inconclusiveReason = 'As fontes retornadas exigem um motor local indisponível neste dispositivo';
       this.recordLog(diagnostic);

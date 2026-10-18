@@ -3850,7 +3850,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
-              onClick={() => onRetrySources?.()}
+              onClick={() => {
+                setHasError(false);
+                setIsLoading(true);
+                onRetrySources?.();
+              }}
               disabled={!onRetrySources}
               className="px-6 py-3 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-full font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
             >

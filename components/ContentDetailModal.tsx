@@ -891,6 +891,10 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
               verificationState={verificationState}
               onRetrySources={() => {
                 providerRegistry.invalidateCache(item);
+                prefetchedSourcesRef.current = null;
+                if (hasEpisodes && currentEpisodeParams) {
+                  episodeAvailabilityService.invalidateEpisode(item.id, currentEpisodeParams.season, currentEpisodeParams.episode);
+                }
                 startPlayback(currentEpisodeParams?.season, currentEpisodeParams?.episode, 'retry_playback', true);
               }}
               initialSeason={currentEpisodeParams?.season || (hasEpisodes ? 1 : undefined)}

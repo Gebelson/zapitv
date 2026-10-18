@@ -933,6 +933,21 @@ class ProviderRegistryService {
                     notWebReady: false
                   }
                 });
+                if (addon.id === 'froststream-http' || sUrl.includes('cloutteam.com')) {
+                  parsedStreams.push({
+                    ...s,
+                    url: `/api/proxy?url=${encodeURIComponent(sUrl)}`,
+                    providerName: `${addon.name} (Proxy)`,
+                    providerId: addon.id,
+                    sourceType: isHls ? 'hls' : 'mp4',
+                    ...(isDubbed ? { isDubbed: true } : {}),
+                    ...(isPtBr ? { isPtBr: true } : {}),
+                    behaviorHints: {
+                      ...(s.behaviorHints || {}),
+                      notWebReady: false
+                    }
+                  });
+                }
               } else if (isTorrent) {
                 const engineOnline = await isLocalStremioEngineOnline();
                 let streamQuality = s.quality;

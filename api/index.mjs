@@ -10560,14 +10560,17 @@ var init_PlaybackOptimizerService = __esm({
 
 // src/core/providers/sourceReadiness.ts
 function isSourcePlayableHere(stream) {
-  if (!stream.url || stream.behaviorHints?.notWebReady === true) return false;
+  if (!stream.url) return false;
   let url = stream.url;
   try {
     url = decodeURIComponent(url);
   } catch {
   }
   const requiresLocalEngine = Boolean(stream.isTorrent) || /(?:^|[/:])(?:localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/i.test(url);
-  return !requiresLocalEngine || stream.behaviorHints?.notWebReady === false;
+  if (requiresLocalEngine) {
+    return stream.behaviorHints?.notWebReady === false;
+  }
+  return true;
 }
 var init_sourceReadiness = __esm({
   "src/core/providers/sourceReadiness.ts"() {
@@ -11379,6 +11382,21 @@ var init_providerRegistry = __esm({
                         notWebReady: false
                       }
                     });
+                    if (addon.id === "froststream-http" || sUrl.includes("cloutteam.com")) {
+                      parsedStreams.push({
+                        ...s,
+                        url: `/api/proxy?url=${encodeURIComponent(sUrl)}`,
+                        providerName: `${addon.name} (Proxy)`,
+                        providerId: addon.id,
+                        sourceType: isHls ? "hls" : "mp4",
+                        ...isDubbed ? { isDubbed: true } : {},
+                        ...isPtBr ? { isPtBr: true } : {},
+                        behaviorHints: {
+                          ...s.behaviorHints || {},
+                          notWebReady: false
+                        }
+                      });
+                    }
                   } else if (isTorrent) {
                     const engineOnline = await isLocalStremioEngineOnline();
                     let streamQuality = s.quality;

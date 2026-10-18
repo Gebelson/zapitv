@@ -65,4 +65,5 @@ try {
   connection.client.close();
 }
 // Imports of the full API also start background schedulers; they are outside this route test.
+await new Promise(resolve => setTimeout(resolve, 80));
 process.exit(0);
