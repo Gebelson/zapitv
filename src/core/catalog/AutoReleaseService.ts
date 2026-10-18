@@ -499,7 +499,7 @@ export class AutoReleaseService {
             season: 1,
             title: `Episódio ${nextEpNum}`,
             videoUrl: cleanStreams[0].url
-          });
+          }, work.type);
 
           if (added) {
             result.newEpisodesAdded++;

@@ -28,6 +28,11 @@ export interface PendingCandidate {
   reasonUnavailable: string;
 }
 
+export interface CatalogReleaseSnapshot {
+  releases: ContentItem[];
+  pending: PendingCandidate[];
+}
+
 export class CatalogReleaseStore {
   private static instance: CatalogReleaseStore;
   private releases: ContentItem[] = [];
@@ -35,6 +40,10 @@ export class CatalogReleaseStore {
   private listeners = new Set<(releases: ContentItem[]) => void>();
 
   private constructor() {}
+
+  private pendingKey(candidate: Pick<PendingCandidate, 'id' | 'imdbId' | 'type'>): string {
+    return `${candidate.type === ContentType.MOVIE ? 'movie' : 'series'}:${candidate.imdbId || candidate.id}`;
+  }
 
   public static getInstance(): CatalogReleaseStore {
     if (!CatalogReleaseStore.instance) {
@@ -50,16 +59,34 @@ export class CatalogReleaseStore {
     return [...this.releases];
   }
 
+  /** Snapshot used by the server to restore releases and pending rechecks after a cold start. */
+  public getSnapshot(): CatalogReleaseSnapshot {
+    return {
+      releases: structuredClone(this.releases),
+      pending: structuredClone([...this.pendingQueue.values()])
+    };
+  }
+
+  public restoreSnapshot(snapshot: CatalogReleaseSnapshot | null): void {
+    this.releases = snapshot ? deduplicateContentItems(structuredClone(snapshot.releases)) : [];
+    this.pendingQueue = new Map(
+      (snapshot?.pending || []).map(candidate => [this.pendingKey(candidate), structuredClone(candidate)])
+    );
+    this.notifyListeners();
+  }
+
   /**
    * Adiciona um novo lançamento ao catálogo com deduplicação canônica
    */
   public addRelease(item: ContentItem): boolean {
     if (!item || !item.id || !item.title) return false;
 
+    const itemFormat = item.mediaFormat || (item.type === ContentType.MOVIE ? 'movie' : 'series');
     const exists = this.releases.some(r => 
-      r.id === item.id || 
+      (r.mediaFormat || (r.type === ContentType.MOVIE ? 'movie' : 'series')) === itemFormat && (
+      r.id === item.id ||
       (r.imdbId && item.imdbId && r.imdbId.toLowerCase() === item.imdbId.toLowerCase()) ||
-      (r.tmdbId && item.tmdbId && String(r.tmdbId) === String(item.tmdbId))
+      (r.tmdbId && item.tmdbId && String(r.tmdbId) === String(item.tmdbId)))
     );
 
     if (exists) {
@@ -69,7 +96,7 @@ export class CatalogReleaseStore {
     this.releases = deduplicateContentItems([item, ...this.releases]);
     
     // Remove da fila de pendentes se estava aguardando
-    const key = item.imdbId || item.id;
+    const key = this.pendingKey(item);
     this.pendingQueue.delete(key);
 
     this.notifyListeners();
@@ -87,8 +114,10 @@ export class CatalogReleaseStore {
     image?: string;
     season?: number;
     videoUrl?: string;
-  }): boolean {
-    const target = this.releases.find(r => r.id === workId || r.imdbId === workId || r.tmdbId === workId);
+  }, workType?: ContentType): boolean {
+    const target = this.releases.find(r =>
+      (!workType || r.type === workType) &&
+      (r.id === workId || r.imdbId === workId || r.tmdbId === workId));
     if (!target) return false;
 
     if (!target.episodes) {
@@ -127,7 +156,7 @@ export class CatalogReleaseStore {
     episodeNumber?: number;
     reason: string;
   }): void {
-    const key = candidate.imdbId || candidate.id;
+    const key = this.pendingKey(candidate);
     const existing = this.pendingQueue.get(key);
 
     const now = Date.now();

@@ -43,7 +43,7 @@ O teste de dois navegadores passou no localhost. Voz, compartilhamento de tela e
 ## Checkpoints que ainda precisam de validação
 
 1. **Estabilização estrutural:** validar voz, compartilhamento de tela e reprodução real em múltiplos dispositivos; ampliar testes de recuperação.
-2. **Organização e produção:** testar catálogo automático entre instâncias, painel com login real, cache e Service Worker em atualizações de deployment; medir desempenho antes de otimizar.
+2. **Organização e produção:** testar o painel com login real, cache e Service Worker em atualizações de deployment; medir desempenho antes de otimizar.
 
 Evitar mudanças amplas até que cada fluxo afetado tenha um teste de regressão reproduzível.
 
@@ -62,3 +62,14 @@ Evitar mudanças amplas até que cada fluxo afetado tenha um teste de regressão
 - O teste de dois navegadores verifica presença, nomes e chat. Ele não prova sincronização de vídeo, áudio da mídia, voice chat ou compartilhamento de tela em dispositivos reais.
 - O repositório de feedback usa um snapshot com limite de 2 MB para evitar gravação silenciosa excessiva. Volumes maiores exigirão tabelas relacionais e paginação no Turso. O catálogo de lançamentos automáticos ainda mantém estado em memória no servidor; sua persistência entre instâncias da Vercel precisa de migração específica.
 - A suíte antiga baseada em Vitest ainda não é executável porque o projeto não declara essa dependência. Os novos testes usam `tsx` e fazem parte do build. Lighthouse, voz/WebRTC real e painel com login Firebase real não foram medidos nesta entrega.
+
+## Continuação da terceira entrega: início da sala, catálogo e segurança
+
+- A Watch Party iniciava o player do anfitrião duas vezes: o botão chamava `startTransmission`, que emitia um evento local, e depois chamava a abertura diretamente. Agora o anfitrião abre uma vez; o sinal aos convidados ocorre quando a mídia está preparada. No modo WebRTC, a intro espera a captura do anfitrião. Inícios e capturas simultâneos são deduplicados.
+- Convites diretos deixam de construir um `ContentItem` com ano, nota e ID fictícios. O item é procurado por identificadores e tipo de mídia; se não for identificado, o modal exibe erro e não abre uma obra substituta.
+- IDs locais do mesmo filme e série deixaram de colidir na deduplicação do catálogo, na fila de pendências e na associação de episódios.
+- Lançamentos e pendências descobertos pelo cron passam a ser salvos em `global_settings` no Turso, com versão e tentativa de mesclagem em concorrência. Uma função nova lê o estado persistido. Ausência de banco retorna 503 em produção em vez de sucesso com catálogo vazio.
+- Rotas de cron exigem `Authorization: Bearer CRON_SECRET`; rotas manuais de manutenção exigem autenticação administrativa Firebase. O segredo foi configurado na produção Vercel e guardado localmente apenas em `.env.local`, ignorado pelo Git.
+- O Service Worker usa uma nova versão de cache do app shell. O build executa typecheck e testes de regressão; `.github/workflows/quality.yml` repete o build no GitHub. O cron semanal duplicado do GitHub foi mantido como acionamento manual; o agendamento oficial continua na Vercel.
+
+Testes locais: contratos da sala e intro, identidade de mídia, colisão filme/série, persistência/concorrência do catálogo, autorização das rotas, typecheck, build e presença/chat em dois navegadores. Os testes de mídia não comprovam áudio/stream WebRTC real em outro dispositivo. O snapshot de lançamentos possui limite explícito de 2 MB e uma varredura acima do tempo limite da Function pode precisar ser particionada. A suíte antiga Vitest e a autenticação Firebase com uma conta real seguem pendentes.

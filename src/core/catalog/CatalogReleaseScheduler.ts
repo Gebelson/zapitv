@@ -43,7 +43,7 @@ export class CatalogReleaseScheduler {
   /**
    * Inicia o agendador diário em segundo plano
    */
-  public start(): void {
+  public start(runSync: () => Promise<AutoReleaseSyncResult> = () => this.executeManualSync()): void {
     if (this.isRunning) return;
     this.isRunning = true;
 
@@ -51,11 +51,11 @@ export class CatalogReleaseScheduler {
 
     // Checa a cada 30 minutos se o momento de disparo diário chegou
     this.timer = setInterval(() => {
-      this.checkAndExecuteScheduledRun();
+      this.checkAndExecuteScheduledRun(runSync);
     }, 30 * 60 * 1000);
 
     // Avalia também na inicialização
-    this.checkAndExecuteScheduledRun();
+    this.checkAndExecuteScheduledRun(runSync);
   }
 
   public stop(): void {
@@ -78,7 +78,7 @@ export class CatalogReleaseScheduler {
     return next;
   }
 
-  public async checkAndExecuteScheduledRun(): Promise<void> {
+  public async checkAndExecuteScheduledRun(runSync: () => Promise<AutoReleaseSyncResult> = () => this.executeManualSync()): Promise<void> {
     const now = Date.now();
     const TWENTY_HOURS_MS = 20 * 60 * 60 * 1000;
 
@@ -89,7 +89,7 @@ export class CatalogReleaseScheduler {
 
     const currentUtcHour = new Date().getUTCHours();
     if (currentUtcHour === this.targetHourUTC) {
-      await this.executeManualSync();
+      await runSync();
     }
   }
 

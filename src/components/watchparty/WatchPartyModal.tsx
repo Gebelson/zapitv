@@ -23,7 +23,7 @@ interface WatchPartyModalProps {
   season?: number;
   episode?: number;
   currentProfileName?: string;
-  onStartWatchPartyPlayback?: (item: ContentItem, season?: number, episode?: number) => void;
+  onStartWatchPartyPlayback?: (item: ContentItem | WatchPartyMediaMetadata, season?: number, episode?: number) => void | boolean | Promise<void | boolean>;
   onStartWatchPartyScreen?: () => void;
   initialRoomId?: string;
 }
@@ -134,23 +134,22 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
 
     // Transição automática para o Player quando a transmissão inicia (tanto para Transmissão do Host quanto Modo Sincronizado)
     const unsubTransmission = watchPartyService.onTransmissionStart((data: any) => {
+      // O anfitrião já abriu o player pelo botão. O evento local não deve abri-lo novamente.
+      if (watchPartyService.isHost()) return;
       const media = data?.media || watchPartyService.roomInfo?.media;
       if (media && onStartWatchPartyPlayback) {
-        const canonicalItem: ContentItem = {
-          id: media.id || media.contentId || 'filme',
-          title: media.title,
-          type: (media.type as any) || 'movie',
-          mediaFormat: media.mediaFormat,
-          tmdbId: media.tmdbId,
-          imdbId: media.imdbId,
-          image: media.image || media.posterUrl || '',
-          backdrop: media.backdrop || media.backdropUrl || '',
-          year: media.year || new Date().getFullYear(),
-          rating: 10,
-          genres: []
-        };
-        onStartWatchPartyPlayback(canonicalItem, media.season, media.episode);
-        onClose();
+        void (async () => {
+          try {
+            const opened = await onStartWatchPartyPlayback(media, media.season, media.episode);
+            if (opened === false) {
+              setErrorMessage('Não foi possível identificar o conteúdo desta sala. Tente novamente mais tarde.');
+              return;
+            }
+            onClose();
+          } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : 'Não foi possível abrir o conteúdo desta sala.');
+          }
+        })();
       } else if (data?.mode === 'screen' && onStartWatchPartyScreen) {
         onStartWatchPartyScreen();
         onClose();
@@ -315,27 +314,13 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
     setErrorMessage(null);
     try {
       watchPartyService.setTransmissionMode(targetMode);
-      watchPartyService.startTransmission(targetMode);
-      const media = roomState.mediaMetadata || (item ? WatchPartyService.normalizeMedia({ ...item, season, episode }) : null);
+      // O player anuncia o início apenas quando a mídia estiver preparada (e, no
+      // modo WebRTC, quando a captura do anfitrião estiver estabelecida).
       if (item && onStartWatchPartyPlayback) {
         onStartWatchPartyPlayback(item, season, episode);
         onClose();
-      } else if (media && onStartWatchPartyPlayback) {
-        const canonicalItem: ContentItem = {
-          id: media.id || media.contentId || 'filme',
-          title: media.title,
-          type: (media.type as any) || 'movie',
-          mediaFormat: media.mediaFormat,
-          tmdbId: media.tmdbId,
-          imdbId: media.imdbId,
-          image: media.image || media.posterUrl || '',
-          backdrop: media.backdrop || media.backdropUrl || '',
-          year: media.year || new Date().getFullYear(),
-          rating: 10,
-          genres: []
-        };
-        onStartWatchPartyPlayback(canonicalItem, media.season, media.episode);
-        onClose();
+      } else {
+        setErrorMessage('O conteúdo desta sala não foi identificado.');
       }
     } catch (error: any) {
       setErrorMessage(error instanceof Error ? error.message : 'Não foi possível iniciar a transmissão.');

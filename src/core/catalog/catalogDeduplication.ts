@@ -98,7 +98,7 @@ export function getCanonicalKeysForItem(item: ContentItem): string[] {
 
   // 6. Chave de ID local explícito
   if (item.id) {
-    keys.add(`id:${item.id.trim().toLowerCase()}`);
+    keys.add(`id:${tmdbMediaType}:${item.id.trim().toLowerCase()}`);
   }
 
   // 7. Chaves Fonéticas e Semânticas por Título + Ano + Categoria

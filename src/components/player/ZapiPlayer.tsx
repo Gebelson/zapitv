@@ -992,6 +992,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (isPtBrAbsent && !hasUserConfirmedNonDubbed) return;
     // Nunca toca a vinheta se a mídia principal ainda não concluiu o pré-buffer
     if (!isMediaReadyRef.current) return;
+    // Na transmissão do anfitrião, espere a captura real antes de iniciar a intro.
+    if (watchPartyService.isConnected && watchPartyService.isHostBroadcastMode() &&
+        watchPartyService.isHost() && !watchPartyService.getBroadcastStatus().isBroadcasting) return;
+    if (watchPartyService.isConnected && watchPartyService.isHost() &&
+        watchPartyService.getTransmissionMode() === 'source') {
+      const state = watchPartyService.getLifecycleState();
+      if (state === 'LOBBY' || state === 'PREPARING' || state === 'READY') {
+        watchPartyService.startTransmission('source');
+      }
+    }
 
     // Se a vinheta não deve ser tocada nesta sessão (ex: reprodução contínua ou já assistida):
     if (!shouldStartWithIntro || isIntroEndedRef.current || userSkippedIntroRef.current) {
@@ -1807,6 +1817,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         await watchPartyService.startHostBroadcast(video);
         setIsHostCapturing(true);
         setHostNeedsDisplayMediaPrompt(false);
+        startIntroIfReady();
       } catch (err: any) {
         console.warn('[ZapiPlayer] Captura automática de vídeo/áudio pendente de autorização explícita do host:', err);
         setHostNeedsDisplayMediaPrompt(true);
@@ -1814,7 +1825,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       }
     };
 
-    if (isMediaReady) {
+    if (isMediaReady && !showNonDubbedPrompt) {
       setupHostBroadcast();
     }
 
@@ -1851,7 +1862,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       unsubStop();
       unsubRemote();
     };
-  }, [isBroadcastHost, isMediaReady, onNextEpisode]);
+  }, [isBroadcastHost, isMediaReady, showNonDubbedPrompt, onNextEpisode, startIntroIfReady]);
 
   const handlePlayerClose = useCallback(() => {
     if (watchPartyService.isHost()) {
@@ -1961,6 +1972,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       startIntroIfReady();
     }
   }, [playbackSessionId, startIntroIfReady, navigationType, isBroadcastGuest]);
+
+  useEffect(() => {
+    if (hasUserConfirmedNonDubbed && isMediaReady && !showNonDubbedPrompt) {
+      startIntroIfReady();
+    }
+  }, [hasUserConfirmedNonDubbed, isMediaReady, showNonDubbedPrompt, startIntroIfReady]);
 
   const handleRejectNonDubbed = useCallback(() => {
     handlePlayerClose();
@@ -3784,6 +3801,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                   await watchPartyService.startHostBroadcast(videoRef.current);
                   setHostNeedsDisplayMediaPrompt(false);
                   setIsHostCapturing(true);
+                  startIntroIfReady();
                 } catch (err: any) {
                   console.warn('[ZapiPlayer] Falha ao autorizar captura da tela:', err);
                 }

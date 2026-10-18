@@ -53,6 +53,7 @@ export class WatchPartyService {
   private voiceService: WatchPartyVoiceService;
   private broadcastService: WatchPartyBroadcastService;
   private playbackSyncService: WatchPartyPlaybackSyncService;
+  private hostBroadcastStartPromise: Promise<MediaStream> | null = null;
 
   // Listeners de eventos de alto nível
   private listeners: Set<WatchPartyEventListener> = new Set();
@@ -248,20 +249,14 @@ export class WatchPartyService {
 
   public static normalizeMedia(raw: any): WatchPartyMediaMetadata {
     if (!raw) {
-      return {
-        id: 'filme',
-        contentId: 'filme',
-        title: 'Watch Party',
-        type: 'movie',
-        season: 1,
-        seasonNumber: 1,
-        episode: 1,
-        episodeNumber: 1
-      };
+      throw new Error('Selecione um conteúdo válido antes de criar a sala.');
     }
     const id = String(raw.id || raw.contentId || '').trim();
-    const title = String(raw.title || 'Conteúdo ZapiTV').trim();
-    const type = raw.type || 'movie';
+    const title = String(raw.title || '').trim();
+    const type = raw.type;
+    if (!id || !title || !type) {
+      throw new Error('O conteúdo da sala está sem identidade válida.');
+    }
     const season = raw.season !== undefined ? Number(raw.season) : (raw.seasonNumber !== undefined ? Number(raw.seasonNumber) : 1);
     const episode = raw.episode !== undefined ? Number(raw.episode) : (raw.episodeNumber !== undefined ? Number(raw.episodeNumber) : 1);
     const image = raw.image || raw.posterUrl || '';
@@ -892,19 +887,26 @@ export class WatchPartyService {
     if (!this.isHost() || !this.roomManager.roomInfo) {
       throw new Error('Apenas o anfitrião pode iniciar a transmissão da sala.');
     }
+    const activeStream = this.broadcastService.getLocalStream();
+    if (activeStream?.active) return activeStream;
+    if (this.hostBroadcastStartPromise) return this.hostBroadcastStartPromise;
 
-    const stream = await this.broadcastService.startHostBroadcast(
-      videoEl,
-      (str, peerId) => {
-        if (this.transport.addLocalMediaStream) {
-          this.transport.addLocalMediaStream(str, peerId);
-        }
-      },
-      this.transport.getConnectedPeers()
-    );
-
-    this.startTransmission('host_broadcast');
-    return stream;
+    this.hostBroadcastStartPromise = (async () => {
+      const stream = await this.broadcastService.startHostBroadcast(
+        videoEl,
+        (str, peerId) => {
+          this.transport.addLocalMediaStream?.(str, peerId);
+        },
+        this.transport.getConnectedPeers()
+      );
+      this.startTransmission('host_broadcast');
+      return stream;
+    })();
+    try {
+      return await this.hostBroadcastStartPromise;
+    } finally {
+      this.hostBroadcastStartPromise = null;
+    }
   }
 
   public stopHostBroadcast(): void {
@@ -967,6 +969,9 @@ export class WatchPartyService {
 
   public startTransmission(mode: TransmissionMode = 'source'): void {
     if (!this.isHost() || !this.roomManager.roomInfo) return;
+    const lifecycle = this.stateMachine.getState();
+    if (this.roomManager.roomInfo.introStartTimestamp &&
+        (lifecycle === 'PLAYING_INTRO' || lifecycle === 'PLAYING_CONTENT' || lifecycle === 'PAUSED')) return;
 
     this.setTransmissionMode(mode);
     const startTimestamp = Date.now();

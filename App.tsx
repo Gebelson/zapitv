@@ -12,6 +12,7 @@ import ScrollToTop from './components/ScrollToTop';
 import GenreDropdown from './components/GenreDropdown';
 import SortDropdown, { CatalogSortOption } from './components/SortDropdown';
 import { getContentRoute, ROUTES } from './src/core/routes/navigationRoutes';
+import { matchesRoomMedia, roomMediaFormat, roomMediaType } from './src/core/watchparty/roomMediaIdentity';
 import { AppView, User, ContentType, ContentItem, SiteNotification, Profile, CustomSection, ActorPerson } from './types';
 import { MOCK_USERS, AVATARS, filmesData } from './constants';
 import { ShieldCheck, Flame, Film, Tv, List, Search, Sparkles, Plus, RefreshCw, Activity, User as UserIcon } from 'lucide-react';
@@ -2787,30 +2788,28 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               }
             }}
             onStartWatchPartyPlayback={async (synthItem, targetSeason, targetEpisode) => {
-              setShowDirectWatchPartyModal(false);
-              let existing = content.find(c => 
-                (synthItem.id && c.id === synthItem.id) || 
-                (synthItem.tmdbId && c.tmdbId === synthItem.tmdbId) || 
-                (synthItem.imdbId && c.imdbId === synthItem.imdbId)
-              );
+              let existing = content.find(candidate => matchesRoomMedia(candidate, synthItem));
 
               if (!existing) {
                 try {
                   if (synthItem.imdbId) {
                     const found = await tmdbService.findByImdb(synthItem.imdbId);
-                    if (found) existing = found;
-                  } else if (synthItem.tmdbId) {
-                    const found = await tmdbService.getDetails(synthItem.tmdbId, (synthItem.type as any) || 'movie');
-                    if (found?.item) existing = found.item;
+                    if (found && matchesRoomMedia(found, synthItem)) existing = found;
+                  }
+                  if (!existing && synthItem.tmdbId) {
+                    const found = await tmdbService.getDetails(synthItem.tmdbId, roomMediaType(synthItem), roomMediaFormat(synthItem));
+                    if (found?.item && matchesRoomMedia(found.item, synthItem)) existing = found.item;
                   }
                 } catch (e) {
                   console.warn('[WatchParty] Erro ao resolver mídia do TMDB:', e);
                 }
               }
 
-              const resolvedItem = existing || synthItem;
+              if (!existing) return false;
+              setShowDirectWatchPartyModal(false);
               setDirectPartyEpisode({ season: targetSeason, episode: targetEpisode });
-              setSelectedContent(resolvedItem);
+              setSelectedContent(existing);
+              return true;
             }}
             />
           </React.Suspense>

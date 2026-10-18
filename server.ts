@@ -9,7 +9,7 @@ import { featuredRankingService } from "./src/core/rankings/FeaturedRankingServi
 import { weeklyFeaturedScheduler } from "./src/core/rankings/WeeklyFeaturedScheduler.ts";
 import { imdbWeeklyRankingService } from "./src/core/rankings/IMDbWeeklyRankingService.ts";
 import { catalogReleaseScheduler } from "./src/core/catalog/CatalogReleaseScheduler.ts";
-import { catalogReleaseStore } from "./src/core/catalog/CatalogReleaseStore.ts";
+import { CatalogReleaseStorageUnavailable, getPersistedReleases, runPersistedReleaseSync } from "./src/server/catalog/releaseRepository.ts";
 import { collaborativeTrainer } from "./src/core/recommendations/CollaborativeTrainer.ts";
 import { bannedContentRegistry } from "./src/core/catalog/BannedContentRegistry.ts";
 import { FeedbackStorageUnavailable, withFeedbackStore } from "./src/server/feedback/repository.ts";
@@ -29,6 +29,25 @@ async function checkStremioEngineStatus(): Promise<boolean> {
     return probe.ok;
   } catch {
     return false;
+  }
+}
+
+function requireCronSecret(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret?.trim() || req.header("authorization") !== `Bearer ${secret}`) {
+    return res.status(401).json({ error: "Autorização de cron necessária." });
+  }
+  next();
+}
+
+async function requireMaintenanceAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  try {
+    const actorUid = await authenticateAdmin(req.header("authorization"));
+    if (!actorUid) return res.status(403).json({ error: "Autenticação administrativa necessária." });
+    res.locals.actorUid = actorUid;
+    next();
+  } catch {
+    return res.status(503).json({ error: "Verificação de autenticação temporariamente indisponível." });
   }
 }
 
@@ -936,7 +955,7 @@ function createApp() {
     }
   });
 
-  app.post("/api/featured/refresh", async (_req, res) => {
+  app.post("/api/featured/refresh", requireMaintenanceAdmin, async (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const selection = await featuredRankingService.refreshFeaturedSelection();
@@ -947,24 +966,8 @@ function createApp() {
   });
 
   // Endpoint acionado semanalmente pela Vercel Cron ou GitHub Actions
-  const handleFeaturedCron = async (req: express.Request, res: express.Response) => {
+  const handleFeaturedCron = async (_req: express.Request, res: express.Response) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
-
-    // Verificação de autorização opcional (CRON_SECRET)
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret) {
-      const authHeader = req.headers["authorization"];
-      const vercelCronHeader = req.headers["x-vercel-cron"];
-      const querySecret = req.query.secret;
-      const isAuthValid = 
-        authHeader === `Bearer ${cronSecret}` || 
-        querySecret === cronSecret || 
-        vercelCronHeader === "1";
-
-      if (!isAuthValid) {
-        return res.status(401).json({ error: "Acesso não autorizado para execução do cron" });
-      }
-    }
 
     try {
       console.log("[Server] Acionamento cron semanal de Em Destaque recebido...");
@@ -986,8 +989,8 @@ function createApp() {
     }
   };
 
-  app.get("/api/featured/cron", handleFeaturedCron);
-  app.post("/api/featured/cron", handleFeaturedCron);
+  app.get("/api/featured/cron", requireCronSecret, handleFeaturedCron);
+  app.post("/api/featured/cron", requireCronSecret, handleFeaturedCron);
 
   app.get("/api/featured/scheduler-status", (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -997,27 +1000,12 @@ function createApp() {
   // =========================================================================
   // SISTEMA AUTOMÁTICO DE DESCOBERTA E ATUALIZAÇÃO DE LANÇAMENTOS DO CATÁLOGO
   // =========================================================================
-  const handleReleaseCron = async (req: express.Request, res: express.Response) => {
+  const handleReleaseCron = async (_req: express.Request, res: express.Response) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
-
-    const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret) {
-      const authHeader = req.headers["authorization"];
-      const vercelCronHeader = req.headers["x-vercel-cron"];
-      const querySecret = req.query.secret;
-      const isAuthValid = 
-        authHeader === `Bearer ${cronSecret}` || 
-        querySecret === cronSecret || 
-        vercelCronHeader === "1";
-
-      if (!isAuthValid) {
-        return res.status(401).json({ error: "Acesso não autorizado para execução do cron de lançamentos" });
-      }
-    }
 
     try {
       console.log("[Server] Acionamento cron diário de lançamentos recebido...");
-      const result = await catalogReleaseScheduler.executeManualSync();
+      const result = await runPersistedReleaseSync();
       return res.json({
         success: true,
         executedAt: new Date(result.timestamp).toISOString(),
@@ -1025,21 +1013,25 @@ function createApp() {
       });
     } catch (err: any) {
       console.error("[Server] Erro no endpoint cron diário de lançamentos:", err);
-      return res.status(500).json({ error: "Falha na sincronização de lançamentos", details: err?.message });
+      return res.status(err instanceof CatalogReleaseStorageUnavailable ? 503 : 500).json({ error: "Falha na sincronização de lançamentos", details: err?.message });
     }
   };
 
-  app.get("/api/catalog/sync-releases", handleReleaseCron);
-  app.post("/api/catalog/sync-releases", handleReleaseCron);
+  app.get("/api/catalog/sync-releases", requireCronSecret, handleReleaseCron);
+  app.post("/api/catalog/sync-releases", requireCronSecret, handleReleaseCron);
 
   app.get("/api/catalog/release-status", (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.json(catalogReleaseScheduler.getStatus());
   });
 
-  app.get("/api/catalog/new-releases", (_req, res) => {
+  app.get("/api/catalog/new-releases", async (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.json(catalogReleaseStore.getReleases());
+    try {
+      res.json(await getPersistedReleases());
+    } catch (err) {
+      res.status(err instanceof CatalogReleaseStorageUnavailable ? 503 : 500).json({ error: "Lançamentos temporariamente indisponíveis" });
+    }
   });
 
   // Auditoria Oficial de Correspondência IMDb (Seção 16 da Especificação)
@@ -1058,7 +1050,7 @@ function createApp() {
   });
 
   // Importação Administrativa de Snapshot Autorizado (Seção 5 da Especificação)
-  app.post("/api/featured/import-snapshot", (req, res) => {
+  app.post("/api/featured/import-snapshot", requireMaintenanceAdmin, (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { snapshot } = req.body || {};
@@ -1112,7 +1104,7 @@ function createApp() {
   });
 
   // Treinamento incremental sob demanda ou via scheduler
-  app.post("/api/recommendations/train", async (_req, res) => {
+  app.post("/api/recommendations/train", requireMaintenanceAdmin, async (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const model = await collaborativeTrainer.train();
@@ -1335,7 +1327,7 @@ if (!process.env.VERCEL) {
     weeklyFeaturedScheduler.start();
 
     // Inicializa o agendador diário de novos lançamentos em segundo plano
-    catalogReleaseScheduler.start();
+    catalogReleaseScheduler.start(runPersistedReleaseSync);
 
     if (process.env.NODE_ENV !== "production") {
       const { createServer: createViteServer } = await import("vite");
