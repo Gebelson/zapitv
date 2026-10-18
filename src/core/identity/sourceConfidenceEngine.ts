@@ -113,13 +113,24 @@ export class SourceConfidenceEngine {
     }
 
     // Addons que separam explicitamente o título da obra na primeira linha
-    // precisam corresponder ao título canônico inteiro, não a uma palavra comum.
+    // precisam corresponder ao título canônico inteiro ou à sua parte principal
     const declaredTitle = streamTitle.match(/🐦‍🔥\s*([^\n⏸️]+)/)?.[1]?.trim();
     if (declaredTitle) {
       const normalizedDeclared = canonicalIdentityService.normalizeTitle(declaredTitle);
+      const declaredParts = declaredTitle.split(/[:\-–—|]/).map(p => canonicalIdentityService.normalizeTitle(p.trim())).filter(p => p.length >= 3);
       const aliases = [identity.title, identity.originalTitle, ...(identity.knownAliases || [])].filter(Boolean)
         .map(alias => canonicalIdentityService.normalizeTitle(alias!));
-      if (!aliases.includes(normalizedDeclared)) {
+
+      const isMatch = aliases.some(alias =>
+        normalizedDeclared === alias ||
+        declaredParts.includes(alias) ||
+        (alias.length >= 5 && normalizedDeclared.startsWith(alias))
+      );
+
+      // Verificação de segurança: não permitir substituição de Naruto clássico por Shippuden
+      const isShippudenMismatch = normalizedDeclared.includes('shippuden') && !aliases.some(a => a.includes('shippuden'));
+
+      if (!isMatch || isShippudenMismatch) {
         reasons.push('Título declarado pelo addon difere da obra solicitada');
         return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
       }

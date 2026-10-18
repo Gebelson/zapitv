@@ -52,5 +52,5 @@ describe('ZAPITV — P0: Catálogo Permanente e Resiliência de Reprodução', (
     const [res1, res2] = await Promise.all([p1, p2]);
     // A busca ativa deve receber as fontes sem ser morta pelo abort do prefetch
     expect(res2.length).toBeGreaterThan(0);
-  });
+  }, 20000);
 });

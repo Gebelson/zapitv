@@ -684,12 +684,22 @@ class ProviderRegistryService {
     if (!imdbStr && rawTargetId.startsWith('tt')) {
       imdbStr = rawTargetId;
     }
-    if (tmdbNum) {
-      if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
-      if (!altIds.includes(`tmdb:${tmdbNum}`)) altIds.push(`tmdb:${tmdbNum}`);
+
+    // Se temos IMDb mas não temos TMDB ID, resolve antecipadamente via TMDB
+    if (!tmdbNum && imdbStr) {
+      try {
+        const found = await Promise.race([
+          tmdbService.findByImdb(imdbStr),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500))
+        ]);
+        if (found?.tmdbId) {
+          tmdbNum = String(found.tmdbId).replace(/^tmdb-?/i, '');
+        }
+      } catch {}
     }
 
-    if (!tmdbNum && !imdbStr && targetTitle) {
+    // Se ainda não temos TMDB ID, busca por título no TMDB
+    if (!tmdbNum && targetTitle) {
       try {
         const searchResults = await Promise.race([
           tmdbService.searchMulti(targetTitle),
@@ -698,28 +708,25 @@ class ProviderRegistryService {
         if (searchResults && searchResults.length > 0) {
           const match = searchResults.find(r => r.imdbId || r.tmdbId) || searchResults[0];
           if (match.tmdbId) {
-            tmdbNum = String(match.tmdbId);
-            if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
+            tmdbNum = String(match.tmdbId).replace(/^tmdb-?/i, '');
           } else if (match.id && !match.id.startsWith('open-') && !match.id.startsWith('local-')) {
             if (/^\d+$/.test(match.id)) {
               tmdbNum = match.id;
-              if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
             }
           }
-          if (match.imdbId) {
+          if (match.imdbId && !imdbStr) {
             imdbStr = match.imdbId;
             if (!altIds.includes(match.imdbId)) altIds.push(match.imdbId);
-          } else if (tmdbNum) {
-            const resolved = await tmdbService.getImdbId(tmdbNum, type);
-            if (resolved) {
-              imdbStr = resolved;
-              if (!altIds.includes(resolved)) altIds.push(resolved);
-            }
           }
         }
       } catch {
         // Ignora
       }
+    }
+
+    if (tmdbNum) {
+      if (!altIds.includes(`tmdb:${tmdbNum}`)) altIds.push(`tmdb:${tmdbNum}`);
+      if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
     }
 
     // Construir identidade canônica para validação estrita e consulta antecipada de legendas
@@ -792,15 +799,26 @@ class ProviderRegistryService {
 
         try {
           const client = new StremioClient(addon.url);
+          let primaryQueryId = stremioId;
+          if (addon.id === 'fenixflix-animes' && type === 'anime' && tmdbNum) {
+            primaryQueryId = episode
+              ? `tmdb:${tmdbNum}:${episode.season}:${episode.episode}`
+              : `tmdb:${tmdbNum}`;
+          }
+
           let res = await Promise.race([
-            client.getStreams(stremioType, stremioId),
+            client.getStreams(stremioType, primaryQueryId),
             new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON')), addonTimeout))
           ]).catch(() => null);
 
           // Fallback para IDs secundários se o primeiro não retornou nada
-          if ((!res || !res.streams || res.streams.length === 0) && altIds.length > 0) {
-            for (const altBase of altIds) {
-              const altId = episode && (type === 'series' || type === 'anime')
+          const secondaryCandidates = primaryQueryId === stremioId
+            ? altIds
+            : [stremioId, ...altIds.filter(a => a !== `tmdb:${tmdbNum}` && a !== tmdbNum)];
+
+          if ((!res || !res.streams || res.streams.length === 0) && secondaryCandidates.length > 0) {
+            for (const altBase of secondaryCandidates) {
+              const altId = episode && (type === 'series' || type === 'anime') && !altBase.includes(':')
                 ? `${altBase}:${episode.season}:${episode.episode}`
                 : altBase;
               try {

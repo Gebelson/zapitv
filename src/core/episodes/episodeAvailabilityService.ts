@@ -248,14 +248,14 @@ export class EpisodeAvailabilityService {
           }
         }
 
-        // Timeout seguro (6000ms) para acomodar primeira consulta de provedores
+        // Timeout seguro (12000ms) para acomodar consulta real de múltiplos provedores de streaming
         const streams = await Promise.race([
           providerRegistry.resolveStreams(
             mediaType,
             { id: item.id, imdbId: targetImdbId, tmdbId: item.tmdbId, title: item.title, originalTitle: item.originalTitle },
             { season, episode }
           ),
-          new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_EP_CHECK')), 6000))
+          new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_EP_CHECK')), 12000))
         ]);
 
         const cleanStreams = streamValidator.filterCleanStreams(streams, item.title, item.originalTitle);

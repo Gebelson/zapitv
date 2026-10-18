@@ -5,6 +5,7 @@ import { subtitlePreferenceService, SubtitleFormat, SubtitleAnalysisResult } fro
 import { CanonicalMediaIdentity } from '../identity/canonicalIdentity';
 import { sourceConfidenceEngine, SourceConfidence } from '../identity/sourceConfidenceEngine';
 import { playbackOptimizerService } from '../playback/PlaybackOptimizerService';
+import { isSourcePlayableHere } from '../providers/sourceReadiness';
 
 export interface SourceScoringResult {
   score: number;
@@ -356,7 +357,12 @@ export class SourceSelectionService {
     const validScored = scored.filter(item => item.evaluation.score >= 0);
 
     // 2. Ordenar de forma estritamente decrescente por score
-    validScored.sort((a, b) => b.evaluation.score - a.evaluation.score);
+    validScored.sort((a, b) => {
+      const aReady = isSourcePlayableHere(a.stream);
+      const bReady = isSourcePlayableHere(b.stream);
+      if (aReady !== bReady) return aReady ? -1 : 1;
+      return b.evaluation.score - a.evaluation.score;
+    });
 
     const rankedStreams = validScored.map(item => ({
       ...item.stream,

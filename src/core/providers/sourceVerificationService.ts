@@ -5,6 +5,7 @@ import { tmdbService } from '../tmdb/tmdbClient';
 import { canonicalIdentityService } from '../identity/canonicalIdentity';
 import { streamValidator } from './streamValidator';
 import { sourceSelectionService } from '../selection/sourceSelectionService';
+import { isSourcePlayableHere } from './sourceReadiness';
 
 export type VerificationState =
   | 'IDLE'
@@ -180,14 +181,12 @@ class SourceVerificationService {
           signal: options?.signal,
           onProgressiveStreams: (progressive) => {
             if (options?.signal?.aborted) return;
-            if (progressive && progressive.length > 0) {
-              const hasWebReady = progressive.some(s => !s.isTorrent && !s.url?.includes('127.0.0.1:11470') && !s.url?.includes('localhost:11470'));
-              diagnostic.approvedStreamsCount = progressive.length;
-              options?.onProgressiveStreams?.(progressive);
-              if (hasWebReady) {
-                // Notifica imediatamente AVAILABLE para preparar o vídeo sem aguardar os demais provedores
-                options?.onStateChange?.('AVAILABLE');
-              }
+            const playable = progressive?.filter(isSourcePlayableHere) || [];
+            if (playable.length > 0) {
+              diagnostic.approvedStreamsCount = playable.length;
+              options?.onProgressiveStreams?.(playable);
+              // Notifica imediatamente AVAILABLE para preparar o vídeo sem aguardar os demais provedores.
+              options?.onStateChange?.('AVAILABLE');
             }
           },
           forceRefresh: options?.forceRefresh,
@@ -200,17 +199,18 @@ class SourceVerificationService {
     }
 
     diagnostic.phase1DurationMs = Date.now() - phase1Start;
-    diagnostic.approvedStreamsCount = phase1Streams.length;
+    const phase1Playable = phase1Streams.filter(isSourcePlayableHere);
+    diagnostic.approvedStreamsCount = phase1Playable.length;
 
     // Se a primeira verificação encontrou fontes válidas, FINALIZA IMEDIATAMENTE (Requisito 3 e 9)
-    if (phase1Streams.length > 0) {
+    if (phase1Playable.length > 0) {
       diagnostic.finalState = 'AVAILABLE';
       diagnostic.totalDurationMs = Date.now() - overallStart;
       this.recordLog(diagnostic);
       options?.onStateChange?.('AVAILABLE');
       return {
         state: 'AVAILABLE',
-        streams: phase1Streams,
+        streams: phase1Playable,
         diagnosticLog: diagnostic
       };
     }
@@ -288,9 +288,10 @@ class SourceVerificationService {
           signal: options?.signal,
           onProgressiveStreams: (progressive) => {
             if (options?.signal?.aborted) return;
-            if (progressive && progressive.length > 0) {
-              diagnostic.approvedStreamsCount = progressive.length;
-              options?.onProgressiveStreams?.(progressive);
+            const playable = progressive?.filter(isSourcePlayableHere) || [];
+            if (playable.length > 0) {
+              diagnostic.approvedStreamsCount = playable.length;
+              options?.onProgressiveStreams?.(playable);
               options?.onStateChange?.('AVAILABLE');
             }
           },
@@ -308,7 +309,7 @@ class SourceVerificationService {
     diagnostic.totalDurationMs = Date.now() - overallStart;
 
     // Se encontrou fontes em qualquer fase, o resultado é obrigatoriamente AVAILABLE
-    const finalStreams = phase2Streams.length > 0 ? phase2Streams : phase1Streams;
+    const finalStreams = phase2Streams.filter(isSourcePlayableHere);
     if (finalStreams.length > 0) {
       diagnostic.approvedStreamsCount = finalStreams.length;
       diagnostic.finalState = 'AVAILABLE';
@@ -319,6 +320,14 @@ class SourceVerificationService {
         streams: finalStreams,
         diagnosticLog: diagnostic
       };
+    }
+
+    if (phase1Streams.length > 0 || phase2Streams.length > 0) {
+      diagnostic.finalState = 'INCONCLUSIVE';
+      diagnostic.inconclusiveReason = 'As fontes retornadas exigem um motor local indisponível neste dispositivo';
+      this.recordLog(diagnostic);
+      options?.onStateChange?.('INCONCLUSIVE', MSG_INCONCLUSIVE);
+      return { state: 'INCONCLUSIVE', streams: [], errorMessage: MSG_INCONCLUSIVE, diagnosticLog: diagnostic };
     }
 
     // =========================================================================

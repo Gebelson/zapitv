@@ -1,5 +1,6 @@
 import type { StremioStream } from '../stremio/stremioTypes';
 import { audioPreferenceService } from '../audio/audioPreferenceService';
+import { isSourcePlayableHere } from './sourceReadiness';
 
 export interface SourceMemoryIdentity {
   canonicalId: string;
@@ -53,6 +54,9 @@ export function prioritizeRememberedSources(streams: StremioStream[], remembered
     row.score * (row.trusted ? 1 : 0.2),
   ]));
   return streams.map((stream, index) => ({ stream, index })).sort((a, b) => {
+    const aReady = isSourcePlayableHere(a.stream);
+    const bReady = isSourcePlayableHere(b.stream);
+    if (aReady !== bReady) return aReady ? -1 : 1;
     // Preserve the existing audio and subtitle tiers; collective history only breaks ties.
     const aTier = (a.stream as any)._smartPriority || ({ dubbed_ptbr: 1, dual_audio: 2, original: 3, foreign: 6 }[audioPreferenceService.analyzeAudio(a.stream).tier]);
     const bTier = (b.stream as any)._smartPriority || ({ dubbed_ptbr: 1, dual_audio: 2, original: 3, foreign: 6 }[audioPreferenceService.analyzeAudio(b.stream).tier]);
