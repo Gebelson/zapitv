@@ -183,7 +183,7 @@ class VideoAdBlockerService {
    * Avalia um stream completo (metadados + histórico de auditoria + bloqueios manuais).
    */
   public evaluateStream(stream: StremioStream, contentTitle?: string, season?: number, episode?: number): AdAuditRecord {
-    const url = stream.url || '';
+    const url = stream.url || (stream.infoHash ? `torrent://${stream.infoHash}` : '');
     if (!url) {
       return {
         id: `audit-${Date.now()}`,

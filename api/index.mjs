@@ -3586,7 +3586,7 @@ var init_videoAdBlocker = __esm({
        * Avalia um stream completo (metadados + histórico de auditoria + bloqueios manuais).
        */
       evaluateStream(stream, contentTitle, season, episode) {
-        const url = stream.url || "";
+        const url = stream.url || (stream.infoHash ? `torrent://${stream.infoHash}` : "");
         if (!url) {
           return {
             id: `audit-${Date.now()}`,
@@ -4278,10 +4278,10 @@ var init_streamValidator = __esm({
        * prevenindo que animes/séries sejam trocados por conteúdos corrompidos em addons de terceiros.
        */
       isStreamMatchingTargetTitle(stream, targetTitle, originalTitle, alternateTitles) {
-        const sTitle = (stream.title || "").trim();
+        const sTitle = (stream.title || stream.description || "").trim();
         const sName = (stream.name || "").trim();
         const sUrl = (stream.url || "").trim();
-        const combined = `${sName} ${sTitle} ${sUrl}`.toLowerCase();
+        const combined = `${sName} ${sTitle} ${stream.description || ""} ${sUrl}`.toLowerCase();
         if (/\b(trailer|teaser|sample|demo)\b/i.test(`${sName} ${sTitle}`)) {
           return false;
         }
@@ -4407,9 +4407,9 @@ var init_streamValidator = __esm({
        */
       filterCleanStreams(streams, targetTitle, originalTitle, alternateTitles) {
         return streams.filter((s) => {
-          if (!s.url) return false;
-          if (this.isUrlBlacklisted(s.url)) return false;
-          if (videoAdBlocker.isStreamBlocked(s.url)) return false;
+          if (!s.url && !s.infoHash) return false;
+          if (s.url && this.isUrlBlacklisted(s.url)) return false;
+          if (s.url && videoAdBlocker.isStreamBlocked(s.url)) return false;
           return this.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles);
         });
       }
@@ -11043,6 +11043,7 @@ var init_providerRegistry = __esm({
         }
         const targetTitle = (id.title || catalogItem?.title || openItem?.title || "").trim();
         const originalTitle = (id.originalTitle || catalogItem?.originalTitle || openItem?.originalTitle || "").trim();
+        const alternateTitles = id.alternateTitles || [];
         if (openItem) {
           if ((type === "series" || type === "anime") && openItem.episodes && openItem.episodes.length > 0) {
             const epNum = episode?.episode || 1;
@@ -11167,8 +11168,7 @@ var init_providerRegistry = __esm({
               if (!imdbStr) {
                 imdbStr = resolved;
               } else if (resolved !== imdbStr) {
-                if (!altIds.includes(imdbStr)) altIds.push(imdbStr);
-                imdbStr = resolved;
+                if (!altIds.includes(resolved)) altIds.push(resolved);
               }
             }
           } catch {
@@ -11274,12 +11274,25 @@ var init_providerRegistry = __esm({
               if (addon.id === "fenixflix-animes" && type === "anime" && tmdbNum) {
                 primaryQueryId = episode ? `tmdb:${tmdbNum}:${episode.season}:${episode.episode}` : `tmdb:${tmdbNum}`;
               }
+              const hasMatchingStreams = (rawStreams) => {
+                if (!rawStreams || !Array.isArray(rawStreams) || rawStreams.length === 0) return false;
+                for (const item of rawStreams) {
+                  const sTitle = (item.title || item.description || item.name || "").trim();
+                  const s = { ...item, title: sTitle };
+                  if (addon.id === "fenixflix-animes" && /🐉\s*Malfoy/i.test(s.title || "")) continue;
+                  if (s.ytId || s.url && (s.url.includes("youtube.com") || s.url.includes("youtu.be"))) continue;
+                  if (streamValidator.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles)) {
+                    return true;
+                  }
+                }
+                return false;
+              };
               let res = await Promise.race([
                 client.getStreams(stremioType, primaryQueryId),
                 new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON")), addonTimeout))
               ]).catch(() => null);
               const secondaryCandidates = primaryQueryId === stremioId ? altIds : [stremioId, ...altIds.filter((a) => a !== `tmdb:${tmdbNum}` && a !== tmdbNum)];
-              if ((!res || !res.streams || res.streams.length === 0) && secondaryCandidates.length > 0) {
+              if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0) {
                 for (const altBase of secondaryCandidates) {
                   const altId = episode && (type === "series" || type === "anime") && !altBase.includes(":") ? `${altBase}:${episode.season}:${episode.episode}` : altBase;
                   try {
@@ -11288,7 +11301,7 @@ var init_providerRegistry = __esm({
                       client.getStreams(stremioType, altId),
                       new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON_ALT")), altTimeout))
                     ]).catch(() => null);
-                    if (altRes && Array.isArray(altRes.streams) && altRes.streams.length > 0) {
+                    if (altRes && Array.isArray(altRes.streams) && hasMatchingStreams(altRes.streams)) {
                       res = altRes;
                       break;
                     }
@@ -11296,19 +11309,24 @@ var init_providerRegistry = __esm({
                   }
                 }
               }
-              if ((!res || !res.streams || res.streams.length === 0) && (type === "anime" || type === "series")) {
+              if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && (type === "anime" || type === "series")) {
                 const altType = stremioType === "series" ? "anime" : "series";
                 try {
-                  res = await Promise.race([
+                  const altTypeRes = await Promise.race([
                     client.getStreams(altType, stremioId),
                     new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON_TYPE")), 5e3))
                   ]).catch(() => null);
+                  if (altTypeRes && Array.isArray(altTypeRes.streams) && hasMatchingStreams(altTypeRes.streams)) {
+                    res = altTypeRes;
+                  }
                 } catch {
                 }
               }
               if (res && Array.isArray(res.streams)) {
                 const parsedStreams = [];
-                for (const s of res.streams) {
+                for (const rawStream of res.streams) {
+                  const sTitle = (rawStream.title || rawStream.description || rawStream.name || "").trim();
+                  const s = { ...rawStream, title: sTitle };
                   const sUrl = s.url || "";
                   if (addon.id === "fenixflix-animes" && /🐉\s*Malfoy/i.test(s.title || "")) continue;
                   if (s.ytId || sUrl.includes("youtube.com") || sUrl.includes("youtu.be")) continue;
@@ -11358,30 +11376,34 @@ var init_providerRegistry = __esm({
                         ...isDubbed ? { isDubbed: true } : {},
                         ...isPtBr ? { isPtBr: true } : {}
                       });
-                      if (typeof window !== "undefined" && window.location.protocol === "https:") {
+                      if (typeof window === "undefined" || window.location.protocol !== "https:") {
                         parsedStreams.push({
                           ...s,
-                          url: sUrl.replace(/^http:/, "https:"),
-                          providerName: `${addon.name} (HTTPS Direto)`,
+                          providerName: addon.name,
                           providerId: addon.id,
                           sourceType: isHls ? "hls" : "mp4",
                           ...isDubbed ? { isDubbed: true } : {},
-                          ...isPtBr ? { isPtBr: true } : {}
+                          ...isPtBr ? { isPtBr: true } : {},
+                          behaviorHints: {
+                            ...s.behaviorHints || {},
+                            notWebReady: false
+                          }
                         });
                       }
+                    } else {
+                      parsedStreams.push({
+                        ...s,
+                        providerName: addon.name,
+                        providerId: addon.id,
+                        sourceType: isHls ? "hls" : "mp4",
+                        ...isDubbed ? { isDubbed: true } : {},
+                        ...isPtBr ? { isPtBr: true } : {},
+                        behaviorHints: {
+                          ...s.behaviorHints || {},
+                          notWebReady: false
+                        }
+                      });
                     }
-                    parsedStreams.push({
-                      ...s,
-                      providerName: addon.name,
-                      providerId: addon.id,
-                      sourceType: isHls ? "hls" : "mp4",
-                      ...isDubbed ? { isDubbed: true } : {},
-                      ...isPtBr ? { isPtBr: true } : {},
-                      behaviorHints: {
-                        ...s.behaviorHints || {},
-                        notWebReady: false
-                      }
-                    });
                     if (addon.id === "froststream-http" || sUrl.includes("cloutteam.com")) {
                       parsedStreams.push({
                         ...s,
@@ -13092,7 +13114,7 @@ var init_sourceConfidenceEngine = __esm({
             canonicalTitle: identity.title
           };
         }
-        const streamTitleToCheck = canonicalIdentityService.normalizeTitle(`${streamName} ${streamTitle}`);
+        const streamTitleToCheck = canonicalIdentityService.normalizeTitle(`${streamName} ${streamTitle} ${stream.description || ""}`);
         for (const collisionTitle of KNOWN_COLLISION_TITLES) {
           const cleanCollision = canonicalIdentityService.normalizeTitle(collisionTitle);
           const regex = new RegExp(`(^|\\s)${cleanCollision}(\\s|$)`, "i");
@@ -13125,8 +13147,8 @@ var init_sourceConfidenceEngine = __esm({
         }
         const targetTokens = canonicalIdentityService.extractSignificantTokens(identity.title);
         const origTokens = identity.originalTitle ? canonicalIdentityService.extractSignificantTokens(identity.originalTitle) : [];
-        const cleanStreamTitle = canonicalIdentityService.normalizeTitle(streamTitle);
-        const titleWords = new Set(canonicalIdentityService.extractSignificantTokens(`${streamName} ${streamTitle}`));
+        const cleanStreamTitle = canonicalIdentityService.normalizeTitle(`${streamTitle} ${stream.description || ""}`);
+        const titleWords = new Set(canonicalIdentityService.extractSignificantTokens(`${streamName} ${streamTitle} ${stream.description || ""}`));
         let aliasMatched = false;
         for (const alias of identity.knownAliases) {
           const cleanAlias = canonicalIdentityService.normalizeTitle(alias);

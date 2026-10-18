@@ -282,10 +282,10 @@ class StreamValidator {
     originalTitle?: string,
     alternateTitles?: string[]
   ): boolean {
-    const sTitle = (stream.title || '').trim();
+    const sTitle = (stream.title || stream.description || '').trim();
     const sName = (stream.name || '').trim();
     const sUrl = (stream.url || '').trim();
-    const combined = `${sName} ${sTitle} ${sUrl}`.toLowerCase();
+    const combined = `${sName} ${sTitle} ${stream.description || ''} ${sUrl}`.toLowerCase();
 
     // Uma URL acessível pode ser trailer ou amostra.
     if (/\b(trailer|teaser|sample|demo)\b/i.test(`${sName} ${sTitle}`)) {
@@ -469,9 +469,9 @@ class StreamValidator {
     alternateTitles?: string[]
   ): StremioStream[] {
     return streams.filter(s => {
-      if (!s.url) return false;
-      if (this.isUrlBlacklisted(s.url)) return false;
-      if (videoAdBlocker.isStreamBlocked(s.url)) return false;
+      if (!s.url && !s.infoHash) return false;
+      if (s.url && this.isUrlBlacklisted(s.url)) return false;
+      if (s.url && videoAdBlocker.isStreamBlocked(s.url)) return false;
       return this.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles);
     });
   }

@@ -544,6 +544,7 @@ class ProviderRegistryService {
 
     const targetTitle = (id.title || catalogItem?.title || openItem?.title || '').trim();
     const originalTitle = (id.originalTitle || catalogItem?.originalTitle || openItem?.originalTitle || '').trim();
+    const alternateTitles: string[] = (id as any).alternateTitles || [];
 
     // 0. Extração imediata de fontes locais (0ms) sem aguardar requisições de rede
     if (openItem) {
@@ -673,8 +674,7 @@ class ProviderRegistryService {
           if (!imdbStr) {
             imdbStr = resolved;
           } else if (resolved !== imdbStr) {
-            if (!altIds.includes(imdbStr)) altIds.push(imdbStr);
-            imdbStr = resolved;
+            if (!altIds.includes(resolved)) altIds.push(resolved);
           }
         }
       } catch {
@@ -806,17 +806,31 @@ class ProviderRegistryService {
               : `tmdb:${tmdbNum}`;
           }
 
+          const hasMatchingStreams = (rawStreams: any[]): boolean => {
+            if (!rawStreams || !Array.isArray(rawStreams) || rawStreams.length === 0) return false;
+            for (const item of rawStreams) {
+              const sTitle = (item.title || item.description || item.name || '').trim();
+              const s = { ...item, title: sTitle };
+              if (addon.id === 'fenixflix-animes' && /🐉\s*Malfoy/i.test(s.title || '')) continue;
+              if (s.ytId || (s.url && (s.url.includes('youtube.com') || s.url.includes('youtu.be')))) continue;
+              if (streamValidator.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles)) {
+                return true;
+              }
+            }
+            return false;
+          };
+
           let res = await Promise.race([
             client.getStreams(stremioType, primaryQueryId),
             new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON')), addonTimeout))
           ]).catch(() => null);
 
-          // Fallback para IDs secundários se o primeiro não retornou nada
+          // Fallback para IDs secundários se o primeiro não retornou nada ou não correspondeu ao título solicitado
           const secondaryCandidates = primaryQueryId === stremioId
             ? altIds
             : [stremioId, ...altIds.filter(a => a !== `tmdb:${tmdbNum}` && a !== tmdbNum)];
 
-          if ((!res || !res.streams || res.streams.length === 0) && secondaryCandidates.length > 0) {
+          if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0) {
             for (const altBase of secondaryCandidates) {
               const altId = episode && (type === 'series' || type === 'anime') && !altBase.includes(':')
                 ? `${altBase}:${episode.season}:${episode.episode}`
@@ -827,7 +841,7 @@ class ProviderRegistryService {
                   client.getStreams(stremioType, altId),
                   new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON_ALT')), altTimeout))
                 ]).catch(() => null);
-                if (altRes && Array.isArray(altRes.streams) && altRes.streams.length > 0) {
+                if (altRes && Array.isArray(altRes.streams) && hasMatchingStreams(altRes.streams)) {
                   res = altRes;
                   break;
                 }
@@ -835,19 +849,24 @@ class ProviderRegistryService {
             }
           }
 
-          if ((!res || !res.streams || res.streams.length === 0) && (type === 'anime' || type === 'series')) {
+          if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && (type === 'anime' || type === 'series')) {
             const altType = stremioType === 'series' ? 'anime' : 'series';
             try {
-              res = await Promise.race([
+              const altTypeRes = await Promise.race([
                 client.getStreams(altType, stremioId),
                 new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON_TYPE')), 5000))
               ]).catch(() => null);
+              if (altTypeRes && Array.isArray(altTypeRes.streams) && hasMatchingStreams(altTypeRes.streams)) {
+                res = altTypeRes;
+              }
             } catch {}
           }
 
           if (res && Array.isArray(res.streams)) {
             const parsedStreams: StremioStream[] = [];
-            for (const s of res.streams) {
+            for (const rawStream of res.streams) {
+              const sTitle = (rawStream.title || rawStream.description || rawStream.name || '').trim();
+              const s = { ...rawStream, title: sTitle };
               const sUrl = s.url || '';
               // A variante Malfoy devolveu obras diferentes sob títulos corretos
               // em várias mídias. A quarentena é por origem, nunca por título.
@@ -909,30 +928,34 @@ class ProviderRegistryService {
                     ...(isDubbed ? { isDubbed: true } : {}),
                     ...(isPtBr ? { isPtBr: true } : {})
                   });
-                  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+                  if (typeof window === 'undefined' || window.location.protocol !== 'https:') {
                     parsedStreams.push({
                       ...s,
-                      url: sUrl.replace(/^http:/, 'https:'),
-                      providerName: `${addon.name} (HTTPS Direto)`,
+                      providerName: addon.name,
                       providerId: addon.id,
                       sourceType: isHls ? 'hls' : 'mp4',
                       ...(isDubbed ? { isDubbed: true } : {}),
-                      ...(isPtBr ? { isPtBr: true } : {})
+                      ...(isPtBr ? { isPtBr: true } : {}),
+                      behaviorHints: {
+                        ...(s.behaviorHints || {}),
+                        notWebReady: false
+                      }
                     });
                   }
+                } else {
+                  parsedStreams.push({
+                    ...s,
+                    providerName: addon.name,
+                    providerId: addon.id,
+                    sourceType: isHls ? 'hls' : 'mp4',
+                    ...(isDubbed ? { isDubbed: true } : {}),
+                    ...(isPtBr ? { isPtBr: true } : {}),
+                    behaviorHints: {
+                      ...(s.behaviorHints || {}),
+                      notWebReady: false
+                    }
+                  });
                 }
-                parsedStreams.push({
-                  ...s,
-                  providerName: addon.name,
-                  providerId: addon.id,
-                  sourceType: isHls ? 'hls' : 'mp4',
-                  ...(isDubbed ? { isDubbed: true } : {}),
-                  ...(isPtBr ? { isPtBr: true } : {}),
-                  behaviorHints: {
-                    ...(s.behaviorHints || {}),
-                    notWebReady: false
-                  }
-                });
                 if (addon.id === 'froststream-http' || sUrl.includes('cloutteam.com')) {
                   parsedStreams.push({
                     ...s,

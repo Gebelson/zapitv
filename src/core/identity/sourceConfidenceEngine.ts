@@ -148,7 +148,7 @@ export class SourceConfidenceEngine {
     }
 
     // 4. DETECÇÃO DE OBRAS COMPLETAMENTE DIFERENTES (Colisão de Títulos)
-    const streamTitleToCheck = canonicalIdentityService.normalizeTitle(`${streamName} ${streamTitle}`);
+    const streamTitleToCheck = canonicalIdentityService.normalizeTitle(`${streamName} ${streamTitle} ${stream.description || ''}`);
     for (const collisionTitle of KNOWN_COLLISION_TITLES) {
       const cleanCollision = canonicalIdentityService.normalizeTitle(collisionTitle);
       const regex = new RegExp(`(^|\\s)${cleanCollision}(\\s|$)`, 'i');
@@ -186,8 +186,8 @@ export class SourceConfidenceEngine {
     // 5. VALIDAÇÃO DE SOBREPOSIÇÃO DE TÍTULO (Positive Title Overlap)
     const targetTokens = canonicalIdentityService.extractSignificantTokens(identity.title);
     const origTokens = identity.originalTitle ? canonicalIdentityService.extractSignificantTokens(identity.originalTitle) : [];
-    const cleanStreamTitle = canonicalIdentityService.normalizeTitle(streamTitle);
-    const titleWords = new Set(canonicalIdentityService.extractSignificantTokens(`${streamName} ${streamTitle}`));
+    const cleanStreamTitle = canonicalIdentityService.normalizeTitle(`${streamTitle} ${stream.description || ''}`);
+    const titleWords = new Set(canonicalIdentityService.extractSignificantTokens(`${streamName} ${streamTitle} ${stream.description || ''}`));
 
     // Verifica se algum alias canônico coincide
     let aliasMatched = false;
