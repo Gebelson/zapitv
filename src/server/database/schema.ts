@@ -92,3 +92,33 @@ export const sourceEvidenceTickets = sqliteTable('source_evidence_tickets', {
   issuedAt: integer('issued_at').notNull(),
   outcome: text('outcome'),
 }, (table) => [index('source_evidence_tickets_issued_idx').on(table.issuedAt)]);
+
+export const watchpartyRooms = sqliteTable('watchparty_rooms', {
+  roomId: text('room_id').primaryKey(),
+  hostPeerId: text('host_peer_id').notNull(),
+  hostNickname: text('host_nickname').notNull(),
+  mediaJson: text('media_json'),
+  transmissionMode: text('transmission_mode').notNull().default('host_broadcast'),
+  lifecycleState: text('lifecycle_state').notNull().default('LOBBY'),
+  introStartTimestamp: integer('intro_start_timestamp'),
+  introDuration: integer('intro_duration'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+  isClosed: integer('is_closed').notNull().default(0),
+  participantsJson: text('participants_json').notNull().default('[]'),
+}, (table) => [
+  index('watchparty_rooms_updated_idx').on(table.updatedAt),
+]);
+
+export const watchpartySignals = sqliteTable('watchparty_signals', {
+  id: text('id').primaryKey(),
+  roomId: text('room_id').notNull(),
+  senderPeerId: text('sender_peer_id').notNull(),
+  targetPeerId: text('target_peer_id'),
+  type: text('type').notNull(),
+  dataJson: text('data_json'),
+  timestamp: integer('timestamp').notNull(),
+}, (table) => [
+  index('watchparty_signals_room_time_idx').on(table.roomId, table.timestamp),
+]);
+

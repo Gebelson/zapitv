@@ -18778,7 +18778,9 @@ __export(schema_exports, {
   media: () => media,
   mediaExternalIds: () => mediaExternalIds,
   sourceEvidenceTickets: () => sourceEvidenceTickets,
-  sourceReliability: () => sourceReliability
+  sourceReliability: () => sourceReliability,
+  watchpartyRooms: () => watchpartyRooms,
+  watchpartySignals: () => watchpartySignals
 });
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 var media = sqliteTable("media", {
@@ -18864,6 +18866,33 @@ var sourceEvidenceTickets = sqliteTable("source_evidence_tickets", {
   issuedAt: integer("issued_at").notNull(),
   outcome: text("outcome")
 }, (table) => [index("source_evidence_tickets_issued_idx").on(table.issuedAt)]);
+var watchpartyRooms = sqliteTable("watchparty_rooms", {
+  roomId: text("room_id").primaryKey(),
+  hostPeerId: text("host_peer_id").notNull(),
+  hostNickname: text("host_nickname").notNull(),
+  mediaJson: text("media_json"),
+  transmissionMode: text("transmission_mode").notNull().default("host_broadcast"),
+  lifecycleState: text("lifecycle_state").notNull().default("LOBBY"),
+  introStartTimestamp: integer("intro_start_timestamp"),
+  introDuration: integer("intro_duration"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  isClosed: integer("is_closed").notNull().default(0),
+  participantsJson: text("participants_json").notNull().default("[]")
+}, (table) => [
+  index("watchparty_rooms_updated_idx").on(table.updatedAt)
+]);
+var watchpartySignals = sqliteTable("watchparty_signals", {
+  id: text("id").primaryKey(),
+  roomId: text("room_id").notNull(),
+  senderPeerId: text("sender_peer_id").notNull(),
+  targetPeerId: text("target_peer_id"),
+  type: text("type").notNull(),
+  dataJson: text("data_json"),
+  timestamp: integer("timestamp").notNull()
+}, (table) => [
+  index("watchparty_signals_room_time_idx").on(table.roomId, table.timestamp)
+]);
 
 // src/server/database/client.ts
 function createDatabase(url, authToken) {
@@ -19238,24 +19267,255 @@ databaseRouter.put("/global-settings/section-titles", async (req, res) => {
 
 // src/server/watchparty/routes.ts
 import { Router as Router2 } from "express";
+function sanitizeRoomId(raw) {
+  if (!raw || typeof raw !== "string") return "";
+  let str = raw.trim();
+  for (let i = 0; i < 3; i++) {
+    try {
+      const decoded = decodeURIComponent(str);
+      if (decoded === str) break;
+      str = decoded;
+    } catch {
+      break;
+    }
+  }
+  if (str.includes("/sala/")) {
+    const parts = str.split("/sala/");
+    str = parts[parts.length - 1];
+  } else if (str.includes("sala=")) {
+    const match = str.match(/sala=([^&#\s]+)/);
+    if (match && match[1]) {
+      str = match[1];
+    }
+  }
+  str = str.split("?")[0].split("#")[0].trim();
+  const canonicalMatch = str.match(/(zapi-[a-zA-Z0-9_-]+)/i);
+  if (canonicalMatch && canonicalMatch[1]) {
+    return canonicalMatch[1].replace(/[^a-zA-Z0-9]+$/, "").toLowerCase();
+  }
+  str = str.replace(/^[\[\(\{<"'\s]+|[\]\)\}>"'\s,\.;:]+$/g, "");
+  str = str.replace(/[^a-zA-Z0-9_-]/g, "");
+  return str.toLowerCase();
+}
+var ROOM_TIMEOUT_MS = 3e5;
+var PARTICIPANT_TIMEOUT_MS = 6e4;
 var activeRooms = /* @__PURE__ */ new Map();
 var roomSignals = /* @__PURE__ */ new Map();
+var closedRooms = /* @__PURE__ */ new Set();
+var dbInitPromise = null;
+async function ensureDbTables(db) {
+  if (!dbInitPromise) {
+    dbInitPromise = (async () => {
+      try {
+        await db.client.execute(`
+          CREATE TABLE IF NOT EXISTS watchparty_rooms (
+            room_id TEXT PRIMARY KEY,
+            host_peer_id TEXT NOT NULL,
+            host_nickname TEXT NOT NULL,
+            media_json TEXT,
+            transmission_mode TEXT NOT NULL DEFAULT 'host_broadcast',
+            lifecycle_state TEXT NOT NULL DEFAULT 'LOBBY',
+            intro_start_timestamp INTEGER,
+            intro_duration INTEGER,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            is_closed INTEGER NOT NULL DEFAULT 0,
+            participants_json TEXT NOT NULL DEFAULT '[]'
+          );
+        `);
+        await db.client.execute(`
+          CREATE TABLE IF NOT EXISTS watchparty_signals (
+            id TEXT PRIMARY KEY,
+            room_id TEXT NOT NULL,
+            sender_peer_id TEXT NOT NULL,
+            target_peer_id TEXT,
+            type TEXT NOT NULL,
+            data_json TEXT,
+            timestamp INTEGER NOT NULL
+          );
+        `);
+        await db.client.execute(`
+          CREATE INDEX IF NOT EXISTS idx_watchparty_signals_room_time 
+          ON watchparty_signals(room_id, timestamp);
+        `);
+      } catch (err) {
+        console.warn("[WatchParty] Falha ao criar tabelas no banco remoto, operando com fallback em mem\xF3ria:", err);
+      }
+    })();
+  }
+  return dbInitPromise;
+}
+async function syncRoomToDb(room, isClosed = 0) {
+  const db = getDatabase();
+  if (!db) return;
+  try {
+    await ensureDbTables(db);
+    const participantsArr = Array.from(room.participants.values());
+    await db.client.execute({
+      sql: `INSERT INTO watchparty_rooms (
+        room_id, host_peer_id, host_nickname, media_json, transmission_mode,
+        lifecycle_state, intro_start_timestamp, intro_duration, created_at,
+        updated_at, is_closed, participants_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(room_id) DO UPDATE SET
+        host_peer_id = excluded.host_peer_id,
+        host_nickname = excluded.host_nickname,
+        media_json = excluded.media_json,
+        transmission_mode = excluded.transmission_mode,
+        lifecycle_state = excluded.lifecycle_state,
+        intro_start_timestamp = excluded.intro_start_timestamp,
+        intro_duration = excluded.intro_duration,
+        updated_at = excluded.updated_at,
+        is_closed = excluded.is_closed,
+        participants_json = excluded.participants_json;`,
+      args: [
+        room.roomId,
+        room.hostPeerId,
+        room.hostNickname,
+        room.media ? JSON.stringify(room.media) : null,
+        room.transmissionMode || "host_broadcast",
+        room.lifecycleState || "LOBBY",
+        room.introStartTimestamp ?? null,
+        room.introDuration ?? null,
+        room.createdAt,
+        room.updatedAt,
+        isClosed,
+        JSON.stringify(participantsArr)
+      ]
+    });
+  } catch (err) {
+    console.warn("[WatchParty] Erro ao sincronizar sala com banco:", err);
+  }
+}
+async function fetchRoomFromDb(roomId) {
+  const db = getDatabase();
+  if (!db) return null;
+  try {
+    await ensureDbTables(db);
+    const result = await db.client.execute({
+      sql: `SELECT * FROM watchparty_rooms WHERE room_id = ? LIMIT 1;`,
+      args: [roomId]
+    });
+    if (!result.rows || result.rows.length === 0) return null;
+    const row = result.rows[0];
+    const isClosed = Boolean(row.is_closed);
+    const now = Date.now();
+    const isExpired = now - Number(row.updated_at) > ROOM_TIMEOUT_MS;
+    let media2 = null;
+    if (row.media_json) {
+      try {
+        media2 = JSON.parse(String(row.media_json));
+      } catch {
+      }
+    }
+    const participants = /* @__PURE__ */ new Map();
+    if (row.participants_json) {
+      try {
+        const arr = JSON.parse(String(row.participants_json));
+        if (Array.isArray(arr)) {
+          for (const p of arr) {
+            if (p?.peerId) participants.set(p.peerId, p);
+          }
+        }
+      } catch {
+      }
+    }
+    const room = {
+      roomId: String(row.room_id),
+      hostPeerId: String(row.host_peer_id || ""),
+      hostNickname: String(row.host_nickname || "Anfitri\xE3o"),
+      media: media2,
+      transmissionMode: String(row.transmission_mode || "host_broadcast"),
+      lifecycleState: String(row.lifecycle_state || "LOBBY"),
+      introStartTimestamp: row.intro_start_timestamp ? Number(row.intro_start_timestamp) : void 0,
+      introDuration: row.intro_duration ? Number(row.intro_duration) : void 0,
+      createdAt: Number(row.created_at || now),
+      updatedAt: Number(row.updated_at || now),
+      participants
+    };
+    return { room, isClosed, isExpired };
+  } catch (err) {
+    console.warn("[WatchParty] Erro ao buscar sala no banco:", err);
+    return null;
+  }
+}
+async function syncSignalToDb(roomId, sig) {
+  const db = getDatabase();
+  if (!db) return;
+  try {
+    await ensureDbTables(db);
+    await db.client.execute({
+      sql: `INSERT INTO watchparty_signals (id, room_id, sender_peer_id, target_peer_id, type, data_json, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?);`,
+      args: [
+        sig.id,
+        roomId,
+        sig.senderPeerId,
+        sig.targetPeerId ?? null,
+        sig.type,
+        sig.data ? JSON.stringify(sig.data) : null,
+        sig.timestamp
+      ]
+    });
+  } catch (err) {
+    console.warn("[WatchParty] Erro ao salvar sinal no banco:", err);
+  }
+}
+async function fetchSignalsFromDb(roomId, peerId, since) {
+  const db = getDatabase();
+  if (!db) return [];
+  try {
+    await ensureDbTables(db);
+    const result = await db.client.execute({
+      sql: `SELECT * FROM watchparty_signals 
+            WHERE room_id = ? AND timestamp > ? AND sender_peer_id != ? AND (target_peer_id IS NULL OR target_peer_id = ?)
+            ORDER BY timestamp ASC LIMIT 100;`,
+      args: [roomId, since, peerId, peerId]
+    });
+    if (!result.rows) return [];
+    return result.rows.map((row) => ({
+      id: String(row.id),
+      senderPeerId: String(row.sender_peer_id),
+      targetPeerId: row.target_peer_id ? String(row.target_peer_id) : void 0,
+      type: String(row.type),
+      data: row.data_json ? JSON.parse(String(row.data_json)) : null,
+      timestamp: Number(row.timestamp)
+    }));
+  } catch (err) {
+    console.warn("[WatchParty] Erro ao buscar sinais no banco:", err);
+    return [];
+  }
+}
+async function markRoomClosedInDb(roomId) {
+  const db = getDatabase();
+  if (!db) return;
+  try {
+    await ensureDbTables(db);
+    await db.client.execute({
+      sql: `UPDATE watchparty_rooms SET is_closed = 1, updated_at = ? WHERE room_id = ?;`,
+      args: [Date.now(), roomId]
+    });
+  } catch (err) {
+    console.warn("[WatchParty] Erro ao fechar sala no banco:", err);
+  }
+}
 function pruneStaleState() {
   const now = Date.now();
   for (const [roomId, room] of activeRooms.entries()) {
-    if (now - room.updatedAt > 6e4) {
+    if (now - room.updatedAt > ROOM_TIMEOUT_MS) {
       activeRooms.delete(roomId);
       roomSignals.delete(roomId);
+      closedRooms.add(roomId);
     } else {
       for (const [peerId, p] of room.participants.entries()) {
-        if (!p.isHost && now - p.lastSeen > 3e4) {
+        if (!p.isHost && now - p.lastSeen > PARTICIPANT_TIMEOUT_MS) {
           room.participants.delete(peerId);
         }
       }
     }
   }
   for (const [roomId, signals] of roomSignals.entries()) {
-    const recent = signals.filter((s) => now - s.timestamp < 35e3);
+    const recent = signals.filter((s) => now - s.timestamp < 6e4);
     if (recent.length === 0) {
       roomSignals.delete(roomId);
     } else {
@@ -19265,15 +19525,19 @@ function pruneStaleState() {
 }
 var watchPartyRouter = Router2();
 if (typeof setInterval !== "undefined") {
-  const timer = setInterval(pruneStaleState, 1e4);
+  const timer = setInterval(pruneStaleState, 15e3);
   if (timer && typeof timer.unref === "function") {
     timer.unref();
   }
 }
-watchPartyRouter.post("/room/announce", (req, res) => {
+watchPartyRouter.post("/room/announce", async (req, res) => {
   pruneStaleState();
+  const rawRoomId = req.body?.roomId;
+  const cleanRoomId = sanitizeRoomId(rawRoomId);
+  if (!cleanRoomId) {
+    return res.status(400).json({ ok: false, error: "C\xF3digo de sala inv\xE1lido.", code: "INVALID_ROOM_CODE" });
+  }
   const {
-    roomId,
     hostPeerId,
     hostNickname,
     media: media2,
@@ -19282,14 +19546,17 @@ watchPartyRouter.post("/room/announce", (req, res) => {
     introStartTimestamp,
     introDuration
   } = req.body || {};
-  if (!roomId || typeof roomId !== "string") {
-    return res.status(400).json({ ok: false, error: "roomId \xE9 obrigat\xF3rio." });
-  }
   const now = Date.now();
-  let room = activeRooms.get(roomId);
+  let room = activeRooms.get(cleanRoomId);
+  if (!room) {
+    const dbRes = await fetchRoomFromDb(cleanRoomId);
+    if (dbRes?.room) {
+      room = dbRes.room;
+    }
+  }
   if (!room) {
     room = {
-      roomId,
+      roomId: cleanRoomId,
       hostPeerId: hostPeerId || "",
       hostNickname: hostNickname || "Anfitri\xE3o",
       media: media2 || null,
@@ -19301,7 +19568,6 @@ watchPartyRouter.post("/room/announce", (req, res) => {
       updatedAt: now,
       participants: /* @__PURE__ */ new Map()
     };
-    activeRooms.set(roomId, room);
   } else {
     room.updatedAt = now;
     if (hostPeerId) room.hostPeerId = hostPeerId;
@@ -19321,6 +19587,9 @@ watchPartyRouter.post("/room/announce", (req, res) => {
       lastSeen: now
     });
   }
+  activeRooms.set(cleanRoomId, room);
+  closedRooms.delete(cleanRoomId);
+  await syncRoomToDb(room, 0);
   res.json({
     ok: true,
     room: {
@@ -19336,14 +19605,47 @@ watchPartyRouter.post("/room/announce", (req, res) => {
     }
   });
 });
-watchPartyRouter.get("/room/:roomId", (req, res) => {
+watchPartyRouter.get("/room/:roomId", async (req, res) => {
   pruneStaleState();
-  const roomId = req.params.roomId;
-  const room = activeRooms.get(roomId);
-  if (!room || Date.now() - room.updatedAt > 6e4) {
+  const rawRoomId = req.params.roomId;
+  const cleanRoomId = sanitizeRoomId(rawRoomId);
+  if (!cleanRoomId) {
+    return res.status(400).json({ ok: false, error: "C\xF3digo de sala inv\xE1lido.", code: "INVALID_ROOM_CODE" });
+  }
+  if (closedRooms.has(cleanRoomId)) {
+    return res.status(404).json({ ok: false, error: "Esta sala foi encerrada pelo anfitri\xE3o.", code: "ROOM_CLOSED" });
+  }
+  let room = activeRooms.get(cleanRoomId);
+  const now = Date.now();
+  if (!room) {
+    const dbRes = await fetchRoomFromDb(cleanRoomId);
+    if (dbRes) {
+      if (dbRes.isClosed) {
+        closedRooms.add(cleanRoomId);
+        return res.status(404).json({ ok: false, error: "Esta sala foi encerrada pelo anfitri\xE3o.", code: "ROOM_CLOSED" });
+      }
+      if (dbRes.isExpired) {
+        return res.status(404).json({ ok: false, error: "A sala expirou ou o anfitri\xE3o se desconectou.", code: "HOST_DISCONNECTED" });
+      }
+      if (dbRes.room) {
+        room = dbRes.room;
+        activeRooms.set(cleanRoomId, room);
+      }
+    }
+  }
+  if (!room) {
     return res.status(404).json({
       ok: false,
-      error: "Sala n\xE3o encontrada ou encerrada pelo anfitri\xE3o."
+      error: "Sala n\xE3o encontrada ou encerrada pelo anfitri\xE3o. Verifique o link e tente novamente.",
+      code: "ROOM_NOT_FOUND"
+    });
+  }
+  if (now - room.updatedAt > ROOM_TIMEOUT_MS) {
+    activeRooms.delete(cleanRoomId);
+    return res.status(404).json({
+      ok: false,
+      error: "A sala expirou por inatividade do anfitri\xE3o.",
+      code: "HOST_DISCONNECTED"
     });
   }
   res.json({
@@ -19361,17 +19663,28 @@ watchPartyRouter.get("/room/:roomId", (req, res) => {
     }
   });
 });
-watchPartyRouter.post("/room/:roomId/heartbeat", (req, res) => {
-  const roomId = req.params.roomId;
-  const room = activeRooms.get(roomId);
-  if (!room || Date.now() - room.updatedAt > 6e4) {
+watchPartyRouter.post("/room/:roomId/heartbeat", async (req, res) => {
+  const cleanRoomId = sanitizeRoomId(req.params.roomId);
+  if (!cleanRoomId) {
+    return res.status(400).json({ ok: false, error: "C\xF3digo de sala inv\xE1lido.", code: "INVALID_ROOM_CODE" });
+  }
+  let room = activeRooms.get(cleanRoomId);
+  const now = Date.now();
+  if (!room) {
+    const dbRes = await fetchRoomFromDb(cleanRoomId);
+    if (dbRes?.room && !dbRes.isClosed && !dbRes.isExpired) {
+      room = dbRes.room;
+      activeRooms.set(cleanRoomId, room);
+    }
+  }
+  if (!room || now - room.updatedAt > ROOM_TIMEOUT_MS) {
     return res.status(404).json({
       ok: false,
-      error: "Sala n\xE3o encontrada ou encerrada."
+      error: "Sala n\xE3o encontrada ou encerrada.",
+      code: "ROOM_NOT_FOUND"
     });
   }
   const { peerId, nickname, isHost, status } = req.body || {};
-  const now = Date.now();
   if (isHost || peerId === room.hostPeerId) {
     room.updatedAt = now;
   }
@@ -19385,6 +19698,8 @@ watchPartyRouter.post("/room/:roomId/heartbeat", (req, res) => {
       lastSeen: now
     });
   }
+  syncRoomToDb(room, 0).catch(() => {
+  });
   res.json({
     ok: true,
     room: {
@@ -19398,16 +19713,19 @@ watchPartyRouter.post("/room/:roomId/heartbeat", (req, res) => {
     }
   });
 });
-watchPartyRouter.post("/room/:roomId/signal", (req, res) => {
-  const roomId = req.params.roomId;
+watchPartyRouter.post("/room/:roomId/signal", async (req, res) => {
+  const cleanRoomId = sanitizeRoomId(req.params.roomId);
+  if (!cleanRoomId) {
+    return res.status(400).json({ ok: false, error: "C\xF3digo de sala inv\xE1lido.", code: "INVALID_ROOM_CODE" });
+  }
   const { senderPeerId, targetPeerId, type, data } = req.body || {};
   if (!senderPeerId || !type) {
     return res.status(400).json({ ok: false, error: "senderPeerId e type s\xE3o obrigat\xF3rios." });
   }
-  let signals = roomSignals.get(roomId);
+  let signals = roomSignals.get(cleanRoomId);
   if (!signals) {
     signals = [];
-    roomSignals.set(roomId, signals);
+    roomSignals.set(cleanRoomId, signals);
   }
   const sig = {
     id: `sig_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -19419,8 +19737,20 @@ watchPartyRouter.post("/room/:roomId/signal", (req, res) => {
   };
   signals.push(sig);
   if (signals.length > 100) signals.shift();
-  const room = activeRooms.get(roomId);
+  syncSignalToDb(cleanRoomId, sig).catch(() => {
+  });
+  let room = activeRooms.get(cleanRoomId);
+  if (!room) {
+    const dbRes = await fetchRoomFromDb(cleanRoomId);
+    if (dbRes?.room) {
+      room = dbRes.room;
+      activeRooms.set(cleanRoomId, room);
+    }
+  }
   if (room && type === "join") {
+    if (!room.participants.has(senderPeerId) && room.participants.size >= 6) {
+      return res.status(403).json({ ok: false, error: "A sala atingiu o limite m\xE1ximo de 6 participantes.", code: "ROOM_FULL" });
+    }
     room.participants.set(senderPeerId, {
       peerId: senderPeerId,
       nickname: data?.nickname || "Convidado",
@@ -19428,25 +19758,42 @@ watchPartyRouter.post("/room/:roomId/signal", (req, res) => {
       status: "ready",
       lastSeen: Date.now()
     });
+    syncRoomToDb(room, 0).catch(() => {
+    });
   }
   res.json({ ok: true, id: sig.id });
 });
-watchPartyRouter.get("/room/:roomId/signals/:peerId", (req, res) => {
-  const { roomId, peerId } = req.params;
+watchPartyRouter.get("/room/:roomId/signals/:peerId", async (req, res) => {
+  const cleanRoomId = sanitizeRoomId(req.params.roomId);
+  const peerId = req.params.peerId;
   const since = Number(req.query.since) || 0;
-  const signals = roomSignals.get(roomId) || [];
-  const filtered = signals.filter(
-    (s) => s.timestamp > since && s.senderPeerId !== peerId && (!s.targetPeerId || s.targetPeerId === peerId)
-  );
-  res.json({ ok: true, signals: filtered, now: Date.now() });
+  const memSignals = roomSignals.get(cleanRoomId) || [];
+  let dbSignals = [];
+  const db = getDatabase();
+  if (db) {
+    dbSignals = await fetchSignalsFromDb(cleanRoomId, peerId, since);
+  }
+  const signalMap = /* @__PURE__ */ new Map();
+  for (const s of memSignals) {
+    if (s.timestamp > since && s.senderPeerId !== peerId && (!s.targetPeerId || s.targetPeerId === peerId)) {
+      signalMap.set(s.id, s);
+    }
+  }
+  for (const s of dbSignals) {
+    signalMap.set(s.id, s);
+  }
+  const combined = Array.from(signalMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+  res.json({ ok: true, signals: combined, now: Date.now() });
 });
-watchPartyRouter.delete("/room/:roomId", (req, res) => {
-  const roomId = req.params.roomId;
+watchPartyRouter.delete("/room/:roomId", async (req, res) => {
+  const cleanRoomId = sanitizeRoomId(req.params.roomId);
   const { peerId } = req.body || req.query || {};
-  const room = activeRooms.get(roomId);
-  if (room && (!peerId || peerId === room.hostPeerId)) {
-    activeRooms.delete(roomId);
-    roomSignals.delete(roomId);
+  const room = activeRooms.get(cleanRoomId);
+  if (cleanRoomId && (!peerId || !room || peerId === room.hostPeerId)) {
+    closedRooms.add(cleanRoomId);
+    activeRooms.delete(cleanRoomId);
+    roomSignals.delete(cleanRoomId);
+    await markRoomClosedInDb(cleanRoomId);
   }
   res.json({ ok: true });
 });

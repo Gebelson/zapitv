@@ -111,6 +111,54 @@ export class WatchPartyService {
   }
 
   /**
+   * Normaliza, decodifica e sanitiza identificadores e links de sala.
+   * Remove sufixos como %5B, colchetes markdown, query parameters, hashes e pontuações espúrias.
+   */
+  public static sanitizeRoomId(raw: string): string {
+    if (!raw || typeof raw !== 'string') return '';
+    let str = raw.trim();
+
+    // 1. Decodificação recursiva de URI (resolve %5B -> [, %255B -> %5B -> [, %20 -> espaço, etc.)
+    for (let i = 0; i < 3; i++) {
+      try {
+        const decoded = decodeURIComponent(str);
+        if (decoded === str) break;
+        str = decoded;
+      } catch {
+        break;
+      }
+    }
+
+    // 2. Extração de caminhos /sala/ ou parâmetros ?sala=
+    if (str.includes('/sala/')) {
+      const parts = str.split('/sala/');
+      str = parts[parts.length - 1];
+    } else if (str.includes('sala=')) {
+      const match = str.match(/sala=([^&#\s]+)/);
+      if (match && match[1]) {
+        str = match[1];
+      }
+    }
+
+    // 3. Remove query strings, hashes e fragmentos de URL
+    str = str.split('?')[0].split('#')[0].trim();
+
+    // 4. Se contiver o padrão canônico zapi-..., isola a chave exata
+    // Ex: "[zapi-1234-abcd%5B]" ou "https://.../sala/zapi-1234-abcd[" -> "zapi-1234-abcd"
+    const canonicalMatch = str.match(/(zapi-[a-zA-Z0-9_-]+)/i);
+    if (canonicalMatch && canonicalMatch[1]) {
+      return canonicalMatch[1].replace(/[^a-zA-Z0-9]+$/, '').toLowerCase();
+    }
+
+    // 5. Fallback para códigos personalizados:
+    // Remove colchetes, parênteses, aspas, barras e caracteres de pontuação ao redor
+    str = str.replace(/^[\[\(\{<"'\s]+|[\]\)\}>"'\s,\.;:]+$/g, '');
+    str = str.replace(/[^a-zA-Z0-9_-]/g, '');
+
+    return str.toLowerCase();
+  }
+
+  /**
    * Gera um código de sala aleatório de alta entropia
    */
   public generateSecureRoomId(): string {
@@ -259,8 +307,10 @@ export class WatchPartyService {
     }
 
     const media = WatchPartyService.normalizeMedia(rawMedia);
-    const roomId = customRoomId || this.generateSecureRoomId();
+    const roomId = customRoomId ? WatchPartyService.sanitizeRoomId(customRoomId) : this.generateSecureRoomId();
     this.localNickname = (nickname || 'Anfitrião').trim().slice(0, 24);
+
+    console.log(`[WatchParty][ROOM_CREATE] Criando sala ${roomId} (modo: ${transmissionMode})`);
 
     this.lifecycleState = 'LOBBY';
     this.permissions = {
@@ -305,6 +355,7 @@ export class WatchPartyService {
 
     // Registra a presença da sala no servidor
     try {
+      console.log(`[WatchParty][ROOM_REGISTER] Registrando sala ${roomId} no servidor`);
       await fetch('/api/watchparty/room/announce', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -333,10 +384,13 @@ export class WatchPartyService {
     nickname: string,
     fallbackMedia?: WatchPartyMediaMetadata
   ): Promise<string> {
-    const cleanRoomId = roomId.trim();
+    const cleanRoomId = WatchPartyService.sanitizeRoomId(roomId);
     if (!cleanRoomId) {
-      throw new Error('Código de sala inválido.');
+      console.error('[WatchParty][ROOM_LOOKUP] Código de sala inválido após sanitização:', roomId);
+      throw new Error('Código de sala inválido. Verifique o link ou código informado.');
     }
+
+    console.log(`[WatchParty][ROOM_LOOKUP] Consultando sala autoritativa no servidor: ${cleanRoomId} (original: ${roomId})`);
 
     this.localNickname = (nickname || 'Amigo').trim().slice(0, 24);
     this.transport.isHost = false;
@@ -352,20 +406,33 @@ export class WatchPartyService {
     let serverRoom: any = null;
     try {
       const res = await fetch(`/api/watchparty/room/${encodeURIComponent(cleanRoomId)}`);
-      if (res.status === 404) {
-        throw new Error('Sala não encontrada ou encerrada pelo anfitrião. Verifique o link e tente novamente.');
-      }
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.ok && data?.room) {
-          serverRoom = data.room;
+      if (!res.ok) {
+        let errJson: any = null;
+        try { errJson = await res.json(); } catch {}
+        const code = errJson?.code;
+        const msg = errJson?.error;
+        console.warn(`[WatchParty][ROOM_LOOKUP] Resposta de erro do servidor: status ${res.status}, code: ${code}, msg: ${msg}`);
+        if (code === 'ROOM_CLOSED') {
+          throw new Error('Esta sala foi encerrada pelo anfitrião.');
+        } else if (code === 'HOST_DISCONNECTED') {
+          throw new Error('A sala expirou ou o anfitrião se desconectou.');
+        } else if (code === 'ROOM_FULL') {
+          throw new Error('A sala atingiu o limite máximo de 6 participantes.');
+        } else if (code === 'INVALID_ROOM_CODE') {
+          throw new Error('Código de sala inválido. Verifique o link ou código informado.');
+        } else if (res.status === 404) {
+          throw new Error('Sala não encontrada ou encerrada pelo anfitrião. Verifique o link e tente novamente.');
+        } else {
+          throw new Error(msg || 'Não foi possível conectar à sala. Tente novamente.');
         }
       }
-    } catch (err: any) {
-      if (err.message?.includes('não encontrada')) {
-        throw err;
+      const data = await res.json();
+      if (data?.ok && data?.room) {
+        serverRoom = data.room;
       }
-      console.warn('[WatchPartyService] Aviso: consulta ao servidor falhou, tentando P2P direto:', err);
+    } catch (err: any) {
+      console.warn('[WatchParty][ROOM_LOOKUP] Falha ao consultar sala no servidor:', err.message);
+      throw err;
     }
 
     // Se o servidor retornou os dados da sala, usamos a mídia real, o anfitrião real e o modo real
@@ -458,9 +525,11 @@ export class WatchPartyService {
     });
 
     // 2. Conecta ao transporte P2P
+    console.log(`[WatchParty][PEER_DISCOVERY] Conectando ao transporte P2P para a sala: ${cleanRoomId}`);
     await this.connectTransport(cleanRoomId, false);
 
     // 3. Notifica presença e solicita handshake no servidor e P2P
+    console.log(`[WatchParty][ROOM_JOIN] Enviando handshake de entrada para a sala: ${cleanRoomId}`);
     try {
       await fetch(`/api/watchparty/room/${encodeURIComponent(cleanRoomId)}/signal`, {
         method: 'POST',
@@ -644,6 +713,7 @@ export class WatchPartyService {
     if (sig.type === 'join' && this.transport.isHost && this.currentRoom) {
       const peerId = sig.senderPeerId;
       const nickname = sig.data?.nickname || 'Convidado';
+      console.log(`[WatchParty][JOIN_ACK] Peer registrado na sala via sinalização HTTP: ${nickname} (${peerId})`);
       if (!this.participants.has(peerId)) {
         this.participants.set(peerId, {
           peerId,
@@ -676,6 +746,7 @@ export class WatchPartyService {
       }).catch(() => {});
     } else if (sig.type === 'announce' && !this.transport.isHost) {
       const roomInfo = sig.data?.roomInfo;
+      console.log('[WatchParty][STATE_SYNC] Sincronização de estado da sala recebida via sinalização HTTP:', sig.senderPeerId);
       if (roomInfo && this.currentRoom) {
         this.currentRoom = {
           ...this.currentRoom,
@@ -718,6 +789,7 @@ export class WatchPartyService {
   private async connectTransport(roomId: string, isHost: boolean, initialInfo?: WatchPartyRoomInfo): Promise<void> {
     await this.transport.joinRoom(roomId, {
       onPeerJoin: (peerId) => {
+        console.log(`[WatchParty][JOIN_ACK] Peer conectado à sala via WebRTC P2P: ${peerId}`);
         if (this.participants.size >= 6) {
           console.warn('[WatchParty] Limite de 6 participantes atingido.');
         }
@@ -941,6 +1013,7 @@ export class WatchPartyService {
 
       onRoomAnnouncement: (announcement, senderId) => {
         if (!this.transport.isHost && announcement.roomInfo) {
+          console.log(`[WatchParty][STATE_SYNC] Sincronização de estado da sala recebida do host via P2P: ${senderId}`);
           const rawInfo = announcement.roomInfo;
           const media = WatchPartyService.normalizeMedia(rawInfo.media);
 
@@ -2455,7 +2528,7 @@ export class WatchPartyService {
    * Constrói a URL canônica compartilhável do convite sem depender de localhost
    */
   public getInviteUrl(roomId?: string): string {
-    const targetId = roomId || this.currentRoom?.roomId;
+    const targetId = WatchPartyService.sanitizeRoomId(roomId || this.currentRoom?.roomId || '');
     if (!targetId) return '';
     
     let origin = 'https://zapitv-stream.vercel.app';

@@ -40,6 +40,7 @@ import { bannedContentRegistry } from './src/core/catalog/BannedContentRegistry'
 import { catalogSnapshotManager } from './src/core/catalog/CatalogSnapshotManager';
 import { heroCarouselStore } from './src/core/catalog/heroCarouselStore';
 import { fetchHeroCarousel, fetchSectionTitles, saveHeroCarousel, saveSectionTitles } from './src/core/admin/globalSettingsClient';
+import { WatchPartyService } from './src/core/watchparty/WatchPartyService';
 
 const ProfileView = React.lazy(() => import('./components/ProfileView'));
 const AdminView = React.lazy(() => import('./components/AdminView'));
@@ -175,7 +176,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   // Estado para Watch Party direta via URL /sala/:roomId ou ?sala=...
   const [directPartyEpisode, setDirectPartyEpisode] = useState<{ season?: number; episode?: number } | null>(null);
-  const watchPartyRoomId = matchWatchParty?.params.roomId || searchParams.get('sala') || null;
+  const rawWatchPartyParam = matchWatchParty?.params.roomId || searchParams.get('sala') || null;
+  const watchPartyRoomId = rawWatchPartyParam ? WatchPartyService.sanitizeRoomId(rawWatchPartyParam) : null;
   const [showDirectWatchPartyModal, setShowDirectWatchPartyModal] = useState<boolean>(Boolean(watchPartyRoomId));
 
   useEffect(() => {

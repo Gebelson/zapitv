@@ -103,11 +103,12 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
 
   useEffect(() => {
     if (initialRoomId) {
-      setJoinInput(initialRoomId);
+      const clean = WatchPartyService.sanitizeRoomId(initialRoomId);
+      setJoinInput(clean);
       setMode('join');
       if (!hasAutoJoinedRef.current && !watchPartyService.isConnected && !isJoining) {
         hasAutoJoinedRef.current = true;
-        handleJoinRoom(initialRoomId);
+        handleJoinRoom(clean);
       }
     }
   }, [initialRoomId]);
@@ -218,16 +219,7 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
   }) : null);
 
   const extractRoomId = (input: string): string => {
-    const trimmed = input.trim();
-    if (trimmed.includes('/sala/')) {
-      const parts = trimmed.split('/sala/');
-      return parts[parts.length - 1].split('?')[0].split('#')[0].trim();
-    }
-    if (trimmed.includes('sala=')) {
-      const match = trimmed.match(/sala=([a-zA-Z0-9_-]+)/);
-      if (match && match[1]) return match[1];
-    }
-    return trimmed;
+    return WatchPartyService.sanitizeRoomId(input);
   };
 
   const handleCopyLink = async () => {
@@ -303,6 +295,8 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
       setErrorMessage('Informe o código ou link completo da sala.');
       return;
     }
+
+    setJoinInput(cleanRoomId);
 
     uiSoundService.prime();
     try {
@@ -479,24 +473,23 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
                     <span>Não foi possível conectar à sala</span>
                   </div>
                   <span>{errorMessage}</span>
-                  {initialRoomId && (
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => handleJoinRoom(initialRoomId)}
-                        className="px-3.5 py-1.5 bg-red-600/30 hover:bg-red-600/50 border border-red-500/40 rounded-xl text-white font-bold transition-all cursor-pointer"
-                      >
-                        Tentar Novamente
-                      </button>
-                      <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-gray-300 font-bold transition-all cursor-pointer"
-                      >
-                        Fechar
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleJoinRoom(joinInput || initialRoomId)}
+                      className="px-3.5 py-1.5 bg-red-600/30 hover:bg-red-600/50 border border-red-500/40 rounded-xl text-white font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Tentar Novamente</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-gray-300 font-bold transition-all cursor-pointer"
+                    >
+                      Fechar
+                    </button>
+                  </div>
                 </div>
               )}
 
