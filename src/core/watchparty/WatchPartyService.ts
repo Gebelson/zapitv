@@ -68,8 +68,8 @@ export class WatchPartyService {
   private localScreenStream: MediaStream | null = null;
   private remoteScreenStream: MediaStream | null = null;
   private screenSharedPeers: Set<string> = new Set();
-  private hostBroadcastCaptureMethod: 'captureStream' | 'getDisplayMedia' | null = null;
   private remoteAudioElements: Map<string, HTMLAudioElement> = new Map();
+  private remoteVadIntervals: Map<string, any> = new Map();
   private audioContext: AudioContext | null = null;
   private localAnalyser: AnalyserNode | null = null;
   private remoteAnalysers: Map<string, AnalyserNode> = new Map();
@@ -78,6 +78,25 @@ export class WatchPartyService {
   private vadInterval: any = null;
   private speakingDecayTimers: Map<string, any> = new Map();
   private isSpeakingLocal: boolean = false;
+
+  private getOrCreateAudioContainer(): HTMLElement | null {
+    if (typeof document === 'undefined') return null;
+    let container = document.getElementById('zapitv-watchparty-audio-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'zapitv-watchparty-audio-container';
+      container.style.position = 'fixed';
+      container.style.left = '-9999px';
+      container.style.top = '-9999px';
+      container.style.width = '0';
+      container.style.height = '0';
+      container.style.opacity = '0';
+      container.style.pointerEvents = 'none';
+      container.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(container);
+    }
+    return container;
+  }
 
   private constructor(transport?: IWatchPartyTransport) {
     this.transport = transport || new TrysteroTransport();
@@ -608,8 +627,8 @@ export class WatchPartyService {
       } catch {}
     };
 
-    setTimeout(doHeartbeatAndSignals, 400);
-    this.heartbeatInterval = setInterval(doHeartbeatAndSignals, 3000);
+    setTimeout(doHeartbeatAndSignals, 300);
+    this.heartbeatInterval = setInterval(doHeartbeatAndSignals, 1000);
   }
 
   private stopHeartbeatLoop(): void {
@@ -687,6 +706,8 @@ export class WatchPartyService {
         this.notify('participants_updated', this.getParticipantList());
         this.notify('state_changed', this.getRoomState());
       }
+    } else if (sig.type === 'chat' && sig.data?.message) {
+      this.handleIncomingChatMessage(sig.data.message, sig.senderPeerId || sig.data.message.senderId);
     }
   }
 
@@ -732,7 +753,7 @@ export class WatchPartyService {
 
         // Se o microfone local já estiver ativo, compartilha a stream de áudio com o novo peer
         if (this.localAudioStream && this.transport.addLocalAudioStream) {
-          this.transport.addLocalAudioStream(this.localAudioStream);
+          this.transport.addLocalAudioStream(this.localAudioStream, peerId);
         }
         if (this.localScreenStream && this.transport.addLocalMediaStream && !this.screenSharedPeers.has(peerId)) {
           this.transport.addLocalMediaStream(this.localScreenStream, peerId);
@@ -779,7 +800,12 @@ export class WatchPartyService {
         if (audio) {
           audio.pause();
           audio.srcObject = null;
+          audio.remove();
           this.remoteAudioElements.delete(peerId);
+        }
+        if (this.remoteVadIntervals.has(peerId)) {
+          clearInterval(this.remoteVadIntervals.get(peerId));
+          this.remoteVadIntervals.delete(peerId);
         }
         this.remoteAnalysers.delete(peerId);
         if (this.speakingDecayTimers.has(peerId)) {
@@ -891,27 +917,7 @@ export class WatchPartyService {
       },
 
       onChatMessage: (message, senderId) => {
-        if (!message || typeof message.text !== 'string' || !message.text.trim() ||
-            this.chatMessages.some(existing => existing.id === message.id)) return;
-        const sender = this.participants.get(senderId);
-        if (!this.permissions.allowChat && !sender?.isHost) {
-          return;
-        }
-
-        const cleanMsg: WatchPartyChatMessage = {
-          id: message.id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          senderId,
-          senderNickname: String(sender?.nickname || message.senderNickname || 'Convidado').slice(0, 24),
-          isHost: Boolean(sender?.isHost),
-          text: message.text.trim().slice(0, 280),
-          timestamp: message.timestamp || Date.now()
-        };
-
-        this.chatMessages.push(cleanMsg);
-        if (this.chatMessages.length > 200) {
-          this.chatMessages.shift();
-        }
-        this.notify('chat_message', cleanMsg);
+        this.handleIncomingChatMessage(message, senderId);
       },
 
       onEpisodeChange: (change, senderId) => {
@@ -1382,8 +1388,73 @@ export class WatchPartyService {
       this.chatMessages.shift();
     }
 
+    // Camada 1: Transmissão direta P2P WebRTC
     this.transport.sendChatMessage(message);
+
+    // Camada 2: Fallback resiliente HTTP signaling
+    if (this.currentRoom?.roomId) {
+      fetch(`/api/watchparty/room/${encodeURIComponent(this.currentRoom.roomId)}/signal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderPeerId: this.transport.selfId,
+          type: 'chat',
+          data: { message }
+        })
+      }).catch(err => console.warn('[WatchParty] Falha ao enviar sinal de chat fallback:', err));
+    }
+
     this.notify('chat_message', message);
+  }
+
+  private handleIncomingChatMessage(message: WatchPartyChatMessage, senderId: string): void {
+    if (!message || typeof message.text !== 'string' || !message.text.trim()) return;
+
+    // Deduplicação estrita: se a mensagem já foi recebida via P2P ou via Fallback, ignora
+    if (this.chatMessages.some(existing => existing.id === message.id)) return;
+
+    const sender = this.participants.get(senderId);
+    const isFromHost = Boolean(
+      sender?.isHost || 
+      message.isHost || 
+      (this.currentRoom?.hostPeerId && senderId === this.currentRoom.hostPeerId)
+    );
+
+    if (!this.permissions.allowChat && !isFromHost) {
+      return;
+    }
+
+    const cleanMsg: WatchPartyChatMessage = {
+      id: message.id || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      senderId: senderId || message.senderId,
+      senderNickname: String(sender?.nickname || message.senderNickname || (isFromHost ? 'Anfitrião' : 'Convidado')).slice(0, 24),
+      isHost: isFromHost,
+      text: message.text.trim().slice(0, 280),
+      timestamp: message.timestamp || Date.now()
+    };
+
+    // Se o remetente ainda não estiver no mapa de participantes, adiciona-o
+    if (senderId && !this.participants.has(senderId)) {
+      this.participants.set(senderId, {
+        peerId: senderId,
+        nickname: cleanMsg.senderNickname,
+        isHost: isFromHost,
+        status: 'ready',
+        joinedAt: Date.now(),
+        isAudioMuted: true,
+        isSpeaking: false,
+        audioVolume: 1.0,
+        permissions: this.getParticipantPermissions(senderId)
+      });
+      this.notify('participants_updated', this.getParticipantList());
+      this.notify('state_changed', this.getRoomState());
+    }
+
+    this.chatMessages.push(cleanMsg);
+    if (this.chatMessages.length > 200) {
+      this.chatMessages.shift();
+    }
+    this.notify('chat_message', cleanMsg);
   }
 
   // ==========================================
@@ -1490,8 +1561,11 @@ export class WatchPartyService {
     this.remoteAudioElements.forEach(el => {
       el.pause();
       el.srcObject = null;
+      el.remove();
     });
     this.remoteAudioElements.clear();
+    this.remoteVadIntervals.forEach(t => clearInterval(t));
+    this.remoteVadIntervals.clear();
     this.remoteAnalysers.clear();
 
     const selfP = this.participants.get(this.transport.selfId);
@@ -1619,10 +1693,21 @@ export class WatchPartyService {
 
   private attachRemoteAudio(peerId: string, stream: MediaStream): void {
     let audio = this.remoteAudioElements.get(peerId);
+    if (audio && audio.srcObject === stream) {
+      const vol = this.participantVolumes.get(peerId) ?? 1.0;
+      const isLocallyMuted = this.localMutedPeers.has(peerId);
+      audio.volume = isLocallyMuted ? 0 : vol;
+      audio.muted = isLocallyMuted;
+      if (audio.paused) audio.play().catch(() => {});
+      return;
+    }
+
     if (!audio) {
-      audio = new Audio();
+      audio = document.createElement('audio');
       audio.autoplay = true;
       (audio as any).playsInline = true;
+      const container = this.getOrCreateAudioContainer();
+      if (container) container.appendChild(audio);
       this.remoteAudioElements.set(peerId, audio);
     }
 
@@ -1632,16 +1717,26 @@ export class WatchPartyService {
     audio.volume = isLocallyMuted ? 0 : vol;
     audio.muted = isLocallyMuted;
 
-    audio.play().catch(e => {
-      console.warn('[WatchParty] Áudio remoto aguardando gesto do usuário:', e);
-      const unlockAudio = () => {
-        audio?.play().catch(() => {});
-        document.removeEventListener('click', unlockAudio);
-        document.removeEventListener('keydown', unlockAudio);
-      };
-      document.addEventListener('click', unlockAudio, { once: true });
-      document.addEventListener('keydown', unlockAudio, { once: true });
-    });
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(e => {
+        console.warn('[WatchParty] Áudio remoto aguardando gesto do usuário:', e);
+        const unlockAudio = () => {
+          audio?.play().catch(() => {});
+          document.removeEventListener('click', unlockAudio);
+          document.removeEventListener('keydown', unlockAudio);
+          document.removeEventListener('touchstart', unlockAudio);
+        };
+        document.addEventListener('click', unlockAudio, { once: true });
+        document.addEventListener('keydown', unlockAudio, { once: true });
+        document.addEventListener('touchstart', unlockAudio, { once: true });
+      });
+    }
+
+    if (this.remoteVadIntervals.has(peerId)) {
+      clearInterval(this.remoteVadIntervals.get(peerId));
+      this.remoteVadIntervals.delete(peerId);
+    }
 
     const ctx = this.ensureAudioContext();
     if (ctx) {
@@ -1656,6 +1751,7 @@ export class WatchPartyService {
         const remoteVad = setInterval(() => {
           if (!this.remoteAudioElements.has(peerId)) {
             clearInterval(remoteVad);
+            this.remoteVadIntervals.delete(peerId);
             return;
           }
           analyser.getByteFrequencyData(buf);
@@ -1683,10 +1779,24 @@ export class WatchPartyService {
             this.speakingDecayTimers.set(peerId, timer);
           }
         }, 100);
+
+        this.remoteVadIntervals.set(peerId, remoteVad);
       } catch (e) {
         console.warn('[WatchParty] Falha ao iniciar VAD remoto:', e);
       }
     }
+  }
+
+  public unlockRemoteAudio(): void {
+    const ctx = this.ensureAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    this.remoteAudioElements.forEach(audio => {
+      if (audio.paused && audio.srcObject) {
+        audio.play().catch(() => {});
+      }
+    });
   }
 
   public setParticipantAudioVolume(peerId: string, volume: number): void {

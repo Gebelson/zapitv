@@ -128,7 +128,7 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
     });
 
     const unsubChat = watchPartyService.onChatMessage((msg) => {
-      setMessages(prev => [...prev, msg]);
+      setMessages(prev => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]));
       if (msg.senderId !== watchPartyService.selfId) uiSoundService.play('message');
     });
 
@@ -187,12 +187,19 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
 
   useEffect(() => {
     if (activeTab === 'chat') {
+      setMessages(watchPartyService.getChatHistory());
       const timer = setTimeout(() => {
         scrollChatToBottom('instant');
       }, 30);
       return () => clearTimeout(timer);
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setMessages(watchPartyService.getChatHistory());
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (activeTab === 'chat' && messages.length > 0) {
@@ -352,10 +359,12 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
     const trimmed = chatInput.trim();
     if (!trimmed) return;
     watchPartyService.sendChatMessage(trimmed);
+    watchPartyService.unlockRemoteAudio();
     setChatInput('');
   };
 
   const handleToggleVoice = async () => {
+    watchPartyService.unlockRemoteAudio();
     try {
       if (!isVoiceActive) {
         const success = await watchPartyService.startVoiceChat();
@@ -885,24 +894,32 @@ export const WatchPartyModal: React.FC<WatchPartyModalProps> = ({
                         Nenhuma mensagem ainda. Diga oi para o grupo!
                       </div>
                     ) : (
-                      messages.map((m) => (
-                        <div key={m.id} className="text-xs">
-                          <div className="flex items-baseline gap-1.5">
-                            <span className={`font-bold ${m.isHost ? 'text-amber-400' : 'text-cyan-400'}`}>
-                              {m.senderNickname}
-                            </span>
-                            {m.isHost && (
-                              <span className="text-[9px] uppercase px-1 bg-amber-500/20 text-amber-300 rounded font-black">
-                                Host
+                      messages.map((m) => {
+                        const isSelf = m.senderId === roomState.localParticipant.id || m.senderId === (roomState.localParticipant as any).peerId;
+                        return (
+                          <div key={m.id} className="text-xs">
+                            <div className="flex items-baseline gap-1.5">
+                              <span className={`font-bold ${m.isHost ? 'text-amber-400' : isSelf ? 'text-emerald-400' : 'text-cyan-400'}`}>
+                                {m.senderNickname}
                               </span>
-                            )}
-                            <span className="text-[9px] text-gray-500">
-                              {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
+                              {isSelf && (
+                                <span className="text-[9px] px-1 bg-emerald-500/20 text-emerald-300 rounded font-semibold">
+                                  Você
+                                </span>
+                              )}
+                              {m.isHost && (
+                                <span className="text-[9px] uppercase px-1 bg-amber-500/20 text-amber-300 rounded font-black">
+                                  Host
+                                </span>
+                              )}
+                              <span className="text-[9px] text-gray-500">
+                                {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="text-gray-200 mt-0.5 break-words">{m.text}</p>
                           </div>
-                          <p className="text-gray-200 mt-0.5 break-words">{m.text}</p>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
 

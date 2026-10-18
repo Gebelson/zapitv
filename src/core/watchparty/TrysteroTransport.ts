@@ -238,9 +238,9 @@ export class TrysteroTransport implements IWatchPartyTransport {
     }
   }
 
-  public addLocalAudioStream(stream: MediaStream): void {
+  public addLocalAudioStream(stream: MediaStream, targetPeerId?: string): void {
     if (this.room) {
-      this.room.addStream(stream);
+      this.room.addStream(stream, targetPeerId ? { target: targetPeerId } : undefined);
     }
   }
 
@@ -288,8 +288,9 @@ export class TrysteroTransport implements IWatchPartyTransport {
       if ('onMessage' in rawAction) {
         // Trystero 0.26 passes { peerId } as message context. onReceive is only
         // an admission hook for incoming transfers, not the message handler.
-        rawAction.onMessage = (data: T, context: { peerId: string }) => {
-          if (typeof context?.peerId === 'string') onReceiveCallback(data, context.peerId);
+        rawAction.onMessage = (data: T, context: any) => {
+          const peerId = typeof context === 'string' ? context : (context?.peerId || (data as any)?.senderId || '');
+          if (peerId) onReceiveCallback(data, peerId);
         };
       }
       if (typeof rawAction.send === 'function') {

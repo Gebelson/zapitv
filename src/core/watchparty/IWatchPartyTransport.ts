@@ -59,7 +59,7 @@ export interface IWatchPartyTransport {
   sendRemoteControlRequest?(targetHostId: string, request: PeerRemoteControlRequestMessage): void;
   
   // Áudio / WebRTC de Voz Opcional
-  addLocalAudioStream?(stream: MediaStream): void;
+  addLocalAudioStream?(stream: MediaStream, targetPeerId?: string): void;
   removeLocalAudioStream?(stream: MediaStream): void;
   addLocalMediaStream?(stream: MediaStream, targetPeerId?: string): void;
   removeLocalMediaStream?(stream: MediaStream): void;

@@ -65,7 +65,7 @@ export const WatchPartyOverlay: React.FC<WatchPartyOverlayProps> = ({
     });
 
     const unsubscribeChat = watchPartyService.onChatMessage((msg) => {
-      setMessages(prev => [...prev, msg]);
+      setMessages(prev => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]));
       if (msg.senderId !== watchPartyService.selfId) uiSoundService.play('message');
       if (!isChatOpen) {
         setUnreadCount(prev => prev + 1);
@@ -110,6 +110,7 @@ export const WatchPartyOverlay: React.FC<WatchPartyOverlayProps> = ({
 
   useEffect(() => {
     if (isChatOpen) {
+      setMessages(watchPartyService.getChatHistory());
       setUnreadCount(0);
       scrollChatToBottom('smooth');
     }
@@ -151,10 +152,12 @@ export const WatchPartyOverlay: React.FC<WatchPartyOverlayProps> = ({
     const trimmed = chatInput.trim();
     if (!trimmed) return;
     watchPartyService.sendChatMessage(trimmed);
+    watchPartyService.unlockRemoteAudio();
     setChatInput('');
   };
 
   const handleToggleVoice = async () => {
+    watchPartyService.unlockRemoteAudio();
     try {
       if (!isVoiceActive) {
         const success = await watchPartyService.startVoiceChat();
