@@ -6,6 +6,7 @@ import { prioritizeRememberedSources, sourceReference } from '../src/core/provid
 import { sourceSelectionService } from '../src/core/selection/sourceSelectionService';
 import { sourceVerificationService } from '../src/core/providers/sourceVerificationService';
 import { providerRegistry } from '../src/core/providers/providerRegistry';
+import { streamValidator } from '../src/core/providers/streamValidator';
 
 const torrent: StremioStream = {
   name: 'Fonte local', title: 'Obra S01E01 Dublado PT-BR',
@@ -25,6 +26,17 @@ assert.equal(prioritizeRememberedSources(
   [{ ...torrent, _smartPriority: 1 } as StremioStream, { ...web, _smartPriority: 3 } as StremioStream],
   [{ providerId: torrent.providerId!, sourceRef: sourceReference(torrent), score: 100, trusted: true, audioLanguage: 'pt-BR', quality: null }],
 )[0].url, web.url);
+
+const episodeOne = { season: 1, episode: 1 };
+const declared = (title: string): StremioStream => ({
+  name: 'Fonte HLS', title: `🐦‍🔥 ${title}\n⏸️ T01 EP01`,
+  url: 'https://media.example.test/episode.m3u8', sourceType: 'hls',
+});
+assert.equal(streamValidator.isStreamMatchingTargetTitle(declared('A Casa do Dragão'), 'House of the Dragon', 'House of the Dragon', [], episodeOne), true);
+assert.equal(streamValidator.isStreamMatchingTargetTitle(declared('Game of Thrones'), 'House of the Dragon', 'House of the Dragon', [], episodeOne), false);
+assert.equal(streamValidator.isStreamMatchingTargetTitle(declared('Mushoku Tensei: Jobless Reincarnation: Mushoku Tensei III: Isekai Ittara Honki Dasu'), 'Mushoku Tensei: Jobless Reincarnation', undefined, [], episodeOne), false);
+assert.equal(streamValidator.isStreamMatchingTargetTitle(declared('Mushoku Tensei: Jobless Reincarnation'), 'Mushoku Tensei: Jobless Reincarnation', undefined, [], episodeOne), true);
+assert.equal(streamValidator.isStreamMatchingTargetTitle({ ...declared('Mushoku Tensei: Jobless Reincarnation'), title: '🐦‍🔥 Mushoku Tensei: Jobless Reincarnation\n🐉 Malfoy' }, 'Mushoku Tensei: Jobless Reincarnation', undefined, [], episodeOne), false);
 
 const item: ContentItem = {
   id: 'series-obra', title: 'Obra', type: ContentType.SERIES, mediaFormat: 'series',

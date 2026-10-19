@@ -1089,7 +1089,8 @@ function formatContentItem(raw, forcedType) {
 function formatCinemetaItem(raw) {
   const isMovie = raw.type === "movie";
   const type = isMovie ? "FILME" /* MOVIE */ : "S\xC9RIE" /* SERIES */;
-  const yearNum = Number(raw.releaseInfo || raw.year || 2024);
+  const yearText = [raw.releaseInfo, raw.year].map((value) => String(value || "").match(/\b(?:18|19|20|21)\d{2}\b/)?.[0]).find(Boolean);
+  const yearNum = yearText ? Number(yearText) : 0;
   const ratingNum = raw.imdbRating ? parseFloat(raw.imdbRating) : 8;
   const rawGenres = raw.genres && raw.genres.length > 0 ? [...raw.genres] : ["Geral"];
   const isAdult = rawGenres.some((g) => {
@@ -1109,7 +1110,7 @@ function formatCinemetaItem(raw) {
     type,
     mediaFormat: isMovie ? "movie" : "series",
     rating: isNaN(ratingNum) ? 8 : ratingNum,
-    year: isNaN(yearNum) ? 2024 : yearNum,
+    year: yearNum,
     image: poster,
     backdrop,
     description: raw.description || "Dispon\xEDvel no cat\xE1logo oficial do Stremio / Cinemeta.",
@@ -4277,7 +4278,7 @@ var init_streamValidator = __esm({
        * Verifica se o stream realmente corresponde ao título do conteúdo requisitado,
        * prevenindo que animes/séries sejam trocados por conteúdos corrompidos em addons de terceiros.
        */
-      isStreamMatchingTargetTitle(stream, targetTitle, originalTitle, alternateTitles) {
+      isStreamMatchingTargetTitle(stream, targetTitle, originalTitle, alternateTitles, episodeParams) {
         const sTitle = (stream.title || stream.description || "").trim();
         const sName = (stream.name || "").trim();
         const sUrl = (stream.url || "").trim();
@@ -4326,6 +4327,9 @@ var init_streamValidator = __esm({
         }
         const rawCandidates = [targetTitle, originalTitle, ...alternateTitles || []].filter((t) => Boolean(t && t.trim()));
         if (rawCandidates.length === 0) return true;
+        if (episodeParams?.season === 1 && rawCandidates.some((title) => /mushoku tensei/i.test(title)) && /\bmushoku tensei\s+iii\b/i.test(sTitle)) {
+          return false;
+        }
         for (const rule of KNOWN_UPSTREAM_MISMATCHES) {
           if (rawCandidates.some((cand) => rule.targetPattern.test(cand))) {
             if (rule.rejectStream(stream)) {
@@ -4342,7 +4346,7 @@ var init_streamValidator = __esm({
         if (fenixMatch) {
           const declaredTitle = normalizeTitle(fenixMatch[1]);
           const declaredWords = declaredTitle.split(" ").filter((w) => w.length >= 3);
-          let matchesAny = false;
+          let matchesAny = declaredTitle === "a casa do dragao" && cleanCandidates.includes("house of the dragon");
           for (const cand of cleanCandidates) {
             if (declaredTitle.includes(cand) || cand.includes(declaredTitle)) {
               matchesAny = true;
@@ -4405,12 +4409,12 @@ var init_streamValidator = __esm({
        * Filtra uma lista de streams, eliminando imediatamente fontes de domínios parked/inválidos
        * e streams que pertencem a conteúdos trocados/diferentes do solicitado.
        */
-      filterCleanStreams(streams, targetTitle, originalTitle, alternateTitles) {
+      filterCleanStreams(streams, targetTitle, originalTitle, alternateTitles, episodeParams) {
         return streams.filter((s) => {
           if (!s.url && !s.infoHash) return false;
           if (s.url && this.isUrlBlacklisted(s.url)) return false;
           if (s.url && videoAdBlocker.isStreamBlocked(s.url)) return false;
-          return this.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles);
+          return this.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles, episodeParams);
         });
       }
     };
@@ -11132,7 +11136,7 @@ var init_providerRegistry = __esm({
           }
         }
         if (streams.length > 0) {
-          const cleanLocal = streamValidator.filterCleanStreams(streams, targetTitle, originalTitle);
+          const cleanLocal = streamValidator.filterCleanStreams(streams, targetTitle, originalTitle, alternateTitles, episode);
           const rankedLocal = sourceSelectionService.rankStreams(cleanLocal, {
             hasExternalPtSub: false,
             preferDubbed: true,
@@ -11281,7 +11285,7 @@ var init_providerRegistry = __esm({
                   const s = { ...item, title: sTitle };
                   if (addon.id === "fenixflix-animes" && /🐉\s*Malfoy/i.test(s.title || "")) continue;
                   if (s.ytId || s.url && (s.url.includes("youtube.com") || s.url.includes("youtu.be"))) continue;
-                  if (streamValidator.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles)) {
+                  if (streamValidator.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles, episode)) {
                     return true;
                   }
                 }
@@ -11490,7 +11494,7 @@ var init_providerRegistry = __esm({
               if (Array.isArray(result) && result.length > 0) {
                 collectedFromAddons.push(...result);
                 const combinedInterim = [...streams, ...collectedFromAddons];
-                const cleanInterim = streamValidator.filterCleanStreams(combinedInterim, targetTitle, originalTitle);
+                const cleanInterim = streamValidator.filterCleanStreams(combinedInterim, targetTitle, originalTitle, alternateTitles, episode);
                 if (cleanInterim.length > 0) {
                   const engineOnline = localEngineCache.active;
                   const hasWebReady = cleanInterim.some((s) => !s.isTorrent && !s.url?.includes("127.0.0.1:11470") && !s.url?.includes("localhost:11470") || engineOnline);
@@ -11538,7 +11542,7 @@ var init_providerRegistry = __esm({
                 }
                 if (!options?.isRetryAttempt) {
                   const engineOnline = localEngineCache.active;
-                  const cleanInterim = streamValidator.filterCleanStreams([...streams, ...collectedFromAddons], targetTitle, originalTitle);
+                  const cleanInterim = streamValidator.filterCleanStreams([...streams, ...collectedFromAddons], targetTitle, originalTitle, alternateTitles, episode);
                   const hasFrostStreamFinished = !sortedAddons.some((a) => a.id.includes("froststream")) || collectedFromAddons.some((s) => s.providerId?.includes("froststream"));
                   const culprits = cleanInterim.filter((s) => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
                   const hasWebReadyPtBr = culprits.length > 0;
@@ -11557,7 +11561,7 @@ var init_providerRegistry = __esm({
         mediaLoadingTracker.transition(rawTargetId, "VALIDATING_SOURCES", {
           rawStreamCount: streams.length
         });
-        const cleanStreams = streamValidator.filterCleanStreams(streams, targetTitle, originalTitle).filter((s) => {
+        const cleanStreams = streamValidator.filterCleanStreams(streams, targetTitle, originalTitle, alternateTitles, episode).filter((s) => {
           if (s.ytId) return false;
           const u = (s.url || "").toLowerCase();
           const t = (s.title || "").toLowerCase();
@@ -15923,6 +15927,7 @@ var IMDbWeeklyRankingService = class _IMDbWeeklyRankingService {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
           this.snapshots = parsed;
+          if (this.repairPittSnapshotId()) this.saveSnapshots();
           return;
         }
       } else if (typeof window !== "undefined" && window.localStorage) {
@@ -15931,6 +15936,7 @@ var IMDbWeeklyRankingService = class _IMDbWeeklyRankingService {
           const parsed = JSON.parse(local);
           if (Array.isArray(parsed) && parsed.length > 0) {
             this.snapshots = parsed;
+            if (this.repairPittSnapshotId()) this.saveSnapshots();
             return;
           }
         }
@@ -15939,6 +15945,23 @@ var IMDbWeeklyRankingService = class _IMDbWeeklyRankingService {
       console.warn("[IMDbWeeklyRankingService] Aviso ao ler snapshot:", e);
     }
     this.initDefaultAuthorizedSnapshots();
+  }
+  repairPittSnapshotId() {
+    let changed = false;
+    for (const snapshot of this.snapshots) {
+      if (snapshot.rankType !== "series" || !Array.isArray(snapshot.items)) continue;
+      let hasCorrectPitt = snapshot.items.some((item) => item.imdbId === "tt31938062" && item.mediaType === "series" && [item.title, item.originalTitle].some((title) => title?.trim().toLowerCase() === "the pitt"));
+      snapshot.items = snapshot.items.filter((item) => {
+        const isOldPitt = item.imdbId === "tt31908234" && item.mediaType === "series" && [item.title, item.originalTitle].some((title) => title?.trim().toLowerCase() === "the pitt");
+        if (!isOldPitt) return true;
+        changed = true;
+        if (hasCorrectPitt) return false;
+        item.imdbId = "tt31938062";
+        hasCorrectPitt = true;
+        return true;
+      });
+    }
+    return changed;
   }
   /**
    * Salva os snapshots persistidos em disco (Node.js) e localStorage (se no navegador)
@@ -16353,7 +16376,7 @@ var IMDbWeeklyRankingService = class _IMDbWeeklyRankingService {
         year: 2004
       },
       {
-        imdbId: "tt31908234",
+        imdbId: "tt31938062",
         title: "The Pitt",
         originalTitle: "The Pitt",
         mediaType: "series",

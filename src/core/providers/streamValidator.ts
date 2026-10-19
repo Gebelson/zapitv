@@ -280,7 +280,8 @@ class StreamValidator {
     stream: StremioStream,
     targetTitle?: string,
     originalTitle?: string,
-    alternateTitles?: string[]
+    alternateTitles?: string[],
+    episodeParams?: { season: number; episode: number }
   ): boolean {
     const sTitle = (stream.title || stream.description || '').trim();
     const sName = (stream.name || '').trim();
@@ -354,6 +355,14 @@ class StreamValidator {
 
     if (rawCandidates.length === 0) return true;
 
+    // O addon devolve a terceira temporada sob a consulta da primeira.
+    // O título da obra coincide, mas o episódio solicitado não.
+    if (episodeParams?.season === 1 &&
+        rawCandidates.some(title => /mushoku tensei/i.test(title)) &&
+        /\bmushoku tensei\s+iii\b/i.test(sTitle)) {
+      return false;
+    }
+
     // 2. Aplica regras de bloqueio de desvios conhecidos (ex: Doraemon -> Sparks of Tomorrow)
     for (const rule of KNOWN_UPSTREAM_MISMATCHES) {
       if (rawCandidates.some(cand => rule.targetPattern.test(cand))) {
@@ -382,7 +391,9 @@ class StreamValidator {
       const declaredTitle = normalizeTitle(fenixMatch[1]);
       const declaredWords = declaredTitle.split(' ').filter(w => w.length >= 3);
 
-      let matchesAny = false;
+      // Tradução oficial exata; não aceitar correspondência por palavras vagas.
+      let matchesAny = declaredTitle === 'a casa do dragao' &&
+        cleanCandidates.includes('house of the dragon');
       for (const cand of cleanCandidates) {
         if (declaredTitle.includes(cand) || cand.includes(declaredTitle)) {
           matchesAny = true;
@@ -466,13 +477,14 @@ class StreamValidator {
     streams: StremioStream[],
     targetTitle?: string,
     originalTitle?: string,
-    alternateTitles?: string[]
+    alternateTitles?: string[],
+    episodeParams?: { season: number; episode: number }
   ): StremioStream[] {
     return streams.filter(s => {
       if (!s.url && !s.infoHash) return false;
       if (s.url && this.isUrlBlacklisted(s.url)) return false;
       if (s.url && videoAdBlocker.isStreamBlocked(s.url)) return false;
-      return this.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles);
+      return this.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles, episodeParams);
     });
   }
 }

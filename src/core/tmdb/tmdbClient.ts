@@ -186,7 +186,10 @@ export function formatContentItem(raw: TMDBRawItem, forcedType?: ContentType): C
 export function formatCinemetaItem(raw: CinemetaMetaItem): ContentItem {
   const isMovie = raw.type === 'movie';
   const type = isMovie ? ContentType.MOVIE : ContentType.SERIES;
-  const yearNum = Number(raw.releaseInfo || raw.year || 2024);
+  const yearText = [raw.releaseInfo, raw.year]
+    .map(value => String(value || '').match(/\b(?:18|19|20|21)\d{2}\b/)?.[0])
+    .find(Boolean);
+  const yearNum = yearText ? Number(yearText) : 0;
   const ratingNum = raw.imdbRating ? parseFloat(raw.imdbRating) : 8.0;
 
   const rawGenres = raw.genres && raw.genres.length > 0 ? [...raw.genres] : ['Geral'];
@@ -209,7 +212,7 @@ export function formatCinemetaItem(raw: CinemetaMetaItem): ContentItem {
     type,
     mediaFormat: isMovie ? 'movie' : 'series',
     rating: isNaN(ratingNum) ? 8.0 : ratingNum,
-    year: isNaN(yearNum) ? 2024 : yearNum,
+    year: yearNum,
     image: poster,
     backdrop,
     description: raw.description || 'Disponível no catálogo oficial do Stremio / Cinemeta.',

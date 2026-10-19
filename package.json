@@ -23,10 +23,11 @@
     "test:feedback-persistence": "tsx tests/feedback_persistence.test.ts",
     "test:catalog-release-persistence": "tsx tests/catalog_release_persistence.test.ts",
     "test:catalog-identity": "tsx tests/catalog_identity_collisions.test.ts",
+    "test:cinemeta-identity": "tsx tests/cinemeta_identity_regression.test.ts",
     "test:maintenance-auth": "tsx tests/maintenance_routes_auth.test.ts",
     "test:playback-remote-sync": "tsx tests/playback_remote_sync.test.ts",
     "test:source-playability": "tsx tests/source_playability.test.ts",
-    "test:stability": "npm run test:watchparty-state && npm run test:watchparty-intro && npm run test:watchparty-media && npm run test:playback-remote-sync && npm run test:source-playability && npm run test:feedback-admin && npm run test:feedback-persistence && npm run test:catalog-identity && npm run test:catalog-release-persistence && npm run test:maintenance-auth",
+    "test:stability": "npm run test:watchparty-state && npm run test:watchparty-intro && npm run test:watchparty-media && npm run test:playback-remote-sync && npm run test:source-playability && npm run test:feedback-admin && npm run test:feedback-persistence && npm run test:catalog-identity && npm run test:cinemeta-identity && npm run test:catalog-release-persistence && npm run test:maintenance-auth",
     "start": "node server.ts"
   },
   "dependencies": {

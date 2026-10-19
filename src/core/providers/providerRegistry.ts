@@ -636,7 +636,7 @@ class ProviderRegistryService {
 
     // Se temos fontes locais verificadas (0ms), já ranqueia e emite imediatamente
     if (streams.length > 0) {
-      const cleanLocal = streamValidator.filterCleanStreams(streams, targetTitle, originalTitle);
+      const cleanLocal = streamValidator.filterCleanStreams(streams, targetTitle, originalTitle, alternateTitles, episode);
       const rankedLocal = sourceSelectionService.rankStreams(cleanLocal, {
         hasExternalPtSub: false,
         preferDubbed: true,
@@ -813,7 +813,7 @@ class ProviderRegistryService {
               const s = { ...item, title: sTitle };
               if (addon.id === 'fenixflix-animes' && /🐉\s*Malfoy/i.test(s.title || '')) continue;
               if (s.ytId || (s.url && (s.url.includes('youtube.com') || s.url.includes('youtu.be')))) continue;
-              if (streamValidator.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles)) {
+              if (streamValidator.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles, episode)) {
                 return true;
               }
             }
@@ -1046,7 +1046,7 @@ class ProviderRegistryService {
             collectedFromAddons.push(...result);
             // Emite progresso em tempo real assim que novas fontes forem descobertas
             const combinedInterim = [...streams, ...collectedFromAddons];
-            const cleanInterim = streamValidator.filterCleanStreams(combinedInterim, targetTitle, originalTitle);
+            const cleanInterim = streamValidator.filterCleanStreams(combinedInterim, targetTitle, originalTitle, alternateTitles, episode);
             if (cleanInterim.length > 0) {
               const engineOnline = localEngineCache.active;
               const hasWebReady = cleanInterim.some(s => (!s.isTorrent && !s.url?.includes('127.0.0.1:11470') && !s.url?.includes('localhost:11470')) || engineOnline);
@@ -1100,7 +1100,7 @@ class ProviderRegistryService {
             }
             if (!options?.isRetryAttempt) {
               const engineOnline = localEngineCache.active;
-              const cleanInterim = streamValidator.filterCleanStreams([...streams, ...collectedFromAddons], targetTitle, originalTitle);
+              const cleanInterim = streamValidator.filterCleanStreams([...streams, ...collectedFromAddons], targetTitle, originalTitle, alternateTitles, episode);
               const hasFrostStreamFinished = !sortedAddons.some(a => a.id.includes('froststream')) || collectedFromAddons.some(s => s.providerId?.includes('froststream'));
               const culprits = cleanInterim.filter(s => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
               const hasWebReadyPtBr = culprits.length > 0;
@@ -1126,7 +1126,7 @@ class ProviderRegistryService {
       rawStreamCount: streams.length
     });
 
-    const cleanStreams = streamValidator.filterCleanStreams(streams, targetTitle, originalTitle).filter(s => {
+    const cleanStreams = streamValidator.filterCleanStreams(streams, targetTitle, originalTitle, alternateTitles, episode).filter(s => {
       if (s.ytId) return false;
       const u = (s.url || '').toLowerCase();
       const t = (s.title || '').toLowerCase();

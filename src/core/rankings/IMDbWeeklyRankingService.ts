@@ -100,6 +100,7 @@ export class IMDbWeeklyRankingService {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
           this.snapshots = parsed;
+          if (this.repairPittSnapshotId()) this.saveSnapshots();
           return;
         }
       } else if (typeof window !== 'undefined' && window.localStorage) {
@@ -108,6 +109,7 @@ export class IMDbWeeklyRankingService {
           const parsed = JSON.parse(local);
           if (Array.isArray(parsed) && parsed.length > 0) {
             this.snapshots = parsed;
+            if (this.repairPittSnapshotId()) this.saveSnapshots();
             return;
           }
         }
@@ -118,6 +120,27 @@ export class IMDbWeeklyRankingService {
 
     // Inicialização segura com os snapshots oficiais autorizados
     this.initDefaultAuthorizedSnapshots();
+  }
+
+  private repairPittSnapshotId(): boolean {
+    let changed = false;
+    for (const snapshot of this.snapshots) {
+      if (snapshot.rankType !== 'series' || !Array.isArray(snapshot.items)) continue;
+      let hasCorrectPitt = snapshot.items.some(item => item.imdbId === 'tt31938062' &&
+        item.mediaType === 'series' &&
+        [item.title, item.originalTitle].some(title => title?.trim().toLowerCase() === 'the pitt'));
+      snapshot.items = snapshot.items.filter(item => {
+        const isOldPitt = item.imdbId === 'tt31908234' && item.mediaType === 'series' &&
+          [item.title, item.originalTitle].some(title => title?.trim().toLowerCase() === 'the pitt');
+        if (!isOldPitt) return true;
+        changed = true;
+        if (hasCorrectPitt) return false;
+        item.imdbId = 'tt31938062';
+        hasCorrectPitt = true;
+        return true;
+      });
+    }
+    return changed;
   }
 
   /**
@@ -535,7 +558,7 @@ export class IMDbWeeklyRankingService {
         year: 2004
       },
       {
-        imdbId: 'tt31908234',
+        imdbId: 'tt31938062',
         title: 'The Pitt',
         originalTitle: 'The Pitt',
         mediaType: 'series',
