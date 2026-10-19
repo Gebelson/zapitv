@@ -355,6 +355,15 @@ class StreamValidator {
 
     if (rawCandidates.length === 0) return true;
 
+    // Magnetflix's specific S1E1 asset plays an older Woody Woodpecker cartoon,
+    // not "Guerra é Guerra". Scope the quarantine to this asset and episode.
+    if (episodeParams?.season === 1 && episodeParams?.episode === 1 &&
+        rawCandidates.some(title => /^(?:o novo pica[- ]pau|the new woody woodpecker show)$/i.test(title.trim())) &&
+        /magnetflix/i.test(`${sName} ${stream.description || ''}`) &&
+        /\/185995\.mp4(?:\?|$)/i.test(sUrl)) {
+      return false;
+    }
+
     // O addon devolve a terceira temporada sob a consulta da primeira.
     // O título da obra coincide, mas o episódio solicitado não.
     if (episodeParams?.season === 1 &&

@@ -4327,6 +4327,9 @@ var init_streamValidator = __esm({
         }
         const rawCandidates = [targetTitle, originalTitle, ...alternateTitles || []].filter((t) => Boolean(t && t.trim()));
         if (rawCandidates.length === 0) return true;
+        if (episodeParams?.season === 1 && episodeParams?.episode === 1 && rawCandidates.some((title) => /^(?:o novo pica[- ]pau|the new woody woodpecker show)$/i.test(title.trim())) && /magnetflix/i.test(`${sName} ${stream.description || ""}`) && /\/185995\.mp4(?:\?|$)/i.test(sUrl)) {
+          return false;
+        }
         if (episodeParams?.season === 1 && rawCandidates.some((title) => /mushoku tensei/i.test(title)) && /\bmushoku tensei\s+iii\b/i.test(sTitle)) {
           return false;
         }
@@ -10628,6 +10631,9 @@ var init_sourceMemory = __esm({
 });
 
 // src/core/providers/providerRegistry.ts
+function stremioEpisodeId(baseId, episode) {
+  return episode && !/:\d+:\d+$/.test(baseId) ? `${baseId}:${episode.season}:${episode.episode}` : baseId;
+}
 async function isLocalStremioEngineOnline() {
   const now = Date.now();
   if (now - localEngineCache.lastCheck < 15e3) {
@@ -11298,7 +11304,7 @@ var init_providerRegistry = __esm({
               const secondaryCandidates = primaryQueryId === stremioId ? altIds : [stremioId, ...altIds.filter((a) => a !== `tmdb:${tmdbNum}` && a !== tmdbNum)];
               if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0) {
                 for (const altBase of secondaryCandidates) {
-                  const altId = episode && (type === "series" || type === "anime") && !altBase.includes(":") ? `${altBase}:${episode.season}:${episode.episode}` : altBase;
+                  const altId = type === "series" || type === "anime" ? stremioEpisodeId(altBase, episode) : altBase;
                   try {
                     const altTimeout = 6e3;
                     const altRes = await Promise.race([

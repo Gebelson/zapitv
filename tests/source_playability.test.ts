@@ -5,7 +5,7 @@ import { isSourcePlayableHere } from '../src/core/providers/sourceReadiness';
 import { prioritizeRememberedSources, sourceReference } from '../src/core/providers/sourceMemory';
 import { sourceSelectionService } from '../src/core/selection/sourceSelectionService';
 import { sourceVerificationService } from '../src/core/providers/sourceVerificationService';
-import { providerRegistry } from '../src/core/providers/providerRegistry';
+import { providerRegistry, stremioEpisodeId } from '../src/core/providers/providerRegistry';
 import { streamValidator } from '../src/core/providers/streamValidator';
 
 const torrent: StremioStream = {
@@ -28,6 +28,19 @@ assert.equal(prioritizeRememberedSources(
 )[0].url, web.url);
 
 const episodeOne = { season: 1, episode: 1 };
+assert.equal(stremioEpisodeId('tt32499579', episodeOne), 'tt32499579:1:1');
+assert.equal(stremioEpisodeId('tmdb:255752', episodeOne), 'tmdb:255752:1:1');
+assert.equal(stremioEpisodeId('tmdb:9980', episodeOne), 'tmdb:9980:1:1');
+assert.equal(stremioEpisodeId('tt0281474:1:1', episodeOne), 'tt0281474:1:1');
+assert.equal(stremioEpisodeId('anilist:108465', episodeOne), 'anilist:108465:1:1');
+const wrongWoody: StremioStream = {
+  name: 'Magnetflix HD', description: 'O Novo Pica-Pau • S01E01 • Servidor: Magnetflix #20',
+  url: 'https://media.example.test/185995.mp4', sourceType: 'mp4',
+};
+assert.equal(streamValidator.isStreamMatchingTargetTitle(wrongWoody, 'O Novo Pica-Pau', 'The New Woody Woodpecker Show', [], episodeOne), false);
+assert.equal(streamValidator.isStreamMatchingTargetTitle({ ...wrongWoody, url: 'https://media.example.test/other.mp4' }, 'O Novo Pica-Pau', undefined, [], episodeOne), true);
+assert.equal(streamValidator.isStreamMatchingTargetTitle(wrongWoody, 'O Novo Pica-Pau', undefined, [], { season: 1, episode: 2 }), true);
+assert.equal(streamValidator.isStreamMatchingTargetTitle(wrongWoody, 'Hotel Assombrado', undefined, [], episodeOne), true);
 const declared = (title: string): StremioStream => ({
   name: 'Fonte HLS', title: `🐦‍🔥 ${title}\n⏸️ T01 EP01`,
   url: 'https://media.example.test/episode.m3u8', sourceType: 'hls',

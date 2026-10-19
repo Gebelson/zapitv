@@ -2636,6 +2636,22 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
 
     const videoUrl = currentStream.url;
+    // FrostStream publishes direct media URLs for clients without a Referer.
+    // Its redirect returns 403 for this site's Referer, while the same video
+    // plays normally when the browser omits it. Scope the policy to this source.
+    let referrerMeta: HTMLMetaElement | null = null;
+    let previousReferrerContent: string | null = null;
+    if (currentStream.providerId === 'froststream-http' && /^https:\/\/froststream\.cloutteam\.com\//i.test(videoUrl)) {
+      referrerMeta = document.querySelector<HTMLMetaElement>('meta[name="referrer"]');
+      if (referrerMeta) {
+        previousReferrerContent = referrerMeta.content;
+      } else {
+        referrerMeta = document.createElement('meta');
+        referrerMeta.name = 'referrer';
+        document.head.append(referrerMeta);
+      }
+      referrerMeta.content = 'no-referrer';
+    }
     attemptIdRef.current += 1;
     const currentAttempt = attemptIdRef.current;
 
@@ -2979,6 +2995,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
 
     return () => {
+      if (referrerMeta) {
+        // Removing a dynamic referrer meta alone leaves Chromium's last policy
+        // active. Restore the page default explicitly before removing it.
+        referrerMeta.content = previousReferrerContent ?? 'strict-origin-when-cross-origin';
+        if (previousReferrerContent === null) referrerMeta.remove();
+      }
       if (initTimer) clearTimeout(initTimer);
       if (segmentTimer) clearTimeout(segmentTimer);
       if (watchdogTimer) clearTimeout(watchdogTimer);

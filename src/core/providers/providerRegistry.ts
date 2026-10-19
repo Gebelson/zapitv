@@ -49,6 +49,13 @@ export interface ResolveStreamsOptions {
   }) => void;
 }
 
+// TMDB/AniList IDs already contain a colon, but still need the episode suffix.
+export function stremioEpisodeId(baseId: string, episode?: { season: number; episode: number }): string {
+  return episode && !/:\d+:\d+$/.test(baseId)
+    ? `${baseId}:${episode.season}:${episode.episode}`
+    : baseId;
+}
+
 // Verificação passiva em cache de prontidão do Stremio Engine local (sem spawn de processos)
 let localEngineCache = { active: false, lastCheck: 0 };
 export async function isLocalStremioEngineOnline(): Promise<boolean> {
@@ -832,8 +839,8 @@ class ProviderRegistryService {
 
           if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0) {
             for (const altBase of secondaryCandidates) {
-              const altId = episode && (type === 'series' || type === 'anime') && !altBase.includes(':')
-                ? `${altBase}:${episode.season}:${episode.episode}`
+              const altId = type === 'series' || type === 'anime'
+                ? stremioEpisodeId(altBase, episode)
                 : altBase;
               try {
                 const altTimeout = 6000;
