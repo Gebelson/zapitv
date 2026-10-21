@@ -1,0 +1,6 @@
+{
+  "name": "ZapiTV",
+  "version": "1.0.0",
+  "parameter": "content:https://zapitv-stream.vercel.app/msx/content.json",
+  "welcome": "none"
+}
