@@ -58,7 +58,15 @@ async function runTvAppInterfaceTests() {
     tvCardCode.includes('GLOW AMBIENTE DAS CAPAS'),
     'TvCard16x9 deve conter a camada de glow ambiente personalizada'
   );
-  console.log('✓ Teste 4: Glow ambiente dinâmico das capas e banners implementado e otimizado');
+  assert(
+    !tvCardCode.includes('absolute inset-0 bg-gradient-to-t'),
+    'TvCard16x9 NÃO deve conter gradiente de tela cheia escurecendo a capa'
+  );
+  assert(
+    tvCardCode.includes('bottom-0 h-24 sm:h-28 bg-gradient-to-t'),
+    'TvCard16x9 deve restringir o gradiente de legibilidade apenas à base inferior'
+  );
+  console.log('✓ Teste 4: Glow ambiente dinâmico e capas com cores vivas e gradiente restrito à base OK');
 
   // Teste 5: Isolamento absoluto - App.tsx renderiza TvApp na rota /tv sem afetar desktop/mobile
   const appPath = path.resolve(process.cwd(), 'App.tsx');

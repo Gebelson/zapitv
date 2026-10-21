@@ -52,9 +52,9 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   isFocused,
   isFocusable = true
 }) => {
-  // Prioriza o poster vertical real em 2:3
+  // Prioriza o poster vertical real em 2:3 com luminosidade e cores originais
   const [imgSrc, setImgSrc] = useState<string>(() => {
-    return posterRecoveryService.getCachedPoster(item) || item.poster || item.image || item.backdrop || '';
+    return posterRecoveryService.getCachedPoster(item) || item.image || item.poster || item.backdrop || '';
   });
   const [hasImageError, setHasImageError] = useState(false);
   const cardContainerRef = useRef<HTMLDivElement>(null);
@@ -77,10 +77,10 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
 
   // Atualiza imagem quando o item muda
   useEffect(() => {
-    const nextSrc = posterRecoveryService.getCachedPoster(item) || item.poster || item.image || item.backdrop || '';
+    const nextSrc = posterRecoveryService.getCachedPoster(item) || item.image || item.poster || item.backdrop || '';
     setImgSrc(nextSrc);
     setHasImageError(!nextSrc);
-  }, [item.id, item.poster, item.image, item.backdrop]);
+  }, [item.id, item.image, item.poster, item.backdrop]);
 
   const handleImgError = () => {
     if (imgSrc !== item.backdrop && item.backdrop) {
@@ -158,13 +158,14 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
           ? 'border-2 border-cyan-400 shadow-[0_0_24px_rgba(0,229,255,0.6),0_12px_28px_rgba(0,0,0,0.85)]'
           : 'border-2 border-white/10 group-hover/tvcard:border-white/25'
       }`}>
-        {/* Imagem do Poster Vertical 2:3 */}
+        {/* Imagem do Poster Vertical 2:3 (Cores vivas, contraste natural e nitidez original) */}
         {!hasImageError && imgSrc ? (
           <img
             src={imgSrc}
             alt={item.title}
             loading={priority ? "eager" : "lazy"}
             decoding="async"
+            referrerPolicy="no-referrer"
             onError={handleImgError}
             className="w-full h-full object-cover object-center transition-transform duration-300 group-hover/tvcard:scale-105"
           />
@@ -175,8 +176,8 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
           </div>
         )}
 
-        {/* Gradiente de Legibilidade Inferior */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#05070a]/95 via-[#05070a]/40 via-35% to-transparent pointer-events-none" />
+        {/* Gradiente de Legibilidade Suave e Restrito à Base (Preserva as cores originais, nitidez e luminosidade das capas) */}
+        <div className="absolute inset-x-0 bottom-0 h-24 sm:h-28 bg-gradient-to-t from-black/80 via-black/35 to-transparent pointer-events-none" />
 
         {/* Informações Sobrepostas no Card Vertical */}
         <div className="absolute inset-x-0 bottom-0 p-3 sm:p-3.5 flex flex-col justify-end pointer-events-none">
