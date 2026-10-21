@@ -96,6 +96,8 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   // Playback session lifecycle
   const playbackRequestIdRef = useRef<number>(0);
   const [playbackSessionId, setPlaybackSessionId] = useState<string>('');
+  const [loadingTraceId, setLoadingTraceId] = useState<string>('');
+  const loadingTraceIdRef = useRef<string>('');
   const [navigationType, setNavigationType] = useState<NavigationType>('manual_start');
   const [sessionIntroPlayed, setSessionIntroPlayed] = useState<boolean>(false);
 
@@ -302,6 +304,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     uiSoundService.play('detailClose');
     playbackRequestIdRef.current++;
     cancelAllPendingRequests();
+    if (loadingTraceIdRef.current) mediaLoadingTracker.endTrace(loadingTraceIdRef.current, 'CANCELLED');
     setIsClosing(true);
     if (playbackSessionId) {
       playbackSessionService.endSession(playbackSessionId);
@@ -318,6 +321,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const handleClosePlayer = useCallback(() => {
     playbackRequestIdRef.current++;
     cancelAllPendingRequests();
+    if (loadingTraceIdRef.current) mediaLoadingTracker.endTrace(loadingTraceIdRef.current, 'CANCELLED');
     setIsPlaying(false);
     setResolvedStreams([]);
     if (playbackSessionId) {
@@ -595,6 +599,20 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       return;
     }
 
+    // Uma tentativa e um episódio por trace, inclusive quando a descoberta já terminou no prefetch.
+    const traceId = mediaLoadingTracker.startTrace(
+      currentTargetItem.id, currentTargetItem.title, currentTargetItem.type,
+      epParams?.season, epParams?.episode
+    );
+    loadingTraceIdRef.current = traceId;
+    setLoadingTraceId(traceId);
+    mediaLoadingTracker.recordEvent(traceId, 'MEDIA_SELECTED', 'ContentDetailModal', 'OK',
+      { season: epParams?.season, episode: epParams?.episode });
+    try {
+      const identity = canonicalIdentityService.buildIdentity(currentTargetItem, epParams);
+      if (identity.canonicalId) mediaLoadingTracker.recordEvent(traceId, 'CANONICAL_ID_RESOLVED', 'canonicalIdentityService');
+    } catch { /* Telemetria não pode interromper a reprodução. */ }
+
     // ETAPA 2: Verifica se já temos fontes pré-resolvidas em cache da etapa 1
     const prefetched = prefetchedSourcesRef.current;
     const hasReadyPrefetch = prefetched && 
@@ -608,9 +626,10 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       setVerificationState('AVAILABLE');
       setResolvedStreams(prefetched.streams);
       setIsLoadingStreams(false);
-      mediaLoadingTracker.transition(currentTargetItem.id, 'BUFFERING', {
+      mediaLoadingTracker.recordEvent(traceId, 'CANDIDATES_FILTERED', 'ContentDetailModal', 'OK',
+        { streamCount: prefetched.streams.length, prefetched: true });
+      mediaLoadingTracker.transition(traceId, 'BUFFERING', {
         streamCount: prefetched.streams.length,
-        bestStream: prefetched.streams[0]?.title,
         prefetched: true
       });
       return;
@@ -624,15 +643,8 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     setIsLoadingStreams(true);
     setResolvedStreams([]);
 
-    // Telemetria do Tracker
-    mediaLoadingTracker.startTrace(
-      currentTargetItem.id,
-      currentTargetItem.title,
-      currentTargetItem.type,
-      epParams?.season,
-      epParams?.episode
-    );
-    mediaLoadingTracker.transition(currentTargetItem.id, 'PREPARING_PLAYER', {
+    mediaLoadingTracker.recordEvent(traceId, 'DISCOVERY_STARTED', 'sourceVerificationService', 'STARTED');
+    mediaLoadingTracker.transition(traceId, 'PREPARING_PLAYER', {
       navType,
       season: epParams?.season,
       episode: epParams?.episode
@@ -655,9 +667,8 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
             progressiveStreamsFound = progressive;
             setResolvedStreams(progressive);
             setIsLoadingStreams(false);
-            mediaLoadingTracker.transition(currentTargetItem.id, 'BUFFERING', {
+            mediaLoadingTracker.transition(traceId, 'BUFFERING', {
               streamCount: progressive.length,
-              bestStream: progressive[0]?.title,
               progressive: true
             });
           }
@@ -710,9 +721,10 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
             streams.length
           );
         }
-        mediaLoadingTracker.transition(currentTargetItem.id, 'BUFFERING', {
+        mediaLoadingTracker.recordEvent(traceId, 'SOURCE_VALIDATION', 'sourceVerificationService', 'OK',
+          { streamCount: streams.length });
+        mediaLoadingTracker.transition(traceId, 'BUFFERING', {
           streamCount: streams.length,
-          bestStream: streams[0]?.title
         });
       } else {
         setVerificationState(verificationResult.state);
@@ -729,9 +741,11 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
           verificationResult.errorMessage ||
           (verificationResult.state === 'INCONCLUSIVE' ? MSG_INCONCLUSIVE : MSG_UNAVAILABLE)
         );
-        mediaLoadingTracker.transition(currentTargetItem.id, verificationResult.state === 'INCONCLUSIVE' ? 'ERROR' : 'UNAVAILABLE', {
-          reason: verificationResult.errorMessage || 'Nenhum provedor retornou streams reproduzíveis'
-        });
+        const errorCode = verificationResult.state === 'INCONCLUSIVE'
+          ? 'SOURCE_VALIDATION_INCONCLUSIVE' : 'NO_CANDIDATES';
+        mediaLoadingTracker.recordEvent(traceId, 'PLAYBACK_FAILED', 'sourceVerificationService',
+          verificationResult.state === 'INCONCLUSIVE' ? 'INCONCLUSIVE' : 'FAILED',
+          undefined, errorCode, verificationResult.errorMessage);
       }
     } catch (err: any) {
       if (currentRequestId !== playbackRequestIdRef.current || playbackAbort.signal.aborted) return;
@@ -746,9 +760,8 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       console.error('Erro ao resolver provedores:', err);
       setVerificationState('INCONCLUSIVE');
       setStreamResolutionError(err?.message || MSG_INCONCLUSIVE);
-      mediaLoadingTracker.transition(currentTargetItem.id, 'ERROR', {
-        error: err?.message || 'Falha ao resolver provedores'
-      });
+      mediaLoadingTracker.recordEvent(traceId, 'PLAYBACK_FAILED', 'sourceVerificationService',
+        'FAILED', undefined, 'SOURCE_DISCOVERY_FAILED', err?.message);
     } finally {
       if (currentRequestId === playbackRequestIdRef.current) {
         setIsLoadingStreams(false);
@@ -901,9 +914,12 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
               initialEpisode={currentEpisodeParams?.episode || (hasEpisodes ? 1 : undefined)}
               nextEpisodeInfo={nextEpisodeInfo}
               playbackSessionId={playbackSessionId}
+              loadingTraceId={loadingTraceId}
               navigationType={navigationType}
               initialPlayIntro={!sessionIntroPlayed}
               onIntroCompleted={() => {
+                if (loadingTraceId) mediaLoadingTracker.recordEvent(loadingTraceId,
+                  'INTRO_COMPLETED', 'ZapiPlayer');
                 setSessionIntroPlayed(true);
                 if (playbackSessionId) {
                   playbackSessionService.markIntroPlayed(playbackSessionId);

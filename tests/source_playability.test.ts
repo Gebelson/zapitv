@@ -38,6 +38,13 @@ const wrongWoody: StremioStream = {
   url: 'https://media.example.test/185995.mp4', sourceType: 'mp4',
 };
 assert.equal(streamValidator.isStreamMatchingTargetTitle(wrongWoody, 'O Novo Pica-Pau', 'The New Woody Woodpecker Show', [], episodeOne), false);
+const proxiedWrongWoody = { ...wrongWoody,
+  url: `/api/proxy?url=${encodeURIComponent(wrongWoody.url!)}`
+};
+assert.equal(streamValidator.isStreamMatchingTargetTitle(proxiedWrongWoody,
+  'O Novo Pica-Pau', 'The New Woody Woodpecker Show', [], episodeOne), false);
+assert.equal(streamValidator.filterCleanStreams([proxiedWrongWoody],
+  'O Novo Pica-Pau', 'The New Woody Woodpecker Show', [], episodeOne).length, 0);
 assert.equal(streamValidator.isStreamMatchingTargetTitle({ ...wrongWoody, url: 'https://media.example.test/other.mp4' }, 'O Novo Pica-Pau', undefined, [], episodeOne), true);
 assert.equal(streamValidator.isStreamMatchingTargetTitle(wrongWoody, 'O Novo Pica-Pau', undefined, [], { season: 1, episode: 2 }), true);
 assert.equal(streamValidator.isStreamMatchingTargetTitle(wrongWoody, 'Hotel Assombrado', undefined, [], episodeOne), true);

@@ -13,6 +13,68 @@ export type LoadingState =
   | 'ERROR'
   | 'TIMEOUT';
 
+export type PlaybackEvent =
+  | 'MEDIA_SELECTED' | 'CANONICAL_ID_RESOLVED' | 'DISCOVERY_STARTED'
+  | 'ADDON_RESPONSE_RECEIVED' | 'SOURCES_NORMALIZED' | 'CANDIDATES_FILTERED'
+  | 'SOURCE_VALIDATION' | 'SOURCE_SELECTED' | 'PLAYER_INITIALIZED'
+  | 'MANIFEST_OR_METADATA_LOADED' | 'INTRO_COMPLETED' | 'CONTENT_PLAYING'
+  | 'PLAYBACK_CONFIRMED' | 'PLAYBACK_FAILED';
+
+export type PlaybackErrorCode =
+  | 'SOURCE_DISCOVERY_FAILED' | 'NO_CANDIDATES' | 'SOURCE_VALIDATION_INCONCLUSIVE'
+  | 'AUTH_REQUIRED' | 'SOURCE_UNSUPPORTED' | 'MEDIA_NETWORK_ERROR'
+  | 'MEDIA_DECODE_ERROR' | 'MANIFEST_ERROR' | 'PLAYBACK_START_FAILED'
+  | 'PLAYBACK_TIMEOUT' | 'SOURCE_EXPIRED' | 'PLAYER_RUNTIME_ERROR';
+
+export interface PlaybackEventTrace {
+  event: PlaybackEvent;
+  at: number;
+  durationMs: number;
+  service: string;
+  result: 'STARTED' | 'OK' | 'FAILED' | 'INCONCLUSIVE';
+  previous?: PlaybackEvent;
+  next?: PlaybackEvent;
+  errorCode?: PlaybackErrorCode;
+  reason?: string;
+  details?: Record<string, string | number | boolean>;
+}
+
+// Never persist or expose stream URLs, query strings, signed tokens, or credentials.
+const SAFE_DETAIL_KEYS = new Set([
+  'streamCount', 'rawStreamCount', 'cleanStreamsCount', 'providerCount',
+  'durationMs', 'season', 'episode', 'quality', 'navType', 'prefetched',
+  'progressive', 'stremioType', 'hasExternalPtSub', 'mediaSeconds', 'frames',
+]);
+export function sanitizePlaybackReason(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  return value.replace(/(?:https?:\/\/|magnet:\?)[^\s)]+/gi, '[redacted-url]')
+    .replace(/(token|key|secret|signature|authorization)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
+    .slice(0, 160);
+}
+export function classifyPlaybackError(reason: string, nativeMediaCode?: number): PlaybackErrorCode {
+  if (nativeMediaCode === 2) return 'MEDIA_NETWORK_ERROR';
+  if (nativeMediaCode === 3) return 'MEDIA_DECODE_ERROR';
+  if (nativeMediaCode === 4) return 'SOURCE_UNSUPPORTED';
+  if (/HTTP\s*40[13]|autentica|acesso negado/i.test(reason)) return 'AUTH_REQUIRED';
+  if (/manifest|m3u8|playlist/i.test(reason)) return 'MANIFEST_ERROR';
+  if (/tempo limite|timeout/i.test(reason)) return 'PLAYBACK_TIMEOUT';
+  if (/decodific|codec/i.test(reason)) return 'MEDIA_DECODE_ERROR';
+  if (/rede|network|fetch|cors/i.test(reason)) return 'MEDIA_NETWORK_ERROR';
+  if (/incompatível|não corresponde|bloquead|isolada|blacklist/i.test(reason)) return 'SOURCE_UNSUPPORTED';
+  return 'PLAYER_RUNTIME_ERROR';
+}
+function safeDetails(details?: Record<string, unknown>): Record<string, string | number | boolean> | undefined {
+  if (!details) return undefined;
+  const safe: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(details)) {
+    if (!SAFE_DETAIL_KEYS.has(key)) continue;
+    if (typeof value === 'number' && Number.isFinite(value)) safe[key] = value;
+    else if (typeof value === 'boolean') safe[key] = value;
+    else if (typeof value === 'string') safe[key] = sanitizePlaybackReason(value) || '';
+  }
+  return Object.keys(safe).length ? safe : undefined;
+}
+
 export interface StepTrace {
   step: LoadingState;
   startedAt: number;
@@ -34,6 +96,7 @@ export interface MediaLoadingTrace {
   endedAt?: number;
   totalDurationMs?: number;
   history: StepTrace[];
+  events: PlaybackEventTrace[];
   providerAttempts: Array<{
     providerId: string;
     providerName: string;
@@ -42,8 +105,9 @@ export interface MediaLoadingTrace {
     streamCount: number;
     error?: string;
   }>;
-  finalStatus?: 'SUCCESS' | 'ERROR' | 'UNAVAILABLE' | 'TIMEOUT';
+  finalStatus?: 'SUCCESS' | 'ERROR' | 'UNAVAILABLE' | 'TIMEOUT' | 'CANCELLED';
   errorDetails?: string;
+  errorCode?: PlaybackErrorCode;
 }
 
 class MediaLoadingTracker {
@@ -66,6 +130,8 @@ class MediaLoadingTracker {
     season?: number,
     episode?: number
   ): string {
+    const prior = this.getActiveTrace(canonicalId);
+    if (prior && !prior.endedAt) this.endTrace(prior.traceId, 'CANCELLED');
     const traceId = `trace_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const trace: MediaLoadingTrace = {
       traceId,
@@ -82,10 +148,15 @@ class MediaLoadingTracker {
           startedAt: Date.now()
         }
       ],
+      events: [],
       providerAttempts: []
     };
 
     this.traces.set(traceId, trace);
+    if (this.traces.size > 40) {
+      const oldest = this.traces.keys().next().value;
+      if (oldest) this.traces.delete(oldest);
+    }
     this.activeTraces.set(canonicalId, traceId);
     this.logDebug(trace, 'INÍCIO', `Iniciando rastreamento de [${title}] (ID: ${canonicalId})`);
     this.notify(trace);
@@ -101,6 +172,36 @@ class MediaLoadingTracker {
     return this.traces.get(traceId);
   }
 
+  public recordEvent(
+    traceIdOrCanonicalId: string, event: PlaybackEvent,
+    service: string, result: PlaybackEventTrace['result'] = 'OK',
+    details?: Record<string, unknown>, errorCode?: PlaybackErrorCode, reason?: string
+  ): void {
+    const trace = this.traces.get(traceIdOrCanonicalId) || this.getActiveTrace(traceIdOrCanonicalId);
+    if (!trace || trace.endedAt) return;
+    const now = Date.now();
+    const previous = trace.events[trace.events.length - 1];
+    if (previous?.event === event && previous.result === result && previous.service === service) return;
+    if (previous) previous.next = event;
+    trace.events.push({ event, at: now, durationMs: now - (previous?.at || trace.startedAt),
+      service, result, previous: previous?.event, details: safeDetails(details),
+      errorCode, reason: sanitizePlaybackReason(reason) });
+    if (trace.events.length > 50) trace.events.shift();
+    if (event === 'PLAYBACK_CONFIRMED') this.endTrace(trace.traceId, 'SUCCESS');
+    else if (event === 'PLAYBACK_FAILED') {
+      trace.errorCode = errorCode || 'PLAYER_RUNTIME_ERROR';
+      trace.errorDetails = sanitizePlaybackReason(reason);
+      this.endTrace(trace.traceId, 'ERROR');
+    } else this.notify(trace);
+  }
+
+  public getDiagnostic(traceIdOrCanonicalId: string): { traceId?: string; stage?: PlaybackEvent; errorCode?: PlaybackErrorCode; reason?: string } {
+    const trace = this.traces.get(traceIdOrCanonicalId) || this.getActiveTrace(traceIdOrCanonicalId);
+    if (!trace) return {};
+    return { traceId: trace.traceId, stage: trace.events[trace.events.length - 1]?.event,
+      errorCode: trace.errorCode, reason: trace.errorDetails };
+  }
+
   public transition(
     traceIdOrCanonicalId: string,
     nextStep: LoadingState,
@@ -113,6 +214,7 @@ class MediaLoadingTracker {
       if (traceId) trace = this.traces.get(traceId);
     }
     if (!trace) return;
+    if (trace.endedAt) return;
 
     const now = Date.now();
     // Fecha o step anterior
@@ -127,17 +229,17 @@ class MediaLoadingTracker {
     trace.history.push({
       step: nextStep,
       startedAt: now,
-      details,
-      error
+      details: safeDetails(details),
+      error: sanitizePlaybackReason(error)
     });
 
-    if (nextStep === 'PLAYING' || nextStep === 'READY') {
-      trace.finalStatus = 'SUCCESS';
-      trace.endedAt = now;
-      trace.totalDurationMs = now - trace.startedAt;
-    } else if (nextStep === 'ERROR') {
+    if (nextStep === 'SEARCHING_SOURCES') this.recordEvent(trace.traceId, 'DISCOVERY_STARTED', 'providerRegistry', 'STARTED');
+    if (nextStep === 'VALIDATING_SOURCES') this.recordEvent(trace.traceId, 'SOURCES_NORMALIZED', 'providerRegistry', 'OK', details);
+    if (nextStep === 'SELECTING_AUDIO') this.recordEvent(trace.traceId, 'CANDIDATES_FILTERED', 'providerRegistry', 'OK', details);
+
+    if (nextStep === 'ERROR') {
       trace.finalStatus = 'ERROR';
-      trace.errorDetails = error || details?.message;
+      trace.errorDetails = sanitizePlaybackReason(error || details?.message || details?.reason);
       trace.endedAt = now;
       trace.totalDurationMs = now - trace.startedAt;
     } else if (nextStep === 'UNAVAILABLE') {
@@ -146,12 +248,12 @@ class MediaLoadingTracker {
       trace.totalDurationMs = now - trace.startedAt;
     } else if (nextStep === 'TIMEOUT') {
       trace.finalStatus = 'TIMEOUT';
-      trace.errorDetails = error || 'Operação excedeu o tempo limite configurado';
+      trace.errorDetails = sanitizePlaybackReason(error || 'Operação excedeu o tempo limite configurado');
       trace.endedAt = now;
       trace.totalDurationMs = now - trace.startedAt;
     }
 
-    this.logDebug(trace, nextStep, `Transição para [${nextStep}] (${currentStepTrace ? currentStepTrace.durationMs + 'ms' : '0ms'})`, details);
+    this.logDebug(trace, nextStep, `Transição para [${nextStep}] (${currentStepTrace ? currentStepTrace.durationMs + 'ms' : '0ms'})`, safeDetails(details));
     this.notify(trace);
   }
 
@@ -173,24 +275,31 @@ class MediaLoadingTracker {
     }
     if (!trace) return;
 
-    trace.providerAttempts.push(attempt);
+    trace.providerAttempts.push({ ...attempt, error: sanitizePlaybackReason(attempt.error) });
+    this.recordEvent(trace.traceId, 'ADDON_RESPONSE_RECEIVED', attempt.providerId,
+      attempt.success ? 'OK' : 'FAILED', { streamCount: attempt.streamCount, durationMs: attempt.durationMs },
+      attempt.success ? undefined : 'SOURCE_DISCOVERY_FAILED', attempt.error);
     this.notify(trace);
   }
 
-  public endTrace(traceIdOrCanonicalId: string, status?: 'SUCCESS' | 'ERROR' | 'UNAVAILABLE' | 'TIMEOUT'): void {
+  public endTrace(traceIdOrCanonicalId: string, status?: 'SUCCESS' | 'ERROR' | 'UNAVAILABLE' | 'TIMEOUT' | 'CANCELLED'): void {
     let trace = this.traces.get(traceIdOrCanonicalId);
     if (!trace) {
       const traceId = this.activeTraces.get(traceIdOrCanonicalId);
       if (traceId) trace = this.traces.get(traceId);
     }
     if (!trace) return;
+    if (trace.endedAt) return;
 
     const now = Date.now();
     if (!trace.endedAt) {
       trace.endedAt = now;
       trace.totalDurationMs = now - trace.startedAt;
     }
-    if (status) trace.finalStatus = status;
+    if (status && !trace.finalStatus &&
+        (status !== 'SUCCESS' || trace.events.some(event => event.event === 'PLAYBACK_CONFIRMED'))) {
+      trace.finalStatus = status;
+    }
 
     const lastStep = trace.history[trace.history.length - 1];
     if (lastStep && !lastStep.endedAt) {
@@ -198,19 +307,19 @@ class MediaLoadingTracker {
       lastStep.durationMs = now - lastStep.startedAt;
     }
 
-    this.activeTraces.delete(trace.canonicalId);
+    if (this.activeTraces.get(trace.canonicalId) === trace.traceId) this.activeTraces.delete(trace.canonicalId);
     this.logDebug(trace, 'FINALIZADO', `Trace encerrado com status [${trace.finalStatus || 'CONCLUÍDO'}] em ${trace.totalDurationMs}ms`);
     this.notify(trace);
   }
 
   private logDebug(trace: MediaLoadingTrace, step: string, msg: string, details?: any) {
-    if (process.env.NODE_ENV !== 'production' || typeof window !== 'undefined') {
+    if (process.env.NODE_ENV !== 'production') {
       const epStr = trace.episode ? ` S${trace.season || 1}E${trace.episode}` : '';
       console.log(
         `%c[ZapiTV-Tracker]%c [${trace.title}${epStr}] ${step}: ${msg}`,
         'background: #ff5500; color: white; padding: 2px 4px; border-radius: 4px; font-weight: bold;',
         'color: #38bdf8;',
-        details || ''
+        safeDetails(details) || ''
       );
     }
   }

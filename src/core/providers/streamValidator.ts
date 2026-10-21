@@ -2,6 +2,7 @@ import { StremioStream } from '../stremio/stremioTypes';
 import { videoAdBlocker } from '../security/videoAdBlocker';
 import { streamQuarantineService } from '../security/streamQuarantineService';
 import { LruCache } from '../cache/LruCache';
+import { resolveValidationTargetUrl } from './validationTargetUrl';
 
 export interface StreamValidationResult {
   valid: boolean;
@@ -360,7 +361,7 @@ class StreamValidator {
     if (episodeParams?.season === 1 && episodeParams?.episode === 1 &&
         rawCandidates.some(title => /^(?:o novo pica[- ]pau|the new woody woodpecker show)$/i.test(title.trim())) &&
         /magnetflix/i.test(`${sName} ${stream.description || ''}`) &&
-        /\/185995\.mp4(?:\?|$)/i.test(sUrl)) {
+        /\/185995\.mp4(?:\?|$)/i.test(resolveValidationTargetUrl(sUrl) || sUrl)) {
       return false;
     }
 

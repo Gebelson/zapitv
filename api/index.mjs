@@ -4085,6 +4085,24 @@ var init_streamQuarantineService = __esm({
   }
 });
 
+// src/core/providers/validationTargetUrl.ts
+function resolveValidationTargetUrl(targetUrl) {
+  let candidate = targetUrl;
+  if (targetUrl.startsWith("/api/proxy?")) {
+    candidate = new URL(targetUrl, "https://zapitv.invalid").searchParams.get("url") || "";
+  }
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+var init_validationTargetUrl = __esm({
+  "src/core/providers/validationTargetUrl.ts"() {
+  }
+});
+
 // src/core/providers/streamValidator.ts
 var KNOWN_PARKED_DOMAINS, KNOWN_UPSTREAM_MISMATCHES, StreamValidator, streamValidator;
 var init_streamValidator = __esm({
@@ -4092,6 +4110,7 @@ var init_streamValidator = __esm({
     init_videoAdBlocker();
     init_streamQuarantineService();
     init_LruCache();
+    init_validationTargetUrl();
     KNOWN_PARKED_DOMAINS = [
       "superflixapi.top",
       "parklogic.com",
@@ -4327,7 +4346,7 @@ var init_streamValidator = __esm({
         }
         const rawCandidates = [targetTitle, originalTitle, ...alternateTitles || []].filter((t) => Boolean(t && t.trim()));
         if (rawCandidates.length === 0) return true;
-        if (episodeParams?.season === 1 && episodeParams?.episode === 1 && rawCandidates.some((title) => /^(?:o novo pica[- ]pau|the new woody woodpecker show)$/i.test(title.trim())) && /magnetflix/i.test(`${sName} ${stream.description || ""}`) && /\/185995\.mp4(?:\?|$)/i.test(sUrl)) {
+        if (episodeParams?.season === 1 && episodeParams?.episode === 1 && rawCandidates.some((title) => /^(?:o novo pica[- ]pau|the new woody woodpecker show)$/i.test(title.trim())) && /magnetflix/i.test(`${sName} ${stream.description || ""}`) && /\/185995\.mp4(?:\?|$)/i.test(resolveValidationTargetUrl(sUrl) || sUrl)) {
           return false;
         }
         if (episodeParams?.season === 1 && rawCandidates.some((title) => /mushoku tensei/i.test(title)) && /\bmushoku tensei\s+iii\b/i.test(sTitle)) {
@@ -5929,9 +5948,41 @@ var init_subtitleService = __esm({
 });
 
 // src/core/tracking/mediaLoadingTracker.ts
-var MediaLoadingTracker, mediaLoadingTracker;
+function sanitizePlaybackReason(value) {
+  if (typeof value !== "string") return void 0;
+  return value.replace(/(?:https?:\/\/|magnet:\?)[^\s)]+/gi, "[redacted-url]").replace(/(token|key|secret|signature|authorization)\s*[:=]\s*[^\s,;]+/gi, "$1=[redacted]").slice(0, 160);
+}
+function safeDetails(details) {
+  if (!details) return void 0;
+  const safe = {};
+  for (const [key, value] of Object.entries(details)) {
+    if (!SAFE_DETAIL_KEYS.has(key)) continue;
+    if (typeof value === "number" && Number.isFinite(value)) safe[key] = value;
+    else if (typeof value === "boolean") safe[key] = value;
+    else if (typeof value === "string") safe[key] = sanitizePlaybackReason(value) || "";
+  }
+  return Object.keys(safe).length ? safe : void 0;
+}
+var SAFE_DETAIL_KEYS, MediaLoadingTracker, mediaLoadingTracker;
 var init_mediaLoadingTracker = __esm({
   "src/core/tracking/mediaLoadingTracker.ts"() {
+    SAFE_DETAIL_KEYS = /* @__PURE__ */ new Set([
+      "streamCount",
+      "rawStreamCount",
+      "cleanStreamsCount",
+      "providerCount",
+      "durationMs",
+      "season",
+      "episode",
+      "quality",
+      "navType",
+      "prefetched",
+      "progressive",
+      "stremioType",
+      "hasExternalPtSub",
+      "mediaSeconds",
+      "frames"
+    ]);
     MediaLoadingTracker = class _MediaLoadingTracker {
       constructor() {
         this.traces = /* @__PURE__ */ new Map();
@@ -5946,6 +5997,8 @@ var init_mediaLoadingTracker = __esm({
         return _MediaLoadingTracker.instance;
       }
       startTrace(canonicalId, title, mediaType, season, episode) {
+        const prior = this.getActiveTrace(canonicalId);
+        if (prior && !prior.endedAt) this.endTrace(prior.traceId, "CANCELLED");
         const traceId = `trace_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
         const trace = {
           traceId,
@@ -5962,9 +6015,14 @@ var init_mediaLoadingTracker = __esm({
               startedAt: Date.now()
             }
           ],
+          events: [],
           providerAttempts: []
         };
         this.traces.set(traceId, trace);
+        if (this.traces.size > 40) {
+          const oldest = this.traces.keys().next().value;
+          if (oldest) this.traces.delete(oldest);
+        }
         this.activeTraces.set(canonicalId, traceId);
         this.logDebug(trace, "IN\xCDCIO", `Iniciando rastreamento de [${title}] (ID: ${canonicalId})`);
         this.notify(trace);
@@ -5977,6 +6035,42 @@ var init_mediaLoadingTracker = __esm({
       getTrace(traceId) {
         return this.traces.get(traceId);
       }
+      recordEvent(traceIdOrCanonicalId, event, service, result = "OK", details, errorCode, reason) {
+        const trace = this.traces.get(traceIdOrCanonicalId) || this.getActiveTrace(traceIdOrCanonicalId);
+        if (!trace || trace.endedAt) return;
+        const now = Date.now();
+        const previous = trace.events[trace.events.length - 1];
+        if (previous?.event === event && previous.result === result && previous.service === service) return;
+        if (previous) previous.next = event;
+        trace.events.push({
+          event,
+          at: now,
+          durationMs: now - (previous?.at || trace.startedAt),
+          service,
+          result,
+          previous: previous?.event,
+          details: safeDetails(details),
+          errorCode,
+          reason: sanitizePlaybackReason(reason)
+        });
+        if (trace.events.length > 50) trace.events.shift();
+        if (event === "PLAYBACK_CONFIRMED") this.endTrace(trace.traceId, "SUCCESS");
+        else if (event === "PLAYBACK_FAILED") {
+          trace.errorCode = errorCode || "PLAYER_RUNTIME_ERROR";
+          trace.errorDetails = sanitizePlaybackReason(reason);
+          this.endTrace(trace.traceId, "ERROR");
+        } else this.notify(trace);
+      }
+      getDiagnostic(traceIdOrCanonicalId) {
+        const trace = this.traces.get(traceIdOrCanonicalId) || this.getActiveTrace(traceIdOrCanonicalId);
+        if (!trace) return {};
+        return {
+          traceId: trace.traceId,
+          stage: trace.events[trace.events.length - 1]?.event,
+          errorCode: trace.errorCode,
+          reason: trace.errorDetails
+        };
+      }
       transition(traceIdOrCanonicalId, nextStep, details, error) {
         let trace = this.traces.get(traceIdOrCanonicalId);
         if (!trace) {
@@ -5984,6 +6078,7 @@ var init_mediaLoadingTracker = __esm({
           if (traceId) trace = this.traces.get(traceId);
         }
         if (!trace) return;
+        if (trace.endedAt) return;
         const now = Date.now();
         const currentStepTrace = trace.history[trace.history.length - 1];
         if (currentStepTrace && !currentStepTrace.endedAt) {
@@ -5994,16 +6089,15 @@ var init_mediaLoadingTracker = __esm({
         trace.history.push({
           step: nextStep,
           startedAt: now,
-          details,
-          error
+          details: safeDetails(details),
+          error: sanitizePlaybackReason(error)
         });
-        if (nextStep === "PLAYING" || nextStep === "READY") {
-          trace.finalStatus = "SUCCESS";
-          trace.endedAt = now;
-          trace.totalDurationMs = now - trace.startedAt;
-        } else if (nextStep === "ERROR") {
+        if (nextStep === "SEARCHING_SOURCES") this.recordEvent(trace.traceId, "DISCOVERY_STARTED", "providerRegistry", "STARTED");
+        if (nextStep === "VALIDATING_SOURCES") this.recordEvent(trace.traceId, "SOURCES_NORMALIZED", "providerRegistry", "OK", details);
+        if (nextStep === "SELECTING_AUDIO") this.recordEvent(trace.traceId, "CANDIDATES_FILTERED", "providerRegistry", "OK", details);
+        if (nextStep === "ERROR") {
           trace.finalStatus = "ERROR";
-          trace.errorDetails = error || details?.message;
+          trace.errorDetails = sanitizePlaybackReason(error || details?.message || details?.reason);
           trace.endedAt = now;
           trace.totalDurationMs = now - trace.startedAt;
         } else if (nextStep === "UNAVAILABLE") {
@@ -6012,11 +6106,11 @@ var init_mediaLoadingTracker = __esm({
           trace.totalDurationMs = now - trace.startedAt;
         } else if (nextStep === "TIMEOUT") {
           trace.finalStatus = "TIMEOUT";
-          trace.errorDetails = error || "Opera\xE7\xE3o excedeu o tempo limite configurado";
+          trace.errorDetails = sanitizePlaybackReason(error || "Opera\xE7\xE3o excedeu o tempo limite configurado");
           trace.endedAt = now;
           trace.totalDurationMs = now - trace.startedAt;
         }
-        this.logDebug(trace, nextStep, `Transi\xE7\xE3o para [${nextStep}] (${currentStepTrace ? currentStepTrace.durationMs + "ms" : "0ms"})`, details);
+        this.logDebug(trace, nextStep, `Transi\xE7\xE3o para [${nextStep}] (${currentStepTrace ? currentStepTrace.durationMs + "ms" : "0ms"})`, safeDetails(details));
         this.notify(trace);
       }
       recordProviderAttempt(traceIdOrCanonicalId, attempt) {
@@ -6026,7 +6120,16 @@ var init_mediaLoadingTracker = __esm({
           if (traceId) trace = this.traces.get(traceId);
         }
         if (!trace) return;
-        trace.providerAttempts.push(attempt);
+        trace.providerAttempts.push({ ...attempt, error: sanitizePlaybackReason(attempt.error) });
+        this.recordEvent(
+          trace.traceId,
+          "ADDON_RESPONSE_RECEIVED",
+          attempt.providerId,
+          attempt.success ? "OK" : "FAILED",
+          { streamCount: attempt.streamCount, durationMs: attempt.durationMs },
+          attempt.success ? void 0 : "SOURCE_DISCOVERY_FAILED",
+          attempt.error
+        );
         this.notify(trace);
       }
       endTrace(traceIdOrCanonicalId, status) {
@@ -6036,29 +6139,32 @@ var init_mediaLoadingTracker = __esm({
           if (traceId) trace = this.traces.get(traceId);
         }
         if (!trace) return;
+        if (trace.endedAt) return;
         const now = Date.now();
         if (!trace.endedAt) {
           trace.endedAt = now;
           trace.totalDurationMs = now - trace.startedAt;
         }
-        if (status) trace.finalStatus = status;
+        if (status && !trace.finalStatus && (status !== "SUCCESS" || trace.events.some((event) => event.event === "PLAYBACK_CONFIRMED"))) {
+          trace.finalStatus = status;
+        }
         const lastStep = trace.history[trace.history.length - 1];
         if (lastStep && !lastStep.endedAt) {
           lastStep.endedAt = now;
           lastStep.durationMs = now - lastStep.startedAt;
         }
-        this.activeTraces.delete(trace.canonicalId);
+        if (this.activeTraces.get(trace.canonicalId) === trace.traceId) this.activeTraces.delete(trace.canonicalId);
         this.logDebug(trace, "FINALIZADO", `Trace encerrado com status [${trace.finalStatus || "CONCLU\xCDDO"}] em ${trace.totalDurationMs}ms`);
         this.notify(trace);
       }
       logDebug(trace, step, msg, details) {
-        if (process.env.NODE_ENV !== "production" || typeof window !== "undefined") {
+        if (process.env.NODE_ENV !== "production") {
           const epStr = trace.episode ? ` S${trace.season || 1}E${trace.episode}` : "";
           console.log(
             `%c[ZapiTV-Tracker]%c [${trace.title}${epStr}] ${step}: ${msg}`,
             "background: #ff5500; color: white; padding: 2px 4px; border-radius: 4px; font-weight: bold;",
             "color: #38bdf8;",
-            details || ""
+            safeDetails(details) || ""
           );
         }
       }
@@ -19536,19 +19642,8 @@ async function saveSnapshot2(connection, snapshot, version, actor) {
   return updated.length === 1;
 }
 
-// src/core/providers/validationTargetUrl.ts
-function resolveValidationTargetUrl(targetUrl) {
-  let candidate = targetUrl;
-  if (targetUrl.startsWith("/api/proxy?")) {
-    candidate = new URL(targetUrl, "https://zapitv.invalid").searchParams.get("url") || "";
-  }
-  try {
-    const parsed = new URL(candidate);
-    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
-  } catch {
-    return null;
-  }
-}
+// server.ts
+init_validationTargetUrl();
 
 // src/server/database/routes.ts
 import { Router } from "express";

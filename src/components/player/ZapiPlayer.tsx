@@ -37,9 +37,10 @@ import {
 } from '../../core/subtitles/subtitleStyleService';
 import { analyzeStreamSubtitleFormat } from '../../core/subtitles/streamSubtitleDetector';
 import { pipService } from '../../core/pip/pipService';
-import { mediaLoadingTracker } from '../../core/tracking/mediaLoadingTracker';
+import { classifyPlaybackError, mediaLoadingTracker, sanitizePlaybackReason } from '../../core/tracking/mediaLoadingTracker';
+import { createPlaybackConfirmationState, observePlayback } from '../../core/tracking/playbackConfirmation';
 import { mediaSourceValidationService } from '../../core/providers/mediaSourceValidationService';
-import { reportSourceEvidence, startSourceEvidence } from '../../core/providers/sourceMemory';
+import { reportSourceEvidence, sourceReference, startSourceEvidence } from '../../core/providers/sourceMemory';
 import { audioSelectionManager, AudioOption } from '../../core/audio/audioSelectionManager';
 import { playbackOptimizerService } from '../../core/playback/PlaybackOptimizerService';
 import { mediaAvailabilityIndex } from '../../core/catalog/MediaAvailabilityIndex';
@@ -67,6 +68,7 @@ interface ZapiPlayerProps {
   initialEpisode?: number;
   nextEpisodeInfo?: NextEpisodeInfo | null;
   playbackSessionId?: string;
+  loadingTraceId?: string;
   navigationType?: NavigationType;
   initialPlayIntro?: boolean;
   onIntroCompleted?: () => void;
@@ -137,6 +139,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   initialEpisode,
   nextEpisodeInfo,
   playbackSessionId,
+  loadingTraceId,
   navigationType,
   initialPlayIntro,
   onIntroCompleted,
@@ -152,6 +155,20 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     key: string; ticket: Promise<string | null>; selectedAt: number;
     playingAt: number | null; positionAt: number | null; reported: boolean;
   } | null>(null);
+  const playbackConfirmationRef = useRef(createPlaybackConfirmationState());
+  const frameSampleRef = useRef({ generation: 0, count: 0, pending: false });
+
+  useEffect(() => {
+    playbackConfirmationRef.current = createPlaybackConfirmationState();
+    const generation = frameSampleRef.current.generation + 1;
+    frameSampleRef.current = { generation, count: 0, pending: false };
+    if (loadingTraceId && currentStream?.url && !isLoadingStreams) {
+      mediaLoadingTracker.recordEvent(loadingTraceId, 'SOURCE_SELECTED', 'ZapiPlayer', 'OK',
+        { quality: currentStream.quality });
+      mediaLoadingTracker.recordEvent(loadingTraceId, 'PLAYER_INITIALIZED', 'ZapiPlayer');
+    }
+    return () => { frameSampleRef.current.generation++; };
+  }, [loadingTraceId, currentStream?.url, isLoadingStreams]);
 
   useEffect(() => {
     if (!currentStream?.url || isLoadingStreams) {
@@ -2274,6 +2291,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (isLoadingStreams) return;
     if (isSwitchingStreamRef.current) return;
     isSwitchingStreamRef.current = true;
+    playbackConfirmationRef.current = createPlaybackConfirmationState();
+    if (loadingTraceId) mediaLoadingTracker.recordEvent(loadingTraceId, 'SOURCE_VALIDATION',
+      'ZapiPlayer', 'FAILED', undefined, classifyPlaybackError(reason), reason);
     const evidence = sourceEvidenceRef.current;
     if (evidence && !evidence.reported && navigator.onLine &&
         /decodific|sem áudio funcional|sem faixa de áudio|não corresponde à obra|fonte isolada|domínio na lista|propaganda embutida|arquivo de vídeo inválido|HTTP 40[34]/i.test(reason)) {
@@ -2361,6 +2381,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         isSwitchingStreamRef.current = false;
       }, 50);
     } else {
+      if (loadingTraceId) mediaLoadingTracker.recordEvent(loadingTraceId, 'PLAYBACK_FAILED',
+        'ZapiPlayer', 'FAILED', undefined, classifyPlaybackError(reason), reason);
       if (videoRef.current && !videoRef.current.paused) {
         videoRef.current.pause();
       }
@@ -2402,7 +2424,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         } catch {}
       }
     }
-  }, [selectedStreamIndex, streams, isLoadingStreams, currentStream, item, activeAudioId, allSourcesFailed, hasUserConfirmedNonDubbed]);
+  }, [selectedStreamIndex, streams, isLoadingStreams, currentStream, item, activeAudioId, allSourcesFailed, hasUserConfirmedNonDubbed, loadingTraceId]);
 
   // Monitor loading of streams from parent modal
   useEffect(() => {
@@ -2438,6 +2460,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       }
       setAllSourcesFailed(true);
       setHasError(true);
+      if (loadingTraceId) mediaLoadingTracker.recordEvent(loadingTraceId, 'PLAYBACK_FAILED',
+        'ZapiPlayer', verificationState === 'INCONCLUSIVE' ? 'INCONCLUSIVE' : 'FAILED',
+        undefined, verificationState === 'INCONCLUSIVE' ? 'SOURCE_VALIDATION_INCONCLUSIVE' : 'NO_CANDIDATES',
+        streamResolutionError || undefined);
       if (verificationState === 'INCONCLUSIVE') {
         setFailureCategory('VERIFICATION_ERROR');
         setErrorMessage(
@@ -2470,7 +2496,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         setIsLoading(true);
       }
     }
-  }, [isBroadcastGuest, isLoadingStreams, verificationState, streams.length, streamResolutionError]);
+  }, [isBroadcastGuest, isLoadingStreams, verificationState, streams.length, streamResolutionError, loadingTraceId]);
 
   // Proteção global inteligente contra esperas infinitas na preparação de reprodução:
   // Se após múltiplas tentativas nenhuma fonte concluir o buffer, encerra com falha de reprodução descritiva.
@@ -2487,6 +2513,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       setIsPlayingIntro(false);
       setIsIntroEnded(true);
       setFailureCategory('PLAYBACK_FAILURE');
+      if (loadingTraceId) mediaLoadingTracker.recordEvent(loadingTraceId, 'PLAYBACK_FAILED',
+        'ZapiPlayer', 'FAILED', undefined, 'PLAYBACK_TIMEOUT', 'Preparação da mídia excedeu o tempo limite');
       setErrorMessage(
         streams.every(s => s.isTorrent || s.url?.includes('127.0.0.1:11470') || s.url?.includes('localhost:11470'))
           ? 'As fontes encontradas dependem do aplicativo de streaming local Stremio Engine (porta 11470), que não está ativo neste momento.'
@@ -2496,7 +2524,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       videoRef.current?.pause();
     }, maxPlaybackPreparationTime);
     return () => clearTimeout(timer);
-  }, [isBroadcastGuest, isLoadingStreams, streams.length, isMediaReady, allSourcesFailed]);
+  }, [isBroadcastGuest, isLoadingStreams, streams.length, isMediaReady, allSourcesFailed, loadingTraceId]);
 
   // Pre-flight instant probe of candidate stream
   useEffect(() => {
@@ -3924,6 +3952,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             playsInline
             muted={isPlayingIntro || isMuted}
             onLoadedMetadata={() => {
+              if (loadingTraceId) mediaLoadingTracker.recordEvent(loadingTraceId,
+                'MANIFEST_OR_METADATA_LOADED', 'ZapiPlayer');
               markMediaAsReadyRef.current();
               applyTargetResumeTime();
             }}
@@ -3947,6 +3977,40 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                 const video = videoRef.current;
                 const cur = video.currentTime;
                 setCurrentTime(cur);
+                const frameSample = frameSampleRef.current;
+                if (!playbackConfirmationRef.current.confirmed &&
+                    typeof video.requestVideoFrameCallback === 'function' && !frameSample.pending) {
+                  frameSample.pending = true;
+                  const generation = frameSample.generation;
+                  video.requestVideoFrameCallback(() => {
+                    if (frameSampleRef.current.generation === generation) {
+                      frameSampleRef.current.count++;
+                      frameSampleRef.current.pending = false;
+                    }
+                  });
+                }
+                const browserFrames = video.getVideoPlaybackQuality?.()?.totalVideoFrames ??
+                  (video as any).webkitDecodedFrameCount ?? null;
+                const presentedFrames = typeof browserFrames === 'number'
+                  ? browserFrames : typeof video.requestVideoFrameCallback === 'function' ? frameSample.count : null;
+                const eligible = !isPlayingIntro && isIntroEnded && !video.paused &&
+                  !video.seeking && video.readyState >= 3 && video.videoWidth > 0 && video.videoHeight > 0;
+                const priorConfirmation = playbackConfirmationRef.current;
+                const nextConfirmation = observePlayback(priorConfirmation, {
+                  wallTimeMs: Date.now(), mediaTimeSeconds: cur, presentedFrames, eligible
+                });
+                playbackConfirmationRef.current = nextConfirmation;
+                if (loadingTraceId && priorConfirmation.startedAtMs === null && nextConfirmation.startedAtMs !== null) {
+                  mediaLoadingTracker.recordEvent(loadingTraceId, 'CONTENT_PLAYING', 'ZapiPlayer', 'STARTED');
+                  mediaLoadingTracker.transition(loadingTraceId, 'PLAYING');
+                }
+                if (loadingTraceId && nextConfirmation.confirmed && !priorConfirmation.confirmed) {
+                  mediaLoadingTracker.recordEvent(loadingTraceId, 'PLAYBACK_CONFIRMED', 'ZapiPlayer', 'OK', {
+                    mediaSeconds: cur - (nextConfirmation.startedAtSeconds || 0),
+                    frames: presentedFrames === null || nextConfirmation.framesAtStart === null
+                      ? 0 : presentedFrames - nextConfirmation.framesAtStart
+                  });
+                }
                 const evidence = sourceEvidenceRef.current;
                 if (evidence && !evidence.reported && !isPlayingIntro && isIntroEnded &&
                     !video.paused && !video.seeking && video.readyState >= 3) {
@@ -3958,8 +4022,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                   const hasAudio = (video as any).mozHasAudio !== false &&
                     ((video as any).audioTracks?.length ?? 1) > 0 &&
                     (typeof decodedAudio !== 'number' || decodedAudio > 0);
-                  if (Date.now() - evidence.playingAt >= 5_000 &&
-                      cur - (evidence.positionAt || 0) >= 5 && hasAudio) {
+                  if (nextConfirmation.confirmed && hasAudio &&
+                      Date.now() - evidence.playingAt >= 15_000 &&
+                      cur - (evidence.positionAt || 0) >= 15) {
                     evidence.reported = true;
                     const actualQuality = video.videoHeight >= 2160 ? '4K' : video.videoHeight >= 1080 ? '1080p'
                       : video.videoHeight >= 720 ? '720p' : video.videoHeight >= 480 ? '480p' : undefined;
@@ -4003,6 +4068,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               }
             }}
             onSeeking={() => {
+              playbackConfirmationRef.current = createPlaybackConfirmationState();
+              if (sourceEvidenceRef.current && !sourceEvidenceRef.current.reported) {
+                sourceEvidenceRef.current.playingAt = null;
+                sourceEvidenceRef.current.positionAt = null;
+              }
               isSeekingRef.current = true;
               setIsSeeking(true);
               setIsLoading(true);
@@ -4054,6 +4124,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               if (videoRef.current) setDuration(videoRef.current.duration);
             }}
             onWaiting={() => {
+              playbackConfirmationRef.current = createPlaybackConfirmationState();
+              if (sourceEvidenceRef.current && !sourceEvidenceRef.current.reported) {
+                sourceEvidenceRef.current.playingAt = null;
+                sourceEvidenceRef.current.positionAt = null;
+              }
               setIsLoading(true);
               playbackOptimizerService.notifyBufferingStart();
               watchPartyService.setBuffering(true);
@@ -4076,10 +4151,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                   duration || videoRef.current?.duration
                 );
               }
-              mediaLoadingTracker.transition(item.id, 'PLAYING', {
-                streamTitle: currentStream?.title,
-                quality: currentStream?.quality
-              });
+              // onPlaying alone is not proof of main-content playback.
             }}
             onStalled={() => {
               playbackOptimizerService.notifyBufferingStart();
@@ -4095,12 +4167,20 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               }
               try {
                 console.warn('[ZapiPlayer] Erro disparado pelo elemento de vídeo nativo:', e, video?.error);
-                handleStreamFallbackRef.current('Erro ao decodificar fluxo de vídeo.');
+                const mediaCode = video?.error?.code;
+                handleStreamFallbackRef.current(mediaCode === 2 ? 'Falha de rede na mídia.'
+                  : mediaCode === 3 ? 'Erro ao decodificar fluxo de vídeo.'
+                  : mediaCode === 4 ? 'Formato de mídia incompatível.' : 'Falha ao iniciar o vídeo.');
               } catch (err) {
                 console.warn('[ZapiPlayer] Erro capturado no handler onError do vídeo:', err);
               }
             }}
             onPause={() => {
+              playbackConfirmationRef.current = createPlaybackConfirmationState();
+              if (sourceEvidenceRef.current && !sourceEvidenceRef.current.reported) {
+                sourceEvidenceRef.current.playingAt = null;
+                sourceEvidenceRef.current.positionAt = null;
+              }
               setIsPlaying(false);
               if (
                 (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) &&
@@ -5337,17 +5417,26 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           item,
           season: (item.type === ContentType.MOVIE || item.mediaFormat === 'movie' || (item.type as any) === 'movie' || (item.type as any) === 'FILME') ? undefined : initialSeason,
           episode: (item.type === ContentType.MOVIE || item.mediaFormat === 'movie' || (item.type as any) === 'movie' || (item.type as any) === 'FILME') ? undefined : initialEpisode,
-          sourceId: currentStream?.url || currentStream?.behaviorHints?.bingeGroup || `stream_${selectedStreamIndex}`,
-          providerId: currentStream?.behaviorHints?.bingeGroup || currentStream?.name || 'stremio_stream',
-          streamName: currentStream?.name || currentStream?.title,
+          sourceId: currentStream ? sourceReference(currentStream) : undefined,
+          providerId: currentStream?.providerId || 'stremio_stream',
+          streamName: sanitizePlaybackReason(currentStream?.name || currentStream?.title),
           streamType: currentStream?.url?.includes('.m3u8') ? 'hls' : currentStream?.url?.includes('.mp4') ? 'mp4' : 'unknown',
           requestedLanguage: activeAudioId || undefined,
           declaredLanguage: currentStream?.isPtBr ? 'pt-BR' : currentStream?.isDubbed ? 'dubbed' : 'original',
           selectedQuality,
           currentTimeSeconds: currentTime,
           durationSeconds: duration,
-          lastErrorMessage: errorMessage || undefined,
-          playerState: isLoading ? 'buffering' : isPlaying ? 'playing' : hasError ? 'error' : 'idle',
+          lastErrorMessage: [
+            mediaLoadingTracker.getDiagnostic(loadingTraceId || item.id).traceId,
+            mediaLoadingTracker.getDiagnostic(loadingTraceId || item.id).stage,
+            sanitizePlaybackReason(errorMessage || mediaLoadingTracker.getDiagnostic(loadingTraceId || item.id).reason)
+          ].filter(Boolean).join(' | ') || undefined,
+          errorCode: mediaLoadingTracker.getDiagnostic(loadingTraceId || item.id).errorCode,
+          failureStage: streams.length === 0 ? 'source_discovery'
+            : mediaLoadingTracker.getDiagnostic(loadingTraceId || item.id).errorCode === 'MANIFEST_ERROR' ? 'hls_manifest'
+            : mediaLoadingTracker.getDiagnostic(loadingTraceId || item.id).errorCode === 'MEDIA_DECODE_ERROR' ? 'decoding'
+            : hasError ? 'playback_stall' : 'none',
+          playerState: hasError ? 'error' : isLoading ? 'buffering' : isPlaying ? 'playing' : 'idle',
           isStalling: isLoading
         }}
       />
