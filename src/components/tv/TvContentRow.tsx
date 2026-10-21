@@ -1,7 +1,7 @@
-import React, { memo, useState, useRef, useCallback, useEffect } from 'react';
-import { FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
+import React, { memo, useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { ContentItem } from '../../../types';
-import { TvCard16x9 } from './TvCard16x9';
+import { TvCard16x9, getCardAmbientGlow } from './TvCard16x9';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 
 interface TvContentRowProps {
@@ -14,6 +14,28 @@ interface TvContentRowProps {
   onRowUp?: () => void;
   onRowDown?: () => void;
 }
+
+// Margem segura da interface (55-65px na resolução de referência 1920x1080)
+// 64px alinha com precisão milimétrica com o título da seção (sm:px-16 = 4rem = 64px)
+const SAFE_MARGIN_LEFT = 64;
+const CARD_GAP = 24; // gap-6 = 24px
+
+/**
+ * Retorna os slots visíveis no carrossel de acordo com a quantidade de mídias disponíveis.
+ * Garante que nenhuma mídia seja duplicada simultaneamente na tela quando o catálogo for reduzido.
+ */
+const getVisibleSlots = (count: number): number[] => {
+  if (count <= 0) return [];
+  if (count === 1) return [0];
+  if (count === 2) return [-1, 0];
+  if (count === 3) return [-1, 0, 1];
+  if (count === 4) return [-1, 0, 1, 2];
+  if (count === 5) return [-1, 0, 1, 2, 3];
+  if (count === 6) return [-1, 0, 1, 2, 3, 4];
+  if (count === 7) return [-1, 0, 1, 2, 3, 4, 5];
+  // Catálogo completo (>= 8 itens): buffer de 2 cards à esquerda (-2, -1), card selecionado (0) e cards visíveis à direita (1 a 7)
+  return [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7];
+};
 
 export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   title,
@@ -28,23 +50,27 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   const containerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  // Índice do item ativo fixado na primeira posição visível (Slot 0)
+  // Índice do item ativo fixado na primeira posição visível (Slot 0 em SAFE_MARGIN_LEFT)
   const [currentIndex, setCurrentIndex] = useState(0);
   const [translateX, setTranslateX] = useState(0);
   const [transitionEnabled, setTransitionEnabled] = useState(false);
   const isAnimatingRef = useRef(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingSlideRef = useRef<'right' | 'left' | null>(null);
 
   // Medição precisa da largura do card + gap (step) para transição fluida sem saltos
   const slotMeasureRef = useRef<HTMLDivElement>(null);
+  const [cardWidth, setCardWidth] = useState(260);
   const [stepSize, setStepSize] = useState(284);
 
   useEffect(() => {
     const measure = () => {
       if (slotMeasureRef.current) {
         const w = slotMeasureRef.current.getBoundingClientRect().width;
-        if (w > 120) {
-          setStepSize(Math.round(w + 24)); // 24px = gap-6
+        if (w > 100) {
+          const wInt = Math.round(w);
+          setCardWidth(wInt);
+          setStepSize(wInt + CARD_GAP);
         }
       }
     };
@@ -53,10 +79,35 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     return () => window.removeEventListener('resize', measure);
   }, []);
 
-  // Navegação horizontal circular: avança mantendo a seleção na primeira posição
+  // Descarrega qualquer animação pendente imediatamente para permitir navegação rápida contínua
+  const flushPendingSlide = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (isAnimatingRef.current && pendingSlideRef.current) {
+      const dir = pendingSlideRef.current;
+      pendingSlideRef.current = null;
+      if (dir === 'right') {
+        setCurrentIndex(prev => (prev + 1) % items.length);
+      } else if (dir === 'left') {
+        setCurrentIndex(prev => (prev - 1 + items.length) % items.length);
+      }
+      setTransitionEnabled(false);
+      setTranslateX(0);
+      isAnimatingRef.current = false;
+    }
+  }, [items.length]);
+
+  // Navegação horizontal circular para a direita: o trilho desliza e a seleção permanece fixa
   const slideNext = useCallback(() => {
-    if (!items || items.length <= 1 || isAnimatingRef.current) return;
+    if (!items || items.length <= 1) return;
+    if (isAnimatingRef.current) {
+      flushPendingSlide();
+    }
+
     isAnimatingRef.current = true;
+    pendingSlideRef.current = 'right';
     setTransitionEnabled(true);
     setTranslateX(-stepSize);
 
@@ -65,13 +116,19 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
       setCurrentIndex(prev => (prev + 1) % items.length);
       setTranslateX(0);
       isAnimatingRef.current = false;
-    }, 200);
-  }, [items, stepSize]);
+      pendingSlideRef.current = null;
+    }, 180);
+  }, [items, stepSize, flushPendingSlide]);
 
-  // Navegação horizontal circular: retrocede mantendo a seleção na primeira posição
+  // Navegação horizontal circular para a esquerda: o trilho desliza e a seleção permanece fixa
   const slidePrev = useCallback(() => {
-    if (!items || items.length <= 1 || isAnimatingRef.current) return;
+    if (!items || items.length <= 1) return;
+    if (isAnimatingRef.current) {
+      flushPendingSlide();
+    }
+
     isAnimatingRef.current = true;
+    pendingSlideRef.current = 'left';
     setTransitionEnabled(true);
     setTranslateX(stepSize);
 
@@ -80,8 +137,9 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
       setCurrentIndex(prev => (prev - 1 + items.length) % items.length);
       setTranslateX(0);
       isAnimatingRef.current = false;
-    }, 200);
-  }, [items, stepSize]);
+      pendingSlideRef.current = null;
+    }, 180);
+  }, [items, stepSize, flushPendingSlide]);
 
   // Foco espacial do Norigin na fileira inteira com ancoragem no Slot 0
   const focusKey = `row-${rowId}`;
@@ -95,11 +153,11 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     onArrowPress: (direction) => {
       if (direction === 'right') {
         slideNext();
-        return false; // Intercepta para deslocar o track e fixar o foco no Slot 0
+        return false; // Intercepta para deslocar o track mantendo o foco fixo no Slot 0
       }
       if (direction === 'left') {
         slidePrev();
-        return false; // Intercepta para deslocar o track e fixar o foco no Slot 0
+        return false; // Intercepta para deslocar o track mantendo o foco fixo no Slot 0
       }
       if (direction === 'up') {
         if (onRowUp) {
@@ -146,10 +204,12 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     return null;
   }
 
-  // Janela deslizante circular: Slot -1 (trazido na volta), Slot 0 (ativo), Slots 1 a 8 (à direita)
-  const visibleSlots = items.length > 1 
-    ? [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8] 
-    : [0];
+  // Janela circular de renderização calculada com base na quantidade real de itens
+  const visibleSlots = useMemo(() => getVisibleSlots(items.length), [items.length]);
+  const negativeSlotsCount = visibleSlots.filter(s => s < 0).length;
+  // Offset base posiciona o Slot 0 rigorosamente em SAFE_MARGIN_LEFT (64px)
+  const baseOffset = SAFE_MARGIN_LEFT - negativeSlotsCount * stepSize;
+  const currentItem = items[currentIndex] || items[0];
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -161,7 +221,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
         className="w-full mb-10 sm:mb-12 select-none overflow-hidden focus:outline-none"
         aria-label={title}
       >
-        {/* Título da Fileira (Alinhado à margem segura, sem contadores e sem selos decorativos) */}
+        {/* Título da Fileira (Alinhado com a margem segura de 64px, sem contadores) */}
         <div className="px-14 sm:px-16 mb-2">
           <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wide drop-shadow-md">
             {title}
@@ -169,33 +229,54 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
         </div>
 
         {/* Trilho Horizontal Infinito de Ponta a Ponta na Tela */}
-        <div className="relative w-full overflow-hidden py-7 sm:py-8">
+        <div className="relative w-full overflow-hidden py-8">
+          {/* MOLDURA FIXA DE SELEÇÃO: Permanece imóvel em SAFE_MARGIN_LEFT enquanto o conteúdo desliza por baixo */}
+          {focused && currentItem && (
+            <div 
+              className="absolute z-30 pointer-events-none transition-all duration-200"
+              style={{
+                left: `${SAFE_MARGIN_LEFT}px`,
+                top: '2rem', // 32px alinhado exatamente ao py-8 do container
+                width: `${cardWidth}px`,
+                aspectRatio: '2/3'
+              }}
+            >
+              {/* Glow Ambiente Atmosférico que acompanha as cores do item selecionado */}
+              <div 
+                className="absolute -inset-3 sm:-inset-4 rounded-3xl pointer-events-none transition-all duration-300 transform-gpu opacity-85"
+                style={{
+                  background: getCardAmbientGlow(currentItem),
+                  filter: 'blur(20px)',
+                  zIndex: -1
+                }}
+                aria-hidden="true"
+              />
+
+              {/* Contorno Ciano Original ZapiTV de 2px com glow suave e cantos perfeitamente simétricos */}
+              <div className="w-full h-full rounded-2xl border-2 border-cyan-400 shadow-[0_0_24px_rgba(0,229,255,0.6),0_12px_28px_rgba(0,0,0,0.85)]" />
+            </div>
+          )}
+
+          {/* Track Deslizante com cards verticais 2:3 */}
           <div 
             ref={trackRef}
             className="flex items-center gap-6 will-change-transform"
             style={{
-              transform: `translate3d(${translateX}px, 0, 0)`,
-              transition: transitionEnabled ? 'transform 200ms cubic-bezier(0.2, 0, 0, 1)' : 'none',
-              paddingLeft: '3.5rem' // 56px (pl-14) garantindo safe area e zero corte no foco
+              transform: `translate3d(${baseOffset + translateX}px, 0, 0)`,
+              transition: transitionEnabled ? 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
             }}
           >
             {visibleSlots.map((slotIdx) => {
-              const itemIndex = (currentIndex + slotIdx + items.length * 1000) % items.length;
+              const itemIndex = ((currentIndex + slotIdx) % items.length + items.length) % items.length;
               const item = items[itemIndex];
               const isSlotActive = slotIdx === 0;
               const isSlotFocused = isSlotActive && focused;
 
-              // Slot -1 fica invisível quando parado para não invadir a margem esquerda
-              const isSlotMinusOne = slotIdx === -1;
-              const slotOpacityClass = isSlotMinusOne 
-                ? (translateX > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none') 
-                : 'opacity-100';
-
               return (
                 <div 
-                  key={`slot-${slotIdx}-${item.id}`}
+                  key={`slot-${slotIdx}`}
                   ref={slotIdx === 0 ? slotMeasureRef : undefined}
-                  className={`flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px] transition-opacity duration-200 ${slotOpacityClass}`}
+                  className="flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px] opacity-100"
                 >
                   <TvCard16x9
                     item={item}
@@ -204,6 +285,8 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
                     priority={slotIdx >= 0 && slotIdx <= 4}
                     isFocusable={false}
                     isFocused={isSlotFocused}
+                    disableScale={true}
+                    suppressFocusBorder={true}
                   />
                 </div>
               );

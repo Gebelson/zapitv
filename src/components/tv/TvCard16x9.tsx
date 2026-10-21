@@ -15,6 +15,8 @@ interface TvCardProps {
   onUpPress?: () => void;
   isFocused?: boolean;
   isFocusable?: boolean;
+  disableScale?: boolean;
+  suppressFocusBorder?: boolean;
 }
 
 // Gera o gradiente de glow ambiente suave personalizado de acordo com o gênero e tom da obra
@@ -50,7 +52,9 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   priority = false,
   onUpPress,
   isFocused,
-  isFocusable = true
+  isFocusable = true,
+  disableScale = false,
+  suppressFocusBorder = false
 }) => {
   // Prioriza o poster vertical real em 2:3 com luminosidade e cores originais
   const [imgSrc, setImgSrc] = useState<string>(() => {
@@ -131,7 +135,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
       data-tv-focused={isTvFocused ? "true" : undefined}
       onClick={() => onClick(item)}
       className={`group/tvcard relative flex-none select-none outline-none cursor-pointer transition-all duration-200 transform-gpu ${
-        isTvFocused 
+        isTvFocused && !disableScale
           ? 'scale-105 z-40' 
           : 'hover:scale-102 z-10'
       } ${className}`}
@@ -140,8 +144,8 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
       {/* Iluminação suave e atmosférica que acompanha as cores originais da capa */}
       <div 
         className={`absolute -inset-3 sm:-inset-4 rounded-3xl pointer-events-none transition-all duration-300 transform-gpu ${
-          isTvFocused 
-            ? 'opacity-85 scale-105' 
+          isTvFocused && !suppressFocusBorder
+            ? (disableScale ? 'opacity-85' : 'opacity-85 scale-105') 
             : 'opacity-25 scale-95'
         }`}
         style={{
@@ -154,7 +158,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
 
       {/* Caixa Vertical 2:3 Principal (Sem bordas duplicadas e sem corte nas extremidades) */}
       <div className={`relative w-full aspect-[2/3] rounded-2xl overflow-hidden bg-[#0d121d] transition-all duration-200 shadow-xl ${
-        isTvFocused
+        isTvFocused && !suppressFocusBorder
           ? 'border-2 border-cyan-400 shadow-[0_0_24px_rgba(0,229,255,0.6),0_12px_28px_rgba(0,0,0,0.85)]'
           : 'border-2 border-white/10 group-hover/tvcard:border-white/25'
       }`}>

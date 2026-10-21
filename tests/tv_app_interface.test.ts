@@ -187,15 +187,19 @@ async function runTvAppInterfaceTests() {
   );
   console.log('✓ Teste 14: Banner ocupa 100% da primeira viewport e carrosséis começam abaixo da tela OK');
 
-  // Teste 15: Carrossel infinito circular com foco fixo no primeiro slot
+  // Teste 15: Carrossel infinito circular com foco fixo no primeiro slot e capa parcial na esquerda
   assert(
     tvContentRowCode.includes('slideNext') &&
     tvContentRowCode.includes('slidePrev') &&
     tvContentRowCode.includes('translate3d') &&
-    tvContentRowCode.includes('isSlotActive && focused'),
-    'TvContentRow deve implementar trilho horizontal deslizante com foco fixo no primeiro slot'
+    tvContentRowCode.includes('isSlotActive && focused') &&
+    tvContentRowCode.includes('SAFE_MARGIN_LEFT') &&
+    tvContentRowCode.includes('getVisibleSlots') &&
+    tvContentRowCode.includes('border-cyan-400') &&
+    !tvContentRowCode.includes('isSlotMinusOne ?'),
+    'TvContentRow deve implementar trilho horizontal deslizante com foco fixo no primeiro slot, capa parcial na esquerda e sem duplicatas simultâneas'
   );
-  console.log('✓ Teste 15: Carrossel circular infinito com seleção fixa no primeiro card OK');
+  console.log('✓ Teste 15: Carrossel circular infinito com seleção fixa, capa parcial visível à esquerda e sem duplicatas OK');
 
   // Teste 16: TvHeroBanner suporta múltiplos destaques com transições cinematográficas e controles remotos
   assert(
