@@ -3,7 +3,7 @@ import {
   ArrowLeft, Play, Pause, RotateCcw, RotateCw, Volume2, VolumeX,
   Maximize, Minimize, Settings, SkipForward, AlertCircle, RefreshCw,
   Subtitles, Check, Sliders, Search, Globe, Languages, FastForward,
-  Sparkles, X, PictureInPicture2, ShieldAlert, Radio
+  Sparkles, X, PictureInPicture2, ShieldAlert, Radio, Smartphone
 } from 'lucide-react';
 import Hls from 'hls.js';
 import { ReportFeedbackModal } from '../feedback/ReportFeedbackModal';
@@ -52,6 +52,7 @@ import { RoomLifecycleState, TransmissionMode } from '../../core/watchparty/watc
 import { VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../../core/providers/sourceVerificationService';
 import { tvModeService } from '../../core/tv/tvModeService';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
+import { mobileFullscreenService, MobileFullscreenState } from '../../core/mobile/mobileFullscreenService';
 
 export interface NextEpisodeInfo {
   season: number;
@@ -199,10 +200,18 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const hlsRef = useRef<Hls | null>(null);
   const isMountedRef = useRef<boolean>(true);
 
+  // Estado e monitoramento de Tela Cheia e Orientação Mobile
+  const [mobileState, setMobileState] = useState<MobileFullscreenState>(() => mobileFullscreenService.getState());
+
+  useEffect(() => {
+    return mobileFullscreenService.subscribe(setMobileState);
+  }, []);
+
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      mobileFullscreenService.exitMobileFullscreen().catch(() => {});
       try {
         if (
           document.fullscreenElement &&
@@ -1937,12 +1946,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       clearInterval(autoPlayTimerRef.current);
       autoPlayTimerRef.current = null;
     }
+    mobileFullscreenService.exitMobileFullscreen().catch(() => {});
     onClose();
   }, [flushProgress, playbackSessionId, onClose]);
 
   // Limpeza profunda garantida ao desmontar o componente do player
   useEffect(() => {
     return () => {
+      mobileFullscreenService.exitMobileFullscreen().catch(() => {});
       if (watchPartyService.isHost()) {
         watchPartyService.stopHostBroadcast();
       }
@@ -3522,6 +3533,24 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
+
+    if (mobileFullscreenService.isMobile()) {
+      if (mobileFullscreenService.isFullscreenActive() || isFullscreen) {
+        mobileFullscreenService.exitMobileFullscreen().then(() => setIsFullscreen(false)).catch(console.error);
+      } else {
+        mobileFullscreenService.requestAutoFullscreenAndLandscape(containerRef.current).then((res) => {
+          if (res.fullscreenGranted) {
+            setIsFullscreen(true);
+          } else if (videoRef.current && (videoRef.current as any).webkitEnterFullscreen) {
+            try {
+              (videoRef.current as any).webkitEnterFullscreen();
+            } catch {}
+          }
+        }).catch(console.error);
+      }
+      return;
+    }
+
     if (!document.fullscreenElement) {
       containerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(console.error);
     } else {
@@ -3680,10 +3709,33 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       onClick={handleUserActivity}
       onTouchStart={handleUserActivity}
       onMouseLeave={handleMouseLeave}
-      className={`fixed inset-0 z-[2000] bg-black flex items-center justify-center select-none overflow-hidden font-sans transition-all duration-150 ${
+      className={`fixed inset-0 h-[100dvh] w-screen z-[2000] bg-black flex items-center justify-center select-none overflow-hidden font-sans transition-all duration-150 ${
         !isCursorVisible && !hasOpenMenu ? 'cursor-none hide-cursor [&_*]:!cursor-none' : 'cursor-default'
       }`}
     >
+      {/* Dica discreta de orientação horizontal para aparelhos móveis em formato retrato */}
+      {mobileState.showOrientationHint && !showNonDubbedPrompt && !isPlayingIntro && (
+        <aside
+          role="status"
+          aria-live="polite"
+          className="absolute top-16 sm:top-20 left-1/2 -translate-x-1/2 z-[3200] flex items-center gap-2 px-4 py-2 bg-black/85 border border-white/20 text-white text-xs font-semibold rounded-full shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-top-4 duration-300"
+        >
+          <Smartphone className="w-4 h-4 text-cyan-400 rotate-90 shrink-0 animate-pulse" />
+          <span>Gire o aparelho para tela cheia</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              mobileFullscreenService.dismissOrientationHint();
+            }}
+            className="ml-1 p-0.5 hover:bg-white/20 rounded-full text-white/70 hover:text-white transition-colors cursor-pointer"
+            aria-label="Dispensar aviso de rotação"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </aside>
+      )}
+
       {/* Banner de Ativação Rápida de Áudio por 1 Toque (Prevenção de Autoplay Policy) */}
       {isAutoplayAudioBlocked && !isPlayingIntro && !showNonDubbedPrompt && (
         <button
@@ -3846,7 +3898,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       )}
 
       {/* Top Header Bar */}
-      <div className={`absolute top-0 inset-x-0 p-4 md:p-6 bg-gradient-to-b from-black/90 via-black/40 to-transparent z-50 flex items-center justify-between transition-opacity duration-300 ${(showControls || !isPlaying || hasOpenMenu) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <div className={`absolute top-0 inset-x-0 p-4 md:p-6 pl-[calc(1rem+env(safe-area-inset-left,0px))] pr-[calc(1rem+env(safe-area-inset-right,0px))] pt-[calc(1rem+env(safe-area-inset-top,0px))] bg-gradient-to-b from-black/90 via-black/40 to-transparent z-50 flex items-center justify-between transition-opacity duration-300 ${(showControls || !isPlaying || hasOpenMenu) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-3 md:gap-4 max-w-[65%] sm:max-w-[70%]">
           <button
             onClick={handlePlayerClose}
@@ -4551,7 +4603,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       {/* Bottom Controls Bar (Native ZapiTV Controls) */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`absolute bottom-0 inset-x-0 p-3 sm:p-4 md:p-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] bg-gradient-to-t from-black/95 via-black/60 to-transparent z-40 transition-opacity duration-300 ${(showControls || !isPlaying || hasOpenMenu) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`absolute bottom-0 inset-x-0 p-3 sm:p-4 md:p-6 pl-[calc(0.75rem+env(safe-area-inset-left,0px))] pr-[calc(0.75rem+env(safe-area-inset-right,0px))] md:pl-[calc(1.5rem+env(safe-area-inset-left,0px))] md:pr-[calc(1.5rem+env(safe-area-inset-right,0px))] pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] bg-gradient-to-t from-black/95 via-black/60 to-transparent z-40 transition-opacity duration-300 ${(showControls || !isPlaying || hasOpenMenu) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       >
         {/* Progress Scrubber */}
         <div className={`relative w-full py-2 mb-2 sm:mb-3 group flex items-center select-none ${(isPlayingIntro || (isBroadcastGuest && !watchPartyService.canLocalControl('canSeek'))) ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}>

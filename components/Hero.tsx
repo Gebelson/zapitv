@@ -6,6 +6,7 @@ import { ZapiLoader } from '../src/components/common/ZapiLoader';
 import { theatricalFilterService } from '../src/core/catalog/theatricalFilterService';
 import { heroCarouselStore, MAX_HERO_DISPLAY_COUNT } from '../src/core/catalog/heroCarouselStore';
 import { uiSoundService } from '../src/core/audio/uiSoundService';
+import { mobileFullscreenService } from '../src/core/mobile/mobileFullscreenService';
 
 interface HeroProps {
   featuredItems: ContentItem[];
@@ -867,7 +868,10 @@ const Hero: React.FC<HeroProps> = ({
                 <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:gap-3 w-full sm:w-auto justify-center md:justify-start">
                   <button 
                     type="button"
-                    onClick={() => onActionClick?.(item)}
+                    onClick={() => {
+                      mobileFullscreenService.requestAutoFullscreenAndLandscape().catch(() => {});
+                      onActionClick?.(item);
+                    }}
                     className="flex-1 sm:flex-none flex items-center justify-center gap-2 md:gap-3 px-5 sm:px-6 md:px-10 py-3 sm:py-3.5 md:py-4 bg-[#007df7] hover:bg-[#0069d9] text-white rounded-xl md:rounded-2xl font-black transition-all hover:scale-105 active:scale-95 shadow-xl shadow-[#007df7]/30 text-xs sm:text-sm md:text-base min-h-[44px] cursor-pointer"
                   >
                     <Play className="w-4 h-4 md:w-5 md:h-5 fill-current" />

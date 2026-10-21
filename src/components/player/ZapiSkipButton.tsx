@@ -205,7 +205,7 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
 
   return (
     <div
-      className={`absolute bottom-24 sm:bottom-28 right-6 sm:right-8 z-50 pointer-events-auto inline-flex items-center group select-none animate-in fade-in zoom-in-95 duration-200 ${className}`}
+      className={`absolute bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] sm:bottom-28 right-[calc(1.5rem+env(safe-area-inset-right,0px))] z-50 pointer-events-auto inline-flex items-center group select-none animate-in fade-in zoom-in-95 duration-200 ${className}`}
       onClick={(e) => e.stopPropagation()}
     >
       <style>{`

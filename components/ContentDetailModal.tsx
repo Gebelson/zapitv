@@ -26,6 +26,7 @@ import { useTvFocusable } from '../src/core/tv/useTvFocusable';
 import { tvModeService } from '../src/core/tv/tvModeService';
 import { tvNavigationManager } from '../src/core/tv/tvNavigationManager';
 import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import { mobileFullscreenService } from '../src/core/mobile/mobileFullscreenService';
 
 const DetailModalTvButton: React.FC<{
   focusKey: string;
@@ -105,7 +106,10 @@ const EpisodeTvRow: React.FC<{
       key={ep.id} 
       data-focus-key={`ep-${currentSeason}-${ep.number}`}
       tabIndex={isTv ? 0 : undefined}
-      onClick={() => onEpisodeClick(currentSeason, ep.number)} 
+      onClick={() => {
+        mobileFullscreenService.requestAutoFullscreenAndLandscape().catch(() => {});
+        onEpisodeClick(currentSeason, ep.number);
+      }} 
       className={`group flex flex-row items-center gap-3 sm:gap-4 md:gap-6 p-3 sm:p-4 md:p-6 transition-all cursor-pointer border-b border-black/20 last:border-0 ${
         focused ? 'tv-focused bg-white/10 ring-2 ring-[#00e5ff] scale-[1.01] z-20' : 'hover:bg-white/5'
       }`}
@@ -417,6 +421,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   }, [item, totalSeasons, episodes.length, progressVersion]);
 
   const handleClose = useCallback(() => {
+    mobileFullscreenService.exitMobileFullscreen().catch(() => {});
     uiSoundService.play('detailClose');
     playbackRequestIdRef.current++;
     cancelAllPendingRequests();
@@ -445,6 +450,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   }, [isPlaying, handleClose]);
 
   const handleClosePlayer = useCallback(() => {
+    mobileFullscreenService.exitMobileFullscreen().catch(() => {});
     playbackRequestIdRef.current++;
     cancelAllPendingRequests();
     if (loadingTraceIdRef.current) mediaLoadingTracker.endTrace(loadingTraceIdRef.current, 'CANCELLED');
@@ -659,6 +665,11 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     navType: NavigationType = 'manual_start',
     isAutoRetry = false
   ) => {
+    // Solicitação imediata de Fullscreen e Orientação no gesto de toque antes de operações assíncronas
+    if (navType === 'manual_start' || navType === 'continuous_playback') {
+      mobileFullscreenService.requestAutoFullscreenAndLandscape().catch(() => {});
+    }
+
     const currentRequestId = ++playbackRequestIdRef.current;
     const currentTargetItem = item;
     let epParams: { season: number; episode: number } | undefined = undefined;
@@ -1124,7 +1135,10 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                   <DetailModalTvButton 
                     focusKey="modal-play"
                     className="h-11 sm:h-12 px-4 sm:px-6 md:px-8 bg-[#007df7] text-white rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm md:text-base hover:bg-[#0069d9] transition-all hover:scale-105 active:scale-95 shadow-xl shadow-[#007df7]/20 flex items-center justify-center gap-2 select-none border border-transparent box-border"
-                    onClick={() => startPlayback(undefined, undefined, 'manual_start')}
+                    onClick={() => {
+                      mobileFullscreenService.requestAutoFullscreenAndLandscape().catch(() => {});
+                      startPlayback(undefined, undefined, 'manual_start');
+                    }}
                   >
                     <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current shrink-0" />
                     <span>
@@ -1299,6 +1313,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
               onStartWatchPartyPlayback={(targetItem, targetSeason, targetEpisode) => {
                 setShowWatchPartyModal(false);
                 setSessionIntroPlayed(false);
+                mobileFullscreenService.requestAutoFullscreenAndLandscape().catch(() => {});
                 startPlayback(targetSeason, targetEpisode, 'manual_start');
               }}
             />
