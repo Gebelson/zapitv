@@ -29,31 +29,21 @@ class TvModeService {
     this.initialized = true;
 
     try {
+      // Limpa dados legados de localStorage/sessionStorage que poderiam vazar para o desktop
+      localStorage.removeItem('zapitv_tv_mode');
+      sessionStorage.removeItem('zapitv_tv_mode');
+
       const urlParams = new URLSearchParams(window.location.search);
       const tvParam = urlParams.get('tv');
       const diagParam = urlParams.get('tvdiag') ?? urlParams.get('tv_diag');
       const isTvPath = window.location.pathname.startsWith('/tv');
 
-      // 1. Verificação explícita do parâmetro de URL ?tv= ou rota /tv
+      // O modo TV é estritamente ativado pela rota /tv ou pelo parâmetro explícito ?tv=1
       if (isTvPath || tvParam === '1' || tvParam === 'true') {
         this.isTv = true;
-        this.persistStorage('1');
-      } else if (tvParam === '0' || tvParam === 'false') {
-        this.isTv = false;
-        this.persistStorage('0');
       } else {
-        // 2. Leitura de armazenamento prévio
-        const saved = this.readStorage();
-        if (saved === '1') {
-          this.isTv = true;
-        } else if (saved === '0') {
-          this.isTv = false;
-        } else {
-          // 3. Detecção secundária segura por User Agent (apenas se não houver preferência explícita salva)
-          const ua = navigator.userAgent.toLowerCase();
-          const isTvUa = /smart-tv|smarttv|tizen|web0s|webos|hbbtv|mediastationx|crkey/i.test(ua);
-          this.isTv = isTvUa;
-        }
+        // Rotas normais (desktop/mobile) NUNCA ativam modo TV automaticamente
+        this.isTv = false;
       }
 
       // Verificação do parâmetro de diagnóstico ?tvdiag=
@@ -76,26 +66,18 @@ class TvModeService {
     }
   }
 
-  private persistStorage(val: string): void {
-    try {
-      sessionStorage.setItem('zapitv_tv_mode', val);
-      localStorage.setItem('zapitv_tv_mode', val);
-    } catch {}
-  }
-
-  private readStorage(): string | null {
-    try {
-      return sessionStorage.getItem('zapitv_tv_mode') || localStorage.getItem('zapitv_tv_mode');
-    } catch {
-      return null;
-    }
-  }
-
   public isTvMode(): boolean {
-    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv')) {
-      return true;
-    }
-    return this.isTv;
+    if (typeof window === 'undefined') return this.isTv;
+    // A rota canônica /tv ou parâmetro explícito são as únicas fontes autorizadas.
+    // O endereço normal / é permanentemente desktop/mobile.
+    const isTvPath = window.location.pathname.startsWith('/tv');
+    if (isTvPath) return true;
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tvParam = urlParams.get('tv');
+      if (tvParam === '1' || tvParam === 'true') return true;
+    } catch {}
+    return false;
   }
 
   public isDiagMode(): boolean {
@@ -104,7 +86,6 @@ class TvModeService {
 
   public setTvMode(enabled: boolean): void {
     this.isTv = enabled;
-    this.persistStorage(enabled ? '1' : '0');
     this.notify();
   }
 

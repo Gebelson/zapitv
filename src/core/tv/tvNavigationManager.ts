@@ -3,7 +3,7 @@
  * Gerencia a pilha de 'Voltar' (Back-Stack), atalhos de controle remoto e integração com Norigin Spatial Navigation.
  */
 
-import { init as initNorigin, setKeyMap, setFocus, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
+import { init as initNorigin, setKeyMap, setFocus, getCurrentFocusKey, pause as pauseNorigin, resume as resumeNorigin } from '@noriginmedia/norigin-spatial-navigation';
 import { tvModeService } from './tvModeService';
 
 export interface BackHandler {
@@ -51,6 +51,18 @@ class TvNavigationManager {
       // Captura global do botão VOLTAR / BACK (Tizen 10009, Escape, Backspace)
       window.addEventListener('keydown', this.handleGlobalKeyDown, { capture: true });
     }
+  }
+
+  public pause(): void {
+    try {
+      pauseNorigin();
+    } catch {}
+  }
+
+  public resume(): void {
+    try {
+      resumeNorigin();
+    } catch {}
   }
 
   private handleGlobalKeyDown = (e: KeyboardEvent): void => {

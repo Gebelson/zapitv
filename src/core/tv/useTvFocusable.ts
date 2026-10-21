@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useFocusable as useNoriginFocusable, FocusableComponentLayout } from '@noriginmedia/norigin-spatial-navigation';
 import { tvModeService } from './tvModeService';
 
@@ -29,6 +29,8 @@ export function useTvFocusable({
   saveLastFocusedChild = true,
   trackChildren = false
 }: UseTvFocusableOptions = {}) {
+  const dummyRef = useRef<any>(null);
+
   const [isTvActive, setIsTvActive] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv')) {
       return true;
@@ -43,7 +45,10 @@ export function useTvFocusable({
     });
   }, []);
 
+  const isEffectiveTv = (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv')) || isTvActive;
+
   const handleFocus = useCallback((layout: FocusableComponentLayout) => {
+    if (!isEffectiveTv) return;
     if (autoScroll && norigin.ref.current) {
       try {
         (norigin.ref.current as any).scrollIntoView({
@@ -58,16 +63,17 @@ export function useTvFocusable({
       }
     }
     onFocus?.(layout);
-  }, [autoScroll, onFocus, scrollBlock, scrollInline]);
+  }, [autoScroll, isEffectiveTv, onFocus, scrollBlock, scrollInline]);
 
   const norigin = useNoriginFocusable<object, any>({
     focusKey,
     onEnterPress: () => {
-      if (focusable) {
+      if (isEffectiveTv && focusable) {
         onEnterPress?.();
       }
     },
     onArrowPress: (direction: string) => {
+      if (!isEffectiveTv) return false;
       if (onArrowPress) {
         return onArrowPress(direction);
       }
@@ -75,17 +81,14 @@ export function useTvFocusable({
     },
     onFocus: handleFocus,
     onBlur,
-    focusable: focusable,
+    focusable: isEffectiveTv ? focusable : false,
     saveLastFocusedChild,
     trackChildren
   });
 
-  // Em rotas que começam com /tv, o componente é sempre ativo para controle remoto
-  const isEffectiveTv = (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv')) || isTvActive;
-
   if (!isEffectiveTv) {
     return {
-      ref: norigin.ref,
+      ref: dummyRef,
       focused: false,
       hasFocusedChild: false,
       focusSelf: () => {},

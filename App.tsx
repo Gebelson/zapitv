@@ -46,7 +46,6 @@ import { WatchPartyService } from './src/core/watchparty/WatchPartyService';
 import { tvModeService } from './src/core/tv/tvModeService';
 import { tvNavigationManager } from './src/core/tv/tvNavigationManager';
 import { TvRemoteDiagnosticOverlay } from './src/components/tv/TvRemoteDiagnosticOverlay';
-import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 const ProfileView = React.lazy(() => import('./components/ProfileView'));
 const AdminView = React.lazy(() => import('./components/AdminView'));
@@ -175,33 +174,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   useEffect(() => uiSoundService.bindInteractions(document), []);
 
   useEffect(() => {
-    tvNavigationManager.init();
-    const syncTvClass = (isTv: boolean) => {
-      if (isTv) {
-        document.body.classList.add('tv-mode');
-      } else {
-        document.body.classList.remove('tv-mode');
-      }
-    };
-    syncTvClass(tvModeService.isTvMode());
-    return tvModeService.subscribe(syncTvClass);
-  }, []);
-
-  // Top-level Back handler (prioridade 10) para Smart TVs
-  useEffect(() => {
-    return tvNavigationManager.registerBackHandler('app-root', 10, () => {
-      if (location.pathname !== '/') {
-        navigate(tvModeService.formatInternalRoute('/'));
-        return true;
-      }
-      const curFocus = getCurrentFocusKey();
-      if (!curFocus || !curFocus.startsWith('sidebar-')) {
-        setFocus('sidebar-home');
-        return true;
-      }
-      return false;
-    });
-  }, [location.pathname, navigate]);
+    // Garante que a versão desktop/mobile NUNCA possua a classe tv-mode no body
+    if (!location.pathname.startsWith('/tv')) {
+      document.body.classList.remove('tv-mode');
+    }
+  }, [location.pathname]);
   useEffect(() => {
     if (currentView !== 'admin' && currentView !== 'notfound') {
       setPreviousView(currentView);
@@ -1365,7 +1342,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         return;
       }
     }
-    tvNavigationManager.saveFocusSnapshot();
+    if (tvModeService.isTvMode()) {
+      tvNavigationManager.saveFocusSnapshot();
+    }
     setSelectedContent(item);
     uiSoundService.play('detailOpen');
   }, [activeProfile]);

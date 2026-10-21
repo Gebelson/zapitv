@@ -109,12 +109,14 @@
 }
 
 /* =========================================================================
-   ZAPITV — MODO TV: DESTAQUE DE FOCO ESPACIAL & PERFORMANCE SMART TV
+   ZAPITV — MODO TV: DESTAQUE DE FOCO ESPACIAL EXCLUSIVO SMART TV (/tv)
    ========================================================================= */
 
-/* Foco Espacial Nítido e Elegante para Smart TVs */
-.tv-focused,
-[data-tv-focused="true"] {
+/* Foco Espacial Nítido e Elegante EXCLUSIVO para Smart TVs (Encapsulado em .zapi-tv-root) */
+.zapi-tv-root .tv-focused,
+.zapi-tv-root [data-tv-focused="true"],
+body.tv-mode .zapi-tv-root .tv-focused,
+body.tv-mode .zapi-tv-root [data-tv-focused="true"] {
   outline: 3.5px solid #00e5ff !important;
   outline-offset: 3px !important;
   box-shadow: 0 0 25px rgba(0, 229, 255, 0.7), 0 0 50px rgba(0, 125, 247, 0.45) !important;
@@ -123,31 +125,31 @@
   transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.15s ease-out, outline 0.15s ease-out !important;
 }
 
-/* Botões com foco em TV */
-button.tv-focused,
-[role="button"].tv-focused {
+/* Botões com foco em TV (Encapsulados em .zapi-tv-root) */
+.zapi-tv-root button.tv-focused,
+.zapi-tv-root [role="button"].tv-focused {
   outline: 3.5px solid #00e5ff !important;
   outline-offset: 2px !important;
   box-shadow: 0 0 20px rgba(0, 229, 255, 0.7) !important;
 }
 
 /* Otimização de Performance para WebViews de TV (Tizen / WebOS / MSX) */
-body.tv-mode {
+body.tv-mode .zapi-tv-root {
   cursor: none !important;
   user-select: none !important;
   -webkit-user-select: none !important;
 }
 
-body.tv-mode * {
+body.tv-mode .zapi-tv-root * {
   -webkit-tap-highlight-color: transparent !important;
 }
 
 /* No modo TV, desativa filtros de desfoque pesado (backdrop-filter) que derrubam a taxa de quadros */
-body.tv-mode .backdrop-blur-md,
-body.tv-mode .backdrop-blur-lg,
-body.tv-mode .backdrop-blur-xl,
-body.tv-mode .backdrop-blur-2xl,
-body.tv-mode .backdrop-blur-3xl {
+body.tv-mode .zapi-tv-root .backdrop-blur-md,
+body.tv-mode .zapi-tv-root .backdrop-blur-lg,
+body.tv-mode .zapi-tv-root .backdrop-blur-xl,
+body.tv-mode .zapi-tv-root .backdrop-blur-2xl,
+body.tv-mode .zapi-tv-root .backdrop-blur-3xl {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   background-color: rgba(10, 15, 25, 0.95) !important;

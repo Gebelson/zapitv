@@ -56,18 +56,21 @@ export const TvApp: React.FC<TvAppProps> = ({
       visualDebug: false
     });
     tvNavigationManager.init();
+    tvNavigationManager.resume();
     tvModeService.setTvMode(true);
     document.body.classList.add('tv-mode');
 
     const timer = setTimeout(() => {
-      setFocus('tv-hero-play');
+      try {
+        setFocus('tv-hero-play');
+      } catch {}
     }, 150);
 
     return () => {
       clearTimeout(timer);
-      if (!window.location.pathname.startsWith('/tv')) {
-        document.body.classList.remove('tv-mode');
-      }
+      tvNavigationManager.pause();
+      tvModeService.setTvMode(false);
+      document.body.classList.remove('tv-mode');
     };
   }, []);
 
@@ -148,7 +151,7 @@ export const TvApp: React.FC<TvAppProps> = ({
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-[#05070a] text-white overflow-x-hidden selection:bg-cyan-500 selection:text-black">
+    <div className="zapi-tv-root relative min-h-screen bg-[#05070a] text-white overflow-x-hidden selection:bg-cyan-500 selection:text-black">
       {/* Diagnóstico em tempo real na TV (?tvdiag=1) */}
       <TvRemoteDiagnosticOverlay />
 

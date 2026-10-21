@@ -1,61 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, Flame, Film, Tv, List, ChevronLeft, ChevronRight, Sparkles, MonitorPlay, Volume2, VolumeX } from 'lucide-react';
-import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { AppView, Profile } from '../types';
 import { uiSoundService } from '../src/core/audio/uiSoundService';
-import { useTvFocusable } from '../src/core/tv/useTvFocusable';
-import { tvModeService } from '../src/core/tv/tvModeService';
 
 // Ícone de Séries - Refinado para strokeWidth 2.2
 const SeriesIcon = (props: any) => <Tv {...props} strokeWidth={2.2} />;
-
-const SidebarMenuItem: React.FC<{
-  item: { id: string; path: string; label: string; icon: any };
-  active: boolean;
-  isCollapsed: boolean;
-  isDarkMode: boolean;
-  onNavigate: () => void;
-}> = ({ item, active, isCollapsed, isDarkMode, onNavigate }) => {
-  const Icon = item.icon;
-  const isTv = tvModeService.isTvMode();
-  const { ref, focused } = useTvFocusable({
-    focusKey: `sidebar-${item.id}`,
-    onEnterPress: onNavigate,
-    autoScroll: true
-  });
-
-  return (
-    <button
-      ref={ref}
-      key={item.id}
-      onClick={onNavigate}
-      data-focus-key={`sidebar-${item.id}`}
-      tabIndex={isTv ? 0 : undefined}
-      title={isCollapsed ? item.label : undefined}
-      className={`w-full h-11 flex items-center transition-all duration-200 group rounded-xl mb-1.5 overflow-hidden text-left ${
-        focused
-          ? 'tv-focused bg-[#007df7] text-white shadow-xl shadow-[#007df7]/40 font-black scale-105 z-30'
-          : active 
-          ? 'bg-[#007df7] text-white shadow-lg shadow-[#007df7]/20 font-bold' 
-          : `hover:bg-black/10 ${isDarkMode ? 'hover:bg-white/5 text-gray-400 hover:text-white' : 'hover:bg-black/5 text-gray-600 hover:text-gray-900'}`
-      }`}
-    >
-      <div className="w-12 h-11 shrink-0 flex items-center justify-center">
-        <Icon className={`w-5 h-5 shrink-0 transition-opacity ${active || focused ? 'text-white opacity-100' : 'group-hover:text-[#007df7] opacity-90'}`} />
-      </div>
-      <div className={`overflow-hidden transition-[opacity,transform,max-width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] flex-1 min-w-0 ${
-        isCollapsed 
-          ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' 
-          : 'max-w-[180px] opacity-100 translate-x-0'
-      }`}>
-        <span className="text-sm whitespace-nowrap block truncate pr-3">
-          {item.label}
-        </span>
-      </div>
-    </button>
-  );
-};
 
 interface SidebarProps {
   currentView?: AppView;
@@ -117,8 +67,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       : 'bg-[#F8F9FC] border-gray-200 text-gray-600'
   }`;
 
-  const isTv = tvModeService.isTvMode();
-
   return (
     <>
       <div 
@@ -134,21 +82,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       } ${
         isCollapsed ? 'lg:w-20' : 'lg:w-64'
       }`}>
-        {!isTv && (
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className={`absolute inset-0 transition-opacity duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${isDarkMode ? 'opacity-40' : 'opacity-70'}`}>
-              <div 
-                className="absolute bottom-[-25%] right-[-10%] w-[110vw] h-[110vh] rounded-full blur-[140px] animate-mesh-vibrant-2"
-                style={{
-                  background: isDarkMode 
-                    ? 'radial-gradient(circle at center, rgba(120, 80, 220, 0.2) 0%, rgba(60, 20, 120, 0) 70%)'
-                    : 'radial-gradient(circle at center, rgba(200, 180, 255, 0.35) 0%, rgba(120, 80, 220, 0) 75%)',
-                  mixBlendMode: isDarkMode ? 'screen' : 'multiply'
-                }}
-              />
-            </div>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className={`absolute inset-0 transition-opacity duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${isDarkMode ? 'opacity-40' : 'opacity-70'}`}>
+            <div 
+              className="absolute bottom-[-25%] right-[-10%] w-[110vw] h-[110vh] rounded-full blur-[140px] animate-mesh-vibrant-2"
+              style={{
+                background: isDarkMode 
+                  ? 'radial-gradient(circle at center, rgba(120, 80, 220, 0.2) 0%, rgba(60, 20, 120, 0) 70%)'
+                  : 'radial-gradient(circle at center, rgba(200, 180, 255, 0.35) 0%, rgba(120, 80, 220, 0) 75%)',
+                mixBlendMode: isDarkMode ? 'screen' : 'multiply'
+              }}
+            />
           </div>
-        )}
+        </div>
 
         <button 
           onClick={onToggleCollapse}
@@ -215,18 +161,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <nav className="flex-1 px-4 mt-4 sm:mt-6 relative z-10 overflow-y-auto overflow-x-hidden no-scrollbar">
-          <FocusContext.Provider value="sidebar">
-            {menuItems.map((item) => (
-              <SidebarMenuItem
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const active = isItemActive(item);
+            return (
+              <button
                 key={item.id}
-                item={item}
-                active={isItemActive(item)}
-                isCollapsed={isCollapsed}
-                isDarkMode={isDarkMode}
-                onNavigate={() => handleNavigate(item.path, item.id)}
-              />
-            ))}
-          </FocusContext.Provider>
+                onClick={() => handleNavigate(item.path, item.id)}
+                title={isCollapsed ? item.label : undefined}
+                className={`w-full h-11 flex items-center transition-colors duration-200 group rounded-xl mb-1.5 overflow-hidden text-left ${
+                  active 
+                    ? 'bg-[#007df7] text-white shadow-lg shadow-[#007df7]/20 font-bold' 
+                    : `hover:bg-black/10 ${isDarkMode ? 'hover:bg-white/5 text-gray-400 hover:text-white' : 'hover:bg-black/5 text-gray-600 hover:text-gray-900'}`
+                }`}
+              >
+                <div className="w-12 h-11 shrink-0 flex items-center justify-center">
+                  <Icon className={`w-5 h-5 shrink-0 transition-opacity ${active ? 'text-white opacity-100' : 'group-hover:text-[#007df7] opacity-90'}`} />
+                </div>
+                <div className={`overflow-hidden transition-[opacity,transform,max-width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] flex-1 min-w-0 ${
+                  isCollapsed 
+                    ? 'max-w-0 opacity-0 -translate-x-2 pointer-events-none' 
+                    : 'max-w-[180px] opacity-100 translate-x-0'
+                }`}>
+                  <span className="text-sm whitespace-nowrap block truncate pr-3">
+                    {item.label}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </nav>
 
         <div className="px-4 py-2 shrink-0 relative z-10">
