@@ -13,6 +13,8 @@ interface TvCardProps {
   focusKeyPrefix?: string;
   priority?: boolean;
   onUpPress?: () => void;
+  isFocused?: boolean;
+  isFocusable?: boolean;
 }
 
 // Gera o gradiente de glow ambiente suave personalizado de acordo com o gênero e tom da obra
@@ -46,7 +48,9 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   className = "",
   focusKeyPrefix = "tv-card",
   priority = false,
-  onUpPress
+  onUpPress,
+  isFocused,
+  isFocusable = true
 }) => {
   // Prioriza o poster vertical real em 2:3
   const [imgSrc, setImgSrc] = useState<string>(() => {
@@ -87,7 +91,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   };
 
   const focusKey = `${focusKeyPrefix}-${item.id}`;
-  const { ref: tvFocusRef, focused: isTvFocused } = useTvFocusable({
+  const { ref: tvFocusRef, focused: isTvFocusHook } = useTvFocusable({
     focusKey,
     onEnterPress: () => onClick(item),
     onArrowPress: (direction) => {
@@ -99,13 +103,18 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
     },
     autoScroll: true,
     scrollInline: 'center',
-    scrollBlock: 'nearest'
+    scrollBlock: 'nearest',
+    focusable: isFocusable
   });
+
+  const isTvFocused = isFocusable ? isTvFocusHook : (isFocused ?? false);
 
   const setCombinedRef = useCallback((node: HTMLDivElement | null) => {
     (cardContainerRef as any).current = node;
-    (tvFocusRef as any).current = node;
-  }, [tvFocusRef]);
+    if (isFocusable) {
+      (tvFocusRef as any).current = node;
+    }
+  }, [isFocusable, tvFocusRef]);
 
   const isEpisodic = item.type === ContentType.SERIES || item.type === ContentType.ANIME || Boolean(item.seasonsCount && item.seasonsCount > 0);
   const progressPercent = Math.min(100, Math.max(0, continuity?.percentage || 0));

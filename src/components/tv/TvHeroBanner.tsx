@@ -78,10 +78,10 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
     <FocusContext.Provider value={focusKey}>
       <section 
         ref={noriginRef as any}
-        className="relative w-full h-[80vh] min-h-[580px] max-h-[840px] select-none overflow-hidden"
+        className="relative w-full h-screen min-h-[100vh] select-none overflow-hidden"
         aria-label={`Destaque: ${item.title}`}
       >
-        {/* Camada 0: Imagem do Banner do Topo Absoluto até a Base */}
+        {/* Camada 0: Imagem do Banner do Topo Absoluto até a Base (100% da primeira viewport) */}
         <div className="absolute inset-0 z-0">
           {backdropUrl && (
             <img
@@ -89,52 +89,90 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
               alt={item.title}
               loading="eager"
               decoding="async"
-              className="w-full h-full object-cover object-top sm:object-right-top"
+              className="w-full h-full object-cover object-center"
+              onError={(e) => {
+                if (item.image && (e.currentTarget as HTMLImageElement).src !== item.image) {
+                  (e.currentTarget as HTMLImageElement).src = item.image;
+                }
+              }}
             />
           )}
 
-          {/* Blur Progressivo Superior (Fade-out suave em direção ao centro) */}
+          {/* Blur Progressivo Superior (Fade-out suave com desfoque desaparecendo em direção ao centro) */}
           <div 
-            className="absolute top-0 inset-x-0 h-44 pointer-events-none z-[1]"
+            className="absolute top-0 inset-x-0 h-48 pointer-events-none z-[2] overflow-hidden"
             style={{
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
               maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)',
               WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)'
             }}
-          />
+          >
+            {backdropUrl && (
+              <img
+                src={backdropUrl}
+                alt=""
+                aria-hidden="true"
+                className="w-full h-full object-cover object-center filter blur-md scale-105"
+              />
+            )}
+            <div 
+              className="absolute inset-0"
+              style={{
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)'
+              }}
+            />
+          </div>
 
-          {/* Gradiente Escuro Superior (Garante legibilidade absoluta de todos os elementos do header) */}
-          <div className="absolute top-0 inset-x-0 h-[45%] bg-gradient-to-b from-[#05070a]/95 via-[#05070a]/70 via-35% to-transparent pointer-events-none z-[2]" />
-
-          {/* Gradiente Lateral Esquerdo (Contraste cinematográfico para o texto e botões) */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#05070a] via-[#05070a]/85 via-45% to-transparent pointer-events-none z-[2]" />
-
-          {/* Blur Progressivo Inferior (Fade-in suave dissolvendo em direção à base) */}
+          {/* Gradiente Escuro Superior Progressivo (0%: escuro intenso, 12%: moderado, 25%: suave, 38%: leve, 54%: livre) */}
           <div 
-            className="absolute bottom-0 inset-x-0 h-56 pointer-events-none z-[1]"
+            className="absolute top-0 inset-x-0 h-[48%] bg-gradient-to-b from-[#05070a] via-[#05070a]/75 via-25% to-transparent pointer-events-none z-[3]"
             style={{
-              backdropFilter: 'blur(14px)',
-              WebkitBackdropFilter: 'blur(14px)',
-              maskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)',
-              WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)'
+              background: 'linear-gradient(to bottom, rgba(5,7,10,0.96) 0%, rgba(5,7,10,0.80) 12%, rgba(5,7,10,0.48) 25%, rgba(5,7,10,0.18) 38%, transparent 54%)'
             }}
           />
 
-          {/* Gradiente Inferior Progressivo (Fusão suave com o fundo e os carrosséis) */}
-          <div className="absolute bottom-0 inset-x-0 h-[50%] bg-gradient-to-t from-[#05070a] via-[#05070a]/80 via-40% to-transparent pointer-events-none z-[2]" />
+          {/* Gradiente Lateral Esquerdo (Contraste cinematográfico para o texto e botões) */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#05070a] via-[#05070a]/85 via-45% to-transparent pointer-events-none z-[3]" />
+
+          {/* Blur Progressivo Inferior (Fade-in suave aumentando em direção à base e dissolvendo no fundo escuro) */}
+          <div 
+            className="absolute bottom-0 inset-x-0 h-64 pointer-events-none z-[2] overflow-hidden"
+            style={{
+              maskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)',
+              WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)'
+            }}
+          >
+            {backdropUrl && (
+              <img
+                src={backdropUrl}
+                alt=""
+                aria-hidden="true"
+                className="w-full h-full object-cover object-center filter blur-lg scale-105"
+              />
+            )}
+            <div 
+              className="absolute inset-0"
+              style={{
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)'
+              }}
+            />
+          </div>
+
+          {/* Gradiente Inferior Progressivo (Fusão suave com o fundo escuro da primeira tela) */}
+          <div className="absolute bottom-0 inset-x-0 h-[48%] bg-gradient-to-t from-[#05070a] via-[#05070a]/85 via-40% to-transparent pointer-events-none z-[3]" />
 
           {/* Efeito Glow Ambiente do Destaque (Cores atmosféricas do ZapiTV) */}
           <div 
-            className="absolute top-1/3 left-14 w-[500px] h-[380px] rounded-full pointer-events-none opacity-35 blur-3xl z-[2]"
+            className="absolute top-1/3 left-14 w-[500px] h-[380px] rounded-full pointer-events-none opacity-30 blur-3xl z-[3]"
             style={{
               background: 'radial-gradient(circle, rgba(0, 125, 247, 0.45) 0%, rgba(0, 229, 255, 0.25) 45%, transparent 75%)'
             }}
           />
         </div>
 
-        {/* Informações do Destaque Posicionadas à Esquerda com Área Segura */}
-        <div className="relative z-10 h-full flex flex-col justify-end pb-16 sm:pb-20 pl-14 sm:pl-16 pr-8 max-w-2xl lg:max-w-3xl">
+        {/* Informações do Destaque Posicionadas no Terço Inferior Esquerdo com Área Segura */}
+        <div className="relative z-10 h-full flex flex-col justify-end pb-24 sm:pb-28 lg:pb-32 pl-14 sm:pl-16 pr-8 max-w-2xl lg:max-w-3xl">
           {/* Metadados: Ano, Classificação, Gêneros, Nota */}
           <div className="flex flex-wrap items-center gap-3 mb-3 text-sm font-bold text-gray-300 drop-shadow">
             {item.rating ? (

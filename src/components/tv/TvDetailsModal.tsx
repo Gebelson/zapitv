@@ -80,6 +80,9 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
     return () => {
       clearTimeout(timer);
       unregister();
+      setTimeout(() => {
+        tvNavigationManager.restoreFocusSnapshot();
+      }, 50);
     };
   }, [onClose]);
 

@@ -17,12 +17,21 @@ async function capture() {
   await page1080.screenshot({ path: out1080 });
   console.log('✓ Captura 1920x1080 salva em:', out1080);
 
-  // 2. Foco no primeiro card para capturar o contorno refinado
+  // 2. Foco no primeiro card para capturar o primeiro carrossel e contorno refinado
   await page1080.keyboard.press('ArrowDown');
-  await page1080.waitForTimeout(600);
+  await page1080.waitForTimeout(800);
   const outFocus = 'C:/Users/gebel/.gemini/antigravity/brain/8cfcb7f3-0115-429d-ad15-6044fcc95e4d/tv_card_focus.png';
   await page1080.screenshot({ path: outFocus });
   console.log('✓ Captura com card focado salva em:', outFocus);
+
+  // 2b. Deslocamento horizontal do carrossel: Seta direita avança os cards mantendo foco no Slot 0
+  await page1080.keyboard.press('ArrowRight');
+  await page1080.waitForTimeout(400);
+  await page1080.keyboard.press('ArrowRight');
+  await page1080.waitForTimeout(600);
+  const outSlide = 'C:/Users/gebel/.gemini/antigravity/brain/8cfcb7f3-0115-429d-ad15-6044fcc95e4d/tv_carousel_slide.png';
+  await page1080.screenshot({ path: outSlide });
+  console.log('✓ Captura do carrossel deslizando com foco fixo no Slot 0 salva em:', outSlide);
 
   // 3. Captura TV 1280x720 (720p 16:9 alternativa)
   const context720 = await browser.newContext({

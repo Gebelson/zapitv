@@ -40,46 +40,49 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
     }).slice(0, 15);
   }, [allContent]);
 
-  // Identificador do primeiro card da primeira fileira
-  const firstCardKey = useMemo(() => {
+  // Identificador da primeira fileira navegável
+  const firstRowKey = useMemo(() => {
     if (continueWatchingItems.length > 0) {
-      return `card-continue-watching-${continueWatchingItems[0].id}`;
+      return 'row-continue-watching';
     }
     if (trendingItems.length > 0) {
-      return `card-trending-${trendingItems[0].id}`;
+      return 'row-trending';
     }
     if (popularMovies.length > 0) {
-      return `card-popular-movies-${popularMovies[0].id}`;
+      return 'row-popular-movies';
     }
     if (popularSeries.length > 0) {
-      return `card-popular-series-${popularSeries[0].id}`;
+      return 'row-popular-series';
     }
     if (animeItems.length > 0) {
-      return `card-popular-animes-${animeItems[0].id}`;
+      return 'row-popular-animes';
     }
     if (featuredItems.length > 1) {
-      return `card-featured-all-${featuredItems[1].id}`;
+      return 'row-featured-all';
     }
     return '';
   }, [continueWatchingItems, trendingItems, popularMovies, popularSeries, animeItems, featuredItems]);
 
   const handleHeroDownPress = useCallback(() => {
-    if (firstCardKey) {
-      setFocus(firstCardKey);
-    } else {
-      setFocus('row-trending');
+    if (firstRowKey) {
+      setFocus(firstRowKey);
+      const el = document.getElementById(firstRowKey) || document.querySelector(`[data-focus-key="${firstRowKey}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
-  }, [firstCardKey]);
+  }, [firstRowKey]);
 
   const handleFirstRowUpPress = useCallback(() => {
     setFocus('tv-hero-play');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const hasContinue = continueWatchingItems.length > 0;
 
   return (
     <div className="w-full min-h-screen pb-24 overflow-x-hidden">
-      {/* Banner Principal Cinematográfico */}
+      {/* Banner Principal Cinematográfico (100% da primeira viewport) */}
       {heroItem && (
         <TvHeroBanner
           item={heroItem}
@@ -89,8 +92,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
         />
       )}
 
-      {/* Fileiras de Conteúdos com Capas Grandes Verticais 2:3 */}
-      <div className="relative z-10 -mt-14 sm:-mt-18 space-y-2 sm:space-y-4">
+      {/* Fileiras de Conteúdos: Exclusivamente abaixo da primeira viewport (Sem margem negativa) */}
+      <div className="relative z-10 pt-8 sm:pt-12 pb-28 space-y-6 sm:space-y-10">
         {/* Continuar Assistindo (Se houver progresso real) */}
         {hasContinue && (
           <TvContentRow
@@ -99,7 +102,6 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={continueWatchingItems}
             onItemClick={onSelectItem}
             showProgress
-            badge="Seu Progresso"
             onRowUp={handleFirstRowUpPress}
           />
         )}
@@ -111,7 +113,6 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             rowId="trending"
             items={trendingItems}
             onItemClick={onSelectItem}
-            badge="Top Semanal"
             onRowUp={!hasContinue ? handleFirstRowUpPress : undefined}
           />
         )}

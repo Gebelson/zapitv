@@ -101,6 +101,11 @@ export const TvApp: React.FC<TvAppProps> = ({
     episode?: number;
   } | null>(null);
 
+  const handleOpenDetailModal = useCallback((item: ContentItem) => {
+    tvNavigationManager.saveFocusSnapshot();
+    setSelectedDetailItem(item);
+  }, []);
+
   // Pilha de navegação Voltar da TV (prioridade 10 - Root)
   useEffect(() => {
     return tvNavigationManager.registerBackHandler('tv-app-root', 10, () => {
@@ -182,7 +187,7 @@ export const TvApp: React.FC<TvAppProps> = ({
         {specialView === 'search' ? (
           <TvSearchView
             allContent={content}
-            onSelectItem={(it) => setSelectedDetailItem(it)}
+            onSelectItem={handleOpenDetailModal}
             onClose={() => setSpecialView(null)}
           />
         ) : specialView === 'mylist' ? (
@@ -190,7 +195,7 @@ export const TvApp: React.FC<TvAppProps> = ({
             title="Minha Lista"
             type="mylist"
             items={myListItems}
-            onSelectItem={(it) => setSelectedDetailItem(it)}
+            onSelectItem={handleOpenDetailModal}
             onBack={() => setSpecialView(null)}
           />
         ) : specialView === 'history' ? (
@@ -198,7 +203,7 @@ export const TvApp: React.FC<TvAppProps> = ({
             title="Histórico de Reprodução"
             type="history"
             items={historyItems}
-            onSelectItem={(it) => setSelectedDetailItem(it)}
+            onSelectItem={handleOpenDetailModal}
             onBack={() => setSpecialView(null)}
           />
         ) : specialView === 'settings' ? (
@@ -220,35 +225,35 @@ export const TvApp: React.FC<TvAppProps> = ({
             popularSeries={popularSeries}
             animeItems={animeItems}
             allContent={content}
-            onSelectItem={(it) => setSelectedDetailItem(it)}
+            onSelectItem={handleOpenDetailModal}
             onPlayItem={(it) => handleStartPlay(it)}
           />
         ) : currentTab === 'movies' ? (
           <TvCategoryView
             categoryTitle="Filmes"
             items={popularMovies}
-            onSelectItem={(it) => setSelectedDetailItem(it)}
+            onSelectItem={handleOpenDetailModal}
             onPlayItem={(it) => handleStartPlay(it)}
           />
         ) : currentTab === 'series' ? (
           <TvCategoryView
             categoryTitle="Séries"
             items={popularSeries}
-            onSelectItem={(it) => setSelectedDetailItem(it)}
+            onSelectItem={handleOpenDetailModal}
             onPlayItem={(it) => handleStartPlay(it)}
           />
         ) : currentTab === 'animes' ? (
           <TvCategoryView
             categoryTitle="Animes"
             items={animeItems}
-            onSelectItem={(it) => setSelectedDetailItem(it)}
+            onSelectItem={handleOpenDetailModal}
             onPlayItem={(it) => handleStartPlay(it)}
           />
         ) : (
           <TvCategoryView
             categoryTitle="Em Destaque"
             items={featuredItems}
-            onSelectItem={(it) => setSelectedDetailItem(it)}
+            onSelectItem={handleOpenDetailModal}
             onPlayItem={(it) => handleStartPlay(it)}
           />
         )}

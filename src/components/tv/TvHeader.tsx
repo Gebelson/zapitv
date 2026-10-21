@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, User as UserIcon } from 'lucide-react';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
@@ -69,6 +69,15 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
   avatarUrl
 }) => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 40);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const { ref: noriginRef, focusKey } = useFocusable({
     focusKey: 'tv-header',
@@ -106,7 +115,11 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     <FocusContext.Provider value={focusKey}>
       <header
         ref={noriginRef as any}
-        className="fixed top-0 inset-x-0 z-[120] h-24 sm:h-[100px] px-14 sm:px-16 flex items-center justify-between pointer-events-none select-none"
+        className={`fixed top-0 inset-x-0 z-[120] h-24 sm:h-[100px] px-14 sm:px-16 flex items-center justify-between pointer-events-none select-none transition-all duration-300 ${
+          isScrolled 
+            ? 'bg-[#05070a]/92 backdrop-blur-md shadow-2xl border-b border-white/5' 
+            : 'bg-transparent border-b border-transparent'
+        }`}
       >
         {/* Esquerda: Logotipo Oficial ZapiTV Ampliado (Largura proporcional ~190-210px) */}
         <div 

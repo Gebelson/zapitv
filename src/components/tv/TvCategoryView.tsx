@@ -44,28 +44,24 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
     return list.sort((a, b) => b.items.length - a.items.length).slice(0, 8);
   }, [items]);
 
-  const firstCardKey = useMemo(() => {
-    if (items.length > 0) {
-      return `card-all-${categoryTitle.toLowerCase()}-${items[0].id}`;
-    }
-    return '';
-  }, [items, categoryTitle]);
+  const firstRowKey = `row-all-${categoryTitle.toLowerCase()}`;
 
   const handleHeroDownPress = useCallback(() => {
-    if (firstCardKey) {
-      setFocus(firstCardKey);
-    } else {
-      setFocus(`row-all-${categoryTitle.toLowerCase()}`);
+    setFocus(firstRowKey);
+    const el = document.getElementById(firstRowKey) || document.querySelector(`[data-focus-key="${firstRowKey}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [firstCardKey, categoryTitle]);
+  }, [firstRowKey]);
 
   const handleFirstRowUpPress = useCallback(() => {
     setFocus('tv-hero-play');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   return (
     <div className="w-full min-h-screen pb-24 overflow-x-hidden">
-      {/* Banner Principal da Categoria */}
+      {/* Banner Principal da Categoria (100% da primeira viewport) */}
       {heroItem && (
         <TvHeroBanner
           item={heroItem}
@@ -75,8 +71,8 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
         />
       )}
 
-      {/* Fileiras de Conteúdos da Categoria com Capas Verticais 2:3 */}
-      <div className="relative z-10 -mt-14 sm:-mt-18 space-y-4">
+      {/* Fileiras de Conteúdos da Categoria: Exclusivamente abaixo da primeira viewport */}
+      <div className="relative z-10 pt-8 sm:pt-12 pb-28 space-y-6 sm:space-y-10">
         {/* Todos os Títulos Mais Populares */}
         <TvContentRow
           title={`Todos os ${categoryTitle} Populares`}

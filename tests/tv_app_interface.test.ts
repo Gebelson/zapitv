@@ -155,7 +155,30 @@ async function runTvAppInterfaceTests() {
   );
   console.log('✓ Teste 13: Contadores de títulos ocultos dos carrosséis na TV conforme especificação');
 
-  console.log('\nTodos os 13 testes da nova interface Smart TV passaram com sucesso!\n');
+  // Teste 14: Banner ocupa 100vh na primeira tela e carrosséis sem margens negativas
+  assert(
+    tvHeroCode.includes('h-screen min-h-[100vh]') || tvHeroCode.includes('min-h-[100vh]'),
+    'TvHeroBanner deve ocupar 100% da primeira viewport (100vh)'
+  );
+  const tvHomeViewPath = path.resolve(process.cwd(), 'src/components/tv/TvHomeView.tsx');
+  const tvHomeViewCode = fs.readFileSync(tvHomeViewPath, 'utf8');
+  assert(
+    !tvHomeViewCode.includes('-mt-14') && !tvHomeViewCode.includes('-mt-18'),
+    'TvHomeView NÃO deve conter margens negativas puxando carrosséis para a primeira tela'
+  );
+  console.log('✓ Teste 14: Banner ocupa 100% da primeira viewport e carrosséis começam abaixo da tela OK');
+
+  // Teste 15: Carrossel infinito circular com foco fixo no primeiro slot
+  assert(
+    tvContentRowCode.includes('slideNext') &&
+    tvContentRowCode.includes('slidePrev') &&
+    tvContentRowCode.includes('translate3d') &&
+    tvContentRowCode.includes('isSlotActive && focused'),
+    'TvContentRow deve implementar trilho horizontal deslizante com foco fixo no primeiro slot'
+  );
+  console.log('✓ Teste 15: Carrossel circular infinito com seleção fixa no primeiro card OK');
+
+  console.log('\nTodos os 15 testes da nova interface Smart TV passaram com sucesso!\n');
 }
 
 runTvAppInterfaceTests().catch(err => {
