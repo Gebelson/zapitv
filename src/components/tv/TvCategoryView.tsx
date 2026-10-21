@@ -17,7 +17,10 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
   onSelectItem,
   onPlayItem
 }) => {
-  const heroItem = useMemo(() => items[0] || null, [items]);
+  const heroSlides = useMemo(() => {
+    if (!items || items.length === 0) return [];
+    return items.slice(0, 6);
+  }, [items]);
 
   // Agrupa os itens por gêneros populares dentro da categoria
   const genreRows = useMemo(() => {
@@ -61,10 +64,10 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
 
   return (
     <div className="w-full min-h-screen pb-24 overflow-x-hidden">
-      {/* Banner Principal da Categoria (100% da primeira viewport) */}
-      {heroItem && (
+      {/* Banner Principal da Categoria (100% da primeira viewport com multi-destaques) */}
+      {heroSlides.length > 0 && (
         <TvHeroBanner
-          item={heroItem}
+          items={heroSlides}
           onPlay={onPlayItem}
           onOpenDetails={onSelectItem}
           onDownPress={handleHeroDownPress}

@@ -2635,7 +2635,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           popularMovies={popularMovies}
           popularSeries={popularSeries}
           animeItems={animeItems}
-          featuredItems={heroCarouselItems.length > 0 ? heroCarouselItems : trendingItems}
+          featuredItems={heroCarouselItems.length > 0 ? heroCarouselItems : heroCarouselStore.getCarouselItems(allowedContent)}
           myList={myList}
           favorites={favorites}
           onToggleList={toggleMyList}

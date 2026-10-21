@@ -4304,7 +4304,14 @@ var init_streamValidator = __esm({
         const streamName = (stream.name || "").trim();
         const streamDesc = (stream.description || "").trim();
         const streamUrl = (stream.url || "").trim();
-        const text2 = `${streamName} ${streamTitle} ${streamDesc} ${streamUrl}`.toLowerCase();
+        let urlPath = "";
+        try {
+          const parsed = new URL(streamUrl);
+          urlPath = parsed.pathname;
+        } catch {
+          urlPath = streamUrl;
+        }
+        const text2 = `${streamName} ${streamTitle} ${streamDesc} ${urlPath}`.toLowerCase();
         const absMatch = text2.match(/\((?:ep|episode)\.?\s*(\d+)\)/i);
         if (absMatch && season > 1) {
           const absEp = parseInt(absMatch[1], 10);

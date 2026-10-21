@@ -178,7 +178,30 @@ async function runTvAppInterfaceTests() {
   );
   console.log('✓ Teste 15: Carrossel circular infinito com seleção fixa no primeiro card OK');
 
-  console.log('\nTodos os 15 testes da nova interface Smart TV passaram com sucesso!\n');
+  // Teste 16: TvHeroBanner suporta múltiplos destaques com transições cinematográficas e controles remotos
+  assert(
+    tvHeroCode.includes('items?: ContentItem[]') &&
+    tvHeroCode.includes('goToSlide') &&
+    tvHeroCode.includes('isCrossfading') &&
+    tvHeroCode.includes('resetTimer') &&
+    tvHeroCode.includes('tv-hero-prev') &&
+    tvHeroCode.includes('tv-hero-next') &&
+    tvHeroCode.includes('visibilitychange'),
+    'TvHeroBanner deve implementar carrossel com crossfade, rotação automática, pausa na visibilidade e botões tv-hero-prev/next'
+  );
+  console.log('✓ Teste 16: Carrossel cinematográfico multi-destaques no Hero com rotação automática e navegação manual OK');
+
+  // Teste 17: TvHomeView conecta-se ao heroCarouselStore e transmite múltiplos destaques reais
+  const tvHomeViewCodeUpdated = fs.readFileSync(tvHomeViewPath, 'utf8');
+  assert(
+    tvHomeViewCodeUpdated.includes('heroCarouselStore') &&
+    tvHomeViewCodeUpdated.includes('items={heroSlides}') &&
+    !tvHomeViewCodeUpdated.includes('item={heroItem}'),
+    'TvHomeView deve conectar-se ao heroCarouselStore e passar a lista de destaques via items={heroSlides}'
+  );
+  console.log('✓ Teste 17: TvHomeView sincronizada em tempo real com heroCarouselStore e múltiplos destaques configurados OK');
+
+  console.log('\nTodos os 17 testes da nova interface Smart TV passaram com sucesso!\n');
 }
 
 runTvAppInterfaceTests().catch(err => {

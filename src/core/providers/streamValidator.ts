@@ -287,7 +287,15 @@ class StreamValidator {
     const streamName = (stream.name || '').trim();
     const streamDesc = (stream.description || '').trim();
     const streamUrl = (stream.url || '').trim();
-    const text = `${streamName} ${streamTitle} ${streamDesc} ${streamUrl}`.toLowerCase();
+    // Isola o caminho do arquivo na URL para evitar que hostnames de CDN (ex: cdn-s01.domain.com) colidam com identificadores de temporada
+    let urlPath = '';
+    try {
+      const parsed = new URL(streamUrl);
+      urlPath = parsed.pathname;
+    } catch {
+      urlPath = streamUrl;
+    }
+    const text = `${streamName} ${streamTitle} ${streamDesc} ${urlPath}`.toLowerCase();
 
     // 1. Tag de episódio absoluto em parênteses: ex: '(Ep. 1)', '(Ep. 13)'
     const absMatch = text.match(/\((?:ep|episode)\.?\s*(\d+)\)/i);

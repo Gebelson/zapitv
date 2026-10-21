@@ -1,6 +1,7 @@
-import React, { memo, useMemo, useCallback } from 'react';
+import React, { memo, useState, useEffect, useMemo, useCallback } from 'react';
 import { ContentItem } from '../../../types';
 import { storageService } from '../../core/storage/storageService';
+import { heroCarouselStore, HERO_CAROUSEL_STORAGE_KEY } from '../../core/catalog/heroCarouselStore';
 import { TvHeroBanner } from './TvHeroBanner';
 import { TvContentRow } from './TvContentRow';
 import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
@@ -26,10 +27,63 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
   onSelectItem,
   onPlayItem
 }) => {
-  // Item do Banner Principal (1º destaque configurado ou 1º em alta)
-  const heroItem = useMemo(() => {
-    return featuredItems[0] || trendingItems[0] || allContent[0];
-  }, [featuredItems, trendingItems, allContent]);
+  // Lista de Destaques configurados no painel administrativo / heroCarouselStore
+  const [liveFeatured, setLiveFeatured] = useState<ContentItem[]>(() => {
+    // 1. Se houver itens personalizados salvos pelo admin no localStorage, respeita todos eles sem corte
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const raw = localStorage.getItem(HERO_CAROUSEL_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+      } catch {}
+    }
+    // 2. Se a prop featuredItems foi fornecida, utiliza os itens de destaque configurados
+    if (featuredItems && featuredItems.length > 0) {
+      return heroCarouselStore.getDisplayItems(featuredItems, 6);
+    }
+    // 3. Fallback para sementes oficiais de destaque
+    return heroCarouselStore.getDisplayItems(allContent, 6);
+  });
+
+  useEffect(() => {
+    // Verifica se há configuração manual no storage
+    let hasManual = false;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const raw = localStorage.getItem(HERO_CAROUSEL_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            hasManual = true;
+            setLiveFeatured(parsed);
+          }
+        }
+      } catch {}
+    }
+    if (!hasManual && featuredItems && featuredItems.length > 0) {
+      setLiveFeatured(heroCarouselStore.getDisplayItems(featuredItems, 6));
+    }
+  }, [featuredItems]);
+
+  useEffect(() => {
+    return heroCarouselStore.subscribe((updatedItems) => {
+      if (updatedItems && updatedItems.length > 0) {
+        setLiveFeatured(updatedItems);
+      }
+    });
+  }, []);
+
+  // Lista cinematográfica de múltiplos destaques (suporta qualquer quantidade de banners configurados)
+  const heroSlides = useMemo(() => {
+    if (liveFeatured.length > 0) return liveFeatured;
+    if (featuredItems.length > 0) return heroCarouselStore.getDisplayItems(featuredItems, 6);
+    if (trendingItems.length > 0) return trendingItems.slice(0, 6);
+    return allContent.slice(0, 6);
+  }, [liveFeatured, featuredItems, trendingItems, allContent]);
 
   // Continuar Assistindo: extrai itens reais em andamento
   const continueWatchingItems = useMemo(() => {
@@ -82,10 +136,10 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
 
   return (
     <div className="w-full min-h-screen pb-24 overflow-x-hidden">
-      {/* Banner Principal Cinematográfico (100% da primeira viewport) */}
-      {heroItem && (
+      {/* Banner Principal Cinematográfico (100% da primeira viewport com carrossel multi-destaques) */}
+      {heroSlides.length > 0 && (
         <TvHeroBanner
-          item={heroItem}
+          items={heroSlides}
           onPlay={onPlayItem}
           onOpenDetails={onSelectItem}
           onDownPress={handleHeroDownPress}
