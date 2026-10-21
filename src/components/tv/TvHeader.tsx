@@ -154,6 +154,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
             src="/zapitv-text.png"
             alt="ZapiTV"
             className="h-[28px] sm:h-[32px] w-auto object-contain select-none ml-1 hidden sm:block drop-shadow-lg"
+            style={{ transform: 'translateY(3px)' }}
             draggable={false}
           />
         </div>

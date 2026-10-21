@@ -126,7 +126,12 @@ async function runTvAppInterfaceTests() {
     tvHeaderCode.includes('left-1/2 -translate-x-1/2'),
     'TvHeader deve aproximar o indicador da página ativa a 5px do texto, centralizado'
   );
-  console.log('✓ Teste 9: Header flutuante livre sem contêiner e indicador ativo aproximado a 5px OK');
+  assert(
+    tvHeaderCode.includes('src="/zapitv-text.png"') &&
+    (tvHeaderCode.includes('translateY(3px)') || tvHeaderCode.includes('translate-y-[3px]')),
+    'TvHeader deve aplicar transform: translateY(3px) exclusivamente ao texto ZapiTV da logo'
+  );
+  console.log('✓ Teste 9: Header flutuante livre, indicador ativo a 5px e texto da logo deslocado 3px OK');
 
   // Teste 10: Banner no topo absoluto, degradê de legibilidade e blur progressivo
   assert(
