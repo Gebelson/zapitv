@@ -145,8 +145,11 @@ async function runTvAppInterfaceTests() {
   assert(
     tvHeroCode.includes('bg-gradient-to-b from-[#05070a]') &&
     tvHeroCode.includes('linear-gradient(to bottom') &&
-    tvHeroCode.includes('linear-gradient(to top'),
-    'TvHeroBanner deve conter degradê superior escuro e blurs progressivos com máscara'
+    tvHeroCode.includes('linear-gradient(to top') &&
+    tvHeroCode.includes('maskImage') &&
+    !tvHeaderCode.includes('border-b border-white/5') &&
+    !tvHeaderCode.includes('bg-[#05070a]/92'),
+    'TvHeroBanner deve conter degradê superior escuro suave, blurs progressivos com máscara e header sem borda horizontal ou fundo sólido'
   );
   console.log('✓ Teste 10: Banner no topo absoluto, degradê superior suave e blur progressivo OK');
 

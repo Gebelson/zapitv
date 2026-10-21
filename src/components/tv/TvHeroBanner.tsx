@@ -275,107 +275,107 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => { setIsPaused(false); resetTimer(); }}
       >
-        {/* Camada 0: Imagens com Crossfade Cinematográfico Contínuo */}
+        {/* Camada 0: Imagens com Crossfade e Blur Progressivo Integrado */}
         <div className="absolute inset-0 z-0 overflow-hidden">
-          {/* Imagem Anterior (Saindo com fade out suave de 700ms) */}
+          {/* Slide Anterior (Saindo com fade out suave de 700ms) */}
           {outgoingItem && outgoingBackdropUrl && (
-            <img
+            <div 
               key={`hero-outgoing-${outgoingItem.id}`}
-              src={outgoingBackdropUrl}
-              alt=""
-              aria-hidden="true"
-              className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out z-0"
+              className="absolute inset-0 transition-opacity duration-700 ease-in-out z-0"
               style={{ opacity: isCrossfading ? 0 : 1 }}
-            />
-          )}
-
-          {/* Imagem Atual (Entrando com fade in suave de 700ms) */}
-          {currentBackdropUrl && (
-            <img
-              key={`hero-current-${currentItem.id}`}
-              src={currentBackdropUrl}
-              alt={currentItem.title}
-              loading="eager"
-              decoding="async"
-              className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out z-[1]"
-              style={{ opacity: outgoingItem ? (isCrossfading ? 1 : 0) : 1 }}
-              onError={(e) => {
-                if (currentItem.image && (e.currentTarget as HTMLImageElement).src !== currentItem.image) {
-                  (e.currentTarget as HTMLImageElement).src = currentItem.image;
-                }
-              }}
-            />
-          )}
-
-          {/* Blur Progressivo Superior (Fade-out suave com desfoque desaparecendo em direção ao centro) */}
-          <div 
-            className="absolute top-0 inset-x-0 h-48 pointer-events-none z-[2] overflow-hidden"
-            style={{
-              maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)',
-              WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)'
-            }}
-          >
-            {currentBackdropUrl && (
+            >
+              {/* Imagem Nítida Base Fullscreen (Inicia em top: 0, 100% da viewport) */}
               <img
-                key={`blur-top-${currentItem.id}`}
-                src={currentBackdropUrl}
+                src={outgoingBackdropUrl}
                 alt=""
                 aria-hidden="true"
-                className="w-full h-full object-cover object-center filter blur-md scale-105 transition-opacity duration-700"
+                className="absolute inset-0 w-full h-full object-cover object-center"
               />
-            )}
-            <div 
-              className="absolute inset-0"
-              style={{
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)'
-              }}
-            />
-          </div>
 
-          {/* Gradiente Escuro Superior Progressivo (Garante 100% de legibilidade dos links e logotipo) */}
+              {/* Blur Progressivo Alinhado ao Backdrop (Desfoque suave no topo atrás do header e na base) */}
+              <div 
+                className="absolute inset-0 pointer-events-none overflow-hidden"
+                style={{
+                  maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 6%, rgba(0,0,0,0.3) 14%, rgba(0,0,0,0) 24%, rgba(0,0,0,0) 68%, rgba(0,0,0,0.35) 80%, rgba(0,0,0,0.85) 92%, rgba(0,0,0,1) 100%)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 6%, rgba(0,0,0,0.3) 14%, rgba(0,0,0,0) 24%, rgba(0,0,0,0) 68%, rgba(0,0,0,0.35) 80%, rgba(0,0,0,0.85) 92%, rgba(0,0,0,1) 100%)'
+                }}
+              >
+                <img
+                  src={outgoingBackdropUrl}
+                  alt=""
+                  aria-hidden="true"
+                  className="w-full h-full object-cover object-center filter blur-xl scale-105 transform-gpu"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Slide Atual (Entrando com fade in suave de 700ms) */}
+          {currentBackdropUrl && (
+            <div 
+              key={`hero-current-${currentItem.id}`}
+              className="absolute inset-0 transition-opacity duration-700 ease-in-out z-[1]"
+              style={{ opacity: outgoingItem ? (isCrossfading ? 1 : 0) : 1 }}
+            >
+              {/* Imagem Nítida Base Fullscreen (Inicia em top: 0, 100% da viewport) */}
+              <img
+                src={currentBackdropUrl}
+                alt={currentItem.title}
+                loading="eager"
+                decoding="async"
+                className="absolute inset-0 w-full h-full object-cover object-center"
+                onError={(e) => {
+                  if (currentItem.image && (e.currentTarget as HTMLImageElement).src !== currentItem.image) {
+                    (e.currentTarget as HTMLImageElement).src = currentItem.image;
+                  }
+                }}
+              />
+
+              {/* Blur Progressivo Alinhado ao Backdrop (Desfoque suave no topo atrás do header e na base) */}
+              <div 
+                className="absolute inset-0 pointer-events-none overflow-hidden"
+                style={{
+                  maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 6%, rgba(0,0,0,0.3) 14%, rgba(0,0,0,0) 24%, rgba(0,0,0,0) 68%, rgba(0,0,0,0.35) 80%, rgba(0,0,0,0.85) 92%, rgba(0,0,0,1) 100%)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 6%, rgba(0,0,0,0.3) 14%, rgba(0,0,0,0) 24%, rgba(0,0,0,0) 68%, rgba(0,0,0,0.35) 80%, rgba(0,0,0,0.85) 92%, rgba(0,0,0,1) 100%)'
+                }}
+              >
+                <img
+                  src={currentBackdropUrl}
+                  alt=""
+                  aria-hidden="true"
+                  className="w-full h-full object-cover object-center filter blur-xl scale-105 transform-gpu"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Gradiente Escuro Superior Cinematográfico (Garante legibilidade dos links sem faixa preta sólida) */}
           <div 
-            className="absolute top-0 inset-x-0 h-[48%] bg-gradient-to-b from-[#05070a] via-[#05070a]/75 via-25% to-transparent pointer-events-none z-[3]"
+            className="absolute top-0 inset-x-0 h-[45%] bg-gradient-to-b from-[#05070a] pointer-events-none z-[2]"
             style={{
-              background: 'linear-gradient(to bottom, rgba(5,7,10,0.96) 0%, rgba(5,7,10,0.80) 12%, rgba(5,7,10,0.48) 25%, rgba(5,7,10,0.18) 38%, transparent 54%)'
+              background: 'linear-gradient(to bottom, rgba(5,7,10,0.70) 0%, rgba(5,7,10,0.50) 8%, rgba(5,7,10,0.28) 16%, rgba(5,7,10,0.08) 28%, transparent 40%)'
             }}
           />
 
-          {/* Gradiente Lateral Esquerdo (Contraste cinematográfico para o texto e botões) */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#05070a] via-[#05070a]/85 via-45% to-transparent pointer-events-none z-[3]" />
-
-          {/* Blur Progressivo Inferior (Fade-in suave aumentando em direção à base e dissolvendo no fundo escuro) */}
+          {/* Gradiente Lateral Esquerdo (Contraste cinematográfico para o texto e botões à esquerda) */}
           <div 
-            className="absolute bottom-0 inset-x-0 h-64 pointer-events-none z-[2] overflow-hidden"
+            className="absolute inset-0 pointer-events-none z-[2]"
             style={{
-              maskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)',
-              WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)'
+              background: 'linear-gradient(to right, rgba(5,7,10,0.88) 0%, rgba(5,7,10,0.70) 24%, rgba(5,7,10,0.35) 46%, transparent 72%)'
             }}
-          >
-            {currentBackdropUrl && (
-              <img
-                key={`blur-bottom-${currentItem.id}`}
-                src={currentBackdropUrl}
-                alt=""
-                aria-hidden="true"
-                className="w-full h-full object-cover object-center filter blur-lg scale-105 transition-opacity duration-700"
-              />
-            )}
-            <div 
-              className="absolute inset-0"
-              style={{
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)'
-              }}
-            />
-          </div>
+          />
 
-          {/* Gradiente Inferior Progressivo (Fusão suave com o fundo escuro da primeira tela) */}
-          <div className="absolute bottom-0 inset-x-0 h-[48%] bg-gradient-to-t from-[#05070a] via-[#05070a]/85 via-40% to-transparent pointer-events-none z-[3]" />
+          {/* Gradiente Inferior Progressivo (Dissolve suavemente no fundo da página sem linha divisória) */}
+          <div 
+            className="absolute bottom-0 inset-x-0 h-[45%] pointer-events-none z-[2]"
+            style={{
+              background: 'linear-gradient(to top, rgba(5,7,10,1) 0%, rgba(5,7,10,0.85) 12%, rgba(5,7,10,0.50) 26%, rgba(5,7,10,0.15) 40%, transparent 58%)'
+            }}
+          />
 
           {/* Efeito Glow Ambiente do Destaque (Cores atmosféricas do ZapiTV) */}
           <div 
-            className="absolute top-1/3 left-14 w-[500px] h-[380px] rounded-full pointer-events-none opacity-30 blur-3xl z-[3]"
+            className="absolute top-1/3 left-14 w-[500px] h-[380px] rounded-full pointer-events-none opacity-25 blur-3xl z-[2]"
             style={{
               background: 'radial-gradient(circle, rgba(0, 125, 247, 0.45) 0%, rgba(0, 229, 255, 0.25) 45%, transparent 75%)'
             }}
