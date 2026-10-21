@@ -1,8 +1,9 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import { ContentItem } from '../../../types';
 import { storageService } from '../../core/storage/storageService';
 import { TvHeroBanner } from './TvHeroBanner';
 import { TvContentRow } from './TvContentRow';
+import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvHomeViewProps {
   featuredItems: ContentItem[];
@@ -39,6 +40,34 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
     }).slice(0, 15);
   }, [allContent]);
 
+  // Identificador do primeiro card da primeira fileira
+  const firstCardKey = useMemo(() => {
+    if (continueWatchingItems.length > 0) {
+      return `card-continue-watching-${continueWatchingItems[0].id}`;
+    }
+    if (trendingItems.length > 0) {
+      return `card-trending-${trendingItems[0].id}`;
+    }
+    if (popularMovies.length > 0) {
+      return `card-popular-movies-${popularMovies[0].id}`;
+    }
+    return '';
+  }, [continueWatchingItems, trendingItems, popularMovies]);
+
+  const handleHeroDownPress = useCallback(() => {
+    if (firstCardKey) {
+      setFocus(firstCardKey);
+    } else {
+      setFocus('row-trending');
+    }
+  }, [firstCardKey]);
+
+  const handleFirstRowUpPress = useCallback(() => {
+    setFocus('tv-hero-play');
+  }, []);
+
+  const hasContinue = continueWatchingItems.length > 0;
+
   return (
     <div className="w-full min-h-screen pb-24 overflow-x-hidden">
       {/* Banner Principal Cinematográfico */}
@@ -47,13 +76,14 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
           item={heroItem}
           onPlay={onPlayItem}
           onOpenDetails={onSelectItem}
+          onDownPress={handleHeroDownPress}
         />
       )}
 
       {/* Fileiras de Conteúdos Horizontais 16:9 */}
       <div className="relative z-10 -mt-8 sm:-mt-12 space-y-2 sm:space-y-4">
         {/* Continuar Assistindo (Se houver progresso real) */}
-        {continueWatchingItems.length > 0 && (
+        {hasContinue && (
           <TvContentRow
             title="Continuar assistindo"
             rowId="continue-watching"
@@ -61,6 +91,7 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             onItemClick={onSelectItem}
             showProgress
             badge="Seu Progresso"
+            onRowUp={handleFirstRowUpPress}
           />
         )}
 
@@ -72,6 +103,7 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={trendingItems}
             onItemClick={onSelectItem}
             badge="Top Semanal"
+            onRowUp={!hasContinue ? handleFirstRowUpPress : undefined}
           />
         )}
 

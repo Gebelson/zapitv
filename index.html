@@ -42,6 +42,19 @@
         scrollbar-width: none;
       }
     </style>
+    <script>
+      (function() {
+        try {
+          var search = window.location.search || '';
+          var pathname = window.location.pathname || '';
+          var hasTv = search.indexOf('tv=1') !== -1 || search.indexOf('tv=true') !== -1;
+          if (hasTv && pathname !== '/tv' && !pathname.startsWith('/tv')) {
+            var isDiag = search.indexOf('tvdiag=1') !== -1 || search.indexOf('tv_diag=1') !== -1;
+            window.location.replace('/tv' + (isDiag ? '?tvdiag=1' : ''));
+          }
+        } catch (e) {}
+      })();
+    </script>
 </head>
   <body class="bg-gray-50 text-gray-900 transition-colors duration-300 no-scrollbar">
     <div id="root"></div>

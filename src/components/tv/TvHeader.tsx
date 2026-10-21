@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, User as UserIcon } from 'lucide-react';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
-import { FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { TvProfileMenu } from './TvProfileMenu';
 
 export type TvTab = 'home' | 'movies' | 'series' | 'animes' | 'featured';
@@ -24,6 +24,13 @@ const TvNavTabButton: React.FC<{
   const { ref, focused } = useTvFocusable({
     focusKey,
     onEnterPress: onClick,
+    onArrowPress: (direction) => {
+      if (direction === 'down') {
+        setFocus('tv-hero-play');
+        return false;
+      }
+      return true;
+    },
     autoScroll: false
   });
 
@@ -62,19 +69,34 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
 
   const { ref: noriginRef, focusKey } = useFocusable({
     focusKey: 'tv-header',
-    trackChildren: true
+    trackChildren: true,
+    saveLastFocusedChild: true
   });
 
   // Botão de Busca
   const { ref: searchRef, focused: searchFocused } = useTvFocusable({
     focusKey: 'tv-nav-search',
-    onEnterPress: onOpenSearch
+    onEnterPress: onOpenSearch,
+    onArrowPress: (direction) => {
+      if (direction === 'down') {
+        setFocus('tv-hero-play');
+        return false;
+      }
+      return true;
+    }
   });
 
   // Botão de Perfil
   const { ref: profileRef, focused: profileFocused } = useTvFocusable({
     focusKey: 'tv-nav-profile',
-    onEnterPress: () => setIsProfileMenuOpen(prev => !prev)
+    onEnterPress: () => setIsProfileMenuOpen(prev => !prev),
+    onArrowPress: (direction) => {
+      if (direction === 'down') {
+        setFocus('tv-hero-details');
+        return false;
+      }
+      return true;
+    }
   });
 
   return (

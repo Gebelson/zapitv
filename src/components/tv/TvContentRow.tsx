@@ -10,6 +10,7 @@ interface TvContentRowProps {
   onItemClick: (item: ContentItem) => void;
   showProgress?: boolean;
   badge?: string;
+  onRowUp?: () => void;
 }
 
 export const TvContentRow: React.FC<TvContentRowProps> = memo(({
@@ -18,13 +19,15 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   rowId,
   onItemClick,
   showProgress = false,
-  badge
+  badge,
+  onRowUp
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { ref: noriginRef, focusKey } = useFocusable({
     focusKey: `row-${rowId}`,
-    trackChildren: true
+    trackChildren: true,
+    saveLastFocusedChild: true
   });
 
   const setRowRef = useCallback((node: HTMLDivElement | null) => {
@@ -75,6 +78,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
                 showProgress={showProgress}
                 focusKeyPrefix={`card-${rowId}`}
                 priority={idx < 5}
+                onUpPress={onRowUp}
               />
             </div>
           ))}

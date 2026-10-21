@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
+import React, { memo, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Play, Star } from 'lucide-react';
 import { ContentItem, ContentType } from '../../../types';
 import { storageService, PlaybackContinuityInfo } from '../../core/storage/storageService';
@@ -12,6 +12,27 @@ interface TvCard16x9Props {
   className?: string;
   focusKeyPrefix?: string;
   priority?: boolean;
+  onUpPress?: () => void;
+}
+
+// Gera o gradiente de glow ambiente suave personalizado de acordo com o gênero e tom da obra
+function getCardAmbientGlow(item: ContentItem): string {
+  const genreStr = ((item.genres && item.genres[0]) || item.type || '').toLowerCase();
+  
+  if (genreStr.includes('terror') || genreStr.includes('suspense') || genreStr.includes('guerra')) {
+    return 'radial-gradient(ellipse at center, rgba(225, 29, 72, 0.6) 0%, rgba(190, 18, 60, 0.4) 40%, rgba(159, 18, 57, 0.2) 70%, transparent 80%)';
+  }
+  if (genreStr.includes('comédia') || genreStr.includes('aventura') || genreStr.includes('infantil') || genreStr.includes('família')) {
+    return 'radial-gradient(ellipse at center, rgba(245, 158, 11, 0.6) 0%, rgba(234, 88, 12, 0.4) 40%, rgba(180, 83, 9, 0.2) 70%, transparent 80%)';
+  }
+  if (genreStr.includes('drama') || genreStr.includes('romance')) {
+    return 'radial-gradient(ellipse at center, rgba(217, 70, 239, 0.6) 0%, rgba(168, 85, 247, 0.4) 40%, rgba(126, 34, 206, 0.2) 70%, transparent 80%)';
+  }
+  if (genreStr.includes('anime') || genreStr.includes('fantasia')) {
+    return 'radial-gradient(ellipse at center, rgba(168, 85, 247, 0.6) 0%, rgba(59, 130, 246, 0.42) 40%, rgba(6, 182, 212, 0.22) 70%, transparent 80%)';
+  }
+  // Padrão ZapiTV: azul elétrico e ciano neon atmosférico
+  return 'radial-gradient(ellipse at center, rgba(0, 125, 247, 0.6) 0%, rgba(0, 229, 255, 0.42) 40%, rgba(147, 51, 234, 0.2) 70%, transparent 80%)';
 }
 
 export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
@@ -20,7 +41,8 @@ export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
   showProgress = false,
   className = "",
   focusKeyPrefix = "tv-card",
-  priority = false
+  priority = false,
+  onUpPress
 }) => {
   const [imgSrc, setImgSrc] = useState<string>(() => {
     return item.backdrop || posterRecoveryService.getCachedPoster(item) || item.image || item.poster || '';
@@ -63,6 +85,13 @@ export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
   const { ref: tvFocusRef, focused: isTvFocused } = useTvFocusable({
     focusKey,
     onEnterPress: () => onClick(item),
+    onArrowPress: (direction) => {
+      if (direction === 'up' && onUpPress) {
+        onUpPress();
+        return false;
+      }
+      return true;
+    },
     autoScroll: true,
     scrollInline: 'center',
     scrollBlock: 'nearest'
@@ -76,6 +105,8 @@ export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
   const isEpisodic = item.type === ContentType.SERIES || item.type === ContentType.ANIME || Boolean(item.seasonsCount && item.seasonsCount > 0);
   const progressPercent = Math.min(100, Math.max(0, continuity?.percentage || 0));
   const hasValidProgress = showProgress && progressPercent > 2 && progressPercent < 95;
+
+  const ambientGlowStyle = useMemo(() => getCardAmbientGlow(item), [item]);
 
   return (
     <div
@@ -91,17 +122,17 @@ export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
           : 'hover:scale-102 z-10'
       } ${className}`}
     >
-      {/* GLOW AMBIENTE DAS CAPAS (Samsung The Frame / Tizen optimized) */}
-      {/* Iluminação ambiental suave associada às cores da imagem, pulsando em foco */}
+      {/* GLOW AMBIENTE DAS CAPAS (Samsung The Frame / Tizen / Media Station X) */}
+      {/* Iluminação suave que acompanha a paleta de cores de cada capa */}
       <div 
-        className={`absolute -inset-2.5 sm:-inset-3.5 rounded-2xl pointer-events-none transition-all duration-300 transform-gpu ${
+        className={`absolute -inset-3 sm:-inset-4 rounded-2xl pointer-events-none transition-all duration-300 transform-gpu ${
           isTvFocused 
             ? 'opacity-100 scale-105' 
             : 'opacity-0 scale-95'
         }`}
         style={{
-          background: 'radial-gradient(ellipse at center, rgba(0, 125, 247, 0.55) 0%, rgba(0, 229, 255, 0.38) 40%, rgba(147, 51, 234, 0.18) 70%, transparent 80%)',
-          filter: 'blur(14px)',
+          background: ambientGlowStyle,
+          filter: 'blur(16px)',
           zIndex: -1
         }}
         aria-hidden="true"
@@ -110,7 +141,7 @@ export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
       {/* Caixa 16:9 Principal */}
       <div className={`relative w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-[#0d121d] border transition-all duration-200 shadow-xl ${
         isTvFocused
-          ? 'border-[#00e5ff] shadow-[0_0_20px_rgba(0,229,255,0.45)] ring-2 ring-[#00e5ff]/50'
+          ? 'border-[#00e5ff] shadow-[0_0_22px_rgba(0,229,255,0.5)] ring-2 ring-[#00e5ff]/50'
           : 'border-white/10 group-hover/tvcard:border-white/20'
       }`}>
         {/* Imagem de Fundo 16:9 */}

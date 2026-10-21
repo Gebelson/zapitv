@@ -49,7 +49,7 @@ export const TvApp: React.FC<TvAppProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Inicializa navegação espacial
+  // Inicializa navegação espacial e define o foco inicial no botão Assistir do Hero
   useEffect(() => {
     initSpatialNavigation({
       debug: false,
@@ -59,8 +59,12 @@ export const TvApp: React.FC<TvAppProps> = ({
     tvModeService.setTvMode(true);
     document.body.classList.add('tv-mode');
 
+    const timer = setTimeout(() => {
+      setFocus('tv-hero-play');
+    }, 150);
+
     return () => {
-      // Quando sair da rota /tv, restaura classe
+      clearTimeout(timer);
       if (!window.location.pathname.startsWith('/tv')) {
         document.body.classList.remove('tv-mode');
       }
@@ -155,6 +159,9 @@ export const TvApp: React.FC<TvAppProps> = ({
           onSelectTab={(tab) => {
             setSpecialView(null);
             setCurrentTab(tab);
+            setTimeout(() => {
+              setFocus('tv-hero-play');
+            }, 100);
           }}
           onOpenSearch={() => setSpecialView('search')}
           onNavigateProfileMenu={(target) => {

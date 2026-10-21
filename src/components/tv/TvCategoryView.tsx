@@ -1,7 +1,8 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import { ContentItem } from '../../../types';
 import { TvHeroBanner } from './TvHeroBanner';
 import { TvContentRow } from './TvContentRow';
+import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvCategoryViewProps {
   categoryTitle: string;
@@ -33,7 +34,6 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
       });
     });
 
-    // Pega os gêneros com pelo menos 3 títulos
     const list: { genre: string; items: ContentItem[] }[] = [];
     genresMap.forEach((genreItems, genre) => {
       if (genreItems.length >= 3) {
@@ -41,9 +41,27 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
       }
     });
 
-    // Ordena pelos que tem mais itens
     return list.sort((a, b) => b.items.length - a.items.length).slice(0, 8);
   }, [items]);
+
+  const firstCardKey = useMemo(() => {
+    if (items.length > 0) {
+      return `card-all-${categoryTitle.toLowerCase()}-${items[0].id}`;
+    }
+    return '';
+  }, [items, categoryTitle]);
+
+  const handleHeroDownPress = useCallback(() => {
+    if (firstCardKey) {
+      setFocus(firstCardKey);
+    } else {
+      setFocus(`row-all-${categoryTitle.toLowerCase()}`);
+    }
+  }, [firstCardKey, categoryTitle]);
+
+  const handleFirstRowUpPress = useCallback(() => {
+    setFocus('tv-hero-play');
+  }, []);
 
   return (
     <div className="w-full min-h-screen pb-24 overflow-x-hidden">
@@ -53,6 +71,7 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
           item={heroItem}
           onPlay={onPlayItem}
           onOpenDetails={onSelectItem}
+          onDownPress={handleHeroDownPress}
         />
       )}
 
@@ -64,6 +83,7 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
           rowId={`all-${categoryTitle.toLowerCase()}`}
           items={items.slice(0, 20)}
           onItemClick={onSelectItem}
+          onRowUp={handleFirstRowUpPress}
         />
 
         {/* Linhas Agrupadas por Gênero */}

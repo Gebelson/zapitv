@@ -129,6 +129,17 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  // Redirecionamento can�nico de entrada de compatibilidade ?tv=1 para a rota /tv
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tvParam = params.get('tv');
+    const isDiag = params.get('tvdiag') === '1' || params.get('tv_diag') === '1';
+
+    if ((tvParam === '1' || tvParam === 'true') && !location.pathname.startsWith('/tv')) {
+      navigate(isDiag ? '/tv?tvdiag=1' : '/tv', { replace: true });
+    }
+  }, [location.pathname, location.search, navigate]);
+
   // Matchers para rotas de detalhes e episódios
   const matchMovieDetail = matchPath('/filmes/:id', location.pathname);
   const matchSeriesEpisode = matchPath('/series/:id/temporada/:season/episodio/:episode', location.pathname);

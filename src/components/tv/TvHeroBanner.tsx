@@ -2,12 +2,13 @@ import React, { memo } from 'react';
 import { Play, Info, Star } from 'lucide-react';
 import { ContentItem } from '../../../types';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
-import { FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvHeroBannerProps {
   item: ContentItem;
   onPlay: (item: ContentItem) => void;
   onOpenDetails: (item: ContentItem) => void;
+  onDownPress?: () => void;
 }
 
 const TvHeroButton: React.FC<{
@@ -16,10 +17,22 @@ const TvHeroButton: React.FC<{
   isPrimary?: boolean;
   icon: React.ReactNode;
   label: string;
-}> = ({ focusKey, onClick, isPrimary = false, icon, label }) => {
+  onDownPress?: () => void;
+}> = ({ focusKey, onClick, isPrimary = false, icon, label, onDownPress }) => {
   const { ref, focused } = useTvFocusable({
     focusKey,
     onEnterPress: onClick,
+    onArrowPress: (direction) => {
+      if (direction === 'up') {
+        setFocus('tv-nav-home');
+        return false;
+      }
+      if (direction === 'down' && onDownPress) {
+        onDownPress();
+        return false;
+      }
+      return true;
+    },
     autoScroll: true
   });
 
@@ -49,11 +62,13 @@ const TvHeroButton: React.FC<{
 export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
   item,
   onPlay,
-  onOpenDetails
+  onOpenDetails,
+  onDownPress
 }) => {
   const { ref: noriginRef, focusKey } = useFocusable({
     focusKey: 'tv-hero',
-    trackChildren: true
+    trackChildren: true,
+    saveLastFocusedChild: true
   });
 
   const backdropUrl = item.backdrop || item.image || item.poster || '';
@@ -134,6 +149,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
               isPrimary
               icon={<Play className="w-5 h-5 fill-white" />}
               label="Assistir"
+              onDownPress={onDownPress}
             />
 
             <TvHeroButton
@@ -142,6 +158,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
               isPrimary={false}
               icon={<Info className="w-5 h-5" />}
               label="Mais detalhes"
+              onDownPress={onDownPress}
             />
           </div>
         </div>

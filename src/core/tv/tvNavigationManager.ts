@@ -28,27 +28,29 @@ class TvNavigationManager {
   }
 
   public init(): void {
-    if (this.isInitialized || typeof window === 'undefined') return;
-    if (!tvModeService.isTvMode()) return;
+    if (typeof window === 'undefined') return;
 
-    this.isInitialized = true;
+    if (!this.isInitialized) {
+      this.isInitialized = true;
 
-    // Inicializa a navegação espacial do Norigin com mapeamento de TV
-    initNorigin({
-      debug: false,
-      visualDebug: false
-    });
+      // Inicializa a navegação espacial do Norigin com mapeamento de TV e foco no DOM nativo
+      initNorigin({
+        debug: false,
+        visualDebug: false,
+        shouldFocusDOMNode: true
+      });
 
-    setKeyMap({
-      left: [37],
-      up: [38],
-      right: [39],
-      down: [40],
-      enter: [13, 10]
-    });
+      setKeyMap({
+        left: [37, 'ArrowLeft'],
+        up: [38, 'ArrowUp'],
+        right: [39, 'ArrowRight'],
+        down: [40, 'ArrowDown'],
+        enter: [13, 10, 'Enter', 'Select', 65385]
+      });
 
-    // Captura global do botão VOLTAR / BACK (Tizen 10009, Escape, Backspace)
-    window.addEventListener('keydown', this.handleGlobalKeyDown, { capture: true });
+      // Captura global do botão VOLTAR / BACK (Tizen 10009, Escape, Backspace)
+      window.addEventListener('keydown', this.handleGlobalKeyDown, { capture: true });
+    }
   }
 
   private handleGlobalKeyDown = (e: KeyboardEvent): void => {
