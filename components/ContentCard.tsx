@@ -1,8 +1,10 @@
-import React, { memo, useState, useEffect, useRef } from 'react';
+import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { Heart, Bookmark, Play, Star } from 'lucide-react';
 import { ContentItem, ContentType } from '../types';
 import { storageService, PlaybackContinuityInfo } from '../src/core/storage/storageService';
 import { posterRecoveryService } from '../src/core/catalog/PosterRecoveryService';
+import { useTvFocusable } from '../src/core/tv/useTvFocusable';
+import { tvModeService } from '../src/core/tv/tvModeService';
 
 interface ContentCardProps {
   item: ContentItem;
@@ -185,6 +187,20 @@ const ContentCard: React.FC<ContentCardProps> = ({
     }
   };
 
+  const isTv = tvModeService.isTvMode();
+  const { ref: tvFocusRef, focused: isTvFocused } = useTvFocusable({
+    focusKey: `card-${item.id}`,
+    onEnterPress: () => onItemClick(item),
+    autoScroll: true,
+    scrollInline: 'center',
+    scrollBlock: 'nearest'
+  });
+
+  const setCombinedCardRef = useCallback((node: HTMLDivElement | null) => {
+    (cardRef as any).current = node;
+    (tvFocusRef as any).current = node;
+  }, [tvFocusRef]);
+
   useEffect(() => {
     return () => {
       if (hoverPrefetchTimerRef.current) clearTimeout(hoverPrefetchTimerRef.current);
@@ -193,20 +209,25 @@ const ContentCard: React.FC<ContentCardProps> = ({
 
   return (
     <div 
-      ref={cardRef}
+      ref={setCombinedCardRef}
       data-ui-sound-card=""
+      data-focus-key={`card-${item.id}`}
+      data-tv-focused={isTvFocused ? "true" : undefined}
+      tabIndex={isTv ? 0 : undefined}
       onClick={() => onItemClick(item)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`flex-none w-full max-w-full min-w-0 group/card cursor-pointer transition-all duration-300 hover:scale-105 hover:z-30 relative ${isInViewport ? 'transform-gpu will-change-transform' : ''} ${className}`}
+      className={`flex-none w-full max-w-full min-w-0 group/card cursor-pointer transition-all duration-300 ${isTvFocused ? 'tv-focused scale-105 z-40' : 'hover:scale-105 hover:z-30'} relative ${isInViewport ? 'transform-gpu will-change-transform' : ''} ${className}`}
     >
       {isInViewport ? <>
-      {/* Brilho Azul no Hover - hardware accelerated */}
-          <div className="absolute inset-x-0 inset-y-[35%] rounded-full opacity-0 group-hover/card:opacity-100 transition-all duration-500 blur-2xl pointer-events-none transform-gpu translate-z-0" style={{ backgroundColor: '#007df7', zIndex: -1 }} />
+      {/* Brilho Azul no Hover - ativado apenas fora do Modo TV para economizar GPU da TV */}
+          {!isTv && (
+            <div className="absolute inset-x-0 inset-y-[35%] rounded-full opacity-0 group-hover/card:opacity-100 transition-all duration-500 blur-2xl pointer-events-none transform-gpu translate-z-0" style={{ backgroundColor: '#007df7', zIndex: -1 }} />
+          )}
           
           <div className={`relative w-full max-w-full aspect-[2/3] rounded-xl md:rounded-2xl overflow-hidden transition-all duration-300 ${
             isDarkMode
-              ? 'bg-gray-900 border border-white/10 group-hover/card:border-white/20 shadow-lg'
+              ? `bg-gray-900 border ${isTvFocused ? 'border-cyan-400' : 'border-white/10 group-hover/card:border-white/20'} shadow-lg`
               : 'bg-transparent border-0 border-none shadow-md shadow-black/5 group-hover/card:border-none'
           }`}>
             {hasImageError || !imgSrc ? (
@@ -246,7 +267,7 @@ const ContentCard: React.FC<ContentCardProps> = ({
                 alt={item.title} 
                 onError={handleImageError}
                 className="w-full h-full max-w-full object-cover transition-transform duration-700 pointer-events-none block" 
-                loading="eager"
+                loading={isTv ? "lazy" : "eager"}
                 decoding="async"
                 referrerPolicy="no-referrer"
               />

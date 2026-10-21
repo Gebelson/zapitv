@@ -22,6 +22,122 @@ import { sourceVerificationService, VerificationState, MSG_INCONCLUSIVE, MSG_UNA
 import { watchPartyService } from '../src/core/watchparty/WatchPartyService';
 import { uiSoundService } from '../src/core/audio/uiSoundService';
 import { getRememberedSources, prioritizeRememberedSources, RememberedSource } from '../src/core/providers/sourceMemory';
+import { useTvFocusable } from '../src/core/tv/useTvFocusable';
+import { tvModeService } from '../src/core/tv/tvModeService';
+import { tvNavigationManager } from '../src/core/tv/tvNavigationManager';
+import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+
+const DetailModalTvButton: React.FC<{
+  focusKey: string;
+  onClick: (e: any) => void;
+  className: string;
+  title?: string;
+  ariaLabel?: string;
+  children: React.ReactNode;
+}> = ({ focusKey, onClick, className, title, ariaLabel, children }) => {
+  const isTv = tvModeService.isTvMode();
+  const { ref, focused } = useTvFocusable({
+    focusKey,
+    onEnterPress: () => onClick({ preventDefault: () => {}, stopPropagation: () => {} } as any)
+  });
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={onClick}
+      data-focus-key={focusKey}
+      tabIndex={isTv ? 0 : undefined}
+      title={title}
+      aria-label={ariaLabel}
+      className={`${className} ${focused ? 'tv-focused scale-105 z-30' : ''}`}
+    >
+      {children}
+    </button>
+  );
+};
+
+const SeasonSelectTv: React.FC<{
+  currentSeason: number;
+  availableSeasons: number[];
+  onChange: (val: number) => void;
+}> = ({ currentSeason, availableSeasons, onChange }) => {
+  const isTv = tvModeService.isTvMode();
+  const { ref, focused } = useTvFocusable({
+    focusKey: 'modal-season-select',
+    autoScroll: true
+  });
+
+  return (
+    <div className={`relative group ${focused ? 'tv-focused rounded-xl' : ''}`}>
+      <select 
+        ref={ref}
+        value={currentSeason} 
+        onChange={(e) => onChange(Number(e.target.value))} 
+        className="appearance-none bg-[#242424] border border-white/20 text-white py-1.5 sm:py-2 pl-3 sm:pl-4 pr-9 sm:pr-10 rounded-xl font-bold text-xs sm:text-sm outline-none cursor-pointer hover:bg-[#333] transition-colors"
+        aria-label="Selecionar temporada"
+      >
+        {availableSeasons.map((sNum) => (
+           <option key={sNum} value={sNum}>Temporada {sNum}</option>
+        ))}
+      </select>
+      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-white" />
+    </div>
+  );
+};
+
+const EpisodeTvRow: React.FC<{
+  ep: any;
+  currentSeason: number;
+  epProgress: number;
+  onEpisodeClick: (season: number, episode: number) => void;
+}> = ({ ep, currentSeason, epProgress, onEpisodeClick }) => {
+  const isTv = tvModeService.isTvMode();
+  const { ref, focused } = useTvFocusable({
+    focusKey: `ep-${currentSeason}-${ep.number}`,
+    onEnterPress: () => onEpisodeClick(currentSeason, ep.number),
+    autoScroll: true
+  });
+
+  return (
+    <div 
+      ref={ref}
+      key={ep.id} 
+      data-focus-key={`ep-${currentSeason}-${ep.number}`}
+      tabIndex={isTv ? 0 : undefined}
+      onClick={() => onEpisodeClick(currentSeason, ep.number)} 
+      className={`group flex flex-row items-center gap-3 sm:gap-4 md:gap-6 p-3 sm:p-4 md:p-6 transition-all cursor-pointer border-b border-black/20 last:border-0 ${
+        focused ? 'tv-focused bg-white/10 ring-2 ring-[#00e5ff] scale-[1.01] z-20' : 'hover:bg-white/5'
+      }`}
+    >
+      <div className={`text-base sm:text-xl md:text-2xl font-normal w-6 sm:w-8 text-center shrink-0 ${focused ? 'text-cyan-300 font-bold' : 'text-gray-500'}`}>{ep.number}</div>
+      <div className="relative w-24 sm:w-36 md:w-40 aspect-video rounded-lg overflow-hidden shrink-0 bg-black shadow-lg">
+        <img 
+          src={ep.image} 
+          alt={`Episódio ${ep.number} - ${ep.title}`}
+          className={`w-full h-full object-cover transition-opacity ${focused ? 'opacity-100' : 'opacity-80 group-hover:opacity-100'}`} 
+          loading="lazy" 
+        />
+        <div className={`absolute inset-0 flex items-center justify-center transition-opacity bg-black/40 ${focused ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+           <Play className="w-5 h-5 sm:w-8 sm:h-8 fill-white text-white" />
+        </div>
+        {/* Barrinha Vermelha de Progresso Assistido (Estilo Netflix) */}
+        {epProgress > 0 && (
+          <div className="absolute bottom-0 inset-x-0 h-1 md:h-1.5 bg-black/70 z-20 overflow-hidden pointer-events-none">
+            <div 
+              className="h-full bg-red-600 transition-all duration-300 shadow-[0_0_8px_rgba(220,38,38,0.8)]"
+              style={{ width: `${Math.min(100, Math.max(3, epProgress))}%` }}
+            />
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <h4 className={`font-bold text-xs sm:text-sm md:text-base transition-colors truncate ${focused ? 'text-cyan-300' : 'text-white group-hover:text-[#007df7]'}`}>{ep.title}</h4>
+        <p className="text-[11px] sm:text-xs md:text-sm text-gray-400 leading-relaxed line-clamp-2 mt-0.5">{ep.description}</p>
+      </div>
+    </div>
+  );
+};
 
 const ZapiPlayer = lazy(() => import('../src/components/player/ZapiPlayer').then(m => ({ default: m.ZapiPlayer })));
 const WatchPartyModal = lazy(() => import('../src/components/watchparty/WatchPartyModal').then(m => ({ default: m.WatchPartyModal })));
@@ -306,6 +422,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     cancelAllPendingRequests();
     if (loadingTraceIdRef.current) mediaLoadingTracker.endTrace(loadingTraceIdRef.current, 'CANCELLED');
     setIsClosing(true);
+    tvNavigationManager.restoreFocusSnapshot(`card-${item.id}`);
     if (playbackSessionId) {
       playbackSessionService.endSession(playbackSessionId);
     } else {
@@ -316,7 +433,16 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     setTimeout(() => {
       onClose();
     }, 280);
-  }, [cancelAllPendingRequests, onClose, playbackSessionId]);
+  }, [cancelAllPendingRequests, item.id, onClose, playbackSessionId]);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      return tvNavigationManager.registerBackHandler('detail-modal', 100, () => {
+        handleClose();
+        return true;
+      });
+    }
+  }, [isPlaying, handleClose]);
 
   const handleClosePlayer = useCallback(() => {
     playbackRequestIdRef.current++;
@@ -995,7 +1121,8 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                 </h1>
                 
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-4">
-                  <button 
+                  <DetailModalTvButton 
+                    focusKey="modal-play"
                     className="h-11 sm:h-12 px-4 sm:px-6 md:px-8 bg-[#007df7] text-white rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm md:text-base hover:bg-[#0069d9] transition-all hover:scale-105 active:scale-95 shadow-xl shadow-[#007df7]/20 flex items-center justify-center gap-2 select-none border border-transparent box-border"
                     onClick={() => startPlayback(undefined, undefined, 'manual_start')}
                   >
@@ -1003,10 +1130,11 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                     <span>
                       {playbackContinuity.hasStarted && !playbackContinuity.isCompleted ? 'Continuar' : 'Assistir'}
                     </span>
-                  </button>
+                  </DetailModalTvButton>
 
                   {/* Botão Grupo (Watch Party P2P Gratuita) */}
-                  <button
+                  <DetailModalTvButton
+                    focusKey="modal-group"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -1014,41 +1142,43 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                     }}
                     className="h-11 sm:h-12 px-4 sm:px-5 bg-gradient-to-r from-cyan-600/20 to-[#007df7]/20 border border-cyan-500/30 hover:border-cyan-400 text-white hover:text-cyan-200 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm md:text-base backdrop-blur-sm transition-all hover:scale-105 active:scale-95 cursor-pointer group shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-2 select-none box-border"
                     title="Assistir em grupo com amigos em tempo real (Watch Party P2P Gratuita)"
-                    aria-label="Grupo"
+                    ariaLabel="Grupo"
                   >
                     <Users className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 group-hover:scale-110 transition-transform shrink-0" />
                     <span>Grupo</span>
-                  </button>
+                  </DetailModalTvButton>
 
-                  <button 
+                  <DetailModalTvButton 
+                    focusKey="modal-fav"
                     onClick={(e) => onToggleFavorite(e, item.id)} 
                     className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full border flex items-center justify-center backdrop-blur-sm transition-all group shrink-0 select-none box-border active:scale-95 ${isFavorite ? 'bg-[#007df7] border-[#007df7] text-white shadow-lg' : 'bg-white/5 border-white/10 text-white hover:bg-white/20 hover:border-white/30'}`} 
                     title="Favoritos"
-                    aria-label="Favoritos"
+                    ariaLabel="Favoritos"
                   >
                     <Heart className={`w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform ${isFavorite ? 'fill-current' : ''}`} />
-                  </button>
-                  <button 
+                  </DetailModalTvButton>
+                  <DetailModalTvButton 
+                    focusKey="modal-list"
                     onClick={(e) => onToggleList(e, item.id)} 
                     className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full border flex items-center justify-center backdrop-blur-sm transition-all group shrink-0 select-none box-border active:scale-95 ${isInList ? 'bg-white text-[#007df7] border-white shadow-lg' : 'bg-white/5 border-white/10 text-white hover:bg-white/20 hover:border-white/30'}`} 
                     title="Minha Lista"
-                    aria-label="Minha Lista"
+                    ariaLabel="Minha Lista"
                   >
                     <Bookmark className={`w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform ${isInList ? 'fill-current' : ''}`} />
-                  </button>
-                  <button 
+                  </DetailModalTvButton>
+                  <DetailModalTvButton 
+                    focusKey="modal-feedback"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       setShowFeedbackModal(true);
                     }}
-                    onMouseDown={(e) => e.stopPropagation()}
                     className="w-11 h-11 sm:w-12 sm:h-12 rounded-full border border-white/10 bg-white/5 text-white/70 hover:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/30 flex items-center justify-center backdrop-blur-sm transition-all group cursor-pointer shrink-0 select-none box-border active:scale-95" 
                     title="Reportar problema neste título"
-                    aria-label="Reportar problema"
+                    ariaLabel="Reportar problema"
                   >
                     <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
-                  </button>
+                  </DetailModalTvButton>
                 </div>
               </div>
             </div>
@@ -1083,19 +1213,11 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                   <div className="flex items-center gap-3">
                     <h3 className="text-lg sm:text-xl md:text-2xl font-black text-white">Episódios</h3>
                   </div>
-                  <div className="relative group">
-                    <select 
-                      value={currentSeason} 
-                      onChange={(e) => setCurrentSeason(Number(e.target.value))} 
-                      className="appearance-none bg-[#242424] border border-white/20 text-white py-1.5 sm:py-2 pl-3 sm:pl-4 pr-9 sm:pr-10 rounded-xl font-bold text-xs sm:text-sm outline-none cursor-pointer hover:bg-[#333] transition-colors"
-                      aria-label="Selecionar temporada"
-                    >
-                      {availableSeasons.map((sNum) => (
-                         <option key={sNum} value={sNum}>Temporada {sNum}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-white" />
-                  </div>
+                  <SeasonSelectTv 
+                    currentSeason={currentSeason} 
+                    availableSeasons={availableSeasons} 
+                    onChange={setCurrentSeason} 
+                  />
                 </div>
 
                 <div className="space-y-px bg-white/5 rounded-xl overflow-hidden border border-white/5">
@@ -1107,42 +1229,15 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                   ) : episodes.length === 0 ? (
                     <div className="p-6 sm:p-8 text-center text-gray-400 text-sm">Não foi possível carregar os episódios agora. Tente novamente mais tarde.</div>
                   ) : (
-                    episodes.map((ep) => {
-                      const epProgress = getEpisodeProgress(currentSeason, ep.number);
-                      return (
-                        <div 
-                          key={ep.id} 
-                          onClick={() => handleEpisodeClick(currentSeason, ep.number)} 
-                          className="group flex flex-row items-center gap-3 sm:gap-4 md:gap-6 p-3 sm:p-4 md:p-6 hover:bg-white/5 transition-colors cursor-pointer border-b border-black/20 last:border-0"
-                        >
-                          <div className="text-base sm:text-xl md:text-2xl font-normal text-gray-500 w-6 sm:w-8 text-center shrink-0">{ep.number}</div>
-                          <div className="relative w-24 sm:w-36 md:w-40 aspect-video rounded-lg overflow-hidden shrink-0 bg-black shadow-lg">
-                            <img 
-                              src={ep.image} 
-                              alt={`Episódio ${ep.number} - ${ep.title}`}
-                              className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
-                              loading="lazy" 
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
-                               <Play className="w-5 h-5 sm:w-8 sm:h-8 fill-white text-white" />
-                            </div>
-                            {/* Barrinha Vermelha de Progresso Assistido (Estilo Netflix) */}
-                            {epProgress > 0 && (
-                              <div className="absolute bottom-0 inset-x-0 h-1 md:h-1.5 bg-black/70 z-20 overflow-hidden pointer-events-none">
-                                <div 
-                                  className="h-full bg-red-600 transition-all duration-300 shadow-[0_0_8px_rgba(220,38,38,0.8)]"
-                                  style={{ width: `${Math.min(100, Math.max(3, epProgress))}%` }}
-                                />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-white font-bold text-xs sm:text-sm md:text-base group-hover:text-[#007df7] transition-colors truncate">{ep.title}</h4>
-                            <p className="text-[11px] sm:text-xs md:text-sm text-gray-400 leading-relaxed line-clamp-2 mt-0.5">{ep.description}</p>
-                          </div>
-                        </div>
-                      );
-                    })
+                    episodes.map((ep) => (
+                      <EpisodeTvRow
+                        key={ep.id}
+                        ep={ep}
+                        currentSeason={currentSeason}
+                        epProgress={getEpisodeProgress(currentSeason, ep.number)}
+                        onEpisodeClick={handleEpisodeClick}
+                      />
+                    ))
                   )}
                 </div>
               </div>

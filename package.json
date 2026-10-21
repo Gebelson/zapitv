@@ -28,11 +28,13 @@
     "test:playback-remote-sync": "tsx tests/playback_remote_sync.test.ts",
     "test:source-playability": "tsx tests/source_playability.test.ts",
     "test:playback-trace": "tsx tests/playback_trace.test.ts",
-    "test:stability": "npm run test:watchparty-state && npm run test:watchparty-intro && npm run test:watchparty-media && npm run test:playback-remote-sync && npm run test:source-playability && npm run test:playback-trace && npm run test:feedback-admin && npm run test:feedback-persistence && npm run test:catalog-identity && npm run test:cinemeta-identity && npm run test:catalog-release-persistence && npm run test:maintenance-auth",
+    "test:tv-navigation": "tsx tests/tv_mode_navigation.test.ts",
+    "test:stability": "npm run test:watchparty-state && npm run test:watchparty-intro && npm run test:watchparty-media && npm run test:playback-remote-sync && npm run test:source-playability && npm run test:playback-trace && npm run test:tv-navigation && npm run test:feedback-admin && npm run test:feedback-persistence && npm run test:catalog-identity && npm run test:cinemeta-identity && npm run test:catalog-release-persistence && npm run test:maintenance-auth",
     "start": "node server.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
+    "@noriginmedia/norigin-spatial-navigation": "^3.3.0",
     "@tanstack/react-query": "^5.104.3",
     "dexie": "^4.0.1",
     "dexie-react-hooks": "^1.1.7",

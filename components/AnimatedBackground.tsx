@@ -1,11 +1,23 @@
 
 import React from 'react';
+import { tvModeService } from '../src/core/tv/tvModeService';
 
 interface AnimatedBackgroundProps {
   isDarkMode: boolean;
 }
 
 const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ isDarkMode }) => {
+  const isTv = tvModeService.isTvMode();
+
+  // Em Modo TV, substitui os filtros de desfoque pesado e animações de blob contínuas por gradiente estático de alta performance
+  if (isTv) {
+    return (
+      <div className="fixed inset-0 -z-50 overflow-hidden pointer-events-none">
+        <div className={`absolute inset-0 ${isDarkMode ? 'bg-gradient-to-br from-[#05070a] via-[#080d17] to-[#05070a]' : 'bg-[#F8F9FC]'}`} />
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 -z-50 overflow-hidden pointer-events-none transform-gpu translate-z-0">
       {/* Camada Base de Cor */}

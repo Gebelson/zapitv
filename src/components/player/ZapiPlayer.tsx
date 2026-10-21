@@ -50,6 +50,8 @@ import { WatchPartyOverlay } from '../watchparty/WatchPartyOverlay';
 import { FeatureErrorBoundary } from '../common/FeatureErrorBoundary';
 import { RoomLifecycleState, TransmissionMode } from '../../core/watchparty/watchPartyTypes';
 import { VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../../core/providers/sourceVerificationService';
+import { tvModeService } from '../../core/tv/tvModeService';
+import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 
 export interface NextEpisodeInfo {
   season: number;
@@ -3207,29 +3209,92 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     return () => clearInterval(interval);
   }, [isPlaying, isLoading, isSwitchingAudio, isSeeking, isPlayingIntro, selectedQuality, availableQualities, currentStream?.url]);
 
-  // Keyboard navigation shortcuts
+  // Keyboard navigation shortcuts & TV remote controls
+  useEffect(() => {
+    return tvNavigationManager.registerBackHandler('zapi-player', 200, () => {
+      if (showFeedbackModal) {
+        setShowFeedbackModal(false);
+        return true;
+      }
+      if (showAudioMenu || showQualityMenu || showSubtitlesMenu || showStyleEditor || showDevDiagnostics || showManualSkipModal) {
+        setShowAudioMenu(false);
+        setShowQualityMenu(false);
+        setShowSubtitlesMenu(false);
+        setShowStyleEditor(false);
+        setShowDevDiagnostics(false);
+        setShowManualSkipModal(false);
+        return true;
+      }
+      if (showNonDubbedPrompt) {
+        handleRejectNonDubbed();
+        return true;
+      }
+      if (showControls) {
+        setShowControls(false);
+        return true;
+      }
+      handlePlayerClose();
+      return true;
+    });
+  }, [
+    showFeedbackModal, showAudioMenu, showQualityMenu, showSubtitlesMenu,
+    showStyleEditor, showDevDiagnostics, showManualSkipModal, showNonDubbedPrompt,
+    showControls, handleRejectNonDubbed, handlePlayerClose
+  ]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-      if (showFeedbackModal) {
-        if (e.key === 'Escape') {
+      const isBackKey = e.keyCode === 10009 || e.key === 'GoBack' || e.key === 'Return' || e.key === 'Escape';
+      if (isBackKey) {
+        if (showFeedbackModal) {
           e.preventDefault();
           e.stopPropagation();
           setShowFeedbackModal(false);
+          return;
         }
+        if (showAudioMenu || showQualityMenu || showSubtitlesMenu || showStyleEditor || showDevDiagnostics || showManualSkipModal) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowAudioMenu(false);
+          setShowQualityMenu(false);
+          setShowSubtitlesMenu(false);
+          setShowStyleEditor(false);
+          setShowDevDiagnostics(false);
+          setShowManualSkipModal(false);
+          return;
+        }
+        if (showNonDubbedPrompt) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleRejectNonDubbed();
+          return;
+        }
+        if (showControls) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowControls(false);
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        handlePlayerClose();
         return;
       }
 
-      if (showNonDubbedPrompt) {
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          handleRejectNonDubbed();
-        } else if (e.key === 'Enter') {
+      if (e.key === 'Enter' || e.keyCode === 13 || e.key === 'MediaPlayPause' || e.keyCode === 10252) {
+        if (showNonDubbedPrompt) {
           e.preventDefault();
           handleConfirmNonDubbed();
+          return;
         }
-        return;
+        if (!showControls && !hasOpenMenu) {
+          e.preventDefault();
+          togglePlay();
+          setShowControls(true);
+          return;
+        }
       }
 
       handleUserActivity();

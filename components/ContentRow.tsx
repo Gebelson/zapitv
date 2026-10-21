@@ -1,10 +1,12 @@
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Edit2, Trash2 } from 'lucide-react';
+import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { ContentItem } from '../types';
 import ContentCard from './ContentCard';
 import { deduplicateContentItems } from '../src/core/catalog/catalogDeduplication';
 import { uiSoundService } from '../src/core/audio/uiSoundService';
+import { tvModeService } from '../src/core/tv/tvModeService';
 
 interface ContentRowProps {
   title: string;
@@ -64,13 +66,16 @@ const ContentRow: React.FC<ContentRowProps> = ({
   const [isActive, setIsActive] = useState(false);
   const [dragMoved, setDragMoved] = useState(false);
 
+  const rowFocusKey = useMemo(() => `row-${title.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'default'}`, [title]);
+
   // Filtra itens únicos para garantir que não haja duplicatas na lista base
   const uniqueItems = useMemo(() => {
     return deduplicateContentItems(items);
   }, [items]);
 
-  // O carrossel só é infinito se tiver MAIS DE 8 capas de conteúdos diferentes
-  const isInfinite = uniqueItems.length > 8;
+  // O carrossel só é infinito em desktop/mobile quando tiver mais de 8 capas
+  const isTv = tvModeService.isTvMode();
+  const isInfinite = !isTv && uniqueItems.length > 8;
 
   // Uma cópia de cada lado mantém o loop sem montar cinco vezes todos os cards.
   const multiplier = isInfinite ? 3 : 1;
@@ -308,22 +313,24 @@ const ContentRow: React.FC<ContentRowProps> = ({
             maskImage: isInfinite ? 'linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)' : 'none'
           }}
         >
-          {extendedItems.map((item, index) => (
-            <div 
-              key={`${item.id}-${index}`} 
-              className={`flex-none w-[115px] sm:w-[150px] md:w-[185px] lg:w-[215px] 2xl:w-[245px]`}
-            >
-              <ContentCard 
-                item={item}
-                isDarkMode={isDarkMode}
-                onItemClick={onItemClick || (() => {})}
-                isFavorite={favorites.includes(item.id)}
-                isInList={myList.includes(item.id)}
-                onToggleFavorite={onToggleFavorite}
-                onToggleList={onToggleList}
-              />
-            </div>
-          ))}
+          <FocusContext.Provider value={rowFocusKey}>
+            {extendedItems.map((item, index) => (
+              <div 
+                key={`${item.id}-${index}`} 
+                className={`flex-none w-[115px] sm:w-[150px] md:w-[185px] lg:w-[215px] 2xl:w-[245px]`}
+              >
+                <ContentCard 
+                  item={item}
+                  isDarkMode={isDarkMode}
+                  onItemClick={onItemClick || (() => {})}
+                  isFavorite={favorites.includes(item.id)}
+                  isInList={myList.includes(item.id)}
+                  onToggleFavorite={onToggleFavorite}
+                  onToggleList={onToggleList}
+                />
+              </div>
+            ))}
+          </FocusContext.Provider>
         </div>
         )}
       </div>

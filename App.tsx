@@ -43,6 +43,10 @@ import { catalogSnapshotManager } from './src/core/catalog/CatalogSnapshotManage
 import { heroCarouselStore } from './src/core/catalog/heroCarouselStore';
 import { fetchHeroCarousel, fetchSectionTitles, saveHeroCarousel, saveSectionTitles } from './src/core/admin/globalSettingsClient';
 import { WatchPartyService } from './src/core/watchparty/WatchPartyService';
+import { tvModeService } from './src/core/tv/tvModeService';
+import { tvNavigationManager } from './src/core/tv/tvNavigationManager';
+import { TvRemoteDiagnosticOverlay } from './src/components/tv/TvRemoteDiagnosticOverlay';
+import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 const ProfileView = React.lazy(() => import('./components/ProfileView'));
 const AdminView = React.lazy(() => import('./components/AdminView'));
@@ -156,6 +160,35 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   const [previousView, setPreviousView] = useState<AppView>('home');
   useEffect(() => uiSoundService.bindInteractions(document), []);
+
+  useEffect(() => {
+    tvNavigationManager.init();
+    const syncTvClass = (isTv: boolean) => {
+      if (isTv) {
+        document.body.classList.add('tv-mode');
+      } else {
+        document.body.classList.remove('tv-mode');
+      }
+    };
+    syncTvClass(tvModeService.isTvMode());
+    return tvModeService.subscribe(syncTvClass);
+  }, []);
+
+  // Top-level Back handler (prioridade 10) para Smart TVs
+  useEffect(() => {
+    return tvNavigationManager.registerBackHandler('app-root', 10, () => {
+      if (location.pathname !== '/') {
+        navigate(tvModeService.formatInternalRoute('/'));
+        return true;
+      }
+      const curFocus = getCurrentFocusKey();
+      if (!curFocus || !curFocus.startsWith('sidebar-')) {
+        setFocus('sidebar-home');
+        return true;
+      }
+      return false;
+    });
+  }, [location.pathname, navigate]);
   useEffect(() => {
     if (currentView !== 'admin' && currentView !== 'notfound') {
       setPreviousView(currentView);
@@ -202,25 +235,27 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     setLiveSearchResults([]);
     setLiveSearchActors([]);
 
+    const routeTo = (path: string) => navigate(tvModeService.formatInternalRoute(path));
+
     switch (view) {
-      case 'home': navigate('/'); break;
-      case 'featured': navigate('/em-destaque'); break;
-      case 'movies': navigate('/filmes'); break;
-      case 'series': navigate('/series'); break;
-      case 'animes': navigate('/animes'); break;
+      case 'home': routeTo('/'); break;
+      case 'featured': routeTo('/em-destaque'); break;
+      case 'movies': routeTo('/filmes'); break;
+      case 'series': routeTo('/series'); break;
+      case 'animes': routeTo('/animes'); break;
       case 'programas':
       case 'television':
-      case 'live': navigate('/programas'); break;
-      case 'mylist': navigate('/minha-lista'); break;
-      case 'history': navigate('/perfil'); break;
-      case 'profile': navigate('/perfil'); break;
-      case 'settings': navigate('/configuracoes'); break;
-      case 'help': navigate('/ajuda'); break;
-      case 'admin': navigate('/admin'); break;
+      case 'live': routeTo('/programas'); break;
+      case 'mylist': routeTo('/minha-lista'); break;
+      case 'history': routeTo('/perfil'); break;
+      case 'profile': routeTo('/perfil'); break;
+      case 'settings': routeTo('/configuracoes'); break;
+      case 'help': routeTo('/ajuda'); break;
+      case 'admin': routeTo('/admin'); break;
       case 'login':
-      case 'signup': navigate('/login'); break;
-      case 'profile-selector': navigate('/perfil-selector'); break;
-      default: navigate('/'); break;
+      case 'signup': routeTo('/login'); break;
+      case 'profile-selector': routeTo('/perfil-selector'); break;
+      default: routeTo('/'); break;
     }
   }, [navigate]);
 
@@ -1317,6 +1352,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         return;
       }
     }
+    tvNavigationManager.saveFocusSnapshot();
     setSelectedContent(item);
     uiSoundService.play('detailOpen');
   }, [activeProfile]);
@@ -2816,6 +2852,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         </FeatureErrorBoundary>
       )}
 
+      <TvRemoteDiagnosticOverlay />
     </div>
   );
 };
