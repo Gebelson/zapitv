@@ -1,0 +1,121 @@
+import React, { useEffect, useMemo } from 'react';
+import { Bookmark, Clock, ArrowLeft } from 'lucide-react';
+import { ContentItem } from '../../../types';
+import { TvCard16x9 } from './TvCard16x9';
+import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
+import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { useTvFocusable } from '../../core/tv/useTvFocusable';
+
+interface TvListViewProps {
+  title: string;
+  type: 'mylist' | 'history';
+  items: ContentItem[];
+  onSelectItem: (item: ContentItem) => void;
+  onBack: () => void;
+}
+
+export const TvListView: React.FC<TvListViewProps> = ({
+  title,
+  type,
+  items,
+  onSelectItem,
+  onBack
+}) => {
+  const { ref: noriginRef, focusKey } = useFocusable({
+    focusKey: `tv-list-${type}`,
+    trackChildren: true
+  });
+
+  const { ref: backRef, focused: isBackFocused } = useTvFocusable({
+    focusKey: 'tv-list-back',
+    onEnterPress: onBack
+  });
+
+  useEffect(() => {
+    const unregister = tvNavigationManager.registerBackHandler(`tv-list-${type}`, 100, () => {
+      onBack();
+      return true;
+    });
+
+    const timer = setTimeout(() => {
+      if (items.length > 0) {
+        setFocus(`card-list-${items[0].id}`);
+      } else {
+        setFocus('tv-list-back');
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      unregister();
+    };
+  }, [type, onBack, items]);
+
+  return (
+    <FocusContext.Provider value={focusKey}>
+      <div 
+        ref={noriginRef as any}
+        className="w-full min-h-screen pt-24 px-8 sm:px-12 md:px-16 pb-24 select-none"
+      >
+        {/* Cabeçalho da Lista */}
+        <div className="flex items-center gap-4 mb-8">
+          <button
+            ref={backRef}
+            type="button"
+            data-focus-key="tv-list-back"
+            data-tv-focused={isBackFocused ? "true" : undefined}
+            onClick={onBack}
+            className={`p-3 rounded-xl border transition-all duration-200 outline-none ${
+              isBackFocused
+                ? 'bg-cyan-500/25 text-cyan-300 border-cyan-400 scale-105 shadow-[0_0_15px_rgba(0,229,255,0.4)]'
+                : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'
+            }`}
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-300">
+              {type === 'mylist' ? <Bookmark className="w-6 h-6" /> : <Clock className="w-6 h-6" />}
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-white tracking-wide">{title}</h1>
+              <p className="text-xs text-gray-400">
+                {items.length === 1 ? '1 título' : `${items.length} títulos salvos`}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Grade 16:9 de Itens */}
+        {items.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+            {items.map((item, idx) => (
+              <TvCard16x9
+                key={`list-${type}-${item.id}-${idx}`}
+                item={item}
+                onClick={onSelectItem}
+                focusKeyPrefix="card-list"
+                showProgress={type === 'history'}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="py-28 text-center text-gray-500 max-w-md mx-auto">
+            <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-4 text-gray-400">
+              {type === 'mylist' ? <Bookmark className="w-8 h-8" /> : <Clock className="w-8 h-8" />}
+            </div>
+            <p className="text-lg font-bold text-gray-300">
+              {type === 'mylist' ? 'Sua lista está vazia' : 'Nenhum histórico recente'}
+            </p>
+            <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+              {type === 'mylist'
+                ? 'Explore o catálogo e adicione filmes ou séries para assistir mais tarde na sua TV.'
+                : 'Os títulos que você reproduzir na Smart TV aparecerão aqui automaticamente.'}
+            </p>
+          </div>
+        )}
+      </div>
+    </FocusContext.Provider>
+  );
+};

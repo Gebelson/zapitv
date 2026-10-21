@@ -32,9 +32,10 @@ class TvModeService {
       const urlParams = new URLSearchParams(window.location.search);
       const tvParam = urlParams.get('tv');
       const diagParam = urlParams.get('tvdiag') ?? urlParams.get('tv_diag');
+      const isTvPath = window.location.pathname.startsWith('/tv');
 
-      // 1. Verificação explícita do parâmetro de URL ?tv=
-      if (tvParam === '1' || tvParam === 'true') {
+      // 1. Verificação explícita do parâmetro de URL ?tv= ou rota /tv
+      if (isTvPath || tvParam === '1' || tvParam === 'true') {
         this.isTv = true;
         this.persistStorage('1');
       } else if (tvParam === '0' || tvParam === 'false') {
@@ -91,6 +92,9 @@ class TvModeService {
   }
 
   public isTvMode(): boolean {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv')) {
+      return true;
+    }
     return this.isTv;
   }
 

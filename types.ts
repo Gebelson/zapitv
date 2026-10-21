@@ -121,4 +121,4 @@ export interface ActorPerson {
   placeOfBirth?: string;
 }
 
-export type AppView = 'home' | 'featured' | 'movies' | 'series' | 'animes' | 'programas' | 'live' | 'mylist' | 'profile' | 'settings' | 'help' | 'admin' | 'login' | 'signup' | 'profile-selector' | 'television' | 'history' | 'notfound' | 'actor';
+export type AppView = 'home' | 'featured' | 'movies' | 'series' | 'animes' | 'programas' | 'live' | 'mylist' | 'profile' | 'settings' | 'help' | 'admin' | 'login' | 'signup' | 'profile-selector' | 'television' | 'history' | 'notfound' | 'actor' | 'tv';

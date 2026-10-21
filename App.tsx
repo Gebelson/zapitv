@@ -62,6 +62,7 @@ const ZapiPlayer = React.lazy(() => import('./src/components/player/ZapiPlayer')
 const CatalogDiagnosticModal = React.lazy(() => import('./src/components/catalog/CatalogDiagnosticModal').then(module => ({ default: module.CatalogDiagnosticModal })));
 const ActorView = React.lazy(() => import('./src/pages/ActorView').then(module => ({ default: module.ActorView })));
 const WatchPartyModal = React.lazy(() => import('./src/components/watchparty/WatchPartyModal').then(module => ({ default: module.WatchPartyModal })));
+const TvApp = React.lazy(() => import('./src/pages/tv/TvApp').then(module => ({ default: module.TvApp })));
 
 const GENRES_LIST = [
   'Ação', 'Adulto', 'Animação', 'Anime', 'Aventura', 'Biografia', 'Comédia', 
@@ -140,6 +141,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   // Derivação automática da view com base no pathname
   const currentView: AppView = useMemo(() => {
     const path = location.pathname;
+    if (path.startsWith('/tv')) return 'tv';
     if (path === '/' || path.startsWith('/sala')) return 'home';
     if (path.startsWith('/em-destaque')) return 'featured';
     if (path.startsWith('/filmes')) return 'movies';
@@ -2631,6 +2633,27 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         onUpdateUser={updateUser} 
         isDarkMode={isDarkMode} 
       /></React.Suspense>
+    );
+  }
+
+  if (location.pathname.startsWith('/tv')) {
+    return (
+      <React.Suspense fallback={<div className="min-h-screen bg-[#05070a] flex items-center justify-center"><ZapiLoader size="xl" /></div>}>
+        <TvApp
+          content={allowedContent}
+          trendingItems={trendingItems}
+          popularMovies={popularMovies}
+          popularSeries={popularSeries}
+          animeItems={animeItems}
+          featuredItems={heroCarouselItems.length > 0 ? heroCarouselItems : trendingItems}
+          myList={myList}
+          favorites={favorites}
+          onToggleList={toggleMyList}
+          onToggleFavorite={toggleFavorite}
+          currentUser={currentUser}
+          activeProfile={activeProfile}
+        />
+      </React.Suspense>
     );
   }
 
