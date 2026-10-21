@@ -31,7 +31,8 @@
     "test:tv-navigation": "tsx tests/tv_mode_navigation.test.ts",
     "test:tv-interface": "tsx tests/tv_app_interface.test.ts",
     "test:tv-isolation": "tsx tests/tv_desktop_isolation.test.ts",
-    "test:stability": "npm run test:watchparty-state && npm run test:watchparty-intro && npm run test:watchparty-media && npm run test:playback-remote-sync && npm run test:source-playability && npm run test:playback-trace && npm run test:tv-navigation && npm run test:tv-interface && npm run test:tv-isolation && npm run test:feedback-admin && npm run test:feedback-persistence && npm run test:catalog-identity && npm run test:cinemeta-identity && npm run test:catalog-release-persistence && npm run test:maintenance-auth",
+    "test:skip-buttons": "tsx tests/skip_buttons_player.test.ts",
+    "test:stability": "npm run test:watchparty-state && npm run test:watchparty-intro && npm run test:watchparty-media && npm run test:playback-remote-sync && npm run test:source-playability && npm run test:playback-trace && npm run test:tv-navigation && npm run test:tv-interface && npm run test:tv-isolation && npm run test:skip-buttons && npm run test:feedback-admin && npm run test:feedback-persistence && npm run test:catalog-identity && npm run test:cinemeta-identity && npm run test:catalog-release-persistence && npm run test:maintenance-auth",
     "start": "node server.ts"
   },
   "dependencies": {

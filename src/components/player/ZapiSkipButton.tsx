@@ -1,6 +1,9 @@
-import React, { useState, useRef, useLayoutEffect, useMemo, useEffect, useId } from 'react';
+import React, { useState, useRef, useLayoutEffect, useMemo, useEffect, useId, useCallback } from 'react';
 import { SkipForward } from 'lucide-react';
 import { SkipInterval } from '../../core/skip/skipService';
+import { useTvFocusable } from '../../core/tv/useTvFocusable';
+import { tvModeService } from '../../core/tv/tvModeService';
+import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 export interface ZapiSkipButtonProps {
   interval: SkipInterval;
@@ -61,6 +64,75 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
   const rawId = useId();
   const gradientId = `zapi-skip-grad-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const filterId = `zapi-skip-filter-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+
+  // Execução fluida do pulo com feedback visual
+  const triggerSkip = useCallback(() => {
+    if (isSkippingRef.current) return;
+    isSkippingRef.current = true;
+
+    // 1. Inicia animação fluida acelerada preenchendo 100% do botão
+    setIsSkipping(true);
+
+    // 2. Quando o contorno completa 100% (~250ms), ativa o piscar intenso com glow
+    setTimeout(() => {
+      setIsFlashing(true);
+    }, 250);
+
+    // 3. Após o flash de glow (~450ms), dispara a ação de pular e reseta o lock
+    setTimeout(() => {
+      onSkip(interval);
+      setIsSkipping(false);
+      setIsFlashing(false);
+      isSkippingRef.current = false;
+    }, 450);
+  }, [interval, onSkip]);
+
+  // Integração com sistema de navegação espacial do Modo Smart TV
+  const { ref: tvFocusRef, focused: isTvFocused } = useTvFocusable({
+    focusKey: 'tv-skip-button',
+    onEnterPress: () => {
+      triggerSkip();
+    }
+  });
+
+  // Foco automático imediato no controle remoto quando o botão surge no Modo TV
+  useEffect(() => {
+    if (tvModeService.isTvMode()) {
+      try {
+        setFocus('tv-skip-button');
+      } catch {}
+    }
+  }, []);
+
+  // Suporte a atalho no teclado ('S') e tecla OK / Enter do controle remoto da TV
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerSkip();
+      } else if (
+        isTvFocused &&
+        (e.key === 'Enter' || e.key === 'Select' || e.keyCode === 13 || e.keyCode === 65385)
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerSkip();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [isTvFocused, triggerSkip]);
+
+  // Merge das refs de medição de layout e do spatial navigation
+  const setMergedRef = useCallback((node: HTMLButtonElement | null) => {
+    (buttonRef as any).current = node;
+    if (typeof tvFocusRef === 'function') {
+      (tvFocusRef as any)(node);
+    } else if (tvFocusRef && 'current' in tvFocusRef) {
+      (tvFocusRef as any).current = node;
+    }
+  }, [tvFocusRef]);
 
   // Calcula progresso normalizado (0 a 1)
   const progress = useMemo(() => {
@@ -128,29 +200,13 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
 
   const handleSkipClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isSkippingRef.current) return;
-    isSkippingRef.current = true;
-
-    // 1. Inicia animação fluida acelerada preenchendo 100% do botão
-    setIsSkipping(true);
-
-    // 2. Quando o contorno completa 100% (~300ms), ativa o piscar intenso com glow
-    setTimeout(() => {
-      setIsFlashing(true);
-    }, 300);
-
-    // 3. Após o flash de glow (~520ms), dispara a ação de pular e reseta o lock
-    setTimeout(() => {
-      onSkip(interval);
-      setIsSkipping(false);
-      setIsFlashing(false);
-      isSkippingRef.current = false;
-    }, 520);
+    triggerSkip();
   };
 
   return (
     <div
-      className={`absolute bottom-24 sm:bottom-28 right-6 sm:right-8 z-30 inline-flex items-center group select-none animate-in fade-in zoom-in-95 duration-200 ${className}`}
+      className={`absolute bottom-24 sm:bottom-28 right-6 sm:right-8 z-50 pointer-events-auto inline-flex items-center group select-none animate-in fade-in zoom-in-95 duration-200 ${className}`}
+      onClick={(e) => e.stopPropagation()}
     >
       <style>{`
         @keyframes skipContourPulse {
@@ -182,11 +238,13 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
         }
       `}</style>
 
-      {/* Aura de Glow de Fundo ao Carregar / Piscar */}
+      {/* Aura de Glow de Fundo ao Carregar / Piscar / Foco na TV */}
       <div
         className={`absolute inset-0 rounded-full transition-all duration-300 pointer-events-none ${
           isFlashing
             ? 'bg-cyan-400/35 blur-xl opacity-100 scale-125 animate-pulse'
+            : isTvFocused
+            ? 'bg-[#00e5ff]/25 blur-lg opacity-90 scale-115'
             : isSkipping
             ? 'bg-blue-500/25 blur-lg opacity-80 scale-110'
             : 'opacity-0'
@@ -217,7 +275,7 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
           <path
             d={pathD}
             fill="none"
-            stroke="rgba(255, 255, 255, 0.28)"
+            stroke={isTvFocused ? "rgba(0, 229, 255, 0.45)" : "rgba(255, 255, 255, 0.28)"}
             strokeWidth={3.5}
           />
         )}
@@ -227,8 +285,8 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
           <path
             d={pathD}
             fill="none"
-            stroke={isFlashing ? '#00f0ff' : `url(#${gradientId})`}
-            strokeWidth={isSkipping || isFlashing ? 4.5 : 3.5}
+            stroke={isFlashing ? '#00f0ff' : isTvFocused ? '#00e5ff' : `url(#${gradientId})`}
+            strokeWidth={isSkipping || isFlashing ? 4.5 : isTvFocused ? 4 : 3.5}
             pathLength={100}
             strokeDasharray={100}
             strokeDashoffset={strokeDashoffset}
@@ -238,7 +296,7 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
               transition: isSeeking
                 ? 'none'
                 : isSkipping
-                ? 'stroke-dashoffset 0.3s cubic-bezier(0.16, 1, 0.3, 1), stroke-width 0.2s ease'
+                ? 'stroke-dashoffset 0.25s cubic-bezier(0.16, 1, 0.3, 1), stroke-width 0.2s ease'
                 : 'stroke-dashoffset 0.25s linear',
               animation: isFlashing ? 'skipContourPulse 0.22s ease-in-out infinite' : undefined
             }}
@@ -246,27 +304,34 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
         )}
       </svg>
 
-      {/* Botão Clicável Estilizado com Feedback Tátil e Visual */}
+      {/* Botão Clicável Estilizado com Feedback Tátil, Visual e Foco TV */}
       <button
-        ref={buttonRef}
+        ref={setMergedRef}
+        type="button"
+        data-focus-key="tv-skip-button"
+        data-tv-focused={isTvFocused ? "true" : undefined}
         onClick={handleSkipClick}
         disabled={isSkipping}
         className={`relative z-10 flex items-center gap-2.5 px-5 py-2.5 rounded-full backdrop-blur-md text-xs font-bold uppercase tracking-wider transition-all cursor-pointer group focus:outline-none ${
           isFlashing
             ? 'bg-black/95 text-cyan-300 scale-105 shadow-[0_0_35px_rgba(0,240,255,0.7)] ring-2 ring-cyan-400'
+            : isTvFocused
+            ? 'bg-black/95 text-cyan-300 scale-110 shadow-[0_0_35px_rgba(0,229,255,0.85)] ring-3 ring-[#00e5ff] border border-[#00e5ff]'
             : isSkipping
             ? 'bg-black/95 text-white scale-105 shadow-[0_0_25px_rgba(0,125,247,0.6)]'
             : 'bg-black/85 hover:bg-black/95 text-white hover:scale-105 shadow-2xl hover:shadow-[0_0_20px_rgba(0,240,255,0.4)]'
         }`}
         title={`${interval.label} (${remainingSeconds}s restantes) • Pressione 'S' ou clique para pular`}
       >
-        <span className={isFlashing ? 'animate-pulse text-cyan-200' : ''}>
+        <span className={isFlashing || isTvFocused ? 'text-cyan-200' : ''}>
           {interval.label}
         </span>
         <SkipForward
           className={`w-4 h-4 transition-transform duration-300 ${
             isFlashing
               ? 'text-cyan-200 translate-x-1.5 animate-pulse'
+              : isTvFocused
+              ? 'text-[#00e5ff] translate-x-1 scale-110'
               : isSkipping
               ? 'text-cyan-400 translate-x-1'
               : 'text-cyan-400 group-hover:translate-x-0.5 group-hover:text-cyan-300'

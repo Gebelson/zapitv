@@ -454,6 +454,15 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const [manualTypeInput, setManualTypeInput] = useState<SkipType>('op');
   const hasAutoSkippedRef = useRef<Set<string>>(new Set());
 
+  // Temporada e episódio atuais normalizados
+  const currentSeason = useMemo(() => {
+    return initialSeason || (item as any).season || (item as any).currentSeason || 1;
+  }, [initialSeason, (item as any).season, (item as any).currentSeason]);
+
+  const currentEpisode = useMemo(() => {
+    return initialEpisode || (item as any).episode || (item as any).currentEpisode || 1;
+  }, [initialEpisode, (item as any).episode, (item as any).currentEpisode]);
+
   // Atualiza intervalos de skip quando o item, episódio ou duração mudarem
   useEffect(() => {
     let isMounted = true;
@@ -463,14 +472,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       try {
         const intervals = await skipService.getSkipTimes(
           item,
-          initialSeason || 1,
-          initialEpisode || 1,
+          currentSeason,
+          currentEpisode,
           duration
         );
         if (isMounted) {
           setSkipIntervals(intervals);
           if (intervals.length > 0) {
-            console.log(`[ZapiSkip] Intervalos carregados para ${item.title} S${initialSeason || 1}E${initialEpisode || 1}:`, intervals.map(i => `${i.label} [${i.startTime}s - ${i.endTime}s] (${i.source})`));
+            console.log(`[ZapiSkip] Intervalos carregados para ${item.title} S${currentSeason}E${currentEpisode}:`, intervals.map(i => `${i.label} [${i.startTime}s - ${i.endTime}s] (${i.source})`));
           }
         }
       } catch (err) {
@@ -483,18 +492,19 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [item.id, initialSeason, initialEpisode, duration]);
+  }, [item.id, currentSeason, currentEpisode, duration]);
 
   // Intervalo de skip ativo no momento (recalculado dinamicamente para reprodução, avanços e retrocessos)
   const activeSkipInterval = useMemo(() => {
     if (!skipIntervals || skipIntervals.length === 0) return null;
     return skipIntervals.find(i => {
       if (i.type === 'ed') {
-        return currentTime >= i.startTime && (i.endTime <= 0 || currentTime <= i.endTime);
+        const effectiveEnd = i.endTime > 0 ? (duration > 0 ? Math.max(i.endTime, duration) : i.endTime) : Infinity;
+        return currentTime >= i.startTime && currentTime <= effectiveEnd;
       }
       return currentTime >= i.startTime && currentTime < i.endTime;
     });
-  }, [skipIntervals, currentTime]);
+  }, [skipIntervals, currentTime, duration]);
 
   // Tratamento dinâmico de avanço e retrocesso na barra de tempo com blindagem de seek
   const handleSeek = useCallback((targetTime: number) => {
@@ -565,24 +575,21 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
-    // Requisito 14: Não tenta avançar vídeos cuja fonte não permita seek
-    if (!video.seekable || video.seekable.length === 0) {
-      console.warn('[ZapiSkip] Fonte de vídeo não suporta busca/seek');
-      return;
-    }
+    const targetTime = interval.endTime > 0 ? interval.endTime : (duration > 0 ? duration : 0);
 
-    const targetTime = interval.endTime;
-    let canSeek = false;
-    for (let i = 0; i < video.seekable.length; i++) {
-      if (targetTime >= video.seekable.start(i) && targetTime <= video.seekable.end(i) + 2) {
-        canSeek = true;
-        break;
+    // Se o vídeo tem intervalos seekable definidos, verifica limites
+    if (video.seekable && video.seekable.length > 0) {
+      let withinSeekable = false;
+      for (let i = 0; i < video.seekable.length; i++) {
+        if (targetTime >= video.seekable.start(i) && targetTime <= video.seekable.end(i) + 2) {
+          withinSeekable = true;
+          break;
+        }
       }
-    }
-
-    if (!canSeek && duration > 0 && targetTime > duration) {
-      console.warn('[ZapiSkip] Tempo de destino excede a duração do vídeo');
-      return;
+      if (!withinSeekable && duration > 0 && targetTime > duration) {
+        console.warn('[ZapiSkip] Tempo de destino excede a duração do vídeo');
+        return;
+      }
     }
 
     try {
@@ -724,13 +731,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     const newOffset = Number((skipOffset + delta).toFixed(1));
     setSkipOffset(newOffset);
     skipService.setSkipOffset(item.id, newOffset);
-    skipService.getSkipTimes(item, initialSeason || 1, initialEpisode || 1, duration).then(setSkipIntervals);
+    skipService.getSkipTimes(item, currentSeason, currentEpisode, duration).then(setSkipIntervals);
   };
 
   const handleResetOffset = () => {
     setSkipOffset(0);
     skipService.setSkipOffset(item.id, 0);
-    skipService.getSkipTimes(item, initialSeason || 1, initialEpisode || 1, duration).then(setSkipIntervals);
+    skipService.getSkipTimes(item, currentSeason, currentEpisode, duration).then(setSkipIntervals);
   };
 
   const handleToggleAutoSkip = () => {
@@ -744,20 +751,20 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     const end = parseFloat(manualEndInput);
     if (isNaN(start) || isNaN(end) || end <= start) return;
 
-    skipService.saveManualInterval(item.id, initialSeason || 1, initialEpisode || 1, {
+    skipService.saveManualInterval(item.id, currentSeason, currentEpisode, {
       startTime: start,
       endTime: end,
       type: manualTypeInput
     });
 
     setShowManualSkipModal(false);
-    skipService.getSkipTimes(item, initialSeason || 1, initialEpisode || 1, duration).then(setSkipIntervals);
+    skipService.getSkipTimes(item, currentSeason, currentEpisode, duration).then(setSkipIntervals);
   };
 
   const handleClearManualSkip = () => {
-    skipService.clearManualInterval(item.id, initialSeason || 1, initialEpisode || 1);
+    skipService.clearManualInterval(item.id, currentSeason, currentEpisode);
     setShowManualSkipModal(false);
-    skipService.getSkipTimes(item, initialSeason || 1, initialEpisode || 1, duration).then(setSkipIntervals);
+    skipService.getSkipTimes(item, currentSeason, currentEpisode, duration).then(setSkipIntervals);
   };
   // Dispara a contagem regressiva de 10s ao chegar ao final do episódio (últimos 12s) e reseta em retrocessos
   useEffect(() => {
@@ -4020,10 +4027,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               if (loadingTraceId) mediaLoadingTracker.recordEvent(loadingTraceId,
                 'MANIFEST_OR_METADATA_LOADED', 'ZapiPlayer');
               markMediaAsReadyRef.current();
+              if (videoRef.current?.duration && !isNaN(videoRef.current.duration) && isFinite(videoRef.current.duration)) {
+                setDuration(videoRef.current.duration);
+              }
               applyTargetResumeTime();
             }}
             onCanPlay={() => {
               markMediaAsReadyRef.current();
+              if (videoRef.current?.duration && !isNaN(videoRef.current.duration) && isFinite(videoRef.current.duration)) {
+                setDuration(videoRef.current.duration);
+              }
               applyTargetResumeTime();
               if (videoRef.current && videoRef.current.readyState >= 3) {
                 setIsLoading(false);
@@ -4035,6 +4048,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             }}
             onLoadedData={() => {
               markMediaAsReadyRef.current();
+              if (videoRef.current?.duration && !isNaN(videoRef.current.duration) && isFinite(videoRef.current.duration)) {
+                setDuration(videoRef.current.duration);
+              }
               applyTargetResumeTime();
             }}
             onTimeUpdate={() => {
@@ -4042,6 +4058,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                 const video = videoRef.current;
                 const cur = video.currentTime;
                 setCurrentTime(cur);
+                if (duration === 0 && video.duration && !isNaN(video.duration) && isFinite(video.duration)) {
+                  setDuration(video.duration);
+                }
                 const frameSample = frameSampleRef.current;
                 if (!playbackConfirmationRef.current.confirmed &&
                     typeof video.requestVideoFrameCallback === 'function' && !frameSample.pending) {

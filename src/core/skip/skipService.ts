@@ -177,6 +177,8 @@ class SkipService {
   private memoryCache = new Map<string, SkipInterval[]>();
   private malIdCache = new Map<string, number | null>();
   private imdbIdCache = new Map<string, string | null>();
+  private manualIntervalsMemory = new Map<string, SkipInterval[]>();
+  private skipOffsetsMemory = new Map<string, number>();
 
   /**
    * Verifica se o recurso de auto-skip está habilitado nas configurações do usuário
@@ -202,11 +204,17 @@ class SkipService {
    * Obtém o offset de ajuste manual de sincronização para o conteúdo (em segundos)
    */
   public getSkipOffset(contentId: string): number {
+    if (this.skipOffsetsMemory.has(contentId)) {
+      return this.skipOffsetsMemory.get(contentId)!;
+    }
     try {
-      const saved = localStorage.getItem(`zapitv_skip_offset_${contentId}`);
+      const saved = this.getStorageItem(`zapitv_skip_offset_${contentId}`);
       if (saved) {
         const parsed = parseFloat(saved);
-        if (!isNaN(parsed)) return parsed;
+        if (!isNaN(parsed)) {
+          this.skipOffsetsMemory.set(contentId, parsed);
+          return parsed;
+        }
       }
     } catch {}
     return 0;
@@ -216,8 +224,11 @@ class SkipService {
    * Salva o offset de ajuste manual para o conteúdo
    */
   public setSkipOffset(contentId: string, offsetSeconds: number): void {
+    this.skipOffsetsMemory.set(contentId, offsetSeconds);
     try {
-      localStorage.setItem(`zapitv_skip_offset_${contentId}`, offsetSeconds.toString());
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        window.localStorage.setItem(`zapitv_skip_offset_${contentId}`, offsetSeconds.toString());
+      }
     } catch {}
   }
 
@@ -225,12 +236,16 @@ class SkipService {
    * Obtém intervalos manuais customizados pelo usuário para um episódio específico
    */
   public getManualIntervals(contentId: string, season = 1, episode = 1): SkipInterval[] | null {
+    const key = `zapitv_custom_skip_${contentId}_s${season}_e${episode}`;
+    if (this.manualIntervalsMemory.has(key)) {
+      return this.manualIntervalsMemory.get(key)!;
+    }
     try {
-      const key = `zapitv_custom_skip_${contentId}_s${season}_e${episode}`;
-      const saved = localStorage.getItem(key);
+      const saved = this.getStorageItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          this.manualIntervalsMemory.set(key, parsed);
           return parsed;
         }
       }
@@ -247,23 +262,26 @@ class SkipService {
     episode = 1,
     interval: { startTime: number; endTime: number; type: SkipType }
   ): void {
+    const key = `zapitv_custom_skip_${contentId}_s${season}_e${episode}`;
+    const existing = this.getManualIntervals(contentId, season, episode) || [];
+    const updated: SkipInterval[] = [
+      ...existing.filter(i => i.type !== interval.type),
+      {
+        startTime: interval.startTime,
+        endTime: interval.endTime,
+        rawStartTime: interval.startTime,
+        rawEndTime: interval.endTime,
+        type: interval.type,
+        label: this.getLabelForType(interval.type),
+        confidence: 1,
+        source: 'manual'
+      }
+    ];
+    this.manualIntervalsMemory.set(key, updated);
     try {
-      const key = `zapitv_custom_skip_${contentId}_s${season}_e${episode}`;
-      const existing = this.getManualIntervals(contentId, season, episode) || [];
-      const updated: SkipInterval[] = [
-        ...existing.filter(i => i.type !== interval.type),
-        {
-          startTime: interval.startTime,
-          endTime: interval.endTime,
-          rawStartTime: interval.startTime,
-          rawEndTime: interval.endTime,
-          type: interval.type,
-          label: this.getLabelForType(interval.type),
-          confidence: 1,
-          source: 'manual'
-        }
-      ];
-      localStorage.setItem(key, JSON.stringify(updated));
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        window.localStorage.setItem(key, JSON.stringify(updated));
+      }
     } catch {}
   }
 
@@ -271,9 +289,12 @@ class SkipService {
    * Remove intervalos de skip manuais salvos pelo usuário
    */
   public clearManualInterval(contentId: string, season = 1, episode = 1): void {
+    const key = `zapitv_custom_skip_${contentId}_s${season}_e${episode}`;
+    this.manualIntervalsMemory.delete(key);
     try {
-      const key = `zapitv_custom_skip_${contentId}_s${season}_e${episode}`;
-      localStorage.removeItem(key);
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        window.localStorage.removeItem(key);
+      }
     } catch {}
   }
 
@@ -1002,12 +1023,12 @@ class SkipService {
 
       // Validação 2: Duração razoável para o tipo de intervalo
       const diff = end - start;
-      if (diff < 5) continue; // Pelo menos 5 segundos de intervalo
-
-      if (interval.type === 'op' || interval.type === 'recap') {
-        if (diff > 360) continue; // Abertura / recapitulação não dura mais de 6 minutos
-      } else if (interval.type === 'ed') {
+      if (interval.type === 'ed') {
+        if (diff < 2) continue; // Pelo menos 2 segundos para créditos (permite encerramento curto)
         if (diff > 480) continue; // Créditos não duram mais de 8 minutos
+      } else {
+        if (diff < 5) continue; // Pelo menos 5 segundos para abertura e recapitulação
+        if (diff > 360) continue; // Abertura / recapitulação não dura mais de 6 minutos
       }
 
       validated.push({
