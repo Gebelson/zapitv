@@ -178,7 +178,7 @@ export const TvApp: React.FC<TvAppProps> = ({
       )}
 
       {/* Visão Ativa */}
-      <main className="relative z-10 w-full min-h-screen pt-16">
+      <main className={`relative z-10 w-full min-h-screen ${specialView ? 'pt-24' : 'pt-0'}`}>
         {specialView === 'search' ? (
           <TvSearchView
             allContent={content}

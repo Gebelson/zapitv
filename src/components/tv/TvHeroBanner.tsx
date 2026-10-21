@@ -43,14 +43,14 @@ const TvHeroButton: React.FC<{
       data-focus-key={focusKey}
       data-tv-focused={focused ? "true" : undefined}
       onClick={onClick}
-      className={`px-8 py-3.5 rounded-xl font-black text-sm tracking-wide flex items-center gap-3 transition-all duration-200 outline-none select-none ${
+      className={`zapi-tv-hero-btn px-9 py-4 rounded-2xl font-black text-base sm:text-lg tracking-wide inline-flex items-center justify-center gap-3.5 transition-all duration-200 outline-none select-none cursor-pointer ${
         isPrimary
           ? focused
-            ? 'bg-gradient-to-r from-blue-500 to-cyan-400 text-white scale-105 shadow-[0_0_30px_rgba(0,229,255,0.7)] border-2 border-[#00e5ff]'
-            : 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-cyan-500/20 hover:scale-102 border-2 border-transparent'
+            ? 'bg-gradient-to-r from-blue-500 via-blue-400 to-cyan-300 text-white scale-105 border-2 border-white shadow-[0_0_30px_rgba(0,229,255,0.75)]'
+            : 'bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 text-white shadow-xl shadow-cyan-500/25 border-2 border-transparent hover:scale-102'
           : focused
-          ? 'bg-white/25 text-white scale-105 shadow-[0_0_25px_rgba(255,255,255,0.4)] border-2 border-white'
-          : 'bg-white/10 hover:bg-white/15 text-gray-200 border border-white/15 hover:scale-102'
+          ? 'bg-white/25 text-white scale-105 border-2 border-white shadow-[0_0_24px_rgba(255,255,255,0.5)]'
+          : 'bg-white/10 hover:bg-white/15 text-gray-200 border-2 border-white/20 hover:scale-102'
       }`}
     >
       {icon}
@@ -78,10 +78,10 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
     <FocusContext.Provider value={focusKey}>
       <section 
         ref={noriginRef as any}
-        className="relative w-full h-[68vh] min-h-[480px] max-h-[720px] mb-4 overflow-hidden select-none"
+        className="relative w-full h-[80vh] min-h-[580px] max-h-[840px] select-none overflow-hidden"
         aria-label={`Destaque: ${item.title}`}
       >
-        {/* Imagem de Fundo Cinematográfica */}
+        {/* Camada 0: Imagem do Banner do Topo Absoluto até a Base */}
         <div className="absolute inset-0 z-0">
           {backdropUrl && (
             <img
@@ -93,28 +93,53 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
             />
           )}
 
-          {/* Gradiente Lateral Esquerdo (Cinematográfico) */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#05070a] via-[#05070a]/80 via-45% to-transparent" />
-
-          {/* Gradiente Inferior Progressivo (Fusão suave com os carrosséis) */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#05070a] via-[#05070a]/70 via-30% to-transparent" />
-
-          {/* Efeito Glow Ambiente do Destaque (Cores atmosféricas) */}
+          {/* Blur Progressivo Superior (Fade-out suave em direção ao centro) */}
           <div 
-            className="absolute top-1/4 left-10 w-[450px] h-[350px] rounded-full pointer-events-none opacity-40 blur-3xl"
+            className="absolute top-0 inset-x-0 h-44 pointer-events-none z-[1]"
+            style={{
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)'
+            }}
+          />
+
+          {/* Gradiente Escuro Superior (Garante legibilidade absoluta de todos os elementos do header) */}
+          <div className="absolute top-0 inset-x-0 h-[45%] bg-gradient-to-b from-[#05070a]/95 via-[#05070a]/70 via-35% to-transparent pointer-events-none z-[2]" />
+
+          {/* Gradiente Lateral Esquerdo (Contraste cinematográfico para o texto e botões) */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#05070a] via-[#05070a]/85 via-45% to-transparent pointer-events-none z-[2]" />
+
+          {/* Blur Progressivo Inferior (Fade-in suave dissolvendo em direção à base) */}
+          <div 
+            className="absolute bottom-0 inset-x-0 h-56 pointer-events-none z-[1]"
+            style={{
+              backdropFilter: 'blur(14px)',
+              WebkitBackdropFilter: 'blur(14px)',
+              maskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)',
+              WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%)'
+            }}
+          />
+
+          {/* Gradiente Inferior Progressivo (Fusão suave com o fundo e os carrosséis) */}
+          <div className="absolute bottom-0 inset-x-0 h-[50%] bg-gradient-to-t from-[#05070a] via-[#05070a]/80 via-40% to-transparent pointer-events-none z-[2]" />
+
+          {/* Efeito Glow Ambiente do Destaque (Cores atmosféricas do ZapiTV) */}
+          <div 
+            className="absolute top-1/3 left-14 w-[500px] h-[380px] rounded-full pointer-events-none opacity-35 blur-3xl z-[2]"
             style={{
               background: 'radial-gradient(circle, rgba(0, 125, 247, 0.45) 0%, rgba(0, 229, 255, 0.25) 45%, transparent 75%)'
             }}
           />
         </div>
 
-        {/* Informações do Destaque Posicionadas à Esquerda */}
-        <div className="relative z-10 h-full flex flex-col justify-end pb-8 sm:pb-12 pl-8 sm:pl-12 md:pl-16 pr-8 max-w-2xl lg:max-w-3xl">
+        {/* Informações do Destaque Posicionadas à Esquerda com Área Segura */}
+        <div className="relative z-10 h-full flex flex-col justify-end pb-16 sm:pb-20 pl-14 sm:pl-16 pr-8 max-w-2xl lg:max-w-3xl">
           {/* Metadados: Ano, Classificação, Gêneros, Nota */}
-          <div className="flex flex-wrap items-center gap-2.5 mb-2.5 text-xs font-bold text-gray-300 drop-shadow">
+          <div className="flex flex-wrap items-center gap-3 mb-3 text-sm font-bold text-gray-300 drop-shadow">
             {item.rating ? (
-              <span className="flex items-center gap-1 text-amber-400 bg-black/60 px-2 py-0.5 rounded-md border border-amber-400/30">
-                <Star className="w-3.5 h-3.5 fill-amber-400" />
+              <span className="flex items-center gap-1.5 text-amber-400 bg-black/60 px-2.5 py-1 rounded-lg border border-amber-400/30">
+                <Star className="w-4 h-4 fill-amber-400" />
                 {item.rating.toFixed(1)}
               </span>
             ) : null}
@@ -122,7 +147,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
             {item.year ? <span>{item.year}</span> : null}
 
             {item.ageRating && (
-              <span className="px-1.5 py-0.5 rounded bg-white/15 border border-white/20 text-[11px] text-white">
+              <span className="px-2 py-0.5 rounded-md bg-white/15 border border-white/20 text-xs text-white">
                 {item.ageRating}
               </span>
             )}
@@ -132,22 +157,22 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
           </div>
 
           {/* Título Principal em Tipografia Imponente */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight mb-3 drop-shadow-2xl">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-tight mb-4 drop-shadow-2xl">
             {item.title}
           </h1>
 
           {/* Sinopse Curta (2 a 3 linhas) */}
-          <p className="text-xs sm:text-sm md:text-base text-gray-300/90 leading-relaxed line-clamp-3 mb-6 max-w-xl drop-shadow">
+          <p className="text-base sm:text-lg text-gray-300/95 leading-relaxed line-clamp-3 mb-8 max-w-xl drop-shadow">
             {item.description || item.overview || 'Acompanhe esta incrível produção agora no ZapiTV com a máxima qualidade e sem interrupções.'}
           </p>
 
           {/* Botões Grandes de Ação para Controle Remoto */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-5">
             <TvHeroButton
               focusKey="tv-hero-play"
               onClick={() => onPlay(item)}
               isPrimary
-              icon={<Play className="w-5 h-5 fill-white" />}
+              icon={<Play className="w-6 h-6 fill-white" />}
               label="Assistir"
               onDownPress={onDownPress}
             />
@@ -156,7 +181,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
               focusKey="tv-hero-details"
               onClick={() => onOpenDetails(item)}
               isPrimary={false}
-              icon={<Info className="w-5 h-5" />}
+              icon={<Info className="w-6 h-6" />}
               label="Mais detalhes"
               onDownPress={onDownPress}
             />

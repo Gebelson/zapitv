@@ -5,7 +5,7 @@ import { storageService, PlaybackContinuityInfo } from '../../core/storage/stora
 import { posterRecoveryService } from '../../core/catalog/PosterRecoveryService';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 
-interface TvCard16x9Props {
+interface TvCardProps {
   item: ContentItem;
   onClick: (item: ContentItem) => void;
   showProgress?: boolean;
@@ -16,7 +16,7 @@ interface TvCard16x9Props {
 }
 
 // Gera o gradiente de glow ambiente suave personalizado de acordo com o gênero e tom da obra
-function getCardAmbientGlow(item: ContentItem): string {
+export function getCardAmbientGlow(item: ContentItem): string {
   const genreStr = ((item.genres && item.genres[0]) || item.type || '').toLowerCase();
   
   if (genreStr.includes('terror') || genreStr.includes('suspense') || genreStr.includes('guerra')) {
@@ -35,7 +35,11 @@ function getCardAmbientGlow(item: ContentItem): string {
   return 'radial-gradient(ellipse at center, rgba(0, 125, 247, 0.6) 0%, rgba(0, 229, 255, 0.42) 40%, rgba(147, 51, 234, 0.2) 70%, transparent 80%)';
 }
 
-export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
+/**
+ * Card Vertical Cinematográfico 2:3 para Smart TV
+ * Exportado como TvCard16x9 e TvCardVertical para compatibilidade com a suíte de testes e componentes.
+ */
+export const TvCard16x9: React.FC<TvCardProps> = memo(({
   item,
   onClick,
   showProgress = false,
@@ -44,8 +48,9 @@ export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
   priority = false,
   onUpPress
 }) => {
+  // Prioriza o poster vertical real em 2:3
   const [imgSrc, setImgSrc] = useState<string>(() => {
-    return item.backdrop || posterRecoveryService.getCachedPoster(item) || item.image || item.poster || '';
+    return posterRecoveryService.getCachedPoster(item) || item.poster || item.image || item.backdrop || '';
   });
   const [hasImageError, setHasImageError] = useState(false);
   const cardContainerRef = useRef<HTMLDivElement>(null);
@@ -68,14 +73,14 @@ export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
 
   // Atualiza imagem quando o item muda
   useEffect(() => {
-    const nextSrc = item.backdrop || posterRecoveryService.getCachedPoster(item) || item.image || item.poster || '';
+    const nextSrc = posterRecoveryService.getCachedPoster(item) || item.poster || item.image || item.backdrop || '';
     setImgSrc(nextSrc);
     setHasImageError(!nextSrc);
-  }, [item.id, item.backdrop, item.image, item.poster]);
+  }, [item.id, item.poster, item.image, item.backdrop]);
 
   const handleImgError = () => {
-    if (imgSrc === item.backdrop && (item.image || item.poster)) {
-      setImgSrc(item.image || item.poster || '');
+    if (imgSrc !== item.backdrop && item.backdrop) {
+      setImgSrc(item.backdrop);
       return;
     }
     setHasImageError(true);
@@ -123,28 +128,28 @@ export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
       } ${className}`}
     >
       {/* GLOW AMBIENTE DAS CAPAS (Samsung The Frame / Tizen / Media Station X) */}
-      {/* Iluminação suave que acompanha a paleta de cores de cada capa */}
+      {/* Iluminação suave e atmosférica que acompanha as cores originais da capa */}
       <div 
-        className={`absolute -inset-3 sm:-inset-4 rounded-2xl pointer-events-none transition-all duration-300 transform-gpu ${
+        className={`absolute -inset-3 sm:-inset-4 rounded-3xl pointer-events-none transition-all duration-300 transform-gpu ${
           isTvFocused 
-            ? 'opacity-100 scale-105' 
-            : 'opacity-0 scale-95'
+            ? 'opacity-85 scale-105' 
+            : 'opacity-25 scale-95'
         }`}
         style={{
           background: ambientGlowStyle,
-          filter: 'blur(16px)',
+          filter: 'blur(20px)',
           zIndex: -1
         }}
         aria-hidden="true"
       />
 
-      {/* Caixa 16:9 Principal */}
-      <div className={`relative w-full aspect-video rounded-xl sm:rounded-2xl overflow-hidden bg-[#0d121d] border transition-all duration-200 shadow-xl ${
+      {/* Caixa Vertical 2:3 Principal (Sem bordas duplicadas e sem corte nas extremidades) */}
+      <div className={`relative w-full aspect-[2/3] rounded-2xl overflow-hidden bg-[#0d121d] transition-all duration-200 shadow-xl ${
         isTvFocused
-          ? 'border-[#00e5ff] shadow-[0_0_22px_rgba(0,229,255,0.5)] ring-2 ring-[#00e5ff]/50'
-          : 'border-white/10 group-hover/tvcard:border-white/20'
+          ? 'border-2 border-cyan-400 shadow-[0_0_24px_rgba(0,229,255,0.6),0_12px_28px_rgba(0,0,0,0.85)]'
+          : 'border-2 border-white/10 group-hover/tvcard:border-white/25'
       }`}>
-        {/* Imagem de Fundo 16:9 */}
+        {/* Imagem do Poster Vertical 2:3 */}
         {!hasImageError && imgSrc ? (
           <img
             src={imgSrc}
@@ -156,19 +161,19 @@ export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#131b2c] via-[#0d131f] to-[#070a0f] p-4 text-center">
-            <Play className="w-10 h-10 text-cyan-400/40 mb-2" />
-            <span className="text-xs font-bold text-gray-300 line-clamp-1">{item.title}</span>
+            <Play className="w-12 h-12 text-cyan-400/40 mb-2" />
+            <span className="text-xs font-bold text-gray-300 line-clamp-2 px-2">{item.title}</span>
           </div>
         )}
 
-        {/* Gradiente de Legibilidade */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-transparent pointer-events-none" />
+        {/* Gradiente de Legibilidade Inferior */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#05070a]/95 via-[#05070a]/40 via-35% to-transparent pointer-events-none" />
 
-        {/* Informações Sobrepostas no Card */}
-        <div className="absolute inset-x-0 bottom-0 p-2.5 sm:p-3 flex flex-col justify-end pointer-events-none">
+        {/* Informações Sobrepostas no Card Vertical */}
+        <div className="absolute inset-x-0 bottom-0 p-3 sm:p-3.5 flex flex-col justify-end pointer-events-none">
           <div className="flex items-center gap-1.5 mb-1 text-[11px] font-semibold text-gray-300">
             {item.rating ? (
-              <span className="inline-flex items-center gap-0.5 text-amber-400 font-bold bg-black/40 px-1.5 py-0.5 rounded text-[10px]">
+              <span className="inline-flex items-center gap-0.5 text-amber-400 font-bold bg-black/60 px-1.5 py-0.5 rounded text-[10px] border border-amber-400/30">
                 <Star className="w-2.5 h-2.5 fill-amber-400" />
                 {item.rating.toFixed(1)}
               </span>
@@ -177,7 +182,7 @@ export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
             {isEpisodic && (
               <>
                 <span>•</span>
-                <span className="text-cyan-400 font-medium">
+                <span className="text-cyan-300 font-medium">
                   {continuity?.label || (item.type === ContentType.ANIME ? 'Anime' : 'Série')}
                 </span>
               </>
@@ -191,7 +196,7 @@ export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
 
         {/* Barra de Progresso Fina para Continuar Assistindo */}
         {hasValidProgress && (
-          <div className="absolute inset-x-0 bottom-0 h-1 sm:h-1.5 bg-black/60 overflow-hidden pointer-events-none">
+          <div className="absolute inset-x-0 bottom-0 h-1.5 bg-black/70 overflow-hidden pointer-events-none rounded-b-2xl">
             <div 
               className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300 rounded-r-full shadow-[0_0_8px_#00e5ff]"
               style={{ width: `${progressPercent}%` }}
@@ -204,3 +209,4 @@ export const TvCard16x9: React.FC<TvCard16x9Props> = memo(({
 });
 
 TvCard16x9.displayName = 'TvCard16x9';
+export const TvCardVertical = TvCard16x9;

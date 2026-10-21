@@ -51,8 +51,17 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
     if (popularMovies.length > 0) {
       return `card-popular-movies-${popularMovies[0].id}`;
     }
+    if (popularSeries.length > 0) {
+      return `card-popular-series-${popularSeries[0].id}`;
+    }
+    if (animeItems.length > 0) {
+      return `card-popular-animes-${animeItems[0].id}`;
+    }
+    if (featuredItems.length > 1) {
+      return `card-featured-all-${featuredItems[1].id}`;
+    }
     return '';
-  }, [continueWatchingItems, trendingItems, popularMovies]);
+  }, [continueWatchingItems, trendingItems, popularMovies, popularSeries, animeItems, featuredItems]);
 
   const handleHeroDownPress = useCallback(() => {
     if (firstCardKey) {
@@ -80,8 +89,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
         />
       )}
 
-      {/* Fileiras de Conteúdos Horizontais 16:9 */}
-      <div className="relative z-10 -mt-8 sm:-mt-12 space-y-2 sm:space-y-4">
+      {/* Fileiras de Conteúdos com Capas Grandes Verticais 2:3 */}
+      <div className="relative z-10 -mt-14 sm:-mt-18 space-y-2 sm:space-y-4">
         {/* Continuar Assistindo (Se houver progresso real) */}
         {hasContinue && (
           <TvContentRow

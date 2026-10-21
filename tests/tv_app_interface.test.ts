@@ -110,7 +110,52 @@ async function runTvAppInterfaceTests() {
   );
   console.log('✓ Teste 8: Transição bidirecional determinística (Header <-> Hero <-> Carrosséis) OK');
 
-  console.log('\nTodos os 8 testes da nova interface Smart TV passaram com sucesso!\n');
+  // Teste 9: Header Flutuante sem retângulo nos links e elementos ampliados para TV 1080p
+  assert(
+    !tvHeaderCode.includes('border border-white/10 shadow-lg') &&
+    !tvHeaderCode.includes('bg-black/40'),
+    'TvHeader NÃO deve conter retângulo/cápsula envolvendo os links de navegação'
+  );
+  assert(
+    tvHeaderCode.includes('text-[22px]') || tvHeaderCode.includes('text-[23px]') || tvHeaderCode.includes('text-[24px]'),
+    'TvHeader deve utilizar tipografia ampliada proporcional a Smart TVs 1080p'
+  );
+  console.log('✓ Teste 9: Header flutuante livre sem contêiner retangular e elementos ampliados OK');
+
+  // Teste 10: Banner no topo absoluto, degradê de legibilidade e blur progressivo
+  assert(
+    tvHeroCode.includes('bg-gradient-to-b from-[#05070a]') &&
+    tvHeroCode.includes('linear-gradient(to bottom') &&
+    tvHeroCode.includes('linear-gradient(to top'),
+    'TvHeroBanner deve conter degradê superior escuro e blurs progressivos com máscara'
+  );
+  console.log('✓ Teste 10: Banner no topo absoluto, degradê superior suave e blur progressivo OK');
+
+  // Teste 11: Acabamento perfeito e simétrico do botão Assistir
+  assert(
+    tvHeroCode.includes('zapi-tv-hero-btn') &&
+    tvHeroCode.includes('rounded-2xl'),
+    'TvHeroBanner deve conter botão Assistir com acabamento simétrico e arredondado'
+  );
+  console.log('✓ Teste 11: Botão Assistir refinado com acabamento simétrico e sem artefatos OK');
+
+  // Teste 12: Capas dos carrosséis em proporção vertical 2:3 com glow ambiente preservado
+  assert(
+    tvCardCode.includes('aspect-[2/3]'),
+    'TvCard16x9 deve adotar a proporção vertical cinematográfica 2:3'
+  );
+  console.log('✓ Teste 12: Capas dos carrosséis ampliadas na orientação vertical 2:3 OK');
+
+  // Teste 13: Remoção de contadores de quantidade de títulos dos cabeçalhos dos carrosséis
+  const tvContentRowPath = path.resolve(process.cwd(), 'src/components/tv/TvContentRow.tsx');
+  const tvContentRowCode = fs.readFileSync(tvContentRowPath, 'utf8');
+  assert(
+    !tvContentRowCode.includes('{items.length} títulos'),
+    'TvContentRow NÃO deve exibir contador de títulos no cabeçalho na TV'
+  );
+  console.log('✓ Teste 13: Contadores de títulos ocultos dos carrosséis na TV conforme especificação');
+
+  console.log('\nTodos os 13 testes da nova interface Smart TV passaram com sucesso!\n');
 }
 
 runTvAppInterfaceTests().catch(err => {

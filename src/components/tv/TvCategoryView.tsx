@@ -75,8 +75,8 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
         />
       )}
 
-      {/* Fileiras de Conteúdos da Categoria */}
-      <div className="relative z-10 -mt-8 sm:-mt-12 space-y-4">
+      {/* Fileiras de Conteúdos da Categoria com Capas Verticais 2:3 */}
+      <div className="relative z-10 -mt-14 sm:-mt-18 space-y-4">
         {/* Todos os Títulos Mais Populares */}
         <TvContentRow
           title={`Todos os ${categoryTitle} Populares`}

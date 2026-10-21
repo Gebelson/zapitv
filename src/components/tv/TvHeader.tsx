@@ -41,18 +41,21 @@ const TvNavTabButton: React.FC<{
       data-focus-key={focusKey}
       data-tv-focused={focused ? "true" : undefined}
       onClick={onClick}
-      className={`relative px-4 py-2 rounded-xl text-sm font-black tracking-wider transition-all duration-200 outline-none select-none ${
+      className={`relative py-2 px-2 text-[20px] lg:text-[23px] font-bold tracking-wide transition-all duration-150 outline-none select-none cursor-pointer whitespace-nowrap ${
         focused
-          ? 'text-cyan-300 scale-110 bg-white/10 shadow-[0_0_15px_rgba(0,229,255,0.4)]'
+          ? 'text-cyan-300 scale-105 drop-shadow-[0_0_14px_rgba(0,229,255,0.7)]'
           : isActive
-          ? 'text-white'
-          : 'text-gray-400 hover:text-gray-200'
+          ? 'text-white font-extrabold drop-shadow'
+          : 'text-gray-300/85 hover:text-white'
       }`}
     >
-      {label}
-      {isActive && (
-        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full shadow-[0_0_8px_#00e5ff]" />
-      )}
+      <span>{label}</span>
+      {/* Indicador refinado da página atual / foco proporcional ao texto */}
+      {focused ? (
+        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-8 h-[3px] bg-cyan-400 rounded-full shadow-[0_0_10px_#00e5ff] transition-all duration-200" />
+      ) : isActive ? (
+        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-[3px] bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full shadow-[0_0_8px_#00e5ff] transition-all duration-200" />
+      ) : null}
     </button>
   );
 };
@@ -73,7 +76,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     saveLastFocusedChild: true
   });
 
-  // Botão de Busca
+  // Botão de Busca Ampliado (Área 56px, Ícone 28px)
   const { ref: searchRef, focused: searchFocused } = useTvFocusable({
     focusKey: 'tv-nav-search',
     onEnterPress: onOpenSearch,
@@ -86,7 +89,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     }
   });
 
-  // Botão de Perfil
+  // Botão de Perfil Ampliado (Área 56px, Avatar 48px)
   const { ref: profileRef, focused: profileFocused } = useTvFocusable({
     focusKey: 'tv-nav-profile',
     onEnterPress: () => setIsProfileMenuOpen(prev => !prev),
@@ -103,16 +106,16 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     <FocusContext.Provider value={focusKey}>
       <header
         ref={noriginRef as any}
-        className="fixed top-0 inset-x-0 z-[120] h-20 px-8 sm:px-12 md:px-16 flex items-center justify-between pointer-events-auto bg-gradient-to-b from-black/95 via-black/60 to-transparent transition-all select-none"
+        className="fixed top-0 inset-x-0 z-[120] h-24 sm:h-[100px] px-14 sm:px-16 flex items-center justify-between pointer-events-none select-none"
       >
-        {/* Esquerda: Logotipo Oficial ZapiTV */}
+        {/* Esquerda: Logotipo Oficial ZapiTV Ampliado (Largura proporcional ~190-210px) */}
         <div 
           role="button"
           tabIndex={0}
           onClick={() => onSelectTab('home')}
-          className="flex items-center gap-2 cursor-pointer group/logo outline-none focus:outline-none"
+          className="flex items-center gap-3.5 cursor-pointer group/logo outline-none focus:outline-none pointer-events-auto"
         >
-          <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center relative">
+          <div className="w-12 h-12 sm:w-[50px] sm:h-[50px] flex items-center justify-center relative flex-shrink-0">
             <video
               autoPlay
               loop
@@ -135,13 +138,13 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
           <img
             src="/zapitv-text.png"
             alt="ZapiTV"
-            className="h-[22px] sm:h-[25px] w-auto object-contain select-none ml-1 hidden sm:block drop-shadow"
+            className="h-[28px] sm:h-[32px] w-auto object-contain select-none ml-1 hidden sm:block drop-shadow-lg"
             draggable={false}
           />
         </div>
 
-        {/* Centro: Navegação Principal Minimalista (SEM "Minha Lista"!) */}
-        <nav className="flex items-center gap-1 sm:gap-2 bg-black/40 backdrop-blur-none px-3 py-1.5 rounded-2xl border border-white/10 shadow-lg">
+        {/* Centro: Navegação Flutuante Livre (SEM RETÂNGULO EXTERNO, CENTRALIZADA NA LARGURA TOTAL) */}
+        <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-6 sm:gap-8 lg:gap-10 pointer-events-auto">
           <TvNavTabButton
             focusKey="tv-nav-home"
             label="Início"
@@ -174,8 +177,8 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
           />
         </nav>
 
-        {/* Direita: Busca e Perfil */}
-        <div className="flex items-center gap-3">
+        {/* Direita: Busca e Perfil Ampliados (Áreas 56px, Ícones 28px) */}
+        <div className="flex items-center gap-4 sm:gap-5 pointer-events-auto ml-auto relative">
           {/* Botão de Busca */}
           <button
             ref={searchRef}
@@ -184,50 +187,52 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
             data-tv-focused={searchFocused ? "true" : undefined}
             onClick={onOpenSearch}
             aria-label="Buscar títulos"
-            className={`p-2.5 rounded-full transition-all duration-200 outline-none ${
+            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 outline-none ${
               searchFocused
-                ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-400 scale-110 shadow-[0_0_15px_rgba(0,229,255,0.4)]'
-                : 'text-gray-300 hover:text-white bg-white/5 border border-white/10'
+                ? 'bg-cyan-500/25 text-cyan-300 border-2 border-cyan-400 scale-105 shadow-[0_0_20px_rgba(0,229,255,0.6)]'
+                : 'text-gray-200 hover:text-white bg-white/10 hover:bg-white/15 border border-white/20'
             }`}
           >
-            <Search className="w-5 h-5" />
+            <Search className="w-7 h-7" />
           </button>
 
-          {/* Botão de Perfil */}
-          <button
-            ref={profileRef}
-            type="button"
-            data-focus-key="tv-nav-profile"
-            data-tv-focused={profileFocused ? "true" : undefined}
-            onClick={() => setIsProfileMenuOpen(prev => !prev)}
-            aria-label="Menu do perfil"
-            className={`p-0.5 rounded-full transition-all duration-200 outline-none ${
-              profileFocused
-                ? 'ring-2 ring-cyan-400 scale-110 shadow-[0_0_20px_rgba(0,229,255,0.5)]'
-                : 'ring-1 ring-white/20'
-            }`}
-          >
-            <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={userName} className="w-full h-full object-cover" />
-              ) : (
-                <UserIcon className="w-5 h-5 text-white" />
-              )}
-            </div>
-          </button>
+          {/* Botão de Perfil e Dropdown Encapsulado */}
+          <div className="relative">
+            <button
+              ref={profileRef}
+              type="button"
+              data-focus-key="tv-nav-profile"
+              data-tv-focused={profileFocused ? "true" : undefined}
+              onClick={() => setIsProfileMenuOpen(prev => !prev)}
+              aria-label="Menu do perfil"
+              className={`w-14 h-14 rounded-full p-1 flex items-center justify-center transition-all duration-200 outline-none ${
+                profileFocused
+                  ? 'border-2 border-cyan-400 scale-105 shadow-[0_0_20px_rgba(0,229,255,0.6)]'
+                  : 'border-2 border-white/20 hover:border-white/40'
+              }`}
+            >
+              <div className="w-full h-full rounded-full overflow-hidden bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={userName} className="w-full h-full object-cover" />
+                ) : (
+                  <UserIcon className="w-6 h-6 text-white" />
+                )}
+              </div>
+            </button>
+
+            {/* Menu Dropdown do Perfil (Minha Lista fica exclusivamente aqui) */}
+            <TvProfileMenu
+              isOpen={isProfileMenuOpen}
+              onClose={() => setIsProfileMenuOpen(false)}
+              onNavigate={(target) => {
+                setIsProfileMenuOpen(false);
+                onNavigateProfileMenu(target);
+              }}
+              userName={userName}
+              avatarUrl={avatarUrl}
+            />
+          </div>
         </div>
-
-        {/* Menu Dropdown do Perfil (contém Minha Lista) */}
-        <TvProfileMenu
-          isOpen={isProfileMenuOpen}
-          onClose={() => setIsProfileMenuOpen(false)}
-          onNavigate={(target) => {
-            setIsProfileMenuOpen(false);
-            onNavigateProfileMenu(target);
-          }}
-          userName={userName}
-          avatarUrl={avatarUrl}
-        />
       </header>
     </FocusContext.Provider>
   );

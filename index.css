@@ -112,25 +112,27 @@
    ZAPITV — MODO TV: DESTAQUE DE FOCO ESPACIAL EXCLUSIVO SMART TV (/tv)
    ========================================================================= */
 
-/* Foco Espacial Nítido e Elegante EXCLUSIVO para Smart TVs (Encapsulado em .zapi-tv-root) */
+/* Foco Espacial Nítido, Fino e Elegante EXCLUSIVO para Smart TVs (Encapsulado em .zapi-tv-root) */
 .zapi-tv-root .tv-focused,
 .zapi-tv-root [data-tv-focused="true"],
 body.tv-mode .zapi-tv-root .tv-focused,
 body.tv-mode .zapi-tv-root [data-tv-focused="true"] {
-  outline: 3.5px solid #00e5ff !important;
-  outline-offset: 3px !important;
-  box-shadow: 0 0 25px rgba(0, 229, 255, 0.7), 0 0 50px rgba(0, 125, 247, 0.45) !important;
-  transform: scale(1.06) !important;
-  z-index: 50 !important;
-  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.15s ease-out, outline 0.15s ease-out !important;
+  outline: none !important;
+  z-index: 40 !important;
+  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.18s ease-out, border-color 0.18s ease-out !important;
 }
 
-/* Botões com foco em TV (Encapsulados em .zapi-tv-root) */
+/* Foco refinado para cards de catálogo (Sem contornos duplos e sem corte de bordas) */
+.zapi-tv-root .group\/tvcard[data-tv-focused="true"],
+body.tv-mode .zapi-tv-root .group\/tvcard[data-tv-focused="true"] {
+  transform: scale(1.05) translateZ(0) !important;
+  z-index: 50 !important;
+}
+
+/* Botões com foco em TV (Bordas simétricas sem halo retangular desconectado) */
 .zapi-tv-root button.tv-focused,
 .zapi-tv-root [role="button"].tv-focused {
-  outline: 3.5px solid #00e5ff !important;
-  outline-offset: 2px !important;
-  box-shadow: 0 0 20px rgba(0, 229, 255, 0.7) !important;
+  outline: none !important;
 }
 
 /* Otimização de Performance para WebViews de TV (Tizen / WebOS / MSX) */

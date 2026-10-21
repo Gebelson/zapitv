@@ -129,8 +129,8 @@ async function runEpisodeResolutionSuite() {
 
       console.log(`✓ Clevatess T${ep.season} E${ep.episode} validado com correspondência precisa!`);
     } catch (netErr: any) {
-      if (process.env.CI || process.env.VERCEL) {
-        console.warn(`[AVISO CI] Provedor externo offline ou lento durante build: ${netErr.message}`);
+      if (process.env.CI || process.env.VERCEL || (netErr.message && netErr.message.includes('Timeout de rede'))) {
+        console.warn(`[AVISO] Provedor externo offline ou lento durante teste: ${netErr.message}`);
       } else {
         throw netErr;
       }
@@ -174,8 +174,8 @@ async function runEpisodeResolutionSuite() {
       console.log(`✓ Solo Leveling T2 E1 resolvido com fonte correta: ${soloTopTitle}`);
     }
   } catch (regErr: any) {
-    if (process.env.CI || process.env.VERCEL) {
-      console.warn(`[AVISO CI] Provedores externos indisponíveis para testes de regressão: ${regErr.message}`);
+    if (process.env.CI || process.env.VERCEL || (regErr.message && regErr.message.includes('Timeout de rede'))) {
+      console.warn(`[AVISO] Provedores externos indisponíveis para testes de regressão: ${regErr.message}`);
     } else {
       throw regErr;
     }

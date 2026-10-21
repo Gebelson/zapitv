@@ -43,33 +43,30 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     <FocusContext.Provider value={focusKey}>
       <section 
         ref={setRowRef}
-        className="w-full mb-6 sm:mb-8 pl-8 sm:pl-12 md:pl-16 pr-6 overflow-visible focus:outline-none"
+        className="w-full mb-8 sm:mb-10 pl-14 sm:pl-16 pr-14 sm:pr-16 overflow-visible focus:outline-none"
         aria-label={title}
       >
-        {/* Título da Fileira */}
-        <div className="flex items-center gap-3 mb-3">
-          <h2 className="text-base sm:text-lg md:text-xl font-black text-white tracking-wide drop-shadow">
+        {/* Título da Fileira (Sem contadores de quantidade de títulos, estritamente limpo) */}
+        <div className="flex items-center gap-3.5 mb-2">
+          <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide drop-shadow">
             {title}
           </h2>
           {badge && (
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+            <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
               {badge}
             </span>
           )}
-          <span className="text-xs font-medium text-gray-500 ml-auto mr-8">
-            {items.length} títulos
-          </span>
         </div>
 
-        {/* Trilho Horizontal com 16:9 Cards */}
+        {/* Trilho Horizontal com Capas Grandes Verticais 2:3 (5 a 6 capas visíveis na tela) */}
         <div 
-          className="flex items-center gap-4 sm:gap-5 overflow-x-auto overflow-y-visible no-scrollbar py-3 scroll-smooth"
+          className="flex items-center gap-6 overflow-x-auto overflow-y-visible no-scrollbar py-6 sm:py-8 scroll-smooth"
           style={{ scrollSnapType: 'x mandatory' }}
         >
           {items.map((item, idx) => (
             <div 
               key={`${rowId}-${item.id}-${idx}`}
-              className="flex-none w-[240px] sm:w-[280px] md:w-[320px] lg:w-[350px]"
+              className="flex-none w-[230px] sm:w-[255px] md:w-[270px] lg:w-[280px]"
               style={{ scrollSnapAlign: 'start' }}
             >
               <TvCard16x9
@@ -77,7 +74,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
                 onClick={onItemClick}
                 showProgress={showProgress}
                 focusKeyPrefix={`card-${rowId}`}
-                priority={idx < 5}
+                priority={idx < 6}
                 onUpPress={onRowUp}
               />
             </div>
