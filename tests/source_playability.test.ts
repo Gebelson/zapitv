@@ -46,7 +46,7 @@ assert.equal(streamValidator.isStreamMatchingTargetTitle(proxiedWrongWoody,
 assert.equal(streamValidator.filterCleanStreams([proxiedWrongWoody],
   'O Novo Pica-Pau', 'The New Woody Woodpecker Show', [], episodeOne).length, 0);
 assert.equal(streamValidator.isStreamMatchingTargetTitle({ ...wrongWoody, url: 'https://media.example.test/other.mp4' }, 'O Novo Pica-Pau', undefined, [], episodeOne), true);
-assert.equal(streamValidator.isStreamMatchingTargetTitle(wrongWoody, 'O Novo Pica-Pau', undefined, [], { season: 1, episode: 2 }), true);
+assert.equal(streamValidator.isStreamMatchingTargetTitle({ ...wrongWoody, description: 'O Novo Pica-Pau • S01E02 • Servidor: Magnetflix #20' }, 'O Novo Pica-Pau', undefined, [], { season: 1, episode: 2 }), true);
 assert.equal(streamValidator.isStreamMatchingTargetTitle(wrongWoody, 'Hotel Assombrado', undefined, [], episodeOne), true);
 const declared = (title: string): StremioStream => ({
   name: 'Fonte HLS', title: `🐦‍🔥 ${title}\n⏸️ T01 EP01`,

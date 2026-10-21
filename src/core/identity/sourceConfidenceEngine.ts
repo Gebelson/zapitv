@@ -104,6 +104,21 @@ export class SourceConfidenceEngine {
       return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
     }
 
+    // Detecção de episódio absoluto de outra temporada (ex: anime T2 E1 com tag '(Ep. 1)')
+    const absEpMatch = streamTitle.match(/\((?:ep|episode)\.?\s*(\d+)\)/i);
+    if (absEpMatch && identity.season && identity.season > 1 && identity.episode) {
+      const absEp = parseInt(absEpMatch[1], 10);
+      if (absEp <= identity.episode) {
+        reasons.push(`Episódio absoluto (${absEp}) pertence à primeira temporada e não à temporada ${identity.season}`);
+        return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+      }
+    }
+
+    if (identity.season === 1 && /\b(?:clevatess\s+ii|mushoku\s+tensei\s+ii|2nd\s+season|3rd\s+season|sais(?:on)?\s*0*2)\b/i.test(streamTitle)) {
+      reasons.push('Fonte pertence a uma temporada posterior e não à primeira');
+      return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+    }
+
     if (identity.type === ContentType.MOVIE && identity.year) {
       const releaseYear = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
       if (releaseYear && Math.abs(Number(releaseYear[1]) - identity.year) > 1) {

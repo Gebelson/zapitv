@@ -274,6 +274,70 @@ class StreamValidator {
   }
 
   /**
+   * Valida estritamente se o stream corresponde à temporada e ao episódio solicitados,
+   * impedindo que fontes da T1 sejam aceitas como fallback indevido para a T2.
+   */
+  public isStreamMatchingEpisode(
+    stream: StremioStream,
+    episodeParams?: { season: number; episode: number }
+  ): boolean {
+    if (!episodeParams) return true;
+    const { season, episode } = episodeParams;
+    const streamTitle = (stream.title || '').trim();
+    const streamName = (stream.name || '').trim();
+    const streamDesc = (stream.description || '').trim();
+    const streamUrl = (stream.url || '').trim();
+    const text = `${streamName} ${streamTitle} ${streamDesc} ${streamUrl}`.toLowerCase();
+
+    // 1. Tag de episódio absoluto em parênteses: ex: '(Ep. 1)', '(Ep. 13)'
+    const absMatch = text.match(/\((?:ep|episode)\.?\s*(\d+)\)/i);
+    if (absMatch && season > 1) {
+      const absEp = parseInt(absMatch[1], 10);
+      // Se temporada > 1 e o episódio absoluto é menor ou igual ao número do episódio relativo
+      // (ex: na T2 E1, um stream com '(Ep. 1)' é comprovadamente da Temporada 1)
+      if (absEp <= episode) {
+        console.warn(`[StreamValidator] Stream rejeitado por episódio absoluto da T1 em requisição da T${season}: ${streamTitle}`);
+        return false;
+      }
+    }
+
+    // 2. Tag combinada S01E01, T01EP01, S1E1, T02 EP01
+    const seMatches = Array.from(text.matchAll(/\b(?:s|t)0*(\d{1,2})\s*(?:e|ep)0*(\d{1,3})\b/gi));
+    for (const m of seMatches) {
+      const sFound = parseInt(m[1], 10);
+      const eFound = parseInt(m[2], 10);
+      if (sFound !== season || eFound !== episode) {
+        console.warn(`[StreamValidator] Stream rejeitado por temporada/episódio divergente [T${sFound}E${eFound} vs T${season}E${episode}]: ${streamTitle}`);
+        return false;
+      }
+    }
+
+    // 3. Temporada declarada explicitamente (ex: 'S01', 'T01', 'Season 1', 'Temporada 1')
+    // Não confunde com resoluções ou intervalos '01-12'
+    const sMatches = Array.from(text.matchAll(/\b(?:season\s*|temporada\s*|sais(?:on)?\s*|s0*|t0*)(\d{1,2})\b(?!\s*-\s*\d)/gi));
+    for (const m of sMatches) {
+      const sFound = parseInt(m[1], 10);
+      if (sFound > 0 && sFound <= 50) {
+        if (sFound !== season) {
+          const fullMatch = m[0].toLowerCase();
+          if (fullMatch.startsWith('season') || fullMatch.startsWith('temporada') || fullMatch.startsWith('sais') || /^[st]0\d$/.test(fullMatch)) {
+            console.warn(`[StreamValidator] Stream rejeitado por temporada divergente [T${sFound} vs T${season}]: ${streamTitle}`);
+            return false;
+          }
+        }
+      }
+    }
+
+    // 4. Numerais romanos e subtítulos de temporadas (ex: Clevatess II vs Clevatess I)
+    if (season === 1 && /\b(?:clevatess\s+ii|mushoku\s+tensei\s+ii|2nd\s+season|2ª\s*temporada)\b/i.test(text)) {
+      console.warn(`[StreamValidator] Stream da Temporada 2 rejeitado para requisição da Temporada 1: ${streamTitle}`);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * Verifica se o stream realmente corresponde ao título do conteúdo requisitado,
    * prevenindo que animes/séries sejam trocados por conteúdos corrompidos em addons de terceiros.
    */
@@ -288,6 +352,11 @@ class StreamValidator {
     const sName = (stream.name || '').trim();
     const sUrl = (stream.url || '').trim();
     const combined = `${sName} ${sTitle} ${stream.description || ''} ${sUrl}`.toLowerCase();
+
+    // Validação estrita de temporada e episódio (Blindagem contra mistura de T1 e T2)
+    if (episodeParams && !this.isStreamMatchingEpisode(stream, episodeParams)) {
+      return false;
+    }
 
     // Uma URL acessível pode ser trailer ou amostra.
     if (/\b(trailer|teaser|sample|demo)\b/i.test(`${sName} ${sTitle}`)) {
@@ -468,6 +537,9 @@ class StreamValidator {
     }
 
     if (episodeParams) {
+      if (!this.isStreamMatchingEpisode({ title: streamText } as any, episodeParams)) {
+        return false;
+      }
       const s = episodeParams.season;
       const e = episodeParams.episode;
       const sPattern = new RegExp(`s0*${s}|temporada\\s*0*${s}`, 'i');

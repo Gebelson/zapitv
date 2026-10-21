@@ -4294,6 +4294,54 @@ var init_streamValidator = __esm({
         }
       }
       /**
+       * Valida estritamente se o stream corresponde à temporada e ao episódio solicitados,
+       * impedindo que fontes da T1 sejam aceitas como fallback indevido para a T2.
+       */
+      isStreamMatchingEpisode(stream, episodeParams) {
+        if (!episodeParams) return true;
+        const { season, episode } = episodeParams;
+        const streamTitle = (stream.title || "").trim();
+        const streamName = (stream.name || "").trim();
+        const streamDesc = (stream.description || "").trim();
+        const streamUrl = (stream.url || "").trim();
+        const text2 = `${streamName} ${streamTitle} ${streamDesc} ${streamUrl}`.toLowerCase();
+        const absMatch = text2.match(/\((?:ep|episode)\.?\s*(\d+)\)/i);
+        if (absMatch && season > 1) {
+          const absEp = parseInt(absMatch[1], 10);
+          if (absEp <= episode) {
+            console.warn(`[StreamValidator] Stream rejeitado por epis\xF3dio absoluto da T1 em requisi\xE7\xE3o da T${season}: ${streamTitle}`);
+            return false;
+          }
+        }
+        const seMatches = Array.from(text2.matchAll(/\b(?:s|t)0*(\d{1,2})\s*(?:e|ep)0*(\d{1,3})\b/gi));
+        for (const m of seMatches) {
+          const sFound = parseInt(m[1], 10);
+          const eFound = parseInt(m[2], 10);
+          if (sFound !== season || eFound !== episode) {
+            console.warn(`[StreamValidator] Stream rejeitado por temporada/epis\xF3dio divergente [T${sFound}E${eFound} vs T${season}E${episode}]: ${streamTitle}`);
+            return false;
+          }
+        }
+        const sMatches = Array.from(text2.matchAll(/\b(?:season\s*|temporada\s*|sais(?:on)?\s*|s0*|t0*)(\d{1,2})\b(?!\s*-\s*\d)/gi));
+        for (const m of sMatches) {
+          const sFound = parseInt(m[1], 10);
+          if (sFound > 0 && sFound <= 50) {
+            if (sFound !== season) {
+              const fullMatch = m[0].toLowerCase();
+              if (fullMatch.startsWith("season") || fullMatch.startsWith("temporada") || fullMatch.startsWith("sais") || /^[st]0\d$/.test(fullMatch)) {
+                console.warn(`[StreamValidator] Stream rejeitado por temporada divergente [T${sFound} vs T${season}]: ${streamTitle}`);
+                return false;
+              }
+            }
+          }
+        }
+        if (season === 1 && /\b(?:clevatess\s+ii|mushoku\s+tensei\s+ii|2nd\s+season|2ª\s*temporada)\b/i.test(text2)) {
+          console.warn(`[StreamValidator] Stream da Temporada 2 rejeitado para requisi\xE7\xE3o da Temporada 1: ${streamTitle}`);
+          return false;
+        }
+        return true;
+      }
+      /**
        * Verifica se o stream realmente corresponde ao título do conteúdo requisitado,
        * prevenindo que animes/séries sejam trocados por conteúdos corrompidos em addons de terceiros.
        */
@@ -4302,6 +4350,9 @@ var init_streamValidator = __esm({
         const sName = (stream.name || "").trim();
         const sUrl = (stream.url || "").trim();
         const combined = `${sName} ${sTitle} ${stream.description || ""} ${sUrl}`.toLowerCase();
+        if (episodeParams && !this.isStreamMatchingEpisode(stream, episodeParams)) {
+          return false;
+        }
         if (/\b(trailer|teaser|sample|demo)\b/i.test(`${sName} ${sTitle}`)) {
           return false;
         }
@@ -4418,6 +4469,9 @@ var init_streamValidator = __esm({
           }
         }
         if (episodeParams) {
+          if (!this.isStreamMatchingEpisode({ title: streamText }, episodeParams)) {
+            return false;
+          }
           const s = episodeParams.season;
           const e = episodeParams.episode;
           const sPattern = new RegExp(`s0*${s}|temporada\\s*0*${s}`, "i");
@@ -11058,7 +11112,7 @@ var init_providerRegistry = __esm({
        * Resolve todos os fluxos de reprodução para um item (filme ou série).
        */
       resolveStreams(type, id, episode, options) {
-        const cacheKey = JSON.stringify(["v5_identity", type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
+        const cacheKey = JSON.stringify(["v6_identity", type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
         const releaseListener = () => {
           const callback = options?.onProgressiveStreams;
           if (!callback) return;
@@ -11126,7 +11180,7 @@ var init_providerRegistry = __esm({
         return request;
       }
       async resolveStreamsFresh(type, id, episode, cacheKey, generation, options) {
-        const effectiveCacheKey = cacheKey || JSON.stringify(["v5_identity", type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
+        const effectiveCacheKey = cacheKey || JSON.stringify(["v6_identity", type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
         const effectiveGen = generation ?? this.cacheGeneration;
         const notifyProgressive = (currentStreams) => {
           const listeners = this.progressiveListeners.get(effectiveCacheKey);
@@ -11387,7 +11441,7 @@ var init_providerRegistry = __esm({
             try {
               const client = new StremioClient(addon.url);
               let primaryQueryId = stremioId;
-              if (addon.id === "fenixflix-animes" && type === "anime" && tmdbNum) {
+              if (addon.id === "fenixflix-animes" && type === "anime" && !imdbStr && tmdbNum) {
                 primaryQueryId = episode ? `tmdb:${tmdbNum}:${episode.season}:${episode.episode}` : `tmdb:${tmdbNum}`;
               }
               const hasMatchingStreams = (rawStreams) => {
@@ -13197,6 +13251,18 @@ var init_sourceConfidenceEngine = __esm({
         }
         if (episodeTag && identity.season && identity.episode && (Number(episodeTag[1] || episodeTag[3]) !== identity.season || Number(episodeTag[2] || episodeTag[4]) !== identity.episode)) {
           reasons.push("Temporada ou epis\xF3dio diferente do solicitado");
+          return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+        }
+        const absEpMatch = streamTitle.match(/\((?:ep|episode)\.?\s*(\d+)\)/i);
+        if (absEpMatch && identity.season && identity.season > 1 && identity.episode) {
+          const absEp = parseInt(absEpMatch[1], 10);
+          if (absEp <= identity.episode) {
+            reasons.push(`Epis\xF3dio absoluto (${absEp}) pertence \xE0 primeira temporada e n\xE3o \xE0 temporada ${identity.season}`);
+            return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+          }
+        }
+        if (identity.season === 1 && /\b(?:clevatess\s+ii|mushoku\s+tensei\s+ii|2nd\s+season|3rd\s+season|sais(?:on)?\s*0*2)\b/i.test(streamTitle)) {
+          reasons.push("Fonte pertence a uma temporada posterior e n\xE3o \xE0 primeira");
           return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
         }
         if (identity.type === "FILME" /* MOVIE */ && identity.year) {

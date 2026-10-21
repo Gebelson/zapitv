@@ -411,7 +411,7 @@ class ProviderRegistryService {
     episode?: { season: number; episode: number },
     options?: ResolveStreamsOptions
   ): Promise<StremioStream[]> {
-    const cacheKey = JSON.stringify(['v5_identity', type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
+    const cacheKey = JSON.stringify(['v6_identity', type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
 
     // 1. Registro de listener progressivo para este cacheKey
     const releaseListener = () => {
@@ -504,7 +504,7 @@ class ProviderRegistryService {
     generation?: number,
     options?: ResolveStreamsOptions
   ): Promise<StremioStream[]> {
-    const effectiveCacheKey = cacheKey || JSON.stringify(['v5_identity', type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
+    const effectiveCacheKey = cacheKey || JSON.stringify(['v6_identity', type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
     const effectiveGen = generation ?? this.cacheGeneration;
 
     const notifyProgressive = (currentStreams: StremioStream[]) => {
@@ -807,7 +807,10 @@ class ProviderRegistryService {
         try {
           const client = new StremioClient(addon.url);
           let primaryQueryId = stremioId;
-          if (addon.id === 'fenixflix-animes' && type === 'anime' && tmdbNum) {
+          // Para o FenixFlix, o identificador IMDb (tt...) é o padrão universal e canônico para séries/animes,
+          // possuindo alinhamento perfeito de temporadas e episódios absolutos.
+          // O TMDB ID só deve ser a consulta primária se NÃO houver IMDb ID disponível.
+          if (addon.id === 'fenixflix-animes' && type === 'anime' && !imdbStr && tmdbNum) {
             primaryQueryId = episode
               ? `tmdb:${tmdbNum}:${episode.season}:${episode.episode}`
               : `tmdb:${tmdbNum}`;

@@ -376,8 +376,10 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       prefetchSources(item);
     } else {
       const cont = storageService.getPlaybackContinuity(item, totalSeasons, episodes.length);
-      const s = cont.season || currentSeason || 1;
-      const e = cont.episode || 1;
+      const s = (currentSeason && (!cont.hasStarted || currentSeason !== cont.season))
+        ? currentSeason
+        : (cont.season || currentSeason || 1);
+      const e = (s === cont.season && cont.hasStarted) ? (cont.episode || 1) : 1;
       prefetchSources(item, s, e);
     }
   }, [item.id, item.tmdbId, item.imdbId, currentSeason, totalSeasons, episodes.length, isPlaying, prefetchSources]);
@@ -404,10 +406,10 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   // Sincroniza a temporada atual com o progresso do item caso o item mude
   useEffect(() => {
     const cont = storageService.getPlaybackContinuity(item);
-    if (cont.hasStarted && cont.season) {
+    if (cont.hasStarted && cont.season && !initialSeason) {
       setCurrentSeason(cont.season);
     }
-  }, [item.id]);
+  }, [item.id, initialSeason]);
 
   // Abertura segura e estável dos detalhes: metadados já carregados e fontes gerenciadas por prefetchSources
 
@@ -687,8 +689,15 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
         // Clique no botão principal "Assistir" ou "Continuar assistindo":
         // Consulta a continuidade como fonte única da verdade
         const cont = storageService.getPlaybackContinuity(currentTargetItem, totalSeasons, episodes.length);
-        targetSeason = cont.season || currentSeason || 1;
-        targetEpisode = cont.episode || 1;
+        // Se o usuário está navegando em uma temporada específica no modal diferente da continuidade gravada,
+        // ou se ainda não iniciou a reprodução:
+        if (currentSeason && (!cont.hasStarted || currentSeason !== cont.season)) {
+          targetSeason = currentSeason;
+          targetEpisode = 1;
+        } else {
+          targetSeason = cont.hasStarted ? (cont.season || currentSeason || 1) : (currentSeason || 1);
+          targetEpisode = cont.hasStarted ? (cont.episode || 1) : 1;
+        }
       }
 
       epParams = { season: targetSeason, episode: targetEpisode };
