@@ -41,7 +41,7 @@ const TvNavTabButton: React.FC<{
       data-focus-key={focusKey}
       data-tv-focused={focused ? "true" : undefined}
       onClick={onClick}
-      className={`relative py-2 px-2 text-[20px] lg:text-[23px] font-bold tracking-wide transition-all duration-150 outline-none select-none cursor-pointer whitespace-nowrap ${
+      className={`relative py-2 px-2 text-[20px] lg:text-[23px] font-bold tracking-wide transition-all duration-150 outline-none select-none cursor-pointer whitespace-nowrap inline-flex items-center justify-center ${
         focused
           ? 'text-cyan-300 scale-105 drop-shadow-[0_0_14px_rgba(0,229,255,0.7)]'
           : isActive
@@ -49,13 +49,15 @@ const TvNavTabButton: React.FC<{
           : 'text-gray-300/85 hover:text-white'
       }`}
     >
-      <span>{label}</span>
-      {/* Indicador refinado da página atual / foco proporcional ao texto */}
-      {focused ? (
-        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-8 h-[3px] bg-cyan-400 rounded-full shadow-[0_0_10px_#00e5ff] transition-all duration-200" />
-      ) : isActive ? (
-        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-[3px] bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full shadow-[0_0_8px_#00e5ff] transition-all duration-200" />
-      ) : null}
+      <span className="relative inline-block">
+        {label}
+        {/* Indicador refinado da página atual / foco proporcional ao texto, aproximado a 5px */}
+        {focused ? (
+          <span className="absolute top-[calc(100%+5px)] left-1/2 -translate-x-1/2 w-8 h-[3px] bg-cyan-400 rounded-full shadow-[0_0_10px_#00e5ff] transition-all duration-200 pointer-events-none" />
+        ) : isActive ? (
+          <span className="absolute top-[calc(100%+5px)] left-1/2 -translate-x-1/2 w-6 h-[3px] bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full shadow-[0_0_8px_#00e5ff] transition-all duration-200 pointer-events-none" />
+        ) : null}
+      </span>
     </button>
   );
 };

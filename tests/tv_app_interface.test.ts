@@ -120,7 +120,13 @@ async function runTvAppInterfaceTests() {
     tvHeaderCode.includes('text-[22px]') || tvHeaderCode.includes('text-[23px]') || tvHeaderCode.includes('text-[24px]'),
     'TvHeader deve utilizar tipografia ampliada proporcional a Smart TVs 1080p'
   );
-  console.log('✓ Teste 9: Header flutuante livre sem contêiner retangular e elementos ampliados OK');
+  assert(
+    !tvHeaderCode.includes('-bottom-2') &&
+    tvHeaderCode.includes('top-[calc(100%+5px)]') &&
+    tvHeaderCode.includes('left-1/2 -translate-x-1/2'),
+    'TvHeader deve aproximar o indicador da página ativa a 5px do texto, centralizado'
+  );
+  console.log('✓ Teste 9: Header flutuante livre sem contêiner e indicador ativo aproximado a 5px OK');
 
   // Teste 10: Banner no topo absoluto, degradê de legibilidade e blur progressivo
   assert(
