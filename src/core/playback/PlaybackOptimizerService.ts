@@ -191,14 +191,15 @@ export class PlaybackOptimizerService {
     const hwConcurrency = nav.hardwareConcurrency || 4;
     const deviceMemory = nav.deviceMemory || 4;
 
-    const isSmartTv = /smart-tv|tizen|webos|viera|bravia|netcast|crkey|aft|googletv/i.test(ua);
+    const isSmartTv = (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv')) ||
+      /smart-tv|smarttv|tizen|webos|viera|bravia|netcast|crkey|aft|googletv|mediastationx/i.test(ua);
     const isMobile = !isSmartTv && /mobile|android|iphone|ipod/i.test(ua);
     const winScreen = typeof window !== 'undefined' ? window.screen : null;
     const isTablet = !isSmartTv && (/ipad/i.test(ua) || (isMobile && winScreen && Math.min(winScreen.width, winScreen.height) >= 600));
     const isDesktop = !isSmartTv && !isMobile && !isTablet;
 
     const deviceType: DeviceProfile['deviceType'] = isSmartTv ? 'smart-tv' : (isMobile ? 'mobile' : (isTablet ? 'tablet' : 'desktop'));
-    const isLowEnd = hwConcurrency <= 2 || deviceMemory <= 2 || isSmartTv;
+    const isLowEnd = hwConcurrency <= 2 || deviceMemory <= 2;
 
     const screenWidth = typeof window !== 'undefined' ? (window.screen?.width || 1920) : 1920;
     const screenHeight = typeof window !== 'undefined' ? (window.screen?.height || 1080) : 1080;
@@ -250,6 +251,10 @@ export class PlaybackOptimizerService {
       maxBufferLength = 15;
       maxMaxBufferLength = 30;
       maxBufferSize = 15 * 1024 * 1024; // 15 MB
+    } else if (dev.deviceType === 'smart-tv') {
+      maxBufferLength = 30;
+      maxMaxBufferLength = 60;
+      maxBufferSize = 30 * 1024 * 1024;
     } else if (net.downlinkMbps >= 15 && !dev.isLowEnd) {
       // Conexão rápida em desktop: buffer generoso para zero travamentos
       maxBufferLength = 45;
@@ -260,7 +265,7 @@ export class PlaybackOptimizerService {
     return {
       enableWorker: true,
       lowLatencyMode: false, // Desativa baixa latência em VoD para garantir buffer contínuo sem micro-travas
-      backBufferLength: dev.isLowEnd ? 30 : 60,
+      backBufferLength: dev.isLowEnd || dev.deviceType === 'smart-tv' ? 30 : 60,
       maxBufferLength,
       maxMaxBufferLength,
       maxBufferSize,

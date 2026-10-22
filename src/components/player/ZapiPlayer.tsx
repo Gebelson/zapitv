@@ -450,6 +450,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const isSeekingRef = useRef<boolean>(false);
   const selectedHlsAudioTrackRef = useRef<number>(-1);
   const stallTimerRef = useRef<number>(0);
+  const tvBufferingSinceRef = useRef<number>(0);
   const lastPlaybackPositionRef = useRef<number>(0);
   const audioCheckTicksRef = useRef<number>(0);
 
@@ -2674,6 +2675,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     setIsLoading(true);
     setIsMediaReady(false);
     isMediaReadyRef.current = false;
+    tvBufferingSinceRef.current = 0;
 
     const video = videoRef.current;
     if (!video) return;
@@ -2684,6 +2686,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
 
     const videoUrl = currentStream.url;
+    const isTvPlayback = window.location.pathname.startsWith('/tv');
     // FrostStream publishes direct media URLs for clients without a Referer.
     // Its redirect returns 403 for this site's Referer, while the same video
     // plays normally when the browser omits it. Scope the policy to this source.
@@ -2756,6 +2759,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       playbackOptimizerService.notifyLoadStart('hls');
       const optimalConfig = playbackOptimizerService.buildOptimalHlsConfig();
       const hls = new Hls(optimalConfig);
+      let fatalNetworkRecoveries = 0;
+      let fatalMediaRecoveries = 0;
+      let fatalFallbackStarted = false;
 
       hlsRef.current = hls;
       hls.loadSource(videoUrl);
@@ -2834,7 +2840,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       });
 
       hls.on(Hls.Events.FRAG_LOADED, (_, data: any) => {
-        handleMediaBuffered();
+        if (!isTvPlayback) handleMediaBuffered();
         const stats = data.frag?.stats || data.stats;
         if (stats?.loading) {
           const durationMs = stats.loading.end - stats.loading.start;
@@ -2843,11 +2849,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       });
 
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
-        handleMediaBuffered();
+        fatalNetworkRecoveries = 0;
+        if (!isTvPlayback || video.readyState >= 2) handleMediaBuffered();
       });
 
       hls.on(Hls.Events.BUFFER_APPENDED, () => {
-        handleMediaBuffered();
+        if (!isTvPlayback || video.readyState >= 2) handleMediaBuffered();
       });
 
       hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_, data) => {
@@ -2907,12 +2914,23 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
+          if (fatalFallbackStarted) return;
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
+              if (isTvPlayback && ++fatalNetworkRecoveries > 2) {
+                fatalFallbackStarted = true;
+                handleStreamFallbackRef.current('Falha persistente de rede no HLS.');
+                break;
+              }
               console.warn('[ZapiPlayer] Erro de rede transitório no HLS. Tentando reconexão...');
               hls.startLoad();
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
+              if (isTvPlayback && ++fatalMediaRecoveries > 2) {
+                fatalFallbackStarted = true;
+                handleStreamFallbackRef.current('Falha persistente de decodificação no HLS.');
+                break;
+              }
               console.warn('[ZapiPlayer] Erro de mídia no HLS. Executando recuperação automática...');
               hls.recoverMediaError();
               break;
@@ -3129,6 +3147,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   // Loop de monitoramento de saúde de reprodução, ABR dinâmico e recuperação ativa de travamentos (Stall Watchdog)
   useEffect(() => {
+    const isTvPlayback = window.location.pathname.startsWith('/tv');
     const interval = setInterval(() => {
       const video = videoRef.current;
       if (!video) return;
@@ -3145,10 +3164,20 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       // 2. Apenas monitora travamentos se o vídeo estiver em reprodução ativa (não pausado, não em intro, não buscando)
       const isBufferingOrSeeking = isSeeking || isSeekingRef.current || video.seeking || video.readyState < 3 || isLoading;
       if (isBufferingOrSeeking) {
+        if (isTvPlayback && video.readyState < 3 && isPlaying && !isLoading && !isSeeking && !isSeekingRef.current && !isSwitchingAudio && !isPlayingIntro && !video.paused) {
+          if (!tvBufferingSinceRef.current) tvBufferingSinceRef.current = Date.now();
+          if (Date.now() - tvBufferingSinceRef.current >= 20000) {
+            tvBufferingSinceRef.current = Number.POSITIVE_INFINITY;
+            handleStreamFallbackRef.current('Buffer de vídeo não recuperado em 20s na TV.');
+          }
+        } else {
+          tvBufferingSinceRef.current = 0;
+        }
         stallTimerRef.current = 0;
         lastPlaybackPositionRef.current = video.currentTime;
         return;
       }
+      tvBufferingSinceRef.current = 0;
 
       if (isPlaying && !isLoading && !isSwitchingAudio && !isSeeking && !isPlayingIntro) {
         const curPos = video.currentTime;
@@ -3163,7 +3192,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           }
 
           // Aos 3.5s de travamento: tenta recuperação suave (downgrade ABR no HLS ou MP4)
-          if (stallTimerRef.current === 3500) {
+          if (stallTimerRef.current === (isTvPlayback ? 6000 : 3500)) {
             console.warn('[ZapiPlayer] Travamento detectado (>3.5s). Aplicando recuperação suave de ABR...');
             if (hlsRef.current && selectedQuality === 'auto') {
               if (hlsRef.current.currentLevel > 0) {
@@ -3182,13 +3211,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               }
             }
             // Nudge milimétrico para destravar demuxer/decodificador
-            try {
-              video.currentTime = Math.max(0, video.currentTime + 0.02);
-            } catch {}
+            if (!isTvPlayback) {
+              try { video.currentTime = Math.max(0, video.currentTime + 0.02); } catch {}
+            }
           }
 
           // Aos 6s de travamento persistente: executa fallback seguro para fonte alternativa da mesma obra
-          if (stallTimerRef.current >= 6000) {
+          if (stallTimerRef.current >= (isTvPlayback ? 12000 : 6000)) {
             console.warn('[ZapiPlayer] Travamento severo (>6s). Alternando para próxima fonte estável...');
             stallTimerRef.current = 0;
             playbackOptimizerService.recordStallRecovered();

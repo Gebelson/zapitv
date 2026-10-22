@@ -113,6 +113,28 @@ describe('ZapiTV — Playback Optimizer & Network Simulation Benchmarks', () => 
       expect(hlsConfig.enableWorker).toBe(true);
     });
 
+    it('não classifica uma TV capaz como hardware fraco apenas pelo tipo de aparelho', () => {
+      Object.defineProperty(global, 'navigator', {
+        value: {
+          onLine: true,
+          userAgent: 'Mozilla/5.0 (SMART-TV; Tizen)',
+          hardwareConcurrency: 8,
+          deviceMemory: 4,
+          connection: { effectiveType: '4g', downlink: 20, rtt: 40 }
+        },
+        configurable: true,
+        writable: true
+      });
+
+      const dev = playbackOptimizerService.getDeviceProfile();
+      const config = playbackOptimizerService.buildOptimalHlsConfig();
+      expect(dev.deviceType).toBe('smart-tv');
+      expect(dev.isLowEnd).toBe(false);
+      expect(dev.recommendedInitialQuality).toBe('1080p');
+      expect(config.maxBufferLength).toBe(30);
+      expect(config.maxBufferSize).toBe(30 * 1024 * 1024);
+    });
+
     it('deve iniciar no nível mais baixo (360p/480p) em conexões 3G para garantir TTFF rápido', () => {
       Object.defineProperty(global, 'navigator', {
         value: {
