@@ -45,11 +45,8 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return isAuthenticated() && (
-        (request.auth.token.email == "gbrielcerqueira@gmail.com" && request.auth.token.email_verified == true) ||
-        (request.auth.token.email == "graficadfuturo@gmail.com") ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
-      );
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     function isOwner(userId) {
@@ -99,7 +96,11 @@ service cloud.firestore {
     }
 
     match /keyValueStore/{keyId} {
-      allow read: if isAuthenticated();
+      allow get: if isAdmin() || (isAuthenticated() &&
+        (keyId == 'zapitv_mylist_' + request.auth.uid ||
+         keyId == 'zapitv_favorites_' + request.auth.uid ||
+         keyId == 'zapitv_section_titles'));
+      allow list: if isAdmin();
       // Allow users to write to their own myList and favorites, otherwise require admin
       allow write: if isAdmin() || (isAuthenticated() && (keyId == 'zapitv_mylist_' + request.auth.uid || keyId == 'zapitv_favorites_' + request.auth.uid));
     }

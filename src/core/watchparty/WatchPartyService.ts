@@ -54,6 +54,7 @@ export class WatchPartyService {
   private broadcastService: WatchPartyBroadcastService;
   private playbackSyncService: WatchPartyPlaybackSyncService;
   private hostBroadcastStartPromise: Promise<MediaStream> | null = null;
+  private hostToken: string | null = null;
 
   // Listeners de eventos de alto nível
   private listeners: Set<WatchPartyEventListener> = new Set();
@@ -378,6 +379,7 @@ export class WatchPartyService {
   ): Promise<string> {
     const rawId = customRoomId || this.generateSecureRoomId();
     const cleanRoomId = WatchPartyService.sanitizeRoomId(rawId);
+    this.hostToken = null;
 
     this.logDiagnostic('ROOM_CREATE', { roomId: cleanRoomId, host: hostNickname });
 
@@ -398,7 +400,7 @@ export class WatchPartyService {
     await this.connectTransport(cleanRoomId);
 
     // 2. Anuncia sala na API local/servidor
-    this.announceRoomToServer(cleanRoomId, normalizedMedia, transmissionMode, hostNickname);
+    await this.announceRoomToServer(cleanRoomId, normalizedMedia, transmissionMode, hostNickname);
 
     // 3. Inicia rotina de heartbeat
     this.startHeartbeatLoop(cleanRoomId);
@@ -411,6 +413,7 @@ export class WatchPartyService {
   }
 
   public async joinRoom(roomId: string, guestNickname: string = 'Zapi Amigo'): Promise<WatchPartyRoomInfo> {
+    this.hostToken = null;
     const cleanRoomId = WatchPartyService.sanitizeRoomId(roomId);
     if (!cleanRoomId) {
       throw new Error('Código de sala inválido.');
@@ -449,8 +452,13 @@ export class WatchPartyService {
 
     if (this.roomManager.roomInfo) {
       const rid = this.roomManager.roomInfo.roomId;
-      fetch(`/api/watchparty/room/${rid}`, { method: 'DELETE' }).catch(() => {});
+      if (this.isHost() && this.hostToken) {
+        fetch(`/api/watchparty/room/${rid}`, {
+          method: 'DELETE', headers: { Authorization: `Bearer ${this.hostToken}` }
+        }).catch(() => {});
+      }
     }
+    this.hostToken = null;
 
     await this.transport.leaveRoom();
     this.roomManager.closeRoom();
@@ -867,7 +875,7 @@ export class WatchPartyService {
         });
         fetch('/api/watchparty/room/announce', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(this.hostToken ? { Authorization: `Bearer ${this.hostToken}` } : {}) },
           body: JSON.stringify({
             roomId: this.roomManager.roomInfo.roomId,
             hostPeerId: this.selfId,
@@ -1205,7 +1213,7 @@ export class WatchPartyService {
       // 1. Heartbeat via API REST
       fetch(`/api/watchparty/room/${roomId}/heartbeat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(this.isHost() && this.hostToken ? { Authorization: `Bearer ${this.hostToken}` } : {}) },
         body: JSON.stringify({
           peerId: this.selfId,
           nickname: this.currentNickname,
@@ -1251,9 +1259,10 @@ export class WatchPartyService {
     media: WatchPartyMediaMetadata,
     mode: TransmissionMode,
     nickname: string
-  ): void {
-    fetch('/api/watchparty/room/announce', {
+  ): Promise<void> {
+    return fetch('/api/watchparty/room/announce', {
       method: 'POST',
+      signal: AbortSignal.timeout(5000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         roomId,
@@ -1263,6 +1272,11 @@ export class WatchPartyService {
         transmissionMode: mode,
         lifecycleState: 'LOBBY'
       })
+    }).then(async response => {
+      if (response.ok) {
+        const body = await response.json();
+        if (typeof body?.hostToken === 'string') this.hostToken = body.hostToken;
+      }
     }).catch(() => {});
   }
 

@@ -17,6 +17,7 @@ import { resolveValidationTargetUrl } from "./src/core/providers/validationTarge
 import { databaseRouter } from "./src/server/database/routes.ts";
 import { authenticateAdmin } from "./src/server/database/firebaseAuth.ts";
 import { watchPartyRouter } from "./src/server/watchparty/routes.ts";
+import { publicHttpGet } from "./src/server/security/publicHttp.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,6 +54,8 @@ async function requireMaintenanceAdmin(req: express.Request, res: express.Respon
 
 function createApp() {
   const app = express();
+  const activeRequests = new Map<string, number>();
+  const validationWindows = new Map<string, { count: number; expires: number }>();
 
   // Normalização de rotas em ambientes serverless da Vercel (rewrites para /api/index)
   app.use((req, _res, next) => {
@@ -75,6 +78,33 @@ function createApp() {
 
   // Enable JSON parsing
   app.use(express.json());
+  app.use(['/api/proxy', '/api/validate-stream'], (req, res, next) => {
+    const endpoint = req.path;
+    const limit = endpoint === '/api/proxy' ? 128 : 24;
+    const active = activeRequests.get(endpoint) || 0;
+    if (active >= limit) return res.status(503).set('Retry-After', '2').json({ error: 'Capacidade temporariamente ocupada.' });
+    if (endpoint === '/api/validate-stream') {
+      const now = Date.now();
+      const key = req.ip || 'unknown';
+      const window = validationWindows.get(key);
+      const nextWindow = !window || window.expires < now ? { count: 1, expires: now + 60000 } : { count: window.count + 1, expires: window.expires };
+      validationWindows.set(key, nextWindow);
+      if (validationWindows.size > 1000) {
+        for (const [ip, entry] of validationWindows) if (entry.expires < now) validationWindows.delete(ip);
+      }
+      if (nextWindow.count > 600) return res.status(429).set('Retry-After', '60').json({ error: 'Limite temporário de validações excedido.' });
+    }
+    activeRequests.set(endpoint, active + 1);
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      activeRequests.set(endpoint, Math.max(0, (activeRequests.get(endpoint) || 1) - 1));
+    };
+    res.once('finish', release);
+    res.once('close', release);
+    next();
+  });
   app.use('/api/db', databaseRouter);
   app.use('/api/watchparty', watchPartyRouter);
 
@@ -562,8 +592,8 @@ function createApp() {
 
   // CORS Proxy for Stremio Addons and media streams
   app.get("/api/proxy", async (req, res) => {
-    const targetUrl = req.query.url as string;
-    if (!targetUrl) {
+    const targetUrl = req.query.url;
+    if (typeof targetUrl !== 'string' || !targetUrl || targetUrl.length > 4096) {
       return res.status(400).json({ error: "Parâmetro 'url' é obrigatório" });
     }
 
@@ -587,13 +617,16 @@ function createApp() {
 
       // Suporte a referer explícito (ex: streams do MagnetFlix / CDN que exigem domínio de origem)
       const customReferer = (req.query.referer as string) || (req.headers["x-target-referer"] as string);
-      if (customReferer) {
+      if (customReferer && customReferer.length <= 1024 && /^https?:\/\//i.test(customReferer)) {
         headers["Referer"] = customReferer;
       } else if (!targetUrl.includes('cloutteam.com')) {
         headers["Referer"] = parsed.origin;
       }
 
       if (req.headers.range) {
+        if (typeof req.headers.range !== 'string' || !/^bytes=\d*-\d*(?:,\d*-\d*){0,4}$/.test(req.headers.range)) {
+          return res.status(416).json({ error: 'Range inválido' });
+        }
         headers["Range"] = req.headers.range;
       }
 
@@ -609,9 +642,10 @@ function createApp() {
         }
       });
 
-      const response = await fetch(targetUrl, {
+      const response = await publicHttpGet(targetUrl, {
         headers,
-        signal: controller.signal
+        signal: controller.signal,
+        timeoutMs: 25000
       });
       clearTimeout(connectTimer);
 
@@ -646,9 +680,8 @@ function createApp() {
 
       res.status(response.status);
       if (response.body) {
-        const { Readable } = await import("stream");
-        // @ts-ignore
-        const nodeStream = Readable.fromWeb(response.body);
+        const nodeStream = response.body;
+        res.once('close', () => nodeStream.destroy());
         nodeStream.on("error", (streamErr: any) => {
           // Client closed connection or timeout reached - close cleanly without crashing
           try {
@@ -660,15 +693,22 @@ function createApp() {
         res.end();
       }
     } catch (err: any) {
-      res.status(502).json({
-        error: "Falha ao consultar recurso via proxy",
-        details: err?.message || String(err)
-      });
+      if (!res.headersSent) res.status(502).json({ error: "Falha ao consultar recurso via proxy" });
+      else res.end();
     }
   });
 
   // Cache em memória de validação de stream (TTL: 10 minutos)
   const streamValidationServerCache = new Map<string, { result: any; timestamp: number }>();
+  const cacheStreamValidation = (key: string, result: any) => {
+    const now = Date.now();
+    for (const [entryKey, entry] of streamValidationServerCache) {
+      if (now - entry.timestamp >= 10 * 60 * 1000) streamValidationServerCache.delete(entryKey);
+    }
+    if (streamValidationServerCache.has(key)) streamValidationServerCache.delete(key);
+    while (streamValidationServerCache.size >= 256) streamValidationServerCache.delete(streamValidationServerCache.keys().next().value!);
+    streamValidationServerCache.set(key, { result, timestamp: now });
+  };
 
   // Stream & Domain Validation Endpoint (ParkLogic, Expired Domains, 404/5xx, Invalid Manifests)
   app.get("/api/validate-stream", async (req, res) => {
@@ -676,11 +716,11 @@ function createApp() {
     res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "*");
 
-    const targetUrl = req.query.url as string;
+    const targetUrl = req.query.url;
     const targetTitle = (req.query.targetTitle as string) || "";
     const expectedType = (req.query.type as string) || "auto";
 
-    if (!targetUrl) {
+    if (typeof targetUrl !== 'string' || !targetUrl || targetUrl.length > 4096 || typeof targetTitle !== 'string' || targetTitle.length > 256) {
       return res.status(400).json({ valid: false, reason: "Parâmetro 'url' é obrigatório" });
     }
 
@@ -709,7 +749,7 @@ function createApp() {
           ? "Motor Stremio Streaming Server ativo localmente"
           : "Fonte requer motor Stremio Streaming Server ativo na porta 11470"
       };
-      streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+      cacheStreamValidation(cacheKey, result);
       return res.json(result);
     }
 
@@ -723,7 +763,7 @@ function createApp() {
         finalUrl: targetUrl,
         reason: "🚨 Quarentena: Assinatura de conteúdo adulto/trote detectada"
       };
-      streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+      cacheStreamValidation(cacheKey, result);
       return res.json(result);
     }
 
@@ -754,15 +794,14 @@ function createApp() {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 6000);
 
-      const response = await fetch(probeUrl, {
-        method: "GET",
+      const response = await publicHttpGet(probeUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
           "Accept": "*/*",
           "Range": "bytes=0-16384"
         },
-        redirect: "follow",
-        signal: controller.signal
+        signal: controller.signal,
+        timeoutMs: 6000
       });
 
       clearTimeout(timeout);
@@ -796,7 +835,7 @@ function createApp() {
           finalUrl,
           reason: `Fonte aceita provisoriamente (Status HTTP ${status} não impede reprodução no navegador)`
         };
-        streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+        cacheStreamValidation(cacheKey, result);
         return res.json(result);
       }
 
@@ -808,7 +847,7 @@ function createApp() {
           finalUrl,
           reason: `Erro HTTP ${status} retornado pelo servidor`
         };
-        streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+        cacheStreamValidation(cacheKey, result);
         return res.json(result);
       }
 
@@ -878,7 +917,7 @@ function createApp() {
           contentType,
           isManifestValid: true
         };
-        streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+        cacheStreamValidation(cacheKey, result);
         return res.json(result);
       }
 
@@ -891,7 +930,7 @@ function createApp() {
           finalUrl,
           reason: "Resposta HTML recebida. Rejeitado: Apenas transmissões nativas diretas de vídeo (HLS/MP4/WebM) são autorizadas. Players externos com anúncios ou iframes são proibidos."
         };
-        streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+        cacheStreamValidation(cacheKey, result);
         return res.json(result);
       }
 
@@ -903,7 +942,7 @@ function createApp() {
         finalUrl,
         contentType
       };
-      streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+      cacheStreamValidation(cacheKey, result);
       return res.json(result);
     } catch (err: any) {
       return res.json({

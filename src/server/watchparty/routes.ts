@@ -1,5 +1,13 @@
 import { Router } from "express";
 import { getDatabase, Database } from "../database/client";
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+
+const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
+const hasHostAuthority = (room: StoredRoom, authorization: unknown): boolean => {
+  const match = /^Bearer ([a-f0-9]{64})$/i.exec(typeof authorization === 'string' ? authorization : '');
+  if (!room.hostTokenHash || !match) return false;
+  return timingSafeEqual(Buffer.from(room.hostTokenHash, 'hex'), Buffer.from(hashToken(match[1]), 'hex'));
+};
 
 export interface StoredParticipant {
   peerId: string;
@@ -13,6 +21,7 @@ export interface StoredRoom {
   roomId: string;
   hostPeerId: string;
   hostNickname: string;
+  hostTokenHash?: string;
   media: any;
   transmissionMode: string;
   lifecycleState: string;
@@ -92,6 +101,7 @@ async function ensureDbTables(db: Database) {
             room_id TEXT PRIMARY KEY,
             host_peer_id TEXT NOT NULL,
             host_nickname TEXT NOT NULL,
+            host_token_hash TEXT,
             media_json TEXT,
             transmission_mode TEXT NOT NULL DEFAULT 'host_broadcast',
             lifecycle_state TEXT NOT NULL DEFAULT 'LOBBY',
@@ -103,6 +113,10 @@ async function ensureDbTables(db: Database) {
             participants_json TEXT NOT NULL DEFAULT '[]'
           );
         `);
+        const columns = await db.client.execute('PRAGMA table_info(watchparty_rooms)');
+        if (!columns.rows.some(row => row.name === 'host_token_hash')) {
+          await db.client.execute('ALTER TABLE watchparty_rooms ADD COLUMN host_token_hash TEXT');
+        }
         await db.client.execute(`
           CREATE TABLE IF NOT EXISTS watchparty_signals (
             id TEXT PRIMARY KEY,
@@ -134,13 +148,14 @@ async function syncRoomToDb(room: StoredRoom, isClosed = 0) {
     const participantsArr = Array.from(room.participants.values());
     await db.client.execute({
       sql: `INSERT INTO watchparty_rooms (
-        room_id, host_peer_id, host_nickname, media_json, transmission_mode,
+        room_id, host_peer_id, host_nickname, host_token_hash, media_json, transmission_mode,
         lifecycle_state, intro_start_timestamp, intro_duration, created_at,
         updated_at, is_closed, participants_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(room_id) DO UPDATE SET
         host_peer_id = excluded.host_peer_id,
         host_nickname = excluded.host_nickname,
+        host_token_hash = excluded.host_token_hash,
         media_json = excluded.media_json,
         transmission_mode = excluded.transmission_mode,
         lifecycle_state = excluded.lifecycle_state,
@@ -153,6 +168,7 @@ async function syncRoomToDb(room: StoredRoom, isClosed = 0) {
         room.roomId,
         room.hostPeerId,
         room.hostNickname,
+        room.hostTokenHash ?? null,
         room.media ? JSON.stringify(room.media) : null,
         room.transmissionMode || 'host_broadcast',
         room.lifecycleState || 'LOBBY',
@@ -204,6 +220,7 @@ async function fetchRoomFromDb(roomId: string): Promise<{ room?: StoredRoom; isC
       roomId: String(row.room_id),
       hostPeerId: String(row.host_peer_id || ''),
       hostNickname: String(row.host_nickname || 'Anfitrião'),
+      hostTokenHash: row.host_token_hash ? String(row.host_token_hash) : undefined,
       media,
       transmissionMode: String(row.transmission_mode || 'host_broadcast'),
       lifecycleState: String(row.lifecycle_state || 'LOBBY'),
@@ -328,7 +345,7 @@ watchPartyRouter.post('/room/announce', async (req, res) => {
   const rawRoomId = req.body?.roomId;
   const cleanRoomId = sanitizeRoomId(rawRoomId);
 
-  if (!cleanRoomId) {
+  if (!cleanRoomId || cleanRoomId.length > 128) {
     return res.status(400).json({ ok: false, error: 'Código de sala inválido.', code: 'INVALID_ROOM_CODE' });
   }
 
@@ -341,22 +358,30 @@ watchPartyRouter.post('/room/announce', async (req, res) => {
     introStartTimestamp,
     introDuration
   } = req.body || {};
+  if (typeof hostPeerId !== 'string' || !hostPeerId || hostPeerId.length > 128 ||
+      (hostNickname && (typeof hostNickname !== 'string' || hostNickname.length > 100))) {
+    return res.status(400).json({ ok: false, code: 'INVALID_HOST' });
+  }
 
   const now = Date.now();
   let room = activeRooms.get(cleanRoomId);
+  let hostToken: string | undefined;
 
   if (!room) {
     const dbRes = await fetchRoomFromDb(cleanRoomId);
+    if (dbRes?.isClosed) return res.status(409).json({ ok: false, code: 'ROOM_CLOSED' });
     if (dbRes?.room) {
       room = dbRes.room;
     }
   }
 
   if (!room) {
+    hostToken = randomBytes(32).toString('hex');
     room = {
       roomId: cleanRoomId,
       hostPeerId: hostPeerId || '',
       hostNickname: hostNickname || 'Anfitrião',
+      hostTokenHash: hashToken(hostToken),
       media: media || null,
       transmissionMode: transmissionMode || 'host_broadcast',
       lifecycleState: lifecycleState || 'LOBBY',
@@ -367,6 +392,9 @@ watchPartyRouter.post('/room/announce', async (req, res) => {
       participants: new Map()
     };
   } else {
+    if (!hasHostAuthority(room, req.header('authorization'))) {
+      return res.status(403).json({ ok: false, code: 'HOST_AUTH_REQUIRED' });
+    }
     room.updatedAt = now;
     if (hostPeerId) room.hostPeerId = hostPeerId;
     if (hostNickname) room.hostNickname = hostNickname;
@@ -395,6 +423,7 @@ watchPartyRouter.post('/room/announce', async (req, res) => {
 
   res.json({
     ok: true,
+    ...(hostToken ? { hostToken } : {}),
     room: {
       roomId: room.roomId,
       hostPeerId: room.hostPeerId,
@@ -502,9 +531,19 @@ watchPartyRouter.post('/room/:roomId/heartbeat', async (req, res) => {
     });
   }
 
-  const { peerId, nickname, isHost, status } = req.body || {};
+  const { peerId, nickname, status } = req.body || {};
+  if (!peerId || typeof peerId !== 'string' || peerId.length > 128) {
+    return res.status(400).json({ ok: false, code: 'INVALID_PEER' });
+  }
+  const claimedHost = peerId === room.hostPeerId;
+  if (claimedHost && !hasHostAuthority(room, req.header('authorization'))) {
+    return res.status(403).json({ ok: false, code: 'HOST_AUTH_REQUIRED' });
+  }
+  if (!room.participants.has(peerId) && room.participants.size >= 6) {
+    return res.status(403).json({ ok: false, code: 'ROOM_FULL' });
+  }
 
-  if (isHost || peerId === room.hostPeerId) {
+  if (claimedHost) {
     room.updatedAt = now;
   }
 
@@ -512,8 +551,8 @@ watchPartyRouter.post('/room/:roomId/heartbeat', async (req, res) => {
     const existing = room.participants.get(peerId);
     room.participants.set(peerId, {
       peerId,
-      nickname: nickname || existing?.nickname || (isHost ? room.hostNickname : 'Convidado'),
-      isHost: Boolean(isHost || peerId === room.hostPeerId),
+      nickname: nickname || existing?.nickname || (claimedHost ? room.hostNickname : 'Convidado'),
+      isHost: claimedHost,
       status: status || existing?.status || 'ready',
       lastSeen: now
     });
@@ -544,8 +583,22 @@ watchPartyRouter.post('/room/:roomId/signal', async (req, res) => {
 
   const { senderPeerId, targetPeerId, type, data } = req.body || {};
 
-  if (!senderPeerId || !type) {
+  if (typeof senderPeerId !== 'string' || !senderPeerId || senderPeerId.length > 128 ||
+      typeof type !== 'string' || !type || type.length > 64) {
     return res.status(400).json({ ok: false, error: 'senderPeerId e type são obrigatórios.' });
+  }
+
+  let room = activeRooms.get(cleanRoomId);
+  if (!room) {
+    const dbRes = await fetchRoomFromDb(cleanRoomId);
+    if (dbRes?.room && !dbRes.isClosed && !dbRes.isExpired) room = dbRes.room;
+  }
+  if (!room) return res.status(404).json({ ok: false, code: 'ROOM_NOT_FOUND' });
+  if (type === 'join' && !room.participants.has(senderPeerId) && room.participants.size >= 6) {
+    return res.status(403).json({ ok: false, code: 'ROOM_FULL' });
+  }
+  if (senderPeerId === room.hostPeerId && !hasHostAuthority(room, req.header('authorization'))) {
+    return res.status(403).json({ ok: false, code: 'HOST_AUTH_REQUIRED' });
   }
 
   let signals = roomSignals.get(cleanRoomId);
@@ -569,14 +622,7 @@ watchPartyRouter.post('/room/:roomId/signal', async (req, res) => {
   syncSignalToDb(cleanRoomId, sig).catch(() => {});
 
   // Se o sinal for um join, registra/atualiza o participante na sala
-  let room = activeRooms.get(cleanRoomId);
-  if (!room) {
-    const dbRes = await fetchRoomFromDb(cleanRoomId);
-    if (dbRes?.room) {
-      room = dbRes.room;
-      activeRooms.set(cleanRoomId, room);
-    }
-  }
+  activeRooms.set(cleanRoomId, room);
 
   if (room && type === 'join') {
     if (!room.participants.has(senderPeerId) && room.participants.size >= 6) {
@@ -627,15 +673,12 @@ watchPartyRouter.get('/room/:roomId/signals/:peerId', async (req, res) => {
 // 6. Encerrar Sala
 watchPartyRouter.delete('/room/:roomId', async (req, res) => {
   const cleanRoomId = sanitizeRoomId(req.params.roomId);
-  const { peerId } = req.body || req.query || {};
-  const room = activeRooms.get(cleanRoomId);
-
-  if (cleanRoomId && (!peerId || !room || peerId === room.hostPeerId)) {
-    closedRooms.add(cleanRoomId);
-    activeRooms.delete(cleanRoomId);
-    roomSignals.delete(cleanRoomId);
-    await markRoomClosedInDb(cleanRoomId);
-  }
-
-  res.json({ ok: true });
+  const room = activeRooms.get(cleanRoomId) || (await fetchRoomFromDb(cleanRoomId))?.room;
+  if (!room) return res.status(404).json({ ok: false, code: 'ROOM_NOT_FOUND' });
+  if (!hasHostAuthority(room, req.header('authorization'))) return res.status(403).json({ ok: false, code: 'HOST_AUTH_REQUIRED' });
+  closedRooms.add(cleanRoomId);
+  activeRooms.delete(cleanRoomId);
+  roomSignals.delete(cleanRoomId);
+  await markRoomClosedInDb(cleanRoomId);
+  return res.json({ ok: true });
 });

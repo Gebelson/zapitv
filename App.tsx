@@ -79,35 +79,36 @@ const ViewWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </div>
 );
 
+const withoutPlaintextPassword = (user: User): User => {
+  const { password: _password, ...safeUser } = user;
+  return safeUser;
+};
+
 const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const [users, setUsers] = useState<User[]>(() => {
     try {
       let parsedUsers = initialState.users;
       if (!Array.isArray(parsedUsers) || parsedUsers.length === 0) parsedUsers = [];
 
-      // MERGE STRATEGY: 
-      // Garante que os MOCK_USERS essenciais existam e tenham as credenciais mais recentes (senha '123'),
-      // sobrescrevendo dados antigos do localStorage para esses IDs específicos.
-      const mergedUsers = [...parsedUsers];
+      // Mantém perfis legados sem propagar senhas em texto puro.
+      const mergedUsers = (parsedUsers as User[]).map(withoutPlaintextPassword);
       
       MOCK_USERS.forEach(mockUser => {
         const index = mergedUsers.findIndex(u => u.id === mockUser.id);
         if (index !== -1) {
-          // Força a atualização de senha e email para garantir o login
           mergedUsers[index] = { 
             ...mergedUsers[index], 
-            password: mockUser.password, // Garante que a senha é '123'
             email: mockUser.email,       // Garante que o email está correto
             // Mantém perfis se o usuário já os customizou, senão usa o mock
             profiles: (mergedUsers[index].profiles && mergedUsers[index].profiles.length > 0) ? mergedUsers[index].profiles : mockUser.profiles 
           };
         } else {
-          mergedUsers.push(mockUser);
+          mergedUsers.push(withoutPlaintextPassword(mockUser));
         }
       });
       
       return mergedUsers;
-    } catch { return MOCK_USERS; }
+    } catch { return MOCK_USERS.map(withoutPlaintextPassword); }
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => initialState.auth);
@@ -115,10 +116,10 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     const user = initialState.currentUser;
     if (user) {
       const mockUser = MOCK_USERS.find(m => m.id === user.id);
-      return { 
+      return withoutPlaintextPassword({
         ...user, 
         profiles: (user.profiles && user.profiles.length > 0) ? user.profiles : (mockUser?.profiles || [])
-      };
+      });
     }
     return user as User;
   });
@@ -1191,7 +1192,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             unsubscribes.push(onSnapshot(collection(firestoreDb, 'users'), (snapshot) => {
               const newUsers = snapshot.docs.map(doc => {
                 const u = doc.data() as User;
-                return { ...u, profiles: u.profiles || [] };
+                return withoutPlaintextPassword({ ...u, profiles: u.profiles || [] });
               });
               if (newUsers.length > 0) {
                 setUsers(newUsers);
@@ -1217,7 +1218,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             unsubscribes.push(onSnapshot(doc(firestoreDb, 'users', currentUser.id), (snapshot) => {
               if (snapshot.exists()) {
                 let updatedCurrentUser = snapshot.data() as User;
-                updatedCurrentUser = { ...updatedCurrentUser, profiles: updatedCurrentUser.profiles || [] };
+                updatedCurrentUser = withoutPlaintextPassword({ ...updatedCurrentUser, profiles: updatedCurrentUser.profiles || [] });
                 setCurrentUser(updatedCurrentUser);
                 setUsers([updatedCurrentUser]);
                 if (activeProfile) {
@@ -1551,7 +1552,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     try {
       db.keyValueStore.put({ key: 'zapitv_auth', value: isAuthenticated });
       if (isAuthenticated) {
-        db.keyValueStore.put({ key: 'zapitv_current_user', value: currentUser });
+        db.keyValueStore.put({ key: 'zapitv_current_user', value: withoutPlaintextPassword(currentUser) });
         db.keyValueStore.put({ key: 'zapitv_last_email', value: currentUser.email });
       } else {
         db.keyValueStore.delete('zapitv_current_user');
@@ -1595,11 +1596,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         return 'Por favor, informe seu e-mail.';
       }
 
-      const isAdminEmail = cleanEmail === 'admin@zapitv.com' ||
-                           cleanEmail === 'graficadfuturo@gmail.com' ||
-                           cleanEmail === 'gbrielcerqueira@gmail.com' ||
-                           cleanEmail.includes('admin');
-
       // 1. Procurar se já existe usuário na lista local ou mock
       const existingUser = users.find(u => u.email.toLowerCase() === cleanEmail) ||
                            MOCK_USERS.find(u => u.email.toLowerCase() === cleanEmail);
@@ -1611,17 +1607,13 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       try {
         const { signInWithEmailAndPassword } = await import('firebase/auth');
         const { auth, db: firestoreDb } = await import('./firebase');
-        const { doc, getDoc, updateDoc } = await import('firebase/firestore');
+        const { doc, getDoc } = await import('firebase/firestore');
 
         const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, pass);
         firebaseUid = userCredential.user.uid;
         const userDoc = await getDoc(doc(firestoreDb, 'users', userCredential.user.uid));
         if (userDoc.exists()) {
           firestoreUserData = userDoc.data() as User;
-          if (isAdminEmail && firestoreUserData.role !== 'admin') {
-            firestoreUserData.role = 'admin';
-            updateDoc(doc(firestoreDb, 'users', userCredential.user.uid), { role: 'admin' }).catch(() => {});
-          }
         }
       } catch (fbErr) {
         // Firebase não tem este usuário ou senha diferente: permitir login livremente
@@ -1635,18 +1627,16 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
       if (firestoreUserData) {
         targetUser = {
-          ...firestoreUserData,
-          password: pass || firestoreUserData.password,
-          role: isAdminEmail ? 'admin' : (firestoreUserData.role || 'user'),
+          ...withoutPlaintextPassword(firestoreUserData),
+          role: firebaseUid && firestoreUserData.role === 'admin' ? 'admin' : 'user',
           profiles: (firestoreUserData.profiles && firestoreUserData.profiles.length > 0)
             ? firestoreUserData.profiles
             : [{ id: `p-${Date.now()}`, name: firestoreUserData.name || formattedName, avatar: AVATARS[0], isChild: false }]
         };
       } else if (existingUser) {
         targetUser = {
-          ...existingUser,
-          password: pass || existingUser.password,
-          role: isAdminEmail ? 'admin' : (existingUser.role || 'user'),
+          ...withoutPlaintextPassword(existingUser),
+          role: 'user',
           profiles: (existingUser.profiles && existingUser.profiles.length > 0)
             ? existingUser.profiles
             : [{ id: `p-${Date.now()}`, name: existingUser.name || formattedName, avatar: AVATARS[0], isChild: false }]
@@ -1657,8 +1647,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           id: firebaseUid || `user-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           name: formattedName,
           email: trimmedEmail,
-          password: pass,
-          role: isAdminEmail ? 'admin' : 'user',
+          role: 'user',
           devMode: false,
           memberSince: new Date().toLocaleDateString('pt-BR'),
           plan: 'Premium 4K',
@@ -1677,7 +1666,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         try {
           const { db: firestoreDb } = await import('./firebase');
           const { doc, setDoc } = await import('firebase/firestore');
-          await setDoc(doc(firestoreDb, 'users', targetUser.id), targetUser);
+          await setDoc(doc(firestoreDb, 'users', targetUser.id), withoutPlaintextPassword(targetUser));
         } catch (e) {
           console.warn('Não foi possível persistir no Firestore, continuando local:', e);
         }
@@ -1696,7 +1685,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
       // Gravar persistência local
       await db.keyValueStore.put({ key: 'zapitv_mock_auth', value: true });
-      await db.keyValueStore.put({ key: 'zapitv_mock_user', value: targetUser });
+      await db.keyValueStore.put({ key: 'zapitv_mock_user', value: withoutPlaintextPassword(targetUser) });
       await db.keyValueStore.put({ key: 'zapitv_last_email', value: trimmedEmail });
 
       setCurrentUser(targetUser);
@@ -1710,8 +1699,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         id: `user-${Date.now()}`,
         name: fallbackName,
         email: (email || 'usuario@zapitv.com').trim(),
-        password: pass,
-        role: email?.toLowerCase().includes('admin') ? 'admin' : 'user',
+        role: 'user',
         devMode: false,
         memberSince: new Date().toLocaleDateString('pt-BR'),
         plan: 'Premium 4K',
@@ -1728,10 +1716,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const handleSignup = useCallback(async (name: string, email: string, pass: string, plan: string) => {
     const trimmedEmail = email.trim();
     const cleanEmail = trimmedEmail.toLowerCase();
-    const isAdminEmail = cleanEmail === 'graficadfuturo@gmail.com' || 
-                         cleanEmail === 'gbrielcerqueira@gmail.com' || 
-                         cleanEmail === 'admin@zapitv.com' ||
-                         cleanEmail.includes('admin');
     try {
       let uid = `user-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
       try {
@@ -1747,8 +1731,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         id: uid,
         name: name || trimmedEmail.split('@')[0] || 'Usuário',
         email: trimmedEmail,
-        password: pass,
-        role: isAdminEmail ? 'admin' : 'user',
+        role: 'user',
         devMode: false,
         memberSince: new Date().toLocaleDateString('pt-BR'),
         plan: plan,
@@ -1759,13 +1742,13 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       try {
         const { db: firestoreDb } = await import('./firebase');
         const { doc, setDoc } = await import('firebase/firestore');
-        await setDoc(doc(firestoreDb, 'users', uid), newUser);
+        await setDoc(doc(firestoreDb, 'users', uid), withoutPlaintextPassword(newUser));
       } catch (err) {
         console.warn("Could not save to firestore:", err);
       }
       
       await db.keyValueStore.put({ key: 'zapitv_mock_auth', value: true });
-      await db.keyValueStore.put({ key: 'zapitv_mock_user', value: newUser });
+      await db.keyValueStore.put({ key: 'zapitv_mock_user', value: withoutPlaintextPassword(newUser) });
       await db.keyValueStore.put({ key: 'zapitv_last_email', value: trimmedEmail });
 
       setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), newUser]);
@@ -1845,10 +1828,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     try {
       const { doc, setDoc } = await import('firebase/firestore');
       const { db: firestoreDb } = await import('./firebase');
-      await setDoc(doc(firestoreDb, 'users', updatedUser.id), updatedUser);
-      setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+      const safeUser = withoutPlaintextPassword(updatedUser);
+      await setDoc(doc(firestoreDb, 'users', safeUser.id), safeUser);
+      setUsers(prev => prev.map(u => u.id === safeUser.id ? safeUser : u));
       if (currentUser.id === updatedUser.id) {
-        setCurrentUser(updatedUser);
+        setCurrentUser(safeUser);
         if (activeProfile) {
           const matchingProfile = updatedUser.profiles.find(p => p.id === activeProfile.id);
           if (matchingProfile) setActiveProfile(matchingProfile);
@@ -2554,14 +2538,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             console.error("Error deleting user:", error);
           }
         }} onUpdateUser={async (user) => {
-          try {
-            const { doc, setDoc } = await import('firebase/firestore');
-            const { db: firestoreDb } = await import('./firebase');
-            await setDoc(doc(firestoreDb, 'users', user.id), user);
-            updateUser(user);
-          } catch (error) {
-            console.error("Error updating user:", error);
-          }
+          await updateUser(user);
         }} content={content} onAddContent={handleAddContent} onUpdateContent={handleUpdateContent} onDeleteContent={async (id) => {
           try {
             const { doc, deleteDoc } = await import('firebase/firestore');
