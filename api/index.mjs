@@ -10435,13 +10435,13 @@ var init_PlaybackOptimizerService = __esm({
         const ua = (nav.userAgent || "").toLowerCase();
         const hwConcurrency = nav.hardwareConcurrency || 4;
         const deviceMemory = nav.deviceMemory || 4;
-        const isSmartTv = /smart-tv|tizen|webos|viera|bravia|netcast|crkey|aft|googletv/i.test(ua);
+        const isSmartTv = typeof window !== "undefined" && window.location.pathname.startsWith("/tv") || /smart-tv|smarttv|tizen|webos|viera|bravia|netcast|crkey|aft|googletv|mediastationx/i.test(ua);
         const isMobile = !isSmartTv && /mobile|android|iphone|ipod/i.test(ua);
         const winScreen = typeof window !== "undefined" ? window.screen : null;
         const isTablet = !isSmartTv && (/ipad/i.test(ua) || isMobile && winScreen && Math.min(winScreen.width, winScreen.height) >= 600);
         const isDesktop = !isSmartTv && !isMobile && !isTablet;
         const deviceType = isSmartTv ? "smart-tv" : isMobile ? "mobile" : isTablet ? "tablet" : "desktop";
-        const isLowEnd = hwConcurrency <= 2 || deviceMemory <= 2 || isSmartTv;
+        const isLowEnd = hwConcurrency <= 2 || deviceMemory <= 2;
         const screenWidth = typeof window !== "undefined" ? window.screen?.width || 1920 : 1920;
         const screenHeight = typeof window !== "undefined" ? window.screen?.height || 1080 : 1080;
         const maxDimension = Math.max(screenWidth, screenHeight);
@@ -10484,6 +10484,10 @@ var init_PlaybackOptimizerService = __esm({
           maxBufferLength = 15;
           maxMaxBufferLength = 30;
           maxBufferSize = 15 * 1024 * 1024;
+        } else if (dev.deviceType === "smart-tv") {
+          maxBufferLength = 30;
+          maxMaxBufferLength = 60;
+          maxBufferSize = 30 * 1024 * 1024;
         } else if (net.downlinkMbps >= 15 && !dev.isLowEnd) {
           maxBufferLength = 45;
           maxMaxBufferLength = 90;
@@ -10493,7 +10497,7 @@ var init_PlaybackOptimizerService = __esm({
           enableWorker: true,
           lowLatencyMode: false,
           // Desativa baixa latência em VoD para garantir buffer contínuo sem micro-travas
-          backBufferLength: dev.isLowEnd ? 30 : 60,
+          backBufferLength: dev.isLowEnd || dev.deviceType === "smart-tv" ? 30 : 60,
           maxBufferLength,
           maxMaxBufferLength,
           maxBufferSize,
@@ -20080,6 +20084,13 @@ databaseRouter.put("/global-settings/section-titles", async (req, res) => {
 
 // src/server/watchparty/routes.ts
 import { Router as Router2 } from "express";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+var hashToken = (token) => createHash("sha256").update(token).digest("hex");
+var hasHostAuthority = (room, authorization) => {
+  const match = /^Bearer ([a-f0-9]{64})$/i.exec(typeof authorization === "string" ? authorization : "");
+  if (!room.hostTokenHash || !match) return false;
+  return timingSafeEqual(Buffer.from(room.hostTokenHash, "hex"), Buffer.from(hashToken(match[1]), "hex"));
+};
 function sanitizeRoomId(raw) {
   if (!raw || typeof raw !== "string") return "";
   let str = raw.trim();
@@ -20125,6 +20136,7 @@ async function ensureDbTables(db) {
             room_id TEXT PRIMARY KEY,
             host_peer_id TEXT NOT NULL,
             host_nickname TEXT NOT NULL,
+            host_token_hash TEXT,
             media_json TEXT,
             transmission_mode TEXT NOT NULL DEFAULT 'host_broadcast',
             lifecycle_state TEXT NOT NULL DEFAULT 'LOBBY',
@@ -20136,6 +20148,10 @@ async function ensureDbTables(db) {
             participants_json TEXT NOT NULL DEFAULT '[]'
           );
         `);
+        const columns = await db.client.execute("PRAGMA table_info(watchparty_rooms)");
+        if (!columns.rows.some((row) => row.name === "host_token_hash")) {
+          await db.client.execute("ALTER TABLE watchparty_rooms ADD COLUMN host_token_hash TEXT");
+        }
         await db.client.execute(`
           CREATE TABLE IF NOT EXISTS watchparty_signals (
             id TEXT PRIMARY KEY,
@@ -20166,13 +20182,14 @@ async function syncRoomToDb(room, isClosed = 0) {
     const participantsArr = Array.from(room.participants.values());
     await db.client.execute({
       sql: `INSERT INTO watchparty_rooms (
-        room_id, host_peer_id, host_nickname, media_json, transmission_mode,
+        room_id, host_peer_id, host_nickname, host_token_hash, media_json, transmission_mode,
         lifecycle_state, intro_start_timestamp, intro_duration, created_at,
         updated_at, is_closed, participants_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(room_id) DO UPDATE SET
         host_peer_id = excluded.host_peer_id,
         host_nickname = excluded.host_nickname,
+        host_token_hash = excluded.host_token_hash,
         media_json = excluded.media_json,
         transmission_mode = excluded.transmission_mode,
         lifecycle_state = excluded.lifecycle_state,
@@ -20185,6 +20202,7 @@ async function syncRoomToDb(room, isClosed = 0) {
         room.roomId,
         room.hostPeerId,
         room.hostNickname,
+        room.hostTokenHash ?? null,
         room.media ? JSON.stringify(room.media) : null,
         room.transmissionMode || "host_broadcast",
         room.lifecycleState || "LOBBY",
@@ -20237,6 +20255,7 @@ async function fetchRoomFromDb(roomId) {
       roomId: String(row.room_id),
       hostPeerId: String(row.host_peer_id || ""),
       hostNickname: String(row.host_nickname || "Anfitri\xE3o"),
+      hostTokenHash: row.host_token_hash ? String(row.host_token_hash) : void 0,
       media: media2,
       transmissionMode: String(row.transmission_mode || "host_broadcast"),
       lifecycleState: String(row.lifecycle_state || "LOBBY"),
@@ -20347,7 +20366,7 @@ watchPartyRouter.post("/room/announce", async (req, res) => {
   pruneStaleState();
   const rawRoomId = req.body?.roomId;
   const cleanRoomId = sanitizeRoomId(rawRoomId);
-  if (!cleanRoomId) {
+  if (!cleanRoomId || cleanRoomId.length > 128) {
     return res.status(400).json({ ok: false, error: "C\xF3digo de sala inv\xE1lido.", code: "INVALID_ROOM_CODE" });
   }
   const {
@@ -20359,19 +20378,26 @@ watchPartyRouter.post("/room/announce", async (req, res) => {
     introStartTimestamp,
     introDuration
   } = req.body || {};
+  if (typeof hostPeerId !== "string" || !hostPeerId || hostPeerId.length > 128 || hostNickname && (typeof hostNickname !== "string" || hostNickname.length > 100)) {
+    return res.status(400).json({ ok: false, code: "INVALID_HOST" });
+  }
   const now = Date.now();
   let room = activeRooms.get(cleanRoomId);
+  let hostToken;
   if (!room) {
     const dbRes = await fetchRoomFromDb(cleanRoomId);
+    if (dbRes?.isClosed) return res.status(409).json({ ok: false, code: "ROOM_CLOSED" });
     if (dbRes?.room) {
       room = dbRes.room;
     }
   }
   if (!room) {
+    hostToken = randomBytes(32).toString("hex");
     room = {
       roomId: cleanRoomId,
       hostPeerId: hostPeerId || "",
       hostNickname: hostNickname || "Anfitri\xE3o",
+      hostTokenHash: hashToken(hostToken),
       media: media2 || null,
       transmissionMode: transmissionMode || "host_broadcast",
       lifecycleState: lifecycleState || "LOBBY",
@@ -20382,6 +20408,9 @@ watchPartyRouter.post("/room/announce", async (req, res) => {
       participants: /* @__PURE__ */ new Map()
     };
   } else {
+    if (!hasHostAuthority(room, req.header("authorization"))) {
+      return res.status(403).json({ ok: false, code: "HOST_AUTH_REQUIRED" });
+    }
     room.updatedAt = now;
     if (hostPeerId) room.hostPeerId = hostPeerId;
     if (hostNickname) room.hostNickname = hostNickname;
@@ -20405,6 +20434,7 @@ watchPartyRouter.post("/room/announce", async (req, res) => {
   await syncRoomToDb(room, 0);
   res.json({
     ok: true,
+    ...hostToken ? { hostToken } : {},
     room: {
       roomId: room.roomId,
       hostPeerId: room.hostPeerId,
@@ -20497,16 +20527,26 @@ watchPartyRouter.post("/room/:roomId/heartbeat", async (req, res) => {
       code: "ROOM_NOT_FOUND"
     });
   }
-  const { peerId, nickname, isHost, status } = req.body || {};
-  if (isHost || peerId === room.hostPeerId) {
+  const { peerId, nickname, status } = req.body || {};
+  if (!peerId || typeof peerId !== "string" || peerId.length > 128) {
+    return res.status(400).json({ ok: false, code: "INVALID_PEER" });
+  }
+  const claimedHost = peerId === room.hostPeerId;
+  if (claimedHost && !hasHostAuthority(room, req.header("authorization"))) {
+    return res.status(403).json({ ok: false, code: "HOST_AUTH_REQUIRED" });
+  }
+  if (!room.participants.has(peerId) && room.participants.size >= 6) {
+    return res.status(403).json({ ok: false, code: "ROOM_FULL" });
+  }
+  if (claimedHost) {
     room.updatedAt = now;
   }
   if (peerId) {
     const existing = room.participants.get(peerId);
     room.participants.set(peerId, {
       peerId,
-      nickname: nickname || existing?.nickname || (isHost ? room.hostNickname : "Convidado"),
-      isHost: Boolean(isHost || peerId === room.hostPeerId),
+      nickname: nickname || existing?.nickname || (claimedHost ? room.hostNickname : "Convidado"),
+      isHost: claimedHost,
       status: status || existing?.status || "ready",
       lastSeen: now
     });
@@ -20532,8 +20572,20 @@ watchPartyRouter.post("/room/:roomId/signal", async (req, res) => {
     return res.status(400).json({ ok: false, error: "C\xF3digo de sala inv\xE1lido.", code: "INVALID_ROOM_CODE" });
   }
   const { senderPeerId, targetPeerId, type, data } = req.body || {};
-  if (!senderPeerId || !type) {
+  if (typeof senderPeerId !== "string" || !senderPeerId || senderPeerId.length > 128 || typeof type !== "string" || !type || type.length > 64) {
     return res.status(400).json({ ok: false, error: "senderPeerId e type s\xE3o obrigat\xF3rios." });
+  }
+  let room = activeRooms.get(cleanRoomId);
+  if (!room) {
+    const dbRes = await fetchRoomFromDb(cleanRoomId);
+    if (dbRes?.room && !dbRes.isClosed && !dbRes.isExpired) room = dbRes.room;
+  }
+  if (!room) return res.status(404).json({ ok: false, code: "ROOM_NOT_FOUND" });
+  if (type === "join" && !room.participants.has(senderPeerId) && room.participants.size >= 6) {
+    return res.status(403).json({ ok: false, code: "ROOM_FULL" });
+  }
+  if (senderPeerId === room.hostPeerId && !hasHostAuthority(room, req.header("authorization"))) {
+    return res.status(403).json({ ok: false, code: "HOST_AUTH_REQUIRED" });
   }
   let signals = roomSignals.get(cleanRoomId);
   if (!signals) {
@@ -20552,14 +20604,7 @@ watchPartyRouter.post("/room/:roomId/signal", async (req, res) => {
   if (signals.length > 100) signals.shift();
   syncSignalToDb(cleanRoomId, sig).catch(() => {
   });
-  let room = activeRooms.get(cleanRoomId);
-  if (!room) {
-    const dbRes = await fetchRoomFromDb(cleanRoomId);
-    if (dbRes?.room) {
-      room = dbRes.room;
-      activeRooms.set(cleanRoomId, room);
-    }
-  }
+  activeRooms.set(cleanRoomId, room);
   if (room && type === "join") {
     if (!room.participants.has(senderPeerId) && room.participants.size >= 6) {
       return res.status(403).json({ ok: false, error: "A sala atingiu o limite m\xE1ximo de 6 participantes.", code: "ROOM_FULL" });
@@ -20600,16 +20645,98 @@ watchPartyRouter.get("/room/:roomId/signals/:peerId", async (req, res) => {
 });
 watchPartyRouter.delete("/room/:roomId", async (req, res) => {
   const cleanRoomId = sanitizeRoomId(req.params.roomId);
-  const { peerId } = req.body || req.query || {};
-  const room = activeRooms.get(cleanRoomId);
-  if (cleanRoomId && (!peerId || !room || peerId === room.hostPeerId)) {
-    closedRooms.add(cleanRoomId);
-    activeRooms.delete(cleanRoomId);
-    roomSignals.delete(cleanRoomId);
-    await markRoomClosedInDb(cleanRoomId);
-  }
-  res.json({ ok: true });
+  const room = activeRooms.get(cleanRoomId) || (await fetchRoomFromDb(cleanRoomId))?.room;
+  if (!room) return res.status(404).json({ ok: false, code: "ROOM_NOT_FOUND" });
+  if (!hasHostAuthority(room, req.header("authorization"))) return res.status(403).json({ ok: false, code: "HOST_AUTH_REQUIRED" });
+  closedRooms.add(cleanRoomId);
+  activeRooms.delete(cleanRoomId);
+  roomSignals.delete(cleanRoomId);
+  await markRoomClosedInDb(cleanRoomId);
+  return res.json({ ok: true });
 });
+
+// src/server/security/publicHttp.ts
+import { lookup } from "node:dns/promises";
+import http from "node:http";
+import https from "node:https";
+import { isIP } from "node:net";
+function isPublicIp(raw) {
+  const ip = raw.replace(/^\[|\]$/g, "").toLowerCase();
+  if (isIP(ip) === 4) {
+    const [a, b, c] = ip.split(".").map(Number);
+    return !(a === 0 || a === 10 || a === 127 || a >= 224 || a === 100 && b >= 64 && b <= 127 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && (b === 0 || b === 168 || b === 88 && c === 99) || a === 198 && (b === 18 || b === 19 || b === 51 && c === 100) || a === 203 && b === 0 && c === 113);
+  }
+  if (isIP(ip) === 6) {
+    if (ip.startsWith("::ffff:")) return false;
+    return /^(2|3)[0-9a-f]{3}:/.test(ip) && !ip.startsWith("2001:db8:") && !ip.startsWith("2001:0:") && !ip.startsWith("2002:");
+  }
+  return false;
+}
+async function resolvePublicTarget(raw) {
+  if (raw.length > 4096) throw new Error("URL inv\xE1lida");
+  const url = new URL(raw);
+  const host = url.hostname.replace(/^\[|\]$/g, "").replace(/\.$/, "").toLowerCase();
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || !host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host === "metadata.google.internal") throw new Error("Destino n\xE3o permitido");
+  const addresses = isIP(host) ? [{ address: host, family: isIP(host) }] : await lookup(host, { all: true, verbatim: true });
+  if (!addresses.length || addresses.some((entry) => !isPublicIp(entry.address))) throw new Error("Destino n\xE3o permitido");
+  return { url, ...addresses[0] };
+}
+async function publicHttpGet(raw, options = {}) {
+  let current = raw;
+  for (let redirects = 0; redirects <= 3; redirects++) {
+    const { url, address, family } = await resolvePublicTarget(current);
+    const response = await new Promise((resolve, reject) => {
+      const request = (url.protocol === "https:" ? https : http).request(url, {
+        method: "GET",
+        headers: options.headers,
+        lookup: (_host, _opts, callback) => callback(null, address, family),
+        signal: options.signal,
+        timeout: options.timeoutMs ?? 12e3
+      }, resolve);
+      request.on("timeout", () => request.destroy(new Error("Tempo limite de origem")));
+      request.on("error", reject);
+      request.end();
+    });
+    if ([301, 302, 303, 307, 308].includes(response.statusCode || 0) && response.headers.location) {
+      response.destroy();
+      if (redirects === 3) throw new Error("Redirecionamentos em excesso");
+      current = new URL(response.headers.location, url).href;
+      continue;
+    }
+    const headers = new Headers();
+    for (const [name, value] of Object.entries(response.headers)) {
+      if (typeof value === "string") headers.set(name, value);
+    }
+    const readLimited = async (limit, truncate = false) => {
+      const chunks = [];
+      let size = 0;
+      for await (const chunk of response) {
+        if (size + chunk.length > limit) {
+          if (truncate) {
+            chunks.push(chunk.subarray(0, limit - size));
+            response.destroy();
+            return Buffer.concat(chunks);
+          }
+          response.destroy();
+          throw new Error("Resposta excede o limite permitido");
+        }
+        size += chunk.length;
+        chunks.push(chunk);
+      }
+      return Buffer.concat(chunks);
+    };
+    return {
+      status: response.statusCode || 502,
+      ok: (response.statusCode || 502) >= 200 && (response.statusCode || 502) < 300,
+      headers,
+      url: url.href,
+      body: response,
+      text: async () => (await readLimited(1024 * 1024)).toString("utf8"),
+      arrayBuffer: async () => readLimited(64 * 1024, true)
+    };
+  }
+  throw new Error("Redirecionamentos em excesso");
+}
 
 // server.ts
 var __filename = fileURLToPath(import.meta.url);
@@ -20641,6 +20768,8 @@ async function requireMaintenanceAdmin(req, res, next) {
 }
 function createApp() {
   const app2 = express();
+  const activeRequests = /* @__PURE__ */ new Map();
+  const validationWindows = /* @__PURE__ */ new Map();
   app2.use((req, _res, next) => {
     if (req.url && req.url.startsWith("/api/index")) {
       const queryIdx = req.url.indexOf("?");
@@ -20658,6 +20787,33 @@ function createApp() {
     next();
   });
   app2.use(express.json());
+  app2.use(["/api/proxy", "/api/validate-stream"], (req, res, next) => {
+    const endpoint = req.path;
+    const limit = endpoint === "/api/proxy" ? 128 : 24;
+    const active = activeRequests.get(endpoint) || 0;
+    if (active >= limit) return res.status(503).set("Retry-After", "2").json({ error: "Capacidade temporariamente ocupada." });
+    if (endpoint === "/api/validate-stream") {
+      const now = Date.now();
+      const key = req.ip || "unknown";
+      const window2 = validationWindows.get(key);
+      const nextWindow = !window2 || window2.expires < now ? { count: 1, expires: now + 6e4 } : { count: window2.count + 1, expires: window2.expires };
+      validationWindows.set(key, nextWindow);
+      if (validationWindows.size > 1e3) {
+        for (const [ip, entry] of validationWindows) if (entry.expires < now) validationWindows.delete(ip);
+      }
+      if (nextWindow.count > 600) return res.status(429).set("Retry-After", "60").json({ error: "Limite tempor\xE1rio de valida\xE7\xF5es excedido." });
+    }
+    activeRequests.set(endpoint, active + 1);
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      activeRequests.set(endpoint, Math.max(0, (activeRequests.get(endpoint) || 1) - 1));
+    };
+    res.once("finish", release);
+    res.once("close", release);
+    next();
+  });
   app2.use("/api/db", databaseRouter);
   app2.use("/api/watchparty", watchPartyRouter);
   function resolveOpenItemStreams(rawId, seasonNum = 1, episodeNum = 1) {
@@ -21078,7 +21234,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
   });
   app2.get("/api/proxy", async (req, res) => {
     const targetUrl = req.query.url;
-    if (!targetUrl) {
+    if (typeof targetUrl !== "string" || !targetUrl || targetUrl.length > 4096) {
       return res.status(400).json({ error: "Par\xE2metro 'url' \xE9 obrigat\xF3rio" });
     }
     try {
@@ -21095,12 +21251,15 @@ ${s.name?.split("\n")[1] || "1080p"}`,
         "Accept-Language": req.headers["accept-language"] || "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
       };
       const customReferer = req.query.referer || req.headers["x-target-referer"];
-      if (customReferer) {
+      if (customReferer && customReferer.length <= 1024 && /^https?:\/\//i.test(customReferer)) {
         headers["Referer"] = customReferer;
       } else if (!targetUrl.includes("cloutteam.com")) {
         headers["Referer"] = parsed.origin;
       }
       if (req.headers.range) {
+        if (typeof req.headers.range !== "string" || !/^bytes=\d*-\d*(?:,\d*-\d*){0,4}$/.test(req.headers.range)) {
+          return res.status(416).json({ error: "Range inv\xE1lido" });
+        }
         headers["Range"] = req.headers.range;
       }
       const controller = new AbortController();
@@ -21118,9 +21277,10 @@ ${s.name?.split("\n")[1] || "1080p"}`,
           }
         }
       });
-      const response = await fetch(targetUrl, {
+      const response = await publicHttpGet(targetUrl, {
         headers,
-        signal: controller.signal
+        signal: controller.signal,
+        timeoutMs: 25e3
       });
       clearTimeout(connectTimer);
       const responseType = response.headers.get("content-type") || "";
@@ -21149,8 +21309,8 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       if (contentLength) res.setHeader("Content-Length", contentLength);
       res.status(response.status);
       if (response.body) {
-        const { Readable } = await import("stream");
-        const nodeStream = Readable.fromWeb(response.body);
+        const nodeStream = response.body;
+        res.once("close", () => nodeStream.destroy());
         nodeStream.on("error", (streamErr) => {
           try {
             if (!res.writableEnded) res.end();
@@ -21162,13 +21322,20 @@ ${s.name?.split("\n")[1] || "1080p"}`,
         res.end();
       }
     } catch (err) {
-      res.status(502).json({
-        error: "Falha ao consultar recurso via proxy",
-        details: err?.message || String(err)
-      });
+      if (!res.headersSent) res.status(502).json({ error: "Falha ao consultar recurso via proxy" });
+      else res.end();
     }
   });
   const streamValidationServerCache = /* @__PURE__ */ new Map();
+  const cacheStreamValidation = (key, result) => {
+    const now = Date.now();
+    for (const [entryKey, entry] of streamValidationServerCache) {
+      if (now - entry.timestamp >= 10 * 60 * 1e3) streamValidationServerCache.delete(entryKey);
+    }
+    if (streamValidationServerCache.has(key)) streamValidationServerCache.delete(key);
+    while (streamValidationServerCache.size >= 256) streamValidationServerCache.delete(streamValidationServerCache.keys().next().value);
+    streamValidationServerCache.set(key, { result, timestamp: now });
+  };
   app2.get("/api/validate-stream", async (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
@@ -21176,7 +21343,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     const targetUrl = req.query.url;
     const targetTitle = req.query.targetTitle || "";
     const expectedType = req.query.type || "auto";
-    if (!targetUrl) {
+    if (typeof targetUrl !== "string" || !targetUrl || targetUrl.length > 4096 || typeof targetTitle !== "string" || targetTitle.length > 256) {
       return res.status(400).json({ valid: false, reason: "Par\xE2metro 'url' \xE9 obrigat\xF3rio" });
     }
     const cacheKey = `${targetUrl}_${expectedType}_${targetTitle}`;
@@ -21199,7 +21366,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
         finalUrl: targetUrl,
         reason: isEngineOnline ? "Motor Stremio Streaming Server ativo localmente" : "Fonte requer motor Stremio Streaming Server ativo na porta 11470"
       };
-      streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+      cacheStreamValidation(cacheKey, result);
       return res.json(result);
     }
     const lowerTarget = `${probeUrl} ${targetTitle}`.toLowerCase().replace(/[-_./+]/g, " ");
@@ -21212,7 +21379,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
         finalUrl: targetUrl,
         reason: "\u{1F6A8} Quarentena: Assinatura de conte\xFAdo adulto/trote detectada"
       };
-      streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+      cacheStreamValidation(cacheKey, result);
       return res.json(result);
     }
     try {
@@ -21238,15 +21405,14 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       }
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 6e3);
-      const response = await fetch(probeUrl, {
-        method: "GET",
+      const response = await publicHttpGet(probeUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
           "Accept": "*/*",
           "Range": "bytes=0-16384"
         },
-        redirect: "follow",
-        signal: controller.signal
+        signal: controller.signal,
+        timeoutMs: 6e3
       });
       clearTimeout(timeout);
       const finalUrl = response.url || targetUrl;
@@ -21272,7 +21438,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
           finalUrl,
           reason: `Fonte aceita provisoriamente (Status HTTP ${status} n\xE3o impede reprodu\xE7\xE3o no navegador)`
         };
-        streamValidationServerCache.set(cacheKey, { result: result2, timestamp: Date.now() });
+        cacheStreamValidation(cacheKey, result2);
         return res.json(result2);
       }
       if (status >= 400 && status !== 416) {
@@ -21283,7 +21449,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
           finalUrl,
           reason: `Erro HTTP ${status} retornado pelo servidor`
         };
-        streamValidationServerCache.set(cacheKey, { result: result2, timestamp: Date.now() });
+        cacheStreamValidation(cacheKey, result2);
         return res.json(result2);
       }
       const buffer = await response.arrayBuffer();
@@ -21345,7 +21511,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
           contentType,
           isManifestValid: true
         };
-        streamValidationServerCache.set(cacheKey, { result: result2, timestamp: Date.now() });
+        cacheStreamValidation(cacheKey, result2);
         return res.json(result2);
       }
       if (contentType.includes("text/html")) {
@@ -21356,7 +21522,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
           finalUrl,
           reason: "Resposta HTML recebida. Rejeitado: Apenas transmiss\xF5es nativas diretas de v\xEDdeo (HLS/MP4/WebM) s\xE3o autorizadas. Players externos com an\xFAncios ou iframes s\xE3o proibidos."
         };
-        streamValidationServerCache.set(cacheKey, { result: result2, timestamp: Date.now() });
+        cacheStreamValidation(cacheKey, result2);
         return res.json(result2);
       }
       const result = {
@@ -21366,7 +21532,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
         finalUrl,
         contentType
       };
-      streamValidationServerCache.set(cacheKey, { result, timestamp: Date.now() });
+      cacheStreamValidation(cacheKey, result);
       return res.json(result);
     } catch (err) {
       return res.json({

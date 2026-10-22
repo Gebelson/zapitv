@@ -86,6 +86,12 @@ async function runEpisodeResolutionSuite() {
   assert(evalS2.confidence !== 'REJECTED' && evalS2.isMatch, 'SourceConfidenceEngine deve validar stream legítimo da T2');
   console.log('✓ SourceConfidenceEngine validou stream legítimo da T2 com sucesso');
 
+  // Fontes externas mudam independentemente do código e são verificadas em uma execução separada.
+  if (!process.argv.includes('--live')) {
+    console.log('Consultas a addons externos: não executadas nesta suíte determinística.');
+    process.exit(0);
+  }
+
   // Teste 3: Auditoria dos Episódios de Clevatess
   console.log('\n[Teste 3] Resolução e Verificação dos Episódios de Clevatess...');
   const clevatessItem = {
@@ -116,7 +122,7 @@ async function runEpisodeResolutionSuite() {
       const topTitle = topStream.title?.replace(/\n/g, ' ') || '';
       const topUrl = topStream.url || '';
       console.log(`  -> Top Stream: ${topTitle}`);
-      console.log(`  -> URL: ${topUrl.substring(0, 75)}...`);
+      console.log(`  -> Endereço da fonte: ${new URL(topUrl).origin}`);
 
       // Validação estrita: se for temporada 2, NUNCA pode apontar para o asset da temporada 1
       if (ep.season === 2) {

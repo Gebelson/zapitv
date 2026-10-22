@@ -1,0 +1,15 @@
+# Estabilização (22/10/2026)
+
+- Base preservada: `934150621d4d3e826f3c52c992432e1474502bf1` em `main`.
+- Trabalho isolado: `stabilization/security-reliability-20261022`. Nenhuma alteração publicada.
+- Retorno seguro: reverter o commit específico nesta branch; `main` e produção permanecem na base até validação e autorização.
+- Backup Turso: `npm run db:backup` não executou porque este ambiente não tem `TURSO_DATABASE_URL` e `TURSO_AUTH_TOKEN`. Não houve escrita em dados de produção. Antes de publicar migração da Watch Party, gerar e verificar backup independente.
+- Firestore: regras alteradas localmente; validar no Firebase Emulator e confirmar UIDs administrativos antes de qualquer publicação das regras.
+- Contas legadas: login/cadastro deixaram de conceder administração pelo texto do e-mail; novos objetos de usuário e gravações não incluem senha em texto puro. Registros antigos não foram migrados. Confirmar acesso administrativo legítimo com conta Firebase cujo documento já tenha `role: admin`.
+- Service Worker: cache do app shell agora recebe versão derivada dos arquivos da build; a instalação exige lista de recursos e precache completos antes de ativar. O botão Atualizar limpa apenas caches do app e recarrega, sem tocar nos dados locais.
+- Reproduções longas e Samsung Tizen/MSX: não verificadas neste ambiente. Não há métrica antes/depois de buffering ou memória.
+- Testes locais: `npm run lint`, testes novos de SSRF e autorização do anfitrião, `npm run test:tv-interface`, smoke da Watch Party, descanso de tela no navegador e `vite build` passaram. `test:watchparty-two-browsers` falhou duas vezes aguardando entrega da mensagem do anfitrião, após presença e nomes aparecerem. Chat segue aberto para diagnóstico; não há prova de causa nesta branch.
+- `npm run test:auth` não executou: o teste existente importa `vitest`, que não consta nas dependências instaladas. Nenhuma dependência foi adicionada só para contornar esse bloqueio.
+- O teste ao vivo de Clevatess T2 E1 encontrou um stream rotulado T2E1 cujo caminho continha o mesmo asset `30331` observado para T1E1. A seleção de fonte não foi alterada nesta branch; a identidade dessa mídia exige investigação e teste real antes de publicação. Consultas externas foram separadas em `npm run test:season-matching-live`; o teste determinístico permanece na build e não afirma que a fonte real funciona.
+- `npm run build` passou após a separação dos testes determinísticos e externos. Isso valida compilação e contratos locais, não reprodução real nem ambiente Samsung.
+- Pendências: titularidade para exclusão de recomendações anônimas, identidade de cada participante da Watch Party, concorrência entre instâncias, persistência serverless das recomendações, teste real de mídia/Range e revisão completa de Service Worker.
