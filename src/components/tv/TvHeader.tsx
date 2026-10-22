@@ -13,6 +13,7 @@ interface TvHeaderProps {
   onNavigateProfileMenu: (view: 'mylist' | 'history' | 'settings') => void;
   userName?: string;
   avatarUrl?: string;
+  accountPlan?: string;
 }
 
 const TvNavTabButton: React.FC<{
@@ -27,6 +28,10 @@ const TvNavTabButton: React.FC<{
     onArrowPress: (direction) => {
       if (direction === 'down') {
         setFocus('tv-hero-play');
+        return false;
+      }
+      if (direction === 'right' && focusKey === 'tv-nav-featured') {
+        setFocus('tv-nav-search');
         return false;
       }
       return true;
@@ -68,7 +73,8 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
   onOpenSearch,
   onNavigateProfileMenu,
   userName = 'Convidado',
-  avatarUrl
+  avatarUrl,
+  accountPlan
 }) => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -77,6 +83,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 40);
     };
+    handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -92,6 +99,14 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     focusKey: 'tv-nav-search',
     onEnterPress: onOpenSearch,
     onArrowPress: (direction) => {
+      if (direction === 'left') {
+        setFocus('tv-nav-featured');
+        return false;
+      }
+      if (direction === 'right') {
+        setFocus('tv-nav-profile');
+        return false;
+      }
       if (direction === 'down') {
         setFocus('tv-hero-play');
         return false;
@@ -105,6 +120,10 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     focusKey: 'tv-nav-profile',
     onEnterPress: () => setIsProfileMenuOpen(prev => !prev),
     onArrowPress: (direction) => {
+      if (direction === 'left') {
+        setFocus('tv-nav-search');
+        return false;
+      }
       if (direction === 'down') {
         setFocus('tv-hero-details');
         return false;
@@ -117,18 +136,19 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     <FocusContext.Provider value={focusKey}>
       <header
         ref={noriginRef as any}
-        className={`fixed top-0 inset-x-0 z-[120] h-24 sm:h-[100px] px-14 sm:px-16 flex items-center justify-between pointer-events-none select-none transition-all duration-300 border-none shadow-none ${
-          isScrolled 
-            ? 'bg-gradient-to-b from-[#05070a]/95 via-[#05070a]/70 to-transparent backdrop-blur-sm' 
-            : 'bg-transparent'
-        }`}
+        className="fixed top-0 inset-x-0 z-[120] h-24 sm:h-[100px] px-14 sm:px-16 flex items-center justify-between pointer-events-none select-none border-none shadow-none bg-transparent"
       >
+        <div
+          aria-hidden="true"
+          className={`absolute z-0 inset-x-0 top-0 h-[220px] pointer-events-none transition-opacity duration-700 ease-in-out ${isScrolled ? 'opacity-100' : 'opacity-0'}`}
+          style={{ background: 'linear-gradient(to bottom, rgba(5,7,10,0.94) 0%, rgba(5,7,10,0.68) 36%, rgba(5,7,10,0.22) 72%, transparent 100%)' }}
+        />
         {/* Esquerda: Logotipo Oficial ZapiTV Ampliado (Largura proporcional ~190-210px) */}
         <div 
           role="button"
           tabIndex={0}
           onClick={() => onSelectTab('home')}
-          className="flex items-center gap-3.5 cursor-pointer group/logo outline-none focus:outline-none pointer-events-auto"
+          className="relative z-10 flex items-center gap-3.5 cursor-pointer group/logo outline-none focus:outline-none pointer-events-auto"
         >
           <div className="w-12 h-12 sm:w-[50px] sm:h-[50px] flex items-center justify-center relative flex-shrink-0">
             <video
@@ -160,7 +180,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
         </div>
 
         {/* Centro: Navegação Flutuante Livre (SEM RETÂNGULO EXTERNO, CENTRALIZADA NA LARGURA TOTAL) */}
-        <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-6 sm:gap-8 lg:gap-10 pointer-events-auto">
+        <nav className="absolute z-10 left-1/2 -translate-x-1/2 flex items-center gap-6 sm:gap-8 lg:gap-10 pointer-events-auto">
           <TvNavTabButton
             focusKey="tv-nav-home"
             label="Início"
@@ -194,7 +214,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
         </nav>
 
         {/* Direita: Busca e Perfil Ampliados (Áreas 56px, Ícones 28px) */}
-        <div className="flex items-center gap-4 sm:gap-5 pointer-events-auto ml-auto relative">
+        <div className="relative z-10 flex items-center gap-4 sm:gap-5 pointer-events-auto ml-auto">
           {/* Botão de Busca */}
           <button
             ref={searchRef}
@@ -246,6 +266,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
               }}
               userName={userName}
               avatarUrl={avatarUrl}
+              accountPlan={accountPlan}
             />
           </div>
         </div>

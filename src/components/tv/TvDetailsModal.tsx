@@ -11,6 +11,7 @@ import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spat
 
 interface TvDetailsModalProps {
   item: ContentItem;
+  initialSeason?: number;
   allContent: ContentItem[];
   myList: string[];
   favorites: string[];
@@ -22,6 +23,7 @@ interface TvDetailsModalProps {
 
 export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
   item: initialItem,
+  initialSeason,
   allContent,
   myList,
   favorites,
@@ -31,8 +33,8 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
   onPlay
 }) => {
   const [item, setItem] = useState<ContentItem>(initialItem);
-  const [currentSeason, setCurrentSeason] = useState(1);
-  const [availableSeasons, setAvailableSeasons] = useState<number[]>([1]);
+  const [currentSeason, setCurrentSeason] = useState(initialSeason || 1);
+  const [availableSeasons, setAvailableSeasons] = useState<number[]>([initialSeason || 1]);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
 
@@ -80,9 +82,6 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
     return () => {
       clearTimeout(timer);
       unregister();
-      setTimeout(() => {
-        tvNavigationManager.restoreFocusSnapshot();
-      }, 50);
     };
   }, [onClose]);
 

@@ -4072,6 +4072,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       >
           <video
             ref={videoRef}
+            data-zapi-main-video="true"
+            data-source-quality={currentStream?.quality || ''}
             className="w-full h-full object-contain"
             playsInline
             muted={isPlayingIntro || isMuted}

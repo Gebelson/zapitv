@@ -56,14 +56,14 @@ const TvHeroButton: React.FC<{
       data-focus-key={focusKey}
       data-tv-focused={focused ? "true" : undefined}
       onClick={onClick}
-      className={`zapi-tv-hero-btn px-9 py-4 rounded-2xl font-black text-base sm:text-lg tracking-wide inline-flex items-center justify-center gap-3.5 transition-all duration-200 outline-none select-none cursor-pointer ${
+      className={`zapi-tv-hero-btn rounded-2xl font-black text-base sm:text-lg tracking-wide inline-flex items-center justify-center gap-3.5 transition-all duration-200 outline-none select-none cursor-pointer ${
         isPrimary
           ? focused
-            ? 'bg-gradient-to-r from-blue-500 via-blue-400 to-cyan-300 text-white scale-105 border-2 border-white shadow-[0_0_30px_rgba(0,229,255,0.75)]'
-            : 'bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 text-white shadow-xl shadow-cyan-500/25 border-2 border-transparent hover:scale-102'
+            ? 'px-[38px] py-[18px] border-0 overflow-hidden bg-gradient-to-r from-blue-500 via-blue-400 to-cyan-300 text-white scale-105 shadow-[0_0_30px_rgba(0,229,255,0.75)]'
+            : 'px-[38px] py-[18px] border-0 overflow-hidden bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 text-white shadow-xl shadow-cyan-500/25 hover:scale-102'
           : focused
-          ? 'bg-white/25 text-white scale-105 border-2 border-white shadow-[0_0_24px_rgba(255,255,255,0.5)]'
-          : 'bg-white/10 hover:bg-white/15 text-gray-200 border-2 border-white/20 hover:scale-102'
+          ? 'px-9 py-4 bg-white/25 text-white scale-105 border-2 border-white shadow-[0_0_24px_rgba(255,255,255,0.5)]'
+          : 'px-9 py-4 bg-white/10 hover:bg-white/15 text-gray-200 border-2 border-white/20 hover:scale-102'
       }`}
     >
       {icon}
@@ -141,6 +141,18 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
     return [];
   }, [items, item]);
 
+  // Diagnóstico temporário: ?tvbanner=original|gradients|full (sem persistência).
+  // Tizen/MSX usa gradientes por padrão: máscaras e filtros podem compor a imagem incorretamente.
+  const { bannerMode, isDiagnostic } = useMemo(() => {
+    if (typeof window === 'undefined') return { bannerMode: 'gradients' as const, isDiagnostic: false };
+    const requestedMode = new URLSearchParams(window.location.search).get('tvbanner');
+    if (requestedMode === 'original' || requestedMode === 'gradients' || requestedMode === 'full') {
+      return { bannerMode: requestedMode, isDiagnostic: true };
+    }
+    const isSamsungTv = /Tizen|Maple|Samsung.*(?:TV|SmartTV)|Media\s*Station\s*X|MediaStationX/i.test(navigator.userAgent);
+    return { bannerMode: isSamsungTv ? 'gradients' as const : 'full' as const, isDiagnostic: false };
+  }, []);
+
   // Estados do carrossel cinematográfico
   const [currentIndex, setCurrentIndex] = useState(0);
   const [outgoingIndex, setOutgoingIndex] = useState<number | null>(null);
@@ -149,6 +161,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
   const [isPaused, setIsPaused] = useState(false);
 
   const isTransitioningRef = useRef(false);
+  const isMountedRef = useRef(true);
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
   const transitionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const textTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -157,20 +170,53 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
   const currentItem = slides[currentIndex] || slides[0] || null;
   const outgoingItem = outgoingIndex !== null ? slides[outgoingIndex] : null;
 
-  // Pré-carregamento do próximo slide para evitar qualquer flash ou tela preta
-  const preloadImage = useCallback((url: string): Promise<void> => {
-    return new Promise((resolve) => {
-      if (!url) return resolve();
-      const img = new Image();
-      img.src = url;
-      if (img.complete) {
-        resolve();
-      } else {
-        img.onload = () => resolve();
-        img.onerror = () => resolve();
+  const [resolvedImages, setResolvedImages] = useState<Record<string, { url: string; portrait: boolean }>>({});
+
+  // Alguns destaques têm pôster vertical no campo backdrop; verifica a imagem real antes de ampliá-la.
+  const resolveBannerImage = useCallback(async (slide: ContentItem) => {
+    const candidates = [...new Set([slide.backdrop, slide.image, slide.poster].filter((url): url is string => Boolean(url)))];
+    let bestLandscape: { url: string; portrait: boolean; width: number } | null = null;
+    let bestPortrait: { url: string; portrait: boolean } | null = null;
+    for (const url of candidates) {
+      const size = await new Promise<{ width: number; height: number } | null>((resolve) => {
+        const img = new Image();
+        const timer = setTimeout(() => {
+          img.onload = null;
+          img.onerror = null;
+          img.src = '';
+          resolve(null);
+        }, 3500);
+        img.onload = () => {
+          clearTimeout(timer);
+          resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        };
+        img.onerror = () => {
+          clearTimeout(timer);
+          resolve(null);
+        };
+        img.src = url;
+      });
+      if (!size) continue;
+      if (size.width / size.height >= 1.3) {
+        if (!bestLandscape || size.width > bestLandscape.width) bestLandscape = { url, portrait: false, width: size.width };
+        if (size.width >= 1280) break;
+      } else if (!bestPortrait) {
+        bestPortrait = { url, portrait: true };
       }
-    });
+    }
+    return bestLandscape || bestPortrait || { url: candidates[0] || '', portrait: false };
   }, []);
+
+  useEffect(() => {
+    if (!currentItem) return;
+    const key = currentItem.backdrop || currentItem.image || currentItem.poster || '';
+    if (!key || resolvedImages[key]) return;
+    let active = true;
+    resolveBannerImage(currentItem).then(choice => {
+      if (active) setResolvedImages(previous => ({ ...previous, [key]: choice }));
+    });
+    return () => { active = false; };
+  }, [currentItem, resolvedImages, resolveBannerImage]);
 
   // Transição sincronizada suave entre destaques (Crossfade + Fade de Textos)
   const goToSlide = useCallback(async (targetIndex: number) => {
@@ -184,10 +230,10 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
 
     const nextItem = slides[normalizedTarget];
     const nextBackdrop = nextItem.backdrop || nextItem.image || nextItem.poster || '';
-
-    // Aguarda o pré-carregamento da imagem do próximo destaque
     if (nextBackdrop) {
-      await preloadImage(nextBackdrop);
+      const choice = resolvedImages[nextBackdrop] || await resolveBannerImage(nextItem);
+      if (!isMountedRef.current) return;
+      setResolvedImages(previous => ({ ...previous, [nextBackdrop]: choice }));
     }
 
     // 1. Suave fade out dos textos (250ms)
@@ -205,7 +251,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
       setIsCrossfading(false);
       isTransitioningRef.current = false;
     }, 700);
-  }, [slides, currentIndex, preloadImage]);
+  }, [slides, currentIndex, resolvedImages, resolveBannerImage]);
 
   const goToNextSlide = useCallback(() => {
     goToSlide(currentIndex + 1);
@@ -218,12 +264,12 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
   // Reinicia o timer de rotação automática
   const resetTimer = useCallback(() => {
     if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
-    if (slides.length <= 1 || isPaused) return;
+    if (slides.length <= 1 || isPaused || isDiagnostic) return;
 
     autoPlayTimerRef.current = setInterval(() => {
       goToNextSlide();
     }, autoRotateInterval);
-  }, [slides.length, isPaused, autoRotateInterval, goToNextSlide]);
+  }, [slides.length, isPaused, isDiagnostic, autoRotateInterval, goToNextSlide]);
 
   // Gerenciamento da rotação automática com pause e resume inteligentes
   useEffect(() => {
@@ -248,7 +294,9 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
 
   // Limpeza de timers na desmontagem
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
       if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
       if (textTimerRef.current) clearTimeout(textTimerRef.current);
@@ -259,8 +307,10 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
     return null;
   }
 
-  const currentBackdropUrl = currentItem.backdrop || currentItem.image || currentItem.poster || '';
-  const outgoingBackdropUrl = outgoingItem ? (outgoingItem.backdrop || outgoingItem.image || outgoingItem.poster || '') : '';
+  const currentImageKey = currentItem.backdrop || currentItem.image || currentItem.poster || '';
+  const outgoingImageKey = outgoingItem ? (outgoingItem.backdrop || outgoingItem.image || outgoingItem.poster || '') : '';
+  const currentBackdropUrl = resolvedImages[currentImageKey]?.url || currentImageKey;
+  const outgoingBackdropUrl = resolvedImages[outgoingImageKey]?.url || outgoingImageKey;
   const genresText = currentItem.genres?.slice(0, 3).join(' • ') || (currentItem.type === 'FILME' ? 'Filme' : 'Série');
 
   // Verifica continuidade de reprodução para exibir "Continuar" ou "Assistir"
@@ -277,7 +327,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => { setIsPaused(false); resetTimer(); }}
       >
-        {/* Camada 0: Imagens com Crossfade e Blur Progressivo Integrado */}
+        {/* Camada 0: imagens originais nítidas com crossfade */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           {/* Slide Anterior (Saindo com fade out suave de 700ms) */}
           {outgoingItem && outgoingBackdropUrl && (
@@ -287,32 +337,15 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
               style={{ opacity: isCrossfading ? 0 : 1 }}
             >
               {/* Imagem Nítida Base Fullscreen (Inicia em top: 0, 100% da viewport) */}
+              {resolvedImages[outgoingImageKey]?.portrait && (
+                <img src={outgoingBackdropUrl} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover object-center opacity-40" />
+              )}
               <img
                 src={outgoingBackdropUrl}
                 alt=""
                 aria-hidden="true"
-                className="absolute inset-0 w-full h-full object-cover object-center"
-                style={{
-                  maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 8%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 75%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0) 100%)',
-                  WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 8%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 75%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0) 100%)'
-                }}
+                className={`absolute inset-0 w-full h-full object-center ${resolvedImages[outgoingImageKey]?.portrait ? 'object-contain' : 'object-cover'}`}
               />
-
-              {/* Blur Progressivo Alinhado ao Backdrop (Desfoque real no topo atrás do header e na base) */}
-              <div 
-                className="absolute inset-0 pointer-events-none overflow-hidden"
-                style={{
-                  maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 8%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 75%, rgba(0,0,0,0.85) 90%, rgba(0,0,0,1) 100%)',
-                  WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 8%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 75%, rgba(0,0,0,0.85) 90%, rgba(0,0,0,1) 100%)'
-                }}
-              >
-                <img
-                  src={outgoingBackdropUrl}
-                  alt=""
-                  aria-hidden="true"
-                  className="w-full h-full object-cover object-center filter blur-xl scale-105 transform-gpu"
-                />
-              </div>
             </div>
           )}
 
@@ -324,72 +357,89 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
               style={{ opacity: outgoingItem ? (isCrossfading ? 1 : 0) : 1 }}
             >
               {/* Imagem Nítida Base Fullscreen (Inicia em top: 0, 100% da viewport) */}
+              {resolvedImages[currentImageKey]?.portrait && (
+                <img src={currentBackdropUrl} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover object-center opacity-40" />
+              )}
               <img
                 src={currentBackdropUrl}
                 alt={currentItem.title}
                 loading="eager"
                 decoding="async"
-                className="absolute inset-0 w-full h-full object-cover object-center"
-                style={{
-                  maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 8%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 75%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0) 100%)',
-                  WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 8%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 75%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0) 100%)'
-                }}
+                className={`absolute inset-0 w-full h-full object-center ${resolvedImages[currentImageKey]?.portrait ? 'object-contain' : 'object-cover'}`}
                 onError={(e) => {
                   if (currentItem.image && (e.currentTarget as HTMLImageElement).src !== currentItem.image) {
                     (e.currentTarget as HTMLImageElement).src = currentItem.image;
                   }
                 }}
               />
-
-              {/* Blur Progressivo Alinhado ao Backdrop (Desfoque real no topo atrás do header e na base) */}
-              <div 
-                className="absolute inset-0 pointer-events-none overflow-hidden"
-                style={{
-                  maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 8%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 75%, rgba(0,0,0,0.85) 90%, rgba(0,0,0,1) 100%)',
-                  WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 8%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 75%, rgba(0,0,0,0.85) 90%, rgba(0,0,0,1) 100%)'
-                }}
-              >
-                <img
-                  src={currentBackdropUrl}
-                  alt=""
-                  aria-hidden="true"
-                  className="w-full h-full object-cover object-center filter blur-xl scale-105 transform-gpu"
-                />
-              </div>
             </div>
           )}
 
-          {/* Gradiente Escuro Superior Cinematográfico (Garante legibilidade dos links sem faixa preta sólida) */}
-          <div 
-            className="absolute top-0 inset-x-0 h-[45%] bg-gradient-to-b from-[#05070a] pointer-events-none z-[2]"
-            style={{
-              background: 'linear-gradient(to bottom, rgba(5,7,10,0.80) 0%, rgba(5,7,10,0.55) 8%, rgba(5,7,10,0.25) 18%, rgba(5,7,10,0.06) 28%, transparent 42%)'
-            }}
-          />
+          {bannerMode === 'full' ? (
+            <>
+              {/* Mesmo sem máscara, cada faixa cobre apenas uma extremidade, nunca o centro. */}
+              <div
+                className="absolute top-0 inset-x-0 h-[12%] pointer-events-none z-[2]"
+                style={{
+                  backdropFilter: 'blur(5px)',
+                  WebkitBackdropFilter: 'blur(5px)',
+                  maskImage: 'linear-gradient(to bottom, black 0%, transparent 100%)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, black 0%, transparent 100%)'
+                }}
+              />
+            </>
+          ) : null}
 
-          {/* Gradiente Lateral Esquerdo (Contraste cinematográfico para o texto e botões à esquerda) */}
-          <div 
-            className="absolute inset-0 pointer-events-none z-[2]"
-            style={{
-              background: 'linear-gradient(to right, rgba(5,7,10,0.88) 0%, rgba(5,7,10,0.70) 24%, rgba(5,7,10,0.35) 46%, transparent 72%)'
-            }}
-          />
+          {/* No Tizen, o gradiente inferior substitui esta máscara de blur. */}
+          {bannerMode === 'full' ? (
+            <div
+              className="absolute bottom-0 inset-x-0 h-[22%] pointer-events-none z-[2]"
+              style={{
+                backdropFilter: 'blur(6px)',
+                WebkitBackdropFilter: 'blur(6px)',
+                maskImage: 'linear-gradient(to top, black 0%, rgba(0,0,0,0.75) 38%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(to top, black 0%, rgba(0,0,0,0.75) 38%, transparent 100%)'
+              }}
+            />
+          ) : null}
 
-          {/* Gradiente Inferior Progressivo (Dissolve suavemente no fundo da página sem linha divisória) */}
-          <div 
-            className="absolute bottom-0 inset-x-0 h-[45%] pointer-events-none z-[2]"
-            style={{
-              background: 'linear-gradient(to top, rgba(5,7,10,1) 0%, rgba(5,7,10,0.85) 12%, rgba(5,7,10,0.45) 26%, rgba(5,7,10,0.12) 40%, transparent 58%)'
-            }}
-          />
+          {bannerMode !== 'original' ? (
+            <>
+              {/* Gradiente Escuro Superior Cinematográfico (Garante legibilidade dos links sem faixa preta sólida) */}
+              <div
+                className="absolute top-0 inset-x-0 h-[45%] bg-gradient-to-b from-[#05070a] pointer-events-none z-[2]"
+                style={{
+                  background: 'linear-gradient(to bottom, rgba(5,7,10,0.80) 0%, rgba(5,7,10,0.55) 8%, rgba(5,7,10,0.25) 18%, rgba(5,7,10,0.06) 28%, transparent 42%)'
+                }}
+              />
+
+              {/* Gradiente Lateral Esquerdo (Contraste cinematográfico para o texto e botões à esquerda) */}
+              <div
+                className="absolute inset-0 pointer-events-none z-[2]"
+                style={{
+                  background: 'linear-gradient(to right, rgba(5,7,10,0.88) 0%, rgba(5,7,10,0.70) 24%, rgba(5,7,10,0.35) 46%, transparent 72%)'
+                }}
+              />
+
+              {/* Gradiente Inferior Progressivo (Dissolve suavemente no fundo da página sem linha divisória) */}
+              <div
+                className="absolute bottom-0 inset-x-0 h-[45%] pointer-events-none z-[2]"
+                style={{
+                  background: 'linear-gradient(to top, rgba(5,7,10,1) 0%, rgba(5,7,10,0.85) 12%, rgba(5,7,10,0.45) 26%, rgba(5,7,10,0.12) 40%, transparent 58%)'
+                }}
+              />
+            </>
+          ) : null}
 
           {/* Efeito Glow Ambiente do Destaque (Cores atmosféricas do ZapiTV) */}
-          <div 
-            className="absolute top-1/3 left-14 w-[500px] h-[380px] rounded-full pointer-events-none opacity-25 blur-3xl z-[2]"
-            style={{
-              background: 'radial-gradient(circle, rgba(0, 125, 247, 0.45) 0%, rgba(0, 229, 255, 0.25) 45%, transparent 75%)'
-            }}
-          />
+          {bannerMode === 'full' && !isDiagnostic ? (
+            <div
+              className="absolute top-1/3 left-14 w-[500px] h-[380px] rounded-full pointer-events-none opacity-25 blur-3xl z-[2]"
+              style={{
+                background: 'radial-gradient(circle, rgba(0, 125, 247, 0.45) 0%, rgba(0, 229, 255, 0.25) 45%, transparent 75%)'
+              }}
+            />
+          ) : null}
         </div>
 
         {/* Indicadores de Paginação Discretos e Estilizados */}
@@ -413,7 +463,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
 
         {/* Informações do Destaque Posicionadas no Terço Inferior Esquerdo com Transição Sincronizada */}
         <div 
-          className="relative z-10 h-full flex flex-col justify-end pb-24 sm:pb-28 lg:pb-32 pl-14 sm:pl-16 pr-8 max-w-2xl lg:max-w-3xl transition-all duration-300 transform-gpu"
+          className="relative z-10 h-full flex flex-col justify-end pb-16 sm:pb-20 lg:pb-24 pl-14 sm:pl-16 pr-8 max-w-2xl lg:max-w-3xl transition-all duration-300 transform-gpu"
           style={{
             opacity: textOpacity,
             transform: textOpacity === 1 ? 'translate3d(0, 0, 0)' : 'translate3d(0, 8px, 0)'

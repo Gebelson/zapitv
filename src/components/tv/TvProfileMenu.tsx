@@ -10,16 +10,16 @@ interface TvProfileMenuProps {
   onNavigate: (view: 'mylist' | 'history' | 'settings') => void;
   userName?: string;
   avatarUrl?: string;
+  accountPlan?: string;
 }
 
 const TvProfileMenuItem: React.FC<{
   focusKey: string;
   icon: React.ReactNode;
   label: string;
-  sublabel?: string;
   onClick: () => void;
   disabled?: boolean;
-}> = ({ focusKey, icon, label, sublabel, onClick, disabled }) => {
+}> = ({ focusKey, icon, label, onClick, disabled }) => {
   const { ref, focused } = useTvFocusable({
     focusKey,
     onEnterPress: () => {
@@ -42,7 +42,7 @@ const TvProfileMenuItem: React.FC<{
         }
       }}
       disabled={disabled}
-      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-left transition-all duration-200 outline-none select-none ${
+      className={`w-full flex items-center justify-between px-4 py-2 rounded-xl text-left transition-all duration-200 outline-none select-none ${
         focused
           ? 'bg-gradient-to-r from-cyan-500/25 to-blue-600/30 text-cyan-300 border border-cyan-400/60 shadow-[0_0_15px_rgba(0,229,255,0.35)] scale-[1.02]'
           : 'text-gray-200 hover:bg-white/10 border border-transparent'
@@ -52,10 +52,7 @@ const TvProfileMenuItem: React.FC<{
         <div className={`p-2 rounded-lg ${focused ? 'bg-cyan-500/20 text-cyan-300' : 'bg-white/5 text-gray-400'}`}>
           {icon}
         </div>
-        <div>
-          <div className="text-sm font-bold tracking-wide">{label}</div>
-          {sublabel && <div className="text-[11px] text-gray-400">{sublabel}</div>}
-        </div>
+        <span className="text-sm font-bold tracking-wide">{label}</span>
       </div>
       <ChevronRight className={`w-4 h-4 ${focused ? 'text-cyan-300 translate-x-0.5' : 'text-gray-500'} transition-transform`} />
     </button>
@@ -67,7 +64,8 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
   onClose,
   onNavigate,
   userName = 'Meu Perfil',
-  avatarUrl
+  avatarUrl,
+  accountPlan
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -186,7 +184,7 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
           </div>
           <div className="min-w-0">
             <div className="text-sm font-black text-white truncate">{userName}</div>
-            <div className="text-[11px] text-cyan-400 font-medium">ZapiTV Smart TV</div>
+            {accountPlan ? <div className="text-[11px] text-cyan-400 font-medium truncate">Plano {accountPlan}</div> : null}
           </div>
         </div>
 
@@ -196,7 +194,6 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
             focusKey="tv-menu-mylist"
             icon={<Bookmark className="w-4 h-4" />}
             label="Minha Lista"
-            sublabel="Seus filmes e séries salvos"
             onClick={() => {
               onClose();
               onNavigate('mylist');
@@ -207,7 +204,6 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
             focusKey="tv-menu-history"
             icon={<Clock className="w-4 h-4" />}
             label="Histórico"
-            sublabel="Títulos reproduzidos recentemente"
             onClick={() => {
               onClose();
               onNavigate('history');
@@ -218,7 +214,6 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
             focusKey="tv-menu-settings"
             icon={<Settings className="w-4 h-4" />}
             label="Configurações"
-            sublabel="Preferências de streaming e áudio"
             onClick={() => {
               onClose();
               onNavigate('settings');
@@ -233,7 +228,6 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
             focusKey="tv-menu-update"
             icon={<RotateCw className={`w-4 h-4 ${isUpdating ? 'animate-spin text-cyan-400' : ''}`} />}
             label={isUpdating ? "Atualizando..." : "Atualizar ZapiTV"}
-            sublabel={isUpdating ? "Recarregando nova versão..." : "Recarregar e buscar nova versão"}
             onClick={handleUpdateApp}
             disabled={isUpdating}
           />

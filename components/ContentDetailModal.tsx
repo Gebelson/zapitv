@@ -159,6 +159,7 @@ interface ContentDetailModalProps {
   initialSeason?: number;
   initialEpisode?: number;
   autoPlayInitialEpisode?: boolean;
+  playerOnly?: boolean;
 }
 
 function uniqueEpisodes<T extends { number: number }>(episodes: T[]): T[] {
@@ -172,7 +173,7 @@ function uniqueEpisodes<T extends { number: number }>(episodes: T[]): T[] {
 
 export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({ 
   item: initialItem, onClose, isDarkMode, myList, favorites, onToggleList, onToggleFavorite, allContent,
-  initialSeason, initialEpisode, autoPlayInitialEpisode
+  initialSeason, initialEpisode, autoPlayInitialEpisode, playerOnly = false
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const [item, setItem] = useState<ContentItem>(initialItem);
@@ -443,21 +444,23 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   }, [cancelAllPendingRequests, item.id, onClose, playbackSessionId]);
 
   useEffect(() => {
-    if (!isPlaying) {
+    if (!isPlaying && !playerOnly) {
       return tvNavigationManager.registerBackHandler('detail-modal', 100, () => {
         handleClose();
         return true;
       });
     }
-  }, [isPlaying, handleClose]);
+  }, [isPlaying, playerOnly, handleClose]);
 
   const handleClosePlayer = useCallback(() => {
     mobileFullscreenService.exitMobileFullscreen().catch(() => {});
     playbackRequestIdRef.current++;
     cancelAllPendingRequests();
     if (loadingTraceIdRef.current) mediaLoadingTracker.endTrace(loadingTraceIdRef.current, 'CANCELLED');
-    setIsPlaying(false);
-    setResolvedStreams([]);
+    if (!playerOnly) {
+      setIsPlaying(false);
+      setResolvedStreams([]);
+    }
     if (playbackSessionId) {
       playbackSessionService.endSession(playbackSessionId);
     } else {
@@ -465,7 +468,8 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     }
     setPlaybackSessionId('');
     setSessionIntroPlayed(false);
-  }, [cancelAllPendingRequests, playbackSessionId]);
+    if (playerOnly) onClose();
+  }, [cancelAllPendingRequests, playbackSessionId, playerOnly, onClose]);
 
   // Click outside to close (apenas quando não estiver no player e nenhum modal flutuante estiver aberto)
   useEffect(() => {
@@ -1080,7 +1084,10 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
         </div>
       )}
       
-      {!isPlaying && (
+      {playerOnly && !isPlaying && (
+        <div className="fixed inset-0 z-[500] bg-black flex items-center justify-center"><ZapiLoader size="lg" /></div>
+      )}
+      {!isPlaying && !playerOnly && (
         <div key="modal-detail-stage" className="min-h-full w-full flex items-start justify-center py-3 sm:py-8 md:py-12 px-2 sm:px-4 md:px-6">
           <div ref={modalRef} className={`relative w-full max-w-[850px] bg-[#0f1115] rounded-2xl sm:rounded-3xl md:rounded-[32px] shadow-2xl overflow-hidden border border-white/10 ${
               isClosing ? 'animate-out zoom-out-95 slide-out-to-bottom-[5%] duration-300' : 'animate-in zoom-in-95 slide-in-from-bottom-[5%] duration-300'

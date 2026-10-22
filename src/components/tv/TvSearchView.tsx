@@ -41,6 +41,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
 
     const timer = setTimeout(() => {
       setFocus('tv-search-input');
+      inputRef.current?.focus();
     }, 100);
 
     return () => {

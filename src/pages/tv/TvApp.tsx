@@ -12,7 +12,7 @@ import { TvListView } from '../../components/tv/TvListView';
 import { TvDetailsModal } from '../../components/tv/TvDetailsModal';
 import { TvRemoteDiagnosticOverlay } from '../../components/tv/TvRemoteDiagnosticOverlay';
 import { ZapiLoader } from '../../components/common/ZapiLoader';
-import { init as initSpatialNavigation, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 // Lazy load do orquestrador de reprodução para máxima performance inicial na TV
 const ContentDetailModal = lazy(() => import('../../../components/ContentDetailModal'));
@@ -51,10 +51,6 @@ export const TvApp: React.FC<TvAppProps> = ({
 
   // Inicializa navegação espacial e define o foco inicial no botão Assistir do Hero
   useEffect(() => {
-    initSpatialNavigation({
-      debug: false,
-      visualDebug: false
-    });
     tvNavigationManager.init();
     tvNavigationManager.resume();
     tvModeService.setTvMode(true);
@@ -95,6 +91,7 @@ export const TvApp: React.FC<TvAppProps> = ({
 
   // Item selecionado para detalhes ou reprodução
   const [selectedDetailItem, setSelectedDetailItem] = useState<ContentItem | null>(null);
+  const [selectedDetailSeason, setSelectedDetailSeason] = useState<number | undefined>();
   const [playingItem, setPlayingItem] = useState<{
     item: ContentItem;
     season?: number;
@@ -103,6 +100,7 @@ export const TvApp: React.FC<TvAppProps> = ({
 
   const handleOpenDetailModal = useCallback((item: ContentItem) => {
     tvNavigationManager.saveFocusSnapshot();
+    setSelectedDetailSeason(undefined);
     setSelectedDetailItem(item);
   }, []);
 
@@ -148,12 +146,18 @@ export const TvApp: React.FC<TvAppProps> = ({
 
   // Execução de reprodução
   const handleStartPlay = useCallback((item: ContentItem, season?: number, episode?: number) => {
+    if (!selectedDetailItem) tvNavigationManager.saveFocusSnapshot();
+    setSelectedDetailItem(item);
+    setSelectedDetailSeason(season ?? storageService.getPlaybackContinuity(item).season);
     setPlayingItem({ item, season, episode });
-  }, []);
+  }, [selectedDetailItem]);
 
   const handleClosePlayer = useCallback(() => {
+    if (playingItem) {
+      setSelectedDetailSeason(storageService.getPlaybackContinuity(playingItem.item).season || playingItem.season);
+    }
     setPlayingItem(null);
-  }, []);
+  }, [playingItem]);
 
   return (
     <div className="zapi-tv-root relative min-h-screen bg-[#05070a] text-white overflow-x-hidden selection:bg-cyan-500 selection:text-black">
@@ -179,6 +183,7 @@ export const TvApp: React.FC<TvAppProps> = ({
           }}
           userName={activeProfile?.name || currentUser?.name || 'ZapiTV'}
           avatarUrl={activeProfile?.avatar}
+          accountPlan={currentUser?.status === 'Ativo' ? currentUser.plan?.trim() : undefined}
         />
       )}
 
@@ -188,7 +193,10 @@ export const TvApp: React.FC<TvAppProps> = ({
           <TvSearchView
             allContent={content}
             onSelectItem={handleOpenDetailModal}
-            onClose={() => setSpecialView(null)}
+            onClose={() => {
+              setSpecialView(null);
+              setTimeout(() => setFocus('tv-nav-search'), 50);
+            }}
           />
         ) : specialView === 'mylist' ? (
           <TvListView
@@ -260,17 +268,20 @@ export const TvApp: React.FC<TvAppProps> = ({
       </main>
 
       {/* Modal de Detalhes Cinematográfico */}
-      {selectedDetailItem && (
+      {selectedDetailItem && !playingItem && (
         <TvDetailsModal
           item={selectedDetailItem}
+          initialSeason={selectedDetailSeason}
           allContent={content}
           myList={myList}
           favorites={favorites}
           onToggleList={onToggleList}
           onToggleFavorite={onToggleFavorite}
-          onClose={() => setSelectedDetailItem(null)}
-          onPlay={(it, s, e) => {
+          onClose={() => {
             setSelectedDetailItem(null);
+            tvNavigationManager.restoreFocusSnapshot('tv-hero-play');
+          }}
+          onPlay={(it, s, e) => {
             handleStartPlay(it, s, e);
           }}
         />
@@ -295,6 +306,7 @@ export const TvApp: React.FC<TvAppProps> = ({
             initialSeason={playingItem.season}
             initialEpisode={playingItem.episode}
             autoPlayInitialEpisode={true}
+            playerOnly={true}
           />
         </Suspense>
       )}

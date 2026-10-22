@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { tvModeService } from '../../core/tv/tvModeService';
 import { getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
+import { playbackOptimizerService } from '../../core/playback/PlaybackOptimizerService';
 
 interface KeyRecord {
   id: string;
@@ -32,6 +33,7 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
   const [currentActiveElement, setCurrentActiveElement] = useState<string>('none');
   const [currentNoriginFocus, setCurrentNoriginFocus] = useState<string>('none');
   const [navigableCount, setNavigableCount] = useState<number>(0);
+  const [videoMetrics, setVideoMetrics] = useState<string | null>(null);
   const countRef = useRef(0);
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
   useEffect(() => {
     if (!isVisible) return;
 
+    let ticks = 0;
     const interval = setInterval(() => {
       const active = document.activeElement;
       let activeDesc = 'body';
@@ -56,6 +59,21 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
       setCurrentActiveElement(activeDesc);
       setCurrentNoriginFocus(getCurrentFocusKey() || 'nenhum');
       setNavigableCount(document.querySelectorAll('[data-focus-key]').length);
+      if (++ticks % 4 === 0) {
+        const video = document.querySelector<HTMLVideoElement>('video[data-zapi-main-video]');
+        if (!video) {
+          setVideoMetrics(null);
+        } else {
+          const telemetry = playbackOptimizerService.getTelemetry();
+          const frames = video.getVideoPlaybackQuality?.();
+          const resolution = video.videoWidth && video.videoHeight ? `${video.videoWidth}×${video.videoHeight}` : 'aguardando';
+          const quality = telemetry.currentResolution || 'auto';
+          const declared = video.dataset.sourceQuality || 'não declarada';
+          const buffer = telemetry.bufferAheadSeconds.toFixed(1);
+          const dropped = frames ? `${frames.droppedVideoFrames}/${frames.totalVideoFrames}` : 'não informado';
+          setVideoMetrics(`${resolution} · HLS/atual ${quality} · fonte ${declared} · buffer ${buffer}s · quadros perdidos ${dropped} · erro ${video.error?.code || 0}`);
+        }
+      }
     }, 250);
 
     return () => clearInterval(interval);
@@ -203,6 +221,12 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
                 <span className="text-cyan-400 font-bold">{navigableCount} elementos</span>
               </div>
             </div>
+
+            {videoMetrics && (
+              <div className="bg-black/40 border border-white/10 rounded-lg p-2 text-[10px] text-gray-300">
+                <span className="text-cyan-300 font-bold">Vídeo real: </span>{videoMetrics}
+              </div>
+            )}
 
             {/* Foco e Região Ativa */}
             <div className="bg-black/40 border border-cyan-400/40 rounded-lg p-2 space-y-0.5">
