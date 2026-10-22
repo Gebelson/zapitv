@@ -117,9 +117,9 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     <FocusContext.Provider value={focusKey}>
       <header
         ref={noriginRef as any}
-        className={`fixed top-0 inset-x-0 z-[120] h-24 sm:h-[100px] px-14 sm:px-16 flex items-center justify-between pointer-events-none select-none transition-colors duration-300 border-none shadow-none ${
+        className={`fixed top-0 inset-x-0 z-[120] h-24 sm:h-[100px] px-14 sm:px-16 flex items-center justify-between pointer-events-none select-none transition-all duration-300 border-none shadow-none ${
           isScrolled 
-            ? 'bg-[#05070a]/85 backdrop-blur-md' 
+            ? 'bg-gradient-to-b from-[#05070a]/95 via-[#05070a]/70 to-transparent backdrop-blur-sm' 
             : 'bg-transparent'
         }`}
       >

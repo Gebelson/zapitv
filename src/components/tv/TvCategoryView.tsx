@@ -58,8 +58,19 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
   }, [firstRowKey]);
 
   const handleFirstRowUpPress = useCallback(() => {
+    // 1. Rola a viewport e o documento de volta ao topo absoluto da página
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+    const heroEl = document.getElementById('tv-hero-banner');
+    if (heroEl) {
+      try {
+        heroEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch {}
+    }
+
+    // 2. Transfere o foco de forma coordenada para o botão Assistir do Hero
     setFocus('tv-hero-play');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   return (

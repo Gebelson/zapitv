@@ -95,41 +95,41 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
   }, [allContent]);
 
   // Identificador da primeira fileira navegável
-  const firstRowKey = useMemo(() => {
-    if (continueWatchingItems.length > 0) {
-      return 'row-continue-watching';
-    }
-    if (trendingItems.length > 0) {
-      return 'row-trending';
-    }
-    if (popularMovies.length > 0) {
-      return 'row-popular-movies';
-    }
-    if (popularSeries.length > 0) {
-      return 'row-popular-series';
-    }
-    if (animeItems.length > 0) {
-      return 'row-popular-animes';
-    }
-    if (featuredItems.length > 1) {
-      return 'row-featured-all';
-    }
+  const firstActiveRowId = useMemo(() => {
+    if (continueWatchingItems.length > 0) return 'continue-watching';
+    if (trendingItems.length > 0) return 'trending';
+    if (popularMovies.length > 0) return 'popular-movies';
+    if (popularSeries.length > 0) return 'popular-series';
+    if (animeItems.length > 0) return 'popular-animes';
+    if (featuredItems.length > 1) return 'featured-all';
     return '';
   }, [continueWatchingItems, trendingItems, popularMovies, popularSeries, animeItems, featuredItems]);
 
   const handleHeroDownPress = useCallback(() => {
-    if (firstRowKey) {
-      setFocus(firstRowKey);
-      const el = document.getElementById(firstRowKey) || document.querySelector(`[data-focus-key="${firstRowKey}"]`);
+    if (firstActiveRowId) {
+      const rowKey = `row-${firstActiveRowId}`;
+      setFocus(rowKey);
+      const el = document.getElementById(rowKey) || document.querySelector(`[data-focus-key="${rowKey}"]`);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
-  }, [firstRowKey]);
+  }, [firstActiveRowId]);
 
   const handleFirstRowUpPress = useCallback(() => {
+    // 1. Rola a viewport e o documento de volta ao topo absoluto da página
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+    const heroEl = document.getElementById('tv-hero-banner');
+    if (heroEl) {
+      try {
+        heroEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch {}
+    }
+
+    // 2. Transfere o foco de forma coordenada para o botão Assistir do Hero
     setFocus('tv-hero-play');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const hasContinue = continueWatchingItems.length > 0;
@@ -156,7 +156,7 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={continueWatchingItems}
             onItemClick={onSelectItem}
             showProgress
-            onRowUp={handleFirstRowUpPress}
+            onRowUp={firstActiveRowId === 'continue-watching' ? handleFirstRowUpPress : undefined}
           />
         )}
 
@@ -167,7 +167,7 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             rowId="trending"
             items={trendingItems}
             onItemClick={onSelectItem}
-            onRowUp={!hasContinue ? handleFirstRowUpPress : undefined}
+            onRowUp={firstActiveRowId === 'trending' ? handleFirstRowUpPress : undefined}
           />
         )}
 
@@ -178,6 +178,7 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             rowId="popular-movies"
             items={popularMovies}
             onItemClick={onSelectItem}
+            onRowUp={firstActiveRowId === 'popular-movies' ? handleFirstRowUpPress : undefined}
           />
         )}
 
@@ -188,6 +189,7 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             rowId="popular-series"
             items={popularSeries}
             onItemClick={onSelectItem}
+            onRowUp={firstActiveRowId === 'popular-series' ? handleFirstRowUpPress : undefined}
           />
         )}
 
@@ -198,6 +200,7 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             rowId="popular-animes"
             items={animeItems}
             onItemClick={onSelectItem}
+            onRowUp={firstActiveRowId === 'popular-animes' ? handleFirstRowUpPress : undefined}
           />
         )}
 
@@ -208,6 +211,7 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             rowId="featured-all"
             items={featuredItems.slice(1)}
             onItemClick={onSelectItem}
+            onRowUp={firstActiveRowId === 'featured-all' ? handleFirstRowUpPress : undefined}
           />
         )}
       </div>

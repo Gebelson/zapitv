@@ -46,7 +46,7 @@ const TvHeroButton: React.FC<{
       }
       return true;
     },
-    autoScroll: true
+    autoScroll: false
   });
 
   return (
@@ -97,7 +97,8 @@ const TvHeroIconButton: React.FC<{
         return false;
       }
       return true;
-    }
+    },
+    autoScroll: false
   });
 
   return (
@@ -270,6 +271,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
     <FocusContext.Provider value={focusKey}>
       <section 
         ref={noriginRef as any}
+        id="tv-hero-banner"
         className="relative w-full h-screen min-h-[100vh] select-none overflow-hidden"
         aria-label={`Destaque: ${currentItem.title}`}
         onMouseEnter={() => setIsPaused(true)}
@@ -290,14 +292,18 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
                 alt=""
                 aria-hidden="true"
                 className="absolute inset-0 w-full h-full object-cover object-center"
+                style={{
+                  maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 8%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 75%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0) 100%)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 8%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 75%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0) 100%)'
+                }}
               />
 
-              {/* Blur Progressivo Alinhado ao Backdrop (Desfoque suave no topo atrás do header e na base) */}
+              {/* Blur Progressivo Alinhado ao Backdrop (Desfoque real no topo atrás do header e na base) */}
               <div 
                 className="absolute inset-0 pointer-events-none overflow-hidden"
                 style={{
-                  maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 6%, rgba(0,0,0,0.3) 14%, rgba(0,0,0,0) 24%, rgba(0,0,0,0) 68%, rgba(0,0,0,0.35) 80%, rgba(0,0,0,0.85) 92%, rgba(0,0,0,1) 100%)',
-                  WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 6%, rgba(0,0,0,0.3) 14%, rgba(0,0,0,0) 24%, rgba(0,0,0,0) 68%, rgba(0,0,0,0.35) 80%, rgba(0,0,0,0.85) 92%, rgba(0,0,0,1) 100%)'
+                  maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 8%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 75%, rgba(0,0,0,0.85) 90%, rgba(0,0,0,1) 100%)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 8%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 75%, rgba(0,0,0,0.85) 90%, rgba(0,0,0,1) 100%)'
                 }}
               >
                 <img
@@ -324,6 +330,10 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
                 loading="eager"
                 decoding="async"
                 className="absolute inset-0 w-full h-full object-cover object-center"
+                style={{
+                  maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 8%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 75%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0) 100%)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 8%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 75%, rgba(0,0,0,0.4) 90%, rgba(0,0,0,0) 100%)'
+                }}
                 onError={(e) => {
                   if (currentItem.image && (e.currentTarget as HTMLImageElement).src !== currentItem.image) {
                     (e.currentTarget as HTMLImageElement).src = currentItem.image;
@@ -331,12 +341,12 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
                 }}
               />
 
-              {/* Blur Progressivo Alinhado ao Backdrop (Desfoque suave no topo atrás do header e na base) */}
+              {/* Blur Progressivo Alinhado ao Backdrop (Desfoque real no topo atrás do header e na base) */}
               <div 
                 className="absolute inset-0 pointer-events-none overflow-hidden"
                 style={{
-                  maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 6%, rgba(0,0,0,0.3) 14%, rgba(0,0,0,0) 24%, rgba(0,0,0,0) 68%, rgba(0,0,0,0.35) 80%, rgba(0,0,0,0.85) 92%, rgba(0,0,0,1) 100%)',
-                  WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 6%, rgba(0,0,0,0.3) 14%, rgba(0,0,0,0) 24%, rgba(0,0,0,0) 68%, rgba(0,0,0,0.35) 80%, rgba(0,0,0,0.85) 92%, rgba(0,0,0,1) 100%)'
+                  maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 8%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 75%, rgba(0,0,0,0.85) 90%, rgba(0,0,0,1) 100%)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 8%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 75%, rgba(0,0,0,0.85) 90%, rgba(0,0,0,1) 100%)'
                 }}
               >
                 <img
@@ -353,7 +363,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
           <div 
             className="absolute top-0 inset-x-0 h-[45%] bg-gradient-to-b from-[#05070a] pointer-events-none z-[2]"
             style={{
-              background: 'linear-gradient(to bottom, rgba(5,7,10,0.70) 0%, rgba(5,7,10,0.50) 8%, rgba(5,7,10,0.28) 16%, rgba(5,7,10,0.08) 28%, transparent 40%)'
+              background: 'linear-gradient(to bottom, rgba(5,7,10,0.80) 0%, rgba(5,7,10,0.55) 8%, rgba(5,7,10,0.25) 18%, rgba(5,7,10,0.06) 28%, transparent 42%)'
             }}
           />
 
@@ -369,7 +379,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
           <div 
             className="absolute bottom-0 inset-x-0 h-[45%] pointer-events-none z-[2]"
             style={{
-              background: 'linear-gradient(to top, rgba(5,7,10,1) 0%, rgba(5,7,10,0.85) 12%, rgba(5,7,10,0.50) 26%, rgba(5,7,10,0.15) 40%, transparent 58%)'
+              background: 'linear-gradient(to top, rgba(5,7,10,1) 0%, rgba(5,7,10,0.85) 12%, rgba(5,7,10,0.45) 26%, rgba(5,7,10,0.12) 40%, transparent 58%)'
             }}
           />
 

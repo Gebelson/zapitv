@@ -141,27 +141,23 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
       } ${className}`}
     >
       {/* GLOW AMBIENTE DAS CAPAS (Samsung The Frame / Tizen / Media Station X) */}
-      {/* Iluminação suave e atmosférica que acompanha as cores originais da capa */}
+      {/* Iluminação suave e atmosférica que acompanha as cores originais da capa, posicionada estritamente ATRÁS do card */}
       <div 
         className={`absolute -inset-3 sm:-inset-4 rounded-3xl pointer-events-none transition-all duration-300 transform-gpu ${
           isTvFocused && !suppressFocusBorder
-            ? (disableScale ? 'opacity-85' : 'opacity-85 scale-105') 
-            : 'opacity-25 scale-95'
+            ? 'opacity-35 scale-100' 
+            : 'opacity-15 scale-95'
         }`}
         style={{
           background: ambientGlowStyle,
           filter: 'blur(20px)',
-          zIndex: -1
+          zIndex: 0
         }}
         aria-hidden="true"
       />
 
-      {/* Caixa Vertical 2:3 Principal (Sem bordas duplicadas e sem corte nas extremidades) */}
-      <div className={`relative w-full aspect-[2/3] rounded-2xl overflow-hidden bg-[#0d121d] transition-all duration-200 shadow-xl ${
-        isTvFocused && !suppressFocusBorder
-          ? 'border-2 border-cyan-400 shadow-[0_0_24px_rgba(0,229,255,0.6),0_12px_28px_rgba(0,0,0,0.85)]'
-          : 'border-2 border-white/10 group-hover/tvcard:border-white/25'
-      }`}>
+      {/* Caixa Vertical 2:3 Principal (Poster com cores vivas e naturais, sem camada luminosa ou desbotamento sobre a imagem) */}
+      <div className="relative z-10 w-full aspect-[2/3] rounded-2xl overflow-hidden bg-[#0d121d] transition-all duration-200 shadow-xl border border-white/10 group-hover/tvcard:border-white/25">
         {/* Imagem do Poster Vertical 2:3 (Cores vivas, contraste natural e nitidez original) */}
         {!hasImageError && imgSrc ? (
           <img
@@ -171,7 +167,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
             decoding="async"
             referrerPolicy="no-referrer"
             onError={handleImgError}
-            className="w-full h-full object-cover object-center transition-transform duration-300 group-hover/tvcard:scale-105"
+            className="w-full h-full object-cover object-center"
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#131b2c] via-[#0d131f] to-[#070a0f] p-4 text-center">
@@ -181,7 +177,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
         )}
 
         {/* Gradiente de Legibilidade Suave e Restrito à Base (Preserva as cores originais, nitidez e luminosidade das capas) */}
-        <div className="absolute inset-x-0 bottom-0 h-24 sm:h-28 bg-gradient-to-t from-black/80 via-black/35 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-24 sm:h-28 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none" />
 
         {/* Informações Sobrepostas no Card Vertical */}
         <div className="absolute inset-x-0 bottom-0 p-3 sm:p-3.5 flex flex-col justify-end pointer-events-none">
@@ -218,6 +214,14 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
           </div>
         )}
       </div>
+
+      {/* Contorno Externo de Seleção para navegação individual (Respiro de 4px externo à capa, sem invadir os pixels do poster) */}
+      {isTvFocused && !suppressFocusBorder && (
+        <div 
+          className="absolute -inset-[4px] rounded-[20px] border-2 border-cyan-400 pointer-events-none z-20 shadow-[0_0_14px_rgba(0,229,255,0.45)]"
+          aria-hidden="true"
+        />
+      )}
     </div>
   );
 });

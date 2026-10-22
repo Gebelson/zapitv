@@ -230,37 +230,48 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
 
         {/* Trilho Horizontal Infinito de Ponta a Ponta na Tela */}
         <div className="relative w-full overflow-hidden py-8">
-          {/* MOLDURA FIXA DE SELEÇÃO: Permanece imóvel em SAFE_MARGIN_LEFT enquanto o conteúdo desliza por baixo */}
+          {/* 1. GLOW AMBIENTE SUTIL (ATRÁS DA CAPA): Iluminação discreta projetada no fundo da página */}
           {focused && currentItem && (
             <div 
-              className="absolute z-30 pointer-events-none transition-all duration-200"
+              className="absolute z-0 pointer-events-none transition-all duration-300"
               style={{
                 left: `${SAFE_MARGIN_LEFT}px`,
-                top: '2rem', // 32px alinhado exatamente ao py-8 do container
+                top: '2rem',
                 width: `${cardWidth}px`,
-                aspectRatio: '2/3'
+                height: `${Math.round(cardWidth * 1.5)}px`
               }}
+              aria-hidden="true"
             >
-              {/* Glow Ambiente Atmosférico que acompanha as cores do item selecionado */}
               <div 
-                className="absolute -inset-3 sm:-inset-4 rounded-3xl pointer-events-none transition-all duration-300 transform-gpu opacity-85"
+                className="absolute -inset-4 sm:-inset-5 rounded-3xl opacity-35 filter blur-xl transform-gpu pointer-events-none"
                 style={{
                   background: getCardAmbientGlow(currentItem),
-                  filter: 'blur(20px)',
-                  zIndex: -1
                 }}
-                aria-hidden="true"
               />
-
-              {/* Contorno Ciano Original ZapiTV de 2px com glow suave e cantos perfeitamente simétricos */}
-              <div className="w-full h-full rounded-2xl border-2 border-cyan-400 shadow-[0_0_24px_rgba(0,229,255,0.6),0_12px_28px_rgba(0,0,0,0.85)]" />
             </div>
           )}
 
-          {/* Track Deslizante com cards verticais 2:3 */}
+          {/* 2. MOLDURA EXTERNA DE SELEÇÃO (Z-30): Fica estritamente FORA da imagem, contornando o card com 4px de respiro */}
+          {focused && currentItem && (
+            <div 
+              className="absolute z-30 pointer-events-none transition-all duration-150 border-2 border-cyan-400"
+              style={{
+                left: `${SAFE_MARGIN_LEFT - 4}px`,
+                top: 'calc(2rem - 4px)',
+                width: `${cardWidth + 8}px`,
+                height: `${Math.round(cardWidth * 1.5) + 8}px`,
+                borderRadius: '20px',
+                boxShadow: '0 0 14px rgba(0, 229, 255, 0.45)',
+                background: 'transparent'
+              }}
+              aria-hidden="true"
+            />
+          )}
+
+          {/* 3. Track Deslizante com cards verticais 2:3 (Z-10, entre o glow de fundo e a moldura externa) */}
           <div 
             ref={trackRef}
-            className="flex items-center gap-6 will-change-transform"
+            className="relative z-10 flex items-center gap-6 will-change-transform"
             style={{
               transform: `translate3d(${baseOffset + translateX}px, 0, 0)`,
               transition: transitionEnabled ? 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
