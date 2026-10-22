@@ -1,14 +1,16 @@
 import path from 'path';
+import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'url';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
+export default defineConfig(() => {
+    let outputDir = path.resolve(__dirname, 'dist');
     return {
       server: {
         port: 3000,
@@ -16,17 +18,23 @@ export default defineConfig(({ mode }) => {
       },
       plugins: [react(), tailwindcss(), {
         name: 'offline-shell-assets',
+        configResolved(config) {
+          outputDir = path.resolve(config.root, config.build.outDir);
+        },
         generateBundle(_options, bundle) {
           const assets = Object.keys(bundle)
             .filter(file => /\.(?:js|css)$/.test(file))
             .map(file => `/${file}`);
           this.emitFile({ type: 'asset', fileName: 'offline-assets.json', source: JSON.stringify(assets) });
+        },
+        closeBundle() {
+          const shell = readFileSync(path.join(outputDir, 'index.html'));
+          const assets = readFileSync(path.join(outputDir, 'offline-assets.json'));
+          const swPath = path.join(outputDir, 'sw.js');
+          const version = createHash('sha256').update(shell).update(assets).digest('hex').slice(0, 12);
+          writeFileSync(swPath, readFileSync(swPath, 'utf8').replace('__BUILD_VERSION__', version));
         }
       }],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-      },
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),

@@ -234,7 +234,8 @@ async function runTvAppInterfaceTests() {
     tvProfileMenuCodeUpdated.includes('Atualizar ZapiTV') &&
     tvProfileMenuCodeUpdated.includes('window.location.reload()') &&
     tvProfileMenuCodeUpdated.includes('caches.delete') &&
-    tvProfileMenuCodeUpdated.includes('registration.update()'),
+    tvProfileMenuCodeUpdated.includes('registration.unregister()') &&
+    tvProfileMenuCodeUpdated.includes("key.startsWith('zapitv-shell-')"),
     'TvProfileMenu deve conter a opção Atualizar ZapiTV com focusKey tv-menu-update, limpeza de CacheStorage e window.location.reload()'
   );
   assert(

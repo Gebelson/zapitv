@@ -1,5 +1,5 @@
 // ZapiTV Service Worker - Suporte Offline & PWA App Shell
-const CACHE_NAME = 'zapitv-shell-v6';
+const CACHE_NAME = 'zapitv-shell-__BUILD_VERSION__';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -10,14 +10,18 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      let assets = [];
+      const response = await fetch('/offline-assets.json', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Lista de recursos indisponível');
+      const assets = await response.json();
+      if (!Array.isArray(assets)) throw new Error('Lista de recursos inválida');
+      // Só ativa uma nova versão se o shell e seus chunks estiverem completos.
       try {
-        const response = await fetch('/offline-assets.json', { cache: 'no-store' });
-        if (response.ok) assets = await response.json();
-      } catch {}
-      // Cada recurso é independente: um erro não descarta o app shell inteiro.
-      await Promise.allSettled([...PRECACHE_URLS, '/offline-assets.json', ...assets]
-        .map(url => cache.add(url)));
+        await Promise.all([...PRECACHE_URLS, '/offline-assets.json', ...assets]
+          .map(url => cache.add(url)));
+      } catch (error) {
+        await caches.delete(CACHE_NAME);
+        throw error;
+      }
       await self.skipWaiting();
     })()
   );

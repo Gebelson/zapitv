@@ -110,6 +110,9 @@ export const TvApp: React.FC<TvAppProps> = ({
   } | null>(null);
   const [tvWatchNotFound, setTvWatchNotFound] = useState(false);
   const [partyActive, setPartyActive] = useState(() => watchPartyService.getRoomState().isActive);
+  const [releasedItems, setReleasedItems] = useState(() => catalogReleaseStore.getReleases());
+
+  useEffect(() => catalogReleaseStore.subscribe(setReleasedItems), []);
 
   useEffect(() => watchPartyService.subscribe(event => {
     if (event === 'state_changed') setPartyActive(watchPartyService.getRoomState().isActive);
@@ -154,14 +157,14 @@ export const TvApp: React.FC<TvAppProps> = ({
       ...(animeItems || []),
       ...(trendingItems || []),
       ...(featuredItems || []),
-      ...catalogReleaseStore.getReleases(),
+      ...releasedItems,
       ...storageService.getCachedCatalog('top_rated'),
       ...canonicalCatalogMaster.getPublicCatalog('movies'),
       ...canonicalCatalogMaster.getPublicCatalog('series'),
       ...canonicalCatalogMaster.getPublicCatalog('animes'),
     ];
     return catalogEligibilityService.filterEligibleItemsSync(deduplicateContentItems(combined));
-  }, [content, popularMovies, popularSeries, animeItems, trendingItems, featuredItems]);
+  }, [content, popularMovies, popularSeries, animeItems, trendingItems, featuredItems, releasedItems]);
 
   // Itens da Minha Lista reais
   const myListItems = useMemo(() => {

@@ -71,7 +71,11 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
           const declared = video.dataset.sourceQuality || 'não declarada';
           const buffer = telemetry.bufferAheadSeconds.toFixed(1);
           const dropped = frames ? `${frames.droppedVideoFrames}/${frames.totalVideoFrames}` : 'não informado';
-          setVideoMetrics(`${resolution} · HLS/atual ${quality} · fonte ${declared} · buffer ${buffer}s · quadros perdidos ${dropped} · erro ${video.error?.code || 0}`);
+          const device = playbackOptimizerService.getDeviceProfile();
+          const engine = telemetry.streamSourceType === 'hls'
+            ? (video.currentSrc.startsWith('blob:') ? 'HLS.js' : 'HLS nativo')
+            : 'HTML5 nativo';
+          setVideoMetrics(`${device.deviceType} · ${engine} · ${resolution} · qualidade ${quality} · fonte ${declared} · buffer ${buffer}s · interrupções ${telemetry.bufferingCount} (${Math.round(telemetry.totalBufferingDurationMs / 1000)}s) · recuperações ${telemetry.stallsRecovered} · quadros perdidos ${dropped} · erro de mídia ${video.error?.code || 0}`);
         }
       }
     }, 250);

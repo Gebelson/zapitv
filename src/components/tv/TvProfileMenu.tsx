@@ -78,6 +78,7 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
   // Manipulador para atualizar ZapiTV (recarregamento real, bypass de cache e busca da versão Vercel)
   const handleUpdateApp = useCallback(async () => {
     if (isUpdating) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
     setIsUpdating(true);
 
     try {
@@ -86,7 +87,7 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
       if (typeof window !== 'undefined' && 'caches' in window) {
         try {
           const cacheKeys = await caches.keys();
-          await Promise.all(cacheKeys.map(key => caches.delete(key)));
+          await Promise.all(cacheKeys.filter(key => key.startsWith('zapitv-shell-')).map(key => caches.delete(key)));
         } catch (cacheErr) {
           console.warn('[TvProfileMenu] Aviso ao limpar CacheStorage:', cacheErr);
         }
@@ -97,10 +98,7 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
         try {
           const registrations = await navigator.serviceWorker.getRegistrations();
           for (const registration of registrations) {
-            await registration.update().catch(() => {});
-            if (registration.waiting) {
-              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-            }
+            if (registration.scope === `${window.location.origin}/`) await registration.unregister();
           }
         } catch (swErr) {
           console.warn('[TvProfileMenu] Aviso ao atualizar Service Worker:', swErr);

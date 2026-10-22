@@ -91,7 +91,7 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
         <TvContentRow
           title={`Todos os ${categoryTitle} Populares`}
           rowId={`all-${categoryTitle.toLowerCase()}`}
-          items={items.slice(0, 20)}
+          items={items}
           onItemClick={onSelectItem}
           onRowUp={handleFirstRowUpPress}
         />
