@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useCallback } from 'react';
-import { Bookmark, Clock, Settings, LogOut, ChevronRight } from 'lucide-react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { Bookmark, Clock, Settings, RotateCw, ChevronRight } from 'lucide-react';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
@@ -18,10 +18,15 @@ const TvProfileMenuItem: React.FC<{
   label: string;
   sublabel?: string;
   onClick: () => void;
-}> = ({ focusKey, icon, label, sublabel, onClick }) => {
+  disabled?: boolean;
+}> = ({ focusKey, icon, label, sublabel, onClick, disabled }) => {
   const { ref, focused } = useTvFocusable({
     focusKey,
-    onEnterPress: onClick,
+    onEnterPress: () => {
+      if (!disabled) {
+        onClick();
+      }
+    },
     autoScroll: true
   });
 
@@ -31,12 +36,17 @@ const TvProfileMenuItem: React.FC<{
       type="button"
       data-focus-key={focusKey}
       data-tv-focused={focused ? "true" : undefined}
-      onClick={onClick}
+      onClick={() => {
+        if (!disabled) {
+          onClick();
+        }
+      }}
+      disabled={disabled}
       className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-left transition-all duration-200 outline-none select-none ${
         focused
           ? 'bg-gradient-to-r from-cyan-500/25 to-blue-600/30 text-cyan-300 border border-cyan-400/60 shadow-[0_0_15px_rgba(0,229,255,0.35)] scale-[1.02]'
           : 'text-gray-200 hover:bg-white/10 border border-transparent'
-      }`}
+      } ${disabled ? 'opacity-75 cursor-not-allowed' : ''}`}
     >
       <div className="flex items-center gap-3">
         <div className={`p-2 rounded-lg ${focused ? 'bg-cyan-500/20 text-cyan-300' : 'bg-white/5 text-gray-400'}`}>
@@ -60,11 +70,58 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
   avatarUrl
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const { ref: noriginRef, focusKey } = useFocusable({
     focusKey: 'tv-profile-menu',
     trackChildren: true
   });
+
+  // Manipulador para atualizar ZapiTV (recarregamento real, bypass de cache e busca da versão Vercel)
+  const handleUpdateApp = useCallback(async () => {
+    if (isUpdating) return;
+    setIsUpdating(true);
+
+    try {
+      // 1. Limpar cache de assets estáticos do CacheStorage para forçar nova versão da Vercel
+      // NOTA: Preserva integralmente localStorage, indexedDB (sessão, histórico, preferências e favoritos mantidos)
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        try {
+          const cacheKeys = await caches.keys();
+          await Promise.all(cacheKeys.map(key => caches.delete(key)));
+        } catch (cacheErr) {
+          console.warn('[TvProfileMenu] Aviso ao limpar CacheStorage:', cacheErr);
+        }
+      }
+
+      // 2. Notificar e solicitar atualização aos Service Workers ativos
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.update().catch(() => {});
+            if (registration.waiting) {
+              registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+          }
+        } catch (swErr) {
+          console.warn('[TvProfileMenu] Aviso ao atualizar Service Worker:', swErr);
+        }
+      }
+    } catch (err) {
+      console.error('[TvProfileMenu] Erro durante rotina de atualização:', err);
+    }
+
+    // 3. Fornece tempo para feedback visual antes do recarregamento real no Tizen/MSX
+    setTimeout(() => {
+      try {
+        // Preserva a rota (/tv) e parâmetros de diagnóstico existentes (?tvdiag=1) sem sair do MSX
+        window.location.reload();
+      } catch (reloadErr) {
+        window.location.href = window.location.href;
+      }
+    }, 450);
+  }, [isUpdating]);
 
   // Registra manipulador do botão Voltar na pilha da TV (Prioridade 100 - Modal/Menu)
   useEffect(() => {
@@ -101,8 +158,10 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
       <div 
         className="fixed inset-0 z-[150] bg-black/40 backdrop-blur-none"
         onClick={() => {
-          onClose();
-          setFocus('tv-nav-profile');
+          if (!isUpdating) {
+            onClose();
+            setFocus('tv-nav-profile');
+          }
         }}
       />
 
@@ -164,6 +223,19 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
               onClose();
               onNavigate('settings');
             }}
+          />
+
+          {/* Divisor discreto para separar ação de sistema */}
+          <div className="my-1.5 border-t border-white/10" />
+
+          {/* Opção Atualizar ZapiTV */}
+          <TvProfileMenuItem
+            focusKey="tv-menu-update"
+            icon={<RotateCw className={`w-4 h-4 ${isUpdating ? 'animate-spin text-cyan-400' : ''}`} />}
+            label={isUpdating ? "Atualizando..." : "Atualizar ZapiTV"}
+            sublabel={isUpdating ? "Recarregando nova versão..." : "Recarregar e buscar nova versão"}
+            onClick={handleUpdateApp}
+            disabled={isUpdating}
           />
         </div>
       </div>

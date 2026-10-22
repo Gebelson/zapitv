@@ -227,7 +227,33 @@ async function runTvAppInterfaceTests() {
   );
   console.log('✓ Teste 17: TvHomeView sincronizada em tempo real com heroCarouselStore e múltiplos destaques configurados OK');
 
-  console.log('\nTodos os 17 testes da nova interface Smart TV passaram com sucesso!\n');
+  // Teste 18: Opção "Atualizar ZapiTV" no menu de perfil com recarga real e bypass de cache
+  const tvProfileMenuCodeUpdated = fs.readFileSync(tvProfileMenuPath, 'utf8');
+  assert(
+    tvProfileMenuCodeUpdated.includes('focusKey="tv-menu-update"') &&
+    tvProfileMenuCodeUpdated.includes('Atualizar ZapiTV') &&
+    tvProfileMenuCodeUpdated.includes('window.location.reload()') &&
+    tvProfileMenuCodeUpdated.includes('caches.delete') &&
+    tvProfileMenuCodeUpdated.includes('registration.update()'),
+    'TvProfileMenu deve conter a opção Atualizar ZapiTV com focusKey tv-menu-update, limpeza de CacheStorage e window.location.reload()'
+  );
+  assert(
+    !tvProfileMenuCodeUpdated.includes('localStorage.clear()') &&
+    !tvProfileMenuCodeUpdated.includes('indexedDB.deleteDatabase'),
+    'TvProfileMenu NÃO deve apagar dados do usuário como login, favoritos, histórico ou preferências'
+  );
+  // Validar ordem rigorosa: Minha Lista -> Histórico -> Configurações -> Atualizar ZapiTV
+  const idxMyList = tvProfileMenuCodeUpdated.indexOf('focusKey="tv-menu-mylist"');
+  const idxHistory = tvProfileMenuCodeUpdated.indexOf('focusKey="tv-menu-history"');
+  const idxSettings = tvProfileMenuCodeUpdated.indexOf('focusKey="tv-menu-settings"');
+  const idxUpdate = tvProfileMenuCodeUpdated.indexOf('focusKey="tv-menu-update"');
+  assert(
+    idxMyList < idxHistory && idxHistory < idxSettings && idxSettings < idxUpdate,
+    'A ordem das opções no menu de perfil deve ser rigorosamente: Minha Lista, Histórico, Configurações e Atualizar ZapiTV'
+  );
+  console.log('✓ Teste 18: Opção "Atualizar ZapiTV" implementada com ordem estrita, bypass de cache e integridade de dados OK');
+
+  console.log('\nTodos os 18 testes da nova interface Smart TV passaram com sucesso!\n');
 }
 
 runTvAppInterfaceTests().catch(err => {
