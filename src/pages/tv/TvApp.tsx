@@ -9,6 +9,9 @@ import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { canonicalCatalogMaster } from '../../core/catalog/CanonicalCatalogMaster';
 import { catalogReleaseStore } from '../../core/catalog/CatalogReleaseStore';
+import { watchPartyService } from '../../core/watchparty/WatchPartyService';
+import { useTvIdle } from '../../core/tv/useTvIdle';
+import { getTvScreensaverItems } from '../../core/tv/tvScreensaverCatalog';
 import { parseWatchRoute, getWatchRoute } from '../../core/routes/navigationRoutes';
 import { TvHeader, TvTab } from '../../components/tv/TvHeader';
 import { TvHomeView } from '../../components/tv/TvHomeView';
@@ -17,8 +20,10 @@ import { TvSearchView } from '../../components/tv/TvSearchView';
 import { TvListView } from '../../components/tv/TvListView';
 import { TvDetailsModal } from '../../components/tv/TvDetailsModal';
 import { TvRemoteDiagnosticOverlay } from '../../components/tv/TvRemoteDiagnosticOverlay';
+import { TvScreensaver } from '../../components/tv/TvScreensaver';
+import { TvWatchError } from '../../components/tv/TvWatchError';
 import { ZapiLoader } from '../../components/common/ZapiLoader';
-import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 // Lazy load do orquestrador de reprodução para máxima performance inicial na TV
 const ContentDetailModal = lazy(() => import('../../../components/ContentDetailModal'));
@@ -64,7 +69,7 @@ export const TvApp: React.FC<TvAppProps> = ({
 
     const timer = setTimeout(() => {
       try {
-        setFocus('tv-hero-play');
+        if (!parseWatchRoute(window.location.pathname).isWatch) setFocus('tv-hero-play');
       } catch {}
     }, 150);
 
@@ -104,6 +109,11 @@ export const TvApp: React.FC<TvAppProps> = ({
     episode?: number;
   } | null>(null);
   const [tvWatchNotFound, setTvWatchNotFound] = useState(false);
+  const [partyActive, setPartyActive] = useState(() => watchPartyService.getRoomState().isActive);
+
+  useEffect(() => watchPartyService.subscribe(event => {
+    if (event === 'state_changed') setPartyActive(watchPartyService.getRoomState().isActive);
+  }), []);
 
   const handleOpenDetailModal = useCallback((item: ContentItem) => {
     tvNavigationManager.saveFocusSnapshot();
@@ -263,6 +273,17 @@ export const TvApp: React.FC<TvAppProps> = ({
     navigate('/tv', { replace: true });
   }, [playingItem, selectedDetailItem, navigate]);
 
+  const handleLeaveWatchError = useCallback(() => {
+    setTvWatchNotFound(false);
+    setPlayingItem(null);
+    setSelectedDetailItem(null);
+    setSelectedDetailSeason(undefined);
+    setSpecialView(null);
+    setCurrentTab('home');
+    navigate('/tv', { replace: true });
+    requestAnimationFrame(() => setFocus('tv-hero-play'));
+  }, [navigate]);
+
   // A URL é a fonte de verdade: um Back que sai da rota de reprodução
   // também desmonta o player, mesmo se houver outro listener de TV ativo.
   useEffect(() => {
@@ -275,6 +296,29 @@ export const TvApp: React.FC<TvAppProps> = ({
 
   const currentWatchRoute = parseWatchRoute(location.pathname);
   const isTvWatchRoute = currentWatchRoute.isWatch && currentWatchRoute.isTv;
+  const screensaverActive = useTvIdle(!playingItem && !isTvWatchRoute && !partyActive);
+  const preSaverFocusRef = React.useRef<string | null>(null);
+  const wasSaverActiveRef = React.useRef(false);
+
+  useEffect(() => {
+    if (screensaverActive) {
+      preSaverFocusRef.current = getCurrentFocusKey() || null;
+      wasSaverActiveRef.current = true;
+      tvNavigationManager.pause();
+    } else if (wasSaverActiveRef.current) {
+      wasSaverActiveRef.current = false;
+      tvNavigationManager.resume();
+      if (preSaverFocusRef.current) setFocus(preSaverFocusRef.current);
+    }
+  }, [screensaverActive]);
+
+  const screensaverItems = useMemo(() => {
+    if (!screensaverActive) return [];
+    return getTvScreensaverItems(
+      [featuredItems, trendingItems, popularMovies, popularSeries, animeItems, fullTvCatalog],
+      activeProfile?.isChild === true
+    );
+  }, [screensaverActive, featuredItems, trendingItems, popularMovies, popularSeries, animeItems, fullTvCatalog, activeProfile?.isChild]);
   const playingMatchesRoute = !isTvWatchRoute ||
     (playingItem && (playingItem.item.id === currentWatchRoute.id || playingItem.item.imdbId === currentWatchRoute.id || playingItem.item.tmdbId === currentWatchRoute.id) &&
       getWatchRoute(playingItem.item, 1, 1, true).split('/')[3] ===
@@ -311,13 +355,14 @@ export const TvApp: React.FC<TvAppProps> = ({
         </div>
       ) : isTvWatchRoute ? (
         <div className="fixed inset-0 flex items-center justify-center bg-black text-white">
-          {tvWatchNotFound ? <div className="text-center"><p>Conteúdo não encontrado ou indisponível.</p><button className="mt-5 rounded-lg bg-[#007df7] px-5 py-2" onClick={() => navigate('/tv', { replace: true })}>Voltar à TV</button></div> : <ZapiLoader size="xl" />}
+          {tvWatchNotFound ? <TvWatchError onBack={handleLeaveWatchError} /> : <ZapiLoader size="xl" />}
         </div>
       ) : (
         <>
           {/* Cabeçalho Fixo Minimalista Cinematográfico */}
           {specialView !== 'search' && (
             <TvHeader
+              suspended={screensaverActive}
               currentTab={currentTab}
               onSelectTab={(tab) => {
                 setSpecialView(null);
@@ -378,6 +423,7 @@ export const TvApp: React.FC<TvAppProps> = ({
               </div>
             ) : currentTab === 'home' ? (
               <TvHomeView
+                suspended={screensaverActive}
                 featuredItems={featuredItems}
                 trendingItems={trendingItems}
                 popularMovies={popularMovies}
@@ -437,6 +483,7 @@ export const TvApp: React.FC<TvAppProps> = ({
               }}
             />
           )}
+          {screensaverActive && <TvScreensaver items={screensaverItems} />}
         </>
       )}
     </div>

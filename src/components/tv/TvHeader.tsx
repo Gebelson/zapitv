@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, User as UserIcon } from 'lucide-react';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
@@ -7,6 +7,7 @@ import { TvProfileMenu } from './TvProfileMenu';
 export type TvTab = 'home' | 'movies' | 'series' | 'animes' | 'featured';
 
 interface TvHeaderProps {
+  suspended?: boolean;
   currentTab: TvTab;
   onSelectTab: (tab: TvTab) => void;
   onOpenSearch: () => void;
@@ -68,6 +69,7 @@ const TvNavTabButton: React.FC<{
 };
 
 export const TvHeader: React.FC<TvHeaderProps> = ({
+  suspended = false,
   currentTab,
   onSelectTab,
   onOpenSearch,
@@ -78,6 +80,14 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
 }) => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const logoVideoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = logoVideoRef.current;
+    if (!video) return;
+    if (suspended) video.pause();
+    else void video.play().catch(() => {});
+  }, [suspended]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -152,6 +162,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
         >
           <div className="w-12 h-12 sm:w-[50px] sm:h-[50px] flex items-center justify-center relative flex-shrink-0">
             <video
+              ref={logoVideoRef}
               autoPlay
               loop
               muted

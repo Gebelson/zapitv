@@ -17,6 +17,7 @@ class TvNavigationManager {
   private backHandlers: BackHandler[] = [];
   private isInitialized: boolean = false;
   private lastFocusedKeyBeforeModal: string | null = null;
+  private activityHandler: ((event: KeyboardEvent) => boolean) | null = null;
 
   private constructor() {}
 
@@ -68,6 +69,12 @@ class TvNavigationManager {
   private handleGlobalKeyDown = (e: KeyboardEvent): void => {
     if (!tvModeService.isTvMode()) return;
 
+    if (this.activityHandler?.(e)) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
+
     const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
     const isBackKey =
       e.keyCode === 10009 ||
@@ -84,6 +91,11 @@ class TvNavigationManager {
       }
     }
   };
+
+  /** Único ponto de captura de teclas da TV para acordar a tela sem acionar o foco anterior. */
+  public setActivityHandler(handler: ((event: KeyboardEvent) => boolean) | null): void {
+    this.activityHandler = handler;
+  }
 
   /**
    * Registra um manipulador na pilha de 'Voltar'.

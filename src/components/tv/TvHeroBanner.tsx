@@ -12,6 +12,7 @@ interface TvHeroBannerProps {
   onOpenDetails: (item: ContentItem) => void;
   onDownPress?: () => void;
   autoRotateInterval?: number; // Padrão de 8 segundos (8000ms)
+  suspended?: boolean;
 }
 
 const TvHeroButton: React.FC<{
@@ -126,6 +127,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
   onPlay,
   onOpenDetails,
   onDownPress,
+  suspended = false,
   autoRotateInterval = 8000
 }) => {
   const { ref: noriginRef, focusKey } = useFocusable({
@@ -264,12 +266,12 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
   // Reinicia o timer de rotação automática
   const resetTimer = useCallback(() => {
     if (autoPlayTimerRef.current) clearInterval(autoPlayTimerRef.current);
-    if (slides.length <= 1 || isPaused || isDiagnostic) return;
+    if (slides.length <= 1 || isPaused || isDiagnostic || suspended) return;
 
     autoPlayTimerRef.current = setInterval(() => {
       goToNextSlide();
     }, autoRotateInterval);
-  }, [slides.length, isPaused, isDiagnostic, autoRotateInterval, goToNextSlide]);
+  }, [slides.length, isPaused, isDiagnostic, suspended, autoRotateInterval, goToNextSlide]);
 
   // Gerenciamento da rotação automática com pause e resume inteligentes
   useEffect(() => {

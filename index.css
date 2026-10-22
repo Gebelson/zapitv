@@ -161,3 +161,11 @@ body.tv-mode .zapi-tv-root .backdrop-blur-3xl {
 .zapi-watch-route > :not(.zapi-watch-surface) {
   display: none !important;
 }
+@keyframes tvScreensaverFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.zapi-tv-root .tv-screensaver-enter {
+  animation: tvScreensaverFade 700ms ease-out both;
+}

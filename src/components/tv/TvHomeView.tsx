@@ -7,6 +7,7 @@ import { TvContentRow } from './TvContentRow';
 import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvHomeViewProps {
+  suspended?: boolean;
   featuredItems: ContentItem[];
   trendingItems: ContentItem[];
   popularMovies: ContentItem[];
@@ -18,6 +19,7 @@ interface TvHomeViewProps {
 }
 
 export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
+  suspended = false,
   featuredItems,
   trendingItems,
   popularMovies,
@@ -140,6 +142,7 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
       {heroSlides.length > 0 && (
         <TvHeroBanner
           items={heroSlides}
+          suspended={suspended}
           onPlay={onPlayItem}
           onOpenDetails={onSelectItem}
           onDownPress={handleHeroDownPress}
