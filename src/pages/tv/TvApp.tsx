@@ -4,6 +4,10 @@ import { ContentItem, User, Profile } from '../../../types';
 import { storageService } from '../../core/storage/storageService';
 import { tvModeService } from '../../core/tv/tvModeService';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
+import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication';
+import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
+import { canonicalCatalogMaster } from '../../core/catalog/CanonicalCatalogMaster';
+import { catalogReleaseStore } from '../../core/catalog/CatalogReleaseStore';
 import { TvHeader, TvTab } from '../../components/tv/TvHeader';
 import { TvHomeView } from '../../components/tv/TvHomeView';
 import { TvCategoryView } from '../../components/tv/TvCategoryView';
@@ -128,6 +132,24 @@ export const TvApp: React.FC<TvAppProps> = ({
     });
   }, [specialView, currentTab]);
 
+  // Catálogo completo unificado e elegível para a busca e detalhes da Smart TV
+  const fullTvCatalog = useMemo(() => {
+    const combined = [
+      ...(content || []),
+      ...(popularMovies || []),
+      ...(popularSeries || []),
+      ...(animeItems || []),
+      ...(trendingItems || []),
+      ...(featuredItems || []),
+      ...catalogReleaseStore.getReleases(),
+      ...storageService.getCachedCatalog('top_rated'),
+      ...canonicalCatalogMaster.getPublicCatalog('movies'),
+      ...canonicalCatalogMaster.getPublicCatalog('series'),
+      ...canonicalCatalogMaster.getPublicCatalog('animes'),
+    ];
+    return catalogEligibilityService.filterEligibleItemsSync(deduplicateContentItems(combined));
+  }, [content, popularMovies, popularSeries, animeItems, trendingItems, featuredItems]);
+
   // Itens da Minha Lista reais
   const myListItems = useMemo(() => {
     if (!content || !myList) return [];
@@ -165,7 +187,7 @@ export const TvApp: React.FC<TvAppProps> = ({
       <TvRemoteDiagnosticOverlay />
 
       {/* Cabeçalho Fixo Minimalista Cinematográfico */}
-      {!playingItem && (
+      {!playingItem && specialView !== 'search' && (
         <TvHeader
           currentTab={currentTab}
           onSelectTab={(tab) => {
@@ -188,10 +210,10 @@ export const TvApp: React.FC<TvAppProps> = ({
       )}
 
       {/* Visão Ativa */}
-      <main className={`relative z-10 w-full min-h-screen ${specialView ? 'pt-24' : 'pt-0'}`}>
+      <main className={`relative z-10 w-full min-h-screen ${specialView && specialView !== 'search' ? 'pt-24' : 'pt-0'}`}>
         {specialView === 'search' ? (
           <TvSearchView
-            allContent={content}
+            allContent={fullTvCatalog}
             onSelectItem={handleOpenDetailModal}
             onClose={() => {
               setSpecialView(null);
@@ -272,7 +294,7 @@ export const TvApp: React.FC<TvAppProps> = ({
         <TvDetailsModal
           item={selectedDetailItem}
           initialSeason={selectedDetailSeason}
-          allContent={content}
+          allContent={fullTvCatalog}
           myList={myList}
           favorites={favorites}
           onToggleList={onToggleList}

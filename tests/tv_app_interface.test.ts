@@ -253,10 +253,98 @@ async function runTvAppInterfaceTests() {
   );
   console.log('✓ Teste 18: Opção "Atualizar ZapiTV" implementada com ordem estrita, bypass de cache e integridade de dados OK');
 
-  console.log('\nTodos os 18 testes da nova interface Smart TV passaram com sucesso!\n');
+  // Teste 19: Reformulação completa da Busca na Smart TV (Layout 2 Colunas, Teclado Virtual, Filtros, Sugestões e Catálogo Completo)
+  const tvSearchPath = path.resolve(process.cwd(), 'src/components/tv/TvSearchView.tsx');
+  assert(fs.existsSync(tvSearchPath), 'TvSearchView.tsx deve existir');
+  const tvSearchCode = fs.readFileSync(tvSearchPath, 'utf8');
+
+  // 1. Estrutura em 2 Colunas conforme a referência
+  assert(
+    tvSearchCode.includes('flex flex-row') &&
+    tvSearchCode.includes('COLUNA ESQUERDA') &&
+    tvSearchCode.includes('COLUNA DIREITA'),
+    'TvSearchView deve implementar o layout de tela dividida em 2 colunas'
+  );
+
+  // 2. Elementos obrigatórios da Coluna Esquerda
+  assert(
+    tvSearchCode.includes('tv-search-back') &&
+    tvSearchCode.includes('Voltar'),
+    'Coluna esquerda deve conter o botão Voltar (tv-search-back)'
+  );
+  assert(
+    tvSearchCode.includes('tv-search-input'),
+    'Coluna esquerda deve conter a caixa com o termo pesquisado (tv-search-input)'
+  );
+  assert(
+    tvSearchCode.includes('tv-key-space') &&
+    tvSearchCode.includes('tv-key-backspace') &&
+    tvSearchCode.includes('tv-key-clear') &&
+    tvSearchCode.includes('KEYBOARD_GRID') &&
+    tvSearchCode.includes('tv-key-${k}'),
+    'Coluna esquerda deve conter o teclado virtual integrado com teclas utilitárias e grid alfanumérico completo'
+  );
+  assert(
+    tvSearchCode.includes('tv-suggest-') &&
+    tvSearchCode.includes('Sugestões'),
+    'Coluna esquerda deve conter a lista de sugestões logo abaixo do teclado'
+  );
+
+  // 3. Elementos obrigatórios da Coluna Direita
+  assert(
+    tvSearchCode.includes('tv-filter-${id}') &&
+    tvSearchCode.includes("id: 'all'") &&
+    tvSearchCode.includes("id: 'movies'") &&
+    tvSearchCode.includes("id: 'series'") &&
+    tvSearchCode.includes("id: 'animes'"),
+    'Coluna direita deve conter os filtros de categoria: Todos, Filmes, Séries e Animes'
+  );
+  assert(
+    tvSearchCode.includes('<TvCard16x9') &&
+    tvSearchCode.includes('focusKeyPrefix="tv-search-card"'),
+    'Coluna direita deve renderizar a grade de capas com TvCard16x9 e foco externo'
+  );
+  assert(
+    !tvSearchCode.includes('.slice(0, 30)'),
+    'TvSearchView NÃO deve truncar o catálogo com slice(0, 30) arbitrário'
+  );
+
+  // 4. Integração do Catálogo Completo em TvApp.tsx
+  const tvAppPath = path.resolve(process.cwd(), 'src/pages/tv/TvApp.tsx');
+  const tvAppCode = fs.readFileSync(tvAppPath, 'utf8');
+  assert(
+    tvAppCode.includes('fullTvCatalog') &&
+    tvAppCode.includes('popularMovies') &&
+    tvAppCode.includes('popularSeries') &&
+    tvAppCode.includes('animeItems') &&
+    tvAppCode.includes('trendingItems') &&
+    tvAppCode.includes('allContent={fullTvCatalog}'),
+    'TvApp deve alimentar a busca da TV com o catálogo completo unificado e deduplicado'
+  );
+
+  // 5. Verificação da Normalização de Texto e Busca Multi-Campo
+  const { normalizeSearchTerm } = await import('../src/components/tv/TvSearchView');
+  assert(
+    normalizeSearchTerm('Ficção Científica') === 'ficcao cientifica',
+    'normalizeSearchTerm deve remover acentos de "Ficção Científica"'
+  );
+  assert(
+    normalizeSearchTerm('Ação & Aventura') === 'acao aventura',
+    'normalizeSearchTerm deve normalizar "Ação & Aventura"'
+  );
+  assert(
+    normalizeSearchTerm('Stranger Things: 4ª Temporada') === 'stranger things 4 temporada',
+    'normalizeSearchTerm deve remover caracteres especiais preservando termos de busca'
+  );
+
+  console.log('✓ Teste 19: Reformulação da busca, teclado virtual, filtros, sugestões e catálogo completo OK');
+
+  console.log('\nTodos os 19 testes da nova interface Smart TV passaram com sucesso!\n');
 }
 
-runTvAppInterfaceTests().catch(err => {
+runTvAppInterfaceTests().then(() => {
+  process.exit(0);
+}).catch(err => {
   console.error('\n❌ Falha nos testes de interface Smart TV:', err);
   process.exit(1);
 });
