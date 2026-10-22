@@ -56,6 +56,19 @@ function createApp() {
   const app = express();
   const activeRequests = new Map<string, number>();
   const validationWindows = new Map<string, { count: number; expires: number }>();
+  const allowPublicRequest = (key: string, limit: number): boolean => {
+    const now = Date.now();
+    const window = validationWindows.get(key);
+    const nextWindow = !window || window.expires < now ? { count: 1, expires: now + 60000 } : { count: window.count + 1, expires: window.expires };
+    validationWindows.set(key, nextWindow);
+    if (validationWindows.size > 4096) {
+      for (const [entryKey, entry] of validationWindows) {
+        if (entry.expires < now) validationWindows.delete(entryKey);
+      }
+      while (validationWindows.size > 4096) validationWindows.delete(validationWindows.keys().next().value!);
+    }
+    return nextWindow.count <= limit;
+  };
 
   // Normalização de rotas em ambientes serverless da Vercel (rewrites para /api/index)
   app.use((req, _res, next) => {
@@ -78,21 +91,28 @@ function createApp() {
 
   // Enable JSON parsing
   app.use(express.json());
+  app.use('/api/watchparty', (req, res, next) => {
+    if (!allowPublicRequest(`watchparty:${req.ip || 'unknown'}`, 1800) ||
+        (req.path === '/room/announce' && !allowPublicRequest(`watchparty-announce:${req.ip || 'unknown'}`, 120))) {
+      return res.status(429).set('Retry-After', '60').json({ error: 'Muitas solicitações à sala.' });
+    }
+    next();
+  });
+  app.use('/api/recommendations/events', (req, res, next) => {
+    if (!allowPublicRequest(`recommendations:${req.ip || 'unknown'}`, 240)) {
+      return res.status(429).set('Retry-After', '60').json({ error: 'Muitos eventos enviados.' });
+    }
+    next();
+  });
   app.use(['/api/proxy', '/api/validate-stream'], (req, res, next) => {
     const endpoint = req.path;
     const limit = endpoint === '/api/proxy' ? 128 : 24;
     const active = activeRequests.get(endpoint) || 0;
     if (active >= limit) return res.status(503).set('Retry-After', '2').json({ error: 'Capacidade temporariamente ocupada.' });
     if (endpoint === '/api/validate-stream') {
-      const now = Date.now();
-      const key = req.ip || 'unknown';
-      const window = validationWindows.get(key);
-      const nextWindow = !window || window.expires < now ? { count: 1, expires: now + 60000 } : { count: window.count + 1, expires: window.expires };
-      validationWindows.set(key, nextWindow);
-      if (validationWindows.size > 1000) {
-        for (const [ip, entry] of validationWindows) if (entry.expires < now) validationWindows.delete(ip);
+      if (!allowPublicRequest(`validation:${req.ip || 'unknown'}`, 600)) {
+        return res.status(429).set('Retry-After', '60').json({ error: 'Limite temporário de validações excedido.' });
       }
-      if (nextWindow.count > 600) return res.status(429).set('Retry-After', '60').json({ error: 'Limite temporário de validações excedido.' });
     }
     activeRequests.set(endpoint, active + 1);
     let released = false;
@@ -1121,8 +1141,9 @@ function createApp() {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { anonymousId, contentId, weight, timestamp } = req.body || {};
-      if (!anonymousId || !contentId) {
-        return res.status(400).json({ error: "anonymousId e contentId são obrigatórios" });
+      if (typeof anonymousId !== 'string' || anonymousId.length < 16 || anonymousId.length > 128 ||
+          typeof contentId !== 'string' || !contentId || contentId.length > 256) {
+        return res.status(400).json({ error: "Identificadores inválidos" });
       }
       const ok = await collaborativeTrainer.ingestEvent({
         anonymousId,
@@ -1130,7 +1151,7 @@ function createApp() {
         weight: Number(weight) || 0.5,
         timestamp: Number(timestamp) || Date.now()
       });
-      return res.json({ success: ok });
+      return res.status(ok ? 200 : 503).json({ success: ok });
     } catch (err: any) {
       return res.status(500).json({ error: "Erro ao registrar evento colaborativo", details: err?.message });
     }
@@ -1158,6 +1179,9 @@ function createApp() {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { anonymousId } = req.params;
+      if (typeof anonymousId !== 'string' || anonymousId.length < 16 || anonymousId.length > 128) {
+        return res.status(400).json({ error: 'Identificador inválido' });
+      }
       const ok = await collaborativeTrainer.purgeUserData(anonymousId);
       return res.json({ success: ok, message: "Dados do identificador purgados com sucesso" });
     } catch (err: any) {

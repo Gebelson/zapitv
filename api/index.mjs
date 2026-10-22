@@ -20770,6 +20770,19 @@ function createApp() {
   const app2 = express();
   const activeRequests = /* @__PURE__ */ new Map();
   const validationWindows = /* @__PURE__ */ new Map();
+  const allowPublicRequest = (key, limit) => {
+    const now = Date.now();
+    const window2 = validationWindows.get(key);
+    const nextWindow = !window2 || window2.expires < now ? { count: 1, expires: now + 6e4 } : { count: window2.count + 1, expires: window2.expires };
+    validationWindows.set(key, nextWindow);
+    if (validationWindows.size > 4096) {
+      for (const [entryKey, entry] of validationWindows) {
+        if (entry.expires < now) validationWindows.delete(entryKey);
+      }
+      while (validationWindows.size > 4096) validationWindows.delete(validationWindows.keys().next().value);
+    }
+    return nextWindow.count <= limit;
+  };
   app2.use((req, _res, next) => {
     if (req.url && req.url.startsWith("/api/index")) {
       const queryIdx = req.url.indexOf("?");
@@ -20787,21 +20800,27 @@ function createApp() {
     next();
   });
   app2.use(express.json());
+  app2.use("/api/watchparty", (req, res, next) => {
+    if (!allowPublicRequest(`watchparty:${req.ip || "unknown"}`, 1800) || req.path === "/room/announce" && !allowPublicRequest(`watchparty-announce:${req.ip || "unknown"}`, 120)) {
+      return res.status(429).set("Retry-After", "60").json({ error: "Muitas solicita\xE7\xF5es \xE0 sala." });
+    }
+    next();
+  });
+  app2.use("/api/recommendations/events", (req, res, next) => {
+    if (!allowPublicRequest(`recommendations:${req.ip || "unknown"}`, 240)) {
+      return res.status(429).set("Retry-After", "60").json({ error: "Muitos eventos enviados." });
+    }
+    next();
+  });
   app2.use(["/api/proxy", "/api/validate-stream"], (req, res, next) => {
     const endpoint = req.path;
     const limit = endpoint === "/api/proxy" ? 128 : 24;
     const active = activeRequests.get(endpoint) || 0;
     if (active >= limit) return res.status(503).set("Retry-After", "2").json({ error: "Capacidade temporariamente ocupada." });
     if (endpoint === "/api/validate-stream") {
-      const now = Date.now();
-      const key = req.ip || "unknown";
-      const window2 = validationWindows.get(key);
-      const nextWindow = !window2 || window2.expires < now ? { count: 1, expires: now + 6e4 } : { count: window2.count + 1, expires: window2.expires };
-      validationWindows.set(key, nextWindow);
-      if (validationWindows.size > 1e3) {
-        for (const [ip, entry] of validationWindows) if (entry.expires < now) validationWindows.delete(ip);
+      if (!allowPublicRequest(`validation:${req.ip || "unknown"}`, 600)) {
+        return res.status(429).set("Retry-After", "60").json({ error: "Limite tempor\xE1rio de valida\xE7\xF5es excedido." });
       }
-      if (nextWindow.count > 600) return res.status(429).set("Retry-After", "60").json({ error: "Limite tempor\xE1rio de valida\xE7\xF5es excedido." });
     }
     activeRequests.set(endpoint, active + 1);
     let released = false;
@@ -21679,8 +21698,8 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { anonymousId, contentId, weight, timestamp } = req.body || {};
-      if (!anonymousId || !contentId) {
-        return res.status(400).json({ error: "anonymousId e contentId s\xE3o obrigat\xF3rios" });
+      if (typeof anonymousId !== "string" || anonymousId.length < 16 || anonymousId.length > 128 || typeof contentId !== "string" || !contentId || contentId.length > 256) {
+        return res.status(400).json({ error: "Identificadores inv\xE1lidos" });
       }
       const ok = await collaborativeTrainer.ingestEvent({
         anonymousId,
@@ -21688,7 +21707,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
         weight: Number(weight) || 0.5,
         timestamp: Number(timestamp) || Date.now()
       });
-      return res.json({ success: ok });
+      return res.status(ok ? 200 : 503).json({ success: ok });
     } catch (err) {
       return res.status(500).json({ error: "Erro ao registrar evento colaborativo", details: err?.message });
     }
@@ -21710,6 +21729,9 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const { anonymousId } = req.params;
+      if (typeof anonymousId !== "string" || anonymousId.length < 16 || anonymousId.length > 128) {
+        return res.status(400).json({ error: "Identificador inv\xE1lido" });
+      }
       const ok = await collaborativeTrainer.purgeUserData(anonymousId);
       return res.json({ success: ok, message: "Dados do identificador purgados com sucesso" });
     } catch (err) {
