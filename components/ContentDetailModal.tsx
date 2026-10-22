@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Play, Bookmark, Heart, ChevronDown, ChevronUp, AlertCircle, Users } from 'lucide-react';
 import { ContentItem, ContentType } from '../types';
 import { tmdbService } from '../src/core/tmdb/tmdbClient';
@@ -27,6 +28,7 @@ import { tvModeService } from '../src/core/tv/tvModeService';
 import { tvNavigationManager } from '../src/core/tv/tvNavigationManager';
 import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { mobileFullscreenService } from '../src/core/mobile/mobileFullscreenService';
+import { getWatchRoute, getContentRoute, parseWatchRoute } from '../src/core/routes/navigationRoutes';
 
 const DetailModalTvButton: React.FC<{
   focusKey: string;
@@ -175,6 +177,8 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   item: initialItem, onClose, isDarkMode, myList, favorites, onToggleList, onToggleFavorite, allContent,
   initialSeason, initialEpisode, autoPlayInitialEpisode, playerOnly = false
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const modalRef = useRef<HTMLDivElement>(null);
   const [item, setItem] = useState<ContentItem>(initialItem);
   const [isSimilarExpanded, setIsSimilarExpanded] = useState(false);
@@ -457,7 +461,8 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     playbackRequestIdRef.current++;
     cancelAllPendingRequests();
     if (loadingTraceIdRef.current) mediaLoadingTracker.endTrace(loadingTraceIdRef.current, 'CANCELLED');
-    if (!playerOnly) {
+    const isTv = tvModeService.isTvMode() || location.pathname.startsWith('/tv');
+    if (!playerOnly || !isTv) {
       setIsPlaying(false);
       setResolvedStreams([]);
     }
@@ -468,8 +473,18 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     }
     setPlaybackSessionId('');
     setSessionIntroPlayed(false);
-    if (playerOnly) onClose();
-  }, [cancelAllPendingRequests, playbackSessionId, playerOnly, onClose]);
+
+    const parsed = parseWatchRoute(location.pathname);
+    if (parsed.isWatch) {
+      if (isTv) {
+        navigate('/tv', { replace: true });
+      } else {
+        navigate(getContentRoute(item), { replace: true });
+      }
+    }
+
+    if (playerOnly && isTv) onClose();
+  }, [cancelAllPendingRequests, playbackSessionId, playerOnly, onClose, location.pathname, navigate, item]);
 
   // Click outside to close (apenas quando não estiver no player e nenhum modal flutuante estiver aberto)
   useEffect(() => {
@@ -711,6 +726,12 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       }
     } else {
       setCurrentEpisodeParams(null);
+    }
+
+    const isTv = tvModeService.isTvMode() || location.pathname.startsWith('/tv');
+    const targetWatchRoute = getWatchRoute(currentTargetItem, epParams?.season, epParams?.episode, isTv);
+    if (location.pathname !== targetWatchRoute) {
+      navigate(targetWatchRoute, { replace: navType === 'continuous_playback' });
     }
 
     const requestedKey = (currentTargetItem.mediaFormat === 'movie' || currentTargetItem.type === ContentType.MOVIE)
@@ -979,6 +1000,9 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     if (watchPartyService.isConnected && (watchPartyService.isHost() || watchPartyService.canLocalControl('canChangeEpisode'))) {
       watchPartyService.changeEpisode(nextEpisodeInfo.season, nextEpisodeInfo.episode);
     }
+    const isTv = tvModeService.isTvMode() || location.pathname.startsWith('/tv');
+    const nextRoute = getWatchRoute(item, nextEpisodeInfo.season, nextEpisodeInfo.episode, isTv);
+    navigate(nextRoute, { replace: true });
     startPlayback(nextEpisodeInfo.season, nextEpisodeInfo.episode, 'continuous_playback');
   };
 
@@ -1038,8 +1062,10 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     );
   };
 
+  const isPlayerSurfaceActive = isPlaying || playerOnly;
+
   return (
-    <div className={`fixed inset-0 z-[400] overflow-y-auto overflow-x-hidden no-scrollbar bg-black/80 backdrop-blur-md ${
+    <div className={isPlayerSurfaceActive ? "zapi-watch-surface fixed inset-0 z-[2000] overflow-hidden bg-black select-none" : `fixed inset-0 z-[400] overflow-y-auto overflow-x-hidden no-scrollbar bg-black/80 backdrop-blur-md ${
       isClosing ? 'animate-out fade-out duration-300' : 'animate-in fade-in duration-300'
     }`}>
       {isPlaying && (

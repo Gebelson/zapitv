@@ -28,13 +28,14 @@
     "test:playback-remote-sync": "tsx tests/playback_remote_sync.test.ts",
     "test:source-playability": "tsx tests/source_playability.test.ts",
     "test:playback-trace": "tsx tests/playback_trace.test.ts",
+    "test:watch-routes": "tsx tests/watch_routes.test.ts",
     "test:tv-navigation": "tsx tests/tv_mode_navigation.test.ts",
     "test:tv-interface": "tsx tests/tv_app_interface.test.ts",
     "test:tv-isolation": "tsx tests/tv_desktop_isolation.test.ts",
     "test:skip-buttons": "tsx tests/skip_buttons_player.test.ts",
     "test:mobile-fullscreen": "tsx tests/mobile_fullscreen_orientation.test.ts",
     "test:season-matching": "tsx tests/season_episode_matching.test.ts",
-    "test:stability": "npm run test:watchparty-state && npm run test:watchparty-intro && npm run test:watchparty-media && npm run test:playback-remote-sync && npm run test:source-playability && npm run test:playback-trace && npm run test:tv-navigation && npm run test:tv-interface && npm run test:tv-isolation && npm run test:skip-buttons && npm run test:mobile-fullscreen && npm run test:season-matching && npm run test:feedback-admin && npm run test:feedback-persistence && npm run test:catalog-identity && npm run test:cinemeta-identity && npm run test:catalog-release-persistence && npm run test:maintenance-auth",
+    "test:stability": "npm run test:watchparty-state && npm run test:watchparty-intro && npm run test:watchparty-media && npm run test:playback-remote-sync && npm run test:source-playability && npm run test:playback-trace && npm run test:watch-routes && npm run test:tv-navigation && npm run test:tv-interface && npm run test:tv-isolation && npm run test:skip-buttons && npm run test:mobile-fullscreen && npm run test:season-matching && npm run test:feedback-admin && npm run test:feedback-persistence && npm run test:catalog-identity && npm run test:cinemeta-identity && npm run test:catalog-release-persistence && npm run test:maintenance-auth",
     "start": "node server.ts"
   },
   "dependencies": {

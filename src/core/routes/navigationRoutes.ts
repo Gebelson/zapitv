@@ -25,8 +25,27 @@ export const ROUTES = {
   DEV_LAB: '/dev/video-enhancement-lab',
   DEV_PLAYER_TEST: '/dev/player-test',
   WATCH_PARTY: '/sala/:roomId',
+  WATCH_MOVIE: '/assistir/filme/:id',
+  WATCH_SERIES: '/assistir/serie/:id/t/:season/e/:episode',
+  WATCH_SERIES_SHORT: '/assistir/serie/:id',
+  WATCH_ANIME: '/assistir/anime/:id/t/:season/e/:episode',
+  WATCH_ANIME_SHORT: '/assistir/anime/:id',
+  TV_WATCH_MOVIE: '/tv/assistir/filme/:id',
+  TV_WATCH_SERIES: '/tv/assistir/serie/:id/t/:season/e/:episode',
+  TV_WATCH_SERIES_SHORT: '/tv/assistir/serie/:id',
+  TV_WATCH_ANIME: '/tv/assistir/anime/:id/t/:season/e/:episode',
+  TV_WATCH_ANIME_SHORT: '/tv/assistir/anime/:id',
   NOT_FOUND: '*'
 } as const;
+
+export interface ParsedWatchRoute {
+  isWatch: boolean;
+  isTv: boolean;
+  mediaType?: 'movie' | 'series' | 'anime';
+  id?: string;
+  season?: number;
+  episode?: number;
+}
 
 export function getActorRoute(actorId: string | number): string {
   const cleanId = String(actorId).replace(/^tmdb-actor-?/i, '');
@@ -52,5 +71,75 @@ export function getEpisodeRoute(item: ContentItem, season: number, episode: numb
 
 export function getWatchPartyRoute(roomId: string): string {
   return `/sala/${roomId}`;
+}
+
+export function getWatchRoute(
+  item: ContentItem,
+  season?: number,
+  episode?: number,
+  isTv: boolean = false
+): string {
+  const prefix = isTv ? '/tv' : '';
+  const isAnime = item.type === ContentType.ANIME || item.genres?.includes('Anime');
+  const isSeries = item.mediaFormat !== 'movie' && (item.type === ContentType.SERIES || isAnime);
+
+  if (isSeries) {
+    const s = season ?? 1;
+    const e = episode ?? 1;
+    const typeSegment = isAnime ? 'anime' : 'serie';
+    return `${prefix}/assistir/${typeSegment}/${encodeURIComponent(item.id)}/t/${s}/e/${e}`;
+  }
+
+  return `${prefix}/assistir/filme/${encodeURIComponent(item.id)}`;
+}
+
+export function parseWatchRoute(pathname: string): ParsedWatchRoute {
+  if (!pathname) return { isWatch: false, isTv: false };
+
+  // Match /tv/assistir or /assistir
+  const isTv = /^\/tv\/assistir(?:\/|$)/.test(pathname);
+  const cleanPath = isTv ? pathname.replace(/^\/tv/, '') : pathname;
+
+  if (!cleanPath.startsWith('/assistir/')) {
+    return { isWatch: false, isTv: false };
+  }
+
+  // 1. /assistir/filme/:id
+  const movieMatch = cleanPath.match(/^\/assistir\/filme\/([^/?#]+)\/?$/i);
+  if (movieMatch) {
+    return {
+      isWatch: true,
+      isTv,
+      mediaType: 'movie',
+      id: safeDecodeWatchId(movieMatch[1])
+    };
+  }
+
+  // 2. /assistir/(serie|anime)/:id/t/:season/e/:episode or /assistir/(serie|anime)/:id
+  const seriesMatch = cleanPath.match(/^\/assistir\/(serie|anime)\/([^/?#]+)(?:\/t\/([1-9]\d*)\/e\/([1-9]\d*))?\/?$/i);
+  if (seriesMatch) {
+    const mediaType = seriesMatch[1].toLowerCase() === 'anime' ? 'anime' : 'series';
+    const id = safeDecodeWatchId(seriesMatch[2]);
+    const season = seriesMatch[3] ? parseInt(seriesMatch[3], 10) : undefined;
+    const episode = seriesMatch[4] ? parseInt(seriesMatch[4], 10) : undefined;
+    return {
+      isWatch: true,
+      isTv,
+      mediaType,
+      id,
+      season,
+      episode
+    };
+  }
+
+  return { isWatch: true, isTv };
+}
+
+function safeDecodeWatchId(value: string): string | undefined {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return undefined;
+  }
 }
 

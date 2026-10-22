@@ -158,3 +158,6 @@ body.tv-mode .zapi-tv-root .backdrop-blur-3xl {
 }
 
 
+.zapi-watch-route > :not(.zapi-watch-surface) {
+  display: none !important;
+}

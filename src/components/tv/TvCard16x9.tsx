@@ -13,6 +13,7 @@ interface TvCardProps {
   focusKeyPrefix?: string;
   priority?: boolean;
   onUpPress?: () => void;
+  onFocus?: () => void;
   isFocused?: boolean;
   isFocusable?: boolean;
   disableScale?: boolean;
@@ -51,6 +52,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   focusKeyPrefix = "tv-card",
   priority = false,
   onUpPress,
+  onFocus,
   isFocused,
   isFocusable = true,
   disableScale = false,
@@ -98,6 +100,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   const { ref: tvFocusRef, focused: isTvFocusHook } = useTvFocusable({
     focusKey,
     onEnterPress: () => onClick(item),
+    onFocus,
     onArrowPress: (direction) => {
       if (direction === 'up' && onUpPress) {
         onUpPress();

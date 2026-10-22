@@ -21,10 +21,51 @@ export interface PlaybackSession {
   lastActiveAt: number;
 }
 
+const SESSION_STORAGE_KEY = 'zapitv_playback_session_v1';
+
 class PlaybackSessionService {
   private currentSession: PlaybackSession | null = null;
   private listeners: Set<(session: PlaybackSession | null) => void> = new Set();
   private sessionCounter = 0;
+  private resumeAfterReload = typeof window !== 'undefined' &&
+    /^(?:\/tv)?\/assistir\//.test(window.location.pathname) &&
+    (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.type === 'reload';
+
+  constructor() {
+    const stored = this.loadStoredSession();
+    if (stored) {
+      this.currentSession = stored;
+    }
+  }
+
+  private loadStoredSession(): PlaybackSession | null {
+    try {
+      if (typeof window === 'undefined' || !window.sessionStorage) return null;
+      const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  private persistSession(session: PlaybackSession | null): void {
+    try {
+      if (typeof window === 'undefined' || !window.sessionStorage) return;
+      if (!session) {
+        window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      } else {
+        window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+      }
+    } catch {}
+  }
+
+  private clearStoredSession(): void {
+    try {
+      if (typeof window === 'undefined' || !window.sessionStorage) return;
+      window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    } catch {}
+  }
 
   /**
    * Inicia ou continua uma sessão de reprodução.
@@ -51,6 +92,7 @@ class PlaybackSessionService {
         introPlayed: true,
         lastActiveAt: now
       };
+      this.persistSession(this.currentSession);
       this.notifyListeners();
       return this.currentSession;
     }
@@ -69,8 +111,30 @@ class PlaybackSessionService {
         startedAt: now,
         lastActiveAt: now
       };
+      this.persistSession(this.currentSession);
       this.notifyListeners();
       return this.currentSession;
+    }
+
+    // Se for manual_start mas o usuário acabou de atualizar a página (F5) no mesmo conteúdo, recupera continuidade sem repetir vinheta
+    if (navigationType === 'manual_start' && this.resumeAfterReload) {
+      this.resumeAfterReload = false;
+      const stored = this.loadStoredSession() || this.currentSession;
+      if (stored && stored.contentId === contentId) {
+        const matchesEpisode = season !== undefined ? (stored.season === season && stored.episode === episode) : true;
+        const isFresh = now - (stored.lastActiveAt || 0) < 30 * 60 * 1000;
+        if (matchesEpisode && isFresh) {
+          this.currentSession = {
+            ...stored,
+            navigationType: 'continuous_playback',
+            introPlayed: true,
+            lastActiveAt: now
+          };
+          this.persistSession(this.currentSession);
+          this.notifyListeners();
+          return this.currentSession;
+        }
+      }
     }
 
     // manual_start: nova sessão
@@ -89,6 +153,7 @@ class PlaybackSessionService {
       lastActiveAt: now
     };
 
+    this.persistSession(this.currentSession);
     this.notifyListeners();
     return this.currentSession;
   }
@@ -114,6 +179,7 @@ class PlaybackSessionService {
     if (!this.currentSession.introPlayed) {
       this.currentSession.introPlayed = true;
       this.currentSession.lastActiveAt = Date.now();
+      this.persistSession(this.currentSession);
       this.notifyListeners();
     }
   }
@@ -137,6 +203,7 @@ class PlaybackSessionService {
 
     this.currentSession.nonDubbedConfirmed = true;
     this.currentSession.lastActiveAt = Date.now();
+    this.persistSession(this.currentSession);
     this.notifyListeners();
   }
 
@@ -165,6 +232,7 @@ class PlaybackSessionService {
     if (sessionId && this.currentSession.sessionId !== sessionId) return;
 
     this.currentSession = null;
+    this.clearStoredSession();
     this.notifyListeners();
   }
 

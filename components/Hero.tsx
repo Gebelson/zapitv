@@ -12,6 +12,7 @@ interface HeroProps {
   featuredItems: ContentItem[];
   isDarkMode: boolean;
   onActionClick?: (item: ContentItem) => void;
+  onPlayClick?: (item: ContentItem) => void;
   isAdmin?: boolean;
   onUpdateItem?: (item: ContentItem) => void;
   onAddContent?: (item: ContentItem) => void;
@@ -43,6 +44,7 @@ const Hero: React.FC<HeroProps> = ({
   featuredItems, 
   isDarkMode, 
   onActionClick, 
+  onPlayClick,
   isAdmin, 
   onUpdateItem, 
   onAddContent,
@@ -870,7 +872,11 @@ const Hero: React.FC<HeroProps> = ({
                     type="button"
                     onClick={() => {
                       mobileFullscreenService.requestAutoFullscreenAndLandscape().catch(() => {});
-                      onActionClick?.(item);
+                      if (onPlayClick) {
+                        onPlayClick(item);
+                      } else {
+                        onActionClick?.(item);
+                      }
                     }}
                     className="flex-1 sm:flex-none flex items-center justify-center gap-2 md:gap-3 px-5 sm:px-6 md:px-10 py-3 sm:py-3.5 md:py-4 bg-[#007df7] hover:bg-[#0069d9] text-white rounded-xl md:rounded-2xl font-black transition-all hover:scale-105 active:scale-95 shadow-xl shadow-[#007df7]/30 text-xs sm:text-sm md:text-base min-h-[44px] cursor-pointer"
                   >

@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useFocusable as useNoriginFocusable, FocusableComponentLayout } from '@noriginmedia/norigin-spatial-navigation';
 import { tvModeService } from './tvModeService';
+import { tvNavigationManager } from './tvNavigationManager';
 
 interface UseTvFocusableOptions {
   focusKey?: string;
@@ -29,6 +30,9 @@ export function useTvFocusable({
   saveLastFocusedChild = true,
   trackChildren = false
 }: UseTvFocusableOptions = {}) {
+  // O hook do Norigin registra nós ainda na montagem, inclusive quando
+  // focusable=false no desktop. Inicialize o adaptador antes do registro.
+  tvNavigationManager.init();
   const dummyRef = useRef<any>(null);
 
   const [isTvActive, setIsTvActive] = useState<boolean>(() => {

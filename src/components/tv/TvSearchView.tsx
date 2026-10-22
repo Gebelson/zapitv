@@ -205,6 +205,8 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<SearchCategory>('all');
   const resultsContainerRef = useRef<HTMLDivElement>(null);
+  const resultsSentinelRef = useRef<HTMLDivElement>(null);
+  const [visibleCount, setVisibleCount] = useState(48);
 
   const { ref: noriginRef, focusKey } = useFocusable({
     focusKey: 'tv-search-screen',
@@ -377,6 +379,39 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
     scored.sort((a, b) => b.score - a.score);
     return scored.map(s => s.item);
   }, [query, selectedCategory, allContent, searchableIndex]);
+
+  useEffect(() => {
+    setVisibleCount(48);
+    if (resultsContainerRef.current) resultsContainerRef.current.scrollTop = 0;
+  }, [query, selectedCategory]);
+
+  useEffect(() => {
+    const root = resultsContainerRef.current;
+    const sentinel = resultsSentinelRef.current;
+    if (!root || !sentinel || visibleCount >= searchResults.length) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      const loadOnScroll = () => {
+        if (root.scrollTop + root.clientHeight >= root.scrollHeight - 600) {
+          setVisibleCount(count => Math.min(searchResults.length, count + 48));
+        }
+      };
+      root.addEventListener('scroll', loadOnScroll, { passive: true });
+      return () => root.removeEventListener('scroll', loadOnScroll);
+    }
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0]?.isIntersecting) {
+        setVisibleCount(count => Math.min(searchResults.length, count + 48));
+      }
+    }, { root, rootMargin: '600px' });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [visibleCount, searchResults]);
+
+  const handleCardFocus = useCallback((index: number) => {
+    if (index >= visibleCount - 12) {
+      setVisibleCount(count => Math.min(searchResults.length, count + 48));
+    }
+  }, [visibleCount, searchResults.length]);
 
   // Lista dinâmica de sugestões baseada no catálogo e termo digitado
   const suggestions = useMemo(() => {
@@ -630,16 +665,20 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
 
           {/* Grade de Resultados Verticais 2:3 */}
           {searchResults.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 pb-24">
-              {searchResults.map((item, idx) => (
-                <TvCard16x9
-                  key={`search-${item.id}-${idx}`}
-                  item={item}
-                  onClick={onSelectItem}
-                  focusKeyPrefix="tv-search-card"
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                {searchResults.slice(0, visibleCount).map((item, idx) => (
+                  <TvCard16x9
+                    key={`search-${item.id}-${idx}`}
+                    item={item}
+                    onClick={onSelectItem}
+                    onFocus={() => handleCardFocus(idx)}
+                    focusKeyPrefix="tv-search-card"
+                  />
+                ))}
+              </div>
+              <div ref={resultsSentinelRef} className="h-24" aria-hidden="true" />
+            </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center py-24 text-center">
               <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-4 text-gray-500">

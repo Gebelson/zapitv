@@ -11,7 +11,7 @@ import AnimatedBackground from './components/AnimatedBackground';
 import ScrollToTop from './components/ScrollToTop';
 import GenreDropdown from './components/GenreDropdown';
 import SortDropdown, { CatalogSortOption } from './components/SortDropdown';
-import { getContentRoute, ROUTES } from './src/core/routes/navigationRoutes';
+import { getContentRoute, getWatchRoute, parseWatchRoute, ROUTES } from './src/core/routes/navigationRoutes';
 import { matchesRoomMedia, roomMediaFormat, roomMediaType } from './src/core/watchparty/roomMediaIdentity';
 import { AppView, User, ContentType, ContentItem, SiteNotification, Profile, CustomSection, ActorPerson } from './types';
 import { MOCK_USERS, AVATARS, filmesData } from './constants';
@@ -149,9 +149,14 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const matchWatchParty = matchPath('/sala/:roomId', location.pathname);
 
   // Derivação automática da view com base no pathname
+  // Matchers para rotas de reprodução persistente (/assistir/...)
+  const parsedWatch = useMemo(() => parseWatchRoute(location.pathname), [location.pathname]);
+  const isWatchRoute = parsedWatch.isWatch && !parsedWatch.isTv;
+
   const currentView: AppView = useMemo(() => {
     const path = location.pathname;
     if (path.startsWith('/tv')) return 'tv';
+    if (isWatchRoute) return 'home';
     if (path === '/' || path.startsWith('/sala')) return 'home';
     if (path.startsWith('/em-destaque')) return 'featured';
     if (path.startsWith('/filmes')) return 'movies';
@@ -168,7 +173,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     if (path.startsWith('/admin')) return 'admin';
     if (path.startsWith('/login') || path.startsWith('/auth')) return 'login';
     return 'notfound';
-  }, [location.pathname]);
+  }, [location.pathname, isWatchRoute]);
 
   const [previousView, setPreviousView] = useState<AppView>('home');
   useEffect(() => uiSoundService.bindInteractions(document), []);
@@ -185,7 +190,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
   }, [currentView]);
 
-  const activeDetailId = matchSeriesEpisode?.params.id ||
+  const activeDetailId = (isWatchRoute ? parsedWatch.id : undefined) ||
+                         matchSeriesEpisode?.params.id ||
                          matchSeriesDetail?.params.id ||
                          matchAnimeEpisode?.params.id ||
                          matchAnimeDetail?.params.id ||
@@ -195,8 +201,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   const urlSeason = matchSeriesEpisode?.params.season || matchAnimeEpisode?.params.season;
   const urlEpisode = matchSeriesEpisode?.params.episode || matchAnimeEpisode?.params.episode;
-  const initialSeasonNum = urlSeason ? parseInt(urlSeason, 10) : undefined;
-  const initialEpisodeNum = urlEpisode ? parseInt(urlEpisode, 10) : undefined;
+  const initialSeasonNum = isWatchRoute ? parsedWatch.season : (urlSeason ? parseInt(urlSeason, 10) : undefined);
+  const initialEpisodeNum = isWatchRoute ? parsedWatch.episode : (urlEpisode ? parseInt(urlEpisode, 10) : undefined);
   const hasDeepLinkEpisode = initialEpisodeNum !== undefined;
 
   // Estado para Watch Party direta via URL /sala/:roomId ou ?sala=...
@@ -213,7 +219,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   const effectiveSeasonNum = directPartyEpisode?.season !== undefined ? directPartyEpisode.season : initialSeasonNum;
   const effectiveEpisodeNum = directPartyEpisode?.episode !== undefined ? directPartyEpisode.episode : initialEpisodeNum;
-  const effectiveAutoPlay = Boolean(directPartyEpisode || hasDeepLinkEpisode);
+  const effectiveAutoPlay = Boolean(isWatchRoute || directPartyEpisode || hasDeepLinkEpisode);
 
   const handleNavigateView = useCallback((view: AppView) => {
     setSelectedContent(null);
@@ -1324,22 +1330,23 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
   });
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
+  const [watchRouteNotFound, setWatchRouteNotFound] = useState(false);
 
 
   // Abertura in-loco de detalhes: abre o modal preservando a rota, página atual, scroll e contexto
   const handleSelectContent = useCallback((item: ContentItem) => {
     if (!catalogEligibilityService.isItemPubliclyPlayableSync(item)) {
-      return;
+      return false;
     }
     if (adultContentService.isAdultContent(item)) {
       if (activeProfile?.isChild) {
         setIsAgeVerificationOpen(true);
-        return;
+        return false;
       }
       if (!adultContentService.isAgeConfirmed(activeProfile?.id)) {
         setPendingAdultItem(item);
         setIsAgeVerificationOpen(true);
-        return;
+        return false;
       }
     }
     if (tvModeService.isTvMode()) {
@@ -1347,7 +1354,14 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
     setSelectedContent(item);
     uiSoundService.play('detailOpen');
+    return true;
   }, [activeProfile]);
+
+  const handlePlayFromHero = useCallback((item: ContentItem) => {
+    if (!handleSelectContent(item)) return;
+    const continuity = storageService.getPlaybackContinuity(item);
+    navigate(getWatchRoute(item, continuity.season, continuity.episode));
+  }, [handleSelectContent, navigate]);
 
   const handleCloseDetailModal = useCallback(() => {
     setSelectedContent(null);
@@ -1367,14 +1381,26 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   // Sincronização de conteúdo EXCLUSIVAMENTE para links diretos/profundos na URL (/filmes/:id, /series/:id, /animes/:id, etc.)
   useEffect(() => {
     if (!activeDetailId) {
+      if (isWatchRoute) setWatchRouteNotFound(true);
       return;
     }
 
-    if (selectedContent && (selectedContent.id === activeDetailId || selectedContent.imdbId === activeDetailId || selectedContent.tmdbId === activeDetailId)) {
+    if (selectedContent && (selectedContent.id === activeDetailId || selectedContent.imdbId === activeDetailId || selectedContent.tmdbId === activeDetailId) &&
+        (!isWatchRoute || getWatchRoute(selectedContent).split('/')[2] ===
+          (parsedWatch.mediaType === 'movie' ? 'filme' : parsedWatch.mediaType === 'anime' ? 'anime' : 'serie'))) {
+      setWatchRouteNotFound(false);
       return;
     }
 
     let active = true;
+    setWatchRouteNotFound(false);
+
+    const acceptsRoute = (candidate: ContentItem) =>
+      !isWatchRoute || (
+        catalogEligibilityService.isItemPubliclyPlayableSync(candidate) &&
+        getWatchRoute(candidate, 1, 1).split('/')[2] ===
+          (parsedWatch.mediaType === 'movie' ? 'filme' : parsedWatch.mediaType === 'anime' ? 'anime' : 'serie')
+      );
 
     const resolveItemFromRoute = async () => {
       // 1. Tenta achar no catálogo local ou itens abertos verificados
@@ -1388,15 +1414,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         i.tmdbId === activeDetailId
       );
 
-      if (localFound) {
+      if (localFound && acceptsRoute(localFound)) {
         if (active) setSelectedContent(localFound);
         return;
       }
 
       // 2. Se não estiver no cache imediato, busca metadados no TMDB/Cinemeta
       try {
-        const isAnime = location.pathname.startsWith('/animes');
-        const isSeries = location.pathname.startsWith('/series') || isAnime;
+        const isAnime = parsedWatch.mediaType === 'anime' || location.pathname.startsWith('/animes');
+        const isSeries = parsedWatch.mediaType === 'series' || location.pathname.startsWith('/series') || isAnime;
         const mediaType = isAnime ? ContentType.ANIME : (isSeries ? ContentType.SERIES : ContentType.MOVIE);
 
         let details: ContentItem | null = null;
@@ -1407,11 +1433,14 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           details = res?.item || null;
         }
 
-        if (active && details) {
+        if (active && details && acceptsRoute(details)) {
           setSelectedContent(details);
+        } else if (active && isWatchRoute) {
+          setWatchRouteNotFound(true);
         }
       } catch (err) {
         console.warn('Erro ao carregar conteúdo da URL profunda:', err);
+        if (active && isWatchRoute) setWatchRouteNotFound(true);
       }
     };
 
@@ -1420,7 +1449,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     return () => {
       active = false;
     };
-  }, [activeDetailId, content, location.pathname, selectedContent]);
+  }, [activeDetailId, content, location.pathname, selectedContent, isWatchRoute, parsedWatch.mediaType]);
 
   // Sincroniza busca se vier por query param (?busca=... ou ?q=...)
   useEffect(() => {
@@ -2252,6 +2281,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                   featuredItems={heroCarouselItems.length > 0 ? heroCarouselItems : heroCarouselStore.getCarouselItems(content)} 
                   isDarkMode={isDarkMode} 
                   onActionClick={handleSelectContent} 
+                  onPlayClick={handlePlayFromHero}
                   isAdmin={currentUser.role === 'admin' || currentUser.devMode}
                   onUpdateItem={handleUpdateContent}
                   onAddContent={handleAddContent}
@@ -2602,12 +2632,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
   };
 
-  const viewContent = useMemo(() => renderContent(), [
-    currentView, submittedSearchQuery, liveSearchActors, activeActorId, isDarkMode, favorites, myList, selectedGenre,
+  const viewContent = useMemo(() => isWatchRoute ? null : renderContent(), [
+    isWatchRoute, currentView, submittedSearchQuery, liveSearchActors, activeActorId, isDarkMode, favorites, myList, selectedGenre,
     currentUser, activeProfile, users, content, sectionTitles, customSections,
     filteredContent, visibleGridCount, trendingItems, popularMovies, popularSeries, animeItems,
     topRatedItems, featuredSelection, continueWatchingList, isLoadingMore,
-    hasMoreMovies, hasMoreSeries, hasMoreAnimes
+    hasMoreMovies, hasMoreSeries, hasMoreAnimes, handlePlayFromHero
   ]);
 
   if (!isAuthenticated) return <React.Suspense fallback={<ZapiLoader size="xl" />}><AuthView isDarkMode={isDarkMode} onLogin={handleLogin} onSignup={handleSignup} onResetPassword={handleResetPassword} users={users} initialEmail={initialState.lastEmail} /></React.Suspense>;
@@ -2648,7 +2678,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   }
 
   return (
-    <div className="min-h-screen relative">
+    <div className={`min-h-screen relative ${isWatchRoute ? 'zapi-watch-route bg-black' : ''}`}>
       <AnimatedBackground isDarkMode={isDarkMode} />
       
       <Sidebar 
@@ -2803,7 +2833,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         onCancel={handleCancelAge}
       />
 
-      {selectedContent && (
+      {selectedContent && (!isWatchRoute || ((selectedContent.id === parsedWatch.id || selectedContent.imdbId === parsedWatch.id || selectedContent.tmdbId === parsedWatch.id) && getWatchRoute(selectedContent).split('/')[2] === (parsedWatch.mediaType === 'movie' ? 'filme' : parsedWatch.mediaType === 'anime' ? 'anime' : 'serie'))) && (
         <React.Suspense fallback={<div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center"><ZapiLoader size="xl" /></div>}><ContentDetailModal
           item={selectedContent} 
           onClose={handleCloseDetailModal} 
@@ -2816,7 +2846,14 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           initialSeason={effectiveSeasonNum}
           initialEpisode={effectiveEpisodeNum}
           autoPlayInitialEpisode={effectiveAutoPlay}
+          playerOnly={isWatchRoute}
         /></React.Suspense>
+      )}
+
+      {isWatchRoute && (!selectedContent || (selectedContent.id !== parsedWatch.id && selectedContent.imdbId !== parsedWatch.id && selectedContent.tmdbId !== parsedWatch.id) || getWatchRoute(selectedContent).split('/')[2] !== (parsedWatch.mediaType === 'movie' ? 'filme' : parsedWatch.mediaType === 'anime' ? 'anime' : 'serie')) && (
+        <div className="zapi-watch-surface fixed inset-0 z-[2000] flex items-center justify-center bg-black text-white">
+          {watchRouteNotFound ? <div className="text-center"><p>Conteúdo não encontrado ou indisponível.</p><button className="mt-5 rounded-lg bg-[#007df7] px-5 py-2" onClick={() => navigate('/', { replace: true })}>Voltar ao início</button></div> : <ZapiLoader size="xl" />}
+        </div>
       )}
 
       {/* Modal de Entrada Direta em Watch Party por Link (/sala/:roomId) */}

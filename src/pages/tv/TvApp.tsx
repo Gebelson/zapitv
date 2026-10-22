@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ContentItem, User, Profile } from '../../../types';
+import { ContentItem, ContentType, User, Profile } from '../../../types';
 import { storageService } from '../../core/storage/storageService';
+import { tmdbService } from '../../core/tmdb/tmdbClient';
 import { tvModeService } from '../../core/tv/tvModeService';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication';
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { canonicalCatalogMaster } from '../../core/catalog/CanonicalCatalogMaster';
 import { catalogReleaseStore } from '../../core/catalog/CatalogReleaseStore';
+import { parseWatchRoute, getWatchRoute } from '../../core/routes/navigationRoutes';
 import { TvHeader, TvTab } from '../../components/tv/TvHeader';
 import { TvHomeView } from '../../components/tv/TvHomeView';
 import { TvCategoryView } from '../../components/tv/TvCategoryView';
@@ -101,6 +103,7 @@ export const TvApp: React.FC<TvAppProps> = ({
     season?: number;
     episode?: number;
   } | null>(null);
+  const [tvWatchNotFound, setTvWatchNotFound] = useState(false);
 
   const handleOpenDetailModal = useCallback((item: ContentItem) => {
     tvNavigationManager.saveFocusSnapshot();
@@ -159,178 +162,282 @@ export const TvApp: React.FC<TvAppProps> = ({
 
   // Itens do Histórico reais
   const historyItems = useMemo(() => {
-    if (!content) return [];
+    if (specialView !== 'history' || !content) return [];
     return content.filter(it => {
       const cont = storageService.getPlaybackContinuity(it);
       return cont.hasStarted;
     });
-  }, [content]);
+  }, [content, specialView]);
 
-  // Execução de reprodução
+  // Recuperação e sincronização de rotas de reprodução na Smart TV (/tv/assistir/...)
+  useEffect(() => {
+    const parsed = parseWatchRoute(location.pathname);
+    if (!parsed.isWatch || !parsed.isTv) {
+      return;
+    }
+    if (!parsed.id) {
+      setTvWatchNotFound(true);
+      return;
+    }
+
+    if (playingItem && (playingItem.item.id === parsed.id || playingItem.item.imdbId === parsed.id || playingItem.item.tmdbId === parsed.id) &&
+        getWatchRoute(playingItem.item, 1, 1, true).split('/')[3] ===
+          (parsed.mediaType === 'movie' ? 'filme' : parsed.mediaType === 'anime' ? 'anime' : 'serie')) {
+      return;
+    }
+
+    let active = true;
+    setTvWatchNotFound(false);
+
+    const resolveItemForTvWatch = async () => {
+      let found = fullTvCatalog.find(i =>
+        i.id === parsed.id ||
+        i.imdbId === parsed.id ||
+        i.tmdbId === parsed.id
+      );
+
+      if (!found) {
+        try {
+          const isAnime = parsed.mediaType === 'anime';
+          const isSeries = parsed.mediaType === 'series' || isAnime;
+          const mediaType = isAnime ? ContentType.ANIME : (isSeries ? ContentType.SERIES : ContentType.MOVIE);
+
+          if (parsed.id!.startsWith('tt')) {
+            found = (await tmdbService.findByImdb(parsed.id!)) || undefined;
+          } else if (/^\d+$/.test(parsed.id!)) {
+            const res = await tmdbService.getDetails(parsed.id!, mediaType);
+            found = res?.item || undefined;
+          }
+        } catch (err) {
+          console.warn('[TvApp] Erro ao carregar conteúdo da rota de reprodução:', err);
+        }
+      }
+
+      const matchesType = found && getWatchRoute(found, 1, 1, true).split('/')[3] ===
+        (parsed.mediaType === 'movie' ? 'filme' : parsed.mediaType === 'anime' ? 'anime' : 'serie');
+      if (active && found && matchesType && catalogEligibilityService.isItemPubliclyPlayableSync(found)) {
+        const continuity = storageService.getPlaybackContinuity(found);
+        const resolvedSeason = parsed.season ?? continuity.season ?? 1;
+        const resolvedEpisode = parsed.episode ?? continuity.episode ?? 1;
+
+        setSelectedDetailItem(found);
+        setSelectedDetailSeason(resolvedSeason);
+        setPlayingItem({
+          item: found,
+          season: resolvedSeason,
+          episode: resolvedEpisode
+        });
+      } else if (active) {
+        setTvWatchNotFound(true);
+      }
+    };
+
+    resolveItemForTvWatch();
+
+    return () => {
+      active = false;
+    };
+  }, [location.pathname, fullTvCatalog, playingItem]);
+
+  // Execução de reprodução com rota persistente
   const handleStartPlay = useCallback((item: ContentItem, season?: number, episode?: number) => {
     if (!selectedDetailItem) tvNavigationManager.saveFocusSnapshot();
+    const continuity = storageService.getPlaybackContinuity(item);
+    const resolvedSeason = season ?? continuity.season ?? 1;
+    const resolvedEpisode = episode ?? continuity.episode ?? 1;
+    const watchRoute = getWatchRoute(item, resolvedSeason, resolvedEpisode, true);
+    navigate(watchRoute);
+
     setSelectedDetailItem(item);
-    setSelectedDetailSeason(season ?? storageService.getPlaybackContinuity(item).season);
-    setPlayingItem({ item, season, episode });
-  }, [selectedDetailItem]);
+    setSelectedDetailSeason(resolvedSeason);
+    setPlayingItem({ item, season: resolvedSeason, episode: resolvedEpisode });
+  }, [selectedDetailItem, navigate]);
 
   const handleClosePlayer = useCallback(() => {
-    if (playingItem) {
-      setSelectedDetailSeason(storageService.getPlaybackContinuity(playingItem.item).season || playingItem.season);
+    const itemToPreserve = playingItem?.item || selectedDetailItem;
+    if (itemToPreserve) {
+      setSelectedDetailItem(itemToPreserve);
+      setSelectedDetailSeason(storageService.getPlaybackContinuity(itemToPreserve).season || playingItem?.season);
     }
     setPlayingItem(null);
-  }, [playingItem]);
+    navigate('/tv', { replace: true });
+  }, [playingItem, selectedDetailItem, navigate]);
+
+  // A URL é a fonte de verdade: um Back que sai da rota de reprodução
+  // também desmonta o player, mesmo se houver outro listener de TV ativo.
+  useEffect(() => {
+    if (!parseWatchRoute(location.pathname).isWatch && playingItem) {
+      setSelectedDetailItem(playingItem.item);
+      setSelectedDetailSeason(storageService.getPlaybackContinuity(playingItem.item).season || playingItem.season);
+      setPlayingItem(null);
+    }
+  }, [location.pathname, playingItem]);
+
+  const currentWatchRoute = parseWatchRoute(location.pathname);
+  const isTvWatchRoute = currentWatchRoute.isWatch && currentWatchRoute.isTv;
+  const playingMatchesRoute = !isTvWatchRoute ||
+    (playingItem && (playingItem.item.id === currentWatchRoute.id || playingItem.item.imdbId === currentWatchRoute.id || playingItem.item.tmdbId === currentWatchRoute.id) &&
+      getWatchRoute(playingItem.item, 1, 1, true).split('/')[3] ===
+        (currentWatchRoute.mediaType === 'movie' ? 'filme' : currentWatchRoute.mediaType === 'anime' ? 'anime' : 'serie'));
 
   return (
     <div className="zapi-tv-root relative min-h-screen bg-[#05070a] text-white overflow-x-hidden selection:bg-cyan-500 selection:text-black">
       {/* Diagnóstico em tempo real na TV (?tvdiag=1) */}
       <TvRemoteDiagnosticOverlay />
 
-      {/* Cabeçalho Fixo Minimalista Cinematográfico */}
-      {!playingItem && specialView !== 'search' && (
-        <TvHeader
-          currentTab={currentTab}
-          onSelectTab={(tab) => {
-            setSpecialView(null);
-            setCurrentTab(tab);
-            setTimeout(() => {
-              setFocus('tv-hero-play');
-            }, 100);
-          }}
-          onOpenSearch={() => setSpecialView('search')}
-          onNavigateProfileMenu={(target) => {
-            if (target === 'mylist') setSpecialView('mylist');
-            else if (target === 'history') setSpecialView('history');
-            else if (target === 'settings') setSpecialView('settings');
-          }}
-          userName={activeProfile?.name || currentUser?.name || 'ZapiTV'}
-          avatarUrl={activeProfile?.avatar}
-          accountPlan={currentUser?.status === 'Ativo' ? currentUser.plan?.trim() : undefined}
-        />
-      )}
+      {playingItem && playingMatchesRoute ? (
+        /* Player de Reprodução em Tela Cheia 100% isolado (Sem elementos da interface anterior no DOM) */
+        <div className="fixed inset-0 z-[5000] bg-black overflow-hidden select-none">
+          <Suspense fallback={
+            <div className="fixed inset-0 z-[5000] bg-black flex items-center justify-center">
+              <ZapiLoader size="xl" />
+            </div>
+          }>
+            <ContentDetailModal
+              item={playingItem.item}
+              onClose={handleClosePlayer}
+              isDarkMode={true}
+              myList={myList}
+              favorites={favorites}
+              onToggleList={onToggleList}
+              onToggleFavorite={onToggleFavorite}
+              allContent={fullTvCatalog}
+              initialSeason={playingItem.season}
+              initialEpisode={playingItem.episode}
+              autoPlayInitialEpisode={true}
+              playerOnly={true}
+            />
+          </Suspense>
+        </div>
+      ) : isTvWatchRoute ? (
+        <div className="fixed inset-0 flex items-center justify-center bg-black text-white">
+          {tvWatchNotFound ? <div className="text-center"><p>Conteúdo não encontrado ou indisponível.</p><button className="mt-5 rounded-lg bg-[#007df7] px-5 py-2" onClick={() => navigate('/tv', { replace: true })}>Voltar à TV</button></div> : <ZapiLoader size="xl" />}
+        </div>
+      ) : (
+        <>
+          {/* Cabeçalho Fixo Minimalista Cinematográfico */}
+          {specialView !== 'search' && (
+            <TvHeader
+              currentTab={currentTab}
+              onSelectTab={(tab) => {
+                setSpecialView(null);
+                setCurrentTab(tab);
+                setTimeout(() => {
+                  setFocus('tv-hero-play');
+                }, 100);
+              }}
+              onOpenSearch={() => setSpecialView('search')}
+              onNavigateProfileMenu={(target) => {
+                if (target === 'mylist') setSpecialView('mylist');
+                else if (target === 'history') setSpecialView('history');
+                else if (target === 'settings') setSpecialView('settings');
+              }}
+              userName={activeProfile?.name || currentUser?.name || 'ZapiTV'}
+              avatarUrl={activeProfile?.avatar}
+              accountPlan={currentUser?.status === 'Ativo' ? currentUser.plan?.trim() : undefined}
+            />
+          )}
 
-      {/* Visão Ativa */}
-      <main className={`relative z-10 w-full min-h-screen ${specialView && specialView !== 'search' ? 'pt-24' : 'pt-0'}`}>
-        {specialView === 'search' ? (
-          <TvSearchView
-            allContent={fullTvCatalog}
-            onSelectItem={handleOpenDetailModal}
-            onClose={() => {
-              setSpecialView(null);
-              setTimeout(() => setFocus('tv-nav-search'), 50);
-            }}
-          />
-        ) : specialView === 'mylist' ? (
-          <TvListView
-            title="Minha Lista"
-            type="mylist"
-            items={myListItems}
-            onSelectItem={handleOpenDetailModal}
-            onBack={() => setSpecialView(null)}
-          />
-        ) : specialView === 'history' ? (
-          <TvListView
-            title="Histórico de Reprodução"
-            type="history"
-            items={historyItems}
-            onSelectItem={handleOpenDetailModal}
-            onBack={() => setSpecialView(null)}
-          />
-        ) : specialView === 'settings' ? (
-          <div className="pt-24 px-12 text-center text-gray-400">
-            <h2 className="text-xl font-bold text-white mb-2">Configurações da Smart TV</h2>
-            <p className="text-sm">Preferências de áudio dublado em Português e qualidade automática ativadas.</p>
-            <button
-              onClick={() => setSpecialView(null)}
-              className="mt-6 px-6 py-2.5 rounded-xl bg-cyan-500 text-black font-bold"
-            >
-              Voltar
-            </button>
-          </div>
-        ) : currentTab === 'home' ? (
-          <TvHomeView
-            featuredItems={featuredItems}
-            trendingItems={trendingItems}
-            popularMovies={popularMovies}
-            popularSeries={popularSeries}
-            animeItems={animeItems}
-            allContent={content}
-            onSelectItem={handleOpenDetailModal}
-            onPlayItem={(it) => handleStartPlay(it)}
-          />
-        ) : currentTab === 'movies' ? (
-          <TvCategoryView
-            categoryTitle="Filmes"
-            items={popularMovies}
-            onSelectItem={handleOpenDetailModal}
-            onPlayItem={(it) => handleStartPlay(it)}
-          />
-        ) : currentTab === 'series' ? (
-          <TvCategoryView
-            categoryTitle="Séries"
-            items={popularSeries}
-            onSelectItem={handleOpenDetailModal}
-            onPlayItem={(it) => handleStartPlay(it)}
-          />
-        ) : currentTab === 'animes' ? (
-          <TvCategoryView
-            categoryTitle="Animes"
-            items={animeItems}
-            onSelectItem={handleOpenDetailModal}
-            onPlayItem={(it) => handleStartPlay(it)}
-          />
-        ) : (
-          <TvCategoryView
-            categoryTitle="Em Destaque"
-            items={featuredItems}
-            onSelectItem={handleOpenDetailModal}
-            onPlayItem={(it) => handleStartPlay(it)}
-          />
-        )}
-      </main>
+          {/* Visão Ativa */}
+          <main className={`relative z-10 w-full min-h-screen ${specialView && specialView !== 'search' ? 'pt-24' : 'pt-0'}`}>
+            {specialView === 'search' ? (
+              <TvSearchView
+                allContent={fullTvCatalog}
+                onSelectItem={handleOpenDetailModal}
+                onClose={() => {
+                  setSpecialView(null);
+                  setTimeout(() => setFocus('tv-nav-search'), 50);
+                }}
+              />
+            ) : specialView === 'mylist' ? (
+              <TvListView
+                title="Minha Lista"
+                type="mylist"
+                items={myListItems}
+                onSelectItem={handleOpenDetailModal}
+                onBack={() => setSpecialView(null)}
+              />
+            ) : specialView === 'history' ? (
+              <TvListView
+                title="Histórico de Reprodução"
+                type="history"
+                items={historyItems}
+                onSelectItem={handleOpenDetailModal}
+                onBack={() => setSpecialView(null)}
+              />
+            ) : specialView === 'settings' ? (
+              <div className="pt-24 px-12 text-center text-gray-400">
+                <h2 className="text-xl font-bold text-white mb-2">Configurações da Smart TV</h2>
+                <p className="text-sm">Preferências de áudio dublado em Português e qualidade automática ativadas.</p>
+                <button
+                  onClick={() => setSpecialView(null)}
+                  className="mt-6 px-6 py-2.5 rounded-xl bg-cyan-500 text-black font-bold"
+                >
+                  Voltar
+                </button>
+              </div>
+            ) : currentTab === 'home' ? (
+              <TvHomeView
+                featuredItems={featuredItems}
+                trendingItems={trendingItems}
+                popularMovies={popularMovies}
+                popularSeries={popularSeries}
+                animeItems={animeItems}
+                allContent={content}
+                onSelectItem={handleOpenDetailModal}
+                onPlayItem={(it) => handleStartPlay(it)}
+              />
+            ) : currentTab === 'movies' ? (
+              <TvCategoryView
+                categoryTitle="Filmes"
+                items={popularMovies}
+                onSelectItem={handleOpenDetailModal}
+                onPlayItem={(it) => handleStartPlay(it)}
+              />
+            ) : currentTab === 'series' ? (
+              <TvCategoryView
+                categoryTitle="Séries"
+                items={popularSeries}
+                onSelectItem={handleOpenDetailModal}
+                onPlayItem={(it) => handleStartPlay(it)}
+              />
+            ) : currentTab === 'animes' ? (
+              <TvCategoryView
+                categoryTitle="Animes"
+                items={animeItems}
+                onSelectItem={handleOpenDetailModal}
+                onPlayItem={(it) => handleStartPlay(it)}
+              />
+            ) : (
+              <TvCategoryView
+                categoryTitle="Em Destaque"
+                items={featuredItems}
+                onSelectItem={handleOpenDetailModal}
+                onPlayItem={(it) => handleStartPlay(it)}
+              />
+            )}
+          </main>
 
-      {/* Modal de Detalhes Cinematográfico */}
-      {selectedDetailItem && !playingItem && (
-        <TvDetailsModal
-          item={selectedDetailItem}
-          initialSeason={selectedDetailSeason}
-          allContent={fullTvCatalog}
-          myList={myList}
-          favorites={favorites}
-          onToggleList={onToggleList}
-          onToggleFavorite={onToggleFavorite}
-          onClose={() => {
-            setSelectedDetailItem(null);
-            tvNavigationManager.restoreFocusSnapshot('tv-hero-play');
-          }}
-          onPlay={(it, s, e) => {
-            handleStartPlay(it, s, e);
-          }}
-        />
-      )}
-
-      {/* Player de Reprodução em Tela Cheia via ContentDetailModal com autoPlay */}
-      {playingItem && (
-        <Suspense fallback={
-          <div className="fixed inset-0 z-[500] bg-black flex items-center justify-center">
-            <ZapiLoader size="xl" />
-          </div>
-        }>
-          <ContentDetailModal
-            item={playingItem.item}
-            onClose={handleClosePlayer}
-            isDarkMode={true}
-            myList={myList}
-            favorites={favorites}
-            onToggleList={onToggleList}
-            onToggleFavorite={onToggleFavorite}
-            allContent={content}
-            initialSeason={playingItem.season}
-            initialEpisode={playingItem.episode}
-            autoPlayInitialEpisode={true}
-            playerOnly={true}
-          />
-        </Suspense>
+          {/* Modal de Detalhes Cinematográfico */}
+          {selectedDetailItem && (
+            <TvDetailsModal
+              item={selectedDetailItem}
+              initialSeason={selectedDetailSeason}
+              allContent={fullTvCatalog}
+              myList={myList}
+              favorites={favorites}
+              onToggleList={onToggleList}
+              onToggleFavorite={onToggleFavorite}
+              onClose={() => {
+                setSelectedDetailItem(null);
+                tvNavigationManager.restoreFocusSnapshot('tv-hero-play');
+              }}
+              onPlay={(it, s, e) => {
+                handleStartPlay(it, s, e);
+              }}
+            />
+          )}
+        </>
       )}
     </div>
   );

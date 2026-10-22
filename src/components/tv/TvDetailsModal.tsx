@@ -105,6 +105,7 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
             ...prev,
             ...details.item,
             id: prev.id,
+            title: details.item.title && details.item.title !== 'Sem Título' ? details.item.title : prev.title,
             director: details.director || prev.director,
             cast: details.cast || prev.cast
           }));
