@@ -31,6 +31,14 @@ const TvNavTabButton: React.FC<{
     focusKey,
     onEnterPress: onClick,
     onArrowPress: (direction) => {
+      // Limite superior: não permite subir além do header
+      if (direction === 'up') {
+        return false;
+      }
+      // Limite esquerdo: no link 'Início', não permite navegar à esquerda
+      if (direction === 'left' && focusKey === 'tv-nav-home') {
+        return false;
+      }
       if (direction === 'down') {
         setFocus('tv-hero-play');
         return false;
@@ -207,6 +215,10 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     focusKey: 'tv-nav-search',
     onEnterPress: onOpenSearch,
     onArrowPress: (direction) => {
+      // Limite superior: não permite subir além do header
+      if (direction === 'up') {
+        return false;
+      }
       if (direction === 'left') {
         setFocus('tv-nav-featured');
         return false;
@@ -228,6 +240,14 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     focusKey: 'tv-nav-profile',
     onEnterPress: () => setIsProfileMenuOpen(prev => !prev),
     onArrowPress: (direction) => {
+      // Limite superior: não permite subir além do header
+      if (direction === 'up') {
+        return false;
+      }
+      // Limite direito: no botão 'Perfil', não permite navegar à direita
+      if (direction === 'right') {
+        return false;
+      }
       if (direction === 'left') {
         setFocus('tv-nav-search');
         return false;
