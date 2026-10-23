@@ -4,6 +4,7 @@ import { ContentItem, ContentType, User, Profile } from '../../../types';
 import { storageService } from '../../core/storage/storageService';
 import { tmdbService } from '../../core/tmdb/tmdbClient';
 import { tvModeService } from '../../core/tv/tvModeService';
+import { tvScrollService } from '../../core/tv/tvScrollService';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication';
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
@@ -127,6 +128,51 @@ export const TvApp: React.FC<TvAppProps> = ({
   useEffect(() => watchPartyService.subscribe(event => {
     if (event === 'state_changed') setPartyActive(watchPartyService.getRoomState().isActive);
   }), []);
+
+  // Retorno imediato ao topo absoluto (0, 0) ao selecionar qualquer aba do header
+  const resetScrollToTop = useCallback(() => {
+    tvScrollService.reset();
+
+    try {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'instant' as any
+      });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+
+    requestAnimationFrame(() => {
+      try {
+        window.scrollTo({
+          top: 0,
+          left: 0,
+          behavior: 'instant' as any
+        });
+      } catch {
+        window.scrollTo(0, 0);
+      }
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+    });
+  }, []);
+
+  // Centralização da navegação do header e garantia de retorno ao topo absoluto
+  const handleSelectTab = useCallback((tab: TvTab) => {
+    setSpecialView(null);
+    setCurrentTab(tab);
+    resetScrollToTop();
+
+    // Coordena a transferência de foco para o botão principal do banner após garantir o topo
+    setTimeout(() => {
+      resetScrollToTop();
+      setFocus('tv-hero-play');
+    }, 100);
+  }, [resetScrollToTop]);
 
   const handleOpenDetailModal = useCallback((item: ContentItem) => {
     tvNavigationManager.saveFocusSnapshot();
@@ -384,18 +430,22 @@ export const TvApp: React.FC<TvAppProps> = ({
             <TvHeader
               suspended={screensaverActive}
               currentTab={currentTab}
-              onSelectTab={(tab) => {
-                setSpecialView(null);
-                setCurrentTab(tab);
-                setTimeout(() => {
-                  setFocus('tv-hero-play');
-                }, 100);
+              onSelectTab={handleSelectTab}
+              onOpenSearch={() => {
+                setSpecialView('search');
+                resetScrollToTop();
               }}
-              onOpenSearch={() => setSpecialView('search')}
               onNavigateProfileMenu={(target) => {
-                if (target === 'mylist') setSpecialView('mylist');
-                else if (target === 'history') setSpecialView('history');
-                else if (target === 'settings') setSpecialView('settings');
+                if (target === 'mylist') {
+                  setSpecialView('mylist');
+                  resetScrollToTop();
+                } else if (target === 'history') {
+                  setSpecialView('history');
+                  resetScrollToTop();
+                } else if (target === 'settings') {
+                  setSpecialView('settings');
+                  resetScrollToTop();
+                }
               }}
               userName={activeProfile?.name || currentUser?.name || 'ZapiTV'}
               avatarUrl={activeProfile?.avatar}
