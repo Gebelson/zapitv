@@ -254,6 +254,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   // Reinicia estados de autoplay ao trocar de episódio
   useEffect(() => {
+    isUserPausedRef.current = false;
     setIsAutoPlayCancelled(false);
     setShowAutoPlayCountdown(false);
     setCountdownSeconds(10);
@@ -277,6 +278,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
+  const isUserPausedRef = useRef<boolean>(false);
   const [isSeeking, setIsSeeking] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -950,15 +952,20 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     const isWpGuest = watchPartyService.isConnected && !watchPartyService.isHost();
     const wpState = isWpGuest ? watchPartyService.getLastPlaybackState() : null;
 
-    if (wpState && !wpState.isPlaying) {
+    if ((wpState && !wpState.isPlaying) || isUserPausedRef.current) {
       applyTargetResumeTime();
       video.pause();
       setIsPlaying(false);
     } else {
       video.play()
         .then(() => {
-          setIsPlaying(true);
-          applyTargetResumeTime();
+          if (isUserPausedRef.current) {
+            video.pause();
+            setIsPlaying(false);
+          } else {
+            setIsPlaying(true);
+            applyTargetResumeTime();
+          }
         })
         .catch((err) => {
           // Fallback de segurança contra bloqueio estrito de autoplay com áudio do navegador pós-intro
@@ -968,8 +975,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             setIsAutoplayAudioBlocked(true);
             video.play()
               .then(() => {
-                setIsPlaying(true);
-                applyTargetResumeTime();
+                if (isUserPausedRef.current) {
+                  video.pause();
+                  setIsPlaying(false);
+                } else {
+                  setIsPlaying(true);
+                  applyTargetResumeTime();
+                }
               })
               .catch(() => setIsPlaying(false));
           } else {
@@ -1070,16 +1082,29 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
     // Se a vinheta não deve ser tocada nesta sessão (ex: reprodução contínua ou já assistida):
     if (!shouldStartWithIntro || isIntroEndedRef.current || userSkippedIntroRef.current) {
+      if (isUserPausedRef.current) return;
       const video = videoRef.current;
       if (video && video.paused && !showNonDubbedPromptRef.current) {
         video.muted = isMuted;
         video.volume = volume;
-        video.play().then(() => setIsPlaying(true)).catch((err) => {
+        video.play().then(() => {
+          if (!isUserPausedRef.current) {
+            setIsPlaying(true);
+          } else {
+            video.pause();
+          }
+        }).catch((err) => {
           if (err && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
             console.warn('[ZapiPlayer] Autoplay com som bloqueado pelo navegador. Ativando recuperação por 1 toque:', err.name);
             video.muted = true;
             setIsAutoplayAudioBlocked(true);
-            video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+            video.play().then(() => {
+              if (!isUserPausedRef.current) {
+                setIsPlaying(true);
+              } else {
+                video.pause();
+              }
+            }).catch(() => setIsPlaying(false));
           } else {
             setIsPlaying(false);
           }
@@ -1180,6 +1205,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Notifica que o stream principal foi carregado e está pronto para tocar
   const markMediaAsReady = useCallback(() => {
     setIsLoading(false);
+    const wasAlreadyReady = isMediaReadyRef.current;
     setIsMediaReady(true);
     isMediaReadyRef.current = true;
 
@@ -1193,7 +1219,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       uiSoundService.play('watch');
     }
 
-    startIntroIfReady();
+    if (!wasAlreadyReady && !isUserPausedRef.current) {
+      startIntroIfReady();
+    }
   }, [startIntroIfReady, navigationType, isBroadcastGuest]);
 
   // Reação automática: assim que a mídia estiver pronta, se a intro já terminou ou foi pulada, transiciona!
@@ -1206,6 +1234,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Se a mídia estiver pronta e a intro já foi concluída (ex: recuperação automática pós-falha), inicia a reprodução direta sem reiniciar a vinheta
   useEffect(() => {
     if (isMediaReady && (isIntroEnded || userSkippedIntro) && !isPlayingIntro && !showNonDubbedPrompt) {
+      if (isUserPausedRef.current) {
+        return;
+      }
       const isWpGuest = watchPartyService.isConnected && !watchPartyService.isHost();
       const wpState = isWpGuest ? watchPartyService.getLastPlaybackState() : null;
       if (wpState && !wpState.isPlaying) {
@@ -1215,7 +1246,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       if (video && video.paused) {
         video.muted = isMuted;
         video.volume = volume;
-        video.play().then(() => setIsPlaying(true)).catch(() => {});
+        video.play().then(() => {
+          if (!isUserPausedRef.current) {
+            setIsPlaying(true);
+          } else {
+            video.pause();
+          }
+        }).catch(() => {});
       }
     }
   }, [isMediaReady, isIntroEnded, userSkippedIntro, isPlayingIntro, showNonDubbedPrompt, isMuted, volume]);
@@ -1710,8 +1747,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       duration,
       currentTime,
       isPlaying,
-      onPlay: () => video?.play(),
-      onPause: () => video?.pause(),
+      onPlay: () => {
+        isUserPausedRef.current = false;
+        video?.play().catch(() => {});
+      },
+      onPause: () => {
+        isUserPausedRef.current = true;
+        video?.pause();
+      },
       onSeek: (seekTime) => {
         if (video) video.currentTime = seekTime;
       },
@@ -1760,6 +1803,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
         // 1. Sincroniza Play / Pause e Alinhamento de Posição
         if (!sync.isPlaying) {
+          isUserPausedRef.current = true;
           if (!video.paused) {
             video.pause();
             setIsPlaying(false);
@@ -1773,8 +1817,15 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           video.playbackRate = sync.playbackRate || 1.0;
         } else {
           // Host está reproduzindo
+          isUserPausedRef.current = false;
           if (video.paused) {
-            video.play().then(() => setIsPlaying(true)).catch(console.warn);
+            video.play().then(() => {
+              if (!isUserPausedRef.current) {
+                setIsPlaying(true);
+              } else {
+                video.pause();
+              }
+            }).catch(console.warn);
           }
 
           // Correção progressiva inteligente:
@@ -1922,8 +1973,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       if (!video) return;
 
       if (req.action === 'play') {
-        video.play().then(() => setIsPlaying(true)).catch(console.warn);
+        isUserPausedRef.current = false;
+        video.play().then(() => {
+          if (!isUserPausedRef.current) {
+            setIsPlaying(true);
+          } else {
+            video.pause();
+          }
+        }).catch(console.warn);
       } else if (req.action === 'pause') {
+        isUserPausedRef.current = true;
         video.pause();
         setIsPlaying(false);
       } else if (req.action === 'seek' && typeof req.payload?.positionSeconds === 'number') {
@@ -2040,6 +2099,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     setForcedNonDubbedPrompt(false);
     setHasUserConfirmedNonDubbed(true);
     showNonDubbedPromptRef.current = false;
+    isUserPausedRef.current = false;
     if (playbackSessionId) {
       playbackSessionService.markNonDubbedConfirmed(playbackSessionId);
     }
@@ -2056,7 +2116,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   useEffect(() => {
     if (hasUserConfirmedNonDubbed && isMediaReady && !showNonDubbedPrompt) {
-      startIntroIfReady();
+      if (!isUserPausedRef.current) {
+        startIntroIfReady();
+      }
     }
   }, [hasUserConfirmedNonDubbed, isMediaReady, showNonDubbedPrompt, startIntroIfReady]);
 
@@ -3612,10 +3674,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       const intro = introVideoRef.current;
       if (!intro) return;
       if (intro.paused) {
+        isUserPausedRef.current = false;
         intro.play().then(() => {
-          setIsPlaying(true);
+          if (!isUserPausedRef.current) {
+            setIsPlaying(true);
+          } else {
+            intro.pause();
+          }
         }).catch(console.error);
       } else {
+        isUserPausedRef.current = true;
         intro.pause();
         setIsPlaying(false);
       }
@@ -3627,6 +3695,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         return;
       }
       const newPlayState = !isPlaying;
+      isUserPausedRef.current = !newPlayState;
       setIsPlaying(newPlayState);
       watchPartyService.requestHostPlaybackAction(newPlayState ? 'play' : 'pause');
       return;
@@ -3635,17 +3704,23 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
+      isUserPausedRef.current = false;
       video.play().then(() => {
-        setIsPlaying(true);
+        if (!isUserPausedRef.current) {
+          setIsPlaying(true);
+        } else {
+          video.pause();
+        }
         if (
           (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) &&
           !isHandlingRemoteSyncRef.current &&
           !watchPartyService.isRemoteActionApplying
         ) {
-          watchPartyService.updatePlaybackState(video.currentTime, true, video.playbackRate, duration || video.duration);
+          watchPartyService.updatePlaybackState(video.currentTime, !isUserPausedRef.current, video.playbackRate, duration || video.duration);
         }
       }).catch(console.error);
     } else {
+      isUserPausedRef.current = true;
       video.pause();
       setIsPlaying(false);
       if (
@@ -3878,6 +3953,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   };
 
   const activeCue = cues.find(c => (currentTime + subDelay) >= c.start && (currentTime + subDelay) <= c.end);
+  const isEffectivePlaying = isPlaying && !isUserPausedRef.current;
 
   return (
     <div
@@ -4078,7 +4154,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
       {/* Top Header Bar */}
       {!isTvPlayback && (
-      <div className={`absolute top-0 inset-x-0 p-4 md:p-6 pl-[calc(1rem+env(safe-area-inset-left,0px))] pr-[calc(1rem+env(safe-area-inset-right,0px))] pt-[calc(1rem+env(safe-area-inset-top,0px))] bg-gradient-to-b from-black/90 via-black/40 to-transparent z-50 flex items-center justify-between transition-opacity duration-300 ${(showControls || !isPlaying || hasOpenMenu) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <div className={`absolute top-0 inset-x-0 p-4 md:p-6 pl-[calc(1rem+env(safe-area-inset-left,0px))] pr-[calc(1rem+env(safe-area-inset-right,0px))] pt-[calc(1rem+env(safe-area-inset-top,0px))] bg-gradient-to-b from-black/90 via-black/40 to-transparent z-50 flex items-center justify-between transition-opacity duration-300 ${(showControls || !isEffectivePlaying || hasOpenMenu) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-3 md:gap-4 max-w-[65%] sm:max-w-[70%]">
           <button
             onClick={handlePlayerClose}
@@ -4262,6 +4338,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             className="w-full h-full object-contain"
             playsInline
             muted={isPlayingIntro || isMuted}
+            onPlay={() => {
+              if (!isUserPausedRef.current) {
+                setIsPlaying(true);
+              }
+            }}
             onLoadedMetadata={() => {
               if (loadingTraceId) mediaLoadingTracker.recordEvent(loadingTraceId,
                 'MANIFEST_OR_METADATA_LOADED', 'ZapiPlayer');
@@ -4743,6 +4824,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                   onClick={() => {
                     const video = videoRef.current;
                     if (video) {
+                      isUserPausedRef.current = false;
                       video.currentTime = 0;
                       video.play().then(() => setIsPlaying(true)).catch(() => {});
                     }
@@ -4797,7 +4879,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       {!isTvPlayback && (
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`absolute bottom-0 inset-x-0 p-3 sm:p-4 md:p-6 pl-[calc(0.75rem+env(safe-area-inset-left,0px))] pr-[calc(0.75rem+env(safe-area-inset-right,0px))] md:pl-[calc(1.5rem+env(safe-area-inset-left,0px))] md:pr-[calc(1.5rem+env(safe-area-inset-right,0px))] pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] bg-gradient-to-t from-black/95 via-black/60 to-transparent z-40 transition-opacity duration-300 ${(showControls || !isPlaying || hasOpenMenu) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`absolute bottom-0 inset-x-0 p-3 sm:p-4 md:p-6 pl-[calc(0.75rem+env(safe-area-inset-left,0px))] pr-[calc(0.75rem+env(safe-area-inset-right,0px))] md:pl-[calc(1.5rem+env(safe-area-inset-left,0px))] md:pr-[calc(1.5rem+env(safe-area-inset-right,0px))] pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] bg-gradient-to-t from-black/95 via-black/60 to-transparent z-40 transition-opacity duration-300 ${(showControls || !isEffectivePlaying || hasOpenMenu) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       >
         {/* Progress Scrubber */}
         <div className={`relative w-full py-2 mb-2 sm:mb-3 group flex items-center select-none ${(isPlayingIntro || (isBroadcastGuest && !watchPartyService.canLocalControl('canSeek'))) ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}`}>
@@ -4839,10 +4921,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               onClick={togglePlay}
               disabled={isBroadcastGuest && !watchPartyService.canLocalControl('canPlayPause')}
               className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all hover:scale-105 shrink-0 ${(isBroadcastGuest && !watchPartyService.canLocalControl('canPlayPause')) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-              aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
+              aria-label={isEffectivePlaying ? 'Pausar' : 'Reproduzir'}
               title={(isBroadcastGuest && !watchPartyService.canLocalControl('canPlayPause')) ? 'Permissão necessária do anfitrião' : undefined}
             >
-              {isPlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5 fill-current" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />}
+              {isEffectivePlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5 fill-current" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />}
             </button>
 
             <button
