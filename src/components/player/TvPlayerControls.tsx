@@ -1,11 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FocusContext, getCurrentFocusKey, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import {
+  AlertTriangle,
   ArrowLeft,
+  ArrowRight,
   Check,
+  Clock,
   FastForward,
   Languages,
   ListVideo,
+  Monitor,
+  MoveVertical,
+  Palette,
   Pause,
   Play,
   Rewind,
@@ -13,6 +19,10 @@ import {
   RotateCw,
   SlidersHorizontal,
   SkipForward,
+  Sparkles,
+  Subtitles,
+  Type,
+  Volume2,
   X
 } from 'lucide-react';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
@@ -22,15 +32,7 @@ import type { AudioOption } from '../../core/audio/audioSelectionManager';
 import type { SubtitleTrack } from '../../core/subtitles/subtitleService';
 import type { SubtitleStyle } from '../../core/subtitles/subtitleStyleService';
 
-export type TvMenuType = 'audio_subtitles' | 'episodes' | 'options' | null;
-
-interface OptionItem {
-  id: string;
-  label: string;
-  active?: boolean;
-  action: () => void;
-  badge?: string;
-}
+export type TvMenuType = 'audio_subtitles' | 'episodes' | 'options' | 'subtitle_styles' | null;
 
 export interface TvPlayerEpisode {
   id: string;
@@ -255,14 +257,64 @@ const Timeline: React.FC<{
   );
 };
 
-/** Opção dentro dos painéis secundários */
-const DrawerOption: React.FC<{
+/** Botão circular de ação para o cabeçalho do Drawer */
+const DrawerIconButton: React.FC<{
   focusKey: string;
-  option: OptionItem;
-}> = ({ focusKey, option }) => {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}> = ({ focusKey, label, onClick, children }) => {
   const { ref, focused } = useTvFocusable({
     focusKey,
-    onEnterPress: option.action,
+    onEnterPress: onClick,
+    soundType: 'hover',
+    enterSound: 'close',
+    isPlayerControl: true
+  });
+  return (
+    <button
+      ref={ref}
+      type="button"
+      data-focus-key={focusKey}
+      data-tv-focused={focused ? 'true' : undefined}
+      onClick={onClick}
+      aria-label={label}
+      className={`w-9 h-9 rounded-full flex items-center justify-center outline-none transition-all duration-150 select-none cursor-pointer ${
+        focused
+          ? 'bg-cyan-500/30 text-white ring-2 ring-cyan-300 scale-105 shadow-[0_0_12px_rgba(0,229,255,0.4)]'
+          : 'bg-white/10 text-gray-300 hover:bg-white/15 hover:text-white'
+      }`}
+    >
+      {children}
+    </button>
+  );
+};
+
+/** Cabeçalho de seção dentro dos Drawers */
+const DrawerSectionHeader: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+}> = ({ icon, title }) => (
+  <div className="flex items-center gap-2.5 mb-3">
+    <span className="text-cyan-400 shrink-0">{icon}</span>
+    <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">{title}</span>
+    <div className="h-px flex-1 bg-white/10" />
+  </div>
+);
+
+/** Chip / Pill elegante para seleção de opções (áudio, legendas, qualidades, estilos) */
+const DrawerPillChip: React.FC<{
+  focusKey: string;
+  label: string;
+  active?: boolean;
+  badge?: string;
+  icon?: React.ReactNode;
+  colorSwatch?: string;
+  onClick: () => void;
+}> = ({ focusKey, label, active, badge, icon, colorSwatch, onClick }) => {
+  const { ref, focused } = useTvFocusable({
+    focusKey,
+    onEnterPress: onClick,
     soundType: 'hover',
     enterSound: 'toggle',
     isPlayerControl: true
@@ -274,35 +326,441 @@ const DrawerOption: React.FC<{
       type="button"
       data-focus-key={focusKey}
       data-tv-focused={focused ? 'true' : undefined}
-      onClick={option.action}
-      className={`w-full min-h-[56px] px-5 py-3.5 rounded-xl text-left flex items-center justify-between text-[18px] font-medium outline-none transition-all duration-150 select-none ${
+      onClick={onClick}
+      className={`relative inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl font-semibold text-sm outline-none transition-all duration-150 select-none cursor-pointer ${
         focused
-          ? 'bg-cyan-500/25 ring-2 ring-cyan-300 text-white shadow-[0_0_14px_rgba(0,229,255,0.35)]'
-          : option.active
-          ? 'bg-white/10 text-cyan-300 font-semibold'
-          : 'text-gray-200 bg-white/5 hover:bg-white/10'
+          ? 'bg-cyan-400 text-black ring-4 ring-cyan-300/40 shadow-[0_0_18px_rgba(0,229,255,0.6)] scale-105 z-10 font-bold'
+          : active
+          ? 'bg-cyan-500/20 border border-cyan-400/80 text-cyan-200 shadow-[0_0_12px_rgba(0,229,255,0.2)]'
+          : 'bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:text-white'
       }`}
     >
-      <div className="flex items-center gap-3 truncate">
-        {option.badge && (
-          <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-white/10 text-gray-300">
-            {option.badge}
-          </span>
-        )}
-        <span className="truncate">{option.label}</span>
-      </div>
-      {option.active && <Check className="w-5 h-5 text-cyan-300 shrink-0 ml-2" />}
+      {colorSwatch && (
+        <span
+          className="w-3.5 h-3.5 rounded-full border border-black/40 shadow-sm shrink-0"
+          style={{ backgroundColor: colorSwatch }}
+        />
+      )}
+      {icon}
+      <span className="truncate">{label}</span>
+      {badge && (
+        <span
+          className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+            focused
+              ? 'bg-black text-cyan-300'
+              : active
+              ? 'bg-cyan-400 text-black'
+              : 'bg-white/15 text-gray-300'
+          }`}
+        >
+          {badge}
+        </span>
+      )}
+      {active && (
+        <Check className={`w-3.5 h-3.5 shrink-0 ml-0.5 ${focused ? 'text-black' : 'text-cyan-300'}`} />
+      )}
     </button>
   );
 };
 
+/** Linha com switch toggle moderno para configurações (Autoplay, Autoskip) */
+const DrawerToggleRow: React.FC<{
+  focusKey: string;
+  title: string;
+  description?: string;
+  enabled: boolean;
+  onToggle: () => void;
+}> = ({ focusKey, title, description, enabled, onToggle }) => {
+  const { ref, focused } = useTvFocusable({
+    focusKey,
+    onEnterPress: onToggle,
+    soundType: 'hover',
+    enterSound: 'toggle',
+    isPlayerControl: true
+  });
+
+  return (
+    <div
+      ref={ref}
+      role="switch"
+      aria-checked={enabled}
+      data-focus-key={focusKey}
+      data-tv-focused={focused ? 'true' : undefined}
+      onClick={onToggle}
+      className={`w-full p-4 rounded-2xl flex items-center justify-between gap-4 outline-none transition-all duration-150 select-none cursor-pointer border ${
+        focused
+          ? 'bg-cyan-500/20 border-cyan-300 ring-2 ring-cyan-300 shadow-[0_0_20px_rgba(0,229,255,0.3)] scale-[1.01]'
+          : 'bg-white/5 border-white/5 hover:bg-white/10'
+      }`}
+    >
+      <div className="flex-1 min-w-0 pr-2">
+        <h4 className={`text-base font-bold tracking-tight ${focused ? 'text-white' : 'text-gray-100'}`}>
+          {title}
+        </h4>
+        {description && (
+          <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+            {description}
+          </p>
+        )}
+      </div>
+      {/* Switch visual estilo iOS / Apple TV */}
+      <div
+        className={`w-12 h-6 rounded-full p-0.5 flex items-center transition-colors duration-200 shrink-0 ${
+          enabled ? 'bg-cyan-400 justify-end' : 'bg-white/20 justify-start'
+        }`}
+      >
+        <span
+          className={`w-5 h-5 rounded-full shadow-md transition-all duration-200 ${
+            enabled ? 'bg-black' : 'bg-gray-300'
+          }`}
+        />
+      </div>
+    </div>
+  );
+};
+
+/** Card moderno para episódios com miniatura 16:9 e metadados organizados */
+const DrawerEpisodeCard: React.FC<{
+  focusKey: string;
+  episode: TvPlayerEpisode;
+  isCurrent: boolean;
+  onSelect: () => void;
+}> = ({ focusKey, episode, isCurrent, onSelect }) => {
+  const [imgError, setImgError] = useState(false);
+  const { ref, focused } = useTvFocusable({
+    focusKey,
+    onEnterPress: onSelect,
+    soundType: 'hover',
+    enterSound: 'confirm',
+    isPlayerControl: true
+  });
+
+  return (
+    <div
+      ref={ref}
+      role="button"
+      data-focus-key={focusKey}
+      data-tv-focused={focused ? 'true' : undefined}
+      onClick={onSelect}
+      className={`group w-full p-3 rounded-2xl flex items-start gap-3.5 outline-none transition-all duration-150 select-none cursor-pointer border ${
+        focused
+          ? 'bg-cyan-500/20 border-cyan-300 ring-2 ring-cyan-300 shadow-[0_0_20px_rgba(0,229,255,0.35)] scale-[1.01]'
+          : isCurrent
+          ? 'bg-cyan-500/10 border-cyan-400/40 text-cyan-200'
+          : 'bg-white/5 border-white/5 hover:bg-white/10'
+      }`}
+    >
+      {/* Miniatura 16:9 */}
+      <div className="relative w-36 sm:w-44 aspect-video rounded-xl overflow-hidden bg-black/50 shrink-0 border border-white/10">
+        {episode.image && !imgError ? (
+          <img
+            src={episode.image}
+            alt={episode.title}
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/10 to-transparent">
+            <Play className="w-7 h-7 text-white/40 fill-current ml-0.5" />
+          </div>
+        )}
+        {/* Overlay do número do episódio */}
+        <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-md text-[11px] font-black tracking-wider bg-black/85 text-cyan-300 border border-cyan-400/40 shadow">
+          EP {episode.number}
+        </span>
+        {isCurrent && (
+          <span className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-cyan-400 text-black shadow-md">
+            Atual
+          </span>
+        )}
+      </div>
+
+      {/* Textos */}
+      <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-extrabold tracking-wider uppercase text-cyan-400">
+            Episódio {episode.number}
+          </span>
+          {isCurrent && (
+            <span className="text-[10px] font-bold text-cyan-300 bg-cyan-500/20 px-2 py-0.5 rounded-full border border-cyan-400/30">
+              Reproduzindo
+            </span>
+          )}
+        </div>
+        <h4 className="text-[15px] sm:text-[16px] font-bold text-white tracking-tight truncate mt-0.5">
+          {episode.title}
+        </h4>
+        {episode.description ? (
+          <p className="text-xs text-gray-400 line-clamp-2 mt-1 leading-relaxed">
+            {episode.description}
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500 italic mt-1">
+            Episódio da série ZapiTV
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/** Card de ação navegável para submenus ou links diretos */
+const DrawerActionCard: React.FC<{
+  focusKey: string;
+  title: string;
+  description?: string;
+  icon?: React.ReactNode;
+  badge?: string;
+  onClick: () => void;
+}> = ({ focusKey, title, description, icon, badge, onClick }) => {
+  const { ref, focused } = useTvFocusable({
+    focusKey,
+    onEnterPress: onClick,
+    soundType: 'hover',
+    enterSound: 'confirm',
+    isPlayerControl: true
+  });
+
+  return (
+    <div
+      ref={ref}
+      role="button"
+      data-focus-key={focusKey}
+      data-tv-focused={focused ? 'true' : undefined}
+      onClick={onClick}
+      className={`w-full p-4 rounded-2xl flex items-center justify-between gap-4 outline-none transition-all duration-150 select-none cursor-pointer border ${
+        focused
+          ? 'bg-cyan-500/20 border-cyan-300 ring-2 ring-cyan-300 shadow-[0_0_20px_rgba(0,229,255,0.3)] scale-[1.01]'
+          : 'bg-white/5 border-white/5 hover:bg-white/10'
+      }`}
+    >
+      <div className="flex items-center gap-3.5 min-w-0">
+        {icon && (
+          <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-cyan-300 shrink-0">
+            {icon}
+          </div>
+        )}
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h4 className="text-base font-bold text-gray-100 tracking-tight truncate">
+              {title}
+            </h4>
+            {badge && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                {badge}
+              </span>
+            )}
+          </div>
+          {description && (
+            <p className="text-xs text-gray-400 mt-0.5 leading-relaxed truncate">
+              {description}
+            </p>
+          )}
+        </div>
+      </div>
+      <ArrowRight className="w-5 h-5 text-gray-400 shrink-0" />
+    </div>
+  );
+};
+
+/** Botão individual de controle de stepper */
+const DrawerStepperButton: React.FC<{
+  focusKey: string;
+  label: string;
+  onClick: () => void;
+  isSecondary?: boolean;
+  children: React.ReactNode;
+}> = ({ focusKey, label, onClick, isSecondary, children }) => {
+  const { ref, focused } = useTvFocusable({
+    focusKey,
+    onEnterPress: onClick,
+    soundType: 'hover',
+    enterSound: 'click',
+    isPlayerControl: true
+  });
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      data-focus-key={focusKey}
+      data-tv-focused={focused ? 'true' : undefined}
+      onClick={onClick}
+      aria-label={label}
+      className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider outline-none transition-all duration-150 select-none cursor-pointer ${
+        focused
+          ? 'bg-cyan-400 text-black ring-2 ring-cyan-300 scale-105 shadow-[0_0_12px_rgba(0,229,255,0.5)] font-black'
+          : isSecondary
+          ? 'bg-white/10 text-cyan-300 border border-cyan-400/30 hover:bg-white/15'
+          : 'bg-white/10 text-white hover:bg-white/15'
+      }`}
+    >
+      {children}
+    </button>
+  );
+};
+
+/** Stepper horizontal moderno para ajustes numéricos (Sincronia e Posição) */
+const DrawerStepper: React.FC<{
+  label: string;
+  description?: string;
+  valueDisplay: string;
+  downFocusKey: string;
+  upFocusKey: string;
+  resetFocusKey?: string;
+  onDown: () => void;
+  onUp: () => void;
+  onReset?: () => void;
+  canReset?: boolean;
+}> = ({
+  label,
+  description,
+  valueDisplay,
+  downFocusKey,
+  upFocusKey,
+  resetFocusKey,
+  onDown,
+  onUp,
+  onReset,
+  canReset
+}) => {
+  return (
+    <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h4 className="text-base font-bold text-gray-100 tracking-tight">{label}</h4>
+          {description && <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{description}</p>}
+        </div>
+        <span className="text-sm font-extrabold text-cyan-300 bg-cyan-500/10 px-3 py-1 rounded-lg border border-cyan-400/30">
+          {valueDisplay}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 pt-1">
+        <DrawerStepperButton focusKey={downFocusKey} label="Diminuir" onClick={onDown}>
+          -1s
+        </DrawerStepperButton>
+        <DrawerStepperButton focusKey={upFocusKey} label="Aumentar" onClick={onUp}>
+          +1s
+        </DrawerStepperButton>
+        {canReset && onReset && resetFocusKey && (
+          <DrawerStepperButton focusKey={resetFocusKey} label="Restaurar Padrão" onClick={onReset} isSecondary>
+            Restaurar
+          </DrawerStepperButton>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/** Caixa de pré-visualização ao vivo das legendas */
+const SubtitlePreviewBox: React.FC<{
+  size: 'sm' | 'md' | 'lg' | 'xl';
+  style: SubtitleStyle;
+}> = ({ size, style }) => {
+  const fontSizes = {
+    sm: 'text-base sm:text-lg',
+    md: 'text-lg sm:text-xl',
+    lg: 'text-xl sm:text-2xl',
+    xl: 'text-2xl sm:text-3xl'
+  };
+
+  const textShadows = {
+    none: 'none',
+    soft: '0 1px 3px rgba(0,0,0,0.8)',
+    strong: '0 2px 8px rgba(0,0,0,0.95), 0 0 2px #000000',
+    drop: '2px 2px 0 #000000, -1px -1px 0 #000000'
+  };
+
+  const bgStyles = {
+    none: 'transparent',
+    semi: 'rgba(0,0,0,0.7)',
+    solid: '#000000'
+  };
+
+  return (
+    <div className="relative w-full h-32 rounded-2xl bg-gradient-to-b from-[#101726] to-[#070b13] border border-white/10 flex items-center justify-center p-4 overflow-hidden shadow-inner mb-2">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(0,229,255,0.06)_0%,transparent_70%)] pointer-events-none" />
+      <div
+        className={`text-center font-bold tracking-tight select-none transition-all duration-150 ${fontSizes[size]}`}
+        style={{
+          color: style.color || '#FFFFFF',
+          textShadow: textShadows[style.shadow || 'strong'],
+          backgroundColor: bgStyles[style.bgColor || 'semi'],
+          padding: style.bgColor !== 'none' ? '6px 16px' : '0',
+          borderRadius: '8px'
+        }}
+      >
+        <span>Exemplo de Legenda ZapiTV</span>
+        <div className="text-[75%] font-medium opacity-85 mt-0.5">
+          Pré-visualização em tempo real na TV
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SUBTITLE_SIZES: { label: string; value: 'sm' | 'md' | 'lg' | 'xl' }[] = [
+  { label: 'Pequena', value: 'sm' },
+  { label: 'Média', value: 'md' },
+  { label: 'Grande', value: 'lg' },
+  { label: 'Extra Grande', value: 'xl' }
+];
+
+const SUBTITLE_COLORS = [
+  { label: 'Branco', value: '#FFFFFF' },
+  { label: 'Amarelo', value: '#FFE66D' },
+  { label: 'Ciano', value: '#00E5FF' }
+];
+
+const SUBTITLE_SHADOWS: { label: string; value: 'none' | 'soft' | 'strong' | 'drop' }[] = [
+  { label: 'Nenhuma', value: 'none' },
+  { label: 'Suave', value: 'soft' },
+  { label: 'Forte', value: 'strong' },
+  { label: 'Destaque', value: 'drop' }
+];
+
+const SUBTITLE_BG_COLORS: { label: string; value: 'none' | 'semi' | 'solid' }[] = [
+  { label: 'Transparente', value: 'none' },
+  { label: 'Translúcido', value: 'semi' },
+  { label: 'Preto Sólido', value: 'solid' }
+];
+
 export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
   const { ref, focusKey } = useFocusable({ focusKey: 'tv-player-controls-root', trackChildren: true });
   const [menu, setMenu] = useState<TvMenuType>(null);
+  const [previousMenu, setPreviousMenu] = useState<'audio_subtitles' | 'options'>('audio_subtitles');
   const [selectedSeason, setSelectedSeason] = useState<number>(() => props.season ?? 1);
   const [preview, setPreview] = useState<number | null>(null);
   const [menuOrigin, setMenuOrigin] = useState('tv-player-play');
   const [activeLabel, setActiveLabel] = useState<string>('Reproduzir / Pausar');
+
+  // Temporadas disponíveis para animes/séries
+  const availableSeasons = useMemo<number[]>(() => {
+    if (!props.episodes || props.episodes.length === 0) return [1];
+    const seasons = Array.from(new Set(props.episodes.map(e => e.season ?? 1)));
+    return seasons.sort((a, b) => a - b);
+  }, [props.episodes]);
+
+  // Episódios da temporada atualmente selecionada no drawer
+  const seasonEpisodes = useMemo<TvPlayerEpisode[]>(() => {
+    if (props.episodes && props.episodes.length > 0) {
+      const filtered = props.episodes.filter(e => (e.season ?? 1) === selectedSeason);
+      if (filtered.length > 0) return filtered;
+    }
+    // Fallback gracioso quando a obra é série/anime com episódios conhecidos
+    if (props.season && props.episode) {
+      const count = Math.max(props.episode, 10);
+      return Array.from({ length: count }, (_, i) => ({
+        id: `ep-${selectedSeason}-${i + 1}`,
+        number: i + 1,
+        season: selectedSeason,
+        title: props.episode === (i + 1) && props.episodeTitle ? props.episodeTitle : `Episódio ${i + 1}`
+      }));
+    }
+    return [];
+  }, [props.episodes, selectedSeason, props.season, props.episode, props.episodeTitle]);
+
   const [seekFeedback, setSeekFeedback] = useState<{
     direction: 'forward' | 'rewind';
     accumulatedSeconds: number;
@@ -390,8 +848,53 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
     setMenuOrigin(origin);
     setMenu(next);
     props.onInteraction();
-    requestAnimationFrame(() => setFocus(`tv-player-drawer-${next}-0`));
+    requestAnimationFrame(() => {
+      if (next === 'audio_subtitles') {
+        if (props.audioOptions.length > 0) {
+          setFocus('tv-player-drawer-audio-0');
+        } else {
+          setFocus('tv-player-drawer-sub-off');
+        }
+      } else if (next === 'episodes') {
+        const curIdx = seasonEpisodes.findIndex(
+          ep => (ep.season ?? 1) === (props.season ?? 1) && ep.number === props.episode
+        );
+        if (curIdx >= 0) {
+          setFocus(`tv-player-drawer-episodes-${curIdx}`);
+        } else {
+          setFocus('tv-player-drawer-episodes-0');
+        }
+      } else if (next === 'options') {
+        if (props.qualities.length > 0) {
+          setFocus('tv-player-drawer-quality-0');
+        } else {
+          setFocus('tv-player-drawer-toggle-autoplay');
+        }
+      } else if (next === 'subtitle_styles') {
+        setFocus('tv-player-drawer-substyle-size-0');
+      }
+    });
+  }, [props.onInteraction, props.audioOptions.length, props.qualities.length, seasonEpisodes, props.season, props.episode]);
+
+  const openSubtitleStyles = useCallback((from: 'audio_subtitles' | 'options') => {
+    uiSoundService.play('toggle', { playerControl: true });
+    setPreviousMenu(from);
+    setMenu('subtitle_styles');
+    props.onInteraction();
+    requestAnimationFrame(() => setFocus('tv-player-drawer-substyle-size-0'));
   }, [props.onInteraction]);
+
+  const returnFromSubtitleStyles = useCallback(() => {
+    uiSoundService.play('toggle', { playerControl: true });
+    setMenu(previousMenu);
+    requestAnimationFrame(() => {
+      if (previousMenu === 'options') {
+        setFocus('tv-player-drawer-options-substyle-btn');
+      } else {
+        setFocus('tv-drawer-sub-styles-btn');
+      }
+    });
+  }, [previousMenu]);
 
   const closeMenu = useCallback((silent = false) => {
     if (!menu) return;
@@ -405,6 +908,11 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
   // Registro prioritário do comando Voltar (Hierarquia Apple TV)
   useEffect(() => tvNavigationManager.registerBackHandler('tv-player-controls', 250, () => {
     if (props.suspended) return false;
+    // 0. Submenu de estilos de legendas: retorna ao menu anterior (áudio e legendas ou opções)
+    if (menu === 'subtitle_styles') {
+      returnFromSubtitleStyles();
+      return true;
+    }
     // 1. Menu/Drawer aberto: fecha apenas o menu e restaura o foco no botão de origem
     if (menu) {
       closeMenu();
@@ -430,7 +938,7 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
     }
     // 5. Controles ocultos: cai para o handler do zapi-player (prioridade 200) que retorna à página de detalhes
     return false;
-  }), [props.suspended, menu, preview, props.visible, props.onHide, closeMenu, cancelScrubSession]);
+  }), [props.suspended, menu, returnFromSubtitleStyles, preview, props.visible, props.onHide, closeMenu, cancelScrubSession]);
 
   // Tratamento de atalhos e comandos do controle remoto (Padrão Apple TV)
   useEffect(() => tvNavigationManager.registerCommandHandler(event => {
@@ -632,194 +1140,7 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
     return () => cancelAnimationFrame(id);
   }, [props.visible, props.suspended, menu]);
 
-  const choose = (action: () => void) => () => {
-    uiSoundService.play('toggle', { playerControl: true });
-    action();
-    closeMenu(true);
-  };
 
-  // Temporadas disponíveis para animes/séries
-  const availableSeasons = useMemo<number[]>(() => {
-    if (!props.episodes || props.episodes.length === 0) return [1];
-    const seasons = Array.from(new Set(props.episodes.map(e => e.season ?? 1)));
-    return seasons.sort((a, b) => a - b);
-  }, [props.episodes]);
-
-  // Episódios da temporada atualmente selecionada no drawer
-  const seasonEpisodes = useMemo<TvPlayerEpisode[]>(() => {
-    if (props.episodes && props.episodes.length > 0) {
-      const filtered = props.episodes.filter(e => (e.season ?? 1) === selectedSeason);
-      if (filtered.length > 0) return filtered;
-    }
-    // Fallback gracioso quando a obra é série/anime com episódios conhecidos
-    if (props.season && props.episode) {
-      const count = Math.max(props.episode, 10);
-      return Array.from({ length: count }, (_, i) => ({
-        id: `ep-${selectedSeason}-${i + 1}`,
-        number: i + 1,
-        season: selectedSeason,
-        title: props.episode === (i + 1) && props.episodeTitle ? props.episodeTitle : `Episódio ${i + 1}`
-      }));
-    }
-    return [];
-  }, [props.episodes, selectedSeason, props.season, props.episode, props.episodeTitle]);
-
-  // Lista de opções para Áudio e Legendas (organizada em duas seções verticais)
-  const audioSubOptions = useMemo<OptionItem[]>(() => {
-    const items: OptionItem[] = [];
-
-    // Seção de Áudio
-    props.audioOptions.forEach(audio => {
-      items.push({
-        id: `audio-${audio.id}`,
-        label: `${audio.flag} ${audio.label}`,
-        badge: 'Áudio',
-        active: audio.isCurrent,
-        action: choose(() => props.onAudio(audio))
-      });
-    });
-
-    // Seção de Legendas
-    items.push({
-      id: 'sub-off',
-      label: 'Desativada (Sem Legenda)',
-      badge: 'Legenda',
-      active: props.selectedSubtitleId === 'off',
-      action: choose(() => props.onSubtitle('off'))
-    });
-
-    props.subtitleOptions.forEach(sub => {
-      items.push({
-        id: `sub-${sub.id}`,
-        label: `${sub.flag} ${sub.languageName}`,
-        badge: 'Legenda',
-        active: props.selectedSubtitleId === sub.id,
-        action: choose(() => props.onSubtitle(sub.id))
-      });
-    });
-
-    return items;
-  }, [props.audioOptions, props.subtitleOptions, props.selectedSubtitleId, props.onAudio, props.onSubtitle, closeMenu]);
-
-  // Lista de opções para "Mais Opções" (Qualidade, Autoplay, Autoskip, Legendas, Reporte)
-  const generalOptions = useMemo<OptionItem[]>(() => {
-    const sizes = ['sm', 'md', 'lg', 'xl'] as const;
-    const sizeIndex = sizes.indexOf(props.subtitleSize);
-    const cycle = <T extends string>(values: readonly T[], current: T): T =>
-      values[(values.indexOf(current) + 1) % values.length];
-
-    const items: OptionItem[] = [];
-
-    // Qualidades de vídeo
-    props.qualities.forEach(q => {
-      items.push({
-        id: `quality-${q}`,
-        label: `Qualidade: ${q === 'auto' ? 'Automática' : q.toUpperCase()}`,
-        badge: 'Vídeo',
-        active: props.selectedQuality === q,
-        action: choose(() => props.onQuality(q))
-      });
-    });
-
-    // Configurações de Reprodução
-    items.push(
-      {
-        id: 'auto-play',
-        label: `Próximo episódio automático: ${props.autoPlayEnabled ? 'Sim' : 'Não'}`,
-        badge: 'Reprodução',
-        action: props.onToggleAutoPlay
-      },
-      {
-        id: 'auto-skip',
-        label: `Pular abertura e encerramento: ${props.autoSkipEnabled ? 'Sim' : 'Não'}`,
-        badge: 'Reprodução',
-        action: props.onToggleAutoSkip
-      },
-      {
-        id: 'sub-size',
-        label: `Tamanho da legenda: ${
-          props.subtitleSize === 'sm'
-            ? 'Pequena'
-            : props.subtitleSize === 'md'
-            ? 'Média'
-            : props.subtitleSize === 'lg'
-            ? 'Grande'
-            : 'Extra Grande'
-        }`,
-        badge: 'Legendas',
-        action: () => props.onSubtitleSize(sizes[(sizeIndex + 1) % sizes.length])
-      },
-      {
-        id: 'sub-position-up',
-        label: 'Subir posição da legenda',
-        badge: 'Legendas',
-        action: () => props.onSubtitlePosition(Math.min(35, props.subtitlePosition + 5))
-      },
-      {
-        id: 'sub-position-down',
-        label: 'Descer posição da legenda',
-        badge: 'Legendas',
-        action: () => props.onSubtitlePosition(Math.max(4, props.subtitlePosition - 5))
-      },
-      {
-        id: 'sub-color',
-        label: `Cor da legenda: ${props.subtitleStyle.color === '#00E5FF' ? 'Ciano' : props.subtitleStyle.color === '#FFE66D' ? 'Amarelo' : 'Branco'}`,
-        badge: 'Legendas',
-        action: () => props.onSubtitleStyle({ color: cycle(['#FFFFFF', '#FFE66D', '#00E5FF'], props.subtitleStyle.color) })
-      },
-      {
-        id: 'sub-shadow',
-        label: `Sombra da legenda: ${props.subtitleStyle.shadow}`,
-        badge: 'Legendas',
-        action: () => props.onSubtitleStyle({ shadow: cycle(['none', 'soft', 'strong', 'drop'] as const, props.subtitleStyle.shadow) })
-      },
-      {
-        id: 'skip-offset-down',
-        label: `Abertura: ${props.skipOffset}s · atrasar 1s`,
-        badge: 'Sincronia',
-        action: () => props.onAdjustSkipOffset(-1)
-      },
-      {
-        id: 'skip-offset-up',
-        label: `Abertura: ${props.skipOffset}s · adiantar 1s`,
-        badge: 'Sincronia',
-        action: () => props.onAdjustSkipOffset(1)
-      },
-      {
-        id: 'skip-offset-reset',
-        label: 'Restaurar ajuste de abertura',
-        badge: 'Sincronia',
-        action: props.onResetSkipOffset
-      },
-      {
-        id: 'report-issue',
-        label: 'Reportar problema neste título',
-        badge: 'Suporte',
-        action: choose(props.onReport)
-      }
-    );
-
-    return items;
-  }, [
-    props.qualities,
-    props.selectedQuality,
-    props.autoPlayEnabled,
-    props.autoSkipEnabled,
-    props.subtitleSize,
-    props.subtitlePosition,
-    props.subtitleStyle,
-    props.skipOffset,
-    props.onQuality,
-    props.onToggleAutoPlay,
-    props.onToggleAutoSkip,
-    props.onSubtitleSize,
-    props.onSubtitlePosition,
-    props.onSubtitleStyle,
-    props.onAdjustSkipOffset,
-    props.onResetSkipOffset,
-    props.onReport,
-    closeMenu
-  ]);
 
   if (props.suspended) return null;
 
@@ -1042,123 +1363,426 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
           </div>
         </div>
 
-        {/* DRAWER SECUNDÁRIO: Áudio e Legendas, Episódios ou Opções */}
+        {/* DRAWER LATERAL PREMIUM: Episódios, Áudio & Legendas, Configurações ou Estilos */}
         {menu && (
           <div
-            className="absolute inset-0 z-30 bg-black/65 backdrop-blur-sm flex items-center justify-end pointer-events-auto animate-in fade-in duration-200"
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-end pointer-events-auto animate-in fade-in duration-200"
             onClick={() => closeMenu()}
           >
             <div
-              className="h-full w-[min(540px,85vw)] bg-[#0b1019]/95 border-l border-white/10 px-8 py-10 flex flex-col justify-between shadow-2xl animate-in slide-in-from-right duration-250"
+              className="h-full w-[min(580px,90vw)] bg-[#070b13]/95 backdrop-blur-2xl border-l border-white/10 px-7 sm:px-8 py-7 flex flex-col justify-between shadow-[0_0_80px_rgba(0,0,0,0.9)] animate-in slide-in-from-right duration-250 select-none overflow-hidden"
               onClick={event => event.stopPropagation()}
             >
-              {/* Cabeçalho do Drawer */}
-              <div>
-                <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                  <h3 className="text-2xl font-black text-white tracking-tight">
-                    {menu === 'audio_subtitles'
-                      ? 'Áudio e Legendas'
-                      : menu === 'episodes'
-                      ? 'Episódios'
-                      : 'Opções'}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => closeMenu()}
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-                    aria-label="Fechar painel"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400 mt-1">Pressione Voltar no controle para fechar</p>
-
-                {/* Seletor de Temporadas (quando aplicável no menu de episódios) */}
-                {menu === 'episodes' && availableSeasons.length > 1 && (
-                  <div className="flex items-center gap-2 mt-4 pb-2 overflow-x-auto no-scrollbar">
-                    {availableSeasons.map(s => (
-                      <button
-                        key={`season-btn-${s}`}
-                        type="button"
-                        onClick={() => {
-                          uiSoundService.play('toggle', { playerControl: true });
-                          setSelectedSeason(s);
-                        }}
-                        className={`px-3.5 py-1.5 rounded-lg text-sm font-bold transition-colors ${
-                          selectedSeason === s
-                            ? 'bg-cyan-500 text-black'
-                            : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
+              {/* CABEÇALHO DO DRAWER */}
+              <div className="pb-4 border-b border-white/10 shrink-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {menu === 'subtitle_styles' && (
+                      <DrawerIconButton
+                        focusKey="tv-drawer-back-btn"
+                        label="Voltar"
+                        onClick={returnFromSubtitleStyles}
                       >
-                        Temporada {s}
-                      </button>
-                    ))}
+                        <ArrowLeft className="w-5 h-5" />
+                      </DrawerIconButton>
+                    )}
+                    <h3 className="text-2xl font-black text-white tracking-tight">
+                      {menu === 'audio_subtitles'
+                        ? 'Áudio e Legendas'
+                        : menu === 'episodes'
+                        ? 'Episódios'
+                        : menu === 'options'
+                        ? 'Configurações'
+                        : 'Estilo das Legendas'}
+                    </h3>
                   </div>
-                )}
+                  <DrawerIconButton
+                    focusKey="tv-drawer-close-btn"
+                    label="Fechar painel"
+                    onClick={() => closeMenu()}
+                  >
+                    <X className="w-5 h-5" />
+                  </DrawerIconButton>
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  {menu === 'subtitle_styles' ? (
+                    <>Pressione <span className="text-cyan-300 font-semibold">Voltar</span> para retornar a {previousMenu === 'options' ? 'Configurações' : 'Áudio e Legendas'}</>
+                  ) : (
+                    <>Pressione <span className="text-cyan-300 font-semibold">Voltar</span> no controle para fechar</>
+                  )}
+                </p>
               </div>
 
-              {/* Lista com rolagem vertical suave */}
-              <div className="flex-1 my-6 overflow-y-auto no-scrollbar space-y-2 pr-1">
-                {menu === 'audio_subtitles' ? (
-                  audioSubOptions.length > 0 ? (
-                    audioSubOptions.map((option, index) => (
-                      <DrawerOption
-                        key={`audio-sub-${option.id}`}
-                        focusKey={`tv-player-drawer-audio_subtitles-${index}`}
-                        option={option}
+              {/* CORPO DO DRAWER COM ROLAGEM SUAVE */}
+              <div className="flex-1 my-5 overflow-y-auto no-scrollbar pr-1 space-y-6">
+                {/* 1. MENU DE EPISÓDIOS */}
+                {menu === 'episodes' && (
+                  <>
+                    {/* Seletor de Temporadas em Pills */}
+                    {availableSeasons.length > 1 && (
+                      <div>
+                        <DrawerSectionHeader icon={<ListVideo className="w-4 h-4" />} title="Temporada" />
+                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+                          {availableSeasons.map(s => (
+                            <DrawerPillChip
+                              key={`season-pill-${s}`}
+                              focusKey={`tv-player-drawer-season-${s}`}
+                              label={`Temporada ${s}`}
+                              active={selectedSeason === s}
+                              onClick={() => {
+                                uiSoundService.play('toggle', { playerControl: true });
+                                setSelectedSeason(s);
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lista de Cards de Episódios 16:9 */}
+                    <div>
+                      <DrawerSectionHeader
+                        icon={<Play className="w-4 h-4 fill-current" />}
+                        title={`Episódios (${seasonEpisodes.length})`}
                       />
-                    ))
-                  ) : (
-                    <p className="text-gray-400 py-4">Nenhuma opção de áudio ou legenda disponível.</p>
-                  )
-                ) : menu === 'episodes' ? (
-                  seasonEpisodes.length > 0 ? (
-                    seasonEpisodes.map((ep, index) => {
-                      const isCurrent =
-                        (ep.season ?? 1) === (props.season ?? 1) && ep.number === props.episode;
-                      const hasDistinctTitle =
-                        ep.title &&
-                        ep.title !== `Episódio ${ep.number}` &&
-                        ep.title !== `Episode ${ep.number}`;
-                      const label = hasDistinctTitle
-                        ? `Episódio ${ep.number} · ${ep.title}`
-                        : `Episódio ${ep.number}`;
-                      return (
-                        <DrawerOption
-                          key={`ep-${ep.id || ep.number}`}
-                          focusKey={`tv-player-drawer-episodes-${index}`}
-                          option={{
-                            id: `ep-${ep.number}`,
-                            label,
-                            badge: isCurrent ? 'Atual' : undefined,
-                            active: isCurrent,
-                            action: choose(() => {
-                              props.onSelectEpisode?.(selectedSeason, ep.number);
-                            })
+                      {seasonEpisodes.length > 0 ? (
+                        <div className="space-y-3">
+                          {seasonEpisodes.map((ep, index) => {
+                            const isCurrent =
+                              (ep.season ?? 1) === (props.season ?? 1) && ep.number === props.episode;
+                            return (
+                              <DrawerEpisodeCard
+                                key={`ep-${ep.id || ep.number}`}
+                                focusKey={`tv-player-drawer-episodes-${index}`}
+                                episode={ep}
+                                isCurrent={isCurrent}
+                                onSelect={() => {
+                                  uiSoundService.play('watch', { playerControl: true });
+                                  props.onSelectEpisode?.(selectedSeason, ep.number);
+                                  closeMenu(true);
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 py-6 text-center text-sm">
+                          Nenhum episódio encontrado para esta temporada.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* 2. MENU DE ÁUDIO E LEGENDAS */}
+                {menu === 'audio_subtitles' && (
+                  <>
+                    {/* Seção Áudio */}
+                    <div>
+                      <DrawerSectionHeader icon={<Volume2 className="w-4 h-4" />} title="Áudio" />
+                      {props.audioOptions.length > 0 ? (
+                        <div className="flex flex-wrap gap-2.5">
+                          {props.audioOptions.map((audio, index) => (
+                            <DrawerPillChip
+                              key={`audio-${audio.id}`}
+                              focusKey={`tv-player-drawer-audio-${index}`}
+                              label={`${audio.flag ? `${audio.flag} ` : ''}${audio.label}`}
+                              badge={audio.badge || undefined}
+                              active={audio.isCurrent}
+                              onClick={() => {
+                                uiSoundService.play('toggle', { playerControl: true });
+                                props.onAudio(audio);
+                                closeMenu(true);
+                              }}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 text-sm py-2">Áudio padrão do título</p>
+                      )}
+                    </div>
+
+                    {/* Seção Legendas */}
+                    <div>
+                      <DrawerSectionHeader icon={<Subtitles className="w-4 h-4" />} title="Legendas" />
+                      <div className="flex flex-wrap gap-2.5">
+                        <DrawerPillChip
+                          focusKey="tv-player-drawer-sub-off"
+                          label="Desativada"
+                          active={props.selectedSubtitleId === 'off'}
+                          onClick={() => {
+                            uiSoundService.play('toggle', { playerControl: true });
+                            props.onSubtitle('off');
+                            closeMenu(true);
                           }}
                         />
-                      );
-                    })
-                  ) : (
-                    <p className="text-gray-400 py-4">Nenhum episódio encontrado para esta temporada.</p>
-                  )
-                ) : generalOptions.length > 0 ? (
-                  generalOptions.map((option, index) => (
-                    <DrawerOption
-                      key={`options-${option.id}`}
-                      focusKey={`tv-player-drawer-options-${index}`}
-                      option={option}
-                    />
-                  ))
-                ) : (
-                  <p className="text-gray-400 py-4">Nenhuma opção disponível.</p>
+                        {props.subtitleOptions.map((sub, index) => (
+                          <DrawerPillChip
+                            key={`sub-${sub.id}`}
+                            focusKey={`tv-player-drawer-sub-${index}`}
+                            label={`${sub.flag ? `${sub.flag} ` : ''}${sub.languageName}`}
+                            badge={sub.isAutoTranslated ? 'Auto' : sub.autoSyncBadge ? 'Sinc' : undefined}
+                            active={props.selectedSubtitleId === sub.id}
+                            onClick={() => {
+                              uiSoundService.play('toggle', { playerControl: true });
+                              props.onSubtitle(sub.id);
+                              closeMenu(true);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Botão de Estilo das Legendas */}
+                    <div className="pt-2">
+                      <DrawerActionCard
+                        focusKey="tv-drawer-sub-styles-btn"
+                        title="Personalizar Estilo das Legendas"
+                        description="Ajuste tamanho, cores, sombra, fundo e posição na tela"
+                        icon={<SlidersHorizontal className="w-5 h-5" />}
+                        onClick={() => openSubtitleStyles('audio_subtitles')}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* 3. MENU DE CONFIGURAÇÕES (OPÇÕES) */}
+                {menu === 'options' && (
+                  <>
+                    {/* Qualidade de Vídeo */}
+                    <div>
+                      <DrawerSectionHeader icon={<Monitor className="w-4 h-4" />} title="Qualidade de Vídeo" />
+                      <div className="flex flex-wrap gap-2.5">
+                        {props.qualities.map((q, index) => (
+                          <DrawerPillChip
+                            key={`quality-${q}`}
+                            focusKey={`tv-player-drawer-quality-${index}`}
+                            label={q === 'auto' ? 'Automática' : q.toUpperCase()}
+                            active={props.selectedQuality === q}
+                            onClick={() => {
+                              uiSoundService.play('toggle', { playerControl: true });
+                              props.onQuality(q);
+                              closeMenu(true);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Comportamento de Reprodução */}
+                    <div className="space-y-3">
+                      <DrawerSectionHeader icon={<Sparkles className="w-4 h-4" />} title="Reprodução Inteligente" />
+                      <DrawerToggleRow
+                        focusKey="tv-player-drawer-toggle-autoplay"
+                        title="Próximo Episódio Automático"
+                        description="Inicia automaticamente o episódio seguinte ao término da reprodução"
+                        enabled={props.autoPlayEnabled}
+                        onToggle={() => {
+                          uiSoundService.play('toggle', { playerControl: true });
+                          props.onToggleAutoPlay();
+                        }}
+                      />
+                      <DrawerToggleRow
+                        focusKey="tv-player-drawer-toggle-autoskip"
+                        title="Pular Abertura e Encerramento"
+                        description="Salta aberturas e créditos automaticamente quando detectados"
+                        enabled={props.autoSkipEnabled}
+                        onToggle={() => {
+                          uiSoundService.play('toggle', { playerControl: true });
+                          props.onToggleAutoSkip();
+                        }}
+                      />
+                    </div>
+
+                    {/* Sincronia do Pulo */}
+                    <div>
+                      <DrawerSectionHeader icon={<Clock className="w-4 h-4" />} title="Sincronia do Pulo" />
+                      <DrawerStepper
+                        label="Ajuste Fino de Abertura"
+                        description="Calibre o momento do pulo se a abertura cortar antes ou depois"
+                        valueDisplay={
+                          props.skipOffset === 0
+                            ? 'Padrão (0s)'
+                            : `${props.skipOffset > 0 ? '+' : ''}${props.skipOffset}s`
+                        }
+                        downFocusKey="tv-player-drawer-skip-down"
+                        upFocusKey="tv-player-drawer-skip-up"
+                        resetFocusKey="tv-player-drawer-skip-reset"
+                        onDown={() => {
+                          uiSoundService.play('click', { playerControl: true });
+                          props.onAdjustSkipOffset(-1);
+                        }}
+                        onUp={() => {
+                          uiSoundService.play('click', { playerControl: true });
+                          props.onAdjustSkipOffset(1);
+                        }}
+                        onReset={() => {
+                          uiSoundService.play('toggle', { playerControl: true });
+                          props.onResetSkipOffset();
+                        }}
+                        canReset={props.skipOffset !== 0}
+                      />
+                    </div>
+
+                    {/* Atalho para Estilo das Legendas */}
+                    <div>
+                      <DrawerActionCard
+                        focusKey="tv-player-drawer-options-substyle-btn"
+                        title="Estilo das Legendas"
+                        description="Tamanho da fonte, cores e posição vertical na tela"
+                        icon={<SlidersHorizontal className="w-5 h-5" />}
+                        onClick={() => openSubtitleStyles('options')}
+                      />
+                    </div>
+
+                    {/* Suporte e Reporte */}
+                    <div className="pt-1">
+                      <DrawerActionCard
+                        focusKey="tv-player-drawer-report"
+                        title="Reportar Problema Neste Título"
+                        description="Notifique a equipe se houver problemas de áudio, legenda ou vídeo"
+                        icon={<AlertTriangle className="w-5 h-5 text-amber-400" />}
+                        onClick={() => {
+                          uiSoundService.play('toggle', { playerControl: true });
+                          props.onReport();
+                          closeMenu(true);
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* 4. SUBMENU DE ESTILO DAS LEGENDAS */}
+                {menu === 'subtitle_styles' && (
+                  <>
+                    {/* Prévia ao Vivo */}
+                    <SubtitlePreviewBox size={props.subtitleSize} style={props.subtitleStyle} />
+
+                    {/* Tamanho da Legenda */}
+                    <div>
+                      <DrawerSectionHeader icon={<Type className="w-4 h-4" />} title="Tamanho do Texto" />
+                      <div className="flex flex-wrap gap-2.5">
+                        {SUBTITLE_SIZES.map((sizeOpt, index) => (
+                          <DrawerPillChip
+                            key={`sub-size-${sizeOpt.value}`}
+                            focusKey={`tv-player-drawer-substyle-size-${index}`}
+                            label={sizeOpt.label}
+                            active={props.subtitleSize === sizeOpt.value}
+                            onClick={() => {
+                              uiSoundService.play('toggle', { playerControl: true });
+                              props.onSubtitleSize(sizeOpt.value);
+                              props.onSubtitleStyle({ fontSize: sizeOpt.value });
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Cor da Legenda */}
+                    <div>
+                      <DrawerSectionHeader icon={<Palette className="w-4 h-4" />} title="Cor do Texto" />
+                      <div className="flex flex-wrap gap-2.5">
+                        {SUBTITLE_COLORS.map((col, index) => (
+                          <DrawerPillChip
+                            key={`sub-color-${col.value}`}
+                            focusKey={`tv-player-drawer-substyle-color-${index}`}
+                            label={col.label}
+                            colorSwatch={col.value}
+                            active={props.subtitleStyle.color === col.value}
+                            onClick={() => {
+                              uiSoundService.play('toggle', { playerControl: true });
+                              props.onSubtitleStyle({ color: col.value });
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Sombra / Realce */}
+                    <div>
+                      <DrawerSectionHeader icon={<Sparkles className="w-4 h-4" />} title="Sombra e Contorno" />
+                      <div className="flex flex-wrap gap-2.5">
+                        {SUBTITLE_SHADOWS.map((shadowOpt, index) => (
+                          <DrawerPillChip
+                            key={`sub-shadow-${shadowOpt.value}`}
+                            focusKey={`tv-player-drawer-substyle-shadow-${index}`}
+                            label={shadowOpt.label}
+                            active={props.subtitleStyle.shadow === shadowOpt.value}
+                            onClick={() => {
+                              uiSoundService.play('toggle', { playerControl: true });
+                              props.onSubtitleStyle({ shadow: shadowOpt.value });
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Fundo da Faixa */}
+                    <div>
+                      <DrawerSectionHeader icon={<Monitor className="w-4 h-4" />} title="Fundo da Faixa" />
+                      <div className="flex flex-wrap gap-2.5">
+                        {SUBTITLE_BG_COLORS.map((bgOpt, index) => (
+                          <DrawerPillChip
+                            key={`sub-bg-${bgOpt.value}`}
+                            focusKey={`tv-player-drawer-substyle-bg-${index}`}
+                            label={bgOpt.label}
+                            active={props.subtitleStyle.bgColor === bgOpt.value}
+                            onClick={() => {
+                              uiSoundService.play('toggle', { playerControl: true });
+                              props.onSubtitleStyle({ bgColor: bgOpt.value });
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Posição Vertical */}
+                    <div>
+                      <DrawerSectionHeader icon={<MoveVertical className="w-4 h-4" />} title="Posição Vertical" />
+                      <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-base font-bold text-gray-100 tracking-tight">Altura na Tela</h4>
+                            <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                              Afastamento a partir da borda inferior
+                            </p>
+                          </div>
+                          <span className="text-sm font-extrabold text-cyan-300 bg-cyan-500/10 px-3 py-1 rounded-lg border border-cyan-400/30">
+                            {props.subtitlePosition}%
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 pt-1">
+                          <DrawerStepperButton
+                            focusKey="tv-player-drawer-substyle-pos-down"
+                            label="Descer Legenda"
+                            onClick={() => {
+                              uiSoundService.play('click', { playerControl: true });
+                              props.onSubtitlePosition(Math.max(4, props.subtitlePosition - 5));
+                            }}
+                          >
+                            Descer (-5%)
+                          </DrawerStepperButton>
+                          <DrawerStepperButton
+                            focusKey="tv-player-drawer-substyle-pos-up"
+                            label="Subir Legenda"
+                            onClick={() => {
+                              uiSoundService.play('click', { playerControl: true });
+                              props.onSubtitlePosition(Math.min(35, props.subtitlePosition + 5));
+                            }}
+                          >
+                            Subir (+5%)
+                          </DrawerStepperButton>
+                        </div>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
 
-              {/* Rodapé informativo discreto */}
-              <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-gray-400">
-                <span>ZapiTV Cinema Engine</span>
-                <span>OK confirma seleção</span>
+              {/* RODAPÉ DO DRAWER */}
+              <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-gray-400 shrink-0">
+                <span className="font-semibold text-gray-300">ZapiTV Cinema</span>
+                <span>OK confirma seleção · Voltar retorna</span>
               </div>
             </div>
           </div>
