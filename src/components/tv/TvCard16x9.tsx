@@ -183,7 +183,16 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
       )}
 
       {/* Caixa Vertical 2:3 Principal (Poster com cores vivas e naturais, sem camada luminosa ou desbotamento sobre a imagem) */}
-      <div className="relative z-10 w-full aspect-[2/3] rounded-2xl overflow-hidden bg-[#0d121d] transition-all duration-200 shadow-xl border border-white/10 group-hover/tvcard:border-white/25">
+      <div 
+        className="relative z-10 w-full aspect-[2/3] rounded-2xl overflow-hidden bg-[#0d121d] transition-all duration-200 border border-white/10 group-hover/tvcard:border-white/25 transform-gpu"
+        style={{
+          WebkitMaskImage: '-webkit-radial-gradient(white, black)',
+          clipPath: 'inset(0 round 1rem)',
+          WebkitClipPath: 'inset(0 round 1rem)',
+          transform: 'translateZ(0)',
+          contain: 'paint'
+        }}
+      >
         {/* Imagem do Poster Vertical 2:3 (Cores vivas, contraste natural e nitidez original) */}
         {!hasImageError && imgSrc ? (
           <img
@@ -232,9 +241,15 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
 
         {/* Barra de Progresso Fina para Continuar Assistindo */}
         {hasValidProgress && (
-          <div className="absolute inset-x-0 bottom-0 h-1.5 bg-black/70 overflow-hidden pointer-events-none rounded-b-2xl">
+          <div 
+            className="absolute inset-x-0 bottom-0 h-1.5 bg-black/75 overflow-hidden pointer-events-none rounded-b-2xl"
+            style={{
+              clipPath: 'inset(0 round 0 0 1rem 1rem)',
+              WebkitClipPath: 'inset(0 round 0 0 1rem 1rem)',
+            }}
+          >
             <div 
-              className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300 rounded-r-full shadow-[0_0_8px_#00e5ff]"
+              className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300 rounded-r-full"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
