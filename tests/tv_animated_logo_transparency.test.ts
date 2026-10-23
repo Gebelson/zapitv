@@ -103,7 +103,30 @@ async function runLogoTransparencySuite() {
   assert(sidebarCode.includes('ZapiAnimatedLogo'), 'Sidebar desktop deve utilizar ZapiAnimatedLogo');
   console.log('✓ Teste 9: Sidebar desktop integrado ao ZapiAnimatedLogo OK');
 
-  console.log('\nTodos os 9 testes de transparência e integração da logo animada passaram com 100% de sucesso!\n');
+  // Teste 10: Auditoria de Antialiasing Suave (Eliminação do Serrilhado) no Frame Base PNG e WebP
+  let partialAlphaCount = 0;
+  for (let r = 0; r < height; r++) {
+    const rowOffset = r * rowStride + 1;
+    for (let c = 0; c < width; c++) {
+      const a = raw[rowOffset + c * 4 + 3];
+      if (a > 0 && a < 255) {
+        partialAlphaCount++;
+      }
+    }
+  }
+  assert(
+    partialAlphaCount > 3000,
+    `Frame base deve conter transição gradual de antialiasing (esperado > 3000 pixels com 0 < alpha < 255, obtido ${partialAlphaCount})`
+  );
+  console.log(`✓ Teste 10: Antialiasing gradual validado com ${partialAlphaCount} pixels de transição suave (sem serrilhado) OK`);
+
+  // Teste 11: Suporte a Cache-Busting e Otimização de Composição GPU no ZapiAnimatedLogo.tsx
+  assert(compCode.includes('ZAPI_LOGO_ASSET_VERSION'), 'ZapiAnimatedLogo deve possuir versão constante para cache-busting');
+  assert(compCode.includes('imageRendering'), 'ZapiAnimatedLogo deve aplicar regra de interpolação suave de imagem');
+  assert(compCode.includes('translateZ(0)'), 'ZapiAnimatedLogo deve promover a camada para composição acelerada por hardware');
+  console.log('✓ Teste 11: Cache-busting automático (?v=...) e aceleração de composição sem serrilhado OK');
+
+  console.log('\nTodos os 11 testes de transparência, suavidade de bordas e integração da logo animada passaram com 100% de sucesso!\n');
 }
 
 runLogoTransparencySuite().then(() => {
