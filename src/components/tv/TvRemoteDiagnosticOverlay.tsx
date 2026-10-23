@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { tvModeService } from '../../core/tv/tvModeService';
 import { getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
 import { playbackOptimizerService } from '../../core/playback/PlaybackOptimizerService';
+import { tvPerformanceService, TvPerformanceMetrics } from '../../core/tv/tvPerformanceService';
 
 interface KeyRecord {
   id: string;
@@ -34,6 +35,7 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
   const [currentNoriginFocus, setCurrentNoriginFocus] = useState<string>('none');
   const [navigableCount, setNavigableCount] = useState<number>(0);
   const [videoMetrics, setVideoMetrics] = useState<string | null>(null);
+  const [perfMetrics, setPerfMetrics] = useState<TvPerformanceMetrics | null>(null);
   const countRef = useRef(0);
 
   useEffect(() => {
@@ -45,6 +47,7 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
   // Monitora o elemento focado e a contagem de componentes navegáveis
   useEffect(() => {
     if (!isVisible) return;
+    tvPerformanceService.startFrameSampling();
 
     let ticks = 0;
     const interval = setInterval(() => {
@@ -59,6 +62,7 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
       setCurrentActiveElement(activeDesc);
       setCurrentNoriginFocus(getCurrentFocusKey() || 'nenhum');
       setNavigableCount(document.querySelectorAll('[data-focus-key]').length);
+      setPerfMetrics(tvPerformanceService.getMetrics());
       if (++ticks % 4 === 0) {
         const video = document.querySelector<HTMLVideoElement>('video[data-zapi-main-video]');
         if (!video) {
@@ -80,7 +84,10 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
       }
     }, 250);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      tvPerformanceService.stopFrameSampling();
+    };
   }, [isVisible]);
 
   useEffect(() => {
@@ -132,6 +139,7 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
       setCurrentNoriginFocus(curFocus);
 
       const latencyMs = Math.round(performance.now() - start);
+      tvPerformanceService.recordInputLatency(start);
       countRef.current += 1;
 
       const record: KeyRecord = {
@@ -231,6 +239,19 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
                 <span className="text-cyan-300 font-bold">Vídeo real: </span>{videoMetrics}
               </div>
             )}
+
+            {/* Métricas de Desempenho e FPS em Tempo Real */}
+            <div className="bg-black/40 border border-emerald-500/40 rounded-lg p-2 space-y-0.5">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-emerald-400 uppercase font-bold">Desempenho UI:</span>
+                <span className="text-emerald-300 font-black">{perfMetrics ? `${perfMetrics.fps} FPS (${perfMetrics.avgFrameTimeMs}ms)` : '60 FPS (16.6ms)'}</span>
+              </div>
+              <div className="text-[9px] text-gray-300 flex justify-between">
+                <span>Quedas: <strong className="text-amber-400">{perfMetrics?.jankCount || 0}</strong></span>
+                <span>Nós DOM: <strong className="text-cyan-300">{perfMetrics?.domNodeCount || navigableCount}</strong></span>
+                <span>Perfil: <strong className="text-purple-300 uppercase">{perfMetrics?.hardwareProfile || 'balanced'}</strong></span>
+              </div>
+            </div>
 
             {/* Foco e Região Ativa */}
             <div className="bg-black/40 border border-cyan-400/40 rounded-lg p-2 space-y-0.5">

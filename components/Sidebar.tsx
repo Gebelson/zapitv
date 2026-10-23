@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, Flame, Film, Tv, List, ChevronLeft, ChevronRight, Sparkles, MonitorPlay, Volume2, VolumeX } from 'lucide-react';
 import { AppView, Profile } from '../types';
 import { uiSoundService } from '../src/core/audio/uiSoundService';
+import { ZapiAnimatedLogo } from '../src/components/common/ZapiAnimatedLogo';
 
 // Ícone de Séries - Refinado para strokeWidth 2.2
 const SeriesIcon = (props: any) => <Tv {...props} strokeWidth={2.2} />;
@@ -125,25 +126,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <div className="w-12 h-12 shrink-0 flex items-center justify-center">
             <div className="w-[40px] h-[40px] sm:w-[46px] sm:h-[46px] shrink-0 sidebar-logo-glow flex items-center justify-center transition-transform duration-200 group-hover/logo:scale-105 relative">
-              <video 
-                autoPlay 
-                loop 
-                muted 
-                playsInline 
+              <ZapiAnimatedLogo
+                videoSrc="/zapi-icon.webm"
                 className="w-full h-full object-contain pointer-events-none select-none"
-                aria-label="ZapiTV"
-              >
-                <source src="/zapi-icon.webm" type="video/webm; codecs=vp9" />
-                {/* Fallback transparente compatível com navegadores que não suportem vídeo com Alpha */}
-                <img 
-                  src="/zapi-icon.webp" 
-                  alt="ZapiTV" 
-                  className="w-full h-full object-contain" 
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = '/zapi-icon.png';
-                  }}
-                />
-              </video>
+                alt="ZapiTV"
+              />
             </div>
           </div>
           <div className={`overflow-hidden transition-[opacity,transform,max-width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] flex items-center shrink-0 ${

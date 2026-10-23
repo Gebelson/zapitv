@@ -4,6 +4,7 @@ import { ContentItem, ContentType } from '../../../types';
 import { storageService, PlaybackContinuityInfo } from '../../core/storage/storageService';
 import { posterRecoveryService } from '../../core/catalog/PosterRecoveryService';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
+import { tvPerformanceProfileService } from '../../core/tv/tvPerformanceProfileService';
 
 interface TvCardProps {
   item: ContentItem;
@@ -59,7 +60,8 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   suppressFocusBorder = false
 }) => {
   // Prioriza o poster vertical real em 2:3 com luminosidade e cores originais
-  const targetPoster = posterRecoveryService.getCachedPoster(item) || item.image || item.poster || item.backdrop || '';
+  const rawPoster = posterRecoveryService.getCachedPoster(item) || item.image || item.poster || item.backdrop || '';
+  const targetPoster = tvPerformanceProfileService.getOptimizedPosterUrl(rawPoster);
   const [prevItemId, setPrevItemId] = useState(item.id);
   const [imgSrc, setImgSrc] = useState<string>(targetPoster);
   const [hasImageError, setHasImageError] = useState(!targetPoster);
@@ -78,6 +80,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   });
 
   useEffect(() => {
+    if (!showProgress) return;
     const handleProgress = (e: any) => {
       const cid = e?.detail?.contentId;
       if (!cid || storageService.getCandidateKeys(item).includes(cid)) {
@@ -86,7 +89,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
     };
     window.addEventListener('zapitv_progress_updated', handleProgress);
     return () => window.removeEventListener('zapitv_progress_updated', handleProgress);
-  }, [item]);
+  }, [item, showProgress]);
 
   // Atualiza imagem quando o item muda
   useEffect(() => {
@@ -152,19 +155,17 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
     >
       {/* GLOW AMBIENTE DAS CAPAS (Samsung The Frame / Tizen / Media Station X) */}
       {/* Iluminação suave e atmosférica que acompanha as cores originais da capa, posicionada estritamente ATRÁS do card */}
-      <div 
-        className={`absolute -inset-3 sm:-inset-4 rounded-3xl pointer-events-none transition-all duration-300 transform-gpu ${
-          isTvFocused && !suppressFocusBorder
-            ? 'opacity-35 scale-100' 
-            : 'opacity-15 scale-95'
-        }`}
-        style={{
-          background: ambientGlowStyle,
-          filter: 'blur(20px)',
-          zIndex: 0
-        }}
-        aria-hidden="true"
-      />
+      {isTvFocused && !suppressFocusBorder && (
+        <div 
+          className="absolute -inset-3 sm:-inset-4 rounded-3xl pointer-events-none transition-all duration-300 transform-gpu opacity-35 scale-100"
+          style={{
+            background: ambientGlowStyle,
+            filter: 'blur(20px)',
+            zIndex: 0
+          }}
+          aria-hidden="true"
+        />
+      )}
 
       {/* Caixa Vertical 2:3 Principal (Poster com cores vivas e naturais, sem camada luminosa ou desbotamento sobre a imagem) */}
       <div className="relative z-10 w-full aspect-[2/3] rounded-2xl overflow-hidden bg-[#0d121d] transition-all duration-200 shadow-xl border border-white/10 group-hover/tvcard:border-white/25">

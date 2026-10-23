@@ -4,6 +4,7 @@ import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { TvProfileMenu } from './TvProfileMenu';
 import { uiSoundService } from '../../core/audio/uiSoundService';
+import { ZapiAnimatedLogo } from '../common/ZapiAnimatedLogo';
 
 export type TvTab = 'home' | 'movies' | 'series' | 'animes' | 'featured';
 
@@ -188,25 +189,11 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
           className="relative z-10 flex items-center gap-3.5 cursor-pointer group/logo outline-none focus:outline-none pointer-events-auto"
         >
           <div className="w-12 h-12 sm:w-[50px] sm:h-[50px] flex items-center justify-center relative flex-shrink-0">
-            <video
-              ref={logoVideoRef}
-              autoPlay
-              loop
-              muted
-              playsInline
+            <ZapiAnimatedLogo
+              videoSrc="/zapi-icon.webm"
               className="w-full h-full object-contain pointer-events-none"
-              aria-label="ZapiTV"
-            >
-              <source src="/zapi-icon.webm" type="video/webm; codecs=vp9" />
-              <img
-                src="/zapi-icon.webp"
-                alt="ZapiTV"
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = '/zapi-icon.png';
-                }}
-              />
-            </video>
+              alt="ZapiTV"
+            />
           </div>
           <img
             src="/zapitv-text.png"

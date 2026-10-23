@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ContentItem, ContentType } from '../../../types';
+import { ZapiAnimatedLogo } from '../common/ZapiAnimatedLogo';
 
 export const TV_SCREENSAVER_SLIDE_MS = 15_000;
 
@@ -30,7 +31,6 @@ export const TvScreensaver: React.FC<{ items: ContentItem[] }> = ({ items }) => 
   const [noBackdrop, setNoBackdrop] = useState(false);
   const nextRef = useRef<Slide | null>(null);
   const currentRef = useRef<Slide | null>(null);
-  const logoVideoRef = useRef<HTMLVideoElement>(null);
 
   // Resolução da logo oficial do conteúdo com fallback para o título
   const currentLogo = useMemo(() => {
@@ -50,11 +50,6 @@ export const TvScreensaver: React.FC<{ items: ContentItem[] }> = ({ items }) => 
     setLogoFailed(false);
   }, [current?.item.id]);
 
-  useEffect(() => {
-    const video = logoVideoRef.current;
-    if (!video) return;
-    void video.play().catch(() => {});
-  }, [current]);
 
   const hasLogo = Boolean(currentLogo && !logoFailed);
 
@@ -147,7 +142,6 @@ export const TvScreensaver: React.FC<{ items: ContentItem[] }> = ({ items }) => 
     };
   }, [candidates]);
 
-  const drift = current ? (current.index % 4) * 0.6 : 0;
   return (
     <div data-tv-screensaver="true" aria-label="Descanso de tela ZapiTV" className="fixed inset-0 z-[1000] overflow-hidden bg-[#05070a] text-white pointer-events-auto">
       {current && (
@@ -177,31 +171,42 @@ export const TvScreensaver: React.FC<{ items: ContentItem[] }> = ({ items }) => 
             }}
           />
 
-          {/* 3. Canto Inferior Esquerdo: Logo do Conteúdo (ou Título como fallback) + Categoria */}
-          <div className="absolute bottom-[8%] left-[6%] max-w-[65vw]" style={{ transform: `translateX(${drift}vw)` }}>
-            {hasLogo ? (
-              <>
-                <h1 className="sr-only">{current.item.title}</h1>
-                <div className="h-16 sm:h-20 md:h-24 max-w-[420px] lg:max-w-[500px] flex items-end">
+          {/* 3. Canto Inferior Esquerdo: Conjunto Fixo e Alinhado (Logo/Título + Categoria) */}
+          <div
+            data-testid="tv-screensaver-content-anchor"
+            className="absolute bottom-[8%] left-[6%] w-[320px] sm:w-[420px] lg:w-[500px] max-w-[65vw] pointer-events-none flex flex-col justify-end"
+          >
+            {/* Área Superior com Altura e Largura Fixas para Logo ou Fallback de Texto */}
+            <div
+              key={current.item.id}
+              data-testid="tv-screensaver-logo-area"
+              className="h-[100px] sm:h-[120px] lg:h-[140px] w-full flex items-end justify-start overflow-hidden tv-screensaver-enter"
+            >
+              {hasLogo ? (
+                <>
+                  <h1 className="sr-only">{current.item.title}</h1>
                   <img
                     src={currentLogo!}
                     alt={current.item.title}
                     onError={() => setLogoFailed(true)}
                     className="max-h-full max-w-full object-contain object-left-bottom drop-shadow-[0_4px_16px_rgba(0,0,0,0.85)] filter"
                   />
-                </div>
-              </>
-            ) : (
-              <h1 
-                className="font-extrabold text-white tracking-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)] line-clamp-2"
-                style={{ fontSize: 'clamp(2.2rem, 3.2vw, 4.5rem)', lineHeight: 1.15 }}
-              >
-                {current.item.title}
-              </h1>
-            )}
+                </>
+              ) : (
+                <h1 
+                  className="w-full font-extrabold text-white tracking-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)] line-clamp-2 text-left"
+                  style={{ fontSize: 'clamp(1.8rem, 2.8vw, 3.2rem)', lineHeight: 1.15 }}
+                >
+                  {current.item.title}
+                </h1>
+              )}
+            </div>
 
-            {/* Linha discreta de categoria abaixo da logo */}
-            <div className="mt-2.5 sm:mt-3 flex items-center gap-2">
+            {/* Área Inferior com Espaçamento Fixo e Altura Constante para Categoria e Ano */}
+            <div
+              data-testid="tv-screensaver-category-area"
+              className="mt-3 sm:mt-3.5 h-6 flex items-center gap-2 select-none"
+            >
               <span className="text-xs sm:text-sm font-bold tracking-wider uppercase text-cyan-300 drop-shadow">
                 {getCategoryLabel(current.item)}
               </span>
@@ -218,32 +223,20 @@ export const TvScreensaver: React.FC<{ items: ContentItem[] }> = ({ items }) => 
         </>
       )}
 
-      {/* 4. Canto Inferior Direito: Logotipo Animado da ZapiTV */}
+      {/* 4. Canto Inferior Direito: Logotipo Animado da ZapiTV (Absolutamente Estável) */}
       {!noBackdrop && (
         <div 
+          data-testid="tv-screensaver-zapi-logo"
           className="absolute bottom-[8%] right-[6%] flex items-center gap-3 select-none pointer-events-none opacity-85"
-          style={{ transform: `translateX(${drift}vw)` }}
         >
           <div className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center relative flex-shrink-0">
-            <video
-              ref={logoVideoRef}
-              autoPlay
-              loop
+            <ZapiAnimatedLogo
+              videoSrc="/zapi-icon.webm"
               muted
               playsInline
               className="w-full h-full object-contain pointer-events-none"
-              aria-label="ZapiTV"
-            >
-              <source src="/zapi-icon.webm" type="video/webm; codecs=vp9" />
-              <img
-                src="/zapi-icon.webp"
-                alt="ZapiTV"
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = '/zapi-icon.png';
-                }}
-              />
-            </video>
+              alt="ZapiTV"
+            />
           </div>
           <img
             src="/zapitv-text.png"
@@ -259,16 +252,13 @@ export const TvScreensaver: React.FC<{ items: ContentItem[] }> = ({ items }) => 
       {noBackdrop && (
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-4">
           <div className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center">
-            <video
-              autoPlay
-              loop
+            <ZapiAnimatedLogo
+              videoSrc="/zapi-icon.webm"
               muted
               playsInline
               className="w-full h-full object-contain"
-            >
-              <source src="/zapi-icon.webm" type="video/webm; codecs=vp9" />
-              <img src="/zapi-icon.png" alt="ZapiTV" className="w-full h-full object-contain" />
-            </video>
+              alt="ZapiTV"
+            />
           </div>
           <img
             src="/zapitv-text.png"

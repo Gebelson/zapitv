@@ -54,11 +54,9 @@ class TvModeService {
         this.isDiag = false;
         try { sessionStorage.setItem('zapitv_tv_diag', '0'); } catch {}
       } else {
-        try {
-          this.isDiag = sessionStorage.getItem('zapitv_tv_diag') === '1';
-        } catch {
-          this.isDiag = false;
-        }
+        // Na ausência de ?tvdiag=1 explícito na URL, o diagnóstico permanece desligado
+        // para garantir que a experiência normal do usuário não exiba o painel.
+        this.isDiag = false;
       }
     } catch {
       this.isTv = false;

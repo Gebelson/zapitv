@@ -415,11 +415,28 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
             cast: details.cast || prev.cast
           }));
 
+          let sNums: number[] = [];
           if (details.seasons && details.seasons.length > 0) {
-            const sNums = details.seasons.map((s: any) => s.season_number || s.seasonNumber || 1).filter((n: number) => n > 0);
-            if (sNums.length > 0) setAvailableSeasons(sNums);
+            sNums = Array.from(
+              new Set<number>(
+                details.seasons
+                  .map((s: any) => {
+                    const raw = typeof s === 'number' || typeof s === 'string' ? s : (s?.season_number ?? s?.seasonNumber);
+                    return Number(raw);
+                  })
+                  .filter((n: number): n is number => Number.isInteger(n) && n > 0)
+              )
+            ).sort((a, b) => a - b);
+          }
+
+          if (sNums.length > 0) {
+            setAvailableSeasons(sNums);
+            setCurrentSeason(prev => (sNums.includes(prev) ? prev : sNums[0]));
           } else if (details.seasonsCount && details.seasonsCount > 1) {
-            setAvailableSeasons(Array.from({ length: details.seasonsCount }, (_, i) => i + 1));
+            const count = Math.max(1, Math.floor(details.seasonsCount));
+            const countSeasons = Array.from({ length: count }, (_, i) => i + 1);
+            setAvailableSeasons(countSeasons);
+            setCurrentSeason(prev => (countSeasons.includes(prev) ? prev : countSeasons[0]));
           }
         }
       } catch (err) {

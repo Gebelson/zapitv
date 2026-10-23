@@ -450,6 +450,7 @@ export const TvApp: React.FC<TvAppProps> = ({
                 items={popularMovies}
                 onSelectItem={handleOpenDetailModal}
                 onPlayItem={(it) => handleStartPlay(it)}
+                suspended={screensaverActive}
               />
             ) : currentTab === 'series' ? (
               <TvCategoryView
@@ -457,6 +458,7 @@ export const TvApp: React.FC<TvAppProps> = ({
                 items={popularSeries}
                 onSelectItem={handleOpenDetailModal}
                 onPlayItem={(it) => handleStartPlay(it)}
+                suspended={screensaverActive}
               />
             ) : currentTab === 'animes' ? (
               <TvAnimeView
@@ -472,6 +474,7 @@ export const TvApp: React.FC<TvAppProps> = ({
                 items={featuredItems}
                 onSelectItem={handleOpenDetailModal}
                 onPlayItem={(it) => handleStartPlay(it)}
+                suspended={screensaverActive}
               />
             )}
           </main>

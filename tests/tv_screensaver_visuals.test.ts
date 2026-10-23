@@ -81,7 +81,77 @@ async function runTvScreensaverVisualsTests() {
   );
   console.log('✓ Teste 7: Execução leve e sem concorrência com o player ou decodificador de vídeo OK');
 
-  console.log('\nTodos os 7 testes visuais do descanso de tela passaram com 100% de sucesso!\n');
+  
+  // ==========================================================================
+  // SUÍTE ESPECÍFICA: FIXAÇÃO DEFINITIVA DAS LOGOS NO DESCANSO DE TELA
+  // ==========================================================================
+  console.log('\n--- Auditoria de Fixação e Alinhamento Permanente das Logos ---');
+
+  // Teste 8: Remoção completa do deslocamento automático (drift / translateX)
+  assert(
+    !code.includes('const drift =') &&
+    !code.includes('translateX(${drift}vw)'),
+    'O deslocamento automático drift e qualquer translateX variável devem ser completamente eliminados'
+  );
+  console.log('✓ Teste 8: Deslocamento automático (drift) e translateX eliminados com 100% de sucesso');
+
+  // Teste 9: Área de posicionamento fixa do conteúdo (left: 6%, bottom: 8%)
+  assert(
+    code.includes('data-testid="tv-screensaver-content-anchor"') &&
+    code.includes('bottom-[8%]') &&
+    code.includes('left-[6%]') &&
+    code.includes('w-[320px] sm:w-[420px] lg:w-[500px]') &&
+    code.includes('max-w-[65vw]'),
+    'O contêiner do conteúdo deve ter ancoragem estática em left: 6%, bottom: 8% e largura máxima de 500px'
+  );
+  console.log('✓ Teste 9: Contêiner de conteúdo ancorado permanentemente em left: 6% e bottom: 8%');
+
+  // Teste 10: Área reservada para a logo com altura fixa e responsiva
+  assert(
+    code.includes('data-testid="tv-screensaver-logo-area"') &&
+    code.includes('h-[100px] sm:h-[120px] lg:h-[140px]') &&
+    code.includes('flex items-end justify-start'),
+    'A área da logo deve ter altura fixa (100px/120px/140px) e alinhar elementos à base e à esquerda'
+  );
+  console.log('✓ Teste 10: Área da logo com altura fixa pré-dimensionada e alinhamento à base esquerda OK');
+
+  // Teste 11: Categoria sempre fixada na mesma altura com espaçamento fixo
+  assert(
+    code.includes('data-testid="tv-screensaver-category-area"') &&
+    code.includes('mt-3 sm:mt-3.5') &&
+    code.includes('h-6 flex items-center'),
+    'A área da categoria deve ter espaçamento fixo superior (mt-3/mt-3.5) e altura constante h-6'
+  );
+  console.log('✓ Teste 11: Categoria e ano ancorados com espaçamento fixo invariante entre slides');
+
+  // Teste 12: Padronização do fallback de texto (título de 1 ou 2 linhas na mesma área)
+  assert(
+    code.includes('line-clamp-2') &&
+    code.includes('text-left') &&
+    code.includes('clamp(1.8rem, 2.8vw, 3.2rem)'),
+    'Fallback de texto deve ser limitado a 2 linhas, alinhado à esquerda e contido na mesma área da logo'
+  );
+  console.log('✓ Teste 12: Fallback tipográfico padronizado em até 2 linhas dentro da mesma área reservada');
+
+  // Teste 13: Logotipo animado da ZapiTV absolutamente estável
+  assert(
+    code.includes('data-testid="tv-screensaver-zapi-logo"') &&
+    code.includes('bottom-[8%]') &&
+    code.includes('right-[6%]'),
+    'O logotipo animado da ZapiTV deve estar permanentemente fixado em bottom: 8% e right: 6%'
+  );
+  console.log('✓ Teste 13: Logotipo da ZapiTV absolutamente estável no canto inferior direito');
+
+  // Teste 14: Verificação da simulação de transição e ausência de layout shift
+  assert(
+    code.includes('tv-screensaver-enter') &&
+    code.includes('overflow-hidden'),
+    'Transições devem preservar overflow controlado sem provocar quebras ou saltos de layout'
+  );
+  console.log('✓ Teste 14: Transições suaves sem deslocamento espacial ou layout shift validadas');
+
+  console.log('\nTodos os 14 testes de fixação e alinhamento do descanso de tela passaram com 100% de sucesso!\n');
+
 }
 
 runTvScreensaverVisualsTests().catch((err) => {

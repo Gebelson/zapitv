@@ -41,6 +41,7 @@
     "test:tv-ui-sound": "tsx tests/tv_ui_sound.test.ts",
     "test:tv-hero-no-arrows": "tsx tests/tv_hero_no_arrows.test.ts",
     "test:tv-anime-crunchyroll": "tsx tests/tv_anime_crunchyroll.test.ts",
+    "test:tv-player-redesign": "tsx tests/tv_player_redesign.test.ts",
     "test:tv-buffering": "tsx tests/tv_buffering_policy.test.ts",
     "test:proxy-range": "tsx tests/proxy_range.test.ts",
     "test:tv-screensaver-browser": "tsx tests/tv_screensaver_browser.test.ts",
@@ -51,8 +52,11 @@
     "test:mobile-fullscreen": "tsx tests/mobile_fullscreen_orientation.test.ts",
     "test:season-matching": "tsx tests/season_episode_matching.test.ts",
     "test:season-matching-live": "tsx tests/season_episode_matching.test.ts --live",
-    "test:stability": "npm run test:public-http-security && npm run test:public-api-security && npm run test:proxy-range && npm run test:watchparty-host-auth && npm run test:watchparty-state && npm run test:watchparty-intro && npm run test:watchparty-media && npm run test:playback-remote-sync && npm run test:source-playability && npm run test:playback-trace && npm run test:watch-routes && npm run test:tv-navigation && npm run test:tv-interface && npm run test:tv-isolation && npm run test:tv-smooth-scroll && npm run test:tv-carousel-transitions && npm run test:tv-episodes-carousel && npm run test:tv-screensaver && npm run test:tv-screensaver-visuals && npm run test:tv-header-blur && npm run test:tv-ui-sound && npm run test:tv-hero-no-arrows && npm run test:tv-anime-crunchyroll && npm run test:tv-buffering && npm run test:skip-buttons && npm run test:mobile-fullscreen && npm run test:season-matching && npm run test:feedback-admin && npm run test:feedback-persistence && npm run test:catalog-identity && npm run test:cinemeta-identity && npm run test:catalog-release-persistence && npm run test:maintenance-auth",
-    "start": "node server.ts"
+    "test:stability": "npm run test:public-http-security && npm run test:public-api-security && npm run test:proxy-range && npm run test:watchparty-host-auth && npm run test:watchparty-state && npm run test:watchparty-intro && npm run test:watchparty-media && npm run test:playback-remote-sync && npm run test:source-playability && npm run test:playback-trace && npm run test:watch-routes && npm run test:tv-navigation && npm run test:tv-interface && npm run test:tv-isolation && npm run test:tv-smooth-scroll && npm run test:tv-carousel-transitions && npm run test:tv-episodes-carousel && npm run test:tv-screensaver && npm run test:tv-screensaver-visuals && npm run test:tv-header-blur && npm run test:tv-ui-sound && npm run test:tv-hero-no-arrows && npm run test:tv-anime-crunchyroll && npm run test:tv-player-redesign && npm run test:tv-buffering && npm run test:skip-buttons && npm run test:mobile-fullscreen && npm run test:season-matching && npm run test:feedback-admin && npm run test:feedback-persistence && npm run test:catalog-identity && npm run test:cinemeta-identity && npm run test:catalog-release-persistence && npm run test:maintenance-auth && npm run test:tv-season-duplication && npm run test:tv-animated-logo && npm run test:tv-perf",
+    "start": "node server.ts",
+    "test:tv-season-duplication": "tsx tests/tv_season_duplication.test.ts",
+    "test:tv-animated-logo": "tsx tests/tv_animated_logo_transparency.test.ts",
+    "test:tv-perf": "tsx tests/tv_performance_bench.test.ts" 
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

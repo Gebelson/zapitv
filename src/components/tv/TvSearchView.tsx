@@ -198,6 +198,9 @@ const TvSearchSuggestionItem: React.FC<TvSearchSuggestionItemProps> = ({
   );
 };
 
+let cachedContentRef: ContentItem[] | null = null;
+let cachedSearchableIndex: any[] = [];
+
 export const TvSearchView: React.FC<TvSearchViewProps> = ({
   allContent,
   onSelectItem,
@@ -292,9 +295,13 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
     }
   }, []);
 
-  // Índice memoizado de busca multi-campo para máxima performance sem engasgos na TV
+  // Índice memoizado com cache em nível de módulo para abertura instantânea e 0ms de bloqueio
   const searchableIndex = useMemo(() => {
-    return (allContent || []).map(item => {
+    if (cachedContentRef === allContent && cachedSearchableIndex.length > 0) {
+      return cachedSearchableIndex;
+    }
+    cachedContentRef = allContent;
+    cachedSearchableIndex = (allContent || []).map(item => {
       const titleNorm = normalizeSearchTerm(item.title);
       const originalTitleNorm = normalizeSearchTerm(item.originalTitle);
       const genresNorm = (item.genres || []).map(g => normalizeSearchTerm(g));
@@ -314,6 +321,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
         combinedBlob
       };
     });
+    return cachedSearchableIndex;
   }, [allContent]);
 
   // Filtragem multi-campo, sem acento, case-insensitive, múltiplas palavras e por categoria

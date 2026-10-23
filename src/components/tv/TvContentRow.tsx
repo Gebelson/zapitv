@@ -40,8 +40,8 @@ const getVisibleSlots = (count: number): number[] => {
   if (count === 5) return [-1, 0, 1, 2, 3];
   if (count === 6) return [-1, 0, 1, 2, 3, 4];
   if (count === 7) return [-1, 0, 1, 2, 3, 4, 5];
-  // Catálogo completo (>= 8 itens): buffer de 2 cards à esquerda (-2, -1), card selecionado (0) e cards visíveis à direita (1 a 7)
-  return [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7];
+  // Catálogo completo (>= 8 itens): buffer otimizado (-1 esquerda, 0 ativo, 1 a 6 visíveis, 7 direita)
+  return [-1, 0, 1, 2, 3, 4, 5, 6, 7];
 };
 
 export const TvContentRow: React.FC<TvContentRowProps> = memo(({
@@ -127,9 +127,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
 
     if (queuedDir && items.length > 1) {
       requestAnimationFrame(() => {
-        if (trackRef.current) {
-          void trackRef.current.offsetHeight; // Força reflow do layout antes da próxima animação
-        }
+        // Otimização: elimina reflow síncrono forçado (offsetHeight) para navegação fluida em 60 FPS na TV
         uiSoundService.play(queuedDir === 'right' ? 'slideRight' : 'slideLeft');
         triggerSlide(queuedDir, CHAINED_DURATION);
       });
@@ -328,10 +326,11 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
           <div 
             ref={trackRef}
             onTransitionEnd={onTrackTransitionEnd}
-            className="relative z-10 flex items-center gap-6 will-change-transform"
+            className="relative z-10 flex items-center gap-6"
             style={{
               transform: `translate3d(${baseOffset + translateX}px, 0, 0)`,
               transition: transitionEnabled ? `transform ${transitionDuration}ms ${EASING_CURVE}` : 'none',
+              willChange: (transitionEnabled || isAnimatingRef.current) ? 'transform' : 'auto',
             }}
           >
             {visibleSlots.map((slotIdx) => {

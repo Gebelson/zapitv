@@ -1073,7 +1073,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
           <Suspense fallback={<div className="fixed inset-0 z-[500] bg-black flex items-center justify-center"><ZapiLoader size="lg" /></div>}>
             <ZapiPlayer 
               key={hasEpisodes ? `${item.id}_s${currentEpisodeParams?.season || 1}_e${currentEpisodeParams?.episode || 1}` : item.id}
-              item={item} 
+              item={item.episodes?.length ? item : (episodes.length ? { ...item, episodes: episodes.map(e => ({ ...e, season: (e as any).season ?? currentSeason })) } : item)} 
               streams={resolvedStreams} 
               isLoadingStreams={isLoadingStreams}
               streamResolutionError={streamResolutionError}
@@ -1105,6 +1105,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
               }}
               onClose={handleClosePlayer}
               onNextEpisode={hasNextEpisode ? handleNextEpisode : undefined}
+              onSelectEpisode={hasEpisodes ? (season, episode) => handleEpisodeClick(season, episode) : undefined}
             />
           </Suspense>
         </div>

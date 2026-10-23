@@ -78,6 +78,7 @@ interface ZapiPlayerProps {
   onIntroCompleted?: () => void;
   onClose: () => void;
   onNextEpisode?: () => void;
+  onSelectEpisode?: (season: number, episode: number) => void;
   initialResumeTime?: number;
   onUpdatePlaybackPosition?: (positionSeconds: number) => void;
 }
@@ -149,6 +150,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   onIntroCompleted,
   onClose,
   onNextEpisode,
+  onSelectEpisode,
   initialResumeTime,
   onUpdatePlaybackPosition
 }) => {
@@ -5688,6 +5690,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           title={item.title}
           season={initialSeason}
           episode={initialEpisode}
+          episodeTitle={item.episodes?.find(e => (e.season ?? 1) === (initialSeason ?? 1) && e.number === (initialEpisode ?? 1))?.title}
+          episodes={item.episodes}
+          onSelectEpisode={onSelectEpisode}
           visible={showControls}
           suspended={showNonDubbedPrompt || allSourcesFailed || showFeedbackModal || showManualSkipModal || showDevDiagnostics}
           playing={isPlaying}
@@ -5713,6 +5718,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           onSeek={handleSeek}
           onSkip={skipTime}
           onClose={handlePlayerClose}
+          onHide={() => setShowControls(false)}
           onShow={handleUserActivity}
           onInteraction={handleUserActivity}
           onInteractionModeChange={setTvInteractionActive}

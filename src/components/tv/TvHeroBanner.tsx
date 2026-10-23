@@ -163,6 +163,24 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
     return () => { active = false; };
   }, [currentItem, resolvedImages, resolveBannerImage]);
 
+  // Pré-decodificação assíncrona inteligente do próximo destaque em background
+  useEffect(() => {
+    if (slides.length <= 1) return;
+    const nextIdx = (currentIndex + 1) % slides.length;
+    const nextSlide = slides[nextIdx];
+    if (!nextSlide) return;
+    const key = nextSlide.backdrop || nextSlide.image || nextSlide.poster || '';
+    if (key && !resolvedImages[key]) {
+      let active = true;
+      resolveBannerImage(nextSlide).then(choice => {
+        if (active && isMountedRef.current) {
+          setResolvedImages(previous => ({ ...previous, [key]: choice }));
+        }
+      });
+      return () => { active = false; };
+    }
+  }, [currentIndex, slides, resolvedImages, resolveBannerImage]);
+
   // Transição sincronizada suave entre destaques (Crossfade + Fade de Textos)
   const goToSlide = useCallback(async (targetIndex: number) => {
     if (slides.length <= 1 || isTransitioningRef.current) return;
@@ -220,7 +238,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
     };
   }, [resetTimer]);
 
-  // Pausa a rotação quando a aba/página estiver oculta
+  // Pausa a rotação quando a aba/página estiver oculta ou o banner for rolado para fora da tela
   useEffect(() => {
     const handleVisibility = () => {
       if (document.hidden) {
@@ -230,7 +248,24 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
+
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const isOffscreen = (window.scrollY || 0) > 450;
+          setIsPaused(prev => prev !== isOffscreen ? isOffscreen : prev);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, [resetTimer]);
 
   // Limpeza de timers na desmontagem

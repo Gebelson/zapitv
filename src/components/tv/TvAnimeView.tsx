@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useCallback } from 'react';
+import React, { memo, useMemo, useCallback, useRef, useEffect } from 'react';
 import { ContentItem } from '../../../types';
 import { TvHeroBanner } from './TvHeroBanner';
 import { TvContentRow } from './TvContentRow';
@@ -61,17 +61,59 @@ export const TvAnimeView: React.FC<TvAnimeViewProps> = memo(({
     }
   }, [firstRowKey]);
 
+  const isScrollingToHeroRef = useRef(false);
+  const scrollTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+      isScrollingToHeroRef.current = false;
+    };
+  }, []);
+
   const handleFirstRowUpPress = useCallback(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-    if (document.documentElement) document.documentElement.scrollTop = 0;
-    if (document.body) document.body.scrollTop = 0;
-    const heroEl = document.getElementById('tv-hero-banner');
-    if (heroEl) {
-      try {
-        heroEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } catch {}
+    if (isScrollingToHeroRef.current) return;
+    if (typeof window === 'undefined') {
+      setFocus('tv-hero-play');
+      return;
     }
-    setFocus('tv-hero-play');
+    const currentScrollY = window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
+    if (currentScrollY <= 2) {
+      setFocus('tv-hero-play');
+      return;
+    }
+
+    isScrollingToHeroRef.current = true;
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+
+    if (scrollTimerRef.current) {
+      clearTimeout(scrollTimerRef.current);
+      scrollTimerRef.current = null;
+    }
+
+    let finished = false;
+    const finishTransition = () => {
+      if (finished) return;
+      finished = true;
+      window.removeEventListener('scrollend', handleScrollEnd);
+      if (scrollTimerRef.current) {
+        clearTimeout(scrollTimerRef.current);
+        scrollTimerRef.current = null;
+      }
+      if (window.scrollY !== 0) {
+        window.scrollTo(0, 0);
+      }
+      setFocus('tv-hero-play');
+      isScrollingToHeroRef.current = false;
+    };
+
+    const handleScrollEnd = () => finishTransition();
+    window.addEventListener('scrollend', handleScrollEnd, { once: true });
+    scrollTimerRef.current = setTimeout(finishTransition, 380);
   }, []);
 
   return (
