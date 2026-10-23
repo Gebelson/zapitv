@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, User as UserIcon } from 'lucide-react';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
@@ -24,7 +24,9 @@ const TvNavTabButton: React.FC<{
   label: string;
   isActive: boolean;
   onClick: () => void;
-}> = ({ focusKey, label, isActive, onClick }) => {
+  onFocusTab: (key: string, el: HTMLElement | null) => void;
+  onBlurTab: (key: string) => void;
+}> = ({ focusKey, label, isActive, onClick, onFocusTab, onBlurTab }) => {
   const { ref, focused } = useTvFocusable({
     focusKey,
     onEnterPress: onClick,
@@ -39,8 +41,22 @@ const TvNavTabButton: React.FC<{
       }
       return true;
     },
+    onFocus: () => {
+      onFocusTab(focusKey, ref.current);
+    },
+    onBlur: () => {
+      onBlurTab(focusKey);
+    },
     autoScroll: false
   });
+
+  useEffect(() => {
+    if (focused) {
+      onFocusTab(focusKey, ref.current);
+    } else {
+      onBlurTab(focusKey);
+    }
+  }, [focused, focusKey, onFocusTab, onBlurTab]);
 
   return (
     <button
@@ -59,12 +75,6 @@ const TvNavTabButton: React.FC<{
     >
       <span className="relative inline-block">
         {label}
-        {/* Indicador refinado da página atual / foco proporcional ao texto, aproximado a 5px */}
-        {focused ? (
-          <span className="absolute top-[calc(100%+5px)] left-1/2 -translate-x-1/2 w-8 h-[3px] bg-cyan-400 rounded-full shadow-[0_0_10px_#00e5ff] transition-all duration-200 pointer-events-none" />
-        ) : isActive ? (
-          <span className="absolute top-[calc(100%+5px)] left-1/2 -translate-x-1/2 w-6 h-[3px] bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full shadow-[0_0_8px_#00e5ff] transition-all duration-200 pointer-events-none" />
-        ) : null}
       </span>
     </button>
   );
@@ -83,6 +93,91 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const logoVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Estado e refs para o traço indicador único deslizante entre os links do header
+  const [indicatorVisible, setIndicatorVisible] = useState(false);
+  const [indicatorX, setIndicatorX] = useState(0);
+  const [hasTransition, setHasTransition] = useState(false);
+
+  const navRef = useRef<HTMLElement | null>(null);
+  const buttonMapRef = useRef<Record<string, HTMLElement | null>>({});
+  const focusedKeyRef = useRef<string | null>(null);
+  const isIndicatorVisibleRef = useRef<boolean>(false);
+  const blurTimerRef = useRef<any>(null);
+
+  const updateIndicatorPosition = useCallback((buttonEl: HTMLElement, animate: boolean = true) => {
+    const navEl = navRef.current;
+    if (!navEl || !buttonEl) return;
+
+    const navRect = navEl.getBoundingClientRect();
+    const buttonRect = buttonEl.getBoundingClientRect();
+
+    let centerX = 0;
+    if (navRect.width > 0 && buttonRect.width > 0) {
+      centerX = (buttonRect.left + buttonRect.width / 2) - navRect.left;
+    } else {
+      centerX = buttonEl.offsetLeft + (buttonEl.offsetWidth || 80) / 2;
+    }
+    const targetX = Math.round(centerX - 16);
+
+    if (!animate || !isIndicatorVisibleRef.current) {
+      // Primeira aparição vinda de outra área: posiciona diretamente sob o link sem cruzar o header
+      setHasTransition(false);
+      setIndicatorX(targetX);
+      requestAnimationFrame(() => {
+        setHasTransition(true);
+        setIndicatorVisible(true);
+        isIndicatorVisibleRef.current = true;
+      });
+    } else {
+      // Navegação direta entre links: desliza suavemente com curva natural
+      setHasTransition(true);
+      setIndicatorX(targetX);
+      setIndicatorVisible(true);
+      isIndicatorVisibleRef.current = true;
+    }
+  }, []);
+
+  const handleTabFocus = useCallback((key: string, buttonEl: HTMLElement | null) => {
+    if (blurTimerRef.current) {
+      clearTimeout(blurTimerRef.current);
+      blurTimerRef.current = null;
+    }
+    focusedKeyRef.current = key;
+    if (buttonEl) {
+      buttonMapRef.current[key] = buttonEl;
+      updateIndicatorPosition(buttonEl, isIndicatorVisibleRef.current);
+    }
+  }, [updateIndicatorPosition]);
+
+  const handleTabBlur = useCallback((key: string) => {
+    if (focusedKeyRef.current === key) {
+      if (blurTimerRef.current) {
+        clearTimeout(blurTimerRef.current);
+      }
+      blurTimerRef.current = setTimeout(() => {
+        focusedKeyRef.current = null;
+        setIndicatorVisible(false);
+        isIndicatorVisibleRef.current = false;
+      }, 60);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (focusedKeyRef.current && buttonMapRef.current[focusedKeyRef.current]) {
+        updateIndicatorPosition(buttonMapRef.current[focusedKeyRef.current], false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (blurTimerRef.current) {
+        clearTimeout(blurTimerRef.current);
+        blurTimerRef.current = null;
+      }
+    };
+  }, [updateIndicatorPosition]);
 
   useEffect(() => {
     const video = logoVideoRef.current;
@@ -205,11 +300,30 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
         </div>
 
         {/* Centro: Navegação Flutuante Livre (SEM RETÂNGULO EXTERNO, CENTRALIZADA NA LARGURA TOTAL) */}
-        <nav className="absolute z-10 left-1/2 -translate-x-1/2 flex items-center gap-6 sm:gap-8 lg:gap-10 pointer-events-auto">
+        <nav
+          ref={navRef}
+          className="absolute z-10 left-1/2 -translate-x-1/2 flex items-center gap-6 sm:gap-8 lg:gap-10 pointer-events-auto"
+        >
+          {/* Único traço indicador deslizante suave entre os links do header aproximado a 5px do texto (top-[calc(100%+5px)]) */}
+          <div
+            aria-hidden="true"
+            data-testid="tv-nav-indicator"
+            className={`absolute left-0 bottom-0 h-[3px] w-8 bg-cyan-400 rounded-full shadow-[0_0_10px_#00e5ff] pointer-events-none will-change-transform ${
+              indicatorVisible ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{
+              transform: `translate3d(${indicatorX}px, 0, 0)`,
+              transition: hasTransition
+                ? 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease-out'
+                : 'opacity 200ms ease-out',
+            }}
+          />
           <TvNavTabButton
             focusKey="tv-nav-home"
             label="Início"
             isActive={currentTab === 'home'}
+            onFocusTab={handleTabFocus}
+            onBlurTab={handleTabBlur}
             onClick={() => {
               uiSoundService.play('navigate');
               onSelectTab('home');
@@ -219,6 +333,8 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
             focusKey="tv-nav-movies"
             label="Filmes"
             isActive={currentTab === 'movies'}
+            onFocusTab={handleTabFocus}
+            onBlurTab={handleTabBlur}
             onClick={() => {
               uiSoundService.play('navigate');
               onSelectTab('movies');
@@ -228,6 +344,8 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
             focusKey="tv-nav-series"
             label="Séries"
             isActive={currentTab === 'series'}
+            onFocusTab={handleTabFocus}
+            onBlurTab={handleTabBlur}
             onClick={() => {
               uiSoundService.play('navigate');
               onSelectTab('series');
@@ -237,6 +355,8 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
             focusKey="tv-nav-animes"
             label="Animes"
             isActive={currentTab === 'animes'}
+            onFocusTab={handleTabFocus}
+            onBlurTab={handleTabBlur}
             onClick={() => {
               uiSoundService.play('navigate');
               onSelectTab('animes');
@@ -246,6 +366,8 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
             focusKey="tv-nav-featured"
             label="Em Destaque"
             isActive={currentTab === 'featured'}
+            onFocusTab={handleTabFocus}
+            onBlurTab={handleTabBlur}
             onClick={() => {
               uiSoundService.play('navigate');
               onSelectTab('featured');
