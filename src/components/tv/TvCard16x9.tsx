@@ -101,7 +101,11 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
     }
   }, [item.id, item.image, item.poster, item.backdrop, imgSrc]);
 
-  const handleImgError = () => {
+  const handleImgError = (e?: React.SyntheticEvent<HTMLImageElement>) => {
+    // Se o evento foi disparado por uma imagem que não corresponde ao item atual, descarta
+    if (e?.currentTarget && e.currentTarget.getAttribute('data-item-id') !== String(item.id)) {
+      return;
+    }
     // 1. Se a versão otimizada (w500) falhou, tenta a URL original antes de desistir
     if (rawPoster && imgSrc !== rawPoster) {
       setImgSrc(rawPoster);
@@ -186,6 +190,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
 
       {/* Caixa Vertical 2:3 Principal (Poster com cores vivas e naturais, sem camada luminosa ou desbotamento sobre a imagem) */}
       <div 
+        data-card-poster="true"
         className="relative z-10 w-full aspect-[2/3] rounded-2xl overflow-hidden bg-[#0d121d] transition-all duration-200 border border-white/10 group-hover/tvcard:border-white/25"
         style={{
           WebkitMaskImage: '-webkit-radial-gradient(white, black)',
@@ -198,6 +203,8 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
         {/* Imagem do Poster Vertical 2:3 (Cores vivas, contraste natural e nitidez original) */}
         {!hasImageError && imgSrc ? (
           <img
+            key={`${item.id}`}
+            data-item-id={item.id}
             src={imgSrc}
             alt={item.title}
             loading={priority ? "eager" : "lazy"}
@@ -261,7 +268,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
       {/* Contorno Externo de Seleção para navegação individual (Respiro de 4px externo à capa, sem invadir os pixels do poster) */}
       {isTvFocused && !suppressFocusBorder && (
         <div 
-          className="absolute -inset-[4px] rounded-[20px] border-2 border-cyan-400 pointer-events-none z-20 shadow-[0_0_14px_rgba(0,229,255,0.45)]"
+          className="absolute -inset-[6px] rounded-[22px] border-2 border-cyan-400 pointer-events-none z-20 shadow-[0_0_14px_rgba(0,229,255,0.45)]"
           aria-hidden="true"
         />
       )}

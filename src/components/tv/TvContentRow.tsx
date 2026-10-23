@@ -34,20 +34,20 @@ const EASING_CURVE = 'cubic-bezier(0.22, 1, 0.36, 1)'; // Desaceleração suave 
  * Garante que nenhuma mídia seja duplicada simultaneamente na tela quando o catálogo for reduzido,
  * mantendo sempre um slot à esquerda (-1) e à direita (1) para transição contínua.
  */
-const getVisibleSlots = (count: number): number[] => {
+export const getVisibleSlots = (count: number): number[] => {
   if (count <= 0) return [];
   if (count === 1) return [0];
   if (count === 2) return [-1, 0, 1];
-  if (count === 3) return [-1, 0, 1];
-  if (count === 4) return [-1, 0, 1, 2];
-  if (count === 5) return [-1, 0, 1, 2, 3];
-  if (count === 6) return [-1, 0, 1, 2, 3, 4];
-  if (count === 7) return [-1, 0, 1, 2, 3, 4, 5];
+  if (count === 3) return [-1, 0, 1, 2];
+  if (count === 4) return [-1, 0, 1, 2, 3];
+  if (count === 5) return [-1, 0, 1, 2, 3, 4];
+  if (count === 6) return [-1, 0, 1, 2, 3, 4, 5];
+  if (count === 7) return [-1, 0, 1, 2, 3, 4, 5, 6];
   // Catálogo completo (>= 8 itens): buffer otimizado por perfil de hardware da TV
   const profile = tvPerformanceProfileService.getActiveConfig();
   if (profile.name === 'eco') {
-    // Modo econômico (The Frame, Tizen, MSX): 7 cards suficientes para cobrir a viewport de 1080p sem sobrecarga de GPU
-    return [-1, 0, 1, 2, 3, 4, 5];
+    // Modo econômico (The Frame, Tizen, MSX): 8 cards suficientes para cobrir a viewport de 1080p sem sobrecarga de GPU
+    return [-1, 0, 1, 2, 3, 4, 5, 6];
   }
   if (profile.name === 'balanced') {
     // Modo equilibrado: 8 cards
@@ -67,6 +67,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   onRowDown
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const trackContainerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
   // Índice do item ativo fixado na primeira posição visível (Slot 0 em SAFE_MARGIN_LEFT)
@@ -85,26 +86,54 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   const targetIndexRef = useRef(0);
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Medição precisa da largura do card + gap (step) para transição fluida sem saltos
+  // Medição precisa da largura do card + gap (step) e geometria da seleção
   const slotMeasureRef = useRef<HTMLDivElement>(null);
   const [cardWidth, setCardWidth] = useState(275);
   const [stepSize, setStepSize] = useState(299);
+  const [selectionGeometry, setSelectionGeometry] = useState({
+    top: 32, // fallback para py-8 (32px / 2rem)
+    left: SAFE_MARGIN_LEFT,
+    width: 275,
+    height: 413,
+  });
+
+  const measureGeometry = useCallback(() => {
+    if (slotMeasureRef.current && trackContainerRef.current) {
+      const slotRect = slotMeasureRef.current.getBoundingClientRect();
+      const containerRect = trackContainerRef.current.getBoundingClientRect();
+      const w = Math.round(slotRect.width);
+      const h = Math.round(slotRect.height);
+      if (w > 100) {
+        const topOffset = Math.round(slotRect.top - containerRect.top);
+        setCardWidth(w);
+        setStepSize(w + CARD_GAP);
+        setSelectionGeometry({
+          top: topOffset,
+          left: SAFE_MARGIN_LEFT,
+          width: w,
+          height: h > 100 ? h : Math.round(w * 1.5)
+        });
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    const measure = () => {
-      if (slotMeasureRef.current) {
-        const w = slotMeasureRef.current.getBoundingClientRect().width;
-        if (w > 100) {
-          const wInt = Math.round(w);
-          setCardWidth(wInt);
-          setStepSize(wInt + CARD_GAP);
-        }
-      }
+    measureGeometry();
+    const rafId = requestAnimationFrame(measureGeometry);
+    window.addEventListener('resize', measureGeometry);
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && trackContainerRef.current) {
+      observer = new ResizeObserver(() => {
+        measureGeometry();
+      });
+      observer.observe(trackContainerRef.current);
+    }
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', measureGeometry);
+      if (observer) observer.disconnect();
     };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, []);
+  }, [measureGeometry]);
 
   // Finalização da transição suave com atualização atômica de slots
   const handleTransitionEnd = useCallback(() => {
@@ -142,7 +171,6 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
       const stepsRemaining = Math.abs(targetIndexRef.current - nextIndex);
       const dynamicDuration = stepsRemaining > 2 ? 140 : stepsRemaining > 1 ? 190 : CHAINED_DURATION;
       requestAnimationFrame(() => {
-        // Otimização: elimina reflow síncrono forçado (offsetHeight) para navegação fluida em 60 FPS na TV
         triggerSlide(queuedDir, dynamicDuration);
       });
     } else {
@@ -186,16 +214,18 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
       queuedDirectionRef.current = 'right';
       setTransitionDuration(CHAINED_DURATION);
       // Se estava deslizando para a esquerda e o usuário inverteu para a direita,
-      // interrompe a direção anterior imediatamente para responder sem atraso
+      // cancela o passo pendente e anima suavemente de volta à posição 0 sem saltar índices
       if (pendingSlideRef.current === 'left') {
-        handleTransitionEnd();
+        pendingSlideRef.current = null;
+        setTranslateX(0);
+        return;
       }
       return;
     }
 
     // 3. Dispara a transição cinematográfica normal para toque isolado
     triggerSlide('right', NORMAL_DURATION);
-  }, [items, triggerSlide, handleTransitionEnd]);
+  }, [items, triggerSlide]);
 
   // Navegação horizontal circular para a esquerda: transição contínua e não-bloqueante
   const slidePrev = useCallback(() => {
@@ -212,16 +242,18 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
       queuedDirectionRef.current = 'left';
       setTransitionDuration(CHAINED_DURATION);
       // Se estava deslizando para a direita e o usuário inverteu para a esquerda,
-      // interrompe a direção anterior imediatamente para responder sem atraso
+      // cancela o passo pendente e anima suavemente de volta à posição 0 sem saltar índices
       if (pendingSlideRef.current === 'right') {
-        handleTransitionEnd();
+        pendingSlideRef.current = null;
+        setTranslateX(0);
+        return;
       }
       return;
     }
 
     // 3. Dispara a transição cinematográfica normal para toque isolado
     triggerSlide('left', NORMAL_DURATION);
-  }, [items, triggerSlide, handleTransitionEnd]);
+  }, [items, triggerSlide]);
 
   // Listener nativo de fim de transição no track
   const onTrackTransitionEnd = useCallback((e: React.TransitionEvent<HTMLDivElement>) => {
@@ -347,14 +379,15 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
         </div>
 
         {/* Trilho Horizontal Infinito de Ponta a Ponta na Tela */}
-        <div className="relative w-full overflow-hidden py-8">
+        <div ref={trackContainerRef} className="relative w-full overflow-hidden py-8">
           {/* 1. GLOW AMBIENTE SUTIL (ATRÁS DA CAPA): Geometria compartilhada 2:3 rigorosamente alinhada ao Slot 0 */}
           {focused && currentItem && (
             <div 
               className="absolute z-0 pointer-events-none transition-all duration-300 flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px]"
               style={{
-                left: `${SAFE_MARGIN_LEFT}px`,
-                top: '2rem',
+                left: `${selectionGeometry.left}px`,
+                top: `${selectionGeometry.top}px`,
+                height: `${selectionGeometry.height}px`,
               }}
               aria-hidden="true"
             >
@@ -374,14 +407,15 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
             <div 
               className="absolute z-30 pointer-events-none flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px]"
               style={{
-                left: `${SAFE_MARGIN_LEFT}px`,
-                top: '2rem',
+                left: `${selectionGeometry.left}px`,
+                top: `${selectionGeometry.top}px`,
+                height: `${selectionGeometry.height}px`,
               }}
               aria-hidden="true"
             >
               <div className="relative w-full aspect-[2/3]">
                 <div 
-                  className="absolute -inset-[4px] rounded-[20px] border-2 border-cyan-400 shadow-[0_0_14px_rgba(0,229,255,0.45)] transition-all duration-150"
+                  className="absolute -inset-[6px] rounded-[22px] border-2 border-cyan-400 shadow-[0_0_14px_rgba(0,229,255,0.45)] transition-all duration-150"
                   style={{
                     background: 'transparent'
                   }}

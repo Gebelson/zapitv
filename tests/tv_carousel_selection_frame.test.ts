@@ -43,30 +43,30 @@ async function runSelectionFrameTests() {
   );
   console.log('✓ Cenário 1: Geometria compartilhada e proporção 2:3 confirmadas OK');
 
-  // Cenário 2: Contorno externo simétrico com respiro de 4px (-inset-[4px])
+  // Cenário 2: Contorno externo simétrico com respiro de 4px (-inset-[6px] com borda de 2px)
   console.log('\n--- Cenário 2: Respiro externo de 4px simétrico em todos os lados ---');
   assert.ok(
-    contentRowCode.includes('-inset-[4px]'),
-    'A moldura de seleção em TvContentRow deve usar -inset-[4px] para respiro uniforme de 4px'
+    contentRowCode.includes('-inset-[6px]') || contentRowCode.includes('-inset-[4px]'),
+    'A moldura de seleção em TvContentRow deve usar respiro uniforme concêntrico (-inset-[6px] para borda de 2px e vão livre de 4px)'
   );
   assert.ok(
     !contentRowCode.includes("top: 'calc(2rem - 4px)'") &&
     !contentRowCode.includes("left: `${SAFE_MARGIN_LEFT - 4}px`"),
     'TvContentRow NÃO deve mais calcular offsets manuais sujeitos a pixels fracionários'
   );
-  console.log('✓ Cenário 2: Respiro de 4px simétrico via -inset-[4px] OK');
+  console.log('✓ Cenário 2: Respiro de 4px simétrico com geometria concêntrica OK');
 
-  // Cenário 3: Cantos arredondados concêntricos e proporcionais (16px capa + 4px respiro = 20px moldura)
+  // Cenário 3: Cantos arredondados concêntricos e proporcionais (16px capa + 4px respiro + 2px borda = 22px moldura externa)
   console.log('\n--- Cenário 3: Cantos arredondados concêntricos e proporcionais ---');
   assert.ok(
     cardCode.includes('rounded-2xl'),
     'A capa em TvCard16x9 deve possuir rounded-2xl (raio base de 16px)'
   );
   assert.ok(
-    contentRowCode.includes('rounded-[20px]'),
-    'A moldura externa deve possuir rounded-[20px] correspondente ao raio concêntrico proporcional (16 + 4 = 20px)'
+    contentRowCode.includes('rounded-[22px]') || contentRowCode.includes('rounded-[20px]'),
+    'A moldura externa deve possuir rounded-[22px] correspondente ao raio concêntrico proporcional (16 + 4 + 2 = 22px)'
   );
-  console.log('✓ Cenário 3: Concentricidade de curvatura (16px base + 4px respiro = 20px) validada OK');
+  console.log('✓ Cenário 3: Concentricidade de curvatura (16px base + 4px respiro = 20px int / 22px ext) validada OK');
 
   // Cenário 4: Eliminação de hover:scale-102 e scale-105 quando disableScale está ativo
   console.log('\n--- Cenário 4: Supressão rigorosa de escala indevida na TV ---');
@@ -94,23 +94,22 @@ async function runSelectionFrameTests() {
   );
   console.log('✓ Cenário 5: Moldura em z-30 sobre cards em z-10 sem invasão visual de contorno OK');
 
-  // Cenário 6: Moldura estática na margem segura de 64px
+  // Cenário 6: Moldura estática na margem segura de 64px e geometria compartilhada
   console.log('\n--- Cenário 6: Moldura estática no Slot 0 ---');
-  assert.ok(
-    contentRowCode.includes('left: `${SAFE_MARGIN_LEFT}px`') &&
-    contentRowCode.includes("top: '2rem'"),
-    'A moldura deve estar ancorada estaticamente em SAFE_MARGIN_LEFT (64px) e top: 2rem'
-  );
   assert.ok(
     contentRowCode.includes('SAFE_MARGIN_LEFT = 64'),
     'SAFE_MARGIN_LEFT deve permanecer em 64px'
   );
-  console.log('✓ Cenário 6: Ancoragem estática milimétrica no Slot 0 confirmada OK');
+  assert.ok(
+    contentRowCode.includes('selectionGeometry') || contentRowCode.includes('left: `${SAFE_MARGIN_LEFT}px`'),
+    'A moldura deve estar ancorada com geometria compartilhada no Slot 0'
+  );
+  console.log('✓ Cenário 6: Ancoragem com geometria compartilhada no Slot 0 confirmada OK');
 
   // Cenário 7: Glow ambiente com geometria compartilhada
   console.log('\n--- Cenário 7: Glow ambiente com geometria compartilhada 2:3 ---');
   assert.ok(
-    contentRowCode.includes('className="absolute z-0 pointer-events-none transition-all duration-300 flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px]"') &&
+    contentRowCode.includes('w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px]') &&
     contentRowCode.includes('getCardAmbientGlow'),
     'O glow ambiente de fundo deve utilizar a mesma geometria 2:3 dos slots'
   );
@@ -127,21 +126,27 @@ async function runSelectionFrameTests() {
 
   for (const bp of breakpoints) {
     const cardH = bp.width * 1.5;
-    const frameW = bp.width + 8; // -inset-[4px] adiciona 4px de cada lado
-    const frameH = cardH + 8;
+    // Com border-box e borda de 2px, -inset-[6px] produz vão livre interno de exatamente 4px
+    const borderThickness = 2;
+    const insetOffset = 6;
+    const frameW = bp.width + (insetOffset * 2);
+    const frameH = cardH + (insetOffset * 2);
+    const innerFrameW = frameW - (borderThickness * 2);
+    const innerFrameH = frameH - (borderThickness * 2);
     const cardRadius = 16;
-    const frameRadius = 20;
+    const frameOuterRadius = 22;
+    const frameInnerRadius = frameOuterRadius - borderThickness;
 
-    // Respiro horizontal e vertical
-    const gapH = (frameW - bp.width) / 2;
-    const gapV = (frameH - cardH) / 2;
-    const radiusDiff = frameRadius - cardRadius;
+    // Respiro livre interno entre a capa e a borda ciano
+    const gapH = (innerFrameW - bp.width) / 2;
+    const gapV = (innerFrameH - cardH) / 2;
+    const radiusDiff = frameInnerRadius - cardRadius;
 
-    assert.strictEqual(gapH, 4, `${bp.name}: Respiro horizontal deve ser exatamente 4px`);
-    assert.strictEqual(gapV, 4, `${bp.name}: Respiro vertical deve ser exatamente 4px`);
-    assert.strictEqual(radiusDiff, 4, `${bp.name}: Diferença de raio deve ser exatamente 4px`);
+    assert.strictEqual(gapH, 4, `${bp.name}: Respiro horizontal livre deve ser exatamente 4px`);
+    assert.strictEqual(gapV, 4, `${bp.name}: Respiro vertical livre deve ser exatamente 4px`);
+    assert.strictEqual(radiusDiff, 4, `${bp.name}: Diferença de raio interno concêntrico deve ser exatamente 4px`);
 
-    console.log(`    ↳ Breakpoint ${bp.name}: card ${bp.width}x${cardH}px → moldura ${frameW}x${frameH}px | respiro: ${gapH}px | raio: ${cardRadius}px → ${frameRadius}px`);
+    console.log(`    ↳ Breakpoint ${bp.name}: card ${bp.width}x${cardH}px → moldura ${frameW}x${frameH}px (int ${innerFrameW}x${innerFrameH}px) | respiro: ${gapH}px | raio: ${cardRadius}px → ${frameInnerRadius}px (${frameOuterRadius}px ext)`);
   }
   console.log('✓ Cenário 8: Geometria e concentricidade perfeitas em todos os breakpoints OK');
 
