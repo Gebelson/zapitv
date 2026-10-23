@@ -279,10 +279,10 @@ const DrawerIconButton: React.FC<{
       data-tv-focused={focused ? 'true' : undefined}
       onClick={onClick}
       aria-label={label}
-      className={`w-9 h-9 rounded-full flex items-center justify-center outline-none transition-all duration-150 select-none cursor-pointer ${
+      className={`w-8 h-8 rounded-full flex items-center justify-center outline-none transition-all duration-150 select-none cursor-pointer ${
         focused
-          ? 'bg-cyan-500/30 text-white ring-2 ring-cyan-300 scale-105 shadow-[0_0_12px_rgba(0,229,255,0.4)]'
-          : 'bg-white/10 text-gray-300 hover:bg-white/15 hover:text-white'
+          ? 'bg-cyan-400 text-black ring-2 ring-cyan-300 scale-105 shadow-[0_0_12px_rgba(0,229,255,0.4)] font-bold'
+          : 'bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white'
       }`}
     >
       {children}
@@ -290,15 +290,54 @@ const DrawerIconButton: React.FC<{
   );
 };
 
+/** Botão compacto para cabeçalhos de seção (ex: Estilos em Legendas) */
+const DrawerHeaderButton: React.FC<{
+  focusKey: string;
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+}> = ({ focusKey, label, icon, onClick }) => {
+  const { ref, focused } = useTvFocusable({
+    focusKey,
+    onEnterPress: onClick,
+    soundType: 'hover',
+    enterSound: 'confirm',
+    isPlayerControl: true
+  });
+  return (
+    <button
+      ref={ref}
+      type="button"
+      data-focus-key={focusKey}
+      data-tv-focused={focused ? 'true' : undefined}
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold outline-none transition-all cursor-pointer ${
+        focused
+          ? 'bg-cyan-400 text-black ring-2 ring-cyan-300 font-bold shadow-[0_0_12px_rgba(0,229,255,0.4)] scale-105'
+          : 'bg-white/10 border border-white/15 text-gray-300 hover:bg-white/20 hover:text-white'
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+};
+
 /** Cabeçalho de seção dentro dos Drawers */
 const DrawerSectionHeader: React.FC<{
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   title: string;
-}> = ({ icon, title }) => (
-  <div className="flex items-center gap-2.5 mb-3">
-    <span className="text-cyan-400 shrink-0">{icon}</span>
-    <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">{title}</span>
-    <div className="h-px flex-1 bg-white/10" />
+  action?: React.ReactNode;
+}> = ({ icon, title, action }) => (
+  <div className="mb-3">
+    <div className="flex items-center justify-between gap-2 mb-1.5">
+      <div className="flex items-center gap-2">
+        {icon && <span className="text-gray-400 shrink-0">{icon}</span>}
+        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-300">{title}</h4>
+      </div>
+      {action}
+    </div>
+    <div className="h-px w-full bg-white/15" />
   </div>
 );
 
@@ -327,12 +366,12 @@ const DrawerPillChip: React.FC<{
       data-focus-key={focusKey}
       data-tv-focused={focused ? 'true' : undefined}
       onClick={onClick}
-      className={`relative inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl font-semibold text-sm outline-none transition-all duration-150 select-none cursor-pointer ${
+      className={`relative inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-semibold text-xs sm:text-sm outline-none transition-all duration-150 select-none cursor-pointer ${
         focused
-          ? 'bg-cyan-400 text-black ring-4 ring-cyan-300/40 shadow-[0_0_18px_rgba(0,229,255,0.6)] scale-105 z-10 font-bold'
+          ? 'bg-cyan-400 text-black ring-2 ring-cyan-300 shadow-[0_0_15px_rgba(0,229,255,0.5)] scale-105 z-10 font-bold'
           : active
-          ? 'bg-cyan-500/20 border border-cyan-400/80 text-cyan-200 shadow-[0_0_12px_rgba(0,229,255,0.2)]'
-          : 'bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10 hover:text-white'
+          ? 'bg-sky-500 text-white shadow-sm font-bold'
+          : 'bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white'
       }`}
     >
       {colorSwatch && (
@@ -345,11 +384,11 @@ const DrawerPillChip: React.FC<{
       <span className="truncate">{label}</span>
       {badge && (
         <span
-          className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+          className={`px-1.5 py-0.2 rounded text-[10px] font-black uppercase tracking-wider ${
             focused
               ? 'bg-black text-cyan-300'
               : active
-              ? 'bg-cyan-400 text-black'
+              ? 'bg-black/30 text-white'
               : 'bg-white/15 text-gray-300'
           }`}
         >
@@ -357,7 +396,51 @@ const DrawerPillChip: React.FC<{
         </span>
       )}
       {active && (
-        <Check className={`w-3.5 h-3.5 shrink-0 ml-0.5 ${focused ? 'text-black' : 'text-cyan-300'}`} />
+        <Check className={`w-3.5 h-3.5 shrink-0 ml-0.5 ${focused ? 'text-black' : 'text-white'}`} />
+      )}
+    </button>
+  );
+};
+
+/** Chip circular elegante para paleta de cores das legendas (Branco, Amarelo, Ciano, Verde) */
+const DrawerColorChip: React.FC<{
+  focusKey: string;
+  color: string;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}> = ({ focusKey, color, label, active, onClick }) => {
+  const { ref, focused } = useTvFocusable({
+    focusKey,
+    onEnterPress: onClick,
+    soundType: 'hover',
+    enterSound: 'toggle',
+    isPlayerControl: true
+  });
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      data-focus-key={focusKey}
+      data-tv-focused={focused ? 'true' : undefined}
+      onClick={onClick}
+      aria-label={label}
+      className={`w-7 h-7 rounded-full outline-none transition-all duration-150 select-none cursor-pointer flex items-center justify-center ${
+        focused
+          ? 'ring-2 ring-cyan-300 ring-offset-2 ring-offset-black scale-110 shadow-[0_0_12px_rgba(0,229,255,0.6)]'
+          : active
+          ? 'ring-2 ring-white ring-offset-2 ring-offset-black/60 scale-105'
+          : 'opacity-80 hover:opacity-100 hover:scale-105'
+      }`}
+      style={{ backgroundColor: color }}
+    >
+      {active && (
+        <Check
+          className={`w-3.5 h-3.5 ${
+            color === '#FFFFFF' || color === '#FFE66D' ? 'text-black' : 'text-white'
+          }`}
+        />
       )}
     </button>
   );
@@ -387,31 +470,31 @@ const DrawerToggleRow: React.FC<{
       data-focus-key={focusKey}
       data-tv-focused={focused ? 'true' : undefined}
       onClick={onToggle}
-      className={`w-full p-4 rounded-2xl flex items-center justify-between gap-4 outline-none transition-all duration-150 select-none cursor-pointer border ${
+      className={`w-full py-2.5 px-3 rounded-xl flex items-center justify-between gap-4 outline-none transition-all duration-150 select-none cursor-pointer ${
         focused
-          ? 'bg-cyan-500/20 border-cyan-300 ring-2 ring-cyan-300 shadow-[0_0_20px_rgba(0,229,255,0.3)] scale-[1.01]'
-          : 'bg-white/5 border-white/5 hover:bg-white/10'
+          ? 'bg-white/10 ring-2 ring-cyan-400 shadow-[0_0_15px_rgba(0,229,255,0.25)]'
+          : 'bg-transparent hover:bg-white/5'
       }`}
     >
       <div className="flex-1 min-w-0 pr-2">
-        <h4 className={`text-base font-bold tracking-tight ${focused ? 'text-white' : 'text-gray-100'}`}>
+        <h4 className={`text-sm font-semibold tracking-tight ${focused ? 'text-white' : 'text-gray-200'}`}>
           {title}
         </h4>
         {description && (
-          <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+          <p className="text-[11px] text-gray-400 mt-0.5 leading-snug truncate">
             {description}
           </p>
         )}
       </div>
-      {/* Switch visual estilo iOS / Apple TV */}
+      {/* Switch estilo referência da TV */}
       <div
-        className={`w-12 h-6 rounded-full p-0.5 flex items-center transition-colors duration-200 shrink-0 ${
-          enabled ? 'bg-cyan-400 justify-end' : 'bg-white/20 justify-start'
+        className={`w-11 h-6 rounded-full p-0.5 flex items-center transition-colors duration-200 shrink-0 ${
+          enabled ? 'bg-sky-500 justify-end' : 'bg-white/20 justify-start'
         }`}
       >
         <span
           className={`w-5 h-5 rounded-full shadow-md transition-all duration-200 ${
-            enabled ? 'bg-black' : 'bg-gray-300'
+            enabled ? 'bg-white' : 'bg-gray-300'
           }`}
         />
       </div>
@@ -419,7 +502,7 @@ const DrawerToggleRow: React.FC<{
   );
 };
 
-/** Card moderno para episódios com miniatura 16:9 e metadados organizados */
+/** Card horizontal refinado para episódios com miniatura 16:9 e metadados concisos */
 const DrawerEpisodeCard: React.FC<{
   focusKey: string;
   episode: TvPlayerEpisode;
@@ -442,16 +525,24 @@ const DrawerEpisodeCard: React.FC<{
       data-focus-key={focusKey}
       data-tv-focused={focused ? 'true' : undefined}
       onClick={onSelect}
-      className={`group w-full p-3 rounded-2xl flex items-start gap-3.5 outline-none transition-all duration-150 select-none cursor-pointer border ${
+      className={`group w-full p-2 rounded-xl flex items-start gap-3 outline-none transition-all duration-150 select-none cursor-pointer ${
         focused
-          ? 'bg-cyan-500/20 border-cyan-300 ring-2 ring-cyan-300 shadow-[0_0_20px_rgba(0,229,255,0.35)] scale-[1.01]'
+          ? 'bg-white/10 ring-1 ring-cyan-400/80 shadow-[0_0_20px_rgba(0,229,255,0.2)]'
           : isCurrent
-          ? 'bg-cyan-500/10 border-cyan-400/40 text-cyan-200'
-          : 'bg-white/5 border-white/5 hover:bg-white/10'
+          ? 'bg-white/5'
+          : 'bg-transparent hover:bg-white/5'
       }`}
     >
       {/* Miniatura 16:9 */}
-      <div className="relative w-36 sm:w-44 aspect-video rounded-xl overflow-hidden bg-black/50 shrink-0 border border-white/10">
+      <div
+        className={`relative w-32 sm:w-36 aspect-video rounded-md overflow-hidden bg-black/50 shrink-0 border transition-all duration-150 ${
+          focused
+            ? 'border-transparent ring-2 ring-cyan-400 shadow-[0_0_12px_rgba(0,229,255,0.4)]'
+            : isCurrent
+            ? 'border-cyan-400/50'
+            : 'border-white/10'
+        }`}
+      >
         {episode.image && !imgError ? (
           <img
             src={episode.image}
@@ -462,41 +553,41 @@ const DrawerEpisodeCard: React.FC<{
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/10 to-transparent">
-            <Play className="w-7 h-7 text-white/40 fill-current ml-0.5" />
+            <Play className="w-6 h-6 text-white/40 fill-current ml-0.5" />
           </div>
         )}
         {/* Overlay do número do episódio */}
-        <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-md text-[11px] font-black tracking-wider bg-black/85 text-cyan-300 border border-cyan-400/40 shadow">
+        <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[10px] font-black tracking-wider bg-black/80 text-cyan-300 border border-cyan-400/30 shadow">
           EP {episode.number}
         </span>
         {isCurrent && (
-          <span className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-cyan-400 text-black shadow-md">
+          <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-cyan-400 text-black shadow-md">
             Atual
           </span>
         )}
       </div>
 
-      {/* Textos */}
+      {/* Textos à direita */}
       <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-extrabold tracking-wider uppercase text-cyan-400">
+          <span className="text-[11px] font-medium tracking-wide text-gray-400">
             Episódio {episode.number}
           </span>
           {isCurrent && (
-            <span className="text-[10px] font-bold text-cyan-300 bg-cyan-500/20 px-2 py-0.5 rounded-full border border-cyan-400/30">
+            <span className="text-[9px] font-bold text-cyan-300 bg-cyan-500/20 px-1.5 py-0.2 rounded border border-cyan-400/30">
               Reproduzindo
             </span>
           )}
         </div>
-        <h4 className="text-[15px] sm:text-[16px] font-bold text-white tracking-tight truncate mt-0.5">
+        <h4 className="text-sm font-semibold text-white tracking-tight truncate mt-0.5 leading-snug">
           {episode.title}
         </h4>
         {episode.description ? (
-          <p className="text-xs text-gray-400 line-clamp-2 mt-1 leading-relaxed">
+          <p className="text-[11px] text-gray-400 line-clamp-2 mt-1 leading-snug">
             {episode.description}
           </p>
         ) : (
-          <p className="text-xs text-gray-500 italic mt-1">
+          <p className="text-[11px] text-gray-500 italic mt-1">
             Episódio da série ZapiTV
           </p>
         )}
@@ -505,7 +596,7 @@ const DrawerEpisodeCard: React.FC<{
   );
 };
 
-/** Card de ação navegável para submenus ou links diretos */
+/** Linha de ação navegável para submenus ou links diretos */
 const DrawerActionCard: React.FC<{
   focusKey: string;
   title: string;
@@ -529,37 +620,37 @@ const DrawerActionCard: React.FC<{
       data-focus-key={focusKey}
       data-tv-focused={focused ? 'true' : undefined}
       onClick={onClick}
-      className={`w-full p-4 rounded-2xl flex items-center justify-between gap-4 outline-none transition-all duration-150 select-none cursor-pointer border ${
+      className={`w-full py-2.5 px-3 rounded-xl flex items-center justify-between gap-3 outline-none transition-all duration-150 select-none cursor-pointer ${
         focused
-          ? 'bg-cyan-500/20 border-cyan-300 ring-2 ring-cyan-300 shadow-[0_0_20px_rgba(0,229,255,0.3)] scale-[1.01]'
-          : 'bg-white/5 border-white/5 hover:bg-white/10'
+          ? 'bg-white/10 ring-2 ring-cyan-400 shadow-[0_0_15px_rgba(0,229,255,0.25)]'
+          : 'bg-transparent hover:bg-white/5'
       }`}
     >
-      <div className="flex items-center gap-3.5 min-w-0">
+      <div className="flex items-center gap-3 min-w-0">
         {icon && (
-          <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-cyan-300 shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-cyan-300 shrink-0">
             {icon}
           </div>
         )}
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h4 className="text-base font-bold text-gray-100 tracking-tight truncate">
+            <h4 className="text-sm font-semibold text-gray-200 tracking-tight truncate">
               {title}
             </h4>
             {badge && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+              <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
                 {badge}
               </span>
             )}
           </div>
           {description && (
-            <p className="text-xs text-gray-400 mt-0.5 leading-relaxed truncate">
+            <p className="text-[11px] text-gray-400 mt-0.5 leading-snug truncate">
               {description}
             </p>
           )}
         </div>
       </div>
-      <ArrowRight className="w-5 h-5 text-gray-400 shrink-0" />
+      <ArrowRight className="w-4 h-4 text-gray-400 shrink-0" />
     </div>
   );
 };
@@ -588,12 +679,12 @@ const DrawerStepperButton: React.FC<{
       data-tv-focused={focused ? 'true' : undefined}
       onClick={onClick}
       aria-label={label}
-      className={`flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider outline-none transition-all duration-150 select-none cursor-pointer ${
+      className={`px-3 py-1.5 rounded-lg text-xs font-semibold outline-none transition-all duration-150 select-none cursor-pointer ${
         focused
-          ? 'bg-cyan-400 text-black ring-2 ring-cyan-300 scale-105 shadow-[0_0_12px_rgba(0,229,255,0.5)] font-black'
+          ? 'bg-cyan-400 text-black ring-2 ring-cyan-300 scale-105 shadow-[0_0_12px_rgba(0,229,255,0.5)] font-bold'
           : isSecondary
           ? 'bg-white/10 text-cyan-300 border border-cyan-400/30 hover:bg-white/15'
-          : 'bg-white/10 text-white hover:bg-white/15'
+          : 'bg-white/10 text-gray-200 hover:bg-white/15'
       }`}
     >
       {children}
@@ -626,17 +717,17 @@ const DrawerStepper: React.FC<{
   canReset
 }) => {
   return (
-    <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
+    <div className="py-2.5 px-3 rounded-xl bg-transparent space-y-2">
       <div className="flex items-center justify-between">
         <div>
-          <h4 className="text-base font-bold text-gray-100 tracking-tight">{label}</h4>
-          {description && <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{description}</p>}
+          <h4 className="text-sm font-semibold text-gray-200 tracking-tight">{label}</h4>
+          {description && <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">{description}</p>}
         </div>
-        <span className="text-sm font-extrabold text-cyan-300 bg-cyan-500/10 px-3 py-1 rounded-lg border border-cyan-400/30">
+        <span className="text-xs font-bold text-sky-400 bg-sky-500/10 px-2.5 py-0.5 rounded border border-sky-400/30">
           {valueDisplay}
         </span>
       </div>
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex items-center gap-2 pt-0.5">
         <DrawerStepperButton focusKey={downFocusKey} label="Diminuir" onClick={onDown}>
           -1s
         </DrawerStepperButton>
@@ -659,10 +750,10 @@ const SubtitlePreviewBox: React.FC<{
   style: SubtitleStyle;
 }> = ({ size, style }) => {
   const fontSizes = {
-    sm: 'text-base sm:text-lg',
-    md: 'text-lg sm:text-xl',
-    lg: 'text-xl sm:text-2xl',
-    xl: 'text-2xl sm:text-3xl'
+    sm: 'text-sm sm:text-base',
+    md: 'text-base sm:text-lg',
+    lg: 'text-lg sm:text-xl',
+    xl: 'text-xl sm:text-2xl'
   };
 
   const textShadows = {
@@ -672,58 +763,89 @@ const SubtitlePreviewBox: React.FC<{
     drop: '2px 2px 0 #000000, -1px -1px 0 #000000'
   };
 
+  const textOutlines = {
+    none: 'none',
+    thin: '1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000',
+    medium: '2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000',
+    thick: '3px 3px 0 #000, -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000'
+  };
+
+  const lineSpacings = {
+    compact: 'leading-tight',
+    normal: 'leading-normal',
+    relaxed: 'leading-relaxed',
+    spacious: 'leading-loose'
+  };
+
   const bgStyles = {
     none: 'transparent',
-    semi: 'rgba(0,0,0,0.7)',
+    semi: 'rgba(0,0,0,0.6)',
     solid: '#000000'
   };
 
+  const combinedShadow = [
+    textOutlines[style.outline || 'thin'] !== 'none' ? textOutlines[style.outline || 'thin'] : '',
+    textShadows[style.shadow || 'strong'] !== 'none' ? textShadows[style.shadow || 'strong'] : ''
+  ].filter(Boolean).join(', ') || 'none';
+
   return (
-    <div className="relative w-full h-32 rounded-2xl bg-gradient-to-b from-[#101726] to-[#070b13] border border-white/10 flex items-center justify-center p-4 overflow-hidden shadow-inner mb-2">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(0,229,255,0.06)_0%,transparent_70%)] pointer-events-none" />
+    <div className="w-full h-24 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center p-3 overflow-hidden shadow-inner mb-4">
       <div
-        className={`text-center font-bold tracking-tight select-none transition-all duration-150 ${fontSizes[size]}`}
+        className={`text-center font-bold tracking-tight select-none transition-all duration-150 ${fontSizes[size]} ${lineSpacings[style.lineSpacing || 'normal']}`}
         style={{
           color: style.color || '#FFFFFF',
-          textShadow: textShadows[style.shadow || 'strong'],
-          backgroundColor: bgStyles[style.bgColor || 'semi'],
-          padding: style.bgColor !== 'none' ? '6px 16px' : '0',
-          borderRadius: '8px'
+          textShadow: combinedShadow,
+          backgroundColor: bgStyles[style.bgColor || 'none'],
+          padding: style.bgColor && style.bgColor !== 'none' ? '4px 12px' : '0',
+          borderRadius: '6px'
         }}
       >
-        <span>Exemplo de Legenda ZapiTV</span>
-        <div className="text-[75%] font-medium opacity-85 mt-0.5">
-          Pré-visualização em tempo real na TV
-        </div>
+        <div>Primeira linha de legenda</div>
+        <div className="opacity-95">Segunda linha com espaçamento</div>
       </div>
     </div>
   );
 };
 
 const SUBTITLE_SIZES: { label: string; value: 'sm' | 'md' | 'lg' | 'xl' }[] = [
-  { label: 'Pequena', value: 'sm' },
-  { label: 'Média', value: 'md' },
-  { label: 'Grande', value: 'lg' },
-  { label: 'Extra Grande', value: 'xl' }
+  { label: 'SM', value: 'sm' },
+  { label: 'MD', value: 'md' },
+  { label: 'LG', value: 'lg' },
+  { label: 'XL', value: 'xl' }
 ];
 
-const SUBTITLE_COLORS = [
-  { label: 'Branco', value: '#FFFFFF' },
-  { label: 'Amarelo', value: '#FFE66D' },
-  { label: 'Ciano', value: '#00E5FF' }
+const SUBTITLE_OUTLINES: { label: string; value: 'none' | 'thin' | 'medium' | 'thick' }[] = [
+  { label: 'Nenhum', value: 'none' },
+  { label: 'Fino', value: 'thin' },
+  { label: 'Médio', value: 'medium' },
+  { label: 'Forte', value: 'thick' }
 ];
 
 const SUBTITLE_SHADOWS: { label: string; value: 'none' | 'soft' | 'strong' | 'drop' }[] = [
   { label: 'Nenhuma', value: 'none' },
   { label: 'Suave', value: 'soft' },
   { label: 'Forte', value: 'strong' },
-  { label: 'Destaque', value: 'drop' }
+  { label: 'Projetada', value: 'drop' }
+];
+
+const SUBTITLE_SPACINGS: { label: string; value: 'compact' | 'normal' | 'relaxed' | 'spacious' }[] = [
+  { label: 'Compacto', value: 'compact' },
+  { label: 'Normal', value: 'normal' },
+  { label: 'Espaçado', value: 'relaxed' },
+  { label: 'Amplo', value: 'spacious' }
+];
+
+const SUBTITLE_COLORS = [
+  { label: 'Branco', value: '#FFFFFF' },
+  { label: 'Amarelo', value: '#FFE66D' },
+  { label: 'Ciano', value: '#00E5FF' },
+  { label: 'Verde', value: '#4ADE80' }
 ];
 
 const SUBTITLE_BG_COLORS: { label: string; value: 'none' | 'semi' | 'solid' }[] = [
-  { label: 'Transparente', value: 'none' },
+  { label: 'Nenhum', value: 'none' },
   { label: 'Translúcido', value: 'semi' },
-  { label: 'Preto Sólido', value: 'solid' }
+  { label: 'Sólido', value: 'solid' }
 ];
 
 export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
@@ -1498,15 +1620,15 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
         {/* DRAWER LATERAL PREMIUM: Episódios, Áudio & Legendas, Configurações ou Estilos */}
         {menu && (
           <div
-            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-end pointer-events-auto animate-in fade-in duration-200"
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] flex items-center justify-end pointer-events-auto animate-in fade-in duration-200"
             onClick={() => closeMenu()}
           >
             <div
-              className="h-full w-[min(580px,90vw)] bg-[#070b13]/95 backdrop-blur-2xl border-l border-white/10 px-7 sm:px-8 py-7 flex flex-col justify-between shadow-[0_0_80px_rgba(0,0,0,0.9)] animate-in slide-in-from-right duration-250 select-none overflow-hidden"
+              className="h-full w-[min(480px,38vw)] bg-gradient-to-l from-black/95 via-black/90 to-black/80 backdrop-blur-xl border-l border-white/10 px-6 sm:px-7 py-6 flex flex-col justify-between shadow-[0_0_90px_rgba(0,0,0,0.95)] animate-in slide-in-from-right duration-250 select-none overflow-hidden"
               onClick={event => event.stopPropagation()}
             >
               {/* CABEÇALHO DO DRAWER */}
-              <div className="pb-4 border-b border-white/10 shrink-0">
+              <div className="pb-3 border-b border-white/15 shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {menu === 'subtitle_styles' && (
@@ -1518,7 +1640,7 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
                         <ArrowLeft className="w-5 h-5" />
                       </DrawerIconButton>
                     )}
-                    <h3 className="text-2xl font-black text-white tracking-tight">
+                    <h3 className="text-xl font-bold text-white tracking-wide">
                       {menu === 'audio_subtitles'
                         ? 'Áudio e Legendas'
                         : menu === 'episodes'
@@ -1536,84 +1658,67 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
                     <X className="w-5 h-5" />
                   </DrawerIconButton>
                 </div>
-                <p className="text-xs text-gray-400 mt-1.5">
-                  {menu === 'subtitle_styles' ? (
-                    <>Pressione <span className="text-cyan-300 font-semibold">Voltar</span> para retornar a {previousMenu === 'options' ? 'Configurações' : 'Áudio e Legendas'}</>
-                  ) : (
-                    <>Pressione <span className="text-cyan-300 font-semibold">Voltar</span> no controle para fechar</>
-                  )}
-                </p>
               </div>
 
               {/* CORPO DO DRAWER COM ROLAGEM SUAVE */}
-              <div className="flex-1 my-5 overflow-y-auto no-scrollbar pr-1 space-y-6">
+              <div className="flex-1 my-4 overflow-y-auto no-scrollbar pr-1">
                 {/* 1. MENU DE EPISÓDIOS */}
                 {menu === 'episodes' && (
-                  <>
+                  <div className="space-y-4">
                     {/* Seletor de Temporadas em Pills */}
-                    {availableSeasons.length > 1 && (
-                      <div>
-                        <DrawerSectionHeader icon={<ListVideo className="w-4 h-4" />} title="Temporada" />
-                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-                          {availableSeasons.map(s => (
-                            <DrawerPillChip
-                              key={`season-pill-${s}`}
-                              focusKey={`tv-player-drawer-season-${s}`}
-                              label={`Temporada ${s}`}
-                              active={selectedSeason === s}
-                              onClick={() => {
-                                uiSoundService.play('toggle', { playerControl: true });
-                                setSelectedSeason(s);
+                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                      {availableSeasons.map(s => (
+                        <DrawerPillChip
+                          key={`season-pill-${s}`}
+                          focusKey={`tv-player-drawer-season-${s}`}
+                          label={`temporada ${s}`}
+                          icon={<span className="text-[10px]">▶</span>}
+                          active={selectedSeason === s}
+                          onClick={() => {
+                            uiSoundService.play('toggle', { playerControl: true });
+                            setSelectedSeason(s);
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Lista de Episódios 16:9 */}
+                    {seasonEpisodes.length > 0 ? (
+                      <div className="space-y-2">
+                        {seasonEpisodes.map((ep, index) => {
+                          const isCurrent =
+                            (ep.season ?? 1) === (props.season ?? 1) && ep.number === props.episode;
+                          return (
+                            <DrawerEpisodeCard
+                              key={`ep-${ep.id || ep.number}`}
+                              focusKey={`tv-player-drawer-episodes-${index}`}
+                              episode={ep}
+                              isCurrent={isCurrent}
+                              onSelect={() => {
+                                uiSoundService.play('watch', { playerControl: true });
+                                props.onSelectEpisode?.(selectedSeason, ep.number);
+                                closeMenu(true);
                               }}
                             />
-                          ))}
-                        </div>
+                          );
+                        })}
                       </div>
+                    ) : (
+                      <p className="text-gray-400 py-6 text-center text-sm">
+                        Nenhum episódio encontrado para esta temporada.
+                      </p>
                     )}
-
-                    {/* Lista de Cards de Episódios 16:9 */}
-                    <div>
-                      <DrawerSectionHeader
-                        icon={<Play className="w-4 h-4 fill-current" />}
-                        title={`Episódios (${seasonEpisodes.length})`}
-                      />
-                      {seasonEpisodes.length > 0 ? (
-                        <div className="space-y-3">
-                          {seasonEpisodes.map((ep, index) => {
-                            const isCurrent =
-                              (ep.season ?? 1) === (props.season ?? 1) && ep.number === props.episode;
-                            return (
-                              <DrawerEpisodeCard
-                                key={`ep-${ep.id || ep.number}`}
-                                focusKey={`tv-player-drawer-episodes-${index}`}
-                                episode={ep}
-                                isCurrent={isCurrent}
-                                onSelect={() => {
-                                  uiSoundService.play('watch', { playerControl: true });
-                                  props.onSelectEpisode?.(selectedSeason, ep.number);
-                                  closeMenu(true);
-                                }}
-                              />
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="text-gray-400 py-6 text-center text-sm">
-                          Nenhum episódio encontrado para esta temporada.
-                        </p>
-                      )}
-                    </div>
-                  </>
+                  </div>
                 )}
 
                 {/* 2. MENU DE ÁUDIO E LEGENDAS */}
                 {menu === 'audio_subtitles' && (
-                  <>
+                  <div className="space-y-5">
                     {/* Seção Áudio */}
                     <div>
-                      <DrawerSectionHeader icon={<Volume2 className="w-4 h-4" />} title="Áudio" />
+                      <DrawerSectionHeader title="Áudio" />
                       {props.audioOptions.length > 0 ? (
-                        <div className="flex flex-wrap gap-2.5">
+                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
                           {props.audioOptions.map((audio, index) => (
                             <DrawerPillChip
                               key={`audio-${audio.id}`}
@@ -1630,14 +1735,24 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-gray-400 text-sm py-2">Áudio padrão do título</p>
+                        <p className="text-gray-400 text-xs py-1">Áudio padrão do título</p>
                       )}
                     </div>
 
                     {/* Seção Legendas */}
                     <div>
-                      <DrawerSectionHeader icon={<Subtitles className="w-4 h-4" />} title="Legendas" />
-                      <div className="flex flex-wrap gap-2.5">
+                      <DrawerSectionHeader
+                        title="Legendas"
+                        action={
+                          <DrawerHeaderButton
+                            focusKey="tv-drawer-sub-styles-btn"
+                            label="Estilos"
+                            icon={<SlidersHorizontal className="w-3.5 h-3.5" />}
+                            onClick={() => openSubtitleStyles('audio_subtitles')}
+                          />
+                        }
+                      />
+                      <div className="flex flex-col gap-2">
                         <DrawerPillChip
                           focusKey="tv-player-drawer-sub-off"
                           label="Desativada"
@@ -1664,32 +1779,21 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
                         ))}
                       </div>
                     </div>
-
-                    {/* Botão de Estilo das Legendas */}
-                    <div className="pt-2">
-                      <DrawerActionCard
-                        focusKey="tv-drawer-sub-styles-btn"
-                        title="Personalizar Estilo das Legendas"
-                        description="Ajuste tamanho, cores, sombra, fundo e posição na tela"
-                        icon={<SlidersHorizontal className="w-5 h-5" />}
-                        onClick={() => openSubtitleStyles('audio_subtitles')}
-                      />
-                    </div>
-                  </>
+                  </div>
                 )}
 
                 {/* 3. MENU DE CONFIGURAÇÕES (OPÇÕES) */}
                 {menu === 'options' && (
-                  <>
+                  <div className="space-y-4">
                     {/* Qualidade de Vídeo */}
                     <div>
-                      <DrawerSectionHeader icon={<Monitor className="w-4 h-4" />} title="Qualidade de Vídeo" />
-                      <div className="flex flex-wrap gap-2.5">
+                      <h4 className="text-sm font-semibold text-gray-200 tracking-tight mb-2">Qualidade de vídeo</h4>
+                      <div className="flex flex-wrap gap-2">
                         {props.qualities.map((q, index) => (
                           <DrawerPillChip
                             key={`quality-${q}`}
                             focusKey={`tv-player-drawer-quality-${index}`}
-                            label={q === 'auto' ? 'Automática' : q.toUpperCase()}
+                            label={q === 'auto' ? 'AUTO' : q.toUpperCase()}
                             active={props.selectedQuality === q}
                             onClick={() => {
                               uiSoundService.play('toggle', { playerControl: true });
@@ -1701,13 +1805,14 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
                       </div>
                     </div>
 
-                    {/* Comportamento de Reprodução */}
-                    <div className="space-y-3">
-                      <DrawerSectionHeader icon={<Sparkles className="w-4 h-4" />} title="Reprodução Inteligente" />
+                    <div className="h-px w-full bg-white/10" />
+
+                    {/* Switches de Reprodução */}
+                    <div className="space-y-1">
                       <DrawerToggleRow
                         focusKey="tv-player-drawer-toggle-autoplay"
-                        title="Próximo Episódio Automático"
-                        description="Inicia automaticamente o episódio seguinte ao término da reprodução"
+                        title="Reprodução automática"
+                        description="Inicia o episódio seguinte ao término"
                         enabled={props.autoPlayEnabled}
                         onToggle={() => {
                           uiSoundService.play('toggle', { playerControl: true });
@@ -1716,8 +1821,8 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
                       />
                       <DrawerToggleRow
                         focusKey="tv-player-drawer-toggle-autoskip"
-                        title="Pular Abertura e Encerramento"
-                        description="Salta aberturas e créditos automaticamente quando detectados"
+                        title="Pular Cenas"
+                        description="Salta aberturas e créditos automaticamente"
                         enabled={props.autoSkipEnabled}
                         onToggle={() => {
                           uiSoundService.play('toggle', { playerControl: true });
@@ -1726,15 +1831,16 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
                       />
                     </div>
 
+                    <div className="h-px w-full bg-white/10" />
+
                     {/* Sincronia do Pulo */}
                     <div>
-                      <DrawerSectionHeader icon={<Clock className="w-4 h-4" />} title="Sincronia do Pulo" />
                       <DrawerStepper
-                        label="Ajuste Fino de Abertura"
-                        description="Calibre o momento do pulo se a abertura cortar antes ou depois"
+                        label="Sincronia do Pulo"
+                        description="Ajuste fino do momento de saltar a abertura"
                         valueDisplay={
                           props.skipOffset === 0
-                            ? 'Padrão (0s)'
+                            ? '0s'
                             : `${props.skipOffset > 0 ? '+' : ''}${props.skipOffset}s`
                         }
                         downFocusKey="tv-player-drawer-skip-down"
@@ -1756,24 +1862,23 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
                       />
                     </div>
 
-                    {/* Atalho para Estilo das Legendas */}
-                    <div>
+                    <div className="h-px w-full bg-white/10" />
+
+                    {/* Atalhos para Estilo das Legendas e Reporte */}
+                    <div className="space-y-1">
                       <DrawerActionCard
                         focusKey="tv-player-drawer-options-substyle-btn"
                         title="Estilo das Legendas"
                         description="Tamanho da fonte, cores e posição vertical na tela"
-                        icon={<SlidersHorizontal className="w-5 h-5" />}
+                        icon={<SlidersHorizontal className="w-4 h-4" />}
                         onClick={() => openSubtitleStyles('options')}
                       />
-                    </div>
 
-                    {/* Suporte e Reporte */}
-                    <div className="pt-1">
                       <DrawerActionCard
                         focusKey="tv-player-drawer-report"
                         title="Reportar Problema Neste Título"
-                        description="Notifique a equipe se houver problemas de áudio, legenda ou vídeo"
-                        icon={<AlertTriangle className="w-5 h-5 text-amber-400" />}
+                        description="Notifique a equipe se houver problemas de áudio ou vídeo"
+                        icon={<AlertTriangle className="w-4 h-4 text-amber-400" />}
                         onClick={() => {
                           uiSoundService.play('toggle', { playerControl: true });
                           props.onReport();
@@ -1781,19 +1886,63 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
                         }}
                       />
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {/* 4. SUBMENU DE ESTILO DAS LEGENDAS */}
                 {menu === 'subtitle_styles' && (
-                  <>
-                    {/* Prévia ao Vivo */}
+                  <div className="space-y-4">
+                    {/* Prévia ao Vivo das duas linhas */}
                     <SubtitlePreviewBox size={props.subtitleSize} style={props.subtitleStyle} />
 
-                    {/* Tamanho da Legenda */}
+                    {/* CONTORNO */}
                     <div>
-                      <DrawerSectionHeader icon={<Type className="w-4 h-4" />} title="Tamanho do Texto" />
-                      <div className="flex flex-wrap gap-2.5">
+                      <span className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                        Contorno
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {SUBTITLE_OUTLINES.map((opt, index) => (
+                          <DrawerPillChip
+                            key={`sub-outline-${opt.value}`}
+                            focusKey={`tv-player-drawer-substyle-outline-${index}`}
+                            label={opt.label}
+                            active={(props.subtitleStyle.outline || 'thin') === opt.value}
+                            onClick={() => {
+                              uiSoundService.play('toggle', { playerControl: true });
+                              props.onSubtitleStyle({ outline: opt.value });
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* SOMBRA */}
+                    <div>
+                      <span className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                        Sombra
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {SUBTITLE_SHADOWS.map((shadowOpt, index) => (
+                          <DrawerPillChip
+                            key={`sub-shadow-${shadowOpt.value}`}
+                            focusKey={`tv-player-drawer-substyle-shadow-${index}`}
+                            label={shadowOpt.label}
+                            active={(props.subtitleStyle.shadow || 'strong') === shadowOpt.value}
+                            onClick={() => {
+                              uiSoundService.play('toggle', { playerControl: true });
+                              props.onSubtitleStyle({ shadow: shadowOpt.value });
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* TAMANHO DA FONTE */}
+                    <div>
+                      <span className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                        Tamanho da Fonte
+                      </span>
+                      <div className="flex flex-wrap gap-2">
                         {SUBTITLE_SIZES.map((sizeOpt, index) => (
                           <DrawerPillChip
                             key={`sub-size-${sizeOpt.value}`}
@@ -1810,17 +1959,85 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
                       </div>
                     </div>
 
-                    {/* Cor da Legenda */}
+                    {/* ESPAÇAMENTO VERTICAL (2 LINHAS) */}
                     <div>
-                      <DrawerSectionHeader icon={<Palette className="w-4 h-4" />} title="Cor do Texto" />
-                      <div className="flex flex-wrap gap-2.5">
-                        {SUBTITLE_COLORS.map((col, index) => (
+                      <span className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                        Espaçamento Vertical (2 Linhas)
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {SUBTITLE_SPACINGS.map((spOpt, index) => (
                           <DrawerPillChip
+                            key={`sub-spacing-${spOpt.value}`}
+                            focusKey={`tv-player-drawer-substyle-spacing-${index}`}
+                            label={spOpt.label}
+                            active={(props.subtitleStyle.lineSpacing || 'normal') === spOpt.value}
+                            onClick={() => {
+                              uiSoundService.play('toggle', { playerControl: true });
+                              props.onSubtitleStyle({ lineSpacing: spOpt.value });
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* POSIÇÃO VERTICAL */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                          Posição Vertical
+                        </span>
+                        <span className="text-xs font-bold text-sky-400">
+                          {props.subtitlePosition}%
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <DrawerStepperButton
+                          focusKey="tv-player-drawer-substyle-pos-down"
+                          label="Descer Legenda"
+                          onClick={() => {
+                            uiSoundService.play('click', { playerControl: true });
+                            props.onSubtitlePosition(Math.max(4, props.subtitlePosition - 5));
+                          }}
+                        >
+                          Descer (-5%)
+                        </DrawerStepperButton>
+                        <DrawerStepperButton
+                          focusKey="tv-player-drawer-substyle-pos-up"
+                          label="Subir Legenda"
+                          onClick={() => {
+                            uiSoundService.play('click', { playerControl: true });
+                            props.onSubtitlePosition(Math.min(35, props.subtitlePosition + 5));
+                          }}
+                        >
+                          Subir (+5%)
+                        </DrawerStepperButton>
+                        <DrawerStepperButton
+                          focusKey="tv-player-drawer-substyle-pos-reset"
+                          label="Restaurar"
+                          onClick={() => {
+                            uiSoundService.play('toggle', { playerControl: true });
+                            props.onSubtitlePosition(10);
+                          }}
+                          isSecondary
+                        >
+                          Restaurar
+                        </DrawerStepperButton>
+                      </div>
+                    </div>
+
+                    {/* COR DO TEXTO */}
+                    <div>
+                      <span className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                        Cor do Texto
+                      </span>
+                      <div className="flex items-center gap-3">
+                        {SUBTITLE_COLORS.map((col, index) => (
+                          <DrawerColorChip
                             key={`sub-color-${col.value}`}
                             focusKey={`tv-player-drawer-substyle-color-${index}`}
+                            color={col.value}
                             label={col.label}
-                            colorSwatch={col.value}
-                            active={props.subtitleStyle.color === col.value}
+                            active={(props.subtitleStyle.color || '#FFFFFF').toUpperCase() === col.value.toUpperCase()}
                             onClick={() => {
                               uiSoundService.play('toggle', { playerControl: true });
                               props.onSubtitleStyle({ color: col.value });
@@ -1830,35 +2047,18 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
                       </div>
                     </div>
 
-                    {/* Sombra / Realce */}
+                    {/* FUNDO */}
                     <div>
-                      <DrawerSectionHeader icon={<Sparkles className="w-4 h-4" />} title="Sombra e Contorno" />
-                      <div className="flex flex-wrap gap-2.5">
-                        {SUBTITLE_SHADOWS.map((shadowOpt, index) => (
-                          <DrawerPillChip
-                            key={`sub-shadow-${shadowOpt.value}`}
-                            focusKey={`tv-player-drawer-substyle-shadow-${index}`}
-                            label={shadowOpt.label}
-                            active={props.subtitleStyle.shadow === shadowOpt.value}
-                            onClick={() => {
-                              uiSoundService.play('toggle', { playerControl: true });
-                              props.onSubtitleStyle({ shadow: shadowOpt.value });
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Fundo da Faixa */}
-                    <div>
-                      <DrawerSectionHeader icon={<Monitor className="w-4 h-4" />} title="Fundo da Faixa" />
-                      <div className="flex flex-wrap gap-2.5">
+                      <span className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                        Fundo
+                      </span>
+                      <div className="flex flex-wrap gap-2">
                         {SUBTITLE_BG_COLORS.map((bgOpt, index) => (
                           <DrawerPillChip
                             key={`sub-bg-${bgOpt.value}`}
                             focusKey={`tv-player-drawer-substyle-bg-${index}`}
                             label={bgOpt.label}
-                            active={props.subtitleStyle.bgColor === bgOpt.value}
+                            active={(props.subtitleStyle.bgColor || 'semi') === bgOpt.value}
                             onClick={() => {
                               uiSoundService.play('toggle', { playerControl: true });
                               props.onSubtitleStyle({ bgColor: bgOpt.value });
@@ -1867,54 +2067,14 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
                         ))}
                       </div>
                     </div>
-
-                    {/* Posição Vertical */}
-                    <div>
-                      <DrawerSectionHeader icon={<MoveVertical className="w-4 h-4" />} title="Posição Vertical" />
-                      <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="text-base font-bold text-gray-100 tracking-tight">Altura na Tela</h4>
-                            <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
-                              Afastamento a partir da borda inferior
-                            </p>
-                          </div>
-                          <span className="text-sm font-extrabold text-cyan-300 bg-cyan-500/10 px-3 py-1 rounded-lg border border-cyan-400/30">
-                            {props.subtitlePosition}%
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 pt-1">
-                          <DrawerStepperButton
-                            focusKey="tv-player-drawer-substyle-pos-down"
-                            label="Descer Legenda"
-                            onClick={() => {
-                              uiSoundService.play('click', { playerControl: true });
-                              props.onSubtitlePosition(Math.max(4, props.subtitlePosition - 5));
-                            }}
-                          >
-                            Descer (-5%)
-                          </DrawerStepperButton>
-                          <DrawerStepperButton
-                            focusKey="tv-player-drawer-substyle-pos-up"
-                            label="Subir Legenda"
-                            onClick={() => {
-                              uiSoundService.play('click', { playerControl: true });
-                              props.onSubtitlePosition(Math.min(35, props.subtitlePosition + 5));
-                            }}
-                          >
-                            Subir (+5%)
-                          </DrawerStepperButton>
-                        </div>
-                      </div>
-                    </div>
-                  </>
+                  </div>
                 )}
               </div>
 
               {/* RODAPÉ DO DRAWER */}
-              <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-gray-400 shrink-0">
+              <div className="pt-2 border-t border-white/10 flex items-center justify-between text-xs text-gray-400 shrink-0">
                 <span className="font-semibold text-gray-300">ZapiTV Cinema</span>
-                <span>OK confirma seleção · Voltar retorna</span>
+                <span>OK confirma · Voltar retorna</span>
               </div>
             </div>
           </div>

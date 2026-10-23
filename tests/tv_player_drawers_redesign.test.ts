@@ -71,13 +71,19 @@ const controlsSource = fs.readFileSync(
 
 // Verifica existência dos novos componentes modulares e elegantes
 assert.ok(controlsSource.includes('DrawerIconButton'), 'Deve conter DrawerIconButton');
+assert.ok(controlsSource.includes('DrawerHeaderButton'), 'Deve conter DrawerHeaderButton');
 assert.ok(controlsSource.includes('DrawerSectionHeader'), 'Deve conter DrawerSectionHeader');
 assert.ok(controlsSource.includes('DrawerPillChip'), 'Deve conter DrawerPillChip');
+assert.ok(controlsSource.includes('DrawerColorChip'), 'Deve conter DrawerColorChip');
 assert.ok(controlsSource.includes('DrawerToggleRow'), 'Deve conter DrawerToggleRow');
 assert.ok(controlsSource.includes('DrawerEpisodeCard'), 'Deve conter DrawerEpisodeCard');
 assert.ok(controlsSource.includes('DrawerActionCard'), 'Deve conter DrawerActionCard');
 assert.ok(controlsSource.includes('DrawerStepper'), 'Deve conter DrawerStepper');
 assert.ok(controlsSource.includes('SubtitlePreviewBox'), 'Deve conter SubtitlePreviewBox');
+
+// Verifica largura calibrada e degradê suave do overlay lateral conforme referências visuais
+assert.ok(controlsSource.includes('w-[min(480px,38vw)]'), 'Largura do drawer deve ser calibrada em w-[min(480px,38vw)] para manter vídeo dominante');
+assert.ok(controlsSource.includes('bg-gradient-to-l from-black/95'), 'Drawer deve usar degradê suave da direita para a esquerda');
 
 // Verifica suporte aos 4 menus laterais
 assert.ok(controlsSource.includes("'audio_subtitles' | 'episodes' | 'options' | 'subtitle_styles'"), 'TvMenuType deve incluir subtitle_styles');
@@ -137,11 +143,16 @@ console.log('✓ Configurações organizadas com switches modernos, chips de qua
 // -----------------------------------------------------------------------------
 console.log('\n[Teste 6] Verificação do Submenu de Estilo das Legendas...');
 assert.ok(controlsSource.includes('SubtitlePreviewBox'), 'Deve renderizar caixa de pré-visualização ao vivo');
-assert.ok(controlsSource.includes('tv-player-drawer-substyle-size-'), 'Tamanho da legenda em pills');
-assert.ok(controlsSource.includes('tv-player-drawer-substyle-color-'), 'Cores da legenda com swatches');
+assert.ok(controlsSource.includes('Primeira linha de legenda'), 'Pré-visualização deve conter primeira linha de exemplo');
+assert.ok(controlsSource.includes('Segunda linha com espaçamento'), 'Pré-visualização deve conter segunda linha de exemplo');
+assert.ok(controlsSource.includes('tv-player-drawer-substyle-outline-'), 'Contorno da legenda em pills');
 assert.ok(controlsSource.includes('tv-player-drawer-substyle-shadow-'), 'Sombras da legenda em pills');
+assert.ok(controlsSource.includes('tv-player-drawer-substyle-size-'), 'Tamanho da legenda em pills');
+assert.ok(controlsSource.includes('tv-player-drawer-substyle-spacing-'), 'Espaçamento vertical de linhas em pills');
+assert.ok(controlsSource.includes('tv-player-drawer-substyle-color-'), 'Cores da legenda com swatches circulares');
 assert.ok(controlsSource.includes('tv-player-drawer-substyle-bg-'), 'Fundo da legenda em pills');
 assert.ok(controlsSource.includes('tv-player-drawer-substyle-pos-down') && controlsSource.includes('tv-player-drawer-substyle-pos-up'), 'Posição vertical em stepper');
+assert.ok(controlsSource.includes('tv-player-drawer-substyle-pos-reset'), 'Posição vertical deve permitir restaurar padrão');
 assert.ok(controlsSource.includes('tv-drawer-back-btn'), 'Cabeçalho do submenu deve conter botão voltar');
 console.log('✓ Submenu de estilos de legenda com pré-visualização em tempo real e seletores elegantes.');
 
