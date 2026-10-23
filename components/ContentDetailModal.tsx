@@ -281,6 +281,22 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     return () => { active = false; };
   }, [item.id, item.canonicalId, item.imdbId, item.tmdbId, item.aniListId,
     item.title, item.type, item.mediaFormat, currentSeason, currentEpisodeParams?.episode, hasEpisodes]);
+
+  // Referência perfeitamente estável do objeto item passado ao player para eliminar loops e re-renderizações desnecessárias
+  const stablePlayerItem = useMemo(() => {
+    if (item.episodes && item.episodes.length > 0) return item;
+    if (episodes && episodes.length > 0) {
+      return {
+        ...item,
+        episodes: episodes.map(e => ({
+          ...e,
+          season: (e as any).season ?? currentSeason
+        }))
+      };
+    }
+    return item;
+  }, [item.id, item.title, item.type, item.mediaFormat, item.episodes, episodes, currentSeason]);
+
   const verifiedStreamsForPlayer = useMemo(() => prioritizeRememberedSources(
     (item.verifiedStreams || []).map(source => ({ ...source, providerId: source.providerId || 'zapitv-verified' })),
     rememberedSources,
@@ -1073,7 +1089,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
           <Suspense fallback={<div className="fixed inset-0 z-[500] bg-black flex items-center justify-center"><ZapiLoader size="lg" /></div>}>
             <ZapiPlayer 
               key={hasEpisodes ? `${item.id}_s${currentEpisodeParams?.season || 1}_e${currentEpisodeParams?.episode || 1}` : item.id}
-              item={item.episodes?.length ? item : (episodes.length ? { ...item, episodes: episodes.map(e => ({ ...e, season: (e as any).season ?? currentSeason })) } : item)} 
+              item={stablePlayerItem} 
               streams={resolvedStreams} 
               isLoadingStreams={isLoadingStreams}
               streamResolutionError={streamResolutionError}

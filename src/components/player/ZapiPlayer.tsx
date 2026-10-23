@@ -336,6 +336,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Continuidade de reprodução entre trocas de stream, qualidade, áudio e recarga de página
   const targetResumeTimeRef = useRef<number>(0);
   const isInitialTimeAppliedRef = useRef<boolean>(false);
+  const lastRestoredContentKeyRef = useRef<string | null>(null);
+  const validatedStreamUrlsRef = useRef<Set<string>>(new Set());
+  const itemRef = useRef(item);
+  itemRef.current = item;
   const isHandlingRemoteSyncRef = useRef<boolean>(false);
   const lastHostBroadcastTimeRef = useRef<number>(0);
 
@@ -552,6 +556,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     // Atualiza imediatamente o estado para que a UI e os botões respondam em tempo real
     setCurrentTime(clampedTime);
     latestProgressRef.current = { currentTime: clampedTime, duration: duration || 0 };
+
+    // Limpa targetResumeTimeRef para que nenhum buffer pendente anule o seek do usuário
+    targetResumeTimeRef.current = 0;
+    isInitialTimeAppliedRef.current = true;
 
     if (video) {
       try {
@@ -1488,19 +1496,26 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     };
   }, [showAudioMenu, showQualityMenu, showSubtitlesMenu, showStyleEditor, closeAllInteractiveMenus]);
 
-  // Carrega e restaura a posição salva (específica do episódio ou filme)
+  // Carrega e restaura a posição salva (específica do episódio ou filme) — Executa apenas 1 vez por mídia
   useEffect(() => {
+    const currentKey = `${item?.id || ''}_s${initialSeason ?? 0}_e${initialEpisode ?? 0}`;
+    if (lastRestoredContentKeyRef.current === currentKey) {
+      return;
+    }
+    lastRestoredContentKeyRef.current = currentKey;
     isInitialTimeAppliedRef.current = false;
+
     let savedTime = 0;
     let dur = 0;
+    const activeItem = itemRef.current;
     if (initialSeason !== undefined && initialEpisode !== undefined) {
-      const epProgress = storageService.resolveEpisodeWatchProgress(item, initialSeason, initialEpisode);
+      const epProgress = storageService.resolveEpisodeWatchProgress(activeItem, initialSeason, initialEpisode);
       if (epProgress) {
         savedTime = epProgress.currentTime;
         dur = epProgress.duration;
       }
     } else {
-      const itemProg = storageService.resolveWatchProgress(item);
+      const itemProg = storageService.resolveWatchProgress(activeItem);
       if (itemProg) {
         savedTime = itemProg.currentTime;
         dur = itemProg.duration;
@@ -1536,6 +1551,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         try {
           videoRef.current.currentTime = savedTime;
           isInitialTimeAppliedRef.current = true;
+          targetResumeTimeRef.current = 0;
         } catch {
           // ignore
         }
@@ -1543,7 +1559,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     } else {
       targetResumeTimeRef.current = 0;
     }
-  }, [item, initialSeason, initialEpisode, initialResumeTime]);
+  }, [item?.id, initialSeason, initialEpisode, initialResumeTime]);
 
   // Aplica com precisão a posição salva quando o player carrega ou troca de fonte/qualidade/áudio
   const applyTargetResumeTime = useCallback(() => {
@@ -1561,6 +1577,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           video.currentTime = target;
         }
         isInitialTimeAppliedRef.current = true;
+        // Consome targetResumeTimeRef imediatamente para eliminar seeks repetitivos em buffers subsequentes
+        targetResumeTimeRef.current = 0;
       } catch (e) {
         console.warn('Erro ao restaurar posição do vídeo:', e);
       }
@@ -1587,10 +1605,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       return;
     }
 
-    if (cur > 0 && dur > 0 && !isNaN(dur)) {
+    const activeItem = itemRef.current;
+    if (cur > 0 && dur > 0 && !isNaN(dur) && activeItem?.id) {
       storageService.saveProgress({
-        contentId: item.id,
-        item,
+        contentId: activeItem.id,
+        item: activeItem,
         season: initialSeason,
         episode: initialEpisode,
         currentTime: cur,
@@ -1603,7 +1622,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         onUpdatePlaybackPosition(cur);
       }
     }
-  }, [item, initialSeason, initialEpisode, onUpdatePlaybackPosition]);
+  }, [item?.id, initialSeason, initialEpisode, onUpdatePlaybackPosition]);
 
   // Picture-in-Picture event listeners e sincronização de legendas nativas
   useEffect(() => {
@@ -1671,11 +1690,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Media Session API para controles nativos no PiP e Windows Media Flyout
   useEffect(() => {
     const video = videoRef.current;
+    const activeItem = itemRef.current;
     pipService.updateMediaSession({
-      title: item.title,
+      title: activeItem.title,
       artist: 'ZapiTV',
-      album: initialSeason && initialEpisode ? `Temporada ${initialSeason} · Ep. ${initialEpisode}` : (item.type || 'Filme'),
-      artworkUrl: item.backdrop || item.image,
+      album: initialSeason && initialEpisode ? `Temporada ${initialSeason} · Ep. ${initialEpisode}` : (activeItem.type || 'Filme'),
+      artworkUrl: activeItem.backdrop || activeItem.image,
       duration,
       currentTime,
       isPlaying,
@@ -1686,7 +1706,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       },
       onNextEpisode: (nextEpisodeInfo && onNextEpisode) ? onNextEpisode : undefined
     });
-  }, [item, initialSeason, initialEpisode, duration, currentTime, isPlaying, nextEpisodeInfo, onNextEpisode]);
+  }, [item?.id, item?.title, initialSeason, initialEpisode, duration, currentTime, isPlaying, nextEpisodeInfo, onNextEpisode]);
 
   // Periodic save of watch progress (every 4 seconds) & flush on unmount
   useEffect(() => {
@@ -2071,7 +2091,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
     const fetchSubs = async () => {
       try {
-        const list = await subtitleService.fetchSubtitles(item, initialSeason, initialEpisode, currentStream);
+        const list = await subtitleService.fetchSubtitles(itemRef.current, initialSeason, initialEpisode, currentStream);
         if (active) {
           setSubtitlesList(list);
         }
@@ -2085,7 +2105,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     };
     fetchSubs();
     return () => { active = false; };
-  }, [item, initialSeason, initialEpisode, currentStream]);
+  }, [item?.id, item?.imdbId, item?.tmdbId, initialSeason, initialEpisode, currentStream?.url]);
 
   // Aplicação estrita da preferência do usuário de legendas (Requisitos 1 a 10):
   useEffect(() => {
@@ -2304,7 +2324,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     } else {
       setAvailableQualities(['auto', ...sorted]);
     }
-  }, [currentStream, streams, selectedStreamIndex, ORDERED_QUALITIES, item, activeAudioId]);
+  }, [currentStream?.url, streams, selectedStreamIndex, ORDERED_QUALITIES, item?.id, activeAudioId]);
 
   // Se a qualidade selecionada não existir mais após troca de fonte/idioma, redefine para 'auto'
   useEffect(() => {
@@ -2341,15 +2361,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
     triedIndicesRef.current.add(selectedStreamIndex);
 
+    const activeItem = itemRef.current;
     // Invalida a fonte com falha no serviço centralizado de validação
-    if (currentStream?.url && item?.id &&
+    if (currentStream?.url && activeItem?.id &&
         !/buffer|rede|network|timeout|tempo limite|stagn|estagn|sem progresso|recupera|HTTP 429|HTTP 5\d\d/i.test(reason)) {
       try {
-        mediaSourceValidationService.invalidateSource(item.id, currentStream.url, reason);
+        mediaSourceValidationService.invalidateSource(activeItem.id, currentStream.url, reason);
       } catch {}
     }
 
-    const originalLanguage = audioSelectionManager.detectOriginalLanguage(item);
+    const originalLanguage = audioSelectionManager.detectOriginalLanguage(activeItem);
     const currentLanguage = currentStream
       ? audioSelectionManager.inspectStreamAudioLanguage(currentStream, originalLanguage) : 'unknown';
     const requiredLanguage = activeAudioId?.startsWith('stream-')
@@ -2401,6 +2422,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
       if (positionBeforeCleanup > 0) {
         targetResumeTimeRef.current = positionBeforeCleanup;
+        isInitialTimeAppliedRef.current = false;
       }
 
       // Se a fonte falhar durante uma tentativa de troca de áudio, reverte o áudio ativo
@@ -2435,18 +2457,18 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         setErrorMessage('Não foi possível reproduzir este conteúdo agora. Tente novamente mais tarde.');
       }
       try {
-        if (mediaAvailabilityIndex && item) {
+        if (mediaAvailabilityIndex && activeItem) {
           mediaAvailabilityIndex.markTemporaryError(
-            mediaAvailabilityIndex.getCanonicalKey(item),
-            item.type === ContentType.MOVIE || item.mediaFormat === 'movie' ? 'movie' :
-              (item.type === ContentType.ANIME ? 'anime' : 'series'),
+            mediaAvailabilityIndex.getCanonicalKey(activeItem),
+            activeItem.type === ContentType.MOVIE || activeItem.mediaFormat === 'movie' ? 'movie' :
+              (activeItem.type === ContentType.ANIME ? 'anime' : 'series'),
             'Todas as fontes compatíveis com a obra falharam temporariamente na reprodução',
             [],
             false
           );
         }
-        if (item) {
-          providerRegistry.invalidateCache(item);
+        if (activeItem) {
+          providerRegistry.invalidateCache(activeItem);
         }
       } catch (availabilityErr) {
         console.warn('[ZapiPlayer] Falha ao registrar status temporário de disponibilidade:', availabilityErr);
@@ -2460,7 +2482,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         } catch {}
       }
     }
-  }, [selectedStreamIndex, streams, isLoadingStreams, currentStream, item, activeAudioId, allSourcesFailed, hasUserConfirmedNonDubbed, loadingTraceId]);
+  }, [selectedStreamIndex, streams, isLoadingStreams, currentStream?.url, item?.id, activeAudioId, allSourcesFailed, hasUserConfirmedNonDubbed, loadingTraceId]);
+
+  const handleStreamFallbackRef = useRef(handleStreamFallback);
+  useEffect(() => {
+    handleStreamFallbackRef.current = handleStreamFallback;
+  }, [handleStreamFallback]);
 
   // Monitor loading of streams from parent modal
   useEffect(() => {
@@ -2567,16 +2594,17 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (isBroadcastGuest || isLoadingStreams || !currentStream?.url) return;
     triedIndicesRef.current.add(selectedStreamIndex);
 
+    const activeItem = itemRef.current;
     // Validação estrita de correspondência de identidade da obra e episódio (Impede obras trocadas)
     try {
-      const canonicalIdentity = canonicalIdentityService.buildIdentity(item, {
+      const canonicalIdentity = canonicalIdentityService.buildIdentity(activeItem, {
         season: initialSeason,
         episode: initialEpisode
       });
       const confidence = sourceConfidenceEngine.evaluate(currentStream, canonicalIdentity);
       if (!confidence.isMatch) {
-        console.warn(`[ZapiPlayer] Fonte rejeitada por incompatibilidade com ${item.title}: ${confidence.reasons.join(', ')}`);
-        handleStreamFallback(`Fonte não corresponde à obra solicitada (${confidence.reasons.join(', ') || 'incompatível'}).`);
+        console.warn(`[ZapiPlayer] Fonte rejeitada por incompatibilidade com ${activeItem?.title}: ${confidence.reasons.join(', ')}`);
+        handleStreamFallbackRef.current(`Fonte não corresponde à obra solicitada (${confidence.reasons.join(', ') || 'incompatível'}).`);
         return;
       }
     } catch (idErr) {
@@ -2584,53 +2612,53 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
 
     // 0. Quarentena de integridade de conteúdo e termos adultos
-    const quarantine = streamQuarantineService.evaluateQuarantine(currentStream, item?.title);
+    const quarantine = streamQuarantineService.evaluateQuarantine(currentStream, activeItem?.title);
     if (quarantine.isQuarantined) {
-      handleStreamFallback(`Fonte isolada por segurança (${quarantine.reason}).`);
+      handleStreamFallbackRef.current(`Fonte isolada por segurança (${quarantine.reason}).`);
       return;
     }
 
     // 1. Domínio na lista de bloqueio/estacionamento
     if (streamValidator.isUrlBlacklisted(currentStream.url)) {
-      handleStreamFallback('Domínio na lista de bloqueio/estacionamento.');
+      handleStreamFallbackRef.current('Domínio na lista de bloqueio/estacionamento.');
       return;
     }
 
     // 2. Bloqueio prévio por propaganda/apostas embutidas (1xBet / Casas de Aposta)
     if (videoAdBlocker.isStreamBlocked(currentStream.url)) {
-      handleStreamFallback('Fonte bloqueada por propaganda embutida no vídeo (1xBet / Apostas).');
+      handleStreamFallbackRef.current('Fonte bloqueada por propaganda embutida no vídeo (1xBet / Apostas).');
       return;
     }
 
-    const adEval = videoAdBlocker.evaluateStream(currentStream, item?.title, initialSeason, initialEpisode);
+    const adEval = videoAdBlocker.evaluateStream(currentStream, activeItem?.title, initialSeason, initialEpisode);
     if (adEval.status === 'bloqueado por propaganda embutida') {
-      handleStreamFallback(`Fonte rejeitada por propaganda embutida (${adEval.reason}).`);
+      handleStreamFallbackRef.current(`Fonte rejeitada por propaganda embutida (${adEval.reason}).`);
       return;
     }
+
+    if (validatedStreamUrlsRef.current.has(currentStream.url)) {
+      return;
+    }
+    validatedStreamUrlsRef.current.add(currentStream.url);
 
     let isMounted = true;
     streamValidator.validateStream(currentStream, 6000).then((res) => {
       if (!isMounted) return;
       // Falhas definitivas: motor Stremio ausente, erros de servidor (502, 503), erros de cliente (401, 403, 404, 410) ou páginas HTML
       if (!res.valid && (res.requiresEngine || res.isParked || [401, 403, 404, 410, 500, 502, 503].includes(res.status || 0) || /resposta html/i.test(res.reason || ''))) {
-        handleStreamFallback(res.reason || 'A fonte não retornou um arquivo de vídeo válido.');
+        handleStreamFallbackRef.current(res.reason || 'A fonte não retornou um arquivo de vídeo válido.');
       }
     }).catch(() => {});
 
     return () => {
       isMounted = false;
     };
-  }, [selectedStreamIndex, currentStream, handleStreamFallback, isLoadingStreams, item, initialSeason, initialEpisode]);
+  }, [selectedStreamIndex, currentStream?.url, isLoadingStreams, item?.id, initialSeason, initialEpisode]);
 
   const markMediaAsReadyRef = useRef(markMediaAsReady);
   useEffect(() => {
     markMediaAsReadyRef.current = markMediaAsReady;
   }, [markMediaAsReady]);
-
-  const handleStreamFallbackRef = useRef(handleStreamFallback);
-  useEffect(() => {
-    handleStreamFallbackRef.current = handleStreamFallback;
-  }, [handleStreamFallback]);
 
   // Seleciona a faixa de áudio HLS correspondente à preferência do usuário (PT-BR, JA, EN, ES)
   const pickMatchingHlsAudioTrack = (
@@ -3754,6 +3782,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           const video = videoRef.current;
           const resumeTime = video && video.currentTime > 0 ? video.currentTime : currentTime;
           targetResumeTimeRef.current = resumeTime;
+          isInitialTimeAppliedRef.current = false;
           setIsSwitchingAudio(true);
           previousStreamIndexRef.current = selectedStreamIndex;
           setSelectedStreamIndex(targetIndex);
@@ -3766,6 +3795,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         const video = videoRef.current;
         const resumeTime = video && video.currentTime > 0 ? video.currentTime : currentTime;
         targetResumeTimeRef.current = resumeTime;
+        isInitialTimeAppliedRef.current = false;
         setIsSwitchingAudio(true);
         previousStreamIndexRef.current = selectedStreamIndex;
         setSelectedStreamIndex(0);
@@ -3777,14 +3807,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const availableAudioOptions = useMemo<AudioOption[]>(() => {
     if (allSourcesFailed) return [];
     return audioSelectionManager.buildAudioOptions({
-      item,
+      item: itemRef.current,
       streams,
       hlsTracks: hlsAudioTracks,
       currentStreamIndex: selectedStreamIndex,
       activeAudioId,
       selectedHlsTrackId: selectedHlsAudioTrack
     });
-  }, [allSourcesFailed, item, streams, hlsAudioTracks, selectedStreamIndex, activeAudioId, selectedHlsAudioTrack]);
+  }, [allSourcesFailed, item?.id, (item as any)?.originalLanguage, streams, hlsAudioTracks, selectedStreamIndex, activeAudioId, selectedHlsAudioTrack]);
 
   const handleSelectAudio = (opt: AudioOption) => {
     setShowAudioMenu(false);
@@ -3816,6 +3846,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
       if (lastTime > 0) {
         targetResumeTimeRef.current = lastTime;
+        isInitialTimeAppliedRef.current = false;
       }
 
       // 2. Comutar stream index e definir o ID da opção solicitada
