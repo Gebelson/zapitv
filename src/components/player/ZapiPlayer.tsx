@@ -42,7 +42,7 @@ import { createPlaybackConfirmationState, observePlayback } from '../../core/tra
 import { mediaSourceValidationService } from '../../core/providers/mediaSourceValidationService';
 import { reportSourceEvidence, sourceReference, startSourceEvidence } from '../../core/providers/sourceMemory';
 import { audioSelectionManager, AudioOption } from '../../core/audio/audioSelectionManager';
-import { playbackOptimizerService } from '../../core/playback/PlaybackOptimizerService';
+import { decideTvStallAction, playbackOptimizerService } from '../../core/playback/PlaybackOptimizerService';
 import { mediaAvailabilityIndex } from '../../core/catalog/MediaAvailabilityIndex';
 import { watchPartyService } from '../../core/watchparty/WatchPartyService';
 import { uiSoundService } from '../../core/audio/uiSoundService';
@@ -52,6 +52,7 @@ import { RoomLifecycleState, TransmissionMode } from '../../core/watchparty/watc
 import { VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../../core/providers/sourceVerificationService';
 import { tvModeService } from '../../core/tv/tvModeService';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
+import { TvPlayerControls } from './TvPlayerControls';
 import { mobileFullscreenService, MobileFullscreenState } from '../../core/mobile/mobileFullscreenService';
 
 export interface NextEpisodeInfo {
@@ -152,6 +153,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   onUpdatePlaybackPosition
 }) => {
   useEffect(() => uiSoundService.beginPlayback(), []);
+  const isTvPlayback = typeof window !== 'undefined' && window.location.pathname.startsWith('/tv');
   const [selectedStreamIndex, setSelectedStreamIndex] = useState(0);
   const currentStream = streams[selectedStreamIndex] || streams[0];
   const sourceEvidenceRef = useRef<{
@@ -451,8 +453,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const selectedHlsAudioTrackRef = useRef<number>(-1);
   const stallTimerRef = useRef<number>(0);
   const tvBufferingSinceRef = useRef<number>(0);
+  const tvNetworkProgressAtRef = useRef<number>(0);
+  const tvRecoveryAttemptedRef = useRef(false);
   const lastPlaybackPositionRef = useRef<number>(0);
   const audioCheckTicksRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (isTvPlayback) playbackOptimizerService.resetTelemetry();
+  }, [isTvPlayback, item.id, initialSeason, initialEpisode]);
 
   // Skip Times state (AniSkip & IntroDB)
   const [skipIntervals, setSkipIntervals] = useState<SkipInterval[]>([]);
@@ -1245,6 +1253,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   // UI states
   const [showControls, setShowControls] = useState(true);
+  const [tvInteractionActive, setTvInteractionActive] = useState(false);
   const [showAudioMenu, setShowAudioMenu] = useState(false);
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [showSubtitlesMenu, setShowSubtitlesMenu] = useState(false);
@@ -1359,6 +1368,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   const shouldKeepControlsVisible = Boolean(
     hasOpenMenu ||
+    (isTvPlayback && tvInteractionActive) ||
     !isPlaying ||
     isLoading
   );
@@ -1394,8 +1404,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         setIsCursorVisible(false);
         setShowControls(false);
       }
-    }, 2000);
-  }, [handlePlayerUserInteraction]);
+    }, isTvPlayback ? 8000 : 2000);
+  }, [handlePlayerUserInteraction, isTvPlayback]);
 
   const handleMouseLeave = useCallback(() => {
     // Se houver menu aberto ou reprodução pausada/interação ativa, NUNCA esconde controles ou cursor ao sair com o mouse
@@ -2299,7 +2309,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (selectedQuality !== 'auto' && availableQualities.length > 0 && !availableQualities.includes(selectedQuality)) {
       setSelectedQuality('auto');
       if (hlsRef.current) {
-        hlsRef.current.currentLevel = -1;
+        if (isTvPlayback) hlsRef.current.nextLevel = -1;
+        else hlsRef.current.currentLevel = -1;
       }
     }
   }, [availableQualities, selectedQuality]);
@@ -2312,6 +2323,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (isLoadingStreams) return;
     if (isSwitchingStreamRef.current) return;
     isSwitchingStreamRef.current = true;
+    if (isTvPlayback) playbackOptimizerService.recordTvPlaybackEvent('source_fallback');
+    // Capture the exact position before removing src: video.load() resets currentTime.
+    const positionBeforeCleanup = videoRef.current?.currentTime || latestProgressRef.current.currentTime || 0;
     playbackConfirmationRef.current = createPlaybackConfirmationState();
     if (loadingTraceId) mediaLoadingTracker.recordEvent(loadingTraceId, 'SOURCE_VALIDATION',
       'ZapiPlayer', 'FAILED', undefined, classifyPlaybackError(reason), reason);
@@ -2326,7 +2340,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     triedIndicesRef.current.add(selectedStreamIndex);
 
     // Invalida a fonte com falha no serviço centralizado de validação
-    if (currentStream?.url && item?.id) {
+    if (currentStream?.url && item?.id &&
+        !/buffer|rede|network|timeout|tempo limite|stagn|estagn|sem progresso|recupera|HTTP 429|HTTP 5\d\d/i.test(reason)) {
       try {
         mediaSourceValidationService.invalidateSource(item.id, currentStream.url, reason);
       } catch {}
@@ -2377,15 +2392,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
 
     if (nextCandidate) {
+      if (isTvPlayback) playbackOptimizerService.recordTvSourceSwitch();
       const candidateIndex = nextCandidate.idx;
       setHasError(false);
       setIsLoading(true);
 
-      const lastTime = (videoRef.current && videoRef.current.currentTime > 0)
-        ? videoRef.current.currentTime
-        : (latestProgressRef.current.currentTime || 0);
-      if (lastTime > 0) {
-        targetResumeTimeRef.current = lastTime;
+      if (positionBeforeCleanup > 0) {
+        targetResumeTimeRef.current = positionBeforeCleanup;
       }
 
       // Se a fonte falhar durante uma tentativa de troca de áudio, reverte o áudio ativo
@@ -2676,6 +2689,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     setIsMediaReady(false);
     isMediaReadyRef.current = false;
     tvBufferingSinceRef.current = 0;
+    tvNetworkProgressAtRef.current = Date.now();
+    tvRecoveryAttemptedRef.current = false;
 
     const video = videoRef.current;
     if (!video) return;
@@ -2687,6 +2702,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
     const videoUrl = currentStream.url;
     const isTvPlayback = window.location.pathname.startsWith('/tv');
+    const sourceLoadStartedAt = performance.now();
     // FrostStream publishes direct media URLs for clients without a Referer.
     // Its redirect returns 403 for this site's Referer, while the same video
     // plays normally when the browser omits it. Scope the policy to this source.
@@ -2716,15 +2732,18 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       handleStreamFallbackRef.current(phaseReason);
     };
 
-    // 1. Timeout de inicialização/metadados (8s): se os metadados ou manifest demorarem demais
+    const onNetworkProgress = () => { tvNetworkProgressAtRef.current = Date.now(); };
+    video.addEventListener('progress', onNetworkProgress);
+
+    // TV sources may need more than 8s for the first manifest/segment.
     initTimer = setTimeout(() => {
-      triggerAttemptFallback('Tempo limite de obtenção dos metadados esgotado (8s)');
-    }, 8000);
+      triggerAttemptFallback('Tempo limite de obtenção dos metadados esgotado.');
+    }, isTvPlayback ? 15000 : 8000);
 
     // Watchdog de segurança geral por fonte (15s): proteção se nenhum dado for armazenado em buffer
     watchdogTimer = setTimeout(() => {
       triggerAttemptFallback('Tempo limite total de resposta do stream esgotado (15s)');
-    }, 15000);
+    }, isTvPlayback ? 30000 : 15000);
 
     const onMetadataReceived = () => {
       if (initTimer) {
@@ -2735,7 +2754,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       if (!segmentTimer && !isMediaReadyRef.current) {
         segmentTimer = setTimeout(() => {
           triggerAttemptFallback('Tempo limite ao aguardar primeiro segmento de vídeo (10s)');
-        }, 10000);
+        }, isTvPlayback ? 20000 : 10000);
       }
     };
 
@@ -2755,12 +2774,19 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       markMediaAsReadyRef.current();
     };
 
-    if (videoUrl.includes('.m3u8') && Hls.isSupported()) {
+    const nativeHlsSupported = Boolean(video.canPlayType('application/vnd.apple.mpegurl'));
+    // Explicit A/B switch for diagnostics only; never persist an unverified TV choice.
+    const testNativeHls = isTvPlayback && new URLSearchParams(window.location.search).get('tvdiag') === '1' &&
+      new URLSearchParams(window.location.search).get('tvhls') === 'native' && nativeHlsSupported;
+    if (videoUrl.includes('.m3u8') && Hls.isSupported() && !testNativeHls) {
       playbackOptimizerService.notifyLoadStart('hls');
+      if (isTvPlayback) playbackOptimizerService.recordTvHlsMethod('hls.js');
       const optimalConfig = playbackOptimizerService.buildOptimalHlsConfig();
       const hls = new Hls(optimalConfig);
       let fatalNetworkRecoveries = 0;
       let fatalMediaRecoveries = 0;
+      let lastFatalNetworkAt = 0;
+      let lastFatalMediaAt = 0;
       let fatalFallbackStarted = false;
 
       hlsRef.current = hls;
@@ -2831,25 +2857,38 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         }
       });
 
+      hls.on(Hls.Events.MANIFEST_LOADED, (_, data: any) => {
+        onNetworkProgress();
+        if (isTvPlayback && data.stats?.loading) {
+          playbackOptimizerService.recordTvHlsManifest(data.stats.loading.end - data.stats.loading.start);
+        }
+      });
+
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
         if (hls.levels[data.level]) {
           const lvl = hls.levels[data.level];
           const qLabel = lvl.height >= 2160 ? '4K' : (lvl.height >= 1440 ? '1440p' : `${lvl.height}p`);
           playbackOptimizerService.updateVideoMetrics(video, qLabel);
+          if (isTvPlayback) {
+            playbackOptimizerService.recordTvHlsBitrate(lvl.bitrate);
+            playbackOptimizerService.tuneTvHlsBuffer(hls.config, lvl.bitrate);
+          }
         }
       });
 
       hls.on(Hls.Events.FRAG_LOADED, (_, data: any) => {
+        onNetworkProgress();
         if (!isTvPlayback) handleMediaBuffered();
         const stats = data.frag?.stats || data.stats;
         if (stats?.loading) {
           const durationMs = stats.loading.end - stats.loading.start;
           playbackOptimizerService.recordSampleThroughput(stats.total, durationMs);
+          if (isTvPlayback) playbackOptimizerService.recordTvHlsSegment(durationMs);
         }
       });
 
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
-        fatalNetworkRecoveries = 0;
+        onNetworkProgress();
         if (!isTvPlayback || video.readyState >= 2) handleMediaBuffered();
       });
 
@@ -2913,25 +2952,35 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
+        if (isTvPlayback) {
+          const status = (data as any).response?.code || (data as any).networkDetails?.status;
+          playbackOptimizerService.recordTvPlaybackEvent(`hls_${data.details}`, status);
+        }
         if (data.fatal) {
           if (fatalFallbackStarted) return;
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
+              if (Date.now() - lastFatalNetworkAt > 60_000) fatalNetworkRecoveries = 0;
+              lastFatalNetworkAt = Date.now();
               if (isTvPlayback && ++fatalNetworkRecoveries > 2) {
                 fatalFallbackStarted = true;
                 handleStreamFallbackRef.current('Falha persistente de rede no HLS.');
                 break;
               }
               console.warn('[ZapiPlayer] Erro de rede transitório no HLS. Tentando reconexão...');
+              if (isTvPlayback) playbackOptimizerService.recordTvRecovery();
               hls.startLoad();
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
+              if (Date.now() - lastFatalMediaAt > 60_000) fatalMediaRecoveries = 0;
+              lastFatalMediaAt = Date.now();
               if (isTvPlayback && ++fatalMediaRecoveries > 2) {
                 fatalFallbackStarted = true;
                 handleStreamFallbackRef.current('Falha persistente de decodificação no HLS.');
                 break;
               }
               console.warn('[ZapiPlayer] Erro de mídia no HLS. Executando recuperação automática...');
+              if (isTvPlayback) playbackOptimizerService.recordTvRecovery();
               hls.recoverMediaError();
               break;
             default:
@@ -2948,10 +2997,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     } else if (videoUrl.includes('.m3u8') && video.canPlayType('application/vnd.apple.mpegurl')) {
       // Suporte nativo para HLS no Safari / iOS (iPhone/iPad/Apple TV)
       playbackOptimizerService.notifyLoadStart('hls');
+      if (isTvPlayback) playbackOptimizerService.recordTvHlsMethod('native');
       video.preload = 'auto';
       video.src = videoUrl;
       video.load();
       video.onloadedmetadata = () => {
+        if (isTvPlayback) playbackOptimizerService.recordTvHlsManifest(performance.now() - sourceLoadStartedAt);
         onMetadataReceived();
         applyTargetResumeTime();
         if (video.videoHeight > 0) {
@@ -3061,6 +3112,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
 
     return () => {
+      video.removeEventListener('progress', onNetworkProgress);
       if (referrerMeta) {
         // Removing a dynamic referrer meta alone leaves Chromium's last policy
         // active. Restore the page default explicitly before removing it.
@@ -3161,23 +3213,76 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
       playbackOptimizerService.updateVideoMetrics(video, activeQ);
 
+      if (isTvPlayback) {
+        const canMonitor = isPlaying && isIntroEnded && !isPlayingIntro && !isSwitchingAudio &&
+          !isSeeking && !isSeekingRef.current && !video.seeking && !video.paused && !video.ended;
+        if (!canMonitor) {
+          tvBufferingSinceRef.current = 0;
+          tvRecoveryAttemptedRef.current = false;
+          lastPlaybackPositionRef.current = video.currentTime;
+          return;
+        }
+        const advancing = video.currentTime - lastPlaybackPositionRef.current >= 0.05;
+        if (advancing) {
+          if (tvBufferingSinceRef.current) {
+            playbackOptimizerService.notifyBufferingEnd();
+            if (tvRecoveryAttemptedRef.current) playbackOptimizerService.recordStallRecovered();
+          }
+          tvBufferingSinceRef.current = 0;
+          tvRecoveryAttemptedRef.current = false;
+          lastPlaybackPositionRef.current = video.currentTime;
+          return;
+        }
+        if (!tvBufferingSinceRef.current) {
+          tvBufferingSinceRef.current = Date.now();
+          playbackOptimizerService.recordTvPlaybackEvent(video.readyState < 3 ? 'buffering' : 'decoder_stall');
+        }
+        const now = Date.now();
+        if (!navigator.onLine) {
+          tvBufferingSinceRef.current = now;
+          return;
+        }
+        const elapsedMs = now - tvBufferingSinceRef.current;
+        if (elapsedMs >= 1500) playbackOptimizerService.notifyBufferingStart();
+        const telemetry = playbackOptimizerService.getTelemetry();
+        const action = decideTvStallAction({
+          elapsedMs,
+          sinceProgressMs: now - tvNetworkProgressAtRef.current,
+          bufferAheadSeconds: telemetry.bufferAheadSeconds,
+          recoveryAttempted: tvRecoveryAttemptedRef.current,
+          online: navigator.onLine
+        });
+        if (action === 'recover') {
+          tvRecoveryAttemptedRef.current = true;
+          playbackOptimizerService.recordTvRecovery();
+          const hls = hlsRef.current;
+          try {
+            if (hls && telemetry.bufferAheadSeconds >= 2) {
+              hls.recoverMediaError();
+            } else if (hls) {
+              if (selectedQuality === 'auto' && hls.currentLevel > 0) {
+                hls.nextAutoLevel = hls.currentLevel - 1;
+              }
+              if (now - tvNetworkProgressAtRef.current >= 8000) hls.startLoad();
+            }
+          } catch { /* The bounded fallback remains available. */ }
+        } else if (action === 'fallback') {
+          tvBufferingSinceRef.current = Number.POSITIVE_INFINITY;
+          playbackOptimizerService.recordTvPlaybackEvent(
+            telemetry.bufferAheadSeconds >= 2 ? 'decoder_timeout' : 'source_timeout'
+          );
+          handleStreamFallbackRef.current('Fluxo de vídeo sem progresso após recuperação controlada na TV.');
+        }
+        return;
+      }
+
       // 2. Apenas monitora travamentos se o vídeo estiver em reprodução ativa (não pausado, não em intro, não buscando)
       const isBufferingOrSeeking = isSeeking || isSeekingRef.current || video.seeking || video.readyState < 3 || isLoading;
       if (isBufferingOrSeeking) {
-        if (isTvPlayback && video.readyState < 3 && isPlaying && !isLoading && !isSeeking && !isSeekingRef.current && !isSwitchingAudio && !isPlayingIntro && !video.paused) {
-          if (!tvBufferingSinceRef.current) tvBufferingSinceRef.current = Date.now();
-          if (Date.now() - tvBufferingSinceRef.current >= 20000) {
-            tvBufferingSinceRef.current = Number.POSITIVE_INFINITY;
-            handleStreamFallbackRef.current('Buffer de vídeo não recuperado em 20s na TV.');
-          }
-        } else {
-          tvBufferingSinceRef.current = 0;
-        }
         stallTimerRef.current = 0;
         lastPlaybackPositionRef.current = video.currentTime;
         return;
       }
-      tvBufferingSinceRef.current = 0;
 
       if (isPlaying && !isLoading && !isSwitchingAudio && !isSeeking && !isPlayingIntro) {
         const curPos = video.currentTime;
@@ -3192,7 +3297,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           }
 
           // Aos 3.5s de travamento: tenta recuperação suave (downgrade ABR no HLS ou MP4)
-          if (stallTimerRef.current === (isTvPlayback ? 6000 : 3500)) {
+          if (stallTimerRef.current === 3500) {
             console.warn('[ZapiPlayer] Travamento detectado (>3.5s). Aplicando recuperação suave de ABR...');
             if (hlsRef.current && selectedQuality === 'auto') {
               if (hlsRef.current.currentLevel > 0) {
@@ -3211,13 +3316,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               }
             }
             // Nudge milimétrico para destravar demuxer/decodificador
-            if (!isTvPlayback) {
-              try { video.currentTime = Math.max(0, video.currentTime + 0.02); } catch {}
-            }
+            try { video.currentTime = Math.max(0, video.currentTime + 0.02); } catch {}
           }
 
           // Aos 6s de travamento persistente: executa fallback seguro para fonte alternativa da mesma obra
-          if (stallTimerRef.current >= (isTvPlayback ? 12000 : 6000)) {
+          if (stallTimerRef.current >= 6000) {
             console.warn('[ZapiPlayer] Travamento severo (>6s). Alternando para próxima fonte estável...');
             stallTimerRef.current = 0;
             playbackOptimizerService.recordStallRecovered();
@@ -3254,7 +3357,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }, 500);
 
     return () => clearInterval(interval);
-  }, [isPlaying, isLoading, isSwitchingAudio, isSeeking, isPlayingIntro, selectedQuality, availableQualities, currentStream?.url]);
+  }, [isPlaying, isIntroEnded, isLoading, isSwitchingAudio, isSeeking, isPlayingIntro, selectedQuality, availableQualities, currentStream?.url]);
 
   // Keyboard navigation shortcuts & TV remote controls
   useEffect(() => {
@@ -3290,6 +3393,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   ]);
 
   useEffect(() => {
+    if (isTvPlayback) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
@@ -3459,7 +3563,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     handleRejectNonDubbed, activeSkipInterval, handleExecuteSkip, handleSkipIntro, onNextEpisode, isLoadingStreams,
     handleTogglePip, showAudioMenu, showQualityMenu, showSubtitlesMenu, showStyleEditor,
     showDevDiagnostics, showManualSkipModal, showFeedbackModal,
-    selectedSubtitleId, subtitlesList, currentStream, hasBrazilianAudio
+    selectedSubtitleId, subtitlesList, currentStream, hasBrazilianAudio, isTvPlayback
   ]);
 
   const togglePlay = () => {
@@ -3601,14 +3705,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     // SITUAÇÃO A: Manifesto HLS com variantes multi-bitrate adaptativas
     if (hlsRef.current && hlsRef.current.levels.length > 0) {
       if (q === 'auto') {
-        hlsRef.current.currentLevel = -1;
+        if (isTvPlayback) hlsRef.current.nextLevel = -1;
+        else hlsRef.current.currentLevel = -1;
       } else {
         const levelIndex = hlsRef.current.levels.findIndex(l => {
           const lLabel = l.height >= 2160 ? '4K' : (l.height >= 1440 ? '1440p' : `${l.height}p`);
           return lLabel.toLowerCase() === q.toLowerCase() || `${l.height}p`.toLowerCase() === q.toLowerCase();
         });
         if (levelIndex !== -1) {
-          hlsRef.current.currentLevel = levelIndex;
+          if (isTvPlayback) hlsRef.current.nextLevel = levelIndex;
+          else hlsRef.current.currentLevel = levelIndex;
           return;
         }
       }
@@ -3927,6 +4033,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       )}
 
       {/* Top Header Bar */}
+      {!isTvPlayback && (
       <div className={`absolute top-0 inset-x-0 p-4 md:p-6 pl-[calc(1rem+env(safe-area-inset-left,0px))] pr-[calc(1rem+env(safe-area-inset-right,0px))] pt-[calc(1rem+env(safe-area-inset-top,0px))] bg-gradient-to-b from-black/90 via-black/40 to-transparent z-50 flex items-center justify-between transition-opacity duration-300 ${(showControls || !isPlaying || hasOpenMenu) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="flex items-center gap-3 md:gap-4 max-w-[65%] sm:max-w-[70%]">
           <button
@@ -3983,6 +4090,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           </button>
         </div>
       </div>
+      )}
 
       {/* Banner de Autorização de Compartilhamento do Host (quando captureStream requer fallback) */}
       {isBroadcastHost && hostNeedsDisplayMediaPrompt && (
@@ -4090,6 +4198,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           allSourcesFailed ? 'pointer-events-none invisible' : ''
         }`}
         onClick={() => {
+          if (isTvPlayback) {
+            handleUserActivity();
+            return;
+          }
           if (hasOpenMenu) {
             closeAllInteractiveMenus();
             setShowDevDiagnostics(false);
@@ -4162,6 +4274,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                   ? browserFrames : typeof video.requestVideoFrameCallback === 'function' ? frameSample.count : null;
                 const eligible = !isPlayingIntro && isIntroEnded && !video.paused &&
                   !video.seeking && video.readyState >= 3 && video.videoWidth > 0 && video.videoHeight > 0;
+                if (eligible && cur > 0 && (presentedFrames === null || presentedFrames > 0)) {
+                  playbackOptimizerService.notifyFirstFrame();
+                }
                 const priorConfirmation = playbackConfirmationRef.current;
                 const nextConfirmation = observePlayback(priorConfirmation, {
                   wallTimeMs: Date.now(), mediaTimeSeconds: cur, presentedFrames, eligible
@@ -4291,6 +4406,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               if (videoRef.current) setDuration(videoRef.current.duration);
             }}
             onWaiting={() => {
+              if (isTvPlayback) playbackOptimizerService.recordTvPlaybackEvent('waiting');
               playbackConfirmationRef.current = createPlaybackConfirmationState();
               if (sourceEvidenceRef.current && !sourceEvidenceRef.current.reported) {
                 sourceEvidenceRef.current.playingAt = null;
@@ -4301,10 +4417,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               watchPartyService.setBuffering(true);
             }}
             onPlaying={() => {
+              if (isTvPlayback) playbackOptimizerService.recordTvPlaybackEvent('playing');
               setIsLoading(false);
               setIsPlaying(true);
               playbackOptimizerService.notifyBufferingEnd();
-              playbackOptimizerService.notifyFirstFrame();
               watchPartyService.setBuffering(false);
               if (
                 (watchPartyService.isHost() || watchPartyService.canLocalControl('canPlayPause')) &&
@@ -4321,12 +4437,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               // onPlaying alone is not proof of main-content playback.
             }}
             onStalled={() => {
+              if (isTvPlayback) playbackOptimizerService.recordTvPlaybackEvent('stalled');
               playbackOptimizerService.notifyBufferingStart();
               console.warn('[ZapiPlayer] Transferência do vídeo estagnada (stalled)');
             }}
             onError={(e) => {
               if (!isMountedRef.current || !currentStream?.url) return;
               const video = videoRef.current;
+              if (isTvPlayback) playbackOptimizerService.recordTvPlaybackEvent(`media_error_${video?.error?.code || 0}`);
               // Erro com código 1 é MEDIA_ERR_ABORTED (gerado naturalmente por cancelamento de requisição durante seek)
               if (video?.error?.code === 1) {
                 console.warn('[ZapiPlayer] Requisição de mídia abortada normalmente pelo navegador (seek ou troca). Ignorando.');
@@ -4632,6 +4750,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       </div>
 
       {/* Bottom Controls Bar (Native ZapiTV Controls) */}
+      {!isTvPlayback && (
       <div
         onClick={(e) => e.stopPropagation()}
         className={`absolute bottom-0 inset-x-0 p-3 sm:p-4 md:p-6 pl-[calc(0.75rem+env(safe-area-inset-left,0px))] pr-[calc(0.75rem+env(safe-area-inset-right,0px))] md:pl-[calc(1.5rem+env(safe-area-inset-left,0px))] md:pr-[calc(1.5rem+env(safe-area-inset-right,0px))] pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] bg-gradient-to-t from-black/95 via-black/60 to-transparent z-40 transition-opacity duration-300 ${(showControls || !isPlaying || hasOpenMenu) && !showNonDubbedPrompt ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
@@ -5562,6 +5681,71 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           </div>
         </div>
       </div>
+      )}
+
+      {isTvPlayback && (
+        <TvPlayerControls
+          title={item.title}
+          season={initialSeason}
+          episode={initialEpisode}
+          visible={showControls}
+          suspended={showNonDubbedPrompt || allSourcesFailed || showFeedbackModal || showManualSkipModal || showDevDiagnostics}
+          playing={isPlaying}
+          intro={isPlayingIntro}
+          loading={isLoading || isLoadingStreams}
+          currentTime={currentTime}
+          duration={duration}
+          canPlayPause={!isBroadcastGuest || watchPartyService.canLocalControl('canPlayPause')}
+          canSeek={!isBroadcastGuest || watchPartyService.canLocalControl('canSeek')}
+          canNext={!isLoadingStreams && !isPlayingIntro && (!isBroadcastGuest || watchPartyService.canLocalControl('canChangeEpisode'))}
+          audioOptions={isBroadcastGuest ? [] : availableAudioOptions}
+          subtitleOptions={filteredSubtitles}
+          selectedSubtitleId={selectedSubtitleId}
+          qualities={isBroadcastGuest ? [] : availableQualities}
+          selectedQuality={selectedQuality}
+          autoPlayEnabled={autoPlayEnabled}
+          autoSkipEnabled={autoSkipEnabled}
+          subtitleSize={subtitleStyle.fontSize}
+          subtitlePosition={normalizeVerticalPosition(subtitleStyle.verticalPosition)}
+          subtitleStyle={subtitleStyle}
+          skipOffset={skipOffset}
+          onTogglePlay={togglePlay}
+          onSeek={handleSeek}
+          onSkip={skipTime}
+          onClose={handlePlayerClose}
+          onShow={handleUserActivity}
+          onInteraction={handleUserActivity}
+          onInteractionModeChange={setTvInteractionActive}
+          onAudio={handleSelectAudio}
+          onSubtitle={(id) => {
+            userManuallyChangedSubRef.current = true;
+            subtitlePreferenceService.setSubtitlesEnabled(id !== 'off');
+            if (id === 'off') {
+              setSelectedSubtitleId('off');
+              setAppliedSubtitleId('off');
+              setCues([]);
+            } else {
+              const track = subtitlesList.find(sub => sub.id === id);
+              if (!track) return;
+              if (track.lang) subtitlePreferenceService.setPreferredLanguage(track.lang);
+              setSelectedSubtitleId(id);
+            }
+          }}
+          onQuality={handleSelectQuality}
+          onToggleAutoPlay={handleToggleAutoPlay}
+          onToggleAutoSkip={handleToggleAutoSkip}
+          onSubtitleSize={(fontSize) => updateSubtitleStyle({ fontSize })}
+          onSubtitlePosition={(verticalPosition) => updateSubtitleStyle({ verticalPosition })}
+          onSubtitleStyle={updateSubtitleStyle}
+          onAdjustSkipOffset={handleAdjustOffset}
+          onResetSkipOffset={handleResetOffset}
+          onNext={onNextEpisode ? () => {
+            if (isBroadcastGuest) watchPartyService.requestHostPlaybackAction('next_episode');
+            else onNextEpisode();
+          } : undefined}
+          onReport={() => { setFeedbackDefaultCategory('other_problem'); setShowFeedbackModal(true); }}
+        />
+      )}
 
       {/* Dev Stream Diagnostics Modal */}
       {showDevDiagnostics && (

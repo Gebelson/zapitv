@@ -204,18 +204,20 @@ async function runTvAppInterfaceTests() {
   );
   console.log('✓ Teste 15: Carrossel circular infinito com seleção fixa, capa parcial visível à esquerda e sem duplicatas OK');
 
-  // Teste 16: TvHeroBanner suporta múltiplos destaques com transições cinematográficas e controles remotos
+  // Teste 16: TvHeroBanner com rotação 100% automática, sem botões manuais de seta ou foco residual
   assert(
     tvHeroCode.includes('items?: ContentItem[]') &&
     tvHeroCode.includes('goToSlide') &&
     tvHeroCode.includes('isCrossfading') &&
     tvHeroCode.includes('resetTimer') &&
-    tvHeroCode.includes('tv-hero-prev') &&
-    tvHeroCode.includes('tv-hero-next') &&
+    !tvHeroCode.includes('tv-hero-prev') &&
+    !tvHeroCode.includes('tv-hero-next') &&
+    !tvHeroCode.includes('ChevronLeft') &&
+    !tvHeroCode.includes('ChevronRight') &&
     tvHeroCode.includes('visibilitychange'),
-    'TvHeroBanner deve implementar carrossel com crossfade, rotação automática, pausa na visibilidade e botões tv-hero-prev/next'
+    'TvHeroBanner deve implementar carrossel 100% automático com crossfade, rotação sem setas tv-hero-prev/next e sem foco residual'
   );
-  console.log('✓ Teste 16: Carrossel cinematográfico multi-destaques no Hero com rotação automática e navegação manual OK');
+  console.log('✓ Teste 16: Carrossel cinematográfico do Hero 100% automático e sem setas manuais OK');
 
   // Teste 17: TvHomeView conecta-se ao heroCarouselStore e transmite múltiplos destaques reais
   const tvHomeViewCodeUpdated = fs.readFileSync(tvHomeViewPath, 'utf8');

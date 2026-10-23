@@ -34,6 +34,18 @@ async function resolvePublicTarget(raw: string): Promise<{ url: URL; address: st
   return { url, ...addresses[0] };
 }
 
+export function createPinnedPublicLookup(address: string, family: number) {
+  return (_host: string, lookupOptions: { all?: boolean }, callback: (
+    error: NodeJS.ErrnoException | null,
+    result: string | Array<{ address: string; family: number }>,
+    family?: number
+  ) => void) => {
+    // Node enables autoSelectFamily with `all: true` on some runtimes.
+    if (lookupOptions.all) callback(null, [{ address, family }]);
+    else callback(null, address, family);
+  };
+}
+
 export async function publicHttpGet(raw: string, options: { headers?: Record<string, string>; signal?: AbortSignal; timeoutMs?: number } = {}) {
   let current = raw;
   for (let redirects = 0; redirects <= 3; redirects++) {
@@ -42,7 +54,7 @@ export async function publicHttpGet(raw: string, options: { headers?: Record<str
       const request = (url.protocol === 'https:' ? https : http).request(url, {
         method: 'GET',
         headers: options.headers,
-        lookup: (_host, _opts, callback) => callback(null, address, family),
+        lookup: createPinnedPublicLookup(address, family),
         signal: options.signal,
         timeout: options.timeoutMs ?? 12000
       }, resolve);

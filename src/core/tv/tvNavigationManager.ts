@@ -5,6 +5,7 @@
 
 import { init as initNorigin, setKeyMap, setFocus, getCurrentFocusKey, pause as pauseNorigin, resume as resumeNorigin } from '@noriginmedia/norigin-spatial-navigation';
 import { tvModeService } from './tvModeService';
+import { uiSoundService } from '../audio/uiSoundService';
 
 export interface BackHandler {
   id: string;
@@ -17,7 +18,9 @@ class TvNavigationManager {
   private backHandlers: BackHandler[] = [];
   private isInitialized: boolean = false;
   private lastFocusedKeyBeforeModal: string | null = null;
+  private lastUserNavTime: number = -Infinity;
   private activityHandler: ((event: KeyboardEvent) => boolean) | null = null;
+  private commandHandler: ((event: KeyboardEvent) => boolean) | null = null;
 
   private constructor() {}
 
@@ -34,11 +37,12 @@ class TvNavigationManager {
     if (!this.isInitialized) {
       this.isInitialized = true;
 
-      // Inicializa a navegação espacial do Norigin com mapeamento de TV e foco no DOM nativo
+      // Inicializa a navegação espacial do Norigin com mapeamento de TV e foco no DOM nativo sem saltos de rolagem
       initNorigin({
         debug: false,
         visualDebug: false,
-        shouldFocusDOMNode: true
+        shouldFocusDOMNode: true,
+        domNodeFocusOptions: { preventScroll: true }
       });
 
       setKeyMap({
@@ -69,10 +73,23 @@ class TvNavigationManager {
   private handleGlobalKeyDown = (e: KeyboardEvent): void => {
     if (!tvModeService.isTvMode()) return;
 
+    // Prepara o AudioContext durante a primeira interação legítima com o controle remoto
+    uiSoundService.prime();
+
     if (this.activityHandler?.(e)) {
       e.preventDefault();
       e.stopImmediatePropagation();
       return;
+    }
+
+    // Registra navegação intencional do usuário ao pressionar setas direcionais
+    const isDirectionKey =
+      e.key === 'ArrowUp' || e.key === 'ArrowDown' ||
+      e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
+      e.keyCode === 37 || e.keyCode === 38 || e.keyCode === 39 || e.keyCode === 40;
+
+    if (isDirectionKey) {
+      this.lastUserNavTime = performance.now();
     }
 
     const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
@@ -87,14 +104,30 @@ class TvNavigationManager {
       const handled = this.dispatchBack();
       if (handled) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
       }
+      return;
+    }
+
+    if (this.commandHandler?.(e)) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
     }
   };
 
   /** Único ponto de captura de teclas da TV para acordar a tela sem acionar o foco anterior. */
   public setActivityHandler(handler: ((event: KeyboardEvent) => boolean) | null): void {
     this.activityHandler = handler;
+  }
+
+  /** Informa se uma mudança de foco é decorrente de navegação intencional do usuário via controle remoto. */
+  public isNavigatingByUser(windowMs: number = 380): boolean {
+    return performance.now() - this.lastUserNavTime < windowMs;
+  }
+
+  public registerCommandHandler(handler: (event: KeyboardEvent) => boolean): () => void {
+    this.commandHandler = handler;
+    return () => { if (this.commandHandler === handler) this.commandHandler = null; };
   }
 
   /**

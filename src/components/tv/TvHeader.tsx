@@ -3,6 +3,7 @@ import { Search, User as UserIcon } from 'lucide-react';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { TvProfileMenu } from './TvProfileMenu';
+import { uiSoundService } from '../../core/audio/uiSoundService';
 
 export type TvTab = 'home' | 'movies' | 'series' | 'animes' | 'featured';
 
@@ -148,16 +149,42 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
         ref={noriginRef as any}
         className="fixed top-0 inset-x-0 z-[120] h-24 sm:h-[100px] px-14 sm:px-16 flex items-center justify-between pointer-events-none select-none border-none shadow-none bg-transparent"
       >
+        {/* Camada de fundo flutuante com Desfoque Real e Degradê Escuro Cinematográfico */}
         <div
           aria-hidden="true"
-          className={`absolute z-0 inset-x-0 top-0 h-[220px] pointer-events-none transition-opacity duration-700 ease-in-out ${isScrolled ? 'opacity-100' : 'opacity-0'}`}
-          style={{ background: 'linear-gradient(to bottom, rgba(5,7,10,0.94) 0%, rgba(5,7,10,0.68) 36%, rgba(5,7,10,0.22) 72%, transparent 100%)' }}
-        />
+          className="absolute z-0 inset-x-0 top-0 h-[140px] sm:h-[160px] pointer-events-none select-none overflow-hidden"
+        >
+          {/* Desfoque Real Progressivo via backdrop-filter e máscara gradual */}
+          <div
+            className={`tv-header-blur absolute inset-0 pointer-events-none transform-gpu transition-opacity duration-500 ease-in-out ${
+              isScrolled ? 'opacity-100' : 'opacity-70'
+            }`}
+            style={{
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              maskImage: 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.92) 35%, rgba(0,0,0,0.45) 68%, transparent 100%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.92) 35%, rgba(0,0,0,0.45) 68%, transparent 100%)'
+            }}
+          />
+
+          {/* Degradê Escuro Cinematográfico (Garante contraste e legibilidade sem faixa sólida) */}
+          <div
+            className={`absolute inset-0 pointer-events-none transition-opacity duration-500 ease-in-out ${
+              isScrolled ? 'opacity-100' : 'opacity-65'
+            }`}
+            style={{
+              background: 'linear-gradient(to bottom, rgba(5,7,10,0.92) 0%, rgba(5,7,10,0.70) 38%, rgba(5,7,10,0.20) 75%, transparent 100%)'
+            }}
+          />
+        </div>
         {/* Esquerda: Logotipo Oficial ZapiTV Ampliado (Largura proporcional ~190-210px) */}
         <div 
           role="button"
           tabIndex={0}
-          onClick={() => onSelectTab('home')}
+          onClick={() => {
+            uiSoundService.play('navigate');
+            onSelectTab('home');
+          }}
           className="relative z-10 flex items-center gap-3.5 cursor-pointer group/logo outline-none focus:outline-none pointer-events-auto"
         >
           <div className="w-12 h-12 sm:w-[50px] sm:h-[50px] flex items-center justify-center relative flex-shrink-0">
@@ -196,31 +223,46 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
             focusKey="tv-nav-home"
             label="Início"
             isActive={currentTab === 'home'}
-            onClick={() => onSelectTab('home')}
+            onClick={() => {
+              uiSoundService.play('navigate');
+              onSelectTab('home');
+            }}
           />
           <TvNavTabButton
             focusKey="tv-nav-movies"
             label="Filmes"
             isActive={currentTab === 'movies'}
-            onClick={() => onSelectTab('movies')}
+            onClick={() => {
+              uiSoundService.play('navigate');
+              onSelectTab('movies');
+            }}
           />
           <TvNavTabButton
             focusKey="tv-nav-series"
             label="Séries"
             isActive={currentTab === 'series'}
-            onClick={() => onSelectTab('series')}
+            onClick={() => {
+              uiSoundService.play('navigate');
+              onSelectTab('series');
+            }}
           />
           <TvNavTabButton
             focusKey="tv-nav-animes"
             label="Animes"
             isActive={currentTab === 'animes'}
-            onClick={() => onSelectTab('animes')}
+            onClick={() => {
+              uiSoundService.play('navigate');
+              onSelectTab('animes');
+            }}
           />
           <TvNavTabButton
             focusKey="tv-nav-featured"
             label="Em Destaque"
             isActive={currentTab === 'featured'}
-            onClick={() => onSelectTab('featured')}
+            onClick={() => {
+              uiSoundService.play('navigate');
+              onSelectTab('featured');
+            }}
           />
         </nav>
 
@@ -232,7 +274,10 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
             type="button"
             data-focus-key="tv-nav-search"
             data-tv-focused={searchFocused ? "true" : undefined}
-            onClick={onOpenSearch}
+            onClick={() => {
+              uiSoundService.play('click');
+              onOpenSearch();
+            }}
             aria-label="Buscar títulos"
             className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 outline-none ${
               searchFocused
@@ -250,7 +295,10 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
               type="button"
               data-focus-key="tv-nav-profile"
               data-tv-focused={profileFocused ? "true" : undefined}
-              onClick={() => setIsProfileMenuOpen(prev => !prev)}
+              onClick={() => {
+                uiSoundService.play('confirm');
+                setIsProfileMenuOpen(prev => !prev);
+              }}
               aria-label="Menu do perfil"
               className={`w-14 h-14 rounded-full p-1 flex items-center justify-center transition-all duration-200 outline-none ${
                 profileFocused

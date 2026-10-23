@@ -5,6 +5,7 @@ import { TvCard16x9 } from './TvCard16x9';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { searchService, SearchCategory } from '../../core/search/searchService';
+import { uiSoundService } from '../../core/audio/uiSoundService';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvSearchViewProps {
@@ -216,7 +217,10 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
   // Botão Voltar no topo da coluna esquerda
   const { ref: backRef, focused: isBackFocused } = useTvFocusable({
     focusKey: 'tv-search-back',
-    onEnterPress: () => onClose()
+    onEnterPress: () => {
+      uiSoundService.play('close');
+      onClose();
+    }
   });
 
   // Campo de exibição do termo digitado
@@ -230,6 +234,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
   // Registra manipulador do botão Voltar da Smart TV (prioridade 100)
   useEffect(() => {
     const unregister = tvNavigationManager.registerBackHandler('tv-search-screen', 100, () => {
+      uiSoundService.play('close');
       onClose();
       return true;
     });
@@ -251,17 +256,20 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
 
       if (e.key === 'Backspace') {
         e.preventDefault();
+        uiSoundService.play('click');
         setQuery(prev => prev.slice(0, -1));
         return;
       }
 
       if (e.key === 'Escape') {
         e.preventDefault();
+        uiSoundService.play('close');
         onClose();
         return;
       }
 
       if (e.key.length === 1 && !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Tab'].includes(e.key)) {
+        uiSoundService.play('click');
         setQuery(prev => prev + e.key);
       }
     };
@@ -273,10 +281,13 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
   // Teclado virtual: manipulação de teclas
   const handleVirtualKeyPress = useCallback((char: string) => {
     if (char === 'BACKSPACE') {
+      uiSoundService.play('click');
       setQuery(prev => prev.slice(0, -1));
     } else if (char === 'CLEAR') {
+      uiSoundService.play('close');
       setQuery('');
     } else {
+      uiSoundService.play('click');
       setQuery(prev => prev + char);
     }
   }, []);
@@ -611,6 +622,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                   text={sug}
                   index={idx}
                   onSelect={(text) => {
+                    uiSoundService.play('click');
                     setQuery(text);
                     setFocus(`tv-filter-${selectedCategory}`);
                   }}
@@ -656,7 +668,10 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                   id={cat.id}
                   label={cat.label}
                   isActive={selectedCategory === cat.id}
-                  onSelect={(id) => setSelectedCategory(id)}
+                  onSelect={(id) => {
+                    uiSoundService.play('toggle');
+                    setSelectedCategory(id);
+                  }}
                   onArrowLeftEdge={idx === 0 ? () => setFocus('tv-key-clear') : undefined}
                 />
               ))}
@@ -671,7 +686,10 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                   <TvCard16x9
                     key={`search-${item.id}-${idx}`}
                     item={item}
-                    onClick={onSelectItem}
+                    onClick={(sel) => {
+                      uiSoundService.play('detailOpen');
+                      onSelectItem(sel);
+                    }}
                     onFocus={() => handleCardFocus(idx)}
                     focusKeyPrefix="tv-search-card"
                   />

@@ -2,6 +2,7 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import { useFocusable as useNoriginFocusable, FocusableComponentLayout } from '@noriginmedia/norigin-spatial-navigation';
 import { tvModeService } from './tvModeService';
 import { tvNavigationManager } from './tvNavigationManager';
+import { uiSoundService } from '../audio/uiSoundService';
 
 interface UseTvFocusableOptions {
   focusKey?: string;
@@ -15,6 +16,9 @@ interface UseTvFocusableOptions {
   focusable?: boolean;
   saveLastFocusedChild?: boolean;
   trackChildren?: boolean;
+  soundType?: 'hover' | 'hoverCard' | 'none';
+  enterSound?: 'click' | 'clickPrimary' | 'confirm' | 'toggle' | 'close' | 'watch' | 'none';
+  isPlayerControl?: boolean;
 }
 
 export function useTvFocusable({
@@ -28,7 +32,10 @@ export function useTvFocusable({
   scrollInline = 'center',
   focusable = true,
   saveLastFocusedChild = true,
-  trackChildren = false
+  trackChildren = false,
+  soundType,
+  enterSound = 'click',
+  isPlayerControl = false
 }: UseTvFocusableOptions = {}) {
   // O hook do Norigin registra nós ainda na montagem, inclusive quando
   // focusable=false no desktop. Inicialize o adaptador antes do registro.
@@ -66,14 +73,33 @@ export function useTvFocusable({
         } catch {}
       }
     }
+
+    // Tocar efeito sonoro de foco espacial (hover ou hoverCard) quando decorrente de ação intencional do controle remoto
+    if (tvNavigationManager.isNavigatingByUser() && soundType !== 'none') {
+      const isCard = soundType === 'hoverCard' ||
+        (soundType !== 'hover' && (
+          Boolean(focusKey?.startsWith('row-')) ||
+          Boolean(focusKey?.includes('card')) ||
+          Boolean(focusKey?.startsWith('episode-'))
+        ));
+      uiSoundService.play(isCard ? 'hoverCard' : 'hover', { playerControl: isPlayerControl });
+    }
+
     onFocus?.(layout);
-  }, [autoScroll, isEffectiveTv, onFocus, scrollBlock, scrollInline]);
+  }, [autoScroll, isEffectiveTv, onFocus, scrollBlock, scrollInline, soundType, focusKey, isPlayerControl]);
 
   const norigin = useNoriginFocusable<object, any>({
     focusKey,
     onEnterPress: () => {
       if (isEffectiveTv && focusable) {
+        const before = performance.now();
         onEnterPress?.();
+        if (enterSound !== 'none') {
+          queueMicrotask(() => {
+            if (uiSoundService.getLastAnyPlayed() >= before) return;
+            uiSoundService.play(enterSound, { playerControl: isPlayerControl });
+          });
+        }
       }
     },
     onArrowPress: (direction: string) => {

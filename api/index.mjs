@@ -1113,6 +1113,7 @@ function formatCinemetaItem(raw) {
     year: yearNum,
     image: poster,
     backdrop,
+    logo: raw.logo,
     description: raw.description || "Dispon\xEDvel no cat\xE1logo oficial do Stremio / Cinemeta.",
     genres: rawGenres,
     isFeatured: ratingNum >= 7.5,
@@ -10347,7 +10348,15 @@ var init_PlaybackOptimizerService = __esm({
           stallsRecovered: 0,
           activeAbrMode: "auto",
           effectiveNetworkType: "unknown",
-          streamSourceType: "unknown"
+          streamSourceType: "unknown",
+          hlsMethod: null,
+          manifestLoadMs: null,
+          segmentLoadMs: null,
+          activeVideoBitrateKbps: null,
+          lastHttpStatus: null,
+          lastPlaybackEvent: "idle",
+          recoveryAttempts: 0,
+          sourceSwitches: 0
         };
         // Medição de largura de banda em tempo real (EWMA)
         this.estimatedBandwidthBps = 5e6;
@@ -10480,14 +10489,14 @@ var init_PlaybackOptimizerService = __esm({
         let maxBufferLength = 30;
         let maxMaxBufferLength = 60;
         let maxBufferSize = 30 * 1024 * 1024;
-        if (net.isSlowConnection || dev.isLowEnd) {
+        if (dev.deviceType === "smart-tv") {
+          maxBufferLength = dev.isLowEnd ? 24 : 30;
+          maxMaxBufferLength = dev.isLowEnd ? 40 : 60;
+          maxBufferSize = (dev.isLowEnd ? 24 : 30) * 1024 * 1024;
+        } else if (net.isSlowConnection || dev.isLowEnd) {
           maxBufferLength = 15;
           maxMaxBufferLength = 30;
           maxBufferSize = 15 * 1024 * 1024;
-        } else if (dev.deviceType === "smart-tv") {
-          maxBufferLength = 30;
-          maxMaxBufferLength = 60;
-          maxBufferSize = 30 * 1024 * 1024;
         } else if (net.downlinkMbps >= 15 && !dev.isLowEnd) {
           maxBufferLength = 45;
           maxMaxBufferLength = 90;
@@ -10501,8 +10510,7 @@ var init_PlaybackOptimizerService = __esm({
           maxBufferLength,
           maxMaxBufferLength,
           maxBufferSize,
-          capLevelToPlayerSize: true,
-          // Nunca baixa 4K se o player for menor que 1080p
+          capLevelToPlayerSize: !(dev.deviceType === "smart-tv" && dev.maxOptimalResolution === "4K"),
           autoStartLoad: true,
           startFragPrefetch: true,
           // Carrega antecipadamente o próximo segmento
@@ -10523,6 +10531,21 @@ var init_PlaybackOptimizerService = __esm({
           // Força menor resolução de início em 3G/2G para TTFF < 500ms
         };
       }
+      /** Recalculate the TV buffer from the active rendition, bounded by memory. */
+      tuneTvHlsBuffer(config, bitrateBps) {
+        const dev = this.getDeviceProfile();
+        if (dev.deviceType !== "smart-tv" || !Number.isFinite(bitrateBps) || bitrateBps <= 0) return;
+        const net = this.getNetworkProfile();
+        const targetSeconds = net.isUnstable ? 36 : net.isSlowConnection ? 30 : 28;
+        const reportedMemoryGb = Number(navigator.deviceMemory);
+        const memoryCapMb = Number.isFinite(reportedMemoryGb) && reportedMemoryGb > 0 ? reportedMemoryGb <= 1 ? 20 : reportedMemoryGb <= 2 ? 30 : 48 : dev.isLowEnd ? 30 : 48;
+        const memoryCapBytes = memoryCapMb * 1024 * 1024;
+        const targetBytes = Math.min(memoryCapBytes, Math.max(18 * 1024 * 1024, bitrateBps * targetSeconds / 8));
+        const affordableSeconds = targetBytes * 8 / bitrateBps;
+        config.maxBufferSize = Math.round(targetBytes);
+        config.maxBufferLength = Math.max(8, Math.min(targetSeconds, affordableSeconds));
+        config.maxMaxBufferLength = Math.max(config.maxBufferLength, Math.min(60, affordableSeconds));
+      }
       /**
        * Notifica início do carregamento de uma mídia para contagem de TTFF
        */
@@ -10533,6 +10556,12 @@ var init_PlaybackOptimizerService = __esm({
         this.telemetry.bufferingCount = 0;
         this.telemetry.totalBufferingDurationMs = 0;
         this.telemetry.stallsRecovered = 0;
+        this.telemetry.hlsMethod = null;
+        this.telemetry.manifestLoadMs = null;
+        this.telemetry.segmentLoadMs = null;
+        this.telemetry.activeVideoBitrateKbps = null;
+        this.telemetry.lastHttpStatus = null;
+        this.telemetry.lastPlaybackEvent = "loading";
         this.bufferStartTime = null;
       }
       /**
@@ -10604,6 +10633,30 @@ var init_PlaybackOptimizerService = __esm({
         this.telemetry.currentBitrateKbps = Math.round(this.estimatedBandwidthBps / 1e3);
         this.notifyTelemetry();
       }
+      recordTvHlsMethod(method) {
+        this.telemetry.hlsMethod = method;
+      }
+      recordTvHlsManifest(durationMs) {
+        if (Number.isFinite(durationMs) && durationMs >= 0) this.telemetry.manifestLoadMs = Math.round(durationMs);
+      }
+      recordTvHlsSegment(durationMs) {
+        if (Number.isFinite(durationMs) && durationMs >= 0) this.telemetry.segmentLoadMs = Math.round(durationMs);
+      }
+      recordTvHlsBitrate(bitrateBps) {
+        if (Number.isFinite(bitrateBps) && bitrateBps > 0) this.telemetry.activeVideoBitrateKbps = Math.round(bitrateBps / 1e3);
+      }
+      recordTvPlaybackEvent(event, httpStatus) {
+        this.telemetry.lastPlaybackEvent = event;
+        if (httpStatus && Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599) {
+          this.telemetry.lastHttpStatus = httpStatus;
+        }
+      }
+      recordTvRecovery() {
+        this.telemetry.recoveryAttempts++;
+      }
+      recordTvSourceSwitch() {
+        this.telemetry.sourceSwitches++;
+      }
       /**
        * Avalia e decide a qualidade ABR ótima para fontes MP4 nativas (Multi-Source ABR)
        */
@@ -10662,7 +10715,15 @@ var init_PlaybackOptimizerService = __esm({
           stallsRecovered: 0,
           activeAbrMode: "auto",
           effectiveNetworkType: this.getNetworkProfile().effectiveType,
-          streamSourceType: "unknown"
+          streamSourceType: "unknown",
+          hlsMethod: null,
+          manifestLoadMs: null,
+          segmentLoadMs: null,
+          activeVideoBitrateKbps: null,
+          lastHttpStatus: null,
+          lastPlaybackEvent: "idle",
+          recoveryAttempts: 0,
+          sourceSwitches: 0
         };
         this.notifyTelemetry();
       }
@@ -20681,6 +20742,12 @@ async function resolvePublicTarget(raw) {
   if (!addresses.length || addresses.some((entry) => !isPublicIp(entry.address))) throw new Error("Destino n\xE3o permitido");
   return { url, ...addresses[0] };
 }
+function createPinnedPublicLookup(address, family) {
+  return (_host, lookupOptions, callback) => {
+    if (lookupOptions.all) callback(null, [{ address, family }]);
+    else callback(null, address, family);
+  };
+}
 async function publicHttpGet(raw, options = {}) {
   let current = raw;
   for (let redirects = 0; redirects <= 3; redirects++) {
@@ -20689,7 +20756,7 @@ async function publicHttpGet(raw, options = {}) {
       const request = (url.protocol === "https:" ? https : http).request(url, {
         method: "GET",
         headers: options.headers,
-        lookup: (_host, _opts, callback) => callback(null, address, family),
+        lookup: createPinnedPublicLookup(address, family),
         signal: options.signal,
         timeout: options.timeoutMs ?? 12e3
       }, resolve);
@@ -20736,6 +20803,36 @@ async function publicHttpGet(raw, options = {}) {
     };
   }
   throw new Error("Redirecionamentos em excesso");
+}
+
+// src/server/proxyRange.ts
+var MAX_PROXY_RANGE_BYTES = 4 * 1024 * 1024;
+function normalizeProxyRange(raw) {
+  if (!/^bytes=\d*-\d*(?:,\d*-\d*){0,4}$/.test(raw)) return null;
+  const suffix = /^bytes=-(\d+)$/.exec(raw);
+  if (suffix) {
+    const bytes = Number(suffix[1]);
+    return Number.isSafeInteger(bytes) && bytes > 0 ? `bytes=-${Math.min(bytes, MAX_PROXY_RANGE_BYTES)}` : null;
+  }
+  if (raw.includes(",")) {
+    let total = 0;
+    for (const part of raw.slice(6).split(",")) {
+      const match = /^(\d+)-(\d+)$/.exec(part);
+      if (!match) return null;
+      const start2 = Number(match[1]);
+      const end2 = Number(match[2]);
+      if (!Number.isSafeInteger(start2) || !Number.isSafeInteger(end2) || end2 < start2) return null;
+      total += end2 - start2 + 1;
+      if (total > MAX_PROXY_RANGE_BYTES) return null;
+    }
+    return raw;
+  }
+  const single = /^bytes=(\d+)-(\d*)$/.exec(raw);
+  if (!single) return null;
+  const start = Number(single[1]);
+  const end = single[2] ? Number(single[2]) : Number.MAX_SAFE_INTEGER;
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start) return null;
+  return `bytes=${start}-${Math.min(end, start + MAX_PROXY_RANGE_BYTES - 1)}`;
 }
 
 // server.ts
@@ -21276,10 +21373,11 @@ ${s.name?.split("\n")[1] || "1080p"}`,
         headers["Referer"] = parsed.origin;
       }
       if (req.headers.range) {
-        if (typeof req.headers.range !== "string" || !/^bytes=\d*-\d*(?:,\d*-\d*){0,4}$/.test(req.headers.range)) {
+        const safeRange = typeof req.headers.range === "string" ? normalizeProxyRange(req.headers.range) : null;
+        if (!safeRange) {
           return res.status(416).json({ error: "Range inv\xE1lido" });
         }
-        headers["Range"] = req.headers.range;
+        headers["Range"] = safeRange;
       }
       const controller = new AbortController();
       const connectTimer = setTimeout(() => {

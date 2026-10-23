@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { memo, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ContentItem } from '../../../types';
 import { storageService } from '../../core/storage/storageService';
 import { heroCarouselStore, HERO_CAROUSEL_STORAGE_KEY } from '../../core/catalog/heroCarouselStore';
@@ -107,6 +107,20 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
     return '';
   }, [continueWatchingItems, trendingItems, popularMovies, popularSeries, animeItems, featuredItems]);
 
+  const isScrollingToHeroRef = useRef(false);
+  const scrollTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Limpeza de timers ao desmontar
+  useEffect(() => {
+    return () => {
+      if (scrollTimerRef.current) {
+        clearTimeout(scrollTimerRef.current);
+        scrollTimerRef.current = null;
+      }
+      isScrollingToHeroRef.current = false;
+    };
+  }, []);
+
   const handleHeroDownPress = useCallback(() => {
     if (firstActiveRowId) {
       const rowKey = `row-${firstActiveRowId}`;
@@ -119,19 +133,70 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
   }, [firstActiveRowId]);
 
   const handleFirstRowUpPress = useCallback(() => {
-    // 1. Rola a viewport e o documento de volta ao topo absoluto da página
-    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-    if (document.documentElement) document.documentElement.scrollTop = 0;
-    if (document.body) document.body.scrollTop = 0;
-    const heroEl = document.getElementById('tv-hero-banner');
-    if (heroEl) {
-      try {
-        heroEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } catch {}
+    // 7. Evita múltiplas animações simultâneas caso o usuário pressione repetidamente as setas
+    if (isScrollingToHeroRef.current) return;
+
+    if (typeof window === 'undefined') {
+      setFocus('tv-hero-play');
+      return;
     }
 
-    // 2. Transfere o foco de forma coordenada para o botão Assistir do Hero
-    setFocus('tv-hero-play');
+    const currentScrollY = window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
+
+    // Se já estiver no topo absoluto, apenas transfere o foco imediatamente
+    if (currentScrollY <= 2) {
+      setFocus('tv-hero-play');
+      return;
+    }
+
+    isScrollingToHeroRef.current = true;
+
+    // 1 & 2. Utiliza uma ÚNICA estratégia de rolagem suave nativa para retornar ao banner principal,
+    // eliminando comandos concorrentes ou conflitantes de scrollTop/scrollIntoView
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
+
+    // 3, 4 & 5. Coordena a transferência de foco para 'tv-hero-play' com a conclusão da rolagem (~380ms),
+    // preservando a curva de desaceleração suave (ease-out) e impedindo que o foco nativo provoque saltos
+    if (scrollTimerRef.current) {
+      clearTimeout(scrollTimerRef.current);
+      scrollTimerRef.current = null;
+    }
+
+    let finished = false;
+    const finishTransition = () => {
+      if (finished) return;
+      finished = true;
+
+      window.removeEventListener('scrollend', handleScrollEnd);
+      if (scrollTimerRef.current) {
+        clearTimeout(scrollTimerRef.current);
+        scrollTimerRef.current = null;
+      }
+
+      // 8. Garante que o banner fique perfeitamente enquadrado ao final da rolagem
+      if (window.scrollY !== 0) {
+        window.scrollTo(0, 0);
+      }
+
+      // Transfere o foco de forma suave para o botão Assistir do Hero já perfeitamente posicionado
+      setFocus('tv-hero-play');
+      isScrollingToHeroRef.current = false;
+    };
+
+    const handleScrollEnd = () => {
+      finishTransition();
+    };
+
+    // Suporta evento nativo scrollend quando disponível
+    window.addEventListener('scrollend', handleScrollEnd, { once: true });
+
+    // Fallback coordenado com duração aproximada de 380ms (faixa ideal de 350-500ms)
+    // para Smart TVs onde o evento scrollend não é emitido
+    scrollTimerRef.current = setTimeout(finishTransition, 380);
   }, []);
 
   const hasContinue = continueWatchingItems.length > 0;

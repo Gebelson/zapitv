@@ -1,5 +1,16 @@
 import assert from 'node:assert/strict';
-import { isPublicIp, publicHttpGet } from '../src/server/security/publicHttp';
+import { createPinnedPublicLookup, isPublicIp, publicHttpGet } from '../src/server/security/publicHttp';
+
+const pinned = createPinnedPublicLookup('8.8.8.8', 4);
+pinned('example.com', { all: true }, (error, addresses) => {
+  assert.equal(error, null);
+  assert.deepEqual(addresses, [{ address: '8.8.8.8', family: 4 }]);
+});
+pinned('example.com', { all: false }, (error, address, family) => {
+  assert.equal(error, null);
+  assert.equal(address, '8.8.8.8');
+  assert.equal(family, 4);
+});
 
 assert.equal(isPublicIp('127.0.0.1'), false);
 assert.equal(isPublicIp('10.1.2.3'), false);

@@ -40,6 +40,7 @@ export interface ContentItem {
   duration?: number;
   overview?: string;
   poster?: string;
+  logo?: string;
   releaseDate?: string;
   
   // Novos metadados detalhados

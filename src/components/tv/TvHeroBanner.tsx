@@ -1,8 +1,9 @@
 import React, { memo, useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Play, Info, Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Info, Star } from 'lucide-react';
 import { ContentItem } from '../../../types';
 import { storageService } from '../../core/storage/storageService';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
+import { uiSoundService } from '../../core/audio/uiSoundService';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvHeroBannerProps {
@@ -22,9 +23,7 @@ const TvHeroButton: React.FC<{
   icon: React.ReactNode;
   label: string;
   onDownPress?: () => void;
-  onLeftPress?: () => void;
-  onRightPress?: () => void;
-}> = ({ focusKey, onClick, isPrimary = false, icon, label, onDownPress, onLeftPress, onRightPress }) => {
+}> = ({ focusKey, onClick, isPrimary = false, icon, label, onDownPress }) => {
   const { ref, focused } = useTvFocusable({
     focusKey,
     onEnterPress: onClick,
@@ -35,14 +34,6 @@ const TvHeroButton: React.FC<{
       }
       if (direction === 'down' && onDownPress) {
         onDownPress();
-        return false;
-      }
-      if (direction === 'left' && onLeftPress) {
-        onLeftPress();
-        return false;
-      }
-      if (direction === 'right' && onRightPress) {
-        onRightPress();
         return false;
       }
       return true;
@@ -69,54 +60,6 @@ const TvHeroButton: React.FC<{
     >
       {icon}
       <span>{label}</span>
-    </button>
-  );
-};
-
-const TvHeroIconButton: React.FC<{
-  focusKey: string;
-  onClick: () => void;
-  icon: React.ReactNode;
-  ariaLabel: string;
-  onDownPress?: () => void;
-  onRightPress?: () => void;
-}> = ({ focusKey, onClick, icon, ariaLabel, onDownPress, onRightPress }) => {
-  const { ref, focused } = useTvFocusable({
-    focusKey,
-    onEnterPress: onClick,
-    onArrowPress: (direction) => {
-      if (direction === 'up') {
-        setFocus('tv-nav-home');
-        return false;
-      }
-      if (direction === 'down' && onDownPress) {
-        onDownPress();
-        return false;
-      }
-      if (direction === 'right' && onRightPress) {
-        onRightPress();
-        return false;
-      }
-      return true;
-    },
-    autoScroll: false
-  });
-
-  return (
-    <button
-      ref={ref}
-      type="button"
-      data-focus-key={focusKey}
-      data-tv-focused={focused ? "true" : undefined}
-      onClick={onClick}
-      aria-label={ariaLabel}
-      className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200 outline-none select-none cursor-pointer ${
-        focused
-          ? 'bg-cyan-500/30 text-cyan-300 border-2 border-cyan-400 scale-105 shadow-[0_0_20px_rgba(0,229,255,0.7)]'
-          : 'bg-white/10 hover:bg-white/20 text-gray-200 border-2 border-white/20 hover:scale-105'
-      }`}
-    >
-      {icon}
     </button>
   );
 };
@@ -257,10 +200,6 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
 
   const goToNextSlide = useCallback(() => {
     goToSlide(currentIndex + 1);
-  }, [goToSlide, currentIndex]);
-
-  const goToPrevSlide = useCallback(() => {
-    goToSlide(currentIndex - 1);
   }, [goToSlide, currentIndex]);
 
   // Reinicia o timer de rotação automática
@@ -444,19 +383,16 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
           ) : null}
         </div>
 
-        {/* Indicadores de Paginação Discretos e Estilizados */}
+        {/* Indicadores de Paginação Discretos e Estilizados (Apenas Exibição Visual, Sem Seleção Manual) */}
         {slides.length > 1 && (
-          <div className="absolute bottom-24 sm:bottom-28 right-14 sm:right-16 z-30 flex items-center gap-2 select-none pointer-events-auto">
+          <div className="absolute bottom-24 sm:bottom-28 right-14 sm:right-16 z-30 flex items-center gap-2 select-none pointer-events-none" aria-hidden="true">
             {slides.map((slide, idx) => (
-              <button
+              <div
                 key={`hero-dot-${slide.id}-${idx}`}
-                type="button"
-                onClick={() => { resetTimer(); goToSlide(idx); }}
-                aria-label={`Ir para destaque ${idx + 1}: ${slide.title}`}
-                className={`transition-all duration-300 rounded-full cursor-pointer outline-none border-none p-0 ${
+                className={`transition-all duration-300 rounded-full p-0 ${
                   idx === currentIndex
                     ? 'w-8 h-2.5 bg-gradient-to-r from-blue-500 to-cyan-400 shadow-[0_0_12px_#00e5ff]'
-                    : 'w-2.5 h-2.5 bg-white/30 hover:bg-white/60'
+                    : 'w-2.5 h-2.5 bg-white/30'
                 }`}
               />
             ))}
@@ -502,48 +438,31 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
             {currentItem.description || currentItem.overview || 'Acompanhe esta incrível produção agora no ZapiTV com a máxima qualidade e sem interrupções.'}
           </p>
 
-          {/* Botões Grandes de Ação e Navegação Manual */}
+          {/* Botões Grandes de Ação */}
           <div className="flex items-center gap-4 flex-wrap">
             <TvHeroButton
               focusKey="tv-hero-play"
-              onClick={() => onPlay(currentItem)}
+              onClick={() => {
+                uiSoundService.play('watch');
+                onPlay(currentItem);
+              }}
               isPrimary
               icon={<Play className="w-6 h-6 fill-white" />}
               label={hasProgress ? "Continuar" : "Assistir"}
               onDownPress={onDownPress}
-              onLeftPress={slides.length > 1 ? () => { resetTimer(); goToPrevSlide(); } : undefined}
             />
 
             <TvHeroButton
               focusKey="tv-hero-details"
-              onClick={() => onOpenDetails(currentItem)}
+              onClick={() => {
+                uiSoundService.play('detailOpen');
+                onOpenDetails(currentItem);
+              }}
               isPrimary={false}
               icon={<Info className="w-6 h-6" />}
               label="Mais detalhes"
               onDownPress={onDownPress}
-              onRightPress={slides.length > 1 ? undefined : undefined}
             />
-
-            {/* Controles discretos de navegação manual entre destaques com foco do controle remoto */}
-            {slides.length > 1 && (
-              <div className="flex items-center gap-2 ml-2">
-                <TvHeroIconButton
-                  focusKey="tv-hero-prev"
-                  onClick={() => { resetTimer(); goToPrevSlide(); }}
-                  icon={<ChevronLeft className="w-5 h-5" />}
-                  ariaLabel="Destaque anterior"
-                  onDownPress={onDownPress}
-                />
-                <TvHeroIconButton
-                  focusKey="tv-hero-next"
-                  onClick={() => { resetTimer(); goToNextSlide(); }}
-                  icon={<ChevronRight className="w-5 h-5" />}
-                  ariaLabel="Próximo destaque"
-                  onDownPress={onDownPress}
-                  onRightPress={() => { resetTimer(); goToNextSlide(); }}
-                />
-              </div>
-            )}
           </div>
         </div>
       </section>

@@ -215,6 +215,7 @@ export function formatCinemetaItem(raw: CinemetaMetaItem): ContentItem {
     year: yearNum,
     image: poster,
     backdrop,
+    logo: raw.logo,
     description: raw.description || 'Disponível no catálogo oficial do Stremio / Cinemeta.',
     genres: rawGenres,
     isFeatured: ratingNum >= 7.5,

@@ -1776,8 +1776,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     setCurrentView('home');
   }, []);
 
-  const toggleMyList = useCallback(async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+  const toggleMyListById = useCallback(async (id: string) => {
     if (!currentUser) return;
     uiSoundService.prime();
     const isAdding = !myList.includes(id);
@@ -1801,8 +1800,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
   }, [myList, currentUser, content, activeProfile?.id]);
 
-  const toggleFavorite = useCallback(async (e: React.MouseEvent, id: string) => {
+  const toggleMyList = useCallback((e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    return toggleMyListById(id);
+  }, [toggleMyListById]);
+
+  const toggleFavoriteById = useCallback(async (id: string) => {
     if (!currentUser) return;
     const isAdding = !favorites.includes(id);
     const newFavorites = isAdding ? [...favorites, id] : favorites.filter(i => i !== id);
@@ -1823,6 +1826,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       console.error("Error saving favorites:", error);
     }
   }, [favorites, currentUser, content, activeProfile?.id]);
+
+  const toggleFavorite = useCallback((e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    return toggleFavoriteById(id);
+  }, [toggleFavoriteById]);
 
   const updateUser = useCallback(async (updatedUser: User) => {
     try {
@@ -2647,6 +2655,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           favorites={favorites}
           onToggleList={toggleMyList}
           onToggleFavorite={toggleFavorite}
+          onToggleListById={toggleMyListById}
+          onToggleFavoriteById={toggleFavoriteById}
           currentUser={currentUser}
           activeProfile={activeProfile}
         />

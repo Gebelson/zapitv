@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
 import { Play, Bookmark, Heart, Star, ArrowLeft, Check, Sparkles } from 'lucide-react';
 import { ContentItem, ContentType } from '../../../types';
 import { tmdbService } from '../../core/tmdb/tmdbClient';
@@ -7,23 +7,165 @@ import { TvCard16x9 } from './TvCard16x9';
 import { TvContentRow } from './TvContentRow';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
+import { uiSoundService } from '../../core/audio/uiSoundService';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvDetailsModalProps {
   item: ContentItem;
   initialSeason?: number;
+  initialEpisode?: number;
   allContent: ContentItem[];
   myList: string[];
   favorites: string[];
-  onToggleList: (e: any, id: string) => void;
-  onToggleFavorite: (e: any, id: string) => void;
+  onToggleList: (id: string) => void;
+  onToggleFavorite: (id: string) => void;
   onClose: () => void;
   onPlay: (item: ContentItem, season?: number, episode?: number) => void;
 }
 
+const episodeFocusKey = (season: number, episode: number) => `tv-details-episode-${season}-${episode}`;
+const seasonFocusKey = (season: number) => `tv-details-season-${season}`;
+
+// Parâmetros de enquadramento exato e transição cinematográfica fluida
+const CARD_GAP = 20; // 20px gap proporcional entre cards de episódios
+const TARGET_CARD_WIDTH = 270; // Largura alvo confortável para proporção 16:9 na Smart TV
+const TRANSITION_DURATION = 320; // Transição suave na faixa de 300-350ms
+const EASING_CURVE = 'cubic-bezier(0.22, 1, 0.36, 1)'; // Desaceleração suave de padrão cinematográfico
+
+const TvSeasonButton: React.FC<{ season: number; selected: boolean; onSelect: () => void; onDown: () => void }> = ({ season, selected, onSelect, onDown }) => {
+  const { ref, focused } = useTvFocusable({
+    focusKey: seasonFocusKey(season),
+    onEnterPress: onSelect,
+    onArrowPress: direction => {
+      if (direction === 'down') { onDown(); return false; }
+      if (direction === 'up') { setFocus('tv-details-play'); return false; }
+      return true;
+    }
+  });
+  return <button ref={ref} type="button" data-focus-key={seasonFocusKey(season)} data-tv-focused={focused ? 'true' : undefined}
+    onClick={onSelect} className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all outline-none ${focused ? 'ring-2 ring-cyan-300 scale-105' : ''} ${selected ? 'bg-cyan-500 text-black shadow-[0_0_12px_#00e5ff]' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}>
+    Temporada {season}
+  </button>;
+};
+
+interface TvEpisodeCardProps {
+  episode: any;
+  season: number;
+  index: number;
+  totalEpisodes: number;
+  cardWidth: number;
+  onSelect: () => void;
+  onFocus: () => void;
+  onUp: () => void;
+  onDown: () => boolean;
+  onNavigateLeft?: () => void;
+  onNavigateRight?: () => void;
+}
+
+const TvEpisodeCard: React.FC<TvEpisodeCardProps> = memo(({
+  episode,
+  season,
+  index,
+  totalEpisodes,
+  cardWidth,
+  onSelect,
+  onFocus,
+  onUp,
+  onDown,
+  onNavigateLeft,
+  onNavigateRight
+}) => {
+  const number = Number(episode.number);
+  const unavailable = episode.availabilityStatus === 'unavailable' || episode.availabilityStatus === 'unreleased';
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [episode.image]);
+
+  const { ref, focused } = useTvFocusable({
+    focusKey: episodeFocusKey(season, number),
+    focusable: !unavailable,
+    autoScroll: false, // Deslocamento horizontal gerenciado exclusivamente pelo trilho do carrossel
+    onEnterPress: onSelect,
+    onFocus,
+    onArrowPress: direction => {
+      if (direction === 'up') {
+        onUp();
+        return false;
+      }
+      if (direction === 'down') {
+        return onDown();
+      }
+      if (direction === 'right') {
+        if (onNavigateRight) {
+          onNavigateRight();
+          return false;
+        }
+        return false; // Não sai do carrossel ao bater no último episódio
+      }
+      if (direction === 'left') {
+        if (onNavigateLeft) {
+          onNavigateLeft();
+          return false;
+        }
+        return false; // Não sai do carrossel ao bater no primeiro episódio
+      }
+      return true;
+    }
+  });
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      disabled={unavailable}
+      data-focus-key={episodeFocusKey(season, number)}
+      data-tv-focused={focused ? 'true' : undefined}
+      onClick={onSelect}
+      style={{ width: `${cardWidth}px` }}
+      className={`flex-none text-left bg-[#0c121e] rounded-xl overflow-hidden border transition-all duration-200 outline-none transform-gpu ${
+        focused 
+          ? 'border-cyan-400 scale-105 shadow-[0_0_16px_rgba(0,229,255,0.35)] z-20' 
+          : 'border-white/10 hover:border-cyan-400 z-10'
+      } ${unavailable ? 'opacity-50' : 'cursor-pointer'}`}
+    >
+      <div className="relative aspect-video bg-black/40 overflow-hidden">
+        {episode.image && !imgError ? (
+          <img 
+            src={episode.image} 
+            alt={episode.title || `Episódio ${number}`} 
+            loading="lazy"
+            decoding="async"
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover object-center" 
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#131b2c] to-[#0c121e]">
+            <Play className="w-8 h-8 text-cyan-400/50" />
+          </div>
+        )}
+        <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-[10px] font-bold text-white border border-white/10">
+          EP {number}
+        </div>
+      </div>
+      <div className="p-2.5 sm:p-3">
+        <div className="text-xs font-bold text-white line-clamp-1 drop-shadow-sm">
+          {episode.title || `Episódio ${number}`}
+        </div>
+        <div className="text-[10px] text-gray-400 line-clamp-2 mt-1 leading-snug">
+          {unavailable ? 'Indisponível' : episode.description || episode.overview || ''}
+        </div>
+      </div>
+    </button>
+  );
+});
+TvEpisodeCard.displayName = 'TvEpisodeCard';
+
 export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
   item: initialItem,
   initialSeason,
+  initialEpisode,
   allContent,
   myList,
   favorites,
@@ -36,54 +178,214 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
   const [currentSeason, setCurrentSeason] = useState(initialSeason || 1);
   const [availableSeasons, setAvailableSeasons] = useState<number[]>([initialSeason || 1]);
   const [episodes, setEpisodes] = useState<any[]>([]);
-  const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
+  const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(initialItem.type === ContentType.SERIES || initialItem.type === ContentType.ANIME);
+  const pendingEpisodeFocus = useRef(Boolean(initialEpisode));
+  const requestedEpisodeFocus = useRef(initialEpisode);
 
   const isEpisodic = item.type === ContentType.SERIES || item.type === ContentType.ANIME || Boolean(item.seasonsCount && item.seasonsCount > 0);
   const isInList = myList.includes(item.id);
   const isFav = favorites.includes(item.id);
+
+  // Lista normalizada de episódios válidos ordenados
+  const validEpisodes = useMemo(() => {
+    return episodes.filter(ep => Number.isInteger(Number(ep.number)) && Number(ep.number) > 0);
+  }, [episodes]);
+
+  const firstEpisode = validEpisodes.find(ep => ep.availabilityStatus !== 'unavailable' && ep.availabilityStatus !== 'unreleased');
+  const lastFocusedEpisodeIndexRef = useRef<number>(0);
+
+  // Responsividade geométrica do carrossel para enquadrar somente cards completos
+  const episodesContainerRef = useRef<HTMLDivElement>(null);
+  const [startIndex, setStartIndex] = useState<number>(0);
+  const [visibleCount, setVisibleCount] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const w = Math.max(800, window.innerWidth - 128 - 24);
+      return Math.max(1, Math.floor((w + CARD_GAP) / (TARGET_CARD_WIDTH + CARD_GAP)));
+    }
+    return 5;
+  });
+  const [cardWidth, setCardWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const w = Math.max(800, window.innerWidth - 128 - 24);
+      const count = Math.max(1, Math.floor((w + CARD_GAP) / (TARGET_CARD_WIDTH + CARD_GAP)));
+      return Math.floor((w - (count - 1) * CARD_GAP) / count);
+    }
+    return TARGET_CARD_WIDTH;
+  });
+
+  const isInitialMountRef = useRef<boolean>(true);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      isInitialMountRef.current = false;
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [currentSeason]);
+
+  // Medição precisa da largura disponível para enquadrar somente cards completos
+  const measureWidth = useCallback(() => {
+    if (episodesContainerRef.current) {
+      const rect = episodesContainerRef.current.getBoundingClientRect();
+      const w = Math.round(rect.width);
+      if (w > 200) {
+        // Reserva 24px de respiro (px-3 em ambos os lados) para acomodar o scale-105 e o glow cyan sem cortes
+        const availableContentWidth = w - 24;
+        const count = Math.max(1, Math.floor((availableContentWidth + CARD_GAP) / (TARGET_CARD_WIDTH + CARD_GAP)));
+        const exactWidth = Math.floor((availableContentWidth - (count - 1) * CARD_GAP) / count);
+        setVisibleCount(count);
+        setCardWidth(exactWidth);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    measureWidth();
+    window.addEventListener('resize', measureWidth);
+    return () => window.removeEventListener('resize', measureWidth);
+  }, [measureWidth]);
+
+  useEffect(() => {
+    if (!isLoadingEpisodes) {
+      const t = setTimeout(measureWidth, 50);
+      return () => clearTimeout(t);
+    }
+  }, [isLoadingEpisodes, measureWidth]);
+
+  // Deslocamento horizontal do trilho com clamp de limites
+  const maxStartIndex = Math.max(0, validEpisodes.length - visibleCount);
+  const stepSize = cardWidth + CARD_GAP;
+  const clampedStartIndex = Math.min(Math.max(0, startIndex), maxStartIndex);
+  const translateX = -clampedStartIndex * stepSize;
+
+  const handleEpisodeFocus = useCallback((idx: number) => {
+    lastFocusedEpisodeIndexRef.current = idx;
+    
+    // Assegura visibilidade vertical suave da seção de episódios no modal
+    if (episodesContainerRef.current) {
+      episodesContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    setStartIndex(prev => {
+      let nextStart = prev;
+      if (idx < prev) {
+        // Desliza suavemente para a esquerda para exibir o card integralmente na primeira posição
+        nextStart = idx;
+      } else if (idx >= prev + visibleCount) {
+        // Desliza suavemente para a direita para exibir o card integralmente na última posição visível
+        nextStart = idx - visibleCount + 1;
+      }
+      return Math.min(Math.max(0, nextStart), Math.max(0, validEpisodes.length - visibleCount));
+    });
+  }, [visibleCount, validEpisodes.length]);
+
+  const relatedFocusKey = 'row-related-titles';
+  const focusBelowActions = () => {
+    if (availableSeasons.length > 1) {
+      setFocus(seasonFocusKey(currentSeason));
+    } else {
+      const targetEp = validEpisodes[lastFocusedEpisodeIndexRef.current] || firstEpisode;
+      if (targetEp) {
+        setFocus(episodeFocusKey(currentSeason, Number(targetEp.number)));
+      } else {
+        setFocus(relatedFocusKey);
+      }
+    }
+  };
+
+  const focusBelowSeasons = () => {
+    const targetEp = validEpisodes[lastFocusedEpisodeIndexRef.current] || firstEpisode;
+    if (targetEp) {
+      setFocus(episodeFocusKey(currentSeason, Number(targetEp.number)));
+    } else {
+      setFocus('tv-details-play');
+    }
+  };
 
   const { ref: noriginRef, focusKey } = useFocusable({
     focusKey: 'tv-details-screen',
     trackChildren: true
   });
 
+  // Toca som de abertura de detalhes na montagem
+  useEffect(() => {
+    uiSoundService.play('detailOpen');
+  }, []);
+
+  const handleClose = useCallback(() => {
+    uiSoundService.play('detailClose');
+    onClose();
+  }, [onClose]);
+
   // Botões de Ação
   const { ref: backRef, focused: isBackFocused } = useTvFocusable({
     focusKey: 'tv-details-back',
-    onEnterPress: onClose
+    onEnterPress: handleClose
   });
 
   const { ref: playRef, focused: isPlayFocused } = useTvFocusable({
     focusKey: 'tv-details-play',
-    onEnterPress: () => onPlay(item, isEpisodic ? currentSeason : undefined, isEpisodic ? 1 : undefined)
+    onArrowPress: direction => { if (direction === 'down') { focusBelowActions(); return false; } return true; },
+    onEnterPress: () => {
+      uiSoundService.play('watch');
+      onPlay(item, isEpisodic ? currentSeason : undefined, isEpisodic ? 1 : undefined);
+    }
   });
 
   const { ref: listRef, focused: isListFocused } = useTvFocusable({
     focusKey: 'tv-details-list',
-    onEnterPress: () => onToggleList({} as any, item.id)
+    onEnterPress: () => {
+      uiSoundService.play(isInList ? 'listRemove' : 'listAdd');
+      onToggleList(item.id);
+    },
+    onArrowPress: direction => { if (direction === 'down') { focusBelowActions(); return false; } return true; }
   });
 
   const { ref: favRef, focused: isFavFocused } = useTvFocusable({
     focusKey: 'tv-details-fav',
-    onEnterPress: () => onToggleFavorite({} as any, item.id)
+    onEnterPress: () => {
+      uiSoundService.play('toggle');
+      onToggleFavorite(item.id);
+    },
+    onArrowPress: direction => { if (direction === 'down') { focusBelowActions(); return false; } return true; }
   });
+
+  useEffect(() => {
+    if (pendingEpisodeFocus.current && !isLoadingEpisodes && validEpisodes.length > 0) {
+      pendingEpisodeFocus.current = false;
+      const requestedIndex = validEpisodes.findIndex(ep => Number(ep.number) === requestedEpisodeFocus.current);
+      if (requestedIndex >= 0) {
+        lastFocusedEpisodeIndexRef.current = requestedIndex;
+        const targetStart = Math.min(
+          Math.max(0, requestedIndex - visibleCount + 1),
+          Math.max(0, validEpisodes.length - visibleCount)
+        );
+        setStartIndex(targetStart);
+        setFocus(episodeFocusKey(currentSeason, Number(validEpisodes[requestedIndex].number)));
+      } else if (firstEpisode) {
+        lastFocusedEpisodeIndexRef.current = 0;
+        setStartIndex(0);
+        setFocus(episodeFocusKey(currentSeason, Number(firstEpisode.number)));
+      } else {
+        setFocus('tv-details-play');
+      }
+    }
+  }, [validEpisodes, isLoadingEpisodes, currentSeason, visibleCount, firstEpisode]);
 
   // Registra Voltar no tvNavigationManager
   useEffect(() => {
     const unregister = tvNavigationManager.registerBackHandler('tv-details-modal', 100, () => {
-      onClose();
+      handleClose();
       return true;
     });
 
     const timer = setTimeout(() => {
-      setFocus('tv-details-play');
+      if (!initialEpisode) setFocus('tv-details-play');
     }, 150);
 
     return () => {
       clearTimeout(timer);
       unregister();
     };
-  }, [onClose]);
+  }, [handleClose, initialEpisode]);
 
   // Carrega metadados detalhados
   useEffect(() => {
@@ -105,7 +407,10 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
             ...prev,
             ...details.item,
             id: prev.id,
-            title: details.item.title && details.item.title !== 'Sem Título' ? details.item.title : prev.title,
+            type: prev.type,
+            mediaFormat: prev.mediaFormat,
+            title: details.item.title && details.item.title !== 'Sem Título' && !/^tt\d+$/.test(details.item.title) ? details.item.title : prev.title,
+            genres: details.item.genres?.length ? details.item.genres : prev.genres,
             director: details.director || prev.director,
             cast: details.cast || prev.cast
           }));
@@ -273,7 +578,7 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
                 type="button"
                 data-focus-key="tv-details-list"
                 data-tv-focused={isListFocused ? "true" : undefined}
-                onClick={(e) => onToggleList(e, item.id)}
+                onClick={() => onToggleList(item.id)}
                 className={`px-5 py-3.5 rounded-xl font-bold text-sm flex items-center gap-2 border transition-all duration-200 outline-none ${
                   isListFocused
                     ? 'bg-white/25 text-white scale-105 shadow-[0_0_20px_rgba(255,255,255,0.4)] border-white'
@@ -292,7 +597,7 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
                 type="button"
                 data-focus-key="tv-details-fav"
                 data-tv-focused={isFavFocused ? "true" : undefined}
-                onClick={(e) => onToggleFavorite(e, item.id)}
+                onClick={() => onToggleFavorite(item.id)}
                 className={`p-3.5 rounded-xl border transition-all duration-200 outline-none ${
                   isFavFocused
                     ? 'bg-rose-500/30 text-rose-300 border-rose-400 scale-105 shadow-[0_0_20px_rgba(244,63,94,0.4)]'
@@ -333,57 +638,76 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
               <div className="flex items-center gap-3 mb-4 overflow-x-auto no-scrollbar py-2">
                 <span className="text-sm font-bold text-gray-300 mr-2">Temporada:</span>
                 {availableSeasons.map((sNum) => (
-                  <button
-                    key={`tv-season-${sNum}`}
-                    type="button"
-                    onClick={() => setCurrentSeason(sNum)}
-                    className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all outline-none ${
-                      currentSeason === sNum
-                        ? 'bg-cyan-500 text-black shadow-[0_0_12px_#00e5ff]'
-                        : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                    }`}
-                  >
-                    Temporada {sNum}
-                  </button>
+                  <TvSeasonButton key={`tv-season-${sNum}`} season={sNum} selected={currentSeason === sNum}
+                    onSelect={() => {
+                      if (sNum !== currentSeason) {
+                        uiSoundService.play('toggle');
+                        pendingEpisodeFocus.current = true;
+                        requestedEpisodeFocus.current = undefined;
+                        setIsLoadingEpisodes(true);
+                        setEpisodes([]);
+                        setStartIndex(0);
+                        lastFocusedEpisodeIndexRef.current = 0;
+                        isInitialMountRef.current = true;
+                        setCurrentSeason(sNum);
+                      }
+                    }}
+                    onDown={focusBelowSeasons} />
                 ))}
               </div>
             )}
 
-            {/* Trilho de Episódios */}
+            {/* Trilho de Episódios Enquadrado com Transição Suave */}
             <h3 className="text-base font-black text-white mb-3">
-              Episódios da Temporada {currentSeason} ({episodes.length})
+              Episódios da Temporada {currentSeason} ({validEpisodes.length})
             </h3>
 
             {isLoadingEpisodes ? (
               <div className="py-8 text-gray-400 text-sm">Carregando episódios...</div>
-            ) : episodes.length > 0 ? (
-              <div className="flex items-center gap-4 overflow-x-auto no-scrollbar py-2">
-                {episodes.map((ep, idx) => (
-                  <div
-                    key={`ep-${ep.number || idx}`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onPlay(item, currentSeason, ep.number || idx + 1)}
-                    className="flex-none w-[260px] bg-[#0c121e] rounded-xl overflow-hidden border border-white/10 hover:border-cyan-400 cursor-pointer transition-all hover:scale-105"
-                  >
-                    <div className="relative aspect-video bg-black/40 overflow-hidden">
-                      {ep.image ? (
-                        <img src={ep.image} alt={ep.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Play className="w-8 h-8 text-cyan-400/50" />
-                        </div>
-                      )}
-                      <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-[10px] font-bold text-white">
-                        EP {ep.number || idx + 1}
-                      </div>
-                    </div>
-                    <div className="p-2.5">
-                      <div className="text-xs font-bold text-white line-clamp-1">{ep.title || `Episódio ${ep.number || idx + 1}`}</div>
-                      <div className="text-[10px] text-gray-400 line-clamp-2 mt-1">{ep.description || ep.overview || ''}</div>
-                    </div>
-                  </div>
-                ))}
+            ) : validEpisodes.length > 0 ? (
+              <div 
+                ref={episodesContainerRef}
+                className="relative w-full overflow-hidden py-5 -my-5 px-3 -mx-3"
+              >
+                <div 
+                  className="flex items-center gap-5 will-change-transform"
+                  style={{
+                    transform: `translate3d(${translateX}px, 0, 0)`,
+                    transition: isInitialMountRef.current ? 'none' : `transform ${TRANSITION_DURATION}ms ${EASING_CURVE}`
+                  }}
+                >
+                  {validEpisodes.map((ep, idx) => {
+                    const epNum = Number(ep.number);
+                    const prevEp = idx > 0 ? validEpisodes[idx - 1] : null;
+                    const nextEp = idx < validEpisodes.length - 1 ? validEpisodes[idx + 1] : null;
+
+                    return (
+                      <TvEpisodeCard
+                        key={`ep-${currentSeason}-${epNum}`}
+                        episode={ep}
+                        season={currentSeason}
+                        index={idx}
+                        totalEpisodes={validEpisodes.length}
+                        cardWidth={cardWidth}
+                        onSelect={() => {
+                          uiSoundService.play('watch');
+                          onPlay(item, currentSeason, epNum);
+                        }}
+                        onFocus={() => handleEpisodeFocus(idx)}
+                        onUp={() => setFocus(availableSeasons.length > 1 ? seasonFocusKey(currentSeason) : 'tv-details-play')}
+                        onDown={() => {
+                          if (relatedItems.length) {
+                            setFocus(relatedFocusKey);
+                            return false;
+                          }
+                          return true;
+                        }}
+                        onNavigateLeft={prevEp ? () => setFocus(episodeFocusKey(currentSeason, Number(prevEp.number))) : undefined}
+                        onNavigateRight={nextEp ? () => setFocus(episodeFocusKey(currentSeason, Number(nextEp.number))) : undefined}
+                      />
+                    );
+                  })}
+                </div>
               </div>
             ) : (
               <div className="py-6 text-gray-500 text-xs">Nenhum episódio cadastrado para esta temporada.</div>
@@ -398,7 +722,26 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
               title="Títulos Semelhantes"
               rowId="related-titles"
               items={relatedItems}
-              onItemClick={(sel) => setItem(sel)}
+              onRowUp={() => {
+                const targetEp = validEpisodes[lastFocusedEpisodeIndexRef.current] || firstEpisode;
+                if (targetEp) {
+                  setFocus(episodeFocusKey(currentSeason, Number(targetEp.number)));
+                } else if (availableSeasons.length > 1) {
+                  setFocus(seasonFocusKey(currentSeason));
+                } else {
+                  setFocus('tv-details-play');
+                }
+              }}
+              onItemClick={(sel) => {
+                pendingEpisodeFocus.current = false;
+                requestedEpisodeFocus.current = undefined;
+                setCurrentSeason(1);
+                setAvailableSeasons([1]);
+                setEpisodes([]);
+                setIsLoadingEpisodes(true);
+                setItem(sel);
+                setFocus('tv-details-play');
+              }}
             />
           </div>
         )}

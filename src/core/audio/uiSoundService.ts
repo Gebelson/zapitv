@@ -12,9 +12,27 @@ export interface UiSoundPreferences {
   autoCarouselSounds: boolean;
 }
 
-const STORAGE_KEY = 'zapitv_ui_sound_v1';
-const DEFAULTS: UiSoundPreferences = { enabled: false, volume: 18, watchPartyNotifications: false,
-  hoverEnabled: true, navigationEnabled: true, autoCarouselSounds: false };
+const STORAGE_KEY_DESKTOP = 'zapitv_ui_sound_v1';
+const STORAGE_KEY_TV = 'zapitv_ui_sound_tv_v1';
+
+const DEFAULTS_DESKTOP: UiSoundPreferences = {
+  enabled: false,
+  volume: 18,
+  watchPartyNotifications: false,
+  hoverEnabled: true,
+  navigationEnabled: true,
+  autoCarouselSounds: false
+};
+
+const DEFAULTS_TV: UiSoundPreferences = {
+  enabled: true, // Sons permanentemente ativados por padrão na Smart TV
+  volume: 24,    // Volume inicial discreto e confortável na televisão (24%)
+  watchPartyNotifications: false,
+  hoverEnabled: true,
+  navigationEnabled: true,
+  autoCarouselSounds: false
+};
+
 const COOLDOWN: Record<UiSound, number> = {
   detailOpen: 180, detailClose: 180, watch: 450, sidebarOpen: 260, sidebarClose: 260,
   listAdd: 220, listRemove: 220, toggle: 110, partyConnect: 800, message: 650, error: 900,
@@ -23,28 +41,48 @@ const COOLDOWN: Record<UiSound, number> = {
   slideRight: 180, navigate: 200, success: 240, notification: 650
 };
 
-function clampVolume(value: number): number {
-  return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : DEFAULTS.volume;
+function clampVolume(value: number | undefined, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(0, Math.min(100, Math.round(value)))
+    : fallback;
 }
 
-function readPreferences(): UiSoundPreferences {
+function getActiveStorageKey(isTv: boolean): string {
+  return isTv ? STORAGE_KEY_TV : STORAGE_KEY_DESKTOP;
+}
+
+function getActiveDefaults(isTv: boolean): UiSoundPreferences {
+  return isTv ? DEFAULTS_TV : DEFAULTS_DESKTOP;
+}
+
+function readPreferences(isTv: boolean): UiSoundPreferences {
+  const key = getActiveStorageKey(isTv);
+  const defaults = getActiveDefaults(isTv);
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+    if (!raw) {
+      return { ...defaults };
+    }
+    const saved = JSON.parse(raw);
     return {
-      enabled: typeof saved.enabled === 'boolean' ? saved.enabled : DEFAULTS.enabled,
-      volume: clampVolume(saved.volume ?? DEFAULTS.volume),
+      enabled: typeof saved.enabled === 'boolean' ? saved.enabled : defaults.enabled,
+      volume: clampVolume(saved.volume, defaults.volume),
       watchPartyNotifications: saved.watchPartyNotifications === true,
       hoverEnabled: saved.hoverEnabled !== false,
       navigationEnabled: saved.navigationEnabled !== false,
       autoCarouselSounds: saved.autoCarouselSounds === true
     };
   } catch {
-    return { ...DEFAULTS };
+    return { ...defaults };
   }
 }
 
 class UiSoundService {
-  private preferences = readPreferences();
+  private isTvMode: boolean = typeof window !== 'undefined' &&
+    (window.location.pathname.startsWith('/tv') ||
+     window.location.search.includes('tv=1') ||
+     window.location.search.includes('tv=true'));
+  private preferences = readPreferences(this.isTvMode);
   private context: AudioContext | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private lastPlayed = new Map<UiSound, number>();
@@ -54,6 +92,29 @@ class UiSoundService {
   private sidebarHoverSuppressedUntil = 0;
   private listeners = new Set<() => void>();
   private activeEnvelopes = new Set<GainNode>();
+  private isSilenced: boolean = false;
+
+  public setTvMode(isTv: boolean): void {
+    if (this.isTvMode === isTv) return;
+    this.isTvMode = isTv;
+    this.preferences = readPreferences(isTv);
+    this.notify();
+  }
+
+  public isTv(): boolean {
+    return this.isTvMode;
+  }
+
+  public setSilenced(silenced: boolean): void {
+    this.isSilenced = silenced;
+    if (silenced) {
+      this.stopEffects();
+    }
+  }
+
+  public getLastAnyPlayed(): number {
+    return this.lastAnyPlayed;
+  }
 
   getPreferences(): UiSoundPreferences {
     return { ...this.preferences };
@@ -79,7 +140,7 @@ class UiSoundService {
   }
 
   syncFromStorage(): void {
-    const next = readPreferences();
+    const next = readPreferences(this.isTvMode);
     if (JSON.stringify(next) === JSON.stringify(this.preferences)) return;
     if (!next.enabled) this.stopEffects();
     this.preferences = next;
@@ -88,18 +149,28 @@ class UiSoundService {
 
   updatePreferences(changes: Partial<UiSoundPreferences>): UiSoundPreferences {
     if (changes.enabled === false) this.stopEffects();
+    const defaults = getActiveDefaults(this.isTvMode);
     this.preferences = {
       enabled: typeof changes.enabled === 'boolean' ? changes.enabled : this.preferences.enabled,
-      volume: changes.volume === undefined ? this.preferences.volume : clampVolume(changes.volume),
+      volume: changes.volume === undefined ? this.preferences.volume : clampVolume(changes.volume, defaults.volume),
       watchPartyNotifications: typeof changes.watchPartyNotifications === 'boolean'
         ? changes.watchPartyNotifications : this.preferences.watchPartyNotifications,
       hoverEnabled: typeof changes.hoverEnabled === 'boolean' ? changes.hoverEnabled : this.preferences.hoverEnabled,
       navigationEnabled: typeof changes.navigationEnabled === 'boolean' ? changes.navigationEnabled : this.preferences.navigationEnabled,
       autoCarouselSounds: typeof changes.autoCarouselSounds === 'boolean' ? changes.autoCarouselSounds : this.preferences.autoCarouselSounds
     };
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.preferences)); } catch {}
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(getActiveStorageKey(this.isTvMode), JSON.stringify(this.preferences));
+      }
+    } catch {}
     this.notify();
     return this.getPreferences();
+  }
+
+  resetDefaults(): UiSoundPreferences {
+    const defaults = getActiveDefaults(this.isTvMode);
+    return this.updatePreferences(defaults);
   }
 
   beginPlayback(): () => void {
@@ -115,7 +186,9 @@ class UiSoundService {
   prime(): void {
     if (!this.preferences.enabled || this.preferences.volume === 0) return;
     try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass = typeof window !== 'undefined'
+        ? (window.AudioContext || (window as any).webkitAudioContext)
+        : null;
       if (!AudioContextClass) return;
       this.context ??= new AudioContextClass();
       if (this.context?.state === 'suspended') void this.context.resume().catch(() => {});
@@ -124,6 +197,7 @@ class UiSoundService {
 
   play(sound: UiSound, options: { preview?: boolean; playerControl?: boolean; automatic?: boolean } = {}): void {
     try {
+      if (this.isSilenced && !options.preview) return;
       const prefs = this.preferences;
       if (!prefs.enabled || prefs.volume === 0) return;
       if (sound === 'message' && !prefs.watchPartyNotifications && !options.preview) return;
@@ -137,13 +211,16 @@ class UiSoundService {
       if (!options.preview && now - (this.lastPlayed.get(sound) ?? -Infinity) < COOLDOWN[sound]) return;
       if (isHover && now - this.lastHoverPlayed < 85) return;
 
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass = typeof window !== 'undefined'
+        ? (window.AudioContext || (window as any).webkitAudioContext)
+        : null;
       if (!AudioContextClass) return;
       this.context ??= new AudioContextClass();
       const context = this.context;
       if (!context) return;
       const renderIfCurrent = () => {
         if (performance.now() - now > 250) return;
+        if (this.isSilenced && !options.preview) return;
         if (this.activePlayers > 0 && sound !== 'error' && sound !== 'message' && sound !== 'watch' && !options.preview && !options.playerControl) return;
         if (!this.preferences.enabled || (sound === 'message' && !this.preferences.watchPartyNotifications)) return;
         this.render(sound, context, this.preferences.volume);
@@ -166,7 +243,10 @@ class UiSoundService {
   /** One listener pair for React portals and lazy routes; released when the app unmounts. */
   bindInteractions(root: Document): () => void {
     const onStorage = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY || event.key === null) this.syncFromStorage();
+      const activeKey = getActiveStorageKey(this.isTvMode);
+      if (event.key === activeKey || event.key === STORAGE_KEY_DESKTOP || event.key === STORAGE_KEY_TV || event.key === null) {
+        this.syncFromStorage();
+      }
     };
     window.addEventListener('storage', onStorage);
     const interactive = 'button, a[href], [role="button"], [role="switch"], [data-ui-sound-card]';

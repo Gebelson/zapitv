@@ -3,6 +3,7 @@ import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { ContentItem } from '../../../types';
 import { TvCard16x9, getCardAmbientGlow } from './TvCard16x9';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
+import { uiSoundService } from '../../core/audio/uiSoundService';
 
 interface TvContentRowProps {
   title: string;
@@ -20,14 +21,20 @@ interface TvContentRowProps {
 const SAFE_MARGIN_LEFT = 64;
 const CARD_GAP = 24; // gap-6 = 24px
 
+// Constantes de transição cinematográfica fluida (estilo Netflix)
+const NORMAL_DURATION = 320; // Duração cinematográfica suave para toques individuais (300-350ms)
+const CHAINED_DURATION = 260; // Duração ágil e contínua para toques rápidos ou tecla mantida pressionada
+const EASING_CURVE = 'cubic-bezier(0.22, 1, 0.36, 1)'; // Desaceleração suave e natural sem trancos
+
 /**
  * Retorna os slots visíveis no carrossel de acordo com a quantidade de mídias disponíveis.
- * Garante que nenhuma mídia seja duplicada simultaneamente na tela quando o catálogo for reduzido.
+ * Garante que nenhuma mídia seja duplicada simultaneamente na tela quando o catálogo for reduzido,
+ * mantendo sempre um slot à esquerda (-1) e à direita (1) para transição contínua.
  */
 const getVisibleSlots = (count: number): number[] => {
   if (count <= 0) return [];
   if (count === 1) return [0];
-  if (count === 2) return [-1, 0];
+  if (count === 2) return [-1, 0, 1];
   if (count === 3) return [-1, 0, 1];
   if (count === 4) return [-1, 0, 1, 2];
   if (count === 5) return [-1, 0, 1, 2, 3];
@@ -54,9 +61,16 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [translateX, setTranslateX] = useState(0);
   const [transitionEnabled, setTransitionEnabled] = useState(false);
+  const [transitionDuration, setTransitionDuration] = useState(NORMAL_DURATION);
+
+  const currentIndexRef = useRef(0);
+  currentIndexRef.current = currentIndex;
+
   const isAnimatingRef = useRef(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const pendingSlideRef = useRef<'right' | 'left' | null>(null);
+  const queuedDirectionRef = useRef<'right' | 'left' | null>(null);
+  const targetIndexRef = useRef(0);
+  const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Medição precisa da largura do card + gap (step) para transição fluida sem saltos
   const slotMeasureRef = useRef<HTMLDivElement>(null);
@@ -79,75 +93,117 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     return () => window.removeEventListener('resize', measure);
   }, []);
 
-  // Descarrega qualquer animação pendente imediatamente para permitir navegação rápida contínua
-  const flushPendingSlide = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
+  // Finalização da transição suave com atualização atômica de slots
+  const handleTransitionEnd = useCallback(() => {
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
     }
-    if (isAnimatingRef.current && pendingSlideRef.current) {
-      const dir = pendingSlideRef.current;
-      pendingSlideRef.current = null;
-      if (dir === 'right') {
-        setCurrentIndex(prev => (prev + 1) % items.length);
-      } else if (dir === 'left') {
-        setCurrentIndex(prev => (prev - 1 + items.length) % items.length);
-      }
-      setTransitionEnabled(false);
-      setTranslateX(0);
+
+    if (!isAnimatingRef.current) return;
+
+    const dir = pendingSlideRef.current;
+    pendingSlideRef.current = null;
+
+    let nextIndex = currentIndexRef.current;
+    if (dir === 'right') {
+      nextIndex = (currentIndexRef.current + 1) % items.length;
+    } else if (dir === 'left') {
+      nextIndex = (currentIndexRef.current - 1 + items.length) % items.length;
+    }
+
+    // Atualiza o índice do item ativo
+    setCurrentIndex(nextIndex);
+    currentIndexRef.current = nextIndex;
+    targetIndexRef.current = nextIndex;
+
+    // Reseta o deslocamento físico instantaneamente com a transição desativada
+    setTransitionEnabled(false);
+    setTranslateX(0);
+
+    // Se o usuário enfileirou nova direção enquanto animava, dispara continuamente sem saltos
+    const queuedDir = queuedDirectionRef.current;
+    queuedDirectionRef.current = null;
+
+    if (queuedDir && items.length > 1) {
+      requestAnimationFrame(() => {
+        if (trackRef.current) {
+          void trackRef.current.offsetHeight; // Força reflow do layout antes da próxima animação
+        }
+        uiSoundService.play(queuedDir === 'right' ? 'slideRight' : 'slideLeft');
+        triggerSlide(queuedDir, CHAINED_DURATION);
+      });
+    } else {
       isAnimatingRef.current = false;
     }
   }, [items.length]);
 
-  // Navegação horizontal circular para a direita: o trilho desliza e a seleção permanece fixa
+  // Inicia o deslocamento horizontal suave do carrossel
+  const triggerSlide = useCallback((direction: 'right' | 'left', duration: number = NORMAL_DURATION) => {
+    if (!items || items.length <= 1) return;
+
+    isAnimatingRef.current = true;
+    pendingSlideRef.current = direction;
+
+    const nextTarget = direction === 'right'
+      ? (currentIndexRef.current + 1) % items.length
+      : (currentIndexRef.current - 1 + items.length) % items.length;
+    targetIndexRef.current = nextTarget;
+
+    setTransitionDuration(duration);
+    setTransitionEnabled(true);
+    setTranslateX(direction === 'right' ? -stepSize : stepSize);
+
+    // Timer de segurança caso a Smart TV demore ou descarte o evento onTransitionEnd
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current);
+    }
+    fallbackTimerRef.current = setTimeout(() => {
+      handleTransitionEnd();
+    }, duration + 60);
+  }, [items, stepSize, handleTransitionEnd]);
+
+  // Navegação horizontal circular para a direita: transição contínua
   const slideNext = useCallback(() => {
     if (!items || items.length <= 1) return;
     if (isAnimatingRef.current) {
-      flushPendingSlide();
+      queuedDirectionRef.current = 'right';
+      return;
     }
+    uiSoundService.play('slideRight');
+    triggerSlide('right', NORMAL_DURATION);
+  }, [items, triggerSlide]);
 
-    isAnimatingRef.current = true;
-    pendingSlideRef.current = 'right';
-    setTransitionEnabled(true);
-    setTranslateX(-stepSize);
-
-    timerRef.current = setTimeout(() => {
-      setTransitionEnabled(false);
-      setCurrentIndex(prev => (prev + 1) % items.length);
-      setTranslateX(0);
-      isAnimatingRef.current = false;
-      pendingSlideRef.current = null;
-    }, 180);
-  }, [items, stepSize, flushPendingSlide]);
-
-  // Navegação horizontal circular para a esquerda: o trilho desliza e a seleção permanece fixa
+  // Navegação horizontal circular para a esquerda: transição contínua
   const slidePrev = useCallback(() => {
     if (!items || items.length <= 1) return;
     if (isAnimatingRef.current) {
-      flushPendingSlide();
+      queuedDirectionRef.current = 'left';
+      return;
     }
+    uiSoundService.play('slideLeft');
+    triggerSlide('left', NORMAL_DURATION);
+  }, [items, triggerSlide]);
 
-    isAnimatingRef.current = true;
-    pendingSlideRef.current = 'left';
-    setTransitionEnabled(true);
-    setTranslateX(stepSize);
-
-    timerRef.current = setTimeout(() => {
-      setTransitionEnabled(false);
-      setCurrentIndex(prev => (prev - 1 + items.length) % items.length);
-      setTranslateX(0);
-      isAnimatingRef.current = false;
-      pendingSlideRef.current = null;
-    }, 180);
-  }, [items, stepSize, flushPendingSlide]);
+  // Listener nativo de fim de transição no track
+  const onTrackTransitionEnd = useCallback((e: React.TransitionEvent<HTMLDivElement>) => {
+    if (e.target !== trackRef.current || e.propertyName !== 'transform') return;
+    handleTransitionEnd();
+  }, [handleTransitionEnd]);
 
   // Foco espacial do Norigin na fileira inteira com ancoragem no Slot 0
   const focusKey = `row-${rowId}`;
   const { ref: noriginRef, focused } = useTvFocusable({
     focusKey,
+    soundType: 'hoverCard',
     onEnterPress: () => {
-      if (items && items[currentIndex]) {
-        onItemClick(items[currentIndex]);
+      if (!items || items.length === 0) return;
+      // Se estiver no meio de um deslizamento, abre o item que está chegando à seleção ativa
+      const targetIdx = isAnimatingRef.current ? targetIndexRef.current : currentIndex;
+      const selectedItem = items[targetIdx] || items[currentIndex] || items[0];
+      if (selectedItem) {
+        uiSoundService.play('detailOpen');
+        onItemClick(selectedItem);
       }
     },
     onArrowPress: (direction) => {
@@ -196,7 +252,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   // Limpeza de timers
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
     };
   }, []);
 
@@ -271,10 +327,11 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
           {/* 3. Track Deslizante com cards verticais 2:3 (Z-10, entre o glow de fundo e a moldura externa) */}
           <div 
             ref={trackRef}
+            onTransitionEnd={onTrackTransitionEnd}
             className="relative z-10 flex items-center gap-6 will-change-transform"
             style={{
               transform: `translate3d(${baseOffset + translateX}px, 0, 0)`,
-              transition: transitionEnabled ? 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1)' : 'none',
+              transition: transitionEnabled ? `transform ${transitionDuration}ms ${EASING_CURVE}` : 'none',
             }}
           >
             {visibleSlots.map((slotIdx) => {

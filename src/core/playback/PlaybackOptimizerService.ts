@@ -47,6 +47,31 @@ export interface PlaybackTelemetry {
   activeAbrMode: 'auto' | 'manual';
   effectiveNetworkType: string;
   streamSourceType: 'hls' | 'mp4' | 'dash' | 'unknown';
+  hlsMethod: 'hls.js' | 'native' | null;
+  manifestLoadMs: number | null;
+  segmentLoadMs: number | null;
+  activeVideoBitrateKbps: number | null;
+  lastHttpStatus: number | null;
+  lastPlaybackEvent: string;
+  recoveryAttempts: number;
+  sourceSwitches: number;
+}
+
+// A pending transfer is evidence that the source is still responding. Do not
+// discard it for a short buffer underrun, but bound an unrecoverable stall.
+export function decideTvStallAction(input: {
+  elapsedMs: number;
+  sinceProgressMs: number;
+  bufferAheadSeconds: number;
+  recoveryAttempted: boolean;
+  online: boolean;
+}): 'wait' | 'recover' | 'fallback' {
+  if (!input.online || input.elapsedMs < 12_000) return 'wait';
+  if (input.elapsedMs >= 45_000 ||
+      (input.elapsedMs >= 30_000 && input.sinceProgressMs >= 15_000)) return 'fallback';
+  if (!input.recoveryAttempted &&
+      (input.bufferAheadSeconds >= 2 || input.sinceProgressMs >= 8_000)) return 'recover';
+  return 'wait';
 }
 
 export interface QualityVariant {
@@ -84,7 +109,15 @@ export class PlaybackOptimizerService {
     stallsRecovered: 0,
     activeAbrMode: 'auto',
     effectiveNetworkType: 'unknown',
-    streamSourceType: 'unknown'
+    streamSourceType: 'unknown',
+    hlsMethod: null,
+    manifestLoadMs: null,
+    segmentLoadMs: null,
+    activeVideoBitrateKbps: null,
+    lastHttpStatus: null,
+    lastPlaybackEvent: 'idle',
+    recoveryAttempts: 0,
+    sourceSwitches: 0
   };
 
   // Medição de largura de banda em tempo real (EWMA)
@@ -247,14 +280,15 @@ export class PlaybackOptimizerService {
     let maxMaxBufferLength = 60;
     let maxBufferSize = 30 * 1024 * 1024; // 30 MB
 
-    if (net.isSlowConnection || dev.isLowEnd) {
+    if (dev.deviceType === 'smart-tv') {
+      // Low core count alone does not mean a high-bitrate TV can survive on 15 MB.
+      maxBufferLength = dev.isLowEnd ? 24 : 30;
+      maxMaxBufferLength = dev.isLowEnd ? 40 : 60;
+      maxBufferSize = (dev.isLowEnd ? 24 : 30) * 1024 * 1024;
+    } else if (net.isSlowConnection || dev.isLowEnd) {
       maxBufferLength = 15;
       maxMaxBufferLength = 30;
       maxBufferSize = 15 * 1024 * 1024; // 15 MB
-    } else if (dev.deviceType === 'smart-tv') {
-      maxBufferLength = 30;
-      maxMaxBufferLength = 60;
-      maxBufferSize = 30 * 1024 * 1024;
     } else if (net.downlinkMbps >= 15 && !dev.isLowEnd) {
       // Conexão rápida em desktop: buffer generoso para zero travamentos
       maxBufferLength = 45;
@@ -269,7 +303,7 @@ export class PlaybackOptimizerService {
       maxBufferLength,
       maxMaxBufferLength,
       maxBufferSize,
-      capLevelToPlayerSize: true, // Nunca baixa 4K se o player for menor que 1080p
+      capLevelToPlayerSize: !(dev.deviceType === 'smart-tv' && dev.maxOptimalResolution === '4K'),
       autoStartLoad: true,
       startFragPrefetch: true, // Carrega antecipadamente o próximo segmento
       fragLoadingTimeOut: net.isSlowConnection ? 20000 : 12000,
@@ -288,6 +322,24 @@ export class PlaybackOptimizerService {
     };
   }
 
+  /** Recalculate the TV buffer from the active rendition, bounded by memory. */
+  public tuneTvHlsBuffer(config: Partial<HlsConfig>, bitrateBps: number): void {
+    const dev = this.getDeviceProfile();
+    if (dev.deviceType !== 'smart-tv' || !Number.isFinite(bitrateBps) || bitrateBps <= 0) return;
+    const net = this.getNetworkProfile();
+    const targetSeconds = net.isUnstable ? 36 : net.isSlowConnection ? 30 : 28;
+    const reportedMemoryGb = Number((navigator as any).deviceMemory);
+    const memoryCapMb = Number.isFinite(reportedMemoryGb) && reportedMemoryGb > 0
+      ? reportedMemoryGb <= 1 ? 20 : reportedMemoryGb <= 2 ? 30 : 48
+      : dev.isLowEnd ? 30 : 48;
+    const memoryCapBytes = memoryCapMb * 1024 * 1024;
+    const targetBytes = Math.min(memoryCapBytes, Math.max(18 * 1024 * 1024, bitrateBps * targetSeconds / 8));
+    const affordableSeconds = targetBytes * 8 / bitrateBps;
+    config.maxBufferSize = Math.round(targetBytes);
+    config.maxBufferLength = Math.max(8, Math.min(targetSeconds, affordableSeconds));
+    config.maxMaxBufferLength = Math.max(config.maxBufferLength, Math.min(60, affordableSeconds));
+  }
+
   /**
    * Notifica início do carregamento de uma mídia para contagem de TTFF
    */
@@ -298,6 +350,12 @@ export class PlaybackOptimizerService {
     this.telemetry.bufferingCount = 0;
     this.telemetry.totalBufferingDurationMs = 0;
     this.telemetry.stallsRecovered = 0;
+    this.telemetry.hlsMethod = null;
+    this.telemetry.manifestLoadMs = null;
+    this.telemetry.segmentLoadMs = null;
+    this.telemetry.activeVideoBitrateKbps = null;
+    this.telemetry.lastHttpStatus = null;
+    this.telemetry.lastPlaybackEvent = 'loading';
     this.bufferStartTime = null;
   }
 
@@ -380,6 +438,32 @@ export class PlaybackOptimizerService {
     this.notifyTelemetry();
   }
 
+  public recordTvHlsMethod(method: 'hls.js' | 'native'): void {
+    this.telemetry.hlsMethod = method;
+  }
+
+  public recordTvHlsManifest(durationMs: number): void {
+    if (Number.isFinite(durationMs) && durationMs >= 0) this.telemetry.manifestLoadMs = Math.round(durationMs);
+  }
+
+  public recordTvHlsSegment(durationMs: number): void {
+    if (Number.isFinite(durationMs) && durationMs >= 0) this.telemetry.segmentLoadMs = Math.round(durationMs);
+  }
+
+  public recordTvHlsBitrate(bitrateBps: number): void {
+    if (Number.isFinite(bitrateBps) && bitrateBps > 0) this.telemetry.activeVideoBitrateKbps = Math.round(bitrateBps / 1000);
+  }
+
+  public recordTvPlaybackEvent(event: string, httpStatus?: number): void {
+    this.telemetry.lastPlaybackEvent = event;
+    if (httpStatus && Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599) {
+      this.telemetry.lastHttpStatus = httpStatus;
+    }
+  }
+
+  public recordTvRecovery(): void { this.telemetry.recoveryAttempts++; }
+  public recordTvSourceSwitch(): void { this.telemetry.sourceSwitches++; }
+
   /**
    * Avalia e decide a qualidade ABR ótima para fontes MP4 nativas (Multi-Source ABR)
    */
@@ -455,7 +539,15 @@ export class PlaybackOptimizerService {
       stallsRecovered: 0,
       activeAbrMode: 'auto',
       effectiveNetworkType: this.getNetworkProfile().effectiveType,
-      streamSourceType: 'unknown'
+      streamSourceType: 'unknown',
+      hlsMethod: null,
+      manifestLoadMs: null,
+      segmentLoadMs: null,
+      activeVideoBitrateKbps: null,
+      lastHttpStatus: null,
+      lastPlaybackEvent: 'idle',
+      recoveryAttempts: 0,
+      sourceSwitches: 0
     };
     this.notifyTelemetry();
   }

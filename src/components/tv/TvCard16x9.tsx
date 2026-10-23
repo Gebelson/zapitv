@@ -59,11 +59,18 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   suppressFocusBorder = false
 }) => {
   // Prioriza o poster vertical real em 2:3 com luminosidade e cores originais
-  const [imgSrc, setImgSrc] = useState<string>(() => {
-    return posterRecoveryService.getCachedPoster(item) || item.image || item.poster || item.backdrop || '';
-  });
-  const [hasImageError, setHasImageError] = useState(false);
+  const targetPoster = posterRecoveryService.getCachedPoster(item) || item.image || item.poster || item.backdrop || '';
+  const [prevItemId, setPrevItemId] = useState(item.id);
+  const [imgSrc, setImgSrc] = useState<string>(targetPoster);
+  const [hasImageError, setHasImageError] = useState(!targetPoster);
   const cardContainerRef = useRef<HTMLDivElement>(null);
+
+  // Sincronização síncrona no render: elimina o atraso de 1 frame e evita piscadas na troca de itens dos slots
+  if (prevItemId !== item.id) {
+    setPrevItemId(item.id);
+    setImgSrc(targetPoster);
+    setHasImageError(!targetPoster);
+  }
 
   // Progresso de reprodução real para "Continuar Assistindo"
   const [continuity, setContinuity] = useState<PlaybackContinuityInfo>(() => {

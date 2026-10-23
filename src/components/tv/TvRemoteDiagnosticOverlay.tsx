@@ -75,7 +75,7 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
           const engine = telemetry.streamSourceType === 'hls'
             ? (video.currentSrc.startsWith('blob:') ? 'HLS.js' : 'HLS nativo')
             : 'HTML5 nativo';
-          setVideoMetrics(`${device.deviceType} · ${engine} · ${resolution} · qualidade ${quality} · fonte ${declared} · buffer ${buffer}s · interrupções ${telemetry.bufferingCount} (${Math.round(telemetry.totalBufferingDurationMs / 1000)}s) · recuperações ${telemetry.stallsRecovered} · quadros perdidos ${dropped} · erro de mídia ${video.error?.code || 0}`);
+          setVideoMetrics(`${device.deviceType} · ${telemetry.hlsMethod || engine} · ${resolution} · qualidade ${quality} · fonte ${declared} · bitrate ${telemetry.activeVideoBitrateKbps ?? '?'} kbps · transferência ${telemetry.currentBitrateKbps ?? '?'} kbps · buffer ${buffer}s · 1º quadro ${telemetry.ttffMs ?? '?'} ms · manifesto ${telemetry.manifestLoadMs ?? '?'} ms · segmento ${telemetry.segmentLoadMs ?? '?'} ms · interrupções ${telemetry.bufferingCount} (${Math.round(telemetry.totalBufferingDurationMs / 1000)}s) · recuperações ${telemetry.recoveryAttempts} · trocas ${telemetry.sourceSwitches} · evento ${telemetry.lastPlaybackEvent} · HTTP ${telemetry.lastHttpStatus ?? '-'} · quadros perdidos ${dropped} · erro de mídia ${video.error?.code || 0}`);
         }
       }
     }, 250);

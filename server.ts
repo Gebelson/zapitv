@@ -18,6 +18,7 @@ import { databaseRouter } from "./src/server/database/routes.ts";
 import { authenticateAdmin } from "./src/server/database/firebaseAuth.ts";
 import { watchPartyRouter } from "./src/server/watchparty/routes.ts";
 import { publicHttpGet } from "./src/server/security/publicHttp.ts";
+import { normalizeProxyRange } from "./src/server/proxyRange.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -644,10 +645,11 @@ function createApp() {
       }
 
       if (req.headers.range) {
-        if (typeof req.headers.range !== 'string' || !/^bytes=\d*-\d*(?:,\d*-\d*){0,4}$/.test(req.headers.range)) {
+        const safeRange = typeof req.headers.range === 'string' ? normalizeProxyRange(req.headers.range) : null;
+        if (!safeRange) {
           return res.status(416).json({ error: 'Range inválido' });
         }
-        headers["Range"] = req.headers.range;
+        headers["Range"] = safeRange;
       }
 
       const controller = new AbortController();

@@ -146,15 +146,38 @@ body.tv-mode .zapi-tv-root * {
   -webkit-tap-highlight-color: transparent !important;
 }
 
-/* No modo TV, desativa filtros de desfoque pesado (backdrop-filter) que derrubam a taxa de quadros */
-body.tv-mode .zapi-tv-root .backdrop-blur-md,
-body.tv-mode .zapi-tv-root .backdrop-blur-lg,
-body.tv-mode .zapi-tv-root .backdrop-blur-xl,
-body.tv-mode .zapi-tv-root .backdrop-blur-2xl,
-body.tv-mode .zapi-tv-root .backdrop-blur-3xl {
+/* No modo TV, desativa filtros de desfoque pesado (backdrop-filter) que derrubam a taxa de quadros,
+   mantendo uma exceção controlada e otimizada exclusivamente para o Header flutuante (.tv-header-blur) */
+body.tv-mode .zapi-tv-root .backdrop-blur-md:not(.tv-header-blur),
+body.tv-mode .zapi-tv-root .backdrop-blur-lg:not(.tv-header-blur),
+body.tv-mode .zapi-tv-root .backdrop-blur-xl:not(.tv-header-blur),
+body.tv-mode .zapi-tv-root .backdrop-blur-2xl:not(.tv-header-blur),
+body.tv-mode .zapi-tv-root .backdrop-blur-3xl:not(.tv-header-blur) {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   background-color: rgba(10, 15, 25, 0.95) !important;
+}
+
+/* Header flutuante da Smart TV: desfoque real progressivo e cinematográfico com aceleração de GPU */
+.zapi-tv-root .tv-header-blur {
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  background-color: transparent !important;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+/* Fallback leve para Smart TVs legadas sem suporte a backdrop-filter */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .zapi-tv-root .tv-header-blur {
+    background: linear-gradient(
+      to bottom,
+      rgba(5, 7, 10, 0.96) 0%,
+      rgba(5, 7, 10, 0.85) 45%,
+      rgba(5, 7, 10, 0.35) 80%,
+      transparent 100%
+    ) !important;
+  }
 }
 
 

@@ -16,14 +16,17 @@ import { parseWatchRoute, getWatchRoute } from '../../core/routes/navigationRout
 import { TvHeader, TvTab } from '../../components/tv/TvHeader';
 import { TvHomeView } from '../../components/tv/TvHomeView';
 import { TvCategoryView } from '../../components/tv/TvCategoryView';
+import { TvAnimeView } from '../../components/tv/TvAnimeView';
 import { TvSearchView } from '../../components/tv/TvSearchView';
 import { TvListView } from '../../components/tv/TvListView';
+import { TvSettingsView } from '../../components/tv/TvSettingsView';
 import { TvDetailsModal } from '../../components/tv/TvDetailsModal';
 import { TvRemoteDiagnosticOverlay } from '../../components/tv/TvRemoteDiagnosticOverlay';
 import { TvScreensaver } from '../../components/tv/TvScreensaver';
 import { TvWatchError } from '../../components/tv/TvWatchError';
 import { ZapiLoader } from '../../components/common/ZapiLoader';
 import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { uiSoundService } from '../../core/audio/uiSoundService';
 
 // Lazy load do orquestrador de reprodução para máxima performance inicial na TV
 const ContentDetailModal = lazy(() => import('../../../components/ContentDetailModal'));
@@ -39,6 +42,8 @@ interface TvAppProps {
   favorites: string[];
   onToggleList: (e: any, id: string) => void;
   onToggleFavorite: (e: any, id: string) => void;
+  onToggleListById: (id: string) => void;
+  onToggleFavoriteById: (id: string) => void;
   currentUser?: User;
   activeProfile?: Profile | null;
 }
@@ -54,6 +59,8 @@ export const TvApp: React.FC<TvAppProps> = ({
   favorites,
   onToggleList,
   onToggleFavorite,
+  onToggleListById,
+  onToggleFavoriteById,
   currentUser,
   activeProfile
 }) => {
@@ -65,6 +72,7 @@ export const TvApp: React.FC<TvAppProps> = ({
     tvNavigationManager.init();
     tvNavigationManager.resume();
     tvModeService.setTvMode(true);
+    uiSoundService.setTvMode(true);
     document.body.classList.add('tv-mode');
 
     const timer = setTimeout(() => {
@@ -77,6 +85,7 @@ export const TvApp: React.FC<TvAppProps> = ({
       clearTimeout(timer);
       tvNavigationManager.pause();
       tvModeService.setTvMode(false);
+      uiSoundService.setTvMode(false);
       document.body.classList.remove('tv-mode');
     };
   }, []);
@@ -103,6 +112,7 @@ export const TvApp: React.FC<TvAppProps> = ({
   // Item selecionado para detalhes ou reprodução
   const [selectedDetailItem, setSelectedDetailItem] = useState<ContentItem | null>(null);
   const [selectedDetailSeason, setSelectedDetailSeason] = useState<number | undefined>();
+  const [selectedDetailEpisode, setSelectedDetailEpisode] = useState<number | undefined>();
   const [playingItem, setPlayingItem] = useState<{
     item: ContentItem;
     season?: number;
@@ -121,6 +131,7 @@ export const TvApp: React.FC<TvAppProps> = ({
   const handleOpenDetailModal = useCallback((item: ContentItem) => {
     tvNavigationManager.saveFocusSnapshot();
     setSelectedDetailSeason(undefined);
+    setSelectedDetailEpisode(undefined);
     setSelectedDetailItem(item);
   }, []);
 
@@ -235,6 +246,7 @@ export const TvApp: React.FC<TvAppProps> = ({
 
         setSelectedDetailItem(found);
         setSelectedDetailSeason(resolvedSeason);
+        setSelectedDetailEpisode(resolvedEpisode);
         setPlayingItem({
           item: found,
           season: resolvedSeason,
@@ -263,6 +275,7 @@ export const TvApp: React.FC<TvAppProps> = ({
 
     setSelectedDetailItem(item);
     setSelectedDetailSeason(resolvedSeason);
+    setSelectedDetailEpisode(resolvedEpisode);
     setPlayingItem({ item, season: resolvedSeason, episode: resolvedEpisode });
   }, [selectedDetailItem, navigate]);
 
@@ -270,7 +283,8 @@ export const TvApp: React.FC<TvAppProps> = ({
     const itemToPreserve = playingItem?.item || selectedDetailItem;
     if (itemToPreserve) {
       setSelectedDetailItem(itemToPreserve);
-      setSelectedDetailSeason(storageService.getPlaybackContinuity(itemToPreserve).season || playingItem?.season);
+      setSelectedDetailSeason(playingItem?.season || storageService.getPlaybackContinuity(itemToPreserve).season);
+      setSelectedDetailEpisode(playingItem?.episode || storageService.getPlaybackContinuity(itemToPreserve).episode);
     }
     setPlayingItem(null);
     navigate('/tv', { replace: true });
@@ -281,6 +295,7 @@ export const TvApp: React.FC<TvAppProps> = ({
     setPlayingItem(null);
     setSelectedDetailItem(null);
     setSelectedDetailSeason(undefined);
+    setSelectedDetailEpisode(undefined);
     setSpecialView(null);
     setCurrentTab('home');
     navigate('/tv', { replace: true });
@@ -292,7 +307,8 @@ export const TvApp: React.FC<TvAppProps> = ({
   useEffect(() => {
     if (!parseWatchRoute(location.pathname).isWatch && playingItem) {
       setSelectedDetailItem(playingItem.item);
-      setSelectedDetailSeason(storageService.getPlaybackContinuity(playingItem.item).season || playingItem.season);
+      setSelectedDetailSeason(playingItem.season || storageService.getPlaybackContinuity(playingItem.item).season);
+      setSelectedDetailEpisode(playingItem.episode || storageService.getPlaybackContinuity(playingItem.item).episode);
       setPlayingItem(null);
     }
   }, [location.pathname, playingItem]);
@@ -304,6 +320,7 @@ export const TvApp: React.FC<TvAppProps> = ({
   const wasSaverActiveRef = React.useRef(false);
 
   useEffect(() => {
+    uiSoundService.setSilenced(screensaverActive);
     if (screensaverActive) {
       preSaverFocusRef.current = getCurrentFocusKey() || null;
       wasSaverActiveRef.current = true;
@@ -414,16 +431,7 @@ export const TvApp: React.FC<TvAppProps> = ({
                 onBack={() => setSpecialView(null)}
               />
             ) : specialView === 'settings' ? (
-              <div className="pt-24 px-12 text-center text-gray-400">
-                <h2 className="text-xl font-bold text-white mb-2">Configurações da Smart TV</h2>
-                <p className="text-sm">Preferências de áudio dublado em Português e qualidade automática ativadas.</p>
-                <button
-                  onClick={() => setSpecialView(null)}
-                  className="mt-6 px-6 py-2.5 rounded-xl bg-cyan-500 text-black font-bold"
-                >
-                  Voltar
-                </button>
-              </div>
+              <TvSettingsView onBack={() => setSpecialView(null)} />
             ) : currentTab === 'home' ? (
               <TvHomeView
                 suspended={screensaverActive}
@@ -451,11 +459,12 @@ export const TvApp: React.FC<TvAppProps> = ({
                 onPlayItem={(it) => handleStartPlay(it)}
               />
             ) : currentTab === 'animes' ? (
-              <TvCategoryView
-                categoryTitle="Animes"
+              <TvAnimeView
                 items={animeItems}
+                allContent={fullTvCatalog}
                 onSelectItem={handleOpenDetailModal}
                 onPlayItem={(it) => handleStartPlay(it)}
+                suspended={screensaverActive}
               />
             ) : (
               <TvCategoryView
@@ -472,11 +481,12 @@ export const TvApp: React.FC<TvAppProps> = ({
             <TvDetailsModal
               item={selectedDetailItem}
               initialSeason={selectedDetailSeason}
+              initialEpisode={selectedDetailEpisode}
               allContent={fullTvCatalog}
               myList={myList}
               favorites={favorites}
-              onToggleList={onToggleList}
-              onToggleFavorite={onToggleFavorite}
+              onToggleList={onToggleListById}
+              onToggleFavorite={onToggleFavoriteById}
               onClose={() => {
                 setSelectedDetailItem(null);
                 tvNavigationManager.restoreFocusSnapshot('tv-hero-play');

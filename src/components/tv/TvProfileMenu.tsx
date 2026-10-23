@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { Bookmark, Clock, Settings, RotateCw, ChevronRight } from 'lucide-react';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
+import { uiSoundService } from '../../core/audio/uiSoundService';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvProfileMenuProps {
@@ -75,10 +76,16 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
     trackChildren: true
   });
 
+  const handleClose = useCallback(() => {
+    uiSoundService.play('close');
+    onClose();
+  }, [onClose]);
+
   // Manipulador para atualizar ZapiTV (recarregamento real, bypass de cache e busca da versão Vercel)
   const handleUpdateApp = useCallback(async () => {
     if (isUpdating) return;
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    uiSoundService.play('confirm');
     setIsUpdating(true);
 
     try {
@@ -129,7 +136,7 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
     }, 50);
 
     const unregister = tvNavigationManager.registerBackHandler('tv-profile-menu', 100, () => {
-      onClose();
+      handleClose();
       // Restaura o foco para o botão de perfil
       setTimeout(() => setFocus('tv-nav-profile'), 50);
       return true;
@@ -139,7 +146,7 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
       clearTimeout(timer);
       unregister();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, handleClose]);
 
   const setCombinedRef = useCallback((node: HTMLDivElement | null) => {
     (menuRef as any).current = node;
@@ -155,7 +162,7 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
         className="fixed inset-0 z-[150] bg-black/40 backdrop-blur-none"
         onClick={() => {
           if (!isUpdating) {
-            onClose();
+            handleClose();
             setFocus('tv-nav-profile');
           }
         }}
@@ -193,6 +200,7 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
             icon={<Bookmark className="w-4 h-4" />}
             label="Minha Lista"
             onClick={() => {
+              uiSoundService.play('click');
               onClose();
               onNavigate('mylist');
             }}
@@ -203,6 +211,7 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
             icon={<Clock className="w-4 h-4" />}
             label="Histórico"
             onClick={() => {
+              uiSoundService.play('click');
               onClose();
               onNavigate('history');
             }}
@@ -213,6 +222,7 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
             icon={<Settings className="w-4 h-4" />}
             label="Configurações"
             onClick={() => {
+              uiSoundService.play('click');
               onClose();
               onNavigate('settings');
             }}
