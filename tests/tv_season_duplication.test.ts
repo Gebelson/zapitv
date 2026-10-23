@@ -159,7 +159,9 @@ async function runSeasonDuplicationSuite() {
   console.log('\nTodos os 10 testes de normalização de temporadas na Smart TV passaram com 100% de sucesso!\n');
 }
 
-runSeasonDuplicationSuite().catch(err => {
+runSeasonDuplicationSuite().then(() => {
+  process.exit(0);
+}).catch(err => {
   console.error('\n❌ Falha nos testes de normalização de temporadas:', err);
   process.exit(1);
 });

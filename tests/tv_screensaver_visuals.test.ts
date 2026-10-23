@@ -154,7 +154,7 @@ async function runTvScreensaverVisualsTests() {
 
 }
 
-runTvScreensaverVisualsTests().catch((err) => {
+runTvScreensaverVisualsTests().then(() => { process.exit(0); }).catch((err) => {
   console.error('\n❌ Falha nos testes visuais do descanso de tela:', err);
   process.exit(1);
 });

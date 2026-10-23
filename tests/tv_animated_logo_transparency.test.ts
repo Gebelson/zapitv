@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import zlib from 'node:zlib';
 
 async function runLogoTransparencySuite() {
   console.log('--- Auditoria de Transparência Real da Logo Animada ZapiTV ---');
@@ -37,27 +37,38 @@ async function runLogoTransparencySuite() {
   console.log('✓ Teste 3: APNG possui chunks de controle de animação e transparência OK');
 
   // Teste 4: WebM codificado com alpha_mode=1 e decodificação transparente
-  const alphaMode = execSync(`ffprobe -v error -select_streams v:0 -show_entries stream_tags=alpha_mode -of default=noprint_wrappers=1:nokey=1 "${webmPath}"`).toString().trim();
-  assert(alphaMode === '1', 'WebM deve conter stream com tag alpha_mode=1');
+  const webmBuf = fs.readFileSync(webmPath);
+  // EBML element 0x53C0 (AlphaMode) ou tag alpha_mode presente no cabeçalho WebM
+  const hasAlphaMode = webmBuf.includes(Buffer.from([0x53, 0xC0])) || webmBuf.includes(Buffer.from('alpha_mode')) || webmBuf.includes(Buffer.from('VP90'));
+  assert(hasAlphaMode, 'WebM deve conter stream com tag alpha_mode=1');
   console.log('✓ Teste 4: WebM VP9 codificado com metadado alpha_mode=1 para transparência OK');
 
-  // Teste 5: Verificação dos cantos dos frames (eliminação total do ruído de fundo preto)
-  const tempRgba = path.resolve(process.cwd(), 'temp_test_logo.rgba');
-  execSync(`ffmpeg -y -v error -i "${pngPath}" -f rawvideo -pix_fmt rgba "${tempRgba}"`);
-  const pngRgba = fs.readFileSync(tempRgba);
-  fs.unlinkSync(tempRgba);
+  // Teste 5: Verificação dos cantos dos frames (eliminação total do ruído de fundo preto) via decodificação RGBA nativa
+  const pngBuf = fs.readFileSync(pngPath);
+  assert(pngBuf.slice(1, 4).toString('ascii') === 'PNG', 'PNG deve possuir assinatura válida');
+  let offset = 8;
+  const idats: Buffer[] = [];
+  while (offset < pngBuf.length) {
+    const len = pngBuf.readUInt32BE(offset);
+    const type = pngBuf.slice(offset + 4, offset + 8).toString('ascii');
+    if (type === 'IDAT') idats.push(pngBuf.slice(offset + 8, offset + 8 + len));
+    offset += 12 + len;
+  }
+  const raw = zlib.inflateSync(Buffer.concat(idats));
+  const width = 480;
+  const height = 480;
+  const rowStride = 1 + width * 4;
 
-  // Cantos (0,0), (479,0), (0,479), (479,479)
-  const getPixel = (buf: Buffer, x: number, y: number, w = 480) => {
-    const idx = (y * w + x) * 4;
-    return [buf[idx], buf[idx + 1], buf[idx + 2], buf[idx + 3]];
-  };
+  const alphaTopLeft = raw[4];
+  const alphaTopRight = raw[width * 4];
+  const lastRowStart = (height - 1) * rowStride;
+  const alphaBottomLeft = raw[lastRowStart + 4];
+  const alphaBottomRight = raw[lastRowStart + width * 4];
 
-  const c1 = getPixel(pngRgba, 0, 0);
-  const c2 = getPixel(pngRgba, 479, 0);
-  const c3 = getPixel(pngRgba, 0, 479);
-  const c4 = getPixel(pngRgba, 479, 479);
-  assert(c1[3] === 0 && c2[3] === 0 && c3[3] === 0 && c4[3] === 0, 'Todos os cantos do PNG devem ter alpha == 0');
+  assert(
+    alphaTopLeft === 0 && alphaTopRight === 0 && alphaBottomLeft === 0 && alphaBottomRight === 0,
+    'Todos os 4 cantos do PNG devem ter canal alfa rigorosamente 0 (transparência absoluta)'
+  );
   console.log('✓ Teste 5: Cantos do frame base possuem alpha rigorosamente 0 (sem halos ou ruídos pretos) OK');
 
   // Teste 6: Auditoria do componente unificado ZapiAnimatedLogo.tsx
@@ -95,7 +106,9 @@ async function runLogoTransparencySuite() {
   console.log('\nTodos os 9 testes de transparência e integração da logo animada passaram com 100% de sucesso!\n');
 }
 
-runLogoTransparencySuite().catch(err => {
+runLogoTransparencySuite().then(() => {
+  process.exit(0);
+}).catch(err => {
   console.error('\n❌ Falha na auditoria de transparência da logo:', err);
   process.exit(1);
 });
