@@ -9,6 +9,9 @@ class TvScrollService {
   private static instance: TvScrollService;
   private isScrollingToHero: boolean = false;
   private heroScrollTimer: any = null;
+  private lastRowScrollTime: number = 0;
+  private pendingRowScrollRaf: any = null;
+  private targetRowElement: HTMLElement | null = null;
 
   private constructor() {}
 
@@ -17,6 +20,54 @@ class TvScrollService {
       TvScrollService.instance = new TvScrollService();
     }
     return TvScrollService.instance;
+  }
+
+  /**
+   * Centralização vertical coordenada de carrossel de conteúdo.
+   * Elimina chamadas concorrentes e saltos bruscos ao navegar com setas verticais.
+   */
+  public scrollToRow(element: HTMLElement | null): void {
+    if (!element) return;
+    if (this.isScrollingToHero) return;
+
+    this.targetRowElement = element;
+    if (this.pendingRowScrollRaf !== null) {
+      if (typeof cancelAnimationFrame !== 'undefined') {
+        cancelAnimationFrame(this.pendingRowScrollRaf);
+      } else {
+        clearTimeout(this.pendingRowScrollRaf);
+      }
+      this.pendingRowScrollRaf = null;
+    }
+
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const isRapid = now - this.lastRowScrollTime < 180;
+    this.lastRowScrollTime = now;
+
+    const executeScroll = () => {
+      this.pendingRowScrollRaf = null;
+      if (!this.targetRowElement || this.isScrollingToHero) return;
+
+      try {
+        if (typeof (this.targetRowElement as any).scrollIntoView === 'function') {
+          this.targetRowElement.scrollIntoView({
+            behavior: isRapid ? 'auto' : 'smooth',
+            block: 'center'
+          });
+        }
+      } catch {
+        try {
+          (this.targetRowElement as any).scrollIntoView?.(false);
+        } catch {}
+      }
+      this.targetRowElement = null;
+    };
+
+    if (typeof requestAnimationFrame !== 'undefined') {
+      this.pendingRowScrollRaf = requestAnimationFrame(executeScroll);
+    } else {
+      this.pendingRowScrollRaf = setTimeout(executeScroll, 16);
+    }
   }
 
   /**
@@ -75,7 +126,7 @@ class TvScrollService {
   }
 
   public isScrolling(): boolean {
-    return this.isScrollingToHero;
+    return this.isScrollingToHero || this.pendingRowScrollRaf !== null;
   }
 
   public reset(): void {
@@ -83,6 +134,15 @@ class TvScrollService {
       clearTimeout(this.heroScrollTimer);
       this.heroScrollTimer = null;
     }
+    if (this.pendingRowScrollRaf !== null) {
+      if (typeof cancelAnimationFrame !== 'undefined') {
+        cancelAnimationFrame(this.pendingRowScrollRaf);
+      } else {
+        clearTimeout(this.pendingRowScrollRaf);
+      }
+      this.pendingRowScrollRaf = null;
+    }
+    this.targetRowElement = null;
     this.isScrollingToHero = false;
   }
 }

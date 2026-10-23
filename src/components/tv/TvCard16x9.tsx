@@ -91,16 +91,29 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
     return () => window.removeEventListener('zapitv_progress_updated', handleProgress);
   }, [item, showProgress]);
 
-  // Atualiza imagem quando o item muda
+  // Atualiza imagem quando o item muda preservando rigorosamente a URL otimizada
   useEffect(() => {
-    const nextSrc = posterRecoveryService.getCachedPoster(item) || item.image || item.poster || item.backdrop || '';
-    setImgSrc(nextSrc);
-    setHasImageError(!nextSrc);
+    const raw = posterRecoveryService.getCachedPoster(item) || item.image || item.poster || item.backdrop || '';
+    const optimized = tvPerformanceProfileService.getOptimizedPosterUrl(raw);
+    setImgSrc(optimized);
+    setHasImageError(!optimized);
   }, [item.id, item.image, item.poster, item.backdrop]);
 
   const handleImgError = () => {
-    if (imgSrc !== item.backdrop && item.backdrop) {
-      setImgSrc(item.backdrop);
+    // 1. Se a versão otimizada (w500) falhou, tenta a URL original antes de desistir
+    if (rawPoster && imgSrc !== rawPoster) {
+      setImgSrc(rawPoster);
+      return;
+    }
+    // 2. Se o poster falhou, tenta o backdrop
+    const rawBackdrop = item.backdrop || '';
+    const optBackdrop = tvPerformanceProfileService.getOptimizedPosterUrl(rawBackdrop);
+    if (optBackdrop && imgSrc !== optBackdrop) {
+      setImgSrc(optBackdrop);
+      return;
+    }
+    if (rawBackdrop && imgSrc !== rawBackdrop) {
+      setImgSrc(rawBackdrop);
       return;
     }
     setHasImageError(true);
@@ -234,6 +247,17 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
         />
       )}
     </div>
+  );
+}, (prev, next) => {
+  return (
+    prev.item.id === next.item.id &&
+    prev.isFocused === next.isFocused &&
+    prev.showProgress === next.showProgress &&
+    prev.priority === next.priority &&
+    prev.isFocusable === next.isFocusable &&
+    prev.disableScale === next.disableScale &&
+    prev.suppressFocusBorder === next.suppressFocusBorder &&
+    prev.className === next.className
   );
 });
 

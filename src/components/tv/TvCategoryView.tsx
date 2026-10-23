@@ -53,10 +53,6 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
 
   const handleHeroDownPress = useCallback(() => {
     setFocus(firstRowKey);
-    const el = document.getElementById(firstRowKey) || document.querySelector(`[data-focus-key="${firstRowKey}"]`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
   }, [firstRowKey]);
 
   const isScrollingToHeroRef = useRef(false);

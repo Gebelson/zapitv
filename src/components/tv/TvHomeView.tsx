@@ -125,10 +125,6 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
     if (firstActiveRowId) {
       const rowKey = `row-${firstActiveRowId}`;
       setFocus(rowKey);
-      const el = document.getElementById(rowKey) || document.querySelector(`[data-focus-key="${rowKey}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
     }
   }, [firstActiveRowId]);
 
@@ -199,6 +195,7 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
     scrollTimerRef.current = setTimeout(finishTransition, 380);
   }, []);
 
+  const editorialItems = useMemo(() => featuredItems.slice(1), [featuredItems]);
   const hasContinue = continueWatchingItems.length > 0;
 
   return (
@@ -277,7 +274,7 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
           <TvContentRow
             title="Seleção Editorial ZapiTV"
             rowId="featured-all"
-            items={featuredItems.slice(1)}
+            items={editorialItems}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'featured-all' ? handleFirstRowUpPress : undefined}
           />

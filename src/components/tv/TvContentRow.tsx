@@ -4,6 +4,8 @@ import { ContentItem } from '../../../types';
 import { TvCard16x9, getCardAmbientGlow } from './TvCard16x9';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { uiSoundService } from '../../core/audio/uiSoundService';
+import { tvPerformanceProfileService } from '../../core/tv/tvPerformanceProfileService';
+import { tvScrollService } from '../../core/tv/tvScrollService';
 
 interface TvContentRowProps {
   title: string;
@@ -40,7 +42,16 @@ const getVisibleSlots = (count: number): number[] => {
   if (count === 5) return [-1, 0, 1, 2, 3];
   if (count === 6) return [-1, 0, 1, 2, 3, 4];
   if (count === 7) return [-1, 0, 1, 2, 3, 4, 5];
-  // Catálogo completo (>= 8 itens): buffer otimizado (-1 esquerda, 0 ativo, 1 a 6 visíveis, 7 direita)
+  // Catálogo completo (>= 8 itens): buffer otimizado por perfil de hardware da TV
+  const profile = tvPerformanceProfileService.getActiveConfig();
+  if (profile.name === 'eco') {
+    // Modo econômico (The Frame, Tizen, MSX): 7 cards suficientes para cobrir a viewport de 1080p sem sobrecarga de GPU
+    return [-1, 0, 1, 2, 3, 4, 5];
+  }
+  if (profile.name === 'balanced') {
+    // Modo equilibrado: 8 cards
+    return [-1, 0, 1, 2, 3, 4, 5, 6];
+  }
   return [-1, 0, 1, 2, 3, 4, 5, 6, 7];
 };
 
@@ -59,6 +70,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
 
   // Índice do item ativo fixado na primeira posição visível (Slot 0 em SAFE_MARGIN_LEFT)
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [targetIndex, setTargetIndex] = useState(0);
   const [translateX, setTranslateX] = useState(0);
   const [transitionEnabled, setTransitionEnabled] = useState(false);
   const [transitionDuration, setTransitionDuration] = useState(NORMAL_DURATION);
@@ -112,26 +124,26 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
       nextIndex = (currentIndexRef.current - 1 + items.length) % items.length;
     }
 
-    // Atualiza o índice do item ativo
+    // Atualiza o índice físico do item ativo
     setCurrentIndex(nextIndex);
     currentIndexRef.current = nextIndex;
-    targetIndexRef.current = nextIndex;
 
     // Reseta o deslocamento físico instantaneamente com a transição desativada
     setTransitionEnabled(false);
     setTranslateX(0);
 
-    // Se o usuário enfileirou nova direção enquanto animava, dispara continuamente sem saltos
-    const queuedDir = queuedDirectionRef.current;
-    queuedDirectionRef.current = null;
+    // Verifica se ainda há passos pendentes para alcançar o índice lógico solicitado pelo usuário
+    const hasMoreSteps = nextIndex !== targetIndexRef.current;
+    const queuedDir = queuedDirectionRef.current || (hasMoreSteps ? (dir || 'right') : null);
 
-    if (queuedDir && items.length > 1) {
+    if (hasMoreSteps && queuedDir && items.length > 1) {
       requestAnimationFrame(() => {
         // Otimização: elimina reflow síncrono forçado (offsetHeight) para navegação fluida em 60 FPS na TV
         uiSoundService.play(queuedDir === 'right' ? 'slideRight' : 'slideLeft');
         triggerSlide(queuedDir, CHAINED_DURATION);
       });
     } else {
+      queuedDirectionRef.current = null;
       isAnimatingRef.current = false;
     }
   }, [items.length]);
@@ -142,11 +154,6 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
 
     isAnimatingRef.current = true;
     pendingSlideRef.current = direction;
-
-    const nextTarget = direction === 'right'
-      ? (currentIndexRef.current + 1) % items.length
-      : (currentIndexRef.current - 1 + items.length) % items.length;
-    targetIndexRef.current = nextTarget;
 
     setTransitionDuration(duration);
     setTransitionEnabled(true);
@@ -161,25 +168,45 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     }, duration + 60);
   }, [items, stepSize, handleTransitionEnd]);
 
-  // Navegação horizontal circular para a direita: transição contínua
+  // Navegação horizontal circular para a direita: transição contínua e não-bloqueante
   const slideNext = useCallback(() => {
     if (!items || items.length <= 1) return;
+
+    // 1. Atualização imediata do índice lógico de destino (zero bloqueio de entrada)
+    const nextTarget = (targetIndexRef.current + 1) % items.length;
+    targetIndexRef.current = nextTarget;
+    setTargetIndex(nextTarget);
+    uiSoundService.play('slideRight');
+
+    // 2. Se já estiver animando, registra a direção encadeada e acelera suavemente para acompanhar
     if (isAnimatingRef.current) {
       queuedDirectionRef.current = 'right';
+      setTransitionDuration(CHAINED_DURATION);
       return;
     }
-    uiSoundService.play('slideRight');
+
+    // 3. Dispara a transição cinematográfica normal para toque isolado
     triggerSlide('right', NORMAL_DURATION);
   }, [items, triggerSlide]);
 
-  // Navegação horizontal circular para a esquerda: transição contínua
+  // Navegação horizontal circular para a esquerda: transição contínua e não-bloqueante
   const slidePrev = useCallback(() => {
     if (!items || items.length <= 1) return;
+
+    // 1. Atualização imediata do índice lógico de destino (zero bloqueio de entrada)
+    const prevTarget = (targetIndexRef.current - 1 + items.length) % items.length;
+    targetIndexRef.current = prevTarget;
+    setTargetIndex(prevTarget);
+    uiSoundService.play('slideLeft');
+
+    // 2. Se já estiver animando, registra a direção encadeada e acelera suavemente para acompanhar
     if (isAnimatingRef.current) {
       queuedDirectionRef.current = 'left';
+      setTransitionDuration(CHAINED_DURATION);
       return;
     }
-    uiSoundService.play('slideLeft');
+
+    // 3. Dispara a transição cinematográfica normal para toque isolado
     triggerSlide('left', NORMAL_DURATION);
   }, [items, triggerSlide]);
 
@@ -237,13 +264,10 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     (noriginRef as any).current = node;
   }, [noriginRef]);
 
-  // Centralização suave no viewport vertical ao receber foco
+  // Centralização suave no viewport vertical ao receber foco coordenada pelo TvScrollService
   useEffect(() => {
     if (focused && containerRef.current) {
-      containerRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
-      });
+      tvScrollService.scrollToRow(containerRef.current);
     }
   }, [focused]);
 
@@ -263,7 +287,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   const negativeSlotsCount = visibleSlots.filter(s => s < 0).length;
   // Offset base posiciona o Slot 0 rigorosamente em SAFE_MARGIN_LEFT (64px)
   const baseOffset = SAFE_MARGIN_LEFT - negativeSlotsCount * stepSize;
-  const currentItem = items[currentIndex] || items[0];
+  const currentItem = items[targetIndex] || items[currentIndex] || items[0];
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -347,7 +371,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
                 >
                   <TvCard16x9
                     item={item}
-                    onClick={() => onItemClick(item)}
+                    onClick={onItemClick}
                     showProgress={showProgress}
                     priority={slotIdx >= 0 && slotIdx <= 4}
                     isFocusable={false}

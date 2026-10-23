@@ -11,6 +11,7 @@ interface KeyRecord {
   keyCode: number;
   time: string;
   latencyMs: number;
+  visualLatencyMs: number;
   activeElement: string;
   focusKey: string;
   defaultPrevented: boolean;
@@ -61,8 +62,9 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
       }
       setCurrentActiveElement(activeDesc);
       setCurrentNoriginFocus(getCurrentFocusKey() || 'nenhum');
-      setNavigableCount(document.querySelectorAll('[data-focus-key]').length);
-      setPerfMetrics(tvPerformanceService.getMetrics());
+      const metrics = tvPerformanceService.getMetrics();
+      setNavigableCount(metrics.navigableFocusableCount || document.querySelectorAll('[data-focus-key]').length);
+      setPerfMetrics(metrics);
       if (++ticks % 4 === 0) {
         const video = document.querySelector<HTMLVideoElement>('video[data-zapi-main-video]');
         if (!video) {
@@ -138,23 +140,32 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
       const curFocus = getCurrentFocusKey() || 'nenhum';
       setCurrentNoriginFocus(curFocus);
 
-      const latencyMs = Math.round(performance.now() - start);
-      tvPerformanceService.recordInputLatency(start);
+      const eventLatencyMs = Number((performance.now() - start).toFixed(1));
       countRef.current += 1;
+      const currentCount = countRef.current;
+      const defaultPrevented = e.defaultPrevented;
+      const timeStr = new Date().toLocaleTimeString('pt-BR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-      const record: KeyRecord = {
-        id: `k_${Date.now()}_${countRef.current}`,
-        key,
-        code,
-        keyCode,
-        time: new Date().toLocaleTimeString('pt-BR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        latencyMs,
-        activeElement: activeDesc,
-        focusKey: curFocus,
-        defaultPrevented: e.defaultPrevented
-      };
+      // Medição da latência visual real: keydown -> foco -> primeiro frame pintado
+      requestAnimationFrame(() => {
+        const visualLatencyMs = Number((performance.now() - start).toFixed(1));
+        tvPerformanceService.recordInputLatency(eventLatencyMs, visualLatencyMs);
 
-      setKeyLogs(prev => [record, ...prev.slice(0, 6)]);
+        const record: KeyRecord = {
+          id: `k_${Date.now()}_${currentCount}`,
+          key,
+          code,
+          keyCode,
+          time: timeStr,
+          latencyMs: eventLatencyMs,
+          visualLatencyMs,
+          activeElement: activeDesc,
+          focusKey: curFocus,
+          defaultPrevented
+        };
+
+        setKeyLogs(prev => [record, ...prev.slice(0, 6)]);
+      });
     };
 
     window.addEventListener('keydown', handleKeyDownCapture, { capture: true });
@@ -248,7 +259,7 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
               </div>
               <div className="text-[9px] text-gray-300 flex justify-between">
                 <span>Quedas: <strong className="text-amber-400">{perfMetrics?.jankCount || 0}</strong></span>
-                <span>Nós DOM: <strong className="text-cyan-300">{perfMetrics?.domNodeCount || navigableCount}</strong></span>
+                <span>Latência: <strong className="text-cyan-300">vis {perfMetrics?.lastVisualLatencyMs ?? 0}ms (evt {perfMetrics?.lastEventLatencyMs ?? 0}ms)</strong></span>
                 <span>Perfil: <strong className="text-purple-300 uppercase">{perfMetrics?.hardwareProfile || 'balanced'}</strong></span>
               </div>
             </div>
@@ -307,7 +318,7 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
                     </div>
                     <div className="flex justify-between text-gray-400 text-[9px]">
                       <span className="truncate max-w-[170px]" title={log.focusKey}>{log.focusKey}</span>
-                      <span className="text-amber-400">{log.latencyMs}ms</span>
+                      <span className="text-amber-400 font-medium">vis: {log.visualLatencyMs ?? log.latencyMs}ms · evt: {log.latencyMs}ms</span>
                     </div>
                   </div>
                 ))

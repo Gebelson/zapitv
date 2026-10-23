@@ -17,6 +17,8 @@ export interface TvPerformanceMetrics {
   avgFrameTimeMs: number;
   droppedFrames: number;
   jankCount: number;
+  lastEventLatencyMs: number;
+  lastVisualLatencyMs: number;
   lastInputLatencyMs: number;
   avgInputLatencyMs: number;
   domNodeCount: number;
@@ -40,6 +42,12 @@ class TvPerformanceService {
 
   private inputLatencies: number[] = [];
   private lastInputLatencyMs: number = 0;
+  private lastEventLatencyMs: number = 0;
+  private lastVisualLatencyMs: number = 0;
+  private lastDomCheckTime: number = 0;
+  private cachedDomNodeCount: number = 0;
+  private cachedNavigableCount: number = 0;
+  private cachedGpuLayerCount: number = 0;
   private currentHardwareProfile: 'high' | 'balanced' | 'eco' = 'balanced';
 
   private activeImageDecodes: number = 0;
@@ -145,12 +153,26 @@ class TvPerformanceService {
   }
 
   /**
-   * Registra a latência entre um comando físico do controle remoto e sua renderização
+   * Registra a latência do comando físico:
+   * - eventDurationOrStart: tempo do handler de evento síncrono (ou timestamp de início)
+   * - visualDuration: tempo total percebido até a pintura do primeiro frame (requestAnimationFrame)
    */
-  public recordInputLatency(startMs: number): void {
-    const latency = Math.max(0, performance.now() - startMs);
-    this.lastInputLatencyMs = latency;
-    this.inputLatencies.push(latency);
+  public recordInputLatency(eventDurationOrStart: number, visualDuration?: number): void {
+    let eventMs = 0;
+    let visualMs = 0;
+
+    if (visualDuration !== undefined) {
+      eventMs = Math.max(0, eventDurationOrStart);
+      visualMs = Math.max(0, visualDuration);
+    } else {
+      eventMs = Math.max(0, performance.now() - eventDurationOrStart);
+      visualMs = eventMs;
+    }
+
+    this.lastEventLatencyMs = Number(eventMs.toFixed(1));
+    this.lastVisualLatencyMs = Number(visualMs.toFixed(1));
+    this.lastInputLatencyMs = Number(visualMs.toFixed(1));
+    this.inputLatencies.push(visualMs);
     if (this.inputLatencies.length > 50) {
       this.inputLatencies.shift();
     }
@@ -168,15 +190,14 @@ class TvPerformanceService {
    * Obtém métricas consolidadas em tempo real
    */
   public getMetrics(): TvPerformanceMetrics {
-    let domNodeCount = 0;
-    let navigableFocusableCount = 0;
-    let gpuLayerHintCount = 0;
-
-    if (typeof document !== 'undefined') {
+    const now = performance.now();
+    // Cache de contagem DOM: evita querySelectorAll('*') custoso a cada 250ms
+    if (typeof document !== 'undefined' && now - this.lastDomCheckTime > 2000) {
+      this.lastDomCheckTime = now;
       const tvRoot = document.querySelector('[data-tv-app-root]') || document.body;
-      domNodeCount = tvRoot ? tvRoot.querySelectorAll('*').length : 0;
-      navigableFocusableCount = document.querySelectorAll('[data-focus-key]').length;
-      gpuLayerHintCount = document.querySelectorAll('.will-change-transform, .transform-gpu').length;
+      this.cachedDomNodeCount = tvRoot ? tvRoot.querySelectorAll('*').length : 0;
+      this.cachedNavigableCount = document.querySelectorAll('[data-focus-key]').length;
+      this.cachedGpuLayerCount = document.querySelectorAll('.will-change-transform, .transform-gpu').length;
     }
 
     const avgInput = this.inputLatencies.length > 0
@@ -188,12 +209,14 @@ class TvPerformanceService {
       avgFrameTimeMs: Number(this.avgFrameTimeMs.toFixed(1)),
       droppedFrames: this.droppedFrames,
       jankCount: this.jankCount,
+      lastEventLatencyMs: this.lastEventLatencyMs,
+      lastVisualLatencyMs: this.lastVisualLatencyMs,
       lastInputLatencyMs: Number(this.lastInputLatencyMs.toFixed(1)),
       avgInputLatencyMs: Number(avgInput.toFixed(1)),
-      domNodeCount,
-      navigableFocusableCount,
+      domNodeCount: this.cachedDomNodeCount,
+      navigableFocusableCount: this.cachedNavigableCount,
       activeImageDecodes: this.activeImageDecodes,
-      gpuLayerHintCount,
+      gpuLayerHintCount: this.cachedGpuLayerCount,
       hardwareProfile: this.currentHardwareProfile
     };
   }
