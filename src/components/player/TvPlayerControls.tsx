@@ -735,6 +735,11 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
   const [menuOrigin, setMenuOrigin] = useState('tv-player-play');
   const [activeLabel, setActiveLabel] = useState<string>('Reproduzir / Pausar');
 
+  // Refs para controle contextual refinado de foco na TV (evita Play/Pause universal)
+  const pendingFocusRef = useRef<string | null>(null);
+  const wasVisibleRef = useRef<boolean>(props.visible);
+  const isClosingMenuRef = useRef<boolean>(false);
+
   // Temporadas disponíveis para animes/séries
   const availableSeasons = useMemo<number[]>(() => {
     if (!props.episodes || props.episodes.length === 0) return [1];
@@ -792,6 +797,8 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
       clearTimeout(session.commitTimer);
     }
     const finalTarget = session.targetTime;
+    const dir = session.direction;
+    pendingFocusRef.current = dir === 'forward' ? 'tv-player-forward' : 'tv-player-rewind';
     scrubSessionRef.current = null;
 
     uiSoundService.play('confirm', { playerControl: true });
@@ -800,7 +807,12 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
     if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
     feedbackTimerRef.current = setTimeout(() => {
       setSeekFeedback(prev => (prev ? { ...prev, visible: false } : null));
-      feedbackTimerRef.current = setTimeout(() => setSeekFeedback(null), 300);
+      feedbackTimerRef.current = setTimeout(() => {
+        setSeekFeedback(null);
+        if (pendingFocusRef.current === 'tv-player-forward' || pendingFocusRef.current === 'tv-player-rewind') {
+          pendingFocusRef.current = null;
+        }
+      }, 300);
     }, 600);
   }, [props.onSeek]);
 
@@ -846,6 +858,7 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
   const openMenu = useCallback((next: Exclude<TvMenuType, null>, origin: string) => {
     uiSoundService.play('toggle', { playerControl: true });
     setMenuOrigin(origin);
+    pendingFocusRef.current = origin;
     setMenu(next);
     props.onInteraction();
     requestAnimationFrame(() => {
@@ -901,8 +914,28 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
     if (!silent) {
       uiSoundService.play('close', { playerControl: true });
     }
+    const origin = menuOrigin || 'tv-player-play';
+    isClosingMenuRef.current = true;
+    pendingFocusRef.current = origin;
     setMenu(null);
-    requestAnimationFrame(() => setFocus(menuOrigin));
+    requestAnimationFrame(() => {
+      try {
+        const targetEl = document.querySelector<HTMLElement>(`[data-focus-key="${origin}"]`);
+        if (targetEl && !targetEl.hasAttribute('disabled')) {
+          setFocus(origin);
+        } else {
+          setFocus('tv-player-play');
+        }
+      } catch {
+        setFocus('tv-player-play');
+      }
+      requestAnimationFrame(() => {
+        isClosingMenuRef.current = false;
+        if (pendingFocusRef.current === origin) {
+          pendingFocusRef.current = null;
+        }
+      });
+    });
   }, [menu, menuOrigin]);
 
   // Registro prioritário do comando Voltar (Hierarquia Apple TV)
@@ -968,6 +1001,7 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
       // Cima ou Baixo: revela a interface com foco no Play/Pause, sem pausar e sem alterar o tempo
       if (key === 'ArrowUp' || key === 'ArrowDown' || keyCode === 38 || keyCode === 40) {
         if (event.repeat) return true;
+        pendingFocusRef.current = 'tv-player-play';
         props.onShow();
         requestAnimationFrame(() => setFocus('tv-player-play'));
         return true;
@@ -1003,6 +1037,7 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
         }
         if (wasPlaying) {
           // Ao pausar, exibe os controles com foco no Play
+          pendingFocusRef.current = 'tv-player-play';
           props.onShow();
           requestAnimationFrame(() => setFocus('tv-player-play'));
         } else {
@@ -1018,6 +1053,8 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
       if (isFwd || isRew) {
         if (!props.canSeek || props.intro || props.duration <= 0) return true;
         const dir: 'forward' | 'rewind' = isFwd ? 'forward' : 'rewind';
+        const targetBtn = dir === 'forward' ? 'tv-player-forward' : 'tv-player-rewind';
+        pendingFocusRef.current = targetBtn;
 
         // Pressionamento prolongado (long press / repetição de tecla contínua)
         if (event.repeat || (scrubSessionRef.current?.active && scrubSessionRef.current.direction === dir)) {
@@ -1104,6 +1141,9 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
           feedbackTimerRef.current = setTimeout(() => {
             setSeekFeedback(null);
             singleTapAccumRef.current.total = 0;
+            if (pendingFocusRef.current === 'tv-player-forward' || pendingFocusRef.current === 'tv-player-rewind') {
+              pendingFocusRef.current = null;
+            }
           }, 300);
         }, 1200);
 
@@ -1172,15 +1212,65 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
 
   // Foco inicial automático no botão de Play/Pause ao abrir os controles
   useEffect(() => {
+    const wasVisible = wasVisibleRef.current;
+    wasVisibleRef.current = props.visible;
+
+    // Se os controles não estão visíveis, estão suspensos ou há menu aberto, não atua
     if (!props.visible || props.suspended || menu !== null) return;
+
+    // Se um menu acabou de ser fechado, closeMenu() já restaurou o foco no botão de origem
+    if (isClosingMenuRef.current) return;
+
+    // Se há um destino de foco pré-definido (ex: avanço/retrocesso de 10s ou restauração de menu)
+    if (pendingFocusRef.current) {
+      const target = pendingFocusRef.current;
+      pendingFocusRef.current = null;
+      const id = requestAnimationFrame(() => {
+        try {
+          const el = document.querySelector<HTMLElement>(`[data-focus-key="${target}"]`);
+          if (el && !el.hasAttribute('disabled')) {
+            setFocus(target);
+          } else {
+            setFocus('tv-player-play');
+          }
+        } catch {
+          setFocus('tv-player-play');
+        }
+      });
+      return () => cancelAnimationFrame(id);
+    }
+
+    // Se os controles já estavam visíveis e continuam visíveis, não sobrescreve o foco atual do usuário
+    if (wasVisible) return;
+
+    // Abertura inicial dos controles a partir do estado oculto (!wasVisible && props.visible):
     const current = getCurrentFocusKey();
+
+    // Se o botão de pular abertura/créditos já estiver focado, preserva rigorosamente
     if (current === 'tv-skip-button') return;
+
+    // Se o foco atual já for um controle válido ativo da barra da TV, não sobrescreve
+    const validTvControls = [
+      'tv-player-play',
+      'tv-player-forward',
+      'tv-player-rewind',
+      'tv-player-next',
+      'tv-player-timeline',
+      'tv-player-episodes',
+      'tv-player-audio',
+      'tv-player-settings',
+      'tv-player-back'
+    ];
+    if (current && validTvControls.includes(current)) return;
+
+    // Primeira abertura geral sem foco definido: define foco inicial em Play/Pause
     const id = requestAnimationFrame(() => {
       if (getCurrentFocusKey() === 'tv-skip-button') return;
+      if (isClosingMenuRef.current) return;
       setFocus('tv-player-play');
     });
     return () => cancelAnimationFrame(id);
-  }, [props.visible, props.suspended, menu]);
+  }, [props.visible, props.suspended]);
 
 
 

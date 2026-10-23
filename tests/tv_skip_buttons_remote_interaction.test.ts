@@ -55,7 +55,7 @@ console.log('✓ No ESTADO 2, botão de pular tem prioridade de acionamento e fa
 console.log('\n[Teste 3] Verificação de roubo de foco ao abrir controles...');
 const focusEffectIndex = tvPlayerControlsCode.indexOf('// Foco inicial automático no botão de Play/Pause ao abrir os controles');
 assert(focusEffectIndex !== -1, 'Efeito de foco inicial deve existir');
-const focusEffectSection = tvPlayerControlsCode.slice(focusEffectIndex, focusEffectIndex + 500);
+const focusEffectSection = tvPlayerControlsCode.slice(focusEffectIndex, focusEffectIndex + 2500);
 
 assert(
   focusEffectSection.includes("if (current === 'tv-skip-button') return;") ||
