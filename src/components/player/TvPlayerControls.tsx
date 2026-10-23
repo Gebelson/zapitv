@@ -1040,10 +1040,6 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
               </ControlButton>
             </div>
           </div>
-
-          {props.loading && (
-            <p className="text-center text-sm text-cyan-300 mt-2 font-medium">Preparando reprodução...</p>
-          )}
         </div>
 
         {/* DRAWER SECUNDÁRIO: Áudio e Legendas, Episódios ou Opções */}
