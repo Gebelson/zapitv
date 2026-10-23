@@ -160,8 +160,10 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
       data-focus-key={focusKey}
       data-tv-focused={isTvFocused ? "true" : undefined}
       onClick={() => onClick(item)}
-      className={`group/tvcard relative flex-none select-none outline-none cursor-pointer transition-all duration-200 transform-gpu ${
-        isTvFocused && !disableScale
+      className={`group/tvcard relative w-full flex-none select-none outline-none cursor-pointer transition-all duration-200 transform-gpu ${
+        disableScale
+          ? 'z-10'
+          : isTvFocused
           ? 'scale-105 z-40' 
           : 'hover:scale-102 z-10'
       } ${className}`}

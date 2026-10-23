@@ -86,8 +86,8 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
 
   // Medição precisa da largura do card + gap (step) para transição fluida sem saltos
   const slotMeasureRef = useRef<HTMLDivElement>(null);
-  const [cardWidth, setCardWidth] = useState(260);
-  const [stepSize, setStepSize] = useState(284);
+  const [cardWidth, setCardWidth] = useState(275);
+  const [stepSize, setStepSize] = useState(299);
 
   useEffect(() => {
     const measure = () => {
@@ -307,42 +307,46 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
 
         {/* Trilho Horizontal Infinito de Ponta a Ponta na Tela */}
         <div className="relative w-full overflow-hidden py-8">
-          {/* 1. GLOW AMBIENTE SUTIL (ATRÁS DA CAPA): Iluminação discreta projetada no fundo da página */}
+          {/* 1. GLOW AMBIENTE SUTIL (ATRÁS DA CAPA): Geometria compartilhada 2:3 rigorosamente alinhada ao Slot 0 */}
           {focused && currentItem && (
             <div 
-              className="absolute z-0 pointer-events-none transition-all duration-300"
+              className="absolute z-0 pointer-events-none transition-all duration-300 flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px]"
               style={{
                 left: `${SAFE_MARGIN_LEFT}px`,
                 top: '2rem',
-                width: `${cardWidth}px`,
-                height: `${Math.round(cardWidth * 1.5)}px`
               }}
               aria-hidden="true"
             >
-              <div 
-                className="absolute -inset-4 sm:-inset-5 rounded-3xl opacity-35 filter blur-xl transform-gpu pointer-events-none"
-                style={{
-                  background: getCardAmbientGlow(currentItem),
-                }}
-              />
+              <div className="relative w-full aspect-[2/3]">
+                <div 
+                  className="absolute -inset-4 sm:-inset-5 rounded-3xl opacity-35 filter blur-xl transform-gpu pointer-events-none"
+                  style={{
+                    background: getCardAmbientGlow(currentItem),
+                  }}
+                />
+              </div>
             </div>
           )}
 
-          {/* 2. MOLDURA EXTERNA DE SELEÇÃO (Z-30): Fica estritamente FORA da imagem, contornando o card com 4px de respiro */}
+          {/* 2. MOLDURA EXTERNA DE SELEÇÃO (Z-30): Geometria compartilhada 2:3 com contorno externo de 4px de respiro e cantos proporcionais */}
           {focused && currentItem && (
             <div 
-              className="absolute z-30 pointer-events-none transition-all duration-150 border-2 border-cyan-400"
+              className="absolute z-30 pointer-events-none flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px]"
               style={{
-                left: `${SAFE_MARGIN_LEFT - 4}px`,
-                top: 'calc(2rem - 4px)',
-                width: `${cardWidth + 8}px`,
-                height: `${Math.round(cardWidth * 1.5) + 8}px`,
-                borderRadius: '20px',
-                boxShadow: '0 0 14px rgba(0, 229, 255, 0.45)',
-                background: 'transparent'
+                left: `${SAFE_MARGIN_LEFT}px`,
+                top: '2rem',
               }}
               aria-hidden="true"
-            />
+            >
+              <div className="relative w-full aspect-[2/3]">
+                <div 
+                  className="absolute -inset-[4px] rounded-[20px] border-2 border-cyan-400 shadow-[0_0_14px_rgba(0,229,255,0.45)] transition-all duration-150"
+                  style={{
+                    background: 'transparent'
+                  }}
+                />
+              </div>
+            </div>
           )}
 
           {/* 3. Track Deslizante com cards verticais 2:3 (Z-10, entre o glow de fundo e a moldura externa) */}
