@@ -74,9 +74,9 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
     setHasImageError(!targetPoster);
   }
 
-  // Progresso de reprodução real para "Continuar Assistindo"
-  const [continuity, setContinuity] = useState<PlaybackContinuityInfo>(() => {
-    return storageService.getPlaybackContinuity(item);
+  // Progresso de reprodução real exclusivo para fileira de "Continuar Assistindo" (elimina custo síncrono em todas as outras fileiras)
+  const [continuity, setContinuity] = useState<PlaybackContinuityInfo | null>(() => {
+    return showProgress ? storageService.getPlaybackContinuity(item) : null;
   });
 
   useEffect(() => {
@@ -91,13 +91,15 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
     return () => window.removeEventListener('zapitv_progress_updated', handleProgress);
   }, [item, showProgress]);
 
-  // Atualiza imagem quando o item muda preservando rigorosamente a URL otimizada
+  // Atualiza imagem quando o item muda preservando rigorosamente a URL otimizada sem renders redundantes
   useEffect(() => {
     const raw = posterRecoveryService.getCachedPoster(item) || item.image || item.poster || item.backdrop || '';
     const optimized = tvPerformanceProfileService.getOptimizedPosterUrl(raw);
-    setImgSrc(optimized);
-    setHasImageError(!optimized);
-  }, [item.id, item.image, item.poster, item.backdrop]);
+    if (optimized && optimized !== imgSrc) {
+      setImgSrc(optimized);
+      setHasImageError(false);
+    }
+  }, [item.id, item.image, item.poster, item.backdrop, imgSrc]);
 
   const handleImgError = () => {
     // 1. Se a versão otimizada (w500) falhou, tenta a URL original antes de desistir
@@ -160,12 +162,12 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
       data-focus-key={focusKey}
       data-tv-focused={isTvFocused ? "true" : undefined}
       onClick={() => onClick(item)}
-      className={`group/tvcard relative w-full flex-none select-none outline-none cursor-pointer transition-all duration-200 transform-gpu ${
+      className={`group/tvcard relative w-full flex-none select-none outline-none cursor-pointer transition-all duration-200 ${
         disableScale
           ? 'z-10'
           : isTvFocused
-          ? 'scale-105 z-40' 
-          : 'hover:scale-102 z-10'
+          ? 'scale-105 z-40 transform-gpu' 
+          : 'hover:scale-102 z-10 transform-gpu'
       } ${className}`}
     >
       {/* GLOW AMBIENTE DAS CAPAS (Samsung The Frame / Tizen / Media Station X) */}
@@ -184,7 +186,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
 
       {/* Caixa Vertical 2:3 Principal (Poster com cores vivas e naturais, sem camada luminosa ou desbotamento sobre a imagem) */}
       <div 
-        className="relative z-10 w-full aspect-[2/3] rounded-2xl overflow-hidden bg-[#0d121d] transition-all duration-200 border border-white/10 group-hover/tvcard:border-white/25 transform-gpu"
+        className="relative z-10 w-full aspect-[2/3] rounded-2xl overflow-hidden bg-[#0d121d] transition-all duration-200 border border-white/10 group-hover/tvcard:border-white/25"
         style={{
           WebkitMaskImage: '-webkit-radial-gradient(white, black)',
           clipPath: 'inset(0 round 1rem)',

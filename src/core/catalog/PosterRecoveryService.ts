@@ -1,6 +1,8 @@
 import { ContentItem, ContentType } from '../../../types';
 import { tmdbService, sameCatalogWork, TMDB_IMAGE_BASE } from '../tmdb/tmdbClient';
 import { LruCache } from '../cache/LruCache';
+import { tvPerformanceProfileService } from '../tv/tvPerformanceProfileService';
+import { tvImagePreloaderService } from '../tv/tvImagePreloaderService';
 
 const POSTER_CACHE_KEY = 'zapitv_poster_recovery_cache_v2';
 export const NO_IMAGE_SENTINEL = '__NO_IMAGE__';
@@ -113,6 +115,32 @@ export class PosterRecoveryService {
     const keys = this.getCacheKeys(item);
     keys.forEach(k => this.memoryCache.set(k, url));
     this.saveStorageCache();
+
+    // Pré-carrega e decodifica imediatamente a imagem otimizada para Smart TV
+    const opt = tvPerformanceProfileService.getOptimizedPosterUrl(url);
+    if (opt) {
+      tvImagePreloaderService.preload(opt, 1);
+    }
+  }
+
+  /**
+   * Indica se a capa já está decodificada e pronta na memória GPU/RAM
+   */
+  public isPosterReady(item: ContentItem): boolean {
+    const raw = this.getCachedPoster(item) || item?.image || item?.poster || item?.backdrop || '';
+    if (!raw) return false;
+    const opt = tvPerformanceProfileService.getOptimizedPosterUrl(raw);
+    return tvImagePreloaderService.isReady(opt);
+  }
+
+  /**
+   * Pré-carrega a capa da obra de forma coordenada
+   */
+  public preloadItemPoster(item: ContentItem, priority: 1 | 2 | 3 = 2): Promise<boolean> {
+    const raw = this.getCachedPoster(item) || item?.image || item?.poster || item?.backdrop || '';
+    if (!raw) return Promise.resolve(false);
+    const opt = tvPerformanceProfileService.getOptimizedPosterUrl(raw);
+    return tvImagePreloaderService.preload(opt, priority);
   }
 
   public markNoImageAvailable(item: ContentItem): void {

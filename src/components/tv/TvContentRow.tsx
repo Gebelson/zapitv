@@ -6,6 +6,7 @@ import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { tvPerformanceProfileService } from '../../core/tv/tvPerformanceProfileService';
 import { tvScrollService } from '../../core/tv/tvScrollService';
+import { posterRecoveryService } from '../../core/catalog/PosterRecoveryService';
 
 interface TvContentRowProps {
   title: string;
@@ -137,9 +138,12 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     const queuedDir = queuedDirectionRef.current || (hasMoreSteps ? (dir || 'right') : null);
 
     if (hasMoreSteps && queuedDir && items.length > 1) {
+      // Ajusta dinamicamente a duração em passos acumulados para acompanhamento imediato
+      const stepsRemaining = Math.abs(targetIndexRef.current - nextIndex);
+      const dynamicDuration = stepsRemaining > 2 ? 140 : stepsRemaining > 1 ? 190 : CHAINED_DURATION;
       requestAnimationFrame(() => {
         // Otimização: elimina reflow síncrono forçado (offsetHeight) para navegação fluida em 60 FPS na TV
-        triggerSlide(queuedDir, CHAINED_DURATION);
+        triggerSlide(queuedDir, dynamicDuration);
       });
     } else {
       queuedDirectionRef.current = null;
@@ -181,12 +185,17 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     if (isAnimatingRef.current) {
       queuedDirectionRef.current = 'right';
       setTransitionDuration(CHAINED_DURATION);
+      // Se estava deslizando para a esquerda e o usuário inverteu para a direita,
+      // interrompe a direção anterior imediatamente para responder sem atraso
+      if (pendingSlideRef.current === 'left') {
+        handleTransitionEnd();
+      }
       return;
     }
 
     // 3. Dispara a transição cinematográfica normal para toque isolado
     triggerSlide('right', NORMAL_DURATION);
-  }, [items, triggerSlide]);
+  }, [items, triggerSlide, handleTransitionEnd]);
 
   // Navegação horizontal circular para a esquerda: transição contínua e não-bloqueante
   const slidePrev = useCallback(() => {
@@ -202,12 +211,17 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     if (isAnimatingRef.current) {
       queuedDirectionRef.current = 'left';
       setTransitionDuration(CHAINED_DURATION);
+      // Se estava deslizando para a direita e o usuário inverteu para a esquerda,
+      // interrompe a direção anterior imediatamente para responder sem atraso
+      if (pendingSlideRef.current === 'right') {
+        handleTransitionEnd();
+      }
       return;
     }
 
     // 3. Dispara a transição cinematográfica normal para toque isolado
     triggerSlide('left', NORMAL_DURATION);
-  }, [items, triggerSlide]);
+  }, [items, triggerSlide, handleTransitionEnd]);
 
   // Listener nativo de fim de transição no track
   const onTrackTransitionEnd = useCallback((e: React.TransitionEvent<HTMLDivElement>) => {
@@ -277,12 +291,39 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     };
   }, []);
 
+  // Janela circular de renderização calculada com base na quantidade real de itens
+  const visibleSlots = useMemo(() => getVisibleSlots(items.length), [items.length]);
+
+  // Pré-carregamento e decodificação antecipada das próximas capas na direção de navegação
+  useEffect(() => {
+    if (!items || items.length === 0) return;
+    const len = items.length;
+
+    // Próximas capas à direita (+1, +2), à esquerda (-1) e atual
+    const next1 = items[(currentIndex + 1) % len];
+    const next2 = items[(currentIndex + 2) % len];
+    const prev1 = items[(currentIndex - 1 + len) % len];
+    const curr = items[currentIndex];
+
+    const prio = focused ? 1 : 2;
+    if (curr) posterRecoveryService.preloadItemPoster(curr, prio);
+    if (next1) posterRecoveryService.preloadItemPoster(next1, prio);
+    if (prev1) posterRecoveryService.preloadItemPoster(prev1, prio);
+    if (next2) posterRecoveryService.preloadItemPoster(next2, prio);
+
+    // Pré-carrega demais slots visíveis com prioridade sob demanda (3)
+    visibleSlots.forEach(s => {
+      if (s > 2) {
+        const itemIdx = ((currentIndex + s) % len + len) % len;
+        if (items[itemIdx]) posterRecoveryService.preloadItemPoster(items[itemIdx], 3);
+      }
+    });
+  }, [currentIndex, focused, items, visibleSlots]);
+
   if (!items || items.length === 0) {
     return null;
   }
 
-  // Janela circular de renderização calculada com base na quantidade real de itens
-  const visibleSlots = useMemo(() => getVisibleSlots(items.length), [items.length]);
   const negativeSlotsCount = visibleSlots.filter(s => s < 0).length;
   // Offset base posiciona o Slot 0 rigorosamente em SAFE_MARGIN_LEFT (64px)
   const baseOffset = SAFE_MARGIN_LEFT - negativeSlotsCount * stepSize;
@@ -376,7 +417,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
                     item={item}
                     onClick={onItemClick}
                     showProgress={showProgress}
-                    priority={slotIdx >= 0 && slotIdx <= 4}
+                    priority={focused && slotIdx >= 0 && slotIdx <= 2}
                     isFocusable={false}
                     isFocused={isSlotFocused}
                     disableScale={true}
