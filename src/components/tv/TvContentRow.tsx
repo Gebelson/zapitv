@@ -139,7 +139,6 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     if (hasMoreSteps && queuedDir && items.length > 1) {
       requestAnimationFrame(() => {
         // Otimização: elimina reflow síncrono forçado (offsetHeight) para navegação fluida em 60 FPS na TV
-        uiSoundService.play(queuedDir === 'right' ? 'slideRight' : 'slideLeft');
         triggerSlide(queuedDir, CHAINED_DURATION);
       });
     } else {
@@ -176,7 +175,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     const nextTarget = (targetIndexRef.current + 1) % items.length;
     targetIndexRef.current = nextTarget;
     setTargetIndex(nextTarget);
-    uiSoundService.play('slideRight');
+    uiSoundService.play('hoverCard');
 
     // 2. Se já estiver animando, registra a direção encadeada e acelera suavemente para acompanhar
     if (isAnimatingRef.current) {
@@ -197,7 +196,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     const prevTarget = (targetIndexRef.current - 1 + items.length) % items.length;
     targetIndexRef.current = prevTarget;
     setTargetIndex(prevTarget);
-    uiSoundService.play('slideLeft');
+    uiSoundService.play('hoverCard');
 
     // 2. Se já estiver animando, registra a direção encadeada e acelera suavemente para acompanhar
     if (isAnimatingRef.current) {

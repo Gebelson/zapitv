@@ -196,7 +196,7 @@ async function runTvUiSoundTests() {
     const filesToCheck = [
       {
         path: 'src/components/tv/TvContentRow.tsx',
-        requirements: ['slideRight', 'slideLeft', 'detailOpen']
+        requirements: ['hoverCard', 'detailOpen']
       },
       {
         path: 'src/components/tv/TvHeader.tsx',
