@@ -3,7 +3,8 @@ import { SkipForward } from 'lucide-react';
 import { SkipInterval } from '../../core/skip/skipService';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvModeService } from '../../core/tv/tvModeService';
-import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { uiSoundService } from '../../core/audio/uiSoundService';
+import { setFocus, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
 
 export interface ZapiSkipButtonProps {
   interval: SkipInterval;
@@ -53,34 +54,46 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
   onSkip,
   className = ''
 }) => {
+  const isTv = tvModeService.isTvMode() || (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv'));
+
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 195, height: 44 });
+  const [dimensions, setDimensions] = useState(() => (isTv ? { width: 240, height: 60 } : { width: 195, height: 44 }));
   const prevTimeRef = useRef(currentTime);
   const [isSeeking, setIsSeeking] = useState(false);
   const [isSkipping, setIsSkipping] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
   const isSkippingRef = useRef(false);
+  const skipTimerRef = useRef<{ flashTimer?: NodeJS.Timeout; doneTimer?: NodeJS.Timeout }>({});
+  const hasAutoFocusedRef = useRef(false);
 
   const rawId = useId();
   const gradientId = `zapi-skip-grad-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const filterId = `zapi-skip-filter-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
-  // Execução fluida do pulo com feedback visual
+  // Execução fluida do pulo com disparo imediato da ação
   const triggerSkip = useCallback(() => {
     if (isSkippingRef.current) return;
     isSkippingRef.current = true;
 
-    // 1. Inicia animação fluida acelerada preenchendo 100% do botão
+    // 1. Toca som de confirmação se disponível
+    try {
+      uiSoundService.play('confirm', { playerControl: true });
+    } catch {}
+
+    // 2. DISPARA O PULO IMEDIATAMENTE (zero delay de seek ou avanço de episódio)
+    onSkip(interval);
+
+    // 3. Feedback visual acelerado (preenchimento 100% e flash intenso)
     setIsSkipping(true);
 
-    // 2. Quando o contorno completa 100% (~250ms), ativa o piscar intenso com glow
-    setTimeout(() => {
-      setIsFlashing(true);
-    }, 250);
+    if (skipTimerRef.current.flashTimer) clearTimeout(skipTimerRef.current.flashTimer);
+    if (skipTimerRef.current.doneTimer) clearTimeout(skipTimerRef.current.doneTimer);
 
-    // 3. Após o flash de glow (~450ms), dispara a ação de pular e reseta o lock
-    setTimeout(() => {
-      onSkip(interval);
+    skipTimerRef.current.flashTimer = setTimeout(() => {
+      setIsFlashing(true);
+    }, 120);
+
+    skipTimerRef.current.doneTimer = setTimeout(() => {
       setIsSkipping(false);
       setIsFlashing(false);
       isSkippingRef.current = false;
@@ -95,13 +108,38 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
     }
   });
 
-  // Foco automático imediato no controle remoto quando o botão surge no Modo TV
+  // Foco automático único no controle remoto quando o botão surge no Modo TV (sem roubar de menus/modais)
   useEffect(() => {
-    if (tvModeService.isTvMode()) {
+    if (hasAutoFocusedRef.current) return;
+    if (!isTv) return;
+
+    // Se houver algum menu, modal ou drawer aberto, o botão de pular não deve roubar o foco
+    const isModalOpen = Boolean(
+      document.querySelector('[role="dialog"]') ||
+      document.querySelector('[data-focus-key^="tv-drawer-"]') ||
+      document.querySelector('[data-focus-key^="tv-player-drawer-"]') ||
+      document.querySelector('[data-focus-key^="tv-modal-"]')
+    );
+    if (isModalOpen) return;
+
+    hasAutoFocusedRef.current = true;
+    try {
+      setFocus('tv-skip-button');
+    } catch {}
+  }, [isTv]);
+
+  // Restauração de foco ao desmontar (após o pulo ou fim do intervalo)
+  useEffect(() => {
+    return () => {
+      if (skipTimerRef.current.flashTimer) clearTimeout(skipTimerRef.current.flashTimer);
+      if (skipTimerRef.current.doneTimer) clearTimeout(skipTimerRef.current.doneTimer);
       try {
-        setFocus('tv-skip-button');
+        const current = getCurrentFocusKey();
+        if (current === 'tv-skip-button') {
+          setFocus('tv-player-play');
+        }
       } catch {}
-    }
+    };
   }, []);
 
   // Suporte a atalho no teclado ('S') e tecla OK / Enter do controle remoto da TV
@@ -186,11 +224,11 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
       ro.observe(buttonRef.current);
       return () => ro.disconnect();
     }
-  }, [interval.label]);
+  }, [interval.label, isTv]);
 
   const pathD = useMemo(() => {
-    return generatePillPath(dimensions.width, dimensions.height, 3.5);
-  }, [dimensions.width, dimensions.height]);
+    return generatePillPath(dimensions.width, dimensions.height, isTv ? 4 : 3.5);
+  }, [dimensions.width, dimensions.height, isTv]);
 
   // Quando o usuário clica em pular, o offset força 0 (100% preenchido)
   const strokeDashoffset = useMemo(() => {
@@ -205,7 +243,11 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
 
   return (
     <div
-      className={`absolute bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] sm:bottom-28 right-[calc(1.5rem+env(safe-area-inset-right,0px))] z-50 pointer-events-auto inline-flex items-center group select-none animate-in fade-in zoom-in-95 duration-200 ${className}`}
+      className={`z-50 pointer-events-auto inline-flex items-center group select-none animate-in fade-in zoom-in-95 duration-200 ${
+        isTv
+          ? 'fixed bottom-[200px] sm:bottom-[210px] right-[5vw] z-[85]'
+          : 'absolute bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] sm:bottom-28 right-[calc(1.5rem+env(safe-area-inset-right,0px))]'
+      } ${className}`}
       onClick={(e) => e.stopPropagation()}
     >
       <style>{`
@@ -276,7 +318,7 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
             d={pathD}
             fill="none"
             stroke={isTvFocused ? "rgba(0, 229, 255, 0.45)" : "rgba(255, 255, 255, 0.28)"}
-            strokeWidth={3.5}
+            strokeWidth={isTv ? (isTvFocused ? 4 : 3.5) : 3.5}
           />
         )}
 
@@ -286,7 +328,7 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
             d={pathD}
             fill="none"
             stroke={isFlashing ? '#00f0ff' : isTvFocused ? '#00e5ff' : `url(#${gradientId})`}
-            strokeWidth={isSkipping || isFlashing ? 4.5 : isTvFocused ? 4 : 3.5}
+            strokeWidth={isTv ? (isSkipping || isFlashing ? 5 : isTvFocused ? 4.5 : 4) : (isSkipping || isFlashing ? 4.5 : isTvFocused ? 4 : 3.5)}
             pathLength={100}
             strokeDasharray={100}
             strokeDashoffset={strokeDashoffset}
@@ -308,26 +350,33 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
       <button
         ref={setMergedRef}
         type="button"
+        id="zapi-skip-button"
         data-focus-key="tv-skip-button"
         data-tv-focused={isTvFocused ? "true" : undefined}
         onClick={handleSkipClick}
         disabled={isSkipping}
-        className={`relative z-10 flex items-center gap-2.5 px-5 py-2.5 rounded-full backdrop-blur-md text-xs font-bold uppercase tracking-wider transition-all cursor-pointer group focus:outline-none ${
+        className={`relative z-10 flex items-center gap-3 rounded-full backdrop-blur-md uppercase tracking-wider transition-all cursor-pointer group focus:outline-none ${
+          isTv
+            ? 'min-h-[58px] sm:min-h-[62px] min-w-[220px] sm:min-w-[250px] px-7 py-3.5 sm:px-8 sm:py-4 text-base sm:text-[18px] font-extrabold justify-center'
+            : 'px-5 py-2.5 text-xs font-bold'
+        } ${
           isFlashing
-            ? 'bg-black/95 text-cyan-300 scale-105 shadow-[0_0_35px_rgba(0,240,255,0.7)] ring-2 ring-cyan-400'
+            ? 'bg-black/95 text-cyan-200 scale-105 shadow-[0_0_40px_rgba(0,240,255,0.95)] ring-4 ring-cyan-300 border border-cyan-300'
             : isTvFocused
-            ? 'bg-black/95 text-cyan-300 scale-110 shadow-[0_0_35px_rgba(0,229,255,0.85)] ring-3 ring-[#00e5ff] border border-[#00e5ff]'
+            ? 'bg-black/95 text-cyan-300 scale-105 sm:scale-110 shadow-[0_0_40px_rgba(0,229,255,0.85)] ring-4 ring-[#00e5ff] border border-[#00e5ff]'
             : isSkipping
             ? 'bg-black/95 text-white scale-105 shadow-[0_0_25px_rgba(0,125,247,0.6)]'
             : 'bg-black/85 hover:bg-black/95 text-white hover:scale-105 shadow-2xl hover:shadow-[0_0_20px_rgba(0,240,255,0.4)]'
         }`}
         title={`${interval.label} (${remainingSeconds}s restantes) • Pressione 'S' ou clique para pular`}
       >
-        <span className={isFlashing || isTvFocused ? 'text-cyan-200' : ''}>
+        <span className={isFlashing || isTvFocused ? 'text-cyan-200 font-extrabold' : ''}>
           {interval.label}
         </span>
         <SkipForward
-          className={`w-4 h-4 transition-transform duration-300 ${
+          className={`transition-transform duration-300 ${
+            isTv ? 'w-5 h-5 sm:w-6 sm:h-6' : 'w-4 h-4'
+          } ${
             isFlashing
               ? 'text-cyan-200 translate-x-1.5 animate-pulse'
               : isTvFocused

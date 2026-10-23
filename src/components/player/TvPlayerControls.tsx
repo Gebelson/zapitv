@@ -976,6 +976,22 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
       // OK/Enter: alternar reprodução e pausa
       if (isSelectKey) {
         if (event.repeat) return true;
+
+        // Se o botão de pular estiver focado, aciona exclusivamente o pulo sem alternar Play/Pause
+        const current = getCurrentFocusKey();
+        const isSkipFocused =
+          current === 'tv-skip-button' ||
+          document.activeElement?.getAttribute('data-focus-key') === 'tv-skip-button' ||
+          document.activeElement?.id === 'zapi-skip-button' ||
+          document.querySelector('[data-focus-key="tv-skip-button"][data-tv-focused="true"]') !== null;
+        if (isSkipFocused) {
+          const skipBtn = document.querySelector<HTMLElement>('[data-focus-key="tv-skip-button"]');
+          if (skipBtn) {
+            skipBtn.click();
+            return true;
+          }
+        }
+
         if (scrubSessionRef.current?.active) {
           commitScrubSession();
           return true;
@@ -1101,10 +1117,31 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
     if (isSelectKey) {
       if (event.repeat) return true;
       const current = getCurrentFocusKey();
+
+      // Se o botão de pular estiver focado, aciona exclusivamente o pulo sem alternar Play/Pause nem roubar foco
+      const isSkipFocused =
+        current === 'tv-skip-button' ||
+        document.activeElement?.getAttribute('data-focus-key') === 'tv-skip-button' ||
+        document.activeElement?.id === 'zapi-skip-button' ||
+        document.querySelector('[data-focus-key="tv-skip-button"][data-tv-focused="true"]') !== null;
+      if (isSkipFocused) {
+        const skipBtn = document.querySelector<HTMLElement>('[data-focus-key="tv-skip-button"]');
+        if (skipBtn) {
+          skipBtn.click();
+          props.onInteraction();
+          return true;
+        }
+      }
+
       const element = Array.from(document.querySelectorAll<HTMLElement>('[data-focus-key]')).find(
         el => el.dataset.focusKey === current
       );
-      element?.click();
+      if (element) {
+        element.click();
+      } else {
+        // Fallback: se o elemento focado não existir (ex: foi desmontado após ação), recupera foco no play
+        setFocus('tv-player-play');
+      }
       props.onInteraction();
       return true;
     }
@@ -1136,7 +1173,12 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
   // Foco inicial automático no botão de Play/Pause ao abrir os controles
   useEffect(() => {
     if (!props.visible || props.suspended || menu !== null) return;
-    const id = requestAnimationFrame(() => setFocus('tv-player-play'));
+    const current = getCurrentFocusKey();
+    if (current === 'tv-skip-button') return;
+    const id = requestAnimationFrame(() => {
+      if (getCurrentFocusKey() === 'tv-skip-button') return;
+      setFocus('tv-player-play');
+    });
     return () => cancelAnimationFrame(id);
   }, [props.visible, props.suspended, menu]);
 

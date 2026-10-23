@@ -54,6 +54,7 @@ import { tvModeService } from '../../core/tv/tvModeService';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { TvPlayerControls } from './TvPlayerControls';
 import { mobileFullscreenService, MobileFullscreenState } from '../../core/mobile/mobileFullscreenService';
+import { setFocus, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
 
 export interface NextEpisodeInfo {
   season: number;
@@ -622,10 +623,20 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
     try {
       handleSeek(targetTime);
+      // Se estiver na reprodução de TV, restaura com segurança o foco para play
+      if (isTvPlayback) {
+        requestAnimationFrame(() => {
+          try {
+            if (getCurrentFocusKey() === 'tv-skip-button') {
+              setFocus('tv-player-play');
+            }
+          } catch {}
+        });
+      }
     } catch (err) {
       console.error('[ZapiSkip] Falha ao avançar vídeo:', err);
     }
-  }, [duration, onNextEpisode, isLoadingStreams, handleSeek]);
+  }, [duration, onNextEpisode, isLoadingStreams, handleSeek, isTvPlayback]);
 
   useEffect(() => {
     setHasDynamicallyConfirmedPtBr(false);
@@ -4625,8 +4636,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             </div>
           )}
 
-          {/* Botão de Skip Inteligente (Pular Abertura / Recapitulação / Créditos) com Contorno de Progresso */}
-          {activeSkipInterval && !isPlayingIntro && !showNonDubbedPrompt && (
+          {/* Botão de Skip Inteligente no Desktop / Mobile */}
+          {!isTvPlayback && activeSkipInterval && !isPlayingIntro && !showNonDubbedPrompt && (
             <ZapiSkipButton
               key={`${activeSkipInterval.type}_${activeSkipInterval.startTime}`}
               interval={activeSkipInterval}
@@ -4636,8 +4647,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             />
           )}
 
-          {/* Botão Pular Intro durante a vinheta institucional */}
-          {isPlayingIntro && (!isIntroEnded || !isMediaReady) && !showNonDubbedPrompt && (
+          {/* Botão Pular Intro durante a vinheta institucional no Desktop / Mobile */}
+          {!isTvPlayback && isPlayingIntro && (!isIntroEnded || !isMediaReady) && !showNonDubbedPrompt && (
             (!watchPartyService.isConnected || watchPartyService.isHost() || watchPartyService.canLocalControl('canSkip')) && (
               <button
                 onClick={(e) => {
@@ -5782,6 +5793,35 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           } : undefined}
           onReport={() => { setFeedbackDefaultCategory('other_problem'); setShowFeedbackModal(true); }}
         />
+      )}
+
+      {/* Camada Dedicada de Ações Contextuais da Smart TV (Pular Abertura / Pular Créditos / Pular Intro) */}
+      {isTvPlayback && !showNonDubbedPrompt && !allSourcesFailed && (
+        <div className="fixed inset-0 z-[85] pointer-events-none select-none overflow-hidden">
+          {activeSkipInterval && !isPlayingIntro && (
+            <ZapiSkipButton
+              key={`tv_${activeSkipInterval.type}_${activeSkipInterval.startTime}`}
+              interval={activeSkipInterval}
+              currentTime={currentTime}
+              onSkip={handleExecuteSkip}
+              className={showAutoPlayCountdown ? '!bottom-[260px] sm:!bottom-[280px]' : ''}
+            />
+          )}
+
+          {isPlayingIntro && (!isIntroEnded || !isMediaReady) && (
+            (!watchPartyService.isConnected || watchPartyService.isHost() || watchPartyService.canLocalControl('canSkip')) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSkipIntro();
+                }}
+                className="pointer-events-auto absolute bottom-[200px] sm:bottom-[210px] right-[5vw] z-[85] flex items-center gap-2 px-7 py-3.5 sm:px-8 sm:py-4 bg-black/85 hover:bg-black/95 active:scale-95 text-white rounded-full border border-cyan-400/50 backdrop-blur-md text-base sm:text-[18px] font-bold uppercase tracking-wider transition-all hover:scale-105 shadow-2xl cursor-pointer"
+              >
+                <span>Pular Intro</span> <SkipForward className="w-5 h-5 text-cyan-400" />
+              </button>
+            )
+          )}
+        </div>
       )}
 
       {/* Dev Stream Diagnostics Modal */}
