@@ -2426,7 +2426,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       'ZapiPlayer', 'FAILED', undefined, classifyPlaybackError(reason), reason);
     const evidence = sourceEvidenceRef.current;
     if (evidence && !evidence.reported && navigator.onLine &&
-        /decodific|sem áudio funcional|sem faixa de áudio|não corresponde à obra|fonte isolada|domínio na lista|propaganda embutida|arquivo de vídeo inválido|HTTP 40[34]/i.test(reason)) {
+        /decodific|não corresponde à obra|fonte isolada|domínio na lista|propaganda embutida|arquivo de vídeo inválido|HTTP 40[34]/i.test(reason)) {
       evidence.reported = true;
       evidence.ticket.then(ticket => {
         if (ticket) reportSourceEvidence(ticket, evidence.playingAt === null ? 'startup_failure' : 'playback_failure');
@@ -2435,9 +2435,9 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     triedIndicesRef.current.add(selectedStreamIndex);
 
     const activeItem = itemRef.current;
-    // Invalida a fonte com falha no serviço centralizado de validação
+    // Invalida a fonte com falha no serviço centralizado de validação apenas para falhas definitivas reais
     if (currentStream?.url && activeItem?.id &&
-        !/buffer|rede|network|timeout|tempo limite|stagn|estagn|sem progresso|recupera|HTTP 429|HTTP 5\d\d/i.test(reason)) {
+        !/buffer|rede|network|timeout|tempo limite|stagn|estagn|sem progresso|recupera|HTTP 429|HTTP 5\d\d|sem áudio funcional|codec não suportado/i.test(reason)) {
       try {
         mediaSourceValidationService.invalidateSource(activeItem.id, currentStream.url, reason);
       } catch {}
@@ -2841,23 +2841,31 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     // TV sources may need more than 8s for the first manifest/segment.
     initTimer = setTimeout(() => {
       triggerAttemptFallback('Tempo limite de obtenção dos metadados esgotado.');
-    }, isTvPlayback ? 15000 : 8000);
+    }, isTvPlayback ? 15000 : 12000);
 
-    // Watchdog de segurança geral por fonte (15s): proteção se nenhum dado for armazenado em buffer
+    // Watchdog de segurança geral por fonte: proteção se nenhum dado for armazenado em buffer
     watchdogTimer = setTimeout(() => {
+      // Se houve progresso recente na rede (download de chunks em andamento), estende a tolerância
+      if (Date.now() - tvNetworkProgressAtRef.current < 8000) {
+        return;
+      }
       triggerAttemptFallback('Tempo limite total de resposta do stream esgotado (15s)');
-    }, isTvPlayback ? 30000 : 15000);
+    }, isTvPlayback ? 30000 : 20000);
 
     const onMetadataReceived = () => {
       if (initTimer) {
         clearTimeout(initTimer);
         initTimer = null;
       }
-      // 2. Timeout para buffering de segmentos após metadados confirmados (10s)
+      // 2. Timeout para buffering de segmentos após metadados confirmados
       if (!segmentTimer && !isMediaReadyRef.current) {
         segmentTimer = setTimeout(() => {
+          // Se houve progresso recente na rede (download de chunks em andamento), não descarta a fonte!
+          if (Date.now() - tvNetworkProgressAtRef.current < 6000) {
+            return;
+          }
           triggerAttemptFallback('Tempo limite ao aguardar primeiro segmento de vídeo (10s)');
-        }, isTvPlayback ? 20000 : 10000);
+        }, isTvPlayback ? 20000 : 15000);
       }
     };
 
@@ -2981,7 +2989,6 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
       hls.on(Hls.Events.FRAG_LOADED, (_, data: any) => {
         onNetworkProgress();
-        if (!isTvPlayback) handleMediaBuffered();
         const stats = data.frag?.stats || data.stats;
         if (stats?.loading) {
           const durationMs = stats.loading.end - stats.loading.start;
@@ -2992,11 +2999,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
         onNetworkProgress();
-        if (!isTvPlayback || video.readyState >= 2) handleMediaBuffered();
+        const hasRealBuffer = video.readyState >= 2 || (video.buffered && video.buffered.length > 0 && video.buffered.end(0) > (video.currentTime || 0));
+        if (hasRealBuffer) handleMediaBuffered();
       });
 
       hls.on(Hls.Events.BUFFER_APPENDED, () => {
-        if (!isTvPlayback || video.readyState >= 2) handleMediaBuffered();
+        onNetworkProgress();
+        const hasRealBuffer = video.readyState >= 2 || (video.buffered && video.buffered.length > 0 && video.buffered.end(0) > (video.currentTime || 0));
+        if (hasRealBuffer) handleMediaBuffered();
       });
 
       hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_, data) => {
@@ -3065,7 +3075,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             case Hls.ErrorTypes.NETWORK_ERROR:
               if (Date.now() - lastFatalNetworkAt > 60_000) fatalNetworkRecoveries = 0;
               lastFatalNetworkAt = Date.now();
-              if (isTvPlayback && ++fatalNetworkRecoveries > 2) {
+              if (++fatalNetworkRecoveries > 2) {
                 fatalFallbackStarted = true;
                 handleStreamFallbackRef.current('Falha persistente de rede no HLS.');
                 break;
@@ -3077,7 +3087,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             case Hls.ErrorTypes.MEDIA_ERROR:
               if (Date.now() - lastFatalMediaAt > 60_000) fatalMediaRecoveries = 0;
               lastFatalMediaAt = Date.now();
-              if (isTvPlayback && ++fatalMediaRecoveries > 2) {
+              if (++fatalMediaRecoveries > 2) {
                 fatalFallbackStarted = true;
                 handleStreamFallbackRef.current('Falha persistente de decodificação no HLS.');
                 break;
@@ -3266,35 +3276,22 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         return;
       }
 
-      // 1. mozHasAudio (Firefox)
+      // Se for HLS e o manifesto possui faixas de áudio confirmadas, a fonte tem áudio
+      if (hlsRef.current && hlsRef.current.audioTracks && hlsRef.current.audioTracks.length > 0) {
+        return;
+      }
+
+      // 1. mozHasAudio (Firefox - aplicável apenas a arquivos diretos sem HLS e após tempo hábil > 10s)
       const mozHasAudio = (video as any).mozHasAudio;
-      if (typeof mozHasAudio === 'boolean' && !mozHasAudio) {
+      if (typeof mozHasAudio === 'boolean' && !mozHasAudio && !hlsRef.current && video.currentTime > 10) {
         console.warn('[ZapiPlayer] Fonte sem faixa de áudio funcional (mozHasAudio = false).');
         handleStreamFallbackRef.current('Fonte sem faixa de áudio funcional.');
         return;
       }
 
-      // 2. audioTracks (HTML5 padrão)
-      const audioTracks = (video as any).audioTracks;
-      if (audioTracks && typeof audioTracks.length === 'number' && audioTracks.length === 0) {
-        console.warn('[ZapiPlayer] Fonte sem trilhas de áudio associadas.');
-        handleStreamFallbackRef.current('Fonte sem faixa de áudio funcional.');
-        return;
-      }
-
-      // 3. webkitAudioDecodedByteCount (Chrome, Edge, Safari)
-      const decodedBytes = (video as any).webkitAudioDecodedByteCount;
-      if (typeof decodedBytes === 'number' && video.currentTime > 6) {
-        if (decodedBytes === 0) {
-          audioCheckTicksRef.current += 1;
-          if (audioCheckTicksRef.current >= 4) { // 4 verificações consecutivas com 0 bytes após 6s
-            console.warn('[ZapiPlayer] Fonte sem sinal de áudio decodificado (0 bytes após 6s).');
-            handleStreamFallbackRef.current('Fonte sem áudio funcional (codec não suportado no dispositivo).');
-          }
-        } else {
-          audioCheckTicksRef.current = 0;
-        }
-      }
+      // NOTA: Em navegadores modernos e HLS via MSE (MediaSource), HTMLMediaElement.audioTracks
+      // e webkitAudioDecodedByteCount retornam 0 ou vazios em Chrome/Edge por especificação/depreciação.
+      // NÃO rejeitar a fonte baseando-se exclusivamente no retorno zero dessas propriedades.
     }, 1000);
 
     return () => clearInterval(interval);
@@ -3379,7 +3376,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         return;
       }
 
-      // 2. Apenas monitora travamentos se o vídeo estiver em reprodução ativa (não pausado, não em intro, não buscando)
+      // 2. Desktop Stall Watchdog calibrado para distinguir buffering de falha real
       const isBufferingOrSeeking = isSeeking || isSeekingRef.current || video.seeking || video.readyState < 3 || isLoading;
       if (isBufferingOrSeeking) {
         stallTimerRef.current = 0;
@@ -3394,40 +3391,70 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         if (diff < 0.05 && !video.paused && !video.ended) {
           // Posição estagnada enquanto deveria estar tocando (stall)
           stallTimerRef.current += 500;
+          const now = Date.now();
+          const sinceProgressMs = now - tvNetworkProgressAtRef.current;
+
+          // Calcula buffer real disponível à frente da reprodução atual
+          let bufferAhead = 0;
+          try {
+            if (video.buffered && video.buffered.length > 0) {
+              for (let i = 0; i < video.buffered.length; i++) {
+                if (curPos >= video.buffered.start(i) && curPos <= video.buffered.end(i)) {
+                  bufferAhead = video.buffered.end(i) - curPos;
+                  break;
+                }
+              }
+            }
+          } catch {}
 
           if (stallTimerRef.current >= 1500) {
             playbackOptimizerService.notifyBufferingStart();
           }
 
-          // Aos 3.5s de travamento: tenta recuperação suave (downgrade ABR no HLS ou MP4)
+          // Aos 3.5s de estagnação: recuperação inicial suave (ABR em HLS e nudge de timecode)
           if (stallTimerRef.current === 3500) {
-            console.warn('[ZapiPlayer] Travamento detectado (>3.5s). Aplicando recuperação suave de ABR...');
+            console.warn('[ZapiPlayer] Estagnação temporária (>3.5s). Aplicando recuperação suave no desktop...');
             if (hlsRef.current && selectedQuality === 'auto') {
               if (hlsRef.current.currentLevel > 0) {
                 hlsRef.current.currentLevel = Math.max(0, hlsRef.current.currentLevel - 1);
-              }
-            } else if (selectedQuality === 'auto' && !currentStream?.url?.includes('.m3u8')) {
-              const telemetry = playbackOptimizerService.getTelemetry();
-              const abrEval = playbackOptimizerService.evaluateMultiSourceAbr({
-                availableQualities,
-                currentQuality: activeQ,
-                bufferAheadSeconds: telemetry.bufferAheadSeconds,
-                isStalling: true
-              });
-              if (abrEval.shouldChange) {
-                handleSelectQuality(abrEval.targetQuality);
               }
             }
             // Nudge milimétrico para destravar demuxer/decodificador
             try { video.currentTime = Math.max(0, video.currentTime + 0.02); } catch {}
           }
 
-          // Aos 6s de travamento persistente: executa fallback seguro para fonte alternativa da mesma obra
-          if (stallTimerRef.current >= 6000) {
-            console.warn('[ZapiPlayer] Travamento severo (>6s). Alternando para próxima fonte estável...');
+          // Aos 8s de estagnação: recuperação de mídia HLS se houver buffer mas o decodificador travou
+          if (stallTimerRef.current === 8000) {
+            if (hlsRef.current) {
+              if (bufferAhead >= 2) {
+                console.warn('[ZapiPlayer] Buffer disponível (>2s) mas decodificador estagnado. Executando recoverMediaError...');
+                hlsRef.current.recoverMediaError();
+              } else if (sinceProgressMs >= 8000) {
+                console.warn('[ZapiPlayer] Sem progresso de rede há >8s. Reativando carga HLS...');
+                hlsRef.current.startLoad();
+              }
+            }
+          }
+
+          // Aos 15s de estagnação: segunda tentativa de reconexão HLS se a rede estiver parada
+          if (stallTimerRef.current === 15000 && hlsRef.current && sinceProgressMs >= 10000) {
+            console.warn('[ZapiPlayer] Estagnação prolongada (>15s). Tentando reconexão de fragmentos...');
+            hlsRef.current.startLoad();
+          }
+
+          // DECISÃO DE FALLBACK FUNDAMENTADA EM EVIDÊNCIA REAL:
+          // Se a rede estiver ativa (downloads de segmentos ocorrendo nos últimos 15s), NÃO descarta a fonte!
+          // Só executa fallback se:
+          // 1. Estagnado por >= 30s E sem progresso de rede por >= 15s
+          // 2. OU estagnado por >= 45s contínuos
+          const isDeadStall = stallTimerRef.current >= 45000 || 
+            (stallTimerRef.current >= 30000 && sinceProgressMs >= 15000);
+
+          if (isDeadStall && navigator.onLine) {
+            console.warn('[ZapiPlayer] Travamento severo e persistente no desktop (>30s sem progresso de rede). Alternando para fonte alternativa...');
             stallTimerRef.current = 0;
             playbackOptimizerService.recordStallRecovered();
-            handleStreamFallbackRef.current('Fluxo de vídeo estagnado por mais de 6s. Alternando para fonte alternativa.');
+            handleStreamFallbackRef.current('Fluxo de vídeo sem progresso após recuperação controlada no PC.');
           }
         } else {
           // Reprodução fluindo normalmente
@@ -3436,22 +3463,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
             stallTimerRef.current = 0;
           }
           lastPlaybackPositionRef.current = curPos;
-
-          // Se estiver fluindo normalmente em MP4 e modo 'auto', avalia periodicamente ABR para upgrade cauteloso
-          if (selectedQuality === 'auto' && !currentStream?.url?.includes('.m3u8')) {
-            const telemetry = playbackOptimizerService.getTelemetry();
-            if (telemetry.bufferAheadSeconds > 25) {
-              const abrEval = playbackOptimizerService.evaluateMultiSourceAbr({
-                availableQualities,
-                currentQuality: activeQ,
-                bufferAheadSeconds: telemetry.bufferAheadSeconds,
-                isStalling: false
-              });
-              if (abrEval.shouldChange && abrEval.targetQuality !== activeQ) {
-                handleSelectQuality(abrEval.targetQuality);
-              }
-            }
-          }
+          // NOTA: Não executar troca automática de fontes MP4 independentes via ABR durante a reprodução saudável.
         }
       } else {
         stallTimerRef.current = 0;
@@ -3859,9 +3871,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           return sLang === currentLanguage;
         });
 
-        // Se não houver fonte na resolução com o mesmo idioma, escolhe a melhor com a resolução
+        // Se não houver fonte na resolução com o mesmo idioma, NÃO troca silenciosamente para outro idioma!
         if (targetIndex === undefined) {
-          targetIndex = matchingIndices[0];
+          console.warn('[ZapiPlayer] Resolução solicitada não disponível no mesmo idioma. Mantendo fonte atual.');
+          return;
         }
 
         if (targetIndex !== selectedStreamIndex) {
@@ -4426,9 +4439,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                     evidence.positionAt = cur;
                   }
                   const decodedAudio = (video as any).webkitAudioDecodedByteCount;
+                  const hasHlsAudio = Boolean(hlsRef.current && (hlsRef.current.audioTracks?.length ?? 0) > 0);
+                  const hasHtml5Audio = Array.isArray((video as any).audioTracks) || (video as any).audioTracks?.length !== undefined
+                    ? ((video as any).audioTracks?.length ?? 0) > 0
+                    : true;
                   const hasAudio = (video as any).mozHasAudio !== false &&
-                    ((video as any).audioTracks?.length ?? 1) > 0 &&
-                    (typeof decodedAudio !== 'number' || decodedAudio > 0);
+                    (hasHlsAudio || hasDynamicallyConfirmedPtBr || hasHtml5Audio || typeof decodedAudio !== 'number' || decodedAudio > 0);
                   if (nextConfirmation.confirmed && hasAudio &&
                       Date.now() - evidence.playingAt >= 15_000 &&
                       cur - (evidence.positionAt || 0) >= 15) {
