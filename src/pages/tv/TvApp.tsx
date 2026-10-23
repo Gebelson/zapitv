@@ -175,11 +175,13 @@ export const TvApp: React.FC<TvAppProps> = ({
     setCurrentTab(tab);
     resetScrollToTop();
 
-    // Coordena a transferência de foco para o botão principal do banner após garantir o topo
-    setTimeout(() => {
-      resetScrollToTop();
-      setFocus('tv-hero-play');
-    }, 100);
+    // Garante que o foco permaneça estritamente no link selecionado do header
+    const targetFocus = tabFocusKeys[tab] || 'tv-nav-home';
+    if (getCurrentFocusKey() !== targetFocus) {
+      try {
+        setFocus(targetFocus);
+      } catch {}
+    }
   }, [resetScrollToTop]);
 
   const handleOpenDetailModal = useCallback((item: ContentItem) => {
@@ -512,6 +514,7 @@ export const TvApp: React.FC<TvAppProps> = ({
             ) : currentTab === 'movies' ? (
               <TvCategoryView
                 categoryTitle="Filmes"
+                upFocusKey="tv-nav-movies"
                 items={popularMovies}
                 onSelectItem={handleOpenDetailModal}
                 onPlayItem={(it) => handleStartPlay(it)}
@@ -520,6 +523,7 @@ export const TvApp: React.FC<TvAppProps> = ({
             ) : currentTab === 'series' ? (
               <TvCategoryView
                 categoryTitle="Séries"
+                upFocusKey="tv-nav-series"
                 items={popularSeries}
                 onSelectItem={handleOpenDetailModal}
                 onPlayItem={(it) => handleStartPlay(it)}
@@ -528,6 +532,7 @@ export const TvApp: React.FC<TvAppProps> = ({
             ) : currentTab === 'animes' ? (
               <TvAnimeView
                 items={animeItems}
+                upFocusKey="tv-nav-animes"
                 allContent={fullTvCatalog}
                 onSelectItem={handleOpenDetailModal}
                 onPlayItem={(it) => handleStartPlay(it)}
@@ -536,6 +541,7 @@ export const TvApp: React.FC<TvAppProps> = ({
             ) : (
               <TvCategoryView
                 categoryTitle="Em Destaque"
+                upFocusKey="tv-nav-featured"
                 items={featuredItems}
                 onSelectItem={handleOpenDetailModal}
                 onPlayItem={(it) => handleStartPlay(it)}

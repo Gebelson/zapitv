@@ -10,6 +10,7 @@ interface TvCategoryViewProps {
   onSelectItem: (item: ContentItem) => void;
   onPlayItem: (item: ContentItem) => void;
   suspended?: boolean;
+  upFocusKey?: string;
 }
 
 export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
@@ -17,8 +18,15 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
   items,
   onSelectItem,
   onPlayItem,
-  suspended = false
+  suspended = false,
+  upFocusKey
 }) => {
+  const resolvedUpFocusKey = upFocusKey || (
+    categoryTitle === 'Filmes' ? 'tv-nav-movies' :
+    categoryTitle === 'Séries' ? 'tv-nav-series' :
+    categoryTitle === 'Em Destaque' ? 'tv-nav-featured' :
+    'tv-nav-home'
+  );
   const heroSlides = useMemo(() => {
     if (!items || items.length === 0) return [];
     return items.slice(0, 6);
@@ -120,6 +128,7 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
           onOpenDetails={onSelectItem}
           onDownPress={handleHeroDownPress}
           suspended={suspended}
+          upFocusKey={resolvedUpFocusKey}
         />
       )}
 

@@ -14,6 +14,18 @@ interface TvHeroBannerProps {
   onDownPress?: () => void;
   autoRotateInterval?: number; // Padrão de 8 segundos (8000ms)
   suspended?: boolean;
+  upFocusKey?: string;
+}
+
+function getActiveHeaderNavFocusKey(): string {
+  if (typeof document !== 'undefined') {
+    const activeBtn = document.querySelector<HTMLElement>('button[data-focus-key^="tv-nav-"][data-tv-active="true"]');
+    if (activeBtn) {
+      const key = activeBtn.getAttribute('data-focus-key');
+      if (key) return key;
+    }
+  }
+  return 'tv-nav-home';
 }
 
 const TvHeroButton: React.FC<{
@@ -23,13 +35,19 @@ const TvHeroButton: React.FC<{
   icon: React.ReactNode;
   label: string;
   onDownPress?: () => void;
-}> = ({ focusKey, onClick, isPrimary = false, icon, label, onDownPress }) => {
+  upFocusKey?: string;
+}> = ({ focusKey, onClick, isPrimary = false, icon, label, onDownPress, upFocusKey }) => {
   const { ref, focused } = useTvFocusable({
     focusKey,
     onEnterPress: onClick,
     onArrowPress: (direction) => {
       if (direction === 'up') {
-        setFocus('tv-nav-home');
+        const target = upFocusKey || getActiveHeaderNavFocusKey();
+        if (target) {
+          setFocus(target);
+        } else {
+          setFocus('tv-nav-home');
+        }
         return false;
       }
       if (direction === 'down' && onDownPress) {
@@ -71,7 +89,8 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
   onOpenDetails,
   onDownPress,
   suspended = false,
-  autoRotateInterval = 8000
+  autoRotateInterval = 8000,
+  upFocusKey
 }) => {
   const { ref: noriginRef, focusKey } = useFocusable({
     focusKey: 'tv-hero',
@@ -485,6 +504,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
               icon={<Play className="w-6 h-6 fill-white" />}
               label={hasProgress ? "Continuar" : "Assistir"}
               onDownPress={onDownPress}
+              upFocusKey={upFocusKey}
             />
 
             <TvHeroButton
@@ -497,6 +517,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
               icon={<Info className="w-6 h-6" />}
               label="Mais detalhes"
               onDownPress={onDownPress}
+              upFocusKey={upFocusKey}
             />
           </div>
         </div>

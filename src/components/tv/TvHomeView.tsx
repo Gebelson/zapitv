@@ -208,6 +208,7 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
           onPlay={onPlayItem}
           onOpenDetails={onSelectItem}
           onDownPress={handleHeroDownPress}
+          upFocusKey="tv-nav-home"
         />
       )}
 

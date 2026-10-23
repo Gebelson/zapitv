@@ -64,6 +64,7 @@ const TvNavTabButton: React.FC<{
       type="button"
       data-focus-key={focusKey}
       data-tv-focused={focused ? "true" : undefined}
+      data-tv-active={isActive ? "true" : undefined}
       onClick={onClick}
       className={`relative py-2 px-2 text-[20px] lg:text-[23px] font-medium tracking-wide transition-all duration-150 outline-none select-none cursor-pointer whitespace-nowrap inline-flex items-center justify-center ${
         focused

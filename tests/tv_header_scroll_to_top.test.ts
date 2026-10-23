@@ -81,11 +81,15 @@ async function runTvHeaderScrollToTopTests() {
     tvAppCode.includes('resetScrollToTop();'),
     'handleSelectTab deve definir a aba e chamar resetScrollToTop imediatamente'
   );
-  assert.ok(
-    tvAppCode.includes("setFocus('tv-hero-play');"),
-    'handleSelectTab deve transferir o foco para tv-hero-play de forma coordenada'
+  const handleSelectTabDef = tvAppCode.substring(
+    tvAppCode.indexOf('const handleSelectTab = useCallback('),
+    tvAppCode.indexOf('const handleOpenDetailModal = useCallback(')
   );
-  console.log('✓ Teste 4: handleSelectTab centraliza navegação, reset de scroll e foco no hero OK');
+  assert.ok(
+    !handleSelectTabDef.includes("setFocus('tv-hero-play')"),
+    'handleSelectTab NÃO deve transferir o foco para tv-hero-play ao trocar de aba'
+  );
+  console.log('✓ Teste 4: handleSelectTab centraliza navegação e reset de scroll preservando o foco no header OK');
 
   // Teste 5: Conexão direta com TvHeader
   console.log('\n--- Teste 5: Conexão do callback onSelectTab={handleSelectTab} no TvHeader ---');

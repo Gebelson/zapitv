@@ -13,6 +13,7 @@ interface TvAnimeViewProps {
   onSelectItem: (item: ContentItem) => void;
   onPlayItem: (item: ContentItem) => void;
   suspended?: boolean;
+  upFocusKey?: string;
 }
 
 export const TvAnimeView: React.FC<TvAnimeViewProps> = memo(({
@@ -20,7 +21,8 @@ export const TvAnimeView: React.FC<TvAnimeViewProps> = memo(({
   allContent,
   onSelectItem,
   onPlayItem,
-  suspended = false
+  suspended = false,
+  upFocusKey
 }) => {
   // Unifica e valida todos os animes elegíveis disponíveis no catálogo da ZapiTV
   const availableAnimes = useMemo(() => {
@@ -122,6 +124,7 @@ export const TvAnimeView: React.FC<TvAnimeViewProps> = memo(({
           onOpenDetails={onSelectItem}
           onDownPress={handleHeroDownPress}
           suspended={suspended}
+          upFocusKey={upFocusKey || 'tv-nav-animes'}
         />
       )}
 
