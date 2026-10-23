@@ -49,6 +49,14 @@ interface TvAppProps {
   activeProfile?: Profile | null;
 }
 
+const tabFocusKeys: Record<TvTab, string> = {
+  home: 'tv-nav-home',
+  movies: 'tv-nav-movies',
+  series: 'tv-nav-series',
+  animes: 'tv-nav-animes',
+  featured: 'tv-nav-featured'
+};
+
 export const TvApp: React.FC<TvAppProps> = ({
   content,
   trendingItems,
@@ -184,23 +192,30 @@ export const TvApp: React.FC<TvAppProps> = ({
   // Pilha de navegação Voltar da TV (prioridade 10 - Root)
   useEffect(() => {
     return tvNavigationManager.registerBackHandler('tv-app-root', 10, () => {
-      // Se estiver em uma tela especial (busca, minha lista, etc.), volta para a Home
+      // Se estiver em uma tela especial (busca, minha lista, etc.), fecha a visão e restaura o foco no link da aba ativa
       if (specialView !== null) {
         setSpecialView(null);
-        setCurrentTab('home');
-        setTimeout(() => setFocus('tv-nav-home'), 50);
+        const targetFocus = tabFocusKeys[currentTab] || 'tv-nav-home';
+        setTimeout(() => {
+          try {
+            setFocus(targetFocus);
+          } catch {}
+        }, 50);
         return true;
       }
 
-      // Se estiver em uma aba que não seja a Home, volta para a Home
-      if (currentTab !== 'home') {
-        setCurrentTab('home');
-        setTimeout(() => setFocus('tv-nav-home'), 50);
-        return true;
+      // Nas páginas principais (Início, Filmes, Séries, Animes, Em Destaque),
+      // o botão Voltar devolve o foco diretamente ao link da página atual, sem alterar a página.
+      const targetFocus = tabFocusKeys[currentTab] || 'tv-nav-home';
+      try {
+        setFocus(targetFocus);
+      } catch {
+        setTimeout(() => {
+          try {
+            setFocus(targetFocus);
+          } catch {}
+        }, 50);
       }
-
-      // Se já estiver na Home e o foco não estiver no header, foca no header
-      setFocus('tv-nav-home');
       return true;
     });
   }, [specialView, currentTab]);
