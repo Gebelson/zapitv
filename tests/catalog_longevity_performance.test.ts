@@ -1,28 +1,58 @@
-import { chromium } from 'playwright';
-import { spawn } from 'child_process';
+import { chromium, type Browser } from 'playwright';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { createServer } from 'node:net';
 import path from 'path';
-import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-const chromePath = fs.existsSync('C:/Program Files/Google/Chrome/Application/chrome.exe') 
-  ? 'C:/Program Files/Google/Chrome/Application/chrome.exe'
-  : (fs.existsSync('C:/Program Files (x86)/Google/Chrome/Application/chrome.exe') ? 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe' : undefined);
+async function availablePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address();
+      probe.close(() => {
+        if (address && typeof address !== 'string') resolve(address.port);
+        else reject(new Error('Não foi possível reservar uma porta de teste.'));
+      });
+    });
+  });
+}
+
+async function stopServer(server: ChildProcessWithoutNullStreams): Promise<void> {
+  if (server.exitCode !== null || server.signalCode !== null) return;
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => server.kill('SIGKILL'), 5000);
+    const deadline = setTimeout(() => reject(new Error('Servidor de teste não encerrou.')), 10000);
+    server.once('close', () => {
+      clearTimeout(timeout);
+      clearTimeout(deadline);
+      resolve();
+    });
+    server.kill('SIGTERM');
+  });
+}
 
 async function runLongevityPerformanceTests() {
   console.log('--- TESTE AUTOMATIZADO DE LONGEVIDADE E PERFORMANCE DO CATÁLOGO ---');
 
-  const testPort = '4010';
-  const server = spawn('npx.cmd', ['tsx', 'server.ts'], {
+  const testPort = String(await availablePort());
+  const server = spawn(process.execPath, ['--import', 'tsx', 'server.ts'], {
     cwd: rootDir,
-    env: { ...process.env, NODE_ENV: 'production', PORT: testPort },
+    // Vite em modo de desenvolvimento serve o código atual, sem depender de dist antigo.
+    env: { ...process.env, NODE_ENV: 'development', PORT: testPort },
     stdio: 'pipe',
-    shell: true
+    shell: false
   });
 
+  let browser: Browser | undefined;
+  let serverError: Error | undefined;
+  server.once('error', (error) => { serverError = error; });
+
+  try {
   server.stdout.on('data', (d) => {
     const msg = d.toString().trim();
     if (msg.includes('running on') || msg.includes('Error')) console.log('[server]', msg);
@@ -34,9 +64,11 @@ async function runLongevityPerformanceTests() {
 
   // Aguarda servidor responder
   let ready = false;
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 120; i++) {
+    if (serverError) throw serverError;
+    if (server.exitCode !== null) throw new Error(`Servidor saiu com código ${server.exitCode}.`);
     try {
-      const res = await fetch(`http://localhost:${testPort}`);
+      const res = await fetch(`http://127.0.0.1:${testPort}/filmes`, { signal: AbortSignal.timeout(1000) });
       if (res.ok) {
         ready = true;
         break;
@@ -46,22 +78,19 @@ async function runLongevityPerformanceTests() {
   }
 
   if (!ready) {
-    console.error('Falha ao subir servidor de teste.');
-    server.kill();
-    process.exit(1);
+    throw new Error('Falha ao subir servidor de teste em 60 segundos.');
   }
 
   console.log(`Servidor ativo na porta ${testPort}. Conectando navegador...`);
 
-  const browser = await chromium.launch({
+  browser = await chromium.launch({
     headless: true,
-    executablePath: chromePath,
+    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
     args: ['--js-flags=--expose-gc']
   });
 
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 
-  try {
     let requestsDuringRepose = 0;
     page.on('request', () => {
       requestsDuringRepose++;
@@ -202,15 +231,15 @@ async function runLongevityPerformanceTests() {
     console.log('========================================================================\n');
 
   } finally {
-    await browser.close().catch(() => {});
     try {
-      server.kill();
-    } catch {}
-    process.exit(0);
+      await browser?.close();
+    } finally {
+      await stopServer(server);
+    }
   }
 }
 
 runLongevityPerformanceTests().catch((err) => {
   console.error('\n❌ Erro durante o teste de longevidade:', err);
-  process.exit(1);
+  process.exitCode = 1;
 });
