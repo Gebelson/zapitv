@@ -33,7 +33,7 @@ function getSharedViewportObserver(): IntersectionObserver | null {
         }
       },
       {
-        rootMargin: '800px 800px',
+        rootMargin: '300px 100px',
         threshold: 0.01
       }
     );

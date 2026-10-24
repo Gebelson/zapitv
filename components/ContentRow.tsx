@@ -77,15 +77,21 @@ const ContentRow: React.FC<ContentRowProps> = ({
   const isTv = tvModeService.isTvMode();
   const isInfinite = !isTv && uniqueItems.length > 8;
 
+  // Limita a base do loop infinito a 20 itens para evitar montar centenas de cards desnecessários
+  const carouselBaseItems = useMemo(() => {
+    if (!isInfinite) return uniqueItems;
+    return uniqueItems.length > 20 ? uniqueItems.slice(0, 20) : uniqueItems;
+  }, [uniqueItems, isInfinite]);
+
   // Uma cópia de cada lado mantém o loop sem montar cinco vezes todos os cards.
   const multiplier = isInfinite ? 3 : 1;
   const extendedItems = useMemo(() => {
     if (!isInfinite) return uniqueItems;
-    return Array(multiplier).fill(uniqueItems).flat();
-  }, [uniqueItems, isInfinite, multiplier]);
+    return Array(multiplier).fill(carouselBaseItems).flat();
+  }, [uniqueItems, carouselBaseItems, isInfinite, multiplier]);
 
   const getSetWidth = useCallback(() => {
-    if (!sliderRef.current || !isInfinite || uniqueItems.length === 0) return 0;
+    if (!sliderRef.current || !isInfinite || carouselBaseItems.length === 0) return 0;
     const container = sliderRef.current;
     const firstItem = container.children[0] as HTMLElement;
     
@@ -96,8 +102,8 @@ const ContentRow: React.FC<ContentRowProps> = ({
     const style = window.getComputedStyle(container);
     const gap = parseFloat(style.gap || '0'); 
     
-    return uniqueItems.length * (itemWidth + gap);
-  }, [uniqueItems.length, isInfinite]);
+    return carouselBaseItems.length * (itemWidth + gap);
+  }, [carouselBaseItems.length, isInfinite]);
 
   // Inicializa posição no centro apenas se for infinito; senão mantém na posição inicial (0)
   useEffect(() => {

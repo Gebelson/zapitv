@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { tvModeService } from '../src/core/tv/tvModeService';
 
 interface AnimatedBackgroundProps {
@@ -8,9 +8,19 @@ interface AnimatedBackgroundProps {
 
 const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ isDarkMode }) => {
   const isTv = tvModeService.isTvMode();
+  const [isVisible, setIsVisible] = useState(() => typeof document !== 'undefined' ? !document.hidden : true);
 
-  // Em Modo TV, substitui os filtros de desfoque pesado e animações de blob contínuas por gradiente estático de alta performance
-  if (isTv) {
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const handleVisibility = () => {
+      setIsVisible(!document.hidden);
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
+  // Em Modo TV ou quando a aba está em segundo plano, utiliza gradiente estático de alta performance
+  if (isTv || !isVisible) {
     return (
       <div className="fixed inset-0 -z-50 overflow-hidden pointer-events-none">
         <div className={`absolute inset-0 ${isDarkMode ? 'bg-gradient-to-br from-[#05070a] via-[#080d17] to-[#05070a]' : 'bg-[#F8F9FC]'}`} />
@@ -25,12 +35,12 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ isDarkMode }) =
         isDarkMode ? 'bg-[#05070A]' : 'bg-[#F8F9FC]'
       }`} />
 
-      {/* Container de Efeitos - Opacidade reduzida para 30% e blur aumentado para suavidade extrema */}
-      <div className={`absolute inset-0 w-full h-full filter blur-[100px] md:blur-[160px] opacity-30`}>
+      {/* Container de Efeitos - Opacidade suave e blur balanceado para evitar sobrecarga de GPU */}
+      <div className="absolute inset-0 w-full h-full filter blur-[80px] md:blur-[120px] opacity-30 transform-gpu contain-strict">
         
         {/* Blob 1 - Roxo/Azul Profundo */}
         <div 
-          className="absolute top-[-10%] left-[-10%] w-[70vw] h-[70vw] rounded-full mix-blend-multiply filter blur-3xl animate-blob-1 will-change-transform"
+          className="absolute top-[-10%] left-[-10%] w-[70vw] h-[70vw] rounded-full mix-blend-multiply animate-blob-1 will-change-transform"
           style={{
             background: isDarkMode 
               ? 'radial-gradient(circle, rgba(76, 29, 149, 0.3) 0%, rgba(59, 130, 246, 0.1) 100%)'
@@ -40,7 +50,7 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ isDarkMode }) =
         
         {/* Blob 2 - Ciano/Verde */}
         <div 
-          className="absolute top-[-10%] right-[-10%] w-[60vw] h-[60vw] rounded-full mix-blend-multiply filter blur-3xl animate-blob-2 will-change-transform"
+          className="absolute top-[-10%] right-[-10%] w-[60vw] h-[60vw] rounded-full mix-blend-multiply animate-blob-2 will-change-transform"
           style={{
             background: isDarkMode 
               ? 'radial-gradient(circle, rgba(6, 182, 212, 0.2) 0%, rgba(16, 185, 129, 0.05) 100%)'
@@ -51,7 +61,7 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ isDarkMode }) =
 
         {/* Blob 3 - Rosa/Laranja */}
         <div 
-          className="absolute bottom-[-20%] left-[20%] w-[80vw] h-[80vw] rounded-full mix-blend-multiply filter blur-3xl animate-blob-3 will-change-transform"
+          className="absolute bottom-[-20%] left-[20%] w-[80vw] h-[80vw] rounded-full mix-blend-multiply animate-blob-3 will-change-transform"
           style={{
             background: isDarkMode 
               ? 'radial-gradient(circle, rgba(236, 72, 153, 0.15) 0%, rgba(249, 115, 22, 0.05) 100%)'
@@ -62,7 +72,7 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ isDarkMode }) =
         
          {/* Blob 4 - Accent Flutuante */}
          <div 
-          className="absolute top-[40%] left-[40%] w-[40vw] h-[40vw] rounded-full mix-blend-overlay filter blur-2xl animate-blob-4 will-change-transform"
+          className="absolute top-[40%] left-[40%] w-[40vw] h-[40vw] rounded-full mix-blend-overlay animate-blob-4 will-change-transform"
           style={{
             background: isDarkMode 
               ? 'radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%)'

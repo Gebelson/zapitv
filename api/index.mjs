@@ -22225,7 +22225,7 @@ if (!process.env.VERCEL) {
           return next();
         }
         try {
-          let template = fs4.readFileSync(path4.resolve(process.cwd(), "index.html"), "utf-8");
+          let template = fs4.readFileSync(path4.resolve(__dirname, "index.html"), "utf-8");
           template = await vite.transformIndexHtml(url, template);
           res.status(200).set({ "Content-Type": "text/html" }).end(template);
         } catch (e) {
@@ -22234,10 +22234,10 @@ if (!process.env.VERCEL) {
         }
       });
     } else {
-      const distPath = path4.join(process.cwd(), "dist");
+      const distPath = path4.resolve(__dirname, "dist");
       app.use(express.static(distPath));
       app.get("/{*path}", (_req, res) => {
-        res.sendFile(path4.join(distPath, "index.html"));
+        res.sendFile("index.html", { root: distPath });
       });
     }
     const port = parseInt(process.env.PORT || "4000", 10);

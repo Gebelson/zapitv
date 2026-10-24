@@ -7,6 +7,7 @@ import Header from './components/Header';
 import Hero from './components/Hero';
 import ContentRow from './components/ContentRow';
 import ContentCard from './components/ContentCard';
+import { VirtualizedCatalogGrid } from './src/components/catalog/VirtualizedCatalogGrid';
 import AnimatedBackground from './components/AnimatedBackground';
 import ScrollToTop from './components/ScrollToTop';
 import GenreDropdown from './components/GenreDropdown';
@@ -320,14 +321,32 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   useEffect(() => {
     const remoteTitles = sectionTitlesQuery.data?.titles;
     if (remoteTitles) {
-      setSectionTitles(current => ({ ...current, ...remoteTitles }));
+      setSectionTitles(current => {
+        let hasChanges = false;
+        for (const [k, v] of Object.entries(remoteTitles)) {
+          if (current[k] !== v) {
+            hasChanges = true;
+            break;
+          }
+        }
+        return hasChanges ? { ...current, ...remoteTitles } : current;
+      });
     }
   }, [sectionTitlesQuery.data?.titles]);
 
   useEffect(() => {
     const remoteItems = heroCarouselQuery.data?.items;
     if (Array.isArray(remoteItems) && remoteItems.length > 0) {
-      setHeroCarouselItems(remoteItems);
+      setHeroCarouselItems(current => {
+        if (current.length === remoteItems.length) {
+          const isIdentical = current.every((item, idx) => {
+            const r = remoteItems[idx];
+            return item.id === r.id && item.title === r.title;
+          });
+          if (isIdentical) return current;
+        }
+        return remoteItems;
+      });
     }
   }, [heroCarouselQuery.data?.items]);
 
@@ -1239,7 +1258,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           unsubscribes.push(onSnapshot(collection(firestoreDb, 'customSections'), (snapshot) => {
             const newSections = snapshot.docs.map(doc => doc.data() as CustomSection);
             if (newSections.length > 0) {
-              setCustomSections(newSections);
+              setCustomSections(prev => {
+                if (prev.length === newSections.length && prev.every((s, i) => s.id === newSections[i].id && s.title === newSections[i].title && s.items.length === newSections[i].items.length)) {
+                  return prev;
+                }
+                return newSections;
+              });
             }
           }, (error) => {
             if (error.code !== 'permission-denied') {
@@ -1251,7 +1275,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           unsubscribes.push(onSnapshot(collection(firestoreDb, 'notifications'), (snapshot) => {
             const newNotifications = snapshot.docs.map(doc => doc.data() as SiteNotification);
             if (newNotifications.length > 0) {
-              setSiteNotifications(newNotifications);
+              setSiteNotifications(prev => {
+                if (prev.length === newNotifications.length && prev.every((n, i) => n.id === newNotifications[i].id && n.title === newNotifications[i].title)) {
+                  return prev;
+                }
+                return newNotifications;
+              });
             }
           }, (error) => {
             if (error.code !== 'permission-denied') {
@@ -1263,7 +1292,13 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           if (currentUser) {
             unsubscribes.push(onSnapshot(doc(firestoreDb, 'keyValueStore', `zapitv_mylist_${currentUser.id}`), (doc) => {
               if (doc.exists() && Array.isArray(doc.data().value)) {
-                setMyList(doc.data().value);
+                const incoming = doc.data().value as string[];
+                setMyList(prev => {
+                  if (prev.length === incoming.length && prev.every((id, idx) => id === incoming[idx])) {
+                    return prev;
+                  }
+                  return incoming;
+                });
               }
             }, (error) => {
               if (error.code !== 'permission-denied') {
@@ -1274,7 +1309,13 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             // Listen to favorites changes
             unsubscribes.push(onSnapshot(doc(firestoreDb, 'keyValueStore', `zapitv_favorites_${currentUser.id}`), (doc) => {
               if (doc.exists() && Array.isArray(doc.data().value)) {
-                setFavorites(doc.data().value);
+                const incoming = doc.data().value as string[];
+                setFavorites(prev => {
+                  if (prev.length === incoming.length && prev.every((id, idx) => id === incoming[idx])) {
+                    return prev;
+                  }
+                  return incoming;
+                });
               }
             }, (error) => {
               if (error.code !== 'permission-denied') {
@@ -2138,58 +2179,76 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     allowedContent, trendingItems, favoritesSet, myListSet, activeProfile?.id, activeProfile?.isChild
   ]);
 
-  // Rolagem Infinita Automática (Infinite Scroll — revela lotes em memória instantaneamente e carrega mais da rede sob demanda)
+  // Rolagem Infinita Automática Estabilizada (Infinite Scroll — revela lotes em memória instantaneamente e carrega mais da rede sob demanda)
+  const visibleGridCountRef = useRef(visibleGridCount);
+  visibleGridCountRef.current = visibleGridCount;
+
+  const filteredContentLengthRef = useRef(filteredContent.length);
+  filteredContentLengthRef.current = filteredContent.length;
+
+  const hasMoreRemoteRef = useRef(false);
+  hasMoreRemoteRef.current = currentView === 'movies' ? hasMoreMovies : currentView === 'series' ? hasMoreSeries : currentView === 'animes' ? hasMoreAnimes : false;
+
+  const handleLoadMoreRef = useRef(handleLoadMore);
+  handleLoadMoreRef.current = handleLoadMore;
+
+  const isAdvancingRef = useRef(false);
+
+  const advanceCatalogWindow = useCallback(() => {
+    if (currentViewRef.current !== currentView) return;
+    if (isLoadingMoreRef.current || isAdvancingRef.current) return;
+
+    const count = visibleGridCountRef.current;
+    const totalLocal = filteredContentLengthRef.current;
+    const hasRemote = hasMoreRemoteRef.current;
+
+    if (count >= totalLocal && !hasRemote) return;
+
+    isAdvancingRef.current = true;
+    try {
+      if (count < totalLocal) {
+        setVisibleGridCount(prev => prev + 42);
+        if (count + 42 >= totalLocal && hasRemote && !isLoadingMoreRef.current) {
+          handleLoadMoreRef.current(currentView);
+        }
+      } else if (hasRemote && !isLoadingMoreRef.current) {
+        setVisibleGridCount(prev => prev + 42);
+        handleLoadMoreRef.current(currentView);
+      }
+    } finally {
+      setTimeout(() => {
+        isAdvancingRef.current = false;
+      }, 250);
+    }
+  }, [currentView]);
+
   useEffect(() => {
     const sentinel = sentinelRef.current;
     const container = scrollContainerRef.current;
     const isBrowseView = currentView === 'movies' || currentView === 'series' || currentView === 'animes';
-    const hasMoreRemote = currentView === 'movies' ? hasMoreMovies : currentView === 'series' ? hasMoreSeries : currentView === 'animes' ? hasMoreAnimes : false;
-    const hasMoreLocal = visibleGridCount < filteredContent.length;
 
-    if (!isBrowseView || (!hasMoreLocal && !hasMoreRemote) || isLoadingMore || isLoadingMoreRef.current) return;
-
-    let isAdvancing = false;
-    const advanceCatalogWindow = () => {
-      if (currentViewRef.current !== currentView) return;
-      if (isLoadingMoreRef.current || isLoadingMore || isAdvancing) return;
-      isAdvancing = true;
-      try {
-        if (visibleGridCount < filteredContent.length) {
-          setVisibleGridCount(prev => prev + 42);
-          if (visibleGridCount + 42 >= filteredContent.length && hasMoreRemote && !isLoadingMoreRef.current && !isLoadingMore) {
-            handleLoadMore(currentView);
-          }
-        } else if (hasMoreRemote && !isLoadingMoreRef.current && !isLoadingMore) {
-          setVisibleGridCount(prev => prev + 42);
-          handleLoadMore(currentView);
-        }
-      } finally {
-        setTimeout(() => {
-          isAdvancing = false;
-        }, 150);
-      }
-    };
+    if (!isBrowseView) return;
 
     let observer: IntersectionObserver | null = null;
     let mountTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-      if (typeof IntersectionObserver !== 'undefined' && sentinel) {
+      if (typeof IntersectionObserver !== 'undefined' && sentinelRef.current) {
         observer = new IntersectionObserver((entries) => {
           const [entry] = entries;
-          if (entry.isIntersecting) {
+          if (entry && entry.isIntersecting) {
             advanceCatalogWindow();
           }
         }, {
-          root: container || null,
+          root: scrollContainerRef.current || null,
           rootMargin: '600px',
           threshold: 0.01
         });
-        observer.observe(sentinel);
+        observer.observe(sentinelRef.current);
       }
     }, 100);
 
     const handleScroll = () => {
-      if (!container || currentViewRef.current !== currentView) return;
-      const { scrollTop, scrollHeight, clientHeight } = container;
+      if (!scrollContainerRef.current || currentViewRef.current !== currentView) return;
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
       if (scrollTop + clientHeight >= scrollHeight - 700) {
         advanceCatalogWindow();
       }
@@ -2215,7 +2274,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       if (container) container.removeEventListener('scroll', handleScroll);
       window.removeEventListener('scroll', handleWindowScroll);
     };
-  }, [currentView, hasMoreMovies, hasMoreSeries, hasMoreAnimes, isLoadingMore, handleLoadMore, visibleGridCount, filteredContent.length]);
+  }, [currentView, advanceCatalogWindow]);
 
   const renderContent = () => {
     const gridClass = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6 px-3 sm:px-6 md:px-12 max-w-[2560px] mx-auto";
@@ -2528,20 +2587,17 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-                {filteredContent.slice(0, visibleGridCount).map((item) => (
-                  <ContentCard 
-                    key={`browse-${currentView}-${item.canonicalId || item.imdbId || item.tmdbId || item.id}`}
-                    item={item}
-                    isDarkMode={isDarkMode}
-                    onItemClick={handleSelectContent}
-                    isFavorite={favoritesSet.has(item.id)}
-                    isInList={myListSet.has(item.id)}
-                    onToggleFavorite={toggleFavorite}
-                    onToggleList={toggleMyList}
-                  />
-                ))}
-              </div>
+              <VirtualizedCatalogGrid 
+                items={filteredContent.slice(0, visibleGridCount)}
+                isDarkMode={isDarkMode}
+                onItemClick={handleSelectContent}
+                favoritesSet={favoritesSet}
+                myListSet={myListSet}
+                onToggleFavorite={toggleFavorite}
+                onToggleList={toggleMyList}
+                currentView={currentView}
+                scrollContainerRef={scrollContainerRef}
+              />
 
               {/* Sentinela de Rolagem Infinita (Carrega mais conteúdos automaticamente conforme o usuário desce) */}
               {(visibleGridCount < filteredContent.length || (currentView === 'movies' ? hasMoreMovies : currentView === 'series' ? hasMoreSeries : currentView === 'animes' ? hasMoreAnimes : false)) && (
