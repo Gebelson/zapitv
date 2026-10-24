@@ -335,11 +335,18 @@ async function runSearchResponsivenessSuite() {
       });
     }
 
-    // Indexa 5.000 títulos
-    const tIndexStart = performance.now();
-    localSearchIndexService.syncCatalog(bigCatalog);
-    const tIndexDuration = performance.now() - tIndexStart;
-    console.log(`     Tempo de indexação de 5.000 itens: ${tIndexDuration.toFixed(2)}ms`);
+    // Cada amostra reconstrói o índice; a mediana reduz ruído da CPU compartilhada.
+    const indexDurations: number[] = [];
+    const indexSamples = process.argv.includes('--performance') ? 5 : 1;
+    for (let sample = 0; sample < indexSamples; sample++) {
+      localSearchIndexService.clear();
+      const tIndexStart = performance.now();
+      localSearchIndexService.syncCatalog(bigCatalog);
+      indexDurations.push(performance.now() - tIndexStart);
+    }
+    indexDurations.sort((a, b) => a - b);
+    const tIndexDuration = indexDurations[Math.floor(indexDurations.length / 2)];
+    console.log(`     Tempo mediano de indexação de 5.000 itens: ${tIndexDuration.toFixed(2)}ms (máximo ${indexDurations[indexDurations.length - 1].toFixed(2)}ms)`);
 
     // Consultas distintas evitam cache e a mediana reduz oscilações do runner.
     const searchDurations: number[] = [];
