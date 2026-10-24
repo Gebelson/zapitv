@@ -60,6 +60,7 @@
     "test:odyssey-schedule": "tsx tests/odyssey_catalog_schedule_and_visibility.test.ts",
     "test:profile-ui-sound": "tsx tests/profile_menu_ui_sound_toggle.test.ts",
     "test:search-responsiveness": "tsx tests/search_responsiveness_and_performance.test.ts",
+    "test:search-performance": "tsx tests/search_responsiveness_and_performance.test.ts --performance",
     "test:editorial-curation": "tsx tests/editorial_curation_quality.test.ts",
     "test:livetv-architecture": "tsx tests/livetv_architecture_and_sources.test.ts",
     "test:tv-selection-slots": "tsx tests/tv_selection_frame_and_slot_atomicity.test.ts",
