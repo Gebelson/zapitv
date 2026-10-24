@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createPortal, flushSync } from 'react-dom';
-import { Search, Bell, Sun, Moon, User as UserIcon, X, Info, AlertTriangle, Star, Settings, LogOut, Menu, Edit3, HelpCircle, ChevronRight, RefreshCw, Lock, Activity, Clock, MessageSquarePlus } from 'lucide-react';
+import { Search, Bell, Sun, Moon, User as UserIcon, X, Info, AlertTriangle, Star, Settings, LogOut, Menu, Edit3, HelpCircle, ChevronRight, RefreshCw, Lock, Activity, Clock, MessageSquarePlus, Volume2, VolumeX } from 'lucide-react';
 import { AppView, User, SiteNotification, Profile, ContentItem, ContentType, ActorPerson } from '../types';
 import { uiSoundService } from '../src/core/audio/uiSoundService';
 import { searchService } from '../src/core/search/searchService';
@@ -40,6 +40,24 @@ const Header: React.FC<HeaderProps> = ({
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifyPanel, setShowNotifyPanel] = useState(false);
+  const [soundsEnabled, setSoundsEnabled] = useState(() => uiSoundService.getPreferences().enabled);
+
+  useEffect(() => {
+    return uiSoundService.subscribe(() => {
+      setSoundsEnabled(uiSoundService.getPreferences().enabled);
+    });
+  }, []);
+
+  const handleToggleSounds = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    const nextState = !soundsEnabled;
+    uiSoundService.updatePreferences({ enabled: nextState });
+    if (nextState) {
+      uiSoundService.prime();
+    }
+  };
   
   // Estados para PIN (Troca Rápida)
   const [targetProfile, setTargetProfile] = useState<Profile | null>(null);
@@ -831,6 +849,43 @@ const Header: React.FC<HeaderProps> = ({
                     Diagnóstico do Catálogo
                   </button>
                 )}
+              </div>
+
+              <div className={`h-[1px] w-full ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`} />
+
+              <div className="p-2">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={soundsEnabled}
+                  aria-label="Sons da interface"
+                  title={soundsEnabled ? 'Sons ativados — clique para desativar' : 'Sons desativados — clique para ativar'}
+                  onClick={handleToggleSounds}
+                  className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded text-xs font-bold transition-all opacity-80 hover:opacity-100 cursor-pointer text-left focus-visible:outline-2 focus-visible:outline-[#007df7] ${
+                    isDarkMode ? 'hover:bg-white/5 text-white' : 'hover:bg-black/5 text-gray-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {soundsEnabled ? (
+                      <Volume2 className="w-4 h-4 shrink-0 text-[#007df7]" />
+                    ) : (
+                      <VolumeX className="w-4 h-4 shrink-0 text-gray-400" />
+                    )}
+                    <span className="truncate hover:underline">Sons da interface</span>
+                  </div>
+                  <span
+                    aria-hidden="true"
+                    className={`h-5 w-9 rounded-full flex items-center shrink-0 p-0.5 transition-colors duration-200 ${
+                      soundsEnabled ? 'bg-[#007df7]' : isDarkMode ? 'bg-gray-600/50' : 'bg-gray-400/50'
+                    }`}
+                  >
+                    <span
+                      className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform duration-200 ${
+                        soundsEnabled ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </span>
+                </button>
               </div>
 
               <div className={`h-[1px] w-full ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`} />
