@@ -32,8 +32,18 @@ async function loadInitialState() {
       } catch {}
 
       if (!alreadyEnriched) {
-        const { updateMovies } = await import('./updateMovies');
-        localContent = await updateMovies(localContent);
+        // Executa enriquecimento em segundo plano para inicialização instantânea (< 50ms) no primeiro boot
+        setTimeout(async () => {
+          try {
+            const { updateMovies } = await import('./updateMovies');
+            await updateMovies(baseContent);
+            try {
+              localStorage.setItem(ENRICHED_MOVIES_SYNC_KEY, '1');
+            } catch {}
+          } catch (e) {
+            console.warn('Enriquecimento em background falhou:', e);
+          }
+        }, 1000);
       }
 
       const theme = kvEntries[0] ? kvEntries[0].value : true;

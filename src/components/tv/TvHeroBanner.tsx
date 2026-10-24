@@ -82,6 +82,38 @@ const TvHeroButton: React.FC<{
   );
 };
 
+const preloadBannerImage = (url: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (!url) return resolve(false);
+    const img = new Image();
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        img.onload = null;
+        img.onerror = null;
+        resolve(false);
+      }
+    }, 2500);
+
+    img.onload = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(true);
+      }
+    };
+    img.onerror = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(false);
+      }
+    };
+    img.src = url;
+  });
+};
+
 export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
   item,
   items,
@@ -206,29 +238,48 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
     const normalizedTarget = (targetIndex + slides.length) % slides.length;
     if (normalizedTarget === currentIndex) return;
 
-    isTransitioningRef.current = true;
-    setIsCrossfading(true);
-    setOutgoingIndex(currentIndex);
-
     const nextItem = slides[normalizedTarget];
+    if (!nextItem) return;
+
+    isTransitioningRef.current = true;
+
+    // 1. Resolve e pré-carrega a imagem do próximo slide ANTES de iniciar a transição visual
     const nextBackdrop = nextItem.backdrop || nextItem.image || nextItem.poster || '';
-    if (nextBackdrop) {
-      const choice = resolvedImages[nextBackdrop] || await resolveBannerImage(nextItem);
-      if (!isMountedRef.current) return;
+    let choice = resolvedImages[nextBackdrop];
+    if (!choice && nextBackdrop) {
+      choice = await resolveBannerImage(nextItem);
+      if (!isMountedRef.current) {
+        isTransitioningRef.current = false;
+        return;
+      }
       setResolvedImages(previous => ({ ...previous, [nextBackdrop]: choice }));
     }
 
-    // 1. Suave fade out dos textos (250ms)
+    const targetUrl = choice?.url || nextBackdrop;
+    if (targetUrl) {
+      await preloadBannerImage(targetUrl);
+      if (!isMountedRef.current) {
+        isTransitioningRef.current = false;
+        return;
+      }
+    }
+
+    setIsCrossfading(true);
+    setOutgoingIndex(currentIndex);
+
+    // 2. Suave fade out dos textos (250ms)
     setTextOpacity(0);
 
-    // 2. Atualiza o conteúdo do texto na metade da transição de crossfade e inicia fade in
+    // 3. Atualiza o conteúdo do texto na metade da transição de crossfade e inicia fade in
     textTimerRef.current = setTimeout(() => {
+      if (!isMountedRef.current) return;
       setCurrentIndex(normalizedTarget);
       setTextOpacity(1);
     }, 250);
 
-    // 3. Finaliza o crossfade completo das imagens aos 700ms
+    // 4. Finaliza o crossfade completo das imagens aos 700ms
     transitionTimerRef.current = setTimeout(() => {
+      if (!isMountedRef.current) return;
       setOutgoingIndex(null);
       setIsCrossfading(false);
       isTransitioningRef.current = false;
@@ -362,8 +413,12 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
                 decoding="async"
                 className={`absolute inset-0 w-full h-full object-center ${resolvedImages[currentImageKey]?.portrait ? 'object-contain' : 'object-cover'}`}
                 onError={(e) => {
-                  if (currentItem.image && (e.currentTarget as HTMLImageElement).src !== currentItem.image) {
-                    (e.currentTarget as HTMLImageElement).src = currentItem.image;
+                  const imgEl = e.currentTarget as HTMLImageElement;
+                  if (imgEl.dataset.fallbackRetried === 'true') return;
+                  imgEl.dataset.fallbackRetried = 'true';
+                  const fallback = currentItem.image || currentItem.poster;
+                  if (fallback && imgEl.src !== fallback) {
+                    imgEl.src = fallback;
                   }
                 }}
               />

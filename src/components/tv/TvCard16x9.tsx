@@ -66,10 +66,12 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   const [imgSrc, setImgSrc] = useState<string>(targetPoster);
   const [hasImageError, setHasImageError] = useState(!targetPoster);
   const cardContainerRef = useRef<HTMLDivElement>(null);
+  const failedUrlsRef = useRef<Set<string>>(new Set());
 
   // Sincronização síncrona no render: elimina o atraso de 1 frame e evita piscadas na troca de itens dos slots
   if (prevItemId !== item.id) {
     setPrevItemId(item.id);
+    failedUrlsRef.current.clear();
     setImgSrc(targetPoster);
     setHasImageError(!targetPoster);
   }
@@ -91,38 +93,42 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
     return () => window.removeEventListener('zapitv_progress_updated', handleProgress);
   }, [item, showProgress]);
 
-  // Atualiza imagem quando o item muda preservando rigorosamente a URL otimizada sem renders redundantes
+  // Atualiza imagem quando o item muda preservando rigorosamente a URL otimizada sem loops
   useEffect(() => {
     const raw = posterRecoveryService.getCachedPoster(item) || item.image || item.poster || item.backdrop || '';
     const optimized = tvPerformanceProfileService.getOptimizedPosterUrl(raw);
     if (optimized && optimized !== imgSrc) {
+      failedUrlsRef.current.clear();
       setImgSrc(optimized);
       setHasImageError(false);
     }
-  }, [item.id, item.image, item.poster, item.backdrop, imgSrc]);
+  }, [item.id, item.image, item.poster, item.backdrop]);
 
   const handleImgError = (e?: React.SyntheticEvent<HTMLImageElement>) => {
     // Se o evento foi disparado por uma imagem que não corresponde ao item atual, descarta
     if (e?.currentTarget && e.currentTarget.getAttribute('data-item-id') !== String(item.id)) {
       return;
     }
-    // 1. Se a versão otimizada (w500) falhou, tenta a URL original antes de desistir
-    if (rawPoster && imgSrc !== rawPoster) {
-      setImgSrc(rawPoster);
-      return;
+
+    if (imgSrc) {
+      failedUrlsRef.current.add(imgSrc);
     }
-    // 2. Se o poster falhou, tenta o backdrop
+
+    // Candidatos em ordem de preferência:
+    // 1. URL original do poster
+    // 2. Backdrop otimizado
+    // 3. Backdrop original
     const rawBackdrop = item.backdrop || '';
     const optBackdrop = tvPerformanceProfileService.getOptimizedPosterUrl(rawBackdrop);
-    if (optBackdrop && imgSrc !== optBackdrop) {
-      setImgSrc(optBackdrop);
-      return;
+
+    const candidates = [rawPoster, optBackdrop, rawBackdrop].filter((url): url is string => Boolean(url));
+    const nextCandidate = candidates.find(url => url !== imgSrc && !failedUrlsRef.current.has(url));
+
+    if (nextCandidate) {
+      setImgSrc(nextCandidate);
+    } else {
+      setHasImageError(true);
     }
-    if (rawBackdrop && imgSrc !== rawBackdrop) {
-      setImgSrc(rawBackdrop);
-      return;
-    }
-    setHasImageError(true);
   };
 
   const focusKey = `${focusKeyPrefix}-${item.id}`;

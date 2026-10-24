@@ -18,6 +18,8 @@ import { normalizeCatalogText } from './catalogDeduplication';
 import { theatricalFilterService } from './theatricalFilterService';
 import { catalogEligibilityService } from './CatalogEligibilityService';
 import { adultContentService } from '../adult/AdultContentService';
+import { FEATURED_CATALOG_ITEMS } from './featuredCatalogItems';
+import { filmesData } from '../../../constants';
 
 export interface CanonicalIdParsed {
   category: 'movie' | 'series' | 'anime';
@@ -53,10 +55,29 @@ export class CanonicalCatalogMaster {
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private lastPeriodicRefresh = 0;
   private isRefreshing = false;
+  private isSeeded = false;
 
   private constructor() {
     // Agenda revalidação periódica de novos episódios e lançamentos a cada 30 minutos
     this.schedulePeriodicRefresh(30 * 60 * 1000);
+  }
+
+  public ensureSeeded(): void {
+    if (this.isSeeded) return;
+    this.isSeeded = true;
+    this.seedBundledCatalog();
+  }
+
+  public seedBundledCatalog(): void {
+    const combined = [
+      ...(Array.isArray(filmesData) ? filmesData : []),
+      ...(Array.isArray(FEATURED_CATALOG_ITEMS) ? FEATURED_CATALOG_ITEMS : [])
+    ];
+    for (const item of combined) {
+      if (item && item.id) {
+        this.registerItem(item);
+      }
+    }
   }
 
   public static getInstance(): CanonicalCatalogMaster {
@@ -418,6 +439,7 @@ export class CanonicalCatalogMaster {
    * Obtém o item mestre pelo canonicalId
    */
   public getItemByCanonicalId(canonicalId: string): ContentItem | null {
+    this.ensureSeeded();
     const entry = this.masterRegistry.get(canonicalId);
     return entry ? entry.item : null;
   }
@@ -426,6 +448,7 @@ export class CanonicalCatalogMaster {
    * Retorna apenas os conteúdos públicos elegíveis e reproduzíveis para uma categoria estrita
    */
   public getPublicCatalog(category: 'movies' | 'series' | 'animes'): ContentItem[] {
+    this.ensureSeeded();
     const targetType = category === 'movies'
       ? ContentType.MOVIE
       : category === 'series'
@@ -448,6 +471,7 @@ export class CanonicalCatalogMaster {
    * Retorna os registros internos completos (inclusive não-lançados ou sem fontes confirmadas)
    */
   public getInternalRegistry(): MasterCatalogEntry[] {
+    this.ensureSeeded();
     return Array.from(this.masterRegistry.values());
   }
 
@@ -455,6 +479,7 @@ export class CanonicalCatalogMaster {
    * Retorna todos os itens cadastrados no índice mestre sincronamente
    */
   public getAllItemsSync(): ContentItem[] {
+    this.ensureSeeded();
     return Array.from(this.masterRegistry.values()).map(e => e.item);
   }
 

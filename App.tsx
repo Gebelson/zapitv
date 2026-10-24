@@ -47,6 +47,7 @@ import { fetchHeroCarousel, fetchSectionTitles, saveHeroCarousel, saveSectionTit
 import { WatchPartyService } from './src/core/watchparty/WatchPartyService';
 import { tvModeService } from './src/core/tv/tvModeService';
 import { tvNavigationManager } from './src/core/tv/tvNavigationManager';
+import { canonicalCatalogMaster } from './src/core/catalog/CanonicalCatalogMaster';
 import { TvRemoteDiagnosticOverlay } from './src/components/tv/TvRemoteDiagnosticOverlay';
 import { useIsMobileViewport } from './src/core/mobile/mobileViewportService';
 import { MobileLayout } from './src/components/mobile';
@@ -305,12 +306,28 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const [myList, setMyList] = useState<string[]>(() => (initialState.myList || []).filter((id: string) => !bannedContentRegistry.isBannedKeyOrId(id)));
   const [favorites, setFavorites] = useState<string[]>(() => (initialState.favorites || []).filter((id: string) => !bannedContentRegistry.isBannedKeyOrId(id)));
 
-  // Catálogos Dinâmicos em PT-BR (TMDB + Local) com Hidratação Instantânea via Cache
-  const [trendingItems, setTrendingItems] = useState<ContentItem[]>(() => deduplicateContentItems(storageService.getCachedCatalog('trending')));
-  const [popularMovies, setPopularMovies] = useState<ContentItem[]>(() => deduplicateContentItems(storageService.getCachedCatalog('movies').filter(i => searchService.isMovieItem(i))));
-  const [popularSeries, setPopularSeries] = useState<ContentItem[]>(() => deduplicateContentItems(storageService.getCachedCatalog('series').filter(i => searchService.isSeriesItem(i))));
+  // Catálogos Dinâmicos em PT-BR (TMDB + Local) com Hidratação Instantânea via Cache e Fallback Canônico
+  const [trendingItems, setTrendingItems] = useState<ContentItem[]>(() => {
+    const cached = deduplicateContentItems(storageService.getCachedCatalog('trending'));
+    if (cached.length > 0) return cached;
+    return canonicalCatalogMaster.getPublicCatalog('movies').slice(0, 10);
+  });
+  const [popularMovies, setPopularMovies] = useState<ContentItem[]>(() => {
+    const cached = deduplicateContentItems(storageService.getCachedCatalog('movies').filter(i => searchService.isMovieItem(i)));
+    if (cached.length > 0) return cached;
+    return canonicalCatalogMaster.getPublicCatalog('movies');
+  });
+  const [popularSeries, setPopularSeries] = useState<ContentItem[]>(() => {
+    const cached = deduplicateContentItems(storageService.getCachedCatalog('series').filter(i => searchService.isSeriesItem(i)));
+    if (cached.length > 0) return cached;
+    return canonicalCatalogMaster.getPublicCatalog('series');
+  });
   const [topRatedItems, setTopRatedItems] = useState<ContentItem[]>(() => deduplicateContentItems(storageService.getCachedCatalog('top_rated')));
-  const [animeItems, setAnimeItems] = useState<ContentItem[]>(() => deduplicateContentItems(storageService.getCachedCatalog('animes').filter(i => searchService.isAnimeItem(i))));
+  const [animeItems, setAnimeItems] = useState<ContentItem[]>(() => {
+    const cached = deduplicateContentItems(storageService.getCachedCatalog('animes').filter(i => searchService.isAnimeItem(i)));
+    if (cached.length > 0) return cached;
+    return canonicalCatalogMaster.getPublicCatalog('animes');
+  });
   const [featuredSelection, setFeaturedSelection] = useState<FeaturedSelectionResult>(() => featuredRankingService.getFeaturedSelectionSync());
   const [heroCarouselItems, setHeroCarouselItems] = useState<ContentItem[]>(() => 
     heroCarouselStore.getCarouselItems(initialState.content || [])
@@ -660,19 +677,32 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const hasDiscoveredLiveRef = useRef(false);
-  const needsCatalogDiscovery = currentView === 'home' || currentView === 'featured' ||
-    currentView === 'movies' || currentView === 'series' || currentView === 'animes';
+  type CatalogDiscoveryStatus = 'idle' | 'loading' | 'success' | 'partial' | 'failed';
+  const discoveryStatusRef = useRef<CatalogDiscoveryStatus>('idle');
+  const discoveryAttemptsRef = useRef<number>(0);
+  const discoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const safetyTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const isTvRoute = location.pathname.startsWith('/tv') || currentView === 'tv';
+  const needsCatalogDiscovery = isTvRoute ||
+    currentView === 'home' || currentView === 'featured' ||
+    currentView === 'movies' || currentView === 'series' || currentView === 'animes' ||
+    currentView === 'explore' || currentView === 'search' || currentView === 'my-zapitv';
 
   useEffect(() => {
-    if (!needsCatalogDiscovery || hasDiscoveredLiveRef.current) return;
+    // Se não precisa de descoberta ou se já concluiu com sucesso e as listas já estão ricas, não re-executa
+    if (!needsCatalogDiscovery) return;
+    if (discoveryStatusRef.current === 'success' && popularMovies.length > 20 && popularSeries.length > 20) return;
+    if (discoveryStatusRef.current === 'loading') return;
+
     let isMounted = true;
-    let discoveryTimer: ReturnType<typeof setTimeout> | null = null;
-    const safetyTimer = setTimeout(() => {
+
+    if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
+    safetyTimerRef.current = setTimeout(() => {
       if (isMounted) {
         setIsCatalogLoading(false);
       }
-    }, 3500);
+    }, 4500);
 
     // 1. Hidratação local imediata de Continuar Assistindo e Favoritos
     Promise.allSettled([
@@ -691,11 +721,13 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       }
     });
 
-    // 2. Descoberta online em segundo plano após o primeiro paint (não bloqueia a Home)
+    // 2. Descoberta online em segundo plano após o primeiro paint (não bloqueia a TV nem a Home)
     const fetchLiveCatalogs = async () => {
       if (!isMounted) return;
-      hasDiscoveredLiveRef.current = true;
+      discoveryStatusRef.current = 'loading';
       setIsCatalogLoading(true);
+      discoveryAttemptsRef.current += 1;
+
       try {
         const [
           trendingRes,
@@ -724,44 +756,63 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           }
         };
 
-        if (trendingRes.status === 'fulfilled' && trendingRes.value.length > 0) {
+        let trendingSuccess = false;
+        if (trendingRes.status === 'fulfilled' && Array.isArray(trendingRes.value) && trendingRes.value.length > 0) {
           const validTrending = deduplicateContentItems(trendingRes.value);
-          setTrendingItems(validTrending);
-          storageService.saveCachedCatalog('trending', validTrending);
-          validTrending.forEach(addItem);
+          if (validTrending.length > 0) {
+            setTrendingItems(validTrending);
+            storageService.saveCachedCatalog('trending', validTrending);
+            validTrending.forEach(addItem);
+            trendingSuccess = true;
+          }
         }
 
         // Combina filmes TMDB + Cinemeta (apenas filmes reais, não animes nem séries)
+        let moviesSuccess = false;
         const rawMovies: ContentItem[] = [];
-        if (moviesP1.status === 'fulfilled') rawMovies.push(...moviesP1.value.items);
-        if (moviesP2.status === 'fulfilled') rawMovies.push(...moviesP2.value.items);
+        if (moviesP1.status === 'fulfilled' && Array.isArray(moviesP1.value?.items)) rawMovies.push(...moviesP1.value.items);
+        if (moviesP2.status === 'fulfilled' && Array.isArray(moviesP2.value?.items)) rawMovies.push(...moviesP2.value.items);
         const combinedMovies = deduplicateContentItems(rawMovies.filter(i => searchService.isMovieItem(i)));
         if (combinedMovies.length > 0) {
-          setPopularMovies(combinedMovies);
-          storageService.saveCachedCatalog('movies', combinedMovies);
+          setPopularMovies(prev => {
+            const merged = deduplicateContentItems([...combinedMovies, ...prev]).filter(i => searchService.isMovieItem(i));
+            storageService.saveCachedCatalog('movies', merged);
+            return merged;
+          });
           combinedMovies.forEach(addItem);
+          moviesSuccess = true;
         }
 
         // Combina séries TMDB + Cinemeta (apenas séries reais de TV, não filmes nem animes)
+        let seriesSuccess = false;
         const rawSeries: ContentItem[] = [];
-        if (seriesP1.status === 'fulfilled') rawSeries.push(...seriesP1.value.items);
-        if (seriesP2.status === 'fulfilled') rawSeries.push(...seriesP2.value.items);
+        if (seriesP1.status === 'fulfilled' && Array.isArray(seriesP1.value?.items)) rawSeries.push(...seriesP1.value.items);
+        if (seriesP2.status === 'fulfilled' && Array.isArray(seriesP2.value?.items)) rawSeries.push(...seriesP2.value.items);
         const combinedSeries = deduplicateContentItems(rawSeries.filter(i => searchService.isSeriesItem(i)));
         if (combinedSeries.length > 0) {
-          setPopularSeries(combinedSeries);
-          storageService.saveCachedCatalog('series', combinedSeries);
+          setPopularSeries(prev => {
+            const merged = deduplicateContentItems([...combinedSeries, ...prev]).filter(i => searchService.isSeriesItem(i));
+            storageService.saveCachedCatalog('series', merged);
+            return merged;
+          });
           combinedSeries.forEach(addItem);
+          seriesSuccess = true;
         }
 
         // Combina animes (séries + filmes de anime como Shinkai/Ghibli/Mugen Train)
+        let animesSuccess = false;
         const rawAnimes: ContentItem[] = [];
-        if (animesP1.status === 'fulfilled') rawAnimes.push(...animesP1.value.items);
-        if (animesP2.status === 'fulfilled') rawAnimes.push(...animesP2.value.items);
+        if (animesP1.status === 'fulfilled' && Array.isArray(animesP1.value?.items)) rawAnimes.push(...animesP1.value.items);
+        if (animesP2.status === 'fulfilled' && Array.isArray(animesP2.value?.items)) rawAnimes.push(...animesP2.value.items);
         const combinedAnimes = deduplicateContentItems(rawAnimes.filter(i => searchService.isAnimeItem(i)));
         if (combinedAnimes.length > 0) {
-          setAnimeItems(combinedAnimes);
-          storageService.saveCachedCatalog('animes', combinedAnimes);
+          setAnimeItems(prev => {
+            const merged = deduplicateContentItems([...combinedAnimes, ...prev]).filter(i => searchService.isAnimeItem(i));
+            storageService.saveCachedCatalog('animes', merged);
+            return merged;
+          });
           combinedAnimes.forEach(addItem);
+          animesSuccess = true;
         }
 
         // Sincroniza novos lançamentos validados do backend (AutoReleaseService)
@@ -781,22 +832,51 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         if (newItems.length > 0) {
           setContent(prev => deduplicateContentItems([...prev, ...newItems]));
         }
+
+        // Avaliação do status de descoberta: Total vs Parcial vs Falha
+        const successfulCategories = (moviesSuccess ? 1 : 0) + (seriesSuccess ? 1 : 0) + (animesSuccess ? 1 : 0) + (trendingSuccess ? 1 : 0);
+        if (successfulCategories >= 3) {
+          discoveryStatusRef.current = 'success';
+        } else if (successfulCategories > 0) {
+          discoveryStatusRef.current = 'partial';
+          if (discoveryAttemptsRef.current < 3 && isMounted) {
+            discoveryTimerRef.current = setTimeout(fetchLiveCatalogs, 5000);
+          }
+        } else {
+          discoveryStatusRef.current = 'failed';
+          if (discoveryAttemptsRef.current < 3 && isMounted) {
+            const delay = discoveryAttemptsRef.current === 1 ? 2000 : 5000;
+            discoveryTimerRef.current = setTimeout(fetchLiveCatalogs, delay);
+          } else {
+            // Permite nova tentativa após 30 segundos
+            setTimeout(() => {
+              if (discoveryStatusRef.current === 'failed') {
+                discoveryStatusRef.current = 'idle';
+              }
+            }, 30000);
+          }
+        }
       } catch (err) {
         console.warn('Erro ao carregar catálogo online:', err);
+        discoveryStatusRef.current = 'failed';
+        if (discoveryAttemptsRef.current < 3 && isMounted) {
+          discoveryTimerRef.current = setTimeout(fetchLiveCatalogs, 3000);
+        }
       } finally {
-        clearTimeout(safetyTimer);
+        if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
         if (isMounted) {
           setIsCatalogLoading(false);
         }
       }
     };
 
-    discoveryTimer = setTimeout(fetchLiveCatalogs, 400);
+    if (discoveryTimerRef.current) clearTimeout(discoveryTimerRef.current);
+    discoveryTimerRef.current = setTimeout(fetchLiveCatalogs, 300);
 
     return () => {
       isMounted = false;
-      if (discoveryTimer) clearTimeout(discoveryTimer);
-      clearTimeout(safetyTimer);
+      if (discoveryTimerRef.current) clearTimeout(discoveryTimerRef.current);
+      if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
     };
   }, [needsCatalogDiscovery]);
 

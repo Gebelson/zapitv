@@ -366,6 +366,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
       <section 
         ref={setRowRef}
         id={`row-${rowId}`}
+        data-row-id={rowId}
         data-focus-key={focusKey}
         data-tv-focused={focused ? "true" : undefined}
         className="w-full mb-10 sm:mb-12 select-none overflow-hidden focus:outline-none"

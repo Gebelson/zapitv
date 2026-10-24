@@ -164,3 +164,4 @@ assert.strictEqual(isDesktopWidth, true, 'Larguras >= 768px mantêm layout deskt
 console.log('  -> Zero regressões para Desktop (>= 768px) e Smart TV (?tv=1).');
 
 console.log('\n=== TODOS OS TESTES OBRIGATÓRIOS DO REDESIGN MOBILE PASSARAM COM SUCESSO! ===');
+process.exit(0);

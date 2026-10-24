@@ -13486,6 +13486,8 @@ var init_CanonicalCatalogMaster = __esm({
     init_catalogDeduplication();
     init_theatricalFilterService();
     init_CatalogEligibilityService();
+    init_featuredCatalogItems();
+    init_constants();
     CanonicalCatalogMaster = class _CanonicalCatalogMaster {
       constructor() {
         // Armazenamento central em memória
@@ -13505,7 +13507,24 @@ var init_CanonicalCatalogMaster = __esm({
         this.refreshTimer = null;
         this.lastPeriodicRefresh = 0;
         this.isRefreshing = false;
+        this.isSeeded = false;
         this.schedulePeriodicRefresh(30 * 60 * 1e3);
+      }
+      ensureSeeded() {
+        if (this.isSeeded) return;
+        this.isSeeded = true;
+        this.seedBundledCatalog();
+      }
+      seedBundledCatalog() {
+        const combined = [
+          ...Array.isArray(filmesData) ? filmesData : [],
+          ...Array.isArray(FEATURED_CATALOG_ITEMS) ? FEATURED_CATALOG_ITEMS : []
+        ];
+        for (const item of combined) {
+          if (item && item.id) {
+            this.registerItem(item);
+          }
+        }
       }
       static getInstance() {
         if (!_CanonicalCatalogMaster.instance) {
@@ -13777,6 +13796,7 @@ var init_CanonicalCatalogMaster = __esm({
        * Obtém o item mestre pelo canonicalId
        */
       getItemByCanonicalId(canonicalId) {
+        this.ensureSeeded();
         const entry = this.masterRegistry.get(canonicalId);
         return entry ? entry.item : null;
       }
@@ -13784,6 +13804,7 @@ var init_CanonicalCatalogMaster = __esm({
        * Retorna apenas os conteúdos públicos elegíveis e reproduzíveis para uma categoria estrita
        */
       getPublicCatalog(category) {
+        this.ensureSeeded();
         const targetType = category === "movies" ? "FILME" /* MOVIE */ : category === "series" ? "S\xC9RIE" /* SERIES */ : "ANIME" /* ANIME */;
         const results = [];
         for (const entry of this.masterRegistry.values()) {
@@ -13799,12 +13820,14 @@ var init_CanonicalCatalogMaster = __esm({
        * Retorna os registros internos completos (inclusive não-lançados ou sem fontes confirmadas)
        */
       getInternalRegistry() {
+        this.ensureSeeded();
         return Array.from(this.masterRegistry.values());
       }
       /**
        * Retorna todos os itens cadastrados no índice mestre sincronamente
        */
       getAllItemsSync() {
+        this.ensureSeeded();
         return Array.from(this.masterRegistry.values()).map((e) => e.item);
       }
       /**

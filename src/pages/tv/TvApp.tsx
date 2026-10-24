@@ -10,6 +10,7 @@ import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { canonicalCatalogMaster } from '../../core/catalog/CanonicalCatalogMaster';
 import { catalogReleaseStore } from '../../core/catalog/CatalogReleaseStore';
+import { searchService } from '../../core/search/searchService';
 import { watchPartyService } from '../../core/watchparty/WatchPartyService';
 import { useTvIdle } from '../../core/tv/useTvIdle';
 import { getTvScreensaverItems } from '../../core/tv/tvScreensaverCatalog';
@@ -246,6 +247,35 @@ export const TvApp: React.FC<TvAppProps> = ({
     ];
     return catalogEligibilityService.filterEligibleItemsSync(deduplicateContentItems(combined));
   }, [content, popularMovies, popularSeries, animeItems, trendingItems, featuredItems, releasedItems, catalogEligibilityTick]);
+
+  // Listas por categoria unificadas aproveitando fullTvCatalog + resultados obtidos da rede
+  const unifiedMovies = useMemo(() => {
+    const catalogMovies = fullTvCatalog.filter(i => searchService.isMovieItem(i));
+    const combined = [...(popularMovies || []), ...catalogMovies];
+    return deduplicateContentItems(combined);
+  }, [popularMovies, fullTvCatalog]);
+
+  const unifiedSeries = useMemo(() => {
+    const catalogSeries = fullTvCatalog.filter(i => searchService.isSeriesItem(i));
+    const combined = [...(popularSeries || []), ...catalogSeries];
+    return deduplicateContentItems(combined);
+  }, [popularSeries, fullTvCatalog]);
+
+  const unifiedAnimes = useMemo(() => {
+    const catalogAnimes = fullTvCatalog.filter(i => searchService.isAnimeItem(i));
+    const combined = [...(animeItems || []), ...catalogAnimes];
+    return deduplicateContentItems(combined);
+  }, [animeItems, fullTvCatalog]);
+
+  const unifiedTrending = useMemo(() => {
+    if (trendingItems && trendingItems.length > 0) return trendingItems;
+    const fallback = deduplicateContentItems([
+      ...(featuredItems || []),
+      ...unifiedMovies.slice(0, 10),
+      ...unifiedSeries.slice(0, 10)
+    ]);
+    return fallback.slice(0, 20);
+  }, [trendingItems, featuredItems, unifiedMovies, unifiedSeries]);
 
   // Itens da Minha Lista reais
   const myListItems = useMemo(() => {
@@ -514,11 +544,11 @@ export const TvApp: React.FC<TvAppProps> = ({
               <TvHomeView
                 suspended={screensaverActive}
                 featuredItems={featuredItems}
-                trendingItems={trendingItems}
-                popularMovies={popularMovies}
-                popularSeries={popularSeries}
-                animeItems={animeItems}
-                allContent={content}
+                trendingItems={unifiedTrending}
+                popularMovies={unifiedMovies}
+                popularSeries={unifiedSeries}
+                animeItems={unifiedAnimes}
+                allContent={fullTvCatalog}
                 onSelectItem={handleOpenDetailModal}
                 onPlayItem={(it) => handleStartPlay(it)}
               />
@@ -526,7 +556,7 @@ export const TvApp: React.FC<TvAppProps> = ({
               <TvCategoryView
                 categoryTitle="Filmes"
                 upFocusKey="tv-nav-movies"
-                items={popularMovies}
+                items={unifiedMovies}
                 onSelectItem={handleOpenDetailModal}
                 onPlayItem={(it) => handleStartPlay(it)}
                 suspended={screensaverActive}
@@ -535,14 +565,14 @@ export const TvApp: React.FC<TvAppProps> = ({
               <TvCategoryView
                 categoryTitle="Séries"
                 upFocusKey="tv-nav-series"
-                items={popularSeries}
+                items={unifiedSeries}
                 onSelectItem={handleOpenDetailModal}
                 onPlayItem={(it) => handleStartPlay(it)}
                 suspended={screensaverActive}
               />
             ) : currentTab === 'animes' ? (
               <TvAnimeView
-                items={animeItems}
+                items={unifiedAnimes}
                 upFocusKey="tv-nav-animes"
                 allContent={fullTvCatalog}
                 onSelectItem={handleOpenDetailModal}
@@ -553,7 +583,7 @@ export const TvApp: React.FC<TvAppProps> = ({
               <TvCategoryView
                 categoryTitle="Em Destaque"
                 upFocusKey="tv-nav-featured"
-                items={featuredItems}
+                items={featuredItems.length > 0 ? featuredItems : unifiedTrending}
                 onSelectItem={handleOpenDetailModal}
                 onPlayItem={(it) => handleStartPlay(it)}
                 suspended={screensaverActive}

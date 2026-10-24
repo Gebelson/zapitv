@@ -5,13 +5,13 @@
   "month": 10,
   "isCurrentMonth": true,
   "statusLabel": "Outubro de 2026 · Parcial",
-  "lastUpdatedAt": 1792874504081,
+  "lastUpdatedAt": 1792876878150,
   "nextScheduledUpdate": 1793005200000,
   "nextScheduledUpdateFormatted": "Segunda-feira, 26/10/2026 às 06:00 (BRT)",
   "movies": [
     {
       "position": 1,
-      "canonicalId": "movie-digger-2026",
+      "canonicalId": "movie:imdb:tt31454558",
       "mediaType": "movie",
       "title": "Digger",
       "originalTitle": "Digger",
@@ -38,6 +38,7 @@
         "isFeatured": true,
         "availabilityStatus": "verified",
         "audioStatus": "pt-br-dubbed",
+        "canonicalId": "movie:imdb:tt31454558",
         "imdbRank": 2,
         "displayRank": 1,
         "heroTags": [
@@ -56,11 +57,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878149
     },
     {
       "position": 2,
-      "canonicalId": "movie-outra-mamae-2026",
+      "canonicalId": "movie:imdb:tt21440780",
       "mediaType": "movie",
       "title": "Outra Mamãe",
       "originalTitle": "Another Mother",
@@ -87,6 +88,7 @@
         "isFeatured": true,
         "availabilityStatus": "verified",
         "audioStatus": "pt-br-dubbed",
+        "canonicalId": "movie:imdb:tt21440780",
         "imdbRank": 3,
         "displayRank": 2,
         "heroTags": [
@@ -105,11 +107,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878149
     },
     {
       "position": 3,
-      "canonicalId": "movie-exorcista-martires-2026",
+      "canonicalId": "movie:imdb:tt28704204",
       "mediaType": "movie",
       "title": "O Exorcista: Mártires",
       "originalTitle": "The Exorcist: Martyrs",
@@ -135,6 +137,7 @@
         "isFeatured": true,
         "availabilityStatus": "verified",
         "audioStatus": "pt-br-dubbed",
+        "canonicalId": "movie:imdb:tt28704204",
         "imdbRank": 5,
         "displayRank": 3,
         "heroTags": [
@@ -153,11 +156,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878149
     },
     {
       "position": 4,
-      "canonicalId": "movie-matchbox-2026",
+      "canonicalId": "movie:imdb:tt31828574",
       "mediaType": "movie",
       "title": "Matchbox: O Filme",
       "originalTitle": "Matchbox",
@@ -183,6 +186,7 @@
         "isFeatured": true,
         "availabilityStatus": "verified",
         "audioStatus": "pt-br-dubbed",
+        "canonicalId": "movie:imdb:tt31828574",
         "imdbRank": 6,
         "displayRank": 4,
         "heroTags": [
@@ -201,11 +205,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878149
     },
     {
       "position": 5,
-      "canonicalId": "movie-resident-evil-2026",
+      "canonicalId": "movie:imdb:tt13000574",
       "mediaType": "movie",
       "title": "Resident Evil",
       "originalTitle": "Resident Evil",
@@ -233,6 +237,7 @@
         "isFeatured": true,
         "availabilityStatus": "verified",
         "audioStatus": "pt-br-dubbed",
+        "canonicalId": "movie:imdb:tt13000574",
         "imdbRank": 7,
         "displayRank": 5,
         "heroTags": [
@@ -251,11 +256,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878149
     },
     {
       "position": 6,
-      "canonicalId": "movie-wild-at-heart-1990",
+      "canonicalId": "movie:imdb:tt0100935",
       "mediaType": "movie",
       "title": "Coração Selvagem",
       "originalTitle": "Wild at Heart",
@@ -282,6 +287,7 @@
         "isFeatured": true,
         "availabilityStatus": "verified",
         "audioStatus": "pt-br-dubbed",
+        "canonicalId": "movie:imdb:tt0100935",
         "imdbRank": 9,
         "displayRank": 6,
         "heroTags": [
@@ -300,11 +306,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 7,
-      "canonicalId": "movie-social-dilemma-2020",
+      "canonicalId": "movie:imdb:tt11464826",
       "mediaType": "movie",
       "title": "O Outro Lado das Redes",
       "originalTitle": "The Social Dilemma",
@@ -330,6 +336,7 @@
         "isFeatured": true,
         "availabilityStatus": "verified",
         "audioStatus": "pt-br-dubbed",
+        "canonicalId": "movie:imdb:tt11464826",
         "imdbRank": 10,
         "displayRank": 7,
         "heroTags": [
@@ -348,11 +355,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 8,
-      "canonicalId": "movie-unabomber-2026",
+      "canonicalId": "movie:imdb:tt1392796",
       "mediaType": "movie",
       "title": "Unabomber",
       "originalTitle": "Unabomber",
@@ -379,6 +386,7 @@
         "isFeatured": true,
         "availabilityStatus": "verified",
         "audioStatus": "pt-br-dubbed",
+        "canonicalId": "movie:imdb:tt1392796",
         "imdbRank": 11,
         "displayRank": 8,
         "heroTags": [
@@ -397,11 +405,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 9,
-      "canonicalId": "movie-dia-d-2026",
+      "canonicalId": "movie:imdb:tt11576182",
       "mediaType": "movie",
       "title": "Dia D",
       "originalTitle": "D-Day",
@@ -428,6 +436,7 @@
         "isFeatured": true,
         "availabilityStatus": "verified",
         "audioStatus": "pt-br-dubbed",
+        "canonicalId": "movie:imdb:tt11576182",
         "imdbRank": 12,
         "displayRank": 9,
         "heroTags": [
@@ -446,11 +455,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 10,
-      "canonicalId": "movie-obsession-1976",
+      "canonicalId": "movie:imdb:tt0074991",
       "mediaType": "movie",
       "title": "Obsessão",
       "originalTitle": "Obsession",
@@ -477,6 +486,7 @@
         "isFeatured": true,
         "availabilityStatus": "verified",
         "audioStatus": "pt-br-dubbed",
+        "canonicalId": "movie:imdb:tt0074991",
         "imdbRank": 14,
         "displayRank": 10,
         "heroTags": [
@@ -495,13 +505,13 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     }
   ],
   "series": [
     {
       "position": 1,
-      "canonicalId": "series-a-leste-do-eden-2026",
+      "canonicalId": "series:imdb:tt21097264",
       "mediaType": "series",
       "title": "A Leste do Éden",
       "originalTitle": "East of Eden",
@@ -538,6 +548,7 @@
             "image": "https://images.metahub.space/poster/medium/tt21097264/img"
           }
         ],
+        "canonicalId": "series:imdb:tt21097264",
         "imdbRank": 3,
         "displayRank": 1,
         "heroTags": [
@@ -556,11 +567,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 2,
-      "canonicalId": "series-ted-lasso",
+      "canonicalId": "series:imdb:tt10986410",
       "mediaType": "series",
       "title": "Ted Lasso",
       "originalTitle": "Ted Lasso",
@@ -604,6 +615,7 @@
             "image": "https://images.metahub.space/poster/medium/tt10986410/img"
           }
         ],
+        "canonicalId": "series:imdb:tt10986410",
         "imdbRank": 5,
         "displayRank": 2,
         "heroTags": [
@@ -622,11 +634,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 3,
-      "canonicalId": "series-slow-horses",
+      "canonicalId": "series:imdb:tt5875444",
       "mediaType": "series",
       "title": "Slow Horses",
       "originalTitle": "Slow Horses",
@@ -670,6 +682,7 @@
             "image": "https://images.metahub.space/poster/medium/tt5875444/img"
           }
         ],
+        "canonicalId": "series:imdb:tt5875444",
         "imdbRank": 7,
         "displayRank": 3,
         "heroTags": [
@@ -688,11 +701,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 4,
-      "canonicalId": "series-monstros",
+      "canonicalId": "series:imdb:tt13207736",
       "mediaType": "series",
       "title": "Monstros",
       "originalTitle": "Monsters",
@@ -729,6 +742,7 @@
             "image": "https://images.metahub.space/poster/medium/tt13207736/img"
           }
         ],
+        "canonicalId": "series:imdb:tt13207736",
         "imdbRank": 9,
         "displayRank": 4,
         "heroTags": [
@@ -747,11 +761,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 5,
-      "canonicalId": "series-ahs",
+      "canonicalId": "series:imdb:tt1844624",
       "mediaType": "series",
       "title": "História de Horror Americana",
       "originalTitle": "American Horror Story",
@@ -788,6 +802,7 @@
             "image": "https://images.metahub.space/poster/medium/tt1844624/img"
           }
         ],
+        "canonicalId": "series:imdb:tt1844624",
         "imdbRank": 10,
         "displayRank": 5,
         "heroTags": [
@@ -806,11 +821,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 6,
-      "canonicalId": "series-the-gentlemen",
+      "canonicalId": "series:imdb:tt16066148",
       "mediaType": "series",
       "title": "Magnatas do Crime",
       "originalTitle": "The Gentlemen",
@@ -848,6 +863,7 @@
             "image": "https://image.tmdb.org/t/p/w500/e5enRsAImbGcsT0BksqwurjA6CZ.jpg"
           }
         ],
+        "canonicalId": "series:imdb:tt16066148",
         "imdbRank": 11,
         "displayRank": 6,
         "heroTags": [
@@ -866,11 +882,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 7,
-      "canonicalId": "series-the-mentalist",
+      "canonicalId": "series:imdb:tt1196946",
       "mediaType": "series",
       "title": "O Mentalista",
       "originalTitle": "The Mentalist",
@@ -907,6 +923,7 @@
             "image": "https://images.metahub.space/poster/medium/tt1196946/img"
           }
         ],
+        "canonicalId": "series:imdb:tt1196946",
         "imdbRank": 12,
         "displayRank": 7,
         "heroTags": [
@@ -925,11 +942,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 8,
-      "canonicalId": "series-game-of-thrones-2011",
+      "canonicalId": "series:imdb:tt0944947",
       "mediaType": "series",
       "title": "Game of Thrones",
       "originalTitle": "Game of Thrones",
@@ -967,6 +984,7 @@
             "image": "https://images.metahub.space/poster/medium/tt0944947/img"
           }
         ],
+        "canonicalId": "series:imdb:tt0944947",
         "imdbRank": 13,
         "displayRank": 8,
         "heroTags": [
@@ -985,11 +1003,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 9,
-      "canonicalId": "series-reacher",
+      "canonicalId": "series:imdb:tt9288030",
       "mediaType": "series",
       "title": "Reacher",
       "originalTitle": "Reacher",
@@ -1026,6 +1044,7 @@
             "image": "https://images.metahub.space/poster/medium/tt9288030/img"
           }
         ],
+        "canonicalId": "series:imdb:tt9288030",
         "imdbRank": 14,
         "displayRank": 9,
         "heroTags": [
@@ -1044,11 +1063,11 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 10,
-      "canonicalId": "series-lioness",
+      "canonicalId": "series:imdb:tt13111078",
       "mediaType": "series",
       "title": "Operação Lioness",
       "originalTitle": "Special Ops: Lioness",
@@ -1085,6 +1104,7 @@
             "image": "https://images.metahub.space/poster/medium/tt13111078/img"
           }
         ],
+        "canonicalId": "series:imdb:tt13111078",
         "imdbRank": 15,
         "displayRank": 10,
         "heroTags": [
@@ -1103,7 +1123,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     }
   ],
   "animes": [
@@ -1170,10 +1190,142 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
       "position": 2,
+      "canonicalId": "anime:anilist:113415",
+      "mediaType": "anime",
+      "title": "Jujutsu Kaisen",
+      "originalTitle": "Jujutsu Kaisen",
+      "year": 2020,
+      "poster": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/gmECX1Dv3y54wQ8o3t300gJ8uVp.jpg",
+      "rating": 8.6,
+      "item": {
+        "id": "anime-jujutsu-kaisen",
+        "canonicalId": "anime:anilist:113415",
+        "title": "Jujutsu Kaisen",
+        "originalTitle": "Jujutsu Kaisen",
+        "type": "ANIME",
+        "mediaFormat": "series",
+        "rating": 8.6,
+        "year": 2020,
+        "image": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/gmECX1Dv3y54wQ8o3t300gJ8uVp.jpg",
+        "description": "Yuji Itadori engole um dedo amaldiçoado de Ryomen Sukuna e ingressa na Escola de Feitiçaria de Tóquio para expurgar maldições ameaçadoras.",
+        "genres": [
+          "Anime",
+          "Ação",
+          "Sobrenatural",
+          "Fantasia"
+        ],
+        "aniListId": 113415,
+        "tmdbId": "95479",
+        "malId": 40748,
+        "seasonsCount": 2,
+        "isFeatured": true,
+        "availabilityStatus": "verified",
+        "audioStatus": "pt-br-dubbed",
+        "episodes": [
+          {
+            "id": "jjk-s1e1",
+            "number": 1,
+            "title": "Ryomen Sukuna",
+            "description": "Yuji Itadori quebra o selo de um talismã amaldiçoado para salvar seus colegas de escola.",
+            "image": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg"
+          }
+        ],
+        "overview": "A boy fights... for \"the right death.\"\n\n\n\nHardship, regret, shame: the negative feelings that humans feel become Curses that lurk in our everyday lives. The Curses run rampant throughout the world, capable of leading people to terrible misfortune and even death. What's more, the Curses can only be exorcised by another Curse.\n\n\n\nItadori Yuji is a boy with tremendous physical strength, though he lives a completely ordinary high school life. One day, to save a friend who has been attacked by Curses, he eats the finger of the Double-Faced Specter, taking the Curse into his own soul. From then on, he shares one body with the Double-Faced Specter. Guided by the most powerful of sorcerers, Gojou Satoru, Itadori is admitted to the Tokyo Metropolitan Technical High School of Sorcery, an organization that fights the Curses... and thus begins the heroic tale of a boy who became a Curse to exorcise a Curse, a life from which he could never turn back.\n\n\n\n(Source: Crunchyroll)\n\n\n\nNote: The first episode received an early web premiere on September 19th, 2020. The regular TV broadcast started on October 3rd, 2020.",
+        "imdbId": "anilist-113415",
+        "imdbRank": 2,
+        "displayRank": 2,
+        "heroTags": [
+          {
+            "id": "rank-2",
+            "text": "#2 Em Destaque (Outubro de 2026)",
+            "color": "#06b6d4",
+            "style": "solid"
+          }
+        ]
+      },
+      "calculatedScore": 1056,
+      "source": "anilist",
+      "originalPosition": 2,
+      "monthKey": "2026-10",
+      "monthLabel": "Outubro de 2026",
+      "isPartial": true,
+      "validationStatus": "verified",
+      "updatedAt": 1792876878150
+    },
+    {
+      "position": 3,
+      "canonicalId": "anime:anilist:101922",
+      "mediaType": "anime",
+      "title": "Demon Slayer: Kimetsu no Yaiba",
+      "originalTitle": "Kimetsu no Yaiba",
+      "year": 2019,
+      "poster": "https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH6SzQEJGP6tjBuYj.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/nTvM4mhqZlHIvPtPRum9WXfa729.jpg",
+      "rating": 8.6,
+      "item": {
+        "id": "anime-demon-slayer",
+        "canonicalId": "anime:anilist:101922",
+        "title": "Demon Slayer: Kimetsu no Yaiba",
+        "originalTitle": "Kimetsu no Yaiba",
+        "type": "ANIME",
+        "mediaFormat": "series",
+        "rating": 8.6,
+        "year": 2019,
+        "image": "https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH6SzQEJGP6tjBuYj.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/nTvM4mhqZlHIvPtPRum9WXfa729.jpg",
+        "description": "Tanjiro Kamado parte em uma jornada para se tornar um exterminador de demônios e devolver a humanidade de sua irmã Nezuko.",
+        "genres": [
+          "Anime",
+          "Ação",
+          "Fantasia",
+          "Histórico"
+        ],
+        "aniListId": 101922,
+        "tmdbId": "85937",
+        "malId": 38000,
+        "seasonsCount": 4,
+        "isFeatured": true,
+        "availabilityStatus": "verified",
+        "audioStatus": "pt-br-dubbed",
+        "episodes": [
+          {
+            "id": "ds-s1e1",
+            "number": 1,
+            "title": "Crueldade",
+            "description": "Tanjiro retorna da cidade e encontra sua família atacada por um demônio devorador de homens.",
+            "image": "https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH6SzQEJGP6tjBuYj.jpg"
+          }
+        ],
+        "overview": "It is the Taisho Period in Japan. Tanjiro, a kindhearted boy who sells charcoal for a living, finds his family slaughtered by a demon. To make matters worse, his younger sister Nezuko, the sole survivor, has been transformed into a demon herself. Though devastated by this grim reality, Tanjiro resolves to become a “demon slayer” so that he can turn his sister back into a human, and kill the demon that massacred his family.\n\n\n\n(Source: Crunchyroll)",
+        "imdbId": "anilist-101922",
+        "imdbRank": 3,
+        "displayRank": 3,
+        "heroTags": [
+          {
+            "id": "rank-3",
+            "text": "#3 Em Destaque (Outubro de 2026)",
+            "color": "#06b6d4",
+            "style": "solid"
+          }
+        ]
+      },
+      "calculatedScore": 1049,
+      "source": "anilist",
+      "originalPosition": 3,
+      "monthKey": "2026-10",
+      "monthLabel": "Outubro de 2026",
+      "isPartial": true,
+      "validationStatus": "verified",
+      "updatedAt": 1792876878150
+    },
+    {
+      "position": 4,
       "canonicalId": "anime:anilist:171018",
       "mediaType": "anime",
       "title": "Dandadan",
@@ -1218,11 +1370,11 @@
         ],
         "imdbId": "anilist-171018",
         "imdbRank": 4,
-        "displayRank": 2,
+        "displayRank": 4,
         "heroTags": [
           {
-            "id": "rank-2",
-            "text": "#2 Em Destaque (Outubro de 2026)",
+            "id": "rank-4",
+            "text": "#4 Em Destaque (Outubro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1235,10 +1387,10 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
-      "position": 3,
+      "position": 5,
       "canonicalId": "anime:anilist:114446",
       "mediaType": "anime",
       "title": "Bleach: Thousand-Year Blood War",
@@ -1283,11 +1435,11 @@
         ],
         "imdbId": "anilist-114446",
         "imdbRank": 5,
-        "displayRank": 3,
+        "displayRank": 5,
         "heroTags": [
           {
-            "id": "rank-3",
-            "text": "#3 Em Destaque (Outubro de 2026)",
+            "id": "rank-5",
+            "text": "#5 Em Destaque (Outubro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1300,10 +1452,10 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
-      "position": 4,
+      "position": 6,
       "canonicalId": "anime:anilist:154587",
       "mediaType": "anime",
       "title": "Frieren: Beyond Journey's End",
@@ -1348,11 +1500,11 @@
         ],
         "imdbId": "anilist-154587",
         "imdbRank": 6,
-        "displayRank": 4,
+        "displayRank": 6,
         "heroTags": [
           {
-            "id": "rank-4",
-            "text": "#4 Em Destaque (Outubro de 2026)",
+            "id": "rank-6",
+            "text": "#6 Em Destaque (Outubro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1365,10 +1517,208 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504080
+      "updatedAt": 1792876878150
     },
     {
-      "position": 5,
+      "position": 7,
+      "canonicalId": "anime:anilist:127230",
+      "mediaType": "anime",
+      "title": "Chainsaw Man",
+      "originalTitle": "Chainsaw Man",
+      "year": 2022,
+      "poster": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/vI3a3n07Jq9g6iK2k69uP8wV7hX.jpg",
+      "rating": 8.5,
+      "item": {
+        "id": "anime-chainsaw-man",
+        "canonicalId": "anime:anilist:127230",
+        "title": "Chainsaw Man",
+        "originalTitle": "Chainsaw Man",
+        "type": "ANIME",
+        "mediaFormat": "series",
+        "rating": 8.5,
+        "year": 2022,
+        "image": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/vI3a3n07Jq9g6iK2k69uP8wV7hX.jpg",
+        "description": "Denji renasce como um híbrido motosserra após se fundir com seu cachorro demônio Pochita e entra para a Segurança Pública.",
+        "genres": [
+          "Anime",
+          "Ação",
+          "Sobrenatural",
+          "Horror"
+        ],
+        "aniListId": 127230,
+        "tmdbId": "114410",
+        "malId": 44511,
+        "seasonsCount": 1,
+        "isFeatured": true,
+        "availabilityStatus": "verified",
+        "audioStatus": "pt-br-dubbed",
+        "episodes": [
+          {
+            "id": "csm-s1e1",
+            "number": 1,
+            "title": "Cachorro e Motosserra",
+            "description": "Denji trabalha caçando demônios para pagar as dívidas deixadas por seu falecido pai.",
+            "image": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg"
+          }
+        ],
+        "overview": "Denji is a teenage boy living with a Chainsaw Devil named Pochita. Due to the debt his father left behind, he has been living a rock-bottom life while repaying his debt by harvesting devil corpses with Pochita.\n\n\nOne day, Denji is betrayed and killed. As his consciousness fades, he makes a contract with Pochita and gets revived as \"Chainsaw Man\" — a man with a devil's heart.\n\n\n\n(Source: Crunchyroll)",
+        "imdbId": "anilist-127230",
+        "imdbRank": 7,
+        "displayRank": 7,
+        "heroTags": [
+          {
+            "id": "rank-7",
+            "text": "#7 Em Destaque (Outubro de 2026)",
+            "color": "#06b6d4",
+            "style": "solid"
+          }
+        ]
+      },
+      "calculatedScore": 994,
+      "source": "anilist",
+      "originalPosition": 7,
+      "monthKey": "2026-10",
+      "monthLabel": "Outubro de 2026",
+      "isPartial": true,
+      "validationStatus": "verified",
+      "updatedAt": 1792876878150
+    },
+    {
+      "position": 8,
+      "canonicalId": "anime:anilist:16498",
+      "mediaType": "anime",
+      "title": "Attack on Titan",
+      "originalTitle": "Shingeki no Kyojin",
+      "year": 2013,
+      "poster": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/hP9cKk97kFh7g1w9w7h5g1kL2.jpg",
+      "rating": 9,
+      "item": {
+        "id": "anime-attack-on-titan",
+        "canonicalId": "anime:anilist:16498",
+        "title": "Attack on Titan",
+        "originalTitle": "Shingeki no Kyojin",
+        "type": "ANIME",
+        "mediaFormat": "series",
+        "rating": 9,
+        "year": 2013,
+        "image": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/hP9cKk97kFh7g1w9w7h5g1kL2.jpg",
+        "description": "Eren Yeager e a Tropa de Exploração lutam desesperadamente pela sobrevivência humana contra gigantes devoradores de homens.",
+        "genres": [
+          "Anime",
+          "Ação",
+          "Drama",
+          "Fantasia"
+        ],
+        "aniListId": 16498,
+        "tmdbId": "1429",
+        "malId": 16498,
+        "seasonsCount": 4,
+        "isFeatured": true,
+        "availabilityStatus": "verified",
+        "audioStatus": "pt-br-dubbed",
+        "episodes": [
+          {
+            "id": "aot-s1e1",
+            "number": 1,
+            "title": "Para Você, Daqui a 2.000 Anos",
+            "description": "A Muralha Maria é rompida pelo Titã Colossal e o caos engole a cidade de Shiganshina.",
+            "image": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg"
+          }
+        ],
+        "overview": "Several hundred years ago, humans were nearly exterminated by titans. Titans are typically several stories tall, seem to have no intelligence, devour human beings and, worst of all, seem to do it for the pleasure rather than as a food source. A small percentage of humanity survived by walling themselves in a city protected by extremely high walls, even taller than the biggest of titans.\n\n\r\nFlash forward to the present and the city has not seen a titan in over 100 years. Teenage boy Eren and his foster sister Mikasa witness something horrific as the city walls are destroyed by a colossal titan that appears out of thin air. As the smaller titans flood the city, the two kids watch in horror as their mother is eaten alive. Eren vows that he will murder every single titan and take revenge for all of mankind.\n\n\r\n(Source: MangaHelpers)",
+        "imdbId": "anilist-16498",
+        "imdbRank": 8,
+        "displayRank": 8,
+        "heroTags": [
+          {
+            "id": "rank-8",
+            "text": "#8 Em Destaque (Outubro de 2026)",
+            "color": "#06b6d4",
+            "style": "solid"
+          }
+        ]
+      },
+      "calculatedScore": 983,
+      "source": "anilist",
+      "originalPosition": 8,
+      "monthKey": "2026-10",
+      "monthLabel": "Outubro de 2026",
+      "isPartial": true,
+      "validationStatus": "verified",
+      "updatedAt": 1792876878150
+    },
+    {
+      "position": 9,
+      "canonicalId": "anime:anilist:21",
+      "mediaType": "anime",
+      "title": "One Piece",
+      "originalTitle": "One Piece",
+      "year": 1999,
+      "poster": "https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/4MCKNAc6AbWjEsM2crWsNmecOCU.jpg",
+      "rating": 8.9,
+      "item": {
+        "id": "anime-one-piece",
+        "canonicalId": "anime:anilist:21",
+        "title": "One Piece",
+        "originalTitle": "One Piece",
+        "type": "ANIME",
+        "mediaFormat": "series",
+        "rating": 8.9,
+        "year": 1999,
+        "image": "https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/4MCKNAc6AbWjEsM2crWsNmecOCU.jpg",
+        "description": "Monkey D. Luffy navega pelos mares com o bando do Chapéu de Palha em busca do tesouro supremo e o título de Rei dos Piratas.",
+        "genres": [
+          "Anime",
+          "Ação",
+          "Aventura",
+          "Comédia"
+        ],
+        "aniListId": 21,
+        "tmdbId": "37854",
+        "malId": 21,
+        "seasonsCount": 21,
+        "isFeatured": true,
+        "availabilityStatus": "verified",
+        "audioStatus": "pt-br-dubbed",
+        "episodes": [
+          {
+            "id": "op-s1e1",
+            "number": 1,
+            "title": "Eu Sou Luffy! O Homem Que Será o Rei dos Piratas!",
+            "description": "Luffy emerge de um barril e conhece Koby a bordo do navio da terrível capitã Alvida.",
+            "image": "https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg"
+          }
+        ],
+        "overview": "Gold Roger was known as the Pirate King, the strongest and most infamous being to have sailed the Grand Line. The capture and death of Roger by the World Government brought a change throughout the world. His last words before his death revealed the location of the greatest treasure in the world, One Piece. It was this revelation that brought about the Grand Age of Pirates, men who dreamed of finding One Piece (which promises an unlimited amount of riches and fame), and quite possibly the most coveted of titles for the person who found it, the title of the Pirate King.\n\n\nEnter Monkey D. Luffy, a 17-year-old boy that defies your standard definition of a pirate. Rather than the popular persona of a wicked, hardened, toothless pirate who ransacks villages for fun, Luffy’s reason for being a pirate is one of pure wonder; the thought of an exciting adventure and meeting new and intriguing people, along with finding One Piece, are his reasons of becoming a pirate. Following in the footsteps of his childhood hero, Luffy and his crew travel across the Grand Line, experiencing crazy adventures, unveiling dark mysteries and battling strong enemies, all in order to reach One Piece.\n\n\n*This includes the following special episodes:\n\n- Chopperman to the Rescue! Protect the TV Station by the Shore! (Episode 336)\n\n- The Strongest Tag-Team! Luffy and Toriko's Hard Struggle! (Episode 492)\n\n- Team Formation! Save Chopper (Episode 542)\n\n- History's Strongest Collaboration vs. Glutton of the Sea (Episode 590)\n\n- 20th Anniversary! Special Romance Dawn (Episode 907)",
+        "imdbId": "anilist-21",
+        "imdbRank": 9,
+        "displayRank": 9,
+        "heroTags": [
+          {
+            "id": "rank-9",
+            "text": "#9 Em Destaque (Outubro de 2026)",
+            "color": "#06b6d4",
+            "style": "solid"
+          }
+        ]
+      },
+      "calculatedScore": 971,
+      "source": "anilist",
+      "originalPosition": 9,
+      "monthKey": "2026-10",
+      "monthLabel": "Outubro de 2026",
+      "isPartial": true,
+      "validationStatus": "verified",
+      "updatedAt": 1792876878150
+    },
+    {
+      "position": 10,
       "canonicalId": "anime:anilist:140960",
       "mediaType": "anime",
       "title": "Spy x Family",
@@ -1413,11 +1763,11 @@
         ],
         "imdbId": "anilist-140960",
         "imdbRank": 10,
-        "displayRank": 5,
+        "displayRank": 10,
         "heroTags": [
           {
-            "id": "rank-5",
-            "text": "#5 Em Destaque (Outubro de 2026)",
+            "id": "rank-10",
+            "text": "#10 Em Destaque (Outubro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1430,136 +1780,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792874504081
-    },
-    {
-      "position": 6,
-      "canonicalId": "anime:anilist:153288",
-      "mediaType": "anime",
-      "title": "Kaiju No. 8",
-      "originalTitle": "Kaijuu 8-gou",
-      "year": 2024,
-      "poster": "https://image.tmdb.org/t/p/w500/fL6K0z0wYV8x1q9eX2xK1v8a7Z1.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/7kK1q2w8vK1m9x2eX2xK1v8a7Z2.jpg",
-      "rating": 8.3,
-      "item": {
-        "id": "anime-kaiju-no-8",
-        "canonicalId": "anime:anilist:153288",
-        "title": "Kaiju No. 8",
-        "originalTitle": "Kaijuu 8-gou",
-        "type": "ANIME",
-        "mediaFormat": "series",
-        "rating": 8.3,
-        "year": 2024,
-        "image": "https://image.tmdb.org/t/p/w500/fL6K0z0wYV8x1q9eX2xK1v8a7Z1.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/7kK1q2w8vK1m9x2eX2xK1v8a7Z2.jpg",
-        "description": "Kafka Hibino realiza o trabalho ingrato de limpar carcaças de monstros gigantes até que um parasita alienígena o transforma no primeiro homem-kaiju.",
-        "genres": [
-          "Anime",
-          "Ação",
-          "Ficção Científica"
-        ],
-        "aniListId": 153288,
-        "tmdbId": "206586",
-        "malId": 52588,
-        "seasonsCount": 1,
-        "isFeatured": true,
-        "availabilityStatus": "verified",
-        "audioStatus": "pt-br-dubbed",
-        "episodes": [
-          {
-            "id": "k8-s1e1",
-            "number": 1,
-            "title": "O Homem Que Se Tornou um Monstro",
-            "description": "Kafka reflete sobre seu sonho abandonado das Forças de Defesa enquanto limpa os restos de uma fera colossal.",
-            "image": "https://image.tmdb.org/t/p/w500/fL6K0z0wYV8x1q9eX2xK1v8a7Z1.jpg"
-          }
-        ],
-        "imdbId": "anilist-153288",
-        "imdbRank": 11,
-        "displayRank": 6,
-        "heroTags": [
-          {
-            "id": "rank-6",
-            "text": "#6 Em Destaque (Outubro de 2026)",
-            "color": "#06b6d4",
-            "style": "solid"
-          }
-        ]
-      },
-      "calculatedScore": 939,
-      "source": "anilist",
-      "originalPosition": 11,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
-      "isPartial": true,
-      "validationStatus": "verified",
-      "updatedAt": 1792874504081
-    },
-    {
-      "position": 7,
-      "canonicalId": "anime:anilist:163148",
-      "mediaType": "anime",
-      "title": "Blue Lock",
-      "originalTitle": "Blue Lock",
-      "year": 2022,
-      "poster": "https://image.tmdb.org/t/p/w500/i9pZkK9w8vK1m9x2eX2xK1v8a7Z3.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/9pZkK9w8vK1m9x2eX2xK1v8a7Z4.jpg",
-      "rating": 8.2,
-      "item": {
-        "id": "anime-blue-lock",
-        "canonicalId": "anime:anilist:163148",
-        "title": "Blue Lock",
-        "originalTitle": "Blue Lock",
-        "type": "ANIME",
-        "mediaFormat": "series",
-        "rating": 8.2,
-        "year": 2022,
-        "image": "https://image.tmdb.org/t/p/w500/i9pZkK9w8vK1m9x2eX2xK1v8a7Z3.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/9pZkK9w8vK1m9x2eX2xK1v8a7Z4.jpg",
-        "description": "Trezentos atacantes colegiais do Japão são confinados em uma prisão de treinamento de futebol para forjar o maior atacante egoísta do mundo.",
-        "genres": [
-          "Anime",
-          "Esporte",
-          "Ação",
-          "Drama"
-        ],
-        "aniListId": 163148,
-        "tmdbId": "136283",
-        "malId": 50528,
-        "seasonsCount": 2,
-        "isFeatured": true,
-        "availabilityStatus": "verified",
-        "audioStatus": "pt-br-dubbed",
-        "episodes": [
-          {
-            "id": "bl-s1e1",
-            "number": 1,
-            "title": "Sonho",
-            "description": "Yoichi Isagi recebe o convite misterioso da União Japonesa de Futebol para o projeto Blue Lock.",
-            "image": "https://image.tmdb.org/t/p/w500/i9pZkK9w8vK1m9x2eX2xK1v8a7Z3.jpg"
-          }
-        ],
-        "imdbId": "anilist-163148",
-        "imdbRank": 12,
-        "displayRank": 7,
-        "heroTags": [
-          {
-            "id": "rank-7",
-            "text": "#7 Em Destaque (Outubro de 2026)",
-            "color": "#06b6d4",
-            "style": "solid"
-          }
-        ]
-      },
-      "calculatedScore": 928,
-      "source": "anilist",
-      "originalPosition": 12,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
-      "isPartial": true,
-      "validationStatus": "verified",
-      "updatedAt": 1792874504081
+      "updatedAt": 1792876878150
     }
   ],
   "totalCandidatesEvaluated": {
@@ -2117,6 +2338,50 @@
         "score": 1082
       },
       {
+        "imdbId": "anilist-113415",
+        "aniListId": 113415,
+        "tmdbId": "95479",
+        "title": "Jujutsu Kaisen",
+        "imdbTitle": "Jujutsu Kaisen",
+        "canonicalTitle": "Jujutsu Kaisen",
+        "year": 2020,
+        "mediaType": "anime",
+        "imdbRank": 2,
+        "displayRank": 2,
+        "rankPosition": 2,
+        "finalPosition": 2,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-jujutsu-kaisen",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 1056
+      },
+      {
+        "imdbId": "anilist-101922",
+        "aniListId": 101922,
+        "tmdbId": "85937",
+        "title": "Demon Slayer: Kimetsu no Yaiba",
+        "imdbTitle": "Demon Slayer: Kimetsu no Yaiba",
+        "canonicalTitle": "Demon Slayer: Kimetsu no Yaiba",
+        "year": 2019,
+        "mediaType": "anime",
+        "imdbRank": 3,
+        "displayRank": 3,
+        "rankPosition": 3,
+        "finalPosition": 3,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-demon-slayer",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 1049
+      },
+      {
         "imdbId": "anilist-171018",
         "aniListId": 171018,
         "tmdbId": "240411",
@@ -2126,9 +2391,9 @@
         "year": 2024,
         "mediaType": "anime",
         "imdbRank": 4,
-        "displayRank": 2,
+        "displayRank": 4,
         "rankPosition": 4,
-        "finalPosition": 2,
+        "finalPosition": 4,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "anime-dandadan",
@@ -2148,9 +2413,9 @@
         "year": 2022,
         "mediaType": "anime",
         "imdbRank": 5,
-        "displayRank": 3,
+        "displayRank": 5,
         "rankPosition": 5,
-        "finalPosition": 3,
+        "finalPosition": 5,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "anime-bleach-tybw",
@@ -2170,9 +2435,9 @@
         "year": 2023,
         "mediaType": "anime",
         "imdbRank": 6,
-        "displayRank": 4,
+        "displayRank": 6,
         "rankPosition": 6,
-        "finalPosition": 4,
+        "finalPosition": 6,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "anime-frieren",
@@ -2181,6 +2446,72 @@
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
         "score": 1013
+      },
+      {
+        "imdbId": "anilist-127230",
+        "aniListId": 127230,
+        "tmdbId": "114410",
+        "title": "Chainsaw Man",
+        "imdbTitle": "Chainsaw Man",
+        "canonicalTitle": "Chainsaw Man",
+        "year": 2022,
+        "mediaType": "anime",
+        "imdbRank": 7,
+        "displayRank": 7,
+        "rankPosition": 7,
+        "finalPosition": 7,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-chainsaw-man",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 994
+      },
+      {
+        "imdbId": "anilist-16498",
+        "aniListId": 16498,
+        "tmdbId": "1429",
+        "title": "Attack on Titan",
+        "imdbTitle": "Attack on Titan",
+        "canonicalTitle": "Attack on Titan",
+        "year": 2013,
+        "mediaType": "anime",
+        "imdbRank": 8,
+        "displayRank": 8,
+        "rankPosition": 8,
+        "finalPosition": 8,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-attack-on-titan",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 983
+      },
+      {
+        "imdbId": "anilist-21",
+        "aniListId": 21,
+        "tmdbId": "37854",
+        "title": "One Piece",
+        "imdbTitle": "One Piece",
+        "canonicalTitle": "One Piece",
+        "year": 1999,
+        "mediaType": "anime",
+        "imdbRank": 9,
+        "displayRank": 9,
+        "rankPosition": 9,
+        "finalPosition": 9,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-one-piece",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 971
       },
       {
         "imdbId": "anilist-140960",
@@ -2192,9 +2523,9 @@
         "year": 2022,
         "mediaType": "anime",
         "imdbRank": 10,
-        "displayRank": 5,
+        "displayRank": 10,
         "rankPosition": 10,
-        "finalPosition": 5,
+        "finalPosition": 10,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "anime-spy-family",
@@ -2203,159 +2534,8 @@
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
         "score": 956
-      },
-      {
-        "imdbId": "anilist-153288",
-        "aniListId": 153288,
-        "tmdbId": "206586",
-        "title": "Kaiju No. 8",
-        "imdbTitle": "Kaiju No. 8",
-        "canonicalTitle": "Kaiju No. 8",
-        "year": 2024,
-        "mediaType": "anime",
-        "imdbRank": 11,
-        "displayRank": 6,
-        "rankPosition": 11,
-        "finalPosition": 6,
-        "status": "APPROVED",
-        "isIncluded": true,
-        "canonicalId": "anime-kaiju-no-8",
-        "availabilityStatus": "verified",
-        "hasAudioPtBr": true,
-        "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1,
-        "score": 939
-      },
-      {
-        "imdbId": "anilist-163148",
-        "aniListId": 163148,
-        "tmdbId": "136283",
-        "title": "Blue Lock",
-        "imdbTitle": "Blue Lock",
-        "canonicalTitle": "Blue Lock",
-        "year": 2022,
-        "mediaType": "anime",
-        "imdbRank": 12,
-        "displayRank": 7,
-        "rankPosition": 12,
-        "finalPosition": 7,
-        "status": "APPROVED",
-        "isIncluded": true,
-        "canonicalId": "anime-blue-lock",
-        "availabilityStatus": "verified",
-        "hasAudioPtBr": true,
-        "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1,
-        "score": 928
       }
     ],
-    "rejectedAnimes": [
-      {
-        "imdbId": "anilist-113415",
-        "title": "Jujutsu Kaisen",
-        "canonicalTitle": "JUJUTSU KAISEN",
-        "year": 2020,
-        "mediaType": "anime",
-        "rankPosition": 2,
-        "status": "REJECTED",
-        "isIncluded": false,
-        "canonicalId": "anilist-113415",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 1056
-      },
-      {
-        "imdbId": "anilist-101922",
-        "title": "Demon Slayer: Kimetsu no Yaiba",
-        "canonicalTitle": "Demon Slayer: Kimetsu no Yaiba",
-        "year": 2019,
-        "mediaType": "anime",
-        "rankPosition": 3,
-        "status": "REJECTED",
-        "isIncluded": false,
-        "canonicalId": "anilist-101922",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 1049
-      },
-      {
-        "imdbId": "anilist-127230",
-        "title": "Chainsaw Man",
-        "canonicalTitle": "Chainsaw Man",
-        "year": 2022,
-        "mediaType": "anime",
-        "rankPosition": 7,
-        "status": "REJECTED",
-        "isIncluded": false,
-        "canonicalId": "anilist-127230",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 994
-      },
-      {
-        "imdbId": "anilist-16498",
-        "title": "Attack on Titan",
-        "canonicalTitle": "Attack on Titan",
-        "year": 2013,
-        "mediaType": "anime",
-        "rankPosition": 8,
-        "status": "REJECTED",
-        "isIncluded": false,
-        "canonicalId": "anilist-16498",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 983
-      },
-      {
-        "imdbId": "anilist-21",
-        "title": "One Piece",
-        "canonicalTitle": "My Hero Academia",
-        "year": 1999,
-        "mediaType": "anime",
-        "rankPosition": 9,
-        "status": "REJECTED",
-        "isIncluded": false,
-        "canonicalId": "anilist-21459",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 971
-      },
-      {
-        "imdbId": "anilist-1735",
-        "aniListId": 1735,
-        "tmdbId": "31910",
-        "title": "Naruto Shippuden",
-        "imdbTitle": "Naruto Shippuden",
-        "year": 2007,
-        "mediaType": "anime",
-        "rankPosition": 13,
-        "status": "REJECTED",
-        "isIncluded": false,
-        "availabilityStatus": "not_in_catalog",
-        "rejectionReason": "Obra não indexada no catálogo da ZapiTV",
-        "score": 912
-      },
-      {
-        "imdbId": "anilist-21459",
-        "title": "My Hero Academia",
-        "canonicalTitle": "My Hero Academia",
-        "year": 2016,
-        "mediaType": "anime",
-        "rankPosition": 14,
-        "status": "REJECTED",
-        "isIncluded": false,
-        "canonicalId": "anilist-21459",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 901
-      },
-      {
-        "imdbId": "anilist-1535",
-        "title": "Death Note",
-        "canonicalTitle": "Death Note",
-        "year": 2006,
-        "mediaType": "anime",
-        "rankPosition": 15,
-        "status": "REJECTED",
-        "isIncluded": false,
-        "canonicalId": "anilist-1535",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 890
-      }
-    ]
+    "rejectedAnimes": []
   }
 }
