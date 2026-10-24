@@ -7,6 +7,7 @@ import { TvCard16x9 } from './TvCard16x9';
 import { TvContentRow } from './TvContentRow';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
+import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
@@ -175,6 +176,14 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
   onPlay
 }) => {
   const [item, setItem] = useState<ContentItem>(initialItem);
+  const [isScheduledUnavailable, setIsScheduledUnavailable] = useState(() => !catalogEligibilityService.isCatalogVisibleNow(initialItem));
+
+  useEffect(() => {
+    setIsScheduledUnavailable(!catalogEligibilityService.isCatalogVisibleNow(item));
+    return catalogEligibilityService.subscribe(() => {
+      setIsScheduledUnavailable(!catalogEligibilityService.isCatalogVisibleNow(item));
+    });
+  }, [item]);
   const [currentSeason, setCurrentSeason] = useState(initialSeason || 1);
   const [availableSeasons, setAvailableSeasons] = useState<number[]>([initialSeason || 1]);
   const [episodes, setEpisodes] = useState<any[]>([]);
@@ -378,7 +387,13 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
     });
 
     const timer = setTimeout(() => {
-      if (!initialEpisode) setFocus('tv-details-play');
+      if (!initialEpisode) {
+        if (!catalogEligibilityService.isCatalogVisibleNow(item)) {
+          setFocus('tv-details-list');
+        } else {
+          setFocus('tv-details-play');
+        }
+      }
     }, 150);
 
     return () => {
@@ -572,22 +587,29 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
 
             {/* Linha de Ações */}
             <div className="flex items-center gap-4">
-              {/* Assistir Principal */}
-              <button
-                ref={playRef}
-                type="button"
-                data-focus-key="tv-details-play"
-                data-tv-focused={isPlayFocused ? "true" : undefined}
-                onClick={() => onPlay(item, isEpisodic ? currentSeason : undefined, isEpisodic ? 1 : undefined)}
-                className={`px-8 py-3.5 rounded-xl font-black text-sm tracking-wide flex items-center gap-3 transition-all duration-200 outline-none ${
-                  isPlayFocused
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-400 text-white scale-105 shadow-[0_0_30px_rgba(0,229,255,0.7)] border-2 border-[#00e5ff]'
-                    : 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-cyan-500/20 border-2 border-transparent'
-                }`}
-              >
-                <Play className="w-5 h-5 fill-white" />
-                <span>Assistir Agora</span>
-              </button>
+              {/* Assistir Principal ou Aviso de Retorno Agendado */}
+              {isScheduledUnavailable ? (
+                <div className="flex items-center gap-3 px-6 py-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 font-semibold text-sm shadow-lg shadow-amber-500/10">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
+                  <span>Disponível no catálogo em 20 de novembro de 2026, às 00h00</span>
+                </div>
+              ) : (
+                <button
+                  ref={playRef}
+                  type="button"
+                  data-focus-key="tv-details-play"
+                  data-tv-focused={isPlayFocused ? "true" : undefined}
+                  onClick={() => onPlay(item, isEpisodic ? currentSeason : undefined, isEpisodic ? 1 : undefined)}
+                  className={`px-8 py-3.5 rounded-xl font-black text-sm tracking-wide flex items-center gap-3 transition-all duration-200 outline-none ${
+                    isPlayFocused
+                      ? 'bg-gradient-to-r from-blue-500 to-cyan-400 text-white scale-105 shadow-[0_0_30px_rgba(0,229,255,0.7)] border-2 border-[#00e5ff]'
+                      : 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-cyan-500/20 border-2 border-transparent'
+                  }`}
+                >
+                  <Play className="w-5 h-5 fill-white" />
+                  <span>Assistir Agora</span>
+                </button>
+              )}
 
               {/* Minha Lista */}
               <button

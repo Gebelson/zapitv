@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Play, Bookmark, Heart, ChevronDown, ChevronUp, AlertCircle, Users } from 'lucide-react';
+import { X, Play, Bookmark, Heart, ChevronDown, ChevronUp, AlertCircle, Users, Clock } from 'lucide-react';
 import { ContentItem, ContentType } from '../types';
 import { tmdbService } from '../src/core/tmdb/tmdbClient';
 import { providerRegistry } from '../src/core/providers/providerRegistry';
@@ -203,6 +203,13 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const [verificationState, setVerificationState] = useState<VerificationState>('IDLE');
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showWatchPartyModal, setShowWatchPartyModal] = useState(false);
+  const isScheduledUnavailable = !catalogEligibilityService.isCatalogVisibleNow(item);
+  const [, setModalEligibilityVersion] = useState(0);
+  useEffect(() => {
+    return catalogEligibilityService.subscribe(() => {
+      setModalEligibilityVersion(v => v + 1);
+    });
+  }, []);
   const [progressVersion, setProgressVersion] = useState(0);
 
   // Auto-play episode if directed by URL deep link
@@ -752,6 +759,13 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       mobileFullscreenService.requestAutoFullscreenAndLandscape().catch(() => {});
     }
 
+    if (isScheduledUnavailable) {
+      setVerificationState('UNAVAILABLE');
+      setStreamResolutionError('Este título está temporariamente indisponível no catálogo. Retorno programado para 20/11/2026 às 00:00 (Horário de Brasília).');
+      setIsLoadingStreams(false);
+      return;
+    }
+
     const currentRequestId = ++playbackRequestIdRef.current;
     const currentTargetItem = item;
     let epParams: { season: number; episode: number } | undefined = undefined;
@@ -1236,35 +1250,44 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                 </h1>
                 
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-4">
-                  <DetailModalTvButton 
-                    focusKey="modal-play"
-                    className="h-11 sm:h-12 px-4 sm:px-6 md:px-8 bg-[#007df7] text-white rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm md:text-base hover:bg-[#0069d9] transition-all hover:scale-105 active:scale-95 shadow-xl shadow-[#007df7]/20 flex items-center justify-center gap-2 select-none border border-transparent box-border"
-                    onClick={() => {
-                      mobileFullscreenService.requestAutoFullscreenAndLandscape().catch(() => {});
-                      startPlayback(undefined, undefined, 'manual_start');
-                    }}
-                  >
-                    <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current shrink-0" />
-                    <span>
-                      {playbackContinuity.hasStarted && !playbackContinuity.isCompleted ? 'Continuar' : 'Assistir'}
-                    </span>
-                  </DetailModalTvButton>
+                  {isScheduledUnavailable ? (
+                    <div className="flex items-center gap-2.5 px-4 sm:px-6 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs sm:text-sm font-semibold select-none shadow-lg">
+                      <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 shrink-0" />
+                      <span>Indisponível temporariamente no catálogo. Retorno programado para 20/11/2026 às 00:00 (Horário de Brasília).</span>
+                    </div>
+                  ) : (
+                    <DetailModalTvButton 
+                      focusKey="modal-play"
+                      className="h-11 sm:h-12 px-4 sm:px-6 md:px-8 bg-[#007df7] text-white rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm md:text-base hover:bg-[#0069d9] transition-all hover:scale-105 active:scale-95 shadow-xl shadow-[#007df7]/20 flex items-center justify-center gap-2 select-none border border-transparent box-border"
+                      onClick={() => {
+                        mobileFullscreenService.requestAutoFullscreenAndLandscape().catch(() => {});
+                        startPlayback(undefined, undefined, 'manual_start');
+                      }}
+                    >
+                      <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current shrink-0" />
+                      <span>
+                        {playbackContinuity.hasStarted && !playbackContinuity.isCompleted ? 'Continuar' : 'Assistir'}
+                      </span>
+                    </DetailModalTvButton>
+                  )}
 
                   {/* Botão Grupo (Watch Party P2P Gratuita) */}
-                  <DetailModalTvButton
-                    focusKey="modal-group"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setShowWatchPartyModal(true);
-                    }}
-                    className="h-11 sm:h-12 px-4 sm:px-5 bg-gradient-to-r from-cyan-600/20 to-[#007df7]/20 border border-cyan-500/30 hover:border-cyan-400 text-white hover:text-cyan-200 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm md:text-base backdrop-blur-sm transition-all hover:scale-105 active:scale-95 cursor-pointer group shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-2 select-none box-border"
-                    title="Assistir em grupo com amigos em tempo real (Watch Party P2P Gratuita)"
-                    ariaLabel="Grupo"
-                  >
-                    <Users className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 group-hover:scale-110 transition-transform shrink-0" />
-                    <span>Grupo</span>
-                  </DetailModalTvButton>
+                  {!isScheduledUnavailable && (
+                    <DetailModalTvButton
+                      focusKey="modal-group"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowWatchPartyModal(true);
+                      }}
+                      className="h-11 sm:h-12 px-4 sm:px-5 bg-gradient-to-r from-cyan-600/20 to-[#007df7]/20 border border-cyan-500/30 hover:border-cyan-400 text-white hover:text-cyan-200 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm md:text-base backdrop-blur-sm transition-all hover:scale-105 active:scale-95 cursor-pointer group shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-2 select-none box-border"
+                      title="Assistir em grupo com amigos em tempo real (Watch Party P2P Gratuita)"
+                      ariaLabel="Grupo"
+                    >
+                      <Users className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 group-hover:scale-110 transition-transform shrink-0" />
+                      <span>Grupo</span>
+                    </DetailModalTvButton>
+                  )}
 
                   <DetailModalTvButton 
                     focusKey="modal-fav"

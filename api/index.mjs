@@ -1920,1076 +1920,6 @@ var init_tmdbClient = __esm({
   }
 });
 
-// src/core/catalog/theatricalFilterService.ts
-var STORAGE_KEY, TheatricalFilterService, theatricalFilterService;
-var init_theatricalFilterService = __esm({
-  "src/core/catalog/theatricalFilterService.ts"() {
-    init_types();
-    init_tmdbClient();
-    STORAGE_KEY = "zapitv_theatrical_evaluations_v3";
-    TheatricalFilterService = class {
-      constructor() {
-        this.cache = /* @__PURE__ */ new Map();
-        this.nowPlayingIds = /* @__PURE__ */ new Set();
-        this.nowPlayingTitles = /* @__PURE__ */ new Set();
-        this.upcomingIds = /* @__PURE__ */ new Set();
-        this.upcomingTitles = /* @__PURE__ */ new Set();
-        this.theatricalListsLoaded = false;
-        this.theatricalFetchPromise = null;
-        this.loadFromStorage();
-      }
-      loadFromStorage() {
-        if (typeof window === "undefined" || !window.localStorage) return;
-        try {
-          try {
-            localStorage.removeItem("zapitv_theatrical_evaluations");
-          } catch {
-          }
-          const raw = localStorage.getItem(STORAGE_KEY);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            const now = Date.now();
-            for (const [k, v] of Object.entries(parsed)) {
-              if (now < v.expiresAt) {
-                this.cache.set(k, v);
-              }
-            }
-          }
-        } catch {
-        }
-      }
-      saveToStorage() {
-        if (typeof window === "undefined" || !window.localStorage) return;
-        try {
-          const obj = {};
-          for (const [k, v] of this.cache.entries()) {
-            obj[k] = v;
-          }
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
-        } catch {
-        }
-      }
-      /**
-       * Identifica se uma fonte ou título é gravação de sala de cinema (CAM / Telesync / HDCAM / Telecine)
-       */
-      isCamRecording(text2) {
-        if (!text2) return false;
-        const lower = text2.toLowerCase();
-        if (/\b(camrip|cam-rip|telesync|hdcam|hd-ts|hdts|telecine|dvdscr|screener)\b/i.test(lower)) {
-          return true;
-        }
-        if (/grava[çc][ãa]o de cinema|cinema rip|audio de cinema|sala de cinema/i.test(lower)) {
-          return true;
-        }
-        if (/\bcam\b/i.test(lower) && /\b(x264|x265|720p|1080p|rip|vbr|v2|cinema|sala|audio|line)\b/i.test(lower)) {
-          return true;
-        }
-        if (/\bts\b/i.test(lower) && !/\.ts(\?|\/|$)/i.test(lower) && /\b(x264|x265|rip|line|clean|hq|hd)\b/i.test(lower)) {
-          return true;
-        }
-        return false;
-      }
-      /**
-       * Identifica se uma fonte retornada por um add-on é na verdade um trailer, teaser ou material promocional
-       */
-      isTrailerOrFakeSource(stream) {
-        if (!stream) return { isFake: false };
-        const combined = `${stream.name || ""} ${stream.title || ""} ${stream.url || ""}`.toLowerCase();
-        if (/\b(trailer|official trailer|teaser|preview clip|promo video|behind the scenes|making of)\b/i.test(combined)) {
-          return { isFake: true, reason: "Fonte identificada como trailer/teaser promocional e n\xE3o como filme completo" };
-        }
-        if (typeof stream.duration === "number" && stream.duration > 0 && stream.duration < 300) {
-          return { isFake: true, reason: `Dura\xE7\xE3o da m\xEDdia (${stream.duration}s) \xE9 caracter\xEDstica de trailer/amostra e n\xE3o de filme completo` };
-        }
-        return { isFake: false };
-      }
-      /**
-       * Carrega os filmes atualmente em cartaz e próximos lançamentos nos cinemas brasileiros direto do TMDB
-       */
-      async loadNowPlayingInBrazil() {
-        if (this.theatricalListsLoaded) return;
-        if (this.theatricalFetchPromise) return this.theatricalFetchPromise;
-        this.theatricalFetchPromise = (async () => {
-          try {
-            const [npRes, upRes] = await Promise.allSettled([
-              fetch(`${TMDB_BASE_URL}/movie/now_playing?api_key=${TMDB_API_KEY}&region=BR&language=pt-BR&page=1`),
-              fetch(`${TMDB_BASE_URL}/movie/upcoming?api_key=${TMDB_API_KEY}&region=BR&language=pt-BR&page=1`)
-            ]);
-            if (npRes.status === "fulfilled" && npRes.value.ok) {
-              const data = await npRes.value.json();
-              const results = data.results || [];
-              for (const item of results) {
-                if (item.id) this.nowPlayingIds.add(String(item.id));
-                if (item.title) this.nowPlayingTitles.add(this.normalizeTitle(item.title));
-                if (item.original_title) this.nowPlayingTitles.add(this.normalizeTitle(item.original_title));
-              }
-            }
-            if (upRes.status === "fulfilled" && upRes.value.ok) {
-              const data = await upRes.value.json();
-              const results = data.results || [];
-              for (const item of results) {
-                if (item.id) this.upcomingIds.add(String(item.id));
-                if (item.title) this.upcomingTitles.add(this.normalizeTitle(item.title));
-                if (item.original_title) this.upcomingTitles.add(this.normalizeTitle(item.original_title));
-              }
-            }
-            this.theatricalListsLoaded = true;
-          } catch (err) {
-            console.warn("[TheatricalFilter] Falha ao carregar listas teatrais BR:", err);
-          } finally {
-            this.theatricalFetchPromise = null;
-          }
-        })();
-        return this.theatricalFetchPromise;
-      }
-      normalizeTitle(t) {
-        return (t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-      }
-      /**
-       * Verifica se o item pertence a obras notoriamente não lançadas ou em cartaz
-       */
-      isKnownUnreleasedOrTheatrical(item) {
-        if (!item) return false;
-        const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-        return Boolean(
-          item.releaseDate && item.releaseDate > todayStr || Number(item.year) > (/* @__PURE__ */ new Date()).getFullYear()
-        );
-      }
-      /**
-       * Verifica se o item está em exibição confirmada nos cinemas
-       */
-      isKnownInTheaters(item) {
-        if (!item) return false;
-        if (item.inTheaters === true) return true;
-        if (item.tmdbId && this.nowPlayingIds.has(String(item.tmdbId))) return true;
-        const rawTmdbId = item.id?.startsWith("tmdb-") ? item.id.replace("tmdb-", "") : null;
-        if (rawTmdbId && this.nowPlayingIds.has(rawTmdbId)) return true;
-        const normTitle = this.normalizeTitle(item.title);
-        if (this.nowPlayingTitles.has(normTitle)) return true;
-        if (item.originalTitle) {
-          const normOrig = this.normalizeTitle(item.originalTitle);
-          if (this.nowPlayingTitles.has(normOrig)) return true;
-        }
-        return false;
-      }
-      /**
-       * Verifica se o item está na lista de próximos lançamentos nos cinemas
-       */
-      isKnownUpcoming(item) {
-        if (!item) return false;
-        if (item.tmdbId && this.upcomingIds.has(String(item.tmdbId))) return true;
-        const rawTmdbId = item.id?.startsWith("tmdb-") ? item.id.replace("tmdb-", "") : null;
-        if (rawTmdbId && this.upcomingIds.has(rawTmdbId)) return true;
-        const normTitle = this.normalizeTitle(item.title);
-        if (this.upcomingTitles.has(normTitle)) return true;
-        if (item.originalTitle) {
-          const normOrig = this.normalizeTitle(item.originalTitle);
-          if (this.upcomingTitles.has(normOrig)) return true;
-        }
-        return false;
-      }
-      /**
-       * Avalia de forma assíncrona se um filme pode ou não ser exibido no catálogo público
-       */
-      async evaluateMovie(item) {
-        if (!item) {
-          return {
-            id: "invalid",
-            region: "BR",
-            title: "Desconhecido",
-            status: "UPCOMING",
-            allowed: false,
-            reason: "Item inv\xE1lido ou nulo",
-            evidence: ["invalid_item"],
-            evaluatedAt: Date.now(),
-            expiresAt: Date.now() + 24 * 60 * 60 * 1e3
-          };
-        }
-        if (item.type === "S\xC9RIE" /* SERIES */) {
-          return {
-            id: item.id,
-            tmdbId: item.tmdbId,
-            region: "BR",
-            title: item.title,
-            status: "NOT_APPLICABLE",
-            allowed: true,
-            reason: "S\xE9rie de TV / Epis\xF3dios \u2014 N\xE3o possui janela cinematogr\xE1fica exclusiva",
-            evidence: ["content_type_series"],
-            evaluatedAt: Date.now(),
-            expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1e3
-            // 30 dias
-          };
-        }
-        const cacheKey = item.tmdbId ? `tmdb-${item.tmdbId}` : item.imdbId || item.id;
-        const cached = this.cache.get(cacheKey);
-        const now = Date.now();
-        if (cached && now < cached.expiresAt) {
-          if (cached.status === "IN_THEATERS" || cached.status === "THEATRICAL_STATUS_UNKNOWN") {
-            return { ...cached, allowed: true };
-          }
-          return cached;
-        }
-        const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-        const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-        const itemYear = Number(item.year) || currentYear;
-        await this.loadNowPlayingInBrazil();
-        if (item.releaseDate && item.releaseDate > todayStr) {
-          const evaluation = {
-            id: item.id,
-            tmdbId: item.tmdbId,
-            region: "BR",
-            title: item.title,
-            status: "UPCOMING",
-            allowed: false,
-            reason: `Filme ainda n\xE3o lan\xE7ado comercialmente (Previs\xE3o de estreia: ${item.releaseDate})`,
-            evidence: ["future_release_date", `date_${item.releaseDate}`],
-            theatricalDate: item.releaseDate,
-            evaluatedAt: now,
-            expiresAt: now + 12 * 60 * 60 * 1e3
-          };
-          this.cache.set(cacheKey, evaluation);
-          this.saveToStorage();
-          return evaluation;
-        }
-        if (this.isKnownUnreleasedOrTheatrical(item)) {
-          const evaluation = {
-            id: item.id,
-            tmdbId: item.tmdbId,
-            region: "BR",
-            title: item.title,
-            status: "UPCOMING",
-            allowed: false,
-            reason: "T\xEDtulo confirmado em produ\xE7\xE3o/aguardando lan\xE7amento cinematogr\xE1fico futuro oficial",
-            evidence: ["known_unreleased_blockbuster"],
-            evaluatedAt: now,
-            expiresAt: now + 24 * 60 * 60 * 1e3
-          };
-          this.cache.set(cacheKey, evaluation);
-          this.saveToStorage();
-          return evaluation;
-        }
-        if (this.isKnownInTheaters(item)) {
-          const evaluation = {
-            id: item.id,
-            tmdbId: item.tmdbId,
-            region: "BR",
-            title: item.title,
-            status: "IN_THEATERS",
-            allowed: true,
-            reason: "Em exibi\xE7\xE3o nos cinemas brasileiros; fontes ainda precisam ser validadas",
-            evidence: ["now_playing_brazil_active", "commercial_theatrical_run"],
-            evaluatedAt: now,
-            expiresAt: now + 12 * 60 * 60 * 1e3
-          };
-          this.cache.set(cacheKey, evaluation);
-          this.saveToStorage();
-          return evaluation;
-        }
-        if (this.isKnownUpcoming(item)) {
-          const evaluation = {
-            id: item.id,
-            tmdbId: item.tmdbId,
-            region: "BR",
-            title: item.title,
-            status: "UPCOMING",
-            allowed: false,
-            reason: "Presente no calend\xE1rio oficial de pr\xF3ximas estreias nos cinemas brasileiros",
-            evidence: ["upcoming_brazil_active"],
-            evaluatedAt: now,
-            expiresAt: now + 12 * 60 * 60 * 1e3
-          };
-          this.cache.set(cacheKey, evaluation);
-          this.saveToStorage();
-          return evaluation;
-        }
-        if (itemYear > currentYear) {
-          const evaluation = {
-            id: item.id,
-            tmdbId: item.tmdbId,
-            region: "BR",
-            title: item.title,
-            status: "UPCOMING",
-            allowed: false,
-            reason: `Filme ainda n\xE3o lan\xE7ado comercialmente (Previs\xE3o de estreia: ${itemYear})`,
-            evidence: ["future_year_release"],
-            evaluatedAt: now,
-            expiresAt: now + 12 * 60 * 60 * 1e3
-          };
-          this.cache.set(cacheKey, evaluation);
-          this.saveToStorage();
-          return evaluation;
-        }
-        if (itemYear < currentYear - 1) {
-          const evaluation = {
-            id: item.id,
-            tmdbId: item.tmdbId,
-            region: "BR",
-            title: item.title,
-            status: "POST_THEATRICAL",
-            allowed: true,
-            reason: `Cat\xE1logo de ano anterior (${itemYear}) \u2014 Fora de qualquer janela cinematogr\xE1fica`,
-            evidence: ["back_catalog_movie", "not_in_theaters"],
-            evaluatedAt: now,
-            expiresAt: now + 30 * 24 * 60 * 60 * 1e3
-            // 30 dias
-          };
-          this.cache.set(cacheKey, evaluation);
-          this.saveToStorage();
-          return evaluation;
-        }
-        const tmdbIdNum = item.tmdbId ? parseInt(item.tmdbId, 10) : item.id.startsWith("tmdb-") ? parseInt(item.id.replace("tmdb-", ""), 10) : NaN;
-        if (!isNaN(tmdbIdNum) && tmdbIdNum > 0) {
-          try {
-            const [datesRes, detailsRes] = await Promise.allSettled([
-              fetch(`${TMDB_BASE_URL}/movie/${tmdbIdNum}/release_dates?api_key=${TMDB_API_KEY}`),
-              fetch(`${TMDB_BASE_URL}/movie/${tmdbIdNum}?api_key=${TMDB_API_KEY}&language=pt-BR`)
-            ]);
-            if (detailsRes.status === "fulfilled" && detailsRes.value.ok) {
-              const detailsData = await detailsRes.value.json();
-              if (detailsData.status && detailsData.status !== "Released") {
-                const evaluation = {
-                  id: item.id,
-                  tmdbId: item.tmdbId,
-                  region: "BR",
-                  title: item.title,
-                  status: "UPCOMING",
-                  allowed: false,
-                  reason: `Status de produ\xE7\xE3o n\xE3o lan\xE7ado no TMDB (${detailsData.status})`,
-                  evidence: [`tmdb_status_${detailsData.status}`],
-                  evaluatedAt: now,
-                  expiresAt: now + 24 * 60 * 60 * 1e3
-                };
-                this.cache.set(cacheKey, evaluation);
-                this.saveToStorage();
-                return evaluation;
-              }
-              if (detailsData.release_date && detailsData.release_date > todayStr) {
-                const evaluation = {
-                  id: item.id,
-                  tmdbId: item.tmdbId,
-                  region: "BR",
-                  title: item.title,
-                  status: "UPCOMING",
-                  allowed: false,
-                  reason: `Estreia nos cinemas prevista para ${detailsData.release_date}`,
-                  evidence: [`tmdb_details_future_date_${detailsData.release_date}`],
-                  theatricalDate: detailsData.release_date,
-                  evaluatedAt: now,
-                  expiresAt: now + 24 * 60 * 60 * 1e3
-                };
-                this.cache.set(cacheKey, evaluation);
-                this.saveToStorage();
-                return evaluation;
-              }
-            }
-            if (datesRes.status === "fulfilled" && datesRes.value.ok) {
-              const data = await datesRes.value.json();
-              const countries = data.results || [];
-              const brData = countries.find((c) => c.iso_3166_1 === "BR");
-              const usData = countries.find((c) => c.iso_3166_1 === "US");
-              let theatricalDate;
-              let digitalDate;
-              const evidence = [];
-              const extractDates = (countryObj, countryCode) => {
-                if (!countryObj?.release_dates) return;
-                for (const rd of countryObj.release_dates) {
-                  const rDate = (rd.release_date || "").slice(0, 10);
-                  if (rd.type === 1 || rd.type === 2 || rd.type === 3) {
-                    if (!theatricalDate || rDate < theatricalDate) {
-                      theatricalDate = rDate;
-                      evidence.push(`theatrical_${countryCode}_${rDate}`);
-                    }
-                  }
-                  if (rd.type === 4 || rd.type === 5 || rd.type === 6) {
-                    if (!digitalDate || rDate < digitalDate) {
-                      digitalDate = rDate;
-                      evidence.push(`digital_${countryCode}_${rDate}`);
-                    }
-                  }
-                }
-              };
-              if (brData) extractDates(brData, "BR");
-              if (usData && (!digitalDate || !theatricalDate)) extractDates(usData, "US");
-              if (theatricalDate && theatricalDate > todayStr) {
-                const evaluation = {
-                  id: item.id,
-                  tmdbId: item.tmdbId,
-                  region: "BR",
-                  title: item.title,
-                  status: "UPCOMING",
-                  allowed: false,
-                  reason: `Estreia nos cinemas prevista para ${theatricalDate}`,
-                  evidence: [...evidence, "theatrical_future_date"],
-                  theatricalDate,
-                  digitalDate,
-                  evaluatedAt: now,
-                  expiresAt: now + 24 * 60 * 60 * 1e3
-                };
-                this.cache.set(cacheKey, evaluation);
-                this.saveToStorage();
-                return evaluation;
-              }
-              if (digitalDate && digitalDate <= todayStr) {
-                const evaluation = {
-                  id: item.id,
-                  tmdbId: item.tmdbId,
-                  region: "BR",
-                  title: item.title,
-                  status: "DIGITAL_RELEASED",
-                  allowed: true,
-                  reason: `Lan\xE7amento digital oficial dispon\xEDvel desde ${digitalDate}`,
-                  evidence: [...evidence, "digital_release_active"],
-                  theatricalDate,
-                  digitalDate,
-                  evaluatedAt: now,
-                  expiresAt: now + 7 * 24 * 60 * 60 * 1e3
-                  // 7 dias
-                };
-                this.cache.set(cacheKey, evaluation);
-                this.saveToStorage();
-                return evaluation;
-              }
-              if (theatricalDate) {
-                const diffDays = Math.floor((now - new Date(theatricalDate).getTime()) / (1e3 * 60 * 60 * 24));
-                if (diffDays < 70) {
-                  const evaluation = {
-                    id: item.id,
-                    tmdbId: item.tmdbId,
-                    region: "BR",
-                    title: item.title,
-                    status: "IN_THEATERS",
-                    allowed: true,
-                    reason: `Em cartaz nos cinemas h\xE1 ${diffDays} dias; fontes ainda precisam ser validadas`,
-                    evidence: [...evidence, `${diffDays}_days_theatrical_window`],
-                    theatricalDate,
-                    evaluatedAt: now,
-                    expiresAt: now + 12 * 60 * 60 * 1e3
-                  };
-                  this.cache.set(cacheKey, evaluation);
-                  this.saveToStorage();
-                  return evaluation;
-                } else if (diffDays < 95) {
-                  const evaluation = {
-                    id: item.id,
-                    tmdbId: item.tmdbId,
-                    region: "BR",
-                    title: item.title,
-                    status: "THEATRICAL_STATUS_UNKNOWN",
-                    allowed: true,
-                    reason: `Per\xEDodo de transi\xE7\xE3o de cinema (${diffDays} dias); fontes ainda precisam ser validadas`,
-                    evidence: [...evidence, "theatrical_status_uncertain"],
-                    theatricalDate,
-                    evaluatedAt: now,
-                    expiresAt: now + 6 * 60 * 60 * 1e3
-                  };
-                  this.cache.set(cacheKey, evaluation);
-                  this.saveToStorage();
-                  return evaluation;
-                } else {
-                  const evaluation = {
-                    id: item.id,
-                    tmdbId: item.tmdbId,
-                    region: "BR",
-                    title: item.title,
-                    status: "POST_THEATRICAL",
-                    allowed: true,
-                    reason: `Janela de exibi\xE7\xE3o nos cinemas finalizada (${diffDays} dias desde o lan\xE7amento)`,
-                    evidence: [...evidence, "theatrical_circuit_closed"],
-                    theatricalDate,
-                    evaluatedAt: now,
-                    expiresAt: now + 14 * 24 * 60 * 60 * 1e3
-                    // 14 dias
-                  };
-                  this.cache.set(cacheKey, evaluation);
-                  this.saveToStorage();
-                  return evaluation;
-                }
-              }
-            }
-          } catch (err) {
-            console.warn(`[TheatricalFilter] Falha na API ao consultar datas de ${item.title}:`, err);
-          }
-        }
-        const fallbackEvaluation = {
-          id: item.id,
-          tmdbId: item.tmdbId,
-          region: "BR",
-          title: item.title,
-          status: "POST_THEATRICAL",
-          allowed: true,
-          reason: "Sem ind\xEDcio de exibi\xE7\xE3o cinematogr\xE1fica ativa no Brasil",
-          evidence: ["heuristic_fallback_allowed"],
-          evaluatedAt: now,
-          expiresAt: now + 24 * 60 * 60 * 1e3
-        };
-        this.cache.set(cacheKey, fallbackEvaluation);
-        this.saveToStorage();
-        return fallbackEvaluation;
-      }
-      /**
-       * Avaliação instantânea síncrona com base no cache e heurísticas imediatas.
-       * Executa sem requisições para evitar esconder títulos já lançados.
-       */
-      isMovieAllowedSync(item) {
-        if (!item) return false;
-        if (item.type === "S\xC9RIE" /* SERIES */) return true;
-        const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-        const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
-        const itemYear = Number(item.year) || currentYear;
-        if (itemYear > currentYear) return false;
-        if (item.releaseDate && item.releaseDate > todayStr) return false;
-        if (this.isKnownUnreleasedOrTheatrical(item)) return false;
-        if (!this.isKnownInTheaters(item) && this.isKnownUpcoming(item)) {
-          return false;
-        }
-        if (this.isKnownInTheaters(item)) return true;
-        const cacheKey = item.tmdbId ? `tmdb-${item.tmdbId}` : item.imdbId || item.id;
-        const cached = this.cache.get(cacheKey);
-        if (cached) {
-          return cached.status === "IN_THEATERS" || cached.status === "THEATRICAL_STATUS_UNKNOWN" || cached.allowed;
-        }
-        if (itemYear < currentYear - 1) return true;
-        return true;
-      }
-      /**
-       * Avalia de forma assíncrona se o filme é permitido
-       */
-      async isMovieAllowed(item) {
-        const res = await this.evaluateMovie(item);
-        return res.allowed;
-      }
-      /**
-       * Filtra uma lista de itens removendo filmes ainda não lançados
-       */
-      async filterAllowedMovies(items) {
-        if (!items || items.length === 0) return [];
-        const evaluations = await Promise.all(items.map((it) => this.evaluateMovie(it)));
-        return items.filter((_, idx) => evaluations[idx].allowed);
-      }
-      /**
-       * Filtro síncrono rápido para views e renderizadores de UI
-       */
-      filterAllowedMoviesSync(items) {
-        if (!items || items.length === 0) return [];
-        return items.filter((it) => this.isMovieAllowedSync(it));
-      }
-      clearCache() {
-        this.cache.clear();
-        if (typeof window !== "undefined" && window.localStorage) {
-          localStorage.removeItem(STORAGE_KEY);
-          localStorage.removeItem("zapitv_theatrical_evaluations");
-        }
-      }
-      /**
-       * Injeta manualmente uma avaliação no cache (usado para testes ou override de segurança)
-       */
-      setMockEvaluation(key, evaluation) {
-        this.cache.set(key, evaluation);
-      }
-    };
-    theatricalFilterService = new TheatricalFilterService();
-  }
-});
-
-// src/core/cache/LruCache.ts
-var LruCache;
-var init_LruCache = __esm({
-  "src/core/cache/LruCache.ts"() {
-    LruCache = class {
-      constructor(maxSize = 100, defaultTtlMs = 0) {
-        this.map = /* @__PURE__ */ new Map();
-        this.maxSize = Math.max(1, maxSize);
-        this.defaultTtlMs = defaultTtlMs;
-      }
-      get(key) {
-        const entry = this.map.get(key);
-        if (!entry) return void 0;
-        if (entry.expiresAt !== null && Date.now() > entry.expiresAt) {
-          this.map.delete(key);
-          return void 0;
-        }
-        this.map.delete(key);
-        this.map.set(key, entry);
-        return entry.value;
-      }
-      set(key, value, ttlMs) {
-        if (this.map.has(key)) {
-          this.map.delete(key);
-        } else if (this.map.size >= this.maxSize) {
-          const oldestKey = this.map.keys().next().value;
-          if (oldestKey !== void 0) {
-            this.map.delete(oldestKey);
-          }
-        }
-        const ttl = ttlMs !== void 0 ? ttlMs : this.defaultTtlMs;
-        const expiresAt = ttl > 0 ? Date.now() + ttl : null;
-        this.map.set(key, { value, expiresAt });
-      }
-      has(key) {
-        const entry = this.map.get(key);
-        if (!entry) return false;
-        if (entry.expiresAt !== null && Date.now() > entry.expiresAt) {
-          this.map.delete(key);
-          return false;
-        }
-        return true;
-      }
-      delete(key) {
-        return this.map.delete(key);
-      }
-      clear() {
-        this.map.clear();
-      }
-      get size() {
-        return this.map.size;
-      }
-      pruneExpired() {
-        const now = Date.now();
-        let count = 0;
-        for (const [key, entry] of this.map.entries()) {
-          if (entry.expiresAt !== null && now > entry.expiresAt) {
-            this.map.delete(key);
-            count++;
-          }
-        }
-        return count;
-      }
-      forEach(callback) {
-        const now = Date.now();
-        for (const [key, entry] of this.map.entries()) {
-          if (entry.expiresAt !== null && now > entry.expiresAt) {
-            this.map.delete(key);
-          } else {
-            callback(entry.value, key);
-          }
-        }
-      }
-      keys() {
-        return this.map.keys();
-      }
-      values() {
-        const now = Date.now();
-        const result = [];
-        for (const [key, entry] of this.map.entries()) {
-          if (entry.expiresAt !== null && now > entry.expiresAt) {
-            this.map.delete(key);
-          } else {
-            result.push(entry.value);
-          }
-        }
-        return result;
-      }
-    };
-  }
-});
-
-// src/core/anilist/aniListClient.ts
-var GRAPHQL_ENDPOINT, CACHE_TTL_MS, AniListClient, aniListClient;
-var init_aniListClient = __esm({
-  "src/core/anilist/aniListClient.ts"() {
-    init_types();
-    init_LruCache();
-    GRAPHQL_ENDPOINT = "https://graphql.anilist.co";
-    CACHE_TTL_MS = 15 * 60 * 1e3;
-    AniListClient = class _AniListClient {
-      constructor() {
-        this.cache = new LruCache(100, CACHE_TTL_MS);
-      }
-      static getInstance() {
-        if (!_AniListClient.instance) {
-          _AniListClient.instance = new _AniListClient();
-        }
-        return _AniListClient.instance;
-      }
-      /**
-       * Executa uma consulta GraphQL com timeout e tratamento resiliente de erros
-       */
-      async executeQuery(query, variables) {
-        const cacheKey = JSON.stringify({ query, variables });
-        const cached = this.cache.get(cacheKey);
-        if (cached) return cached;
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 6e3);
-        try {
-          const response = await fetch(GRAPHQL_ENDPOINT, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Accept": "application/json"
-            },
-            body: JSON.stringify({ query, variables }),
-            signal: controller.signal
-          });
-          if (!response.ok) {
-            if (response.status === 429) {
-              console.warn("[AniListClient] Rate limit atingido no AniList. Usando fallback silencioso.");
-            } else {
-              console.warn(`[AniListClient] Erro HTTP ${response.status} da API AniList`);
-            }
-            return null;
-          }
-          const json = await response.json();
-          if (json.errors && json.errors.length > 0) {
-            console.warn("[AniListClient] Erros GraphQL retornados:", json.errors[0]?.message);
-            return null;
-          }
-          const data = json.data;
-          if (data) {
-            this.cache.set(cacheKey, data);
-          }
-          return data;
-        } catch (err) {
-          if (err.name !== "AbortError") {
-            console.warn("[AniListClient] Falha de comunica\xE7\xE3o com AniList:", err.message || err);
-          }
-          return null;
-        } finally {
-          clearTimeout(timeout);
-        }
-      }
-      /**
-       * Converte um registro oficial do AniList em um ContentItem padronizado do ZapiTV
-       */
-      convertAniListToContentItem(media2) {
-        const isMovie = media2.format === "MOVIE";
-        const mainTitle = media2.title.english || media2.title.romaji || media2.title.native || "Anime";
-        const origTitle = media2.title.native || media2.title.romaji || void 0;
-        const year = media2.seasonYear || media2.startDate?.year || (/* @__PURE__ */ new Date()).getFullYear();
-        const poster = media2.coverImage?.extraLarge || media2.coverImage?.large || media2.coverImage?.medium || "";
-        const backdrop = media2.bannerImage || poster;
-        const rating = media2.averageScore ? Number((media2.averageScore / 10).toFixed(1)) : 8;
-        const genres = Array.from(/* @__PURE__ */ new Set(["Anime", ...media2.genres || []]));
-        const cleanDesc = (media2.description || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim();
-        const episodeCount = media2.episodes || (isMovie ? 1 : 12);
-        const episodes2 = isMovie ? void 0 : Array.from({ length: Math.min(episodeCount, 1500) }, (_, idx) => {
-          const epNum = idx + 1;
-          return {
-            id: `ep-${epNum}`,
-            number: epNum,
-            title: `Epis\xF3dio ${epNum}`,
-            description: `Epis\xF3dio ${epNum} de ${mainTitle}`,
-            image: poster
-          };
-        });
-        return {
-          id: `anilist-${media2.id}`,
-          canonicalId: `anime:anilist:${media2.id}`,
-          aniListId: media2.id,
-          malId: media2.idMal || void 0,
-          title: mainTitle,
-          originalTitle: origTitle,
-          type: "ANIME" /* ANIME */,
-          mediaFormat: isMovie ? "movie" : "series",
-          year,
-          rating,
-          image: poster,
-          backdrop,
-          description: cleanDesc,
-          overview: cleanDesc,
-          genres,
-          seasonsCount: 1,
-          episodes: episodes2,
-          isFeatured: false,
-          availabilityStatus: "declared"
-        };
-      }
-      /**
-       * Pesquisa animes por termo com paginação
-       */
-      async searchAnime(query, page = 1, perPage = 20) {
-        if (!query || query.trim().length === 0) return [];
-        const gql = `
-      query ($search: String, $page: Int, $perPage: Int) {
-        Page(page: $page, perPage: $perPage) {
-          media(search: $search, type: ANIME, sort: SEARCH_MATCH) {
-            id
-            idMal
-            title {
-              romaji
-              english
-              native
-            }
-            format
-            status
-            episodes
-            seasonYear
-            startDate {
-              year
-            }
-            coverImage {
-              extraLarge
-              large
-              medium
-            }
-            bannerImage
-            genres
-            averageScore
-            description
-          }
-        }
-      }
-    `;
-        const data = await this.executeQuery(gql, {
-          search: query.trim(),
-          page,
-          perPage
-        });
-        if (!data?.Page?.media) return [];
-        return data.Page.media.map((m) => this.convertAniListToContentItem(m));
-      }
-      /**
-       * Obtém os animes mais populares do AniList
-       */
-      async getPopularAnimes(page = 1, perPage = 20) {
-        const gql = `
-      query ($page: Int, $perPage: Int) {
-        Page(page: $page, perPage: $perPage) {
-          media(type: ANIME, sort: POPULARITY_DESC) {
-            id
-            idMal
-            title {
-              romaji
-              english
-              native
-            }
-            format
-            status
-            episodes
-            seasonYear
-            startDate {
-              year
-            }
-            coverImage {
-              extraLarge
-              large
-            }
-            bannerImage
-            genres
-            averageScore
-            description
-          }
-        }
-      }
-    `;
-        const data = await this.executeQuery(gql, { page, perPage });
-        if (!data?.Page?.media) return [];
-        return data.Page.media.map((m) => this.convertAniListToContentItem(m));
-      }
-      /**
-       * Obtém detalhes de um anime por AniList ID
-       */
-      async getAnimeById(id) {
-        const gql = `
-      query ($id: Int) {
-        Media(id: $id, type: ANIME) {
-          id
-          idMal
-          title {
-            romaji
-            english
-            native
-          }
-          format
-          status
-          episodes
-          seasonYear
-          startDate {
-            year
-          }
-          coverImage {
-            extraLarge
-            large
-          }
-          bannerImage
-          genres
-          averageScore
-          description
-        }
-      }
-    `;
-        const data = await this.executeQuery(gql, { id });
-        if (!data?.Media) return null;
-        return this.convertAniListToContentItem(data.Media);
-      }
-      /**
-       * Obtém detalhes de um anime por MyAnimeList (MAL) ID
-       */
-      async getAnimeByMalId(malId) {
-        const gql = `
-      query ($idMal: Int) {
-        Media(idMal: $idMal, type: ANIME) {
-          id
-          idMal
-          title {
-            romaji
-            english
-            native
-          }
-          format
-          status
-          episodes
-          seasonYear
-          startDate {
-            year
-          }
-          coverImage {
-            extraLarge
-            large
-          }
-          bannerImage
-          genres
-          averageScore
-          description
-        }
-      }
-    `;
-        const data = await this.executeQuery(gql, { idMal: malId });
-        if (!data?.Media) return null;
-        return this.convertAniListToContentItem(data.Media);
-      }
-    };
-    aniListClient = AniListClient.getInstance();
-  }
-});
-
-// src/core/catalog/catalogDeduplication.ts
-function normalizeCatalogText(text2) {
-  if (!text2) return "";
-  return text2.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "").trim();
-}
-function getCanonicalKeysForItem(item) {
-  if (!item) return [];
-  const keys = /* @__PURE__ */ new Set();
-  if (item.canonicalId) {
-    keys.add(`canonical:${item.canonicalId.trim().toLowerCase()}`);
-  }
-  try {
-    const resolved = canonicalCatalogMaster.resolveCanonicalId(item);
-    if (resolved) {
-      keys.add(`canonical:${resolved.trim().toLowerCase()}`);
-    }
-  } catch {
-  }
-  if (item.imdbId && /^tt\d+$/i.test(item.imdbId.trim())) {
-    keys.add(`imdb:${item.imdbId.trim().toLowerCase()}`);
-  } else if (item.imdbId && /^\d{6,10}$/.test(item.imdbId.trim())) {
-    keys.add(`imdb:tt${item.imdbId.trim()}`);
-  }
-  if (item.id && /^tt\d+$/i.test(item.id.trim())) {
-    keys.add(`imdb:${item.id.trim().toLowerCase()}`);
-  }
-  const imdbInIdMatch = String(item.id || "").match(/^(?:movie|series|anime)[-_](?:tt)?(\d{6,10})$/i);
-  if (imdbInIdMatch) {
-    keys.add(`imdb:tt${imdbInIdMatch[1]}`);
-  }
-  const isMovie = item.type === "FILME" /* MOVIE */ || item.type === "movie" || item.type === "FILME" || item.mediaFormat === "movie";
-  const isSeries = item.type === "S\xC9RIE" /* SERIES */ || item.type === "series" || item.type === "tv" || item.type === "S\xC9RIE" || item.mediaFormat === "series";
-  const isAnime = item.type === "ANIME" /* ANIME */ || item.type === "anime" || item.type === "ANIME" || Boolean(item.aniListId) || Boolean(item.malId) || item.genres?.some((g) => g.toLowerCase() === "anime");
-  const cat = isAnime ? "anime" : isMovie ? "movie" : "series";
-  const tmdbMediaType = isMovie ? "movie" : "tv";
-  if (item.tmdbId) {
-    keys.add(`tmdb:${tmdbMediaType}:${String(item.tmdbId).trim().toLowerCase()}`);
-  }
-  const tmdbMatch = String(item.id || "").match(/^tmdb-(?:movie-|tv-|anime-)?(\d+)/i);
-  if (tmdbMatch) {
-    keys.add(`tmdb:${tmdbMediaType}:${tmdbMatch[1]}`);
-  }
-  if (item.aniListId) {
-    keys.add(`anilist:${item.aniListId}`);
-  }
-  const aniMatch = String(item.id || "").match(/^anilist-(\d+)/i);
-  if (aniMatch) {
-    keys.add(`anilist:${aniMatch[1]}`);
-  }
-  if (item.malId) {
-    keys.add(`mal:${item.malId}`);
-  }
-  if (item.id) {
-    keys.add(`id:${tmdbMediaType}:${item.id.trim().toLowerCase()}`);
-  }
-  const year = Number(item.year) || 0;
-  const titlesToProcess = [item.title, item.originalTitle].filter(Boolean);
-  for (const rawTitle of titlesToProcess) {
-    const norm = normalizeCatalogText(rawTitle);
-    if (!norm) continue;
-    if (year > 0) {
-      keys.add(`title:${cat}:${norm}:${year}`);
-      keys.add(`title_bucket:${cat}:${norm}:${year}`);
-      keys.add(`title_bucket:${cat}:${norm}:${year - 1}`);
-    } else {
-      keys.add(`title_only:${cat}:${norm}`);
-    }
-    const parts = rawTitle.split(/[:–—|-]/);
-    if (parts.length > 1) {
-      const primaryPart = parts[0].trim();
-      const normPrimary = normalizeCatalogText(primaryPart);
-      if (normPrimary && normPrimary.length >= 4 && normPrimary !== norm) {
-        if (year > 0) {
-          keys.add(`title:${cat}:${normPrimary}:${year}`);
-          keys.add(`title_bucket:${cat}:${normPrimary}:${year}`);
-          keys.add(`title_bucket:${cat}:${normPrimary}:${year - 1}`);
-        }
-      }
-    }
-  }
-  return Array.from(keys);
-}
-function deduplicateContentItems(items) {
-  if (!Array.isArray(items) || items.length === 0) return [];
-  const result = [];
-  const seenCanonicalKeys = /* @__PURE__ */ new Set();
-  const itemByIndex = /* @__PURE__ */ new Map();
-  for (const item of items) {
-    if (!item || !item.id && !item.title) continue;
-    const keys = getCanonicalKeysForItem(item);
-    let matchedItem;
-    for (const key of keys) {
-      if (itemByIndex.has(key)) {
-        matchedItem = itemByIndex.get(key);
-        break;
-      }
-    }
-    if (matchedItem) {
-      if (!matchedItem.imdbId && item.imdbId) matchedItem.imdbId = item.imdbId;
-      if (!matchedItem.tmdbId && item.tmdbId) matchedItem.tmdbId = item.tmdbId;
-      if (!matchedItem.aniListId && item.aniListId) matchedItem.aniListId = item.aniListId;
-      if (!matchedItem.malId && item.malId) matchedItem.malId = item.malId;
-      if (!matchedItem.canonicalId && item.canonicalId) matchedItem.canonicalId = item.canonicalId;
-      if (!matchedItem.backdrop && item.backdrop) matchedItem.backdrop = item.backdrop;
-      if (!matchedItem.image && item.image) matchedItem.image = item.image;
-      if (!matchedItem.genres || matchedItem.genres.length === 0) {
-        if (item.genres) matchedItem.genres = item.genres;
-      } else if (item.genres && Array.isArray(item.genres)) {
-        const merged = new Set(matchedItem.genres);
-        for (const g of item.genres) {
-          if (g && typeof g === "string") merged.add(g);
-        }
-        matchedItem.genres = Array.from(merged);
-      }
-      if (!matchedItem.overview && item.overview) matchedItem.overview = item.overview;
-      if (!matchedItem.description && item.description) matchedItem.description = item.description;
-      if ((!matchedItem.episodes || matchedItem.episodes.length === 0) && item.episodes) matchedItem.episodes = item.episodes;
-      for (const key of keys) {
-        seenCanonicalKeys.add(key);
-        itemByIndex.set(key, matchedItem);
-      }
-      continue;
-    }
-    for (const key of keys) {
-      seenCanonicalKeys.add(key);
-      itemByIndex.set(key, item);
-    }
-    result.push(item);
-  }
-  return result;
-}
-var init_catalogDeduplication = __esm({
-  "src/core/catalog/catalogDeduplication.ts"() {
-    init_CanonicalCatalogMaster();
-    init_types();
-  }
-});
-
 // src/core/catalog/BannedContentRegistry.ts
 var BANNED_PATTERNS, BannedContentRegistry, bannedContentRegistry;
 var init_BannedContentRegistry = __esm({
@@ -4163,6 +3093,98 @@ var init_streamQuarantineService = __esm({
   }
 });
 
+// src/core/cache/LruCache.ts
+var LruCache;
+var init_LruCache = __esm({
+  "src/core/cache/LruCache.ts"() {
+    LruCache = class {
+      constructor(maxSize = 100, defaultTtlMs = 0) {
+        this.map = /* @__PURE__ */ new Map();
+        this.maxSize = Math.max(1, maxSize);
+        this.defaultTtlMs = defaultTtlMs;
+      }
+      get(key) {
+        const entry = this.map.get(key);
+        if (!entry) return void 0;
+        if (entry.expiresAt !== null && Date.now() > entry.expiresAt) {
+          this.map.delete(key);
+          return void 0;
+        }
+        this.map.delete(key);
+        this.map.set(key, entry);
+        return entry.value;
+      }
+      set(key, value, ttlMs) {
+        if (this.map.has(key)) {
+          this.map.delete(key);
+        } else if (this.map.size >= this.maxSize) {
+          const oldestKey = this.map.keys().next().value;
+          if (oldestKey !== void 0) {
+            this.map.delete(oldestKey);
+          }
+        }
+        const ttl = ttlMs !== void 0 ? ttlMs : this.defaultTtlMs;
+        const expiresAt = ttl > 0 ? Date.now() + ttl : null;
+        this.map.set(key, { value, expiresAt });
+      }
+      has(key) {
+        const entry = this.map.get(key);
+        if (!entry) return false;
+        if (entry.expiresAt !== null && Date.now() > entry.expiresAt) {
+          this.map.delete(key);
+          return false;
+        }
+        return true;
+      }
+      delete(key) {
+        return this.map.delete(key);
+      }
+      clear() {
+        this.map.clear();
+      }
+      get size() {
+        return this.map.size;
+      }
+      pruneExpired() {
+        const now = Date.now();
+        let count = 0;
+        for (const [key, entry] of this.map.entries()) {
+          if (entry.expiresAt !== null && now > entry.expiresAt) {
+            this.map.delete(key);
+            count++;
+          }
+        }
+        return count;
+      }
+      forEach(callback) {
+        const now = Date.now();
+        for (const [key, entry] of this.map.entries()) {
+          if (entry.expiresAt !== null && now > entry.expiresAt) {
+            this.map.delete(key);
+          } else {
+            callback(entry.value, key);
+          }
+        }
+      }
+      keys() {
+        return this.map.keys();
+      }
+      values() {
+        const now = Date.now();
+        const result = [];
+        for (const [key, entry] of this.map.entries()) {
+          if (entry.expiresAt !== null && now > entry.expiresAt) {
+            this.map.delete(key);
+          } else {
+            result.push(entry.value);
+          }
+        }
+        return result;
+      }
+    };
+  }
+});
+
 // src/core/providers/validationTargetUrl.ts
 function resolveValidationTargetUrl(targetUrl) {
   let candidate = targetUrl;
@@ -4189,6 +3211,7 @@ var init_streamValidator = __esm({
     init_streamQuarantineService();
     init_LruCache();
     init_validationTargetUrl();
+    init_theatricalFilterService();
     KNOWN_PARKED_DOMAINS = [
       "superflixapi.top",
       "parklogic.com",
@@ -4595,6 +3618,7 @@ var init_streamValidator = __esm({
           if (!s.url && !s.infoHash) return false;
           if (s.url && this.isUrlBlacklisted(s.url)) return false;
           if (s.url && videoAdBlocker.isStreamBlocked(s.url)) return false;
+          if (theatricalFilterService.isCamRecording(`${s.name || ""} ${s.title || ""}`)) return false;
           return this.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles, episodeParams);
         });
       }
@@ -6983,7 +6007,8 @@ var init_featuredCatalogItems = __esm({
         genres: ["Aventura", "Fantasia", "Drama"],
         imdbId: "tt33764258",
         tmdbId: "1368337",
-        isFeatured: true
+        isFeatured: true,
+        catalogVisibleFrom: "2026-11-20T00:00:00-03:00"
       },
       // 14. OBSESSÃO (1976 - tt0074991) — Disponível
       {
@@ -12292,6 +11317,103 @@ var init_AdultContentService = __esm({
   }
 });
 
+// src/core/time/trustedTimeService.ts
+var TrustedTimeService, trustedTimeService;
+var init_trustedTimeService = __esm({
+  "src/core/time/trustedTimeService.ts"() {
+    TrustedTimeService = class _TrustedTimeService {
+      constructor() {
+        this.serverOffsetMs = 0;
+        this.isSynchronized = false;
+        this.mockTimestamp = null;
+        this.syncPromise = null;
+        this.initSync();
+      }
+      static getInstance() {
+        if (!_TrustedTimeService.instance) {
+          _TrustedTimeService.instance = new _TrustedTimeService();
+        }
+        return _TrustedTimeService.instance;
+      }
+      /**
+       * Sincroniza o relógio do cliente com o servidor
+       */
+      async syncWithServer() {
+        if (typeof window === "undefined") return;
+        try {
+          const before = Date.now();
+          const res = await fetch("/api/time", { signal: AbortSignal.timeout(3e3) });
+          if (res.ok) {
+            const data = await res.json();
+            const after = Date.now();
+            const roundtrip = after - before;
+            const serverEpoch = typeof data.epoch === "number" ? data.epoch : Date.parse(data.iso || "");
+            if (!isNaN(serverEpoch)) {
+              this.serverOffsetMs = serverEpoch - (before + Math.floor(roundtrip / 2));
+              this.isSynchronized = true;
+            }
+          }
+        } catch {
+        }
+      }
+      initSync() {
+        if (typeof window !== "undefined") {
+          this.syncWithServer().catch(() => {
+          });
+          setInterval(() => {
+            this.syncWithServer().catch(() => {
+            });
+          }, 15 * 60 * 1e3);
+        }
+      }
+      /**
+       * Retorna o timestamp confiável atual (em milissegundos)
+       */
+      getNow() {
+        if (this.mockTimestamp !== null) {
+          return this.mockTimestamp;
+        }
+        return Date.now() + this.serverOffsetMs;
+      }
+      /**
+       * Retorna o objeto Date confiável atual
+       */
+      getDate() {
+        return new Date(this.getNow());
+      }
+      /**
+       * Retorna a string ISO-8601 correspondente ao tempo confiável
+       */
+      getIsoString() {
+        return new Date(this.getNow()).toISOString();
+      }
+      /**
+       * Define um timestamp simulado para fins de testes automatizados
+       */
+      setMockTime(time) {
+        if (time === null) {
+          this.mockTimestamp = null;
+          return;
+        }
+        if (typeof time === "string") {
+          const parsed = Date.parse(time);
+          if (isNaN(parsed)) throw new Error(`[TrustedTimeService] Data inv\xE1lida para mock: ${time}`);
+          this.mockTimestamp = parsed;
+        } else {
+          this.mockTimestamp = time;
+        }
+      }
+      /**
+       * Reseta qualquer mock de tempo ativo
+       */
+      resetMockTime() {
+        this.mockTimestamp = null;
+      }
+    };
+    trustedTimeService = TrustedTimeService.getInstance();
+  }
+});
+
 // src/core/catalog/CatalogEligibilityService.ts
 var STORAGE_ELIGIBILITY_KEY, TTL_AVAILABLE_MS, TTL_UNAVAILABLE_MS, TTL_ERROR_MS, KNOWN_EXCLUDED_PATTERNS, CatalogEligibilityService, catalogEligibilityService;
 var init_CatalogEligibilityService = __esm({
@@ -12304,6 +11426,7 @@ var init_CatalogEligibilityService = __esm({
     init_streamValidator();
     init_AdultContentService();
     init_BannedContentRegistry();
+    init_trustedTimeService();
     STORAGE_ELIGIBILITY_KEY = "zapitv_catalog_eligibility_v2";
     TTL_AVAILABLE_MS = 24 * 60 * 60 * 1e3;
     TTL_UNAVAILABLE_MS = 12 * 60 * 60 * 1e3;
@@ -12318,14 +11441,53 @@ var init_CatalogEligibilityService = __esm({
         this.records = /* @__PURE__ */ new Map();
         this.listeners = /* @__PURE__ */ new Set();
         this.isEvaluating = /* @__PURE__ */ new Set();
+        this.autoUnlocked = false;
+        this.autoUnlockTimer = null;
         this.loadFromStorage();
         this.seedVerifiedOpenItems();
+        this.setupScheduledVisibilityWatcher();
       }
       static getInstance() {
         if (!_CatalogEligibilityService.instance) {
           _CatalogEligibilityService.instance = new _CatalogEligibilityService();
         }
         return _CatalogEligibilityService.instance;
+      }
+      /**
+       * Identifica canonicamente a obra cinematográfica A Odisseia (2026) pelos IDs oficiais
+       */
+      isTheOdyssey2026(item) {
+        if (!item) return false;
+        const isMovie = item.type === "FILME" /* MOVIE */ || String(item.type || "").toUpperCase() === "FILME" || String(item.type || "").toLowerCase() === "movie";
+        const is2026 = Number(item.year) === 2026;
+        if (!isMovie || !is2026) return false;
+        const imdbId = (item.imdbId || "").trim().toLowerCase();
+        const tmdbId = String(item.tmdbId || "").trim();
+        const id = (item.id || "").trim().toLowerCase();
+        return imdbId === "tt33764258" || tmdbId === "1368337" || id === "movie-a-odisseia-2026" || id === "tt33764258" || id === "tmdb-1368337";
+      }
+      /**
+       * Retorna a data de agendamento de visibilidade pública se houver
+       */
+      getCatalogVisibleFrom(item) {
+        if (!item) return null;
+        if (item.catalogVisibleFrom) return item.catalogVisibleFrom;
+        if (this.isTheOdyssey2026(item)) {
+          return "2026-11-20T00:00:00-03:00";
+        }
+        return null;
+      }
+      /**
+       * Verifica se a obra está liberada para exibição no catálogo com base no tempo confiável
+       */
+      isCatalogVisibleNow(item, referenceTimeMs) {
+        if (!item) return false;
+        const visibleFrom = this.getCatalogVisibleFrom(item);
+        if (!visibleFrom) return true;
+        const visibleFromEpoch = Date.parse(visibleFrom);
+        if (isNaN(visibleFromEpoch)) return true;
+        const now = referenceTimeMs !== void 0 ? referenceTimeMs : trustedTimeService.getNow();
+        return now >= visibleFromEpoch;
       }
       getCanonicalKey(item) {
         if (item.id) return item.id.toLowerCase();
@@ -12449,12 +11611,15 @@ var init_CatalogEligibilityService = __esm({
         if (bannedContentRegistry.isBanned(item)) {
           return false;
         }
+        if (!this.isCatalogVisibleNow(item)) {
+          return false;
+        }
         if (item.availabilityStatus === "unavailable") {
           return false;
         }
         const titleLower = item.title.trim().toLowerCase();
-        const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-        const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+        const todayStr = trustedTimeService.getIsoString().slice(0, 10);
+        const currentYear = trustedTimeService.getDate().getFullYear();
         const itemYear = Number(item.year) || currentYear;
         for (const pat of KNOWN_EXCLUDED_PATTERNS) {
           if (pat.test(titleLower) || item.originalTitle && pat.test(item.originalTitle)) {
@@ -12520,9 +11685,40 @@ var init_CatalogEligibilityService = __esm({
           const rejectionReasons = [];
           let releaseStatus = "RELEASED";
           let theatricalStatus = "NOT_APPLICABLE";
-          const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-          const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+          const todayStr = trustedTimeService.getIsoString().slice(0, 10);
+          const currentYear = trustedTimeService.getDate().getFullYear();
           const itemYear = Number(item.year) || currentYear;
+          if (!this.isCatalogVisibleNow(item)) {
+            const visibleFrom = this.getCatalogVisibleFrom(item) || "2026-11-20T00:00:00-03:00";
+            const record2 = {
+              canonicalId: key,
+              title: item.title,
+              originalTitle: item.originalTitle,
+              mediaType,
+              year: itemYear,
+              releaseDate: item.releaseDate,
+              releaseStatus: "NOT_RELEASED",
+              theatricalStatus: "NOT_APPLICABLE",
+              playbackStatus: "UNAVAILABLE_CONFIRMED",
+              isPubliclyPlayable: false,
+              rejectionReasons: [`Visibilidade no cat\xE1logo programada para ${visibleFrom}`],
+              candidateSourceCount: 0,
+              validSourceCount: 0,
+              rejectedSourceCount: 0,
+              providersChecked: [],
+              providersFailed: [],
+              episodes: [],
+              availableEpisodeCount: 0,
+              hasPtBrAudio: false,
+              hasOriginalAudio: false,
+              checkedAt: now,
+              expiresAt: Date.parse(visibleFrom)
+            };
+            this.records.set(key, record2);
+            this.saveToStorage();
+            mediaAvailabilityIndex.markUnavailableConfirmed(key, mediaType, ["Agendamento de Cat\xE1logo"], item.title);
+            return record2;
+          }
           if (itemYear > currentYear || item.releaseDate && item.releaseDate > todayStr) {
             releaseStatus = "NOT_RELEASED";
             rejectionReasons.push(`Data de lan\xE7amento futura: ${item.releaseDate || itemYear}`);
@@ -12704,7 +11900,7 @@ var init_CatalogEligibilityService = __esm({
       async validateEpisode(item, season, episodeNum) {
         const key = this.getCanonicalKey(item);
         const mediaType = item.type === "ANIME" /* ANIME */ ? "anime" : "series";
-        const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+        const todayStr = trustedTimeService.getIsoString().slice(0, 10);
         const epObj = item.episodes?.find((e) => e.number === episodeNum);
         const epReleaseDate = epObj?.releaseDate;
         let releaseStatus = "RELEASED";
@@ -12837,6 +12033,48 @@ var init_CatalogEligibilityService = __esm({
           animesApproved
         };
       }
+      invalidateScheduledItemCaches(item) {
+        const keysToPurge = ["movie-a-odisseia-2026", "tt33764258", "tmdb-1368337"];
+        if (item?.id) keysToPurge.push(item.id.toLowerCase());
+        if (item?.imdbId) keysToPurge.push(item.imdbId.toLowerCase());
+        if (item?.tmdbId) keysToPurge.push(`tmdb-${item.tmdbId}`);
+        for (const k of keysToPurge) {
+          this.records.delete(k);
+        }
+        this.saveToStorage();
+        theatricalFilterService.clearCacheForKeys(keysToPurge);
+        this.notifyListeners();
+      }
+      setupScheduledVisibilityWatcher() {
+        const targetEpoch = Date.parse("2026-11-20T00:00:00-03:00");
+        const checkAndTrigger = () => {
+          const now = trustedTimeService.getNow();
+          if (now >= targetEpoch) {
+            if (!this.autoUnlocked) {
+              this.autoUnlocked = true;
+              this.invalidateScheduledItemCaches();
+            }
+          } else {
+            this.autoUnlocked = false;
+          }
+        };
+        checkAndTrigger();
+        if (typeof window !== "undefined") {
+          const diff = targetEpoch - trustedTimeService.getNow();
+          if (diff > 0 && diff < 2147483600) {
+            this.autoUnlockTimer = setTimeout(checkAndTrigger, diff);
+          }
+          setInterval(checkAndTrigger, 30 * 1e3);
+        }
+      }
+      notifyListeners() {
+        for (const l of this.listeners) {
+          try {
+            l();
+          } catch {
+          }
+        }
+      }
       subscribe(listener) {
         this.listeners.add(listener);
         return () => this.listeners.delete(listener);
@@ -12851,6 +12089,1016 @@ var init_CatalogEligibilityService = __esm({
       }
     };
     catalogEligibilityService = CatalogEligibilityService.getInstance();
+  }
+});
+
+// src/core/catalog/theatricalFilterService.ts
+var STORAGE_KEY, TheatricalFilterService, theatricalFilterService;
+var init_theatricalFilterService = __esm({
+  "src/core/catalog/theatricalFilterService.ts"() {
+    init_types();
+    init_tmdbClient();
+    init_CatalogEligibilityService();
+    STORAGE_KEY = "zapitv_theatrical_evaluations_v3";
+    TheatricalFilterService = class {
+      constructor() {
+        this.cache = /* @__PURE__ */ new Map();
+        this.nowPlayingIds = /* @__PURE__ */ new Set();
+        this.nowPlayingTitles = /* @__PURE__ */ new Set();
+        this.upcomingIds = /* @__PURE__ */ new Set();
+        this.upcomingTitles = /* @__PURE__ */ new Set();
+        this.theatricalListsLoaded = false;
+        this.theatricalFetchPromise = null;
+        this.loadFromStorage();
+      }
+      loadFromStorage() {
+        if (typeof window === "undefined" || !window.localStorage) return;
+        try {
+          try {
+            localStorage.removeItem("zapitv_theatrical_evaluations");
+          } catch {
+          }
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const now = Date.now();
+            for (const [k, v] of Object.entries(parsed)) {
+              if (now < v.expiresAt) {
+                this.cache.set(k, v);
+              }
+            }
+          }
+        } catch {
+        }
+      }
+      clearCacheForKeys(keys) {
+        for (const key of keys) {
+          this.cache.delete(key);
+          this.cache.delete(`tmdb-${key}`);
+          this.cache.delete("movie-a-odisseia-2026");
+          this.cache.delete("tt33764258");
+          this.cache.delete("1368337");
+        }
+        this.saveToStorage();
+      }
+      saveToStorage() {
+        if (typeof window === "undefined" || !window.localStorage) return;
+        try {
+          const obj = {};
+          for (const [k, v] of this.cache.entries()) {
+            obj[k] = v;
+          }
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+        } catch {
+        }
+      }
+      /**
+       * Identifica se uma fonte ou título é gravação de sala de cinema (CAM / Telesync / HDCAM / Telecine)
+       */
+      isCamRecording(text2) {
+        if (!text2) return false;
+        const lower = text2.toLowerCase();
+        if (/\b(camrip|cam-rip|telesync|tele-?sync|hdcam|hd-ts|hdts|hdtc|hd-tc|tc|telecine|tele-?cine|dvdscr|screener)\b/i.test(lower)) {
+          return true;
+        }
+        if (/grava[çc][ãa]o de cinema|cinema rip|audio de cinema|sala de cinema/i.test(lower)) {
+          return true;
+        }
+        if (/\bcam\b/i.test(lower) && /\b(x264|x265|720p|1080p|rip|vbr|v2|cinema|sala|audio|line)\b/i.test(lower)) {
+          return true;
+        }
+        if (/\bts\b/i.test(lower) && !/\.ts(\?|\/|$)/i.test(lower) && /\b(x264|x265|rip|line|clean|hq|hd)\b/i.test(lower)) {
+          return true;
+        }
+        return false;
+      }
+      /**
+       * Identifica se uma fonte retornada por um add-on é na verdade um trailer, teaser ou material promocional
+       */
+      isTrailerOrFakeSource(stream) {
+        if (!stream) return { isFake: false };
+        const combined = `${stream.name || ""} ${stream.title || ""} ${stream.url || ""}`.toLowerCase();
+        if (/\b(trailer|official trailer|teaser|preview clip|promo video|behind the scenes|making of)\b/i.test(combined)) {
+          return { isFake: true, reason: "Fonte identificada como trailer/teaser promocional e n\xE3o como filme completo" };
+        }
+        if (typeof stream.duration === "number" && stream.duration > 0 && stream.duration < 300) {
+          return { isFake: true, reason: `Dura\xE7\xE3o da m\xEDdia (${stream.duration}s) \xE9 caracter\xEDstica de trailer/amostra e n\xE3o de filme completo` };
+        }
+        return { isFake: false };
+      }
+      /**
+       * Carrega os filmes atualmente em cartaz e próximos lançamentos nos cinemas brasileiros direto do TMDB
+       */
+      async loadNowPlayingInBrazil() {
+        if (this.theatricalListsLoaded) return;
+        if (this.theatricalFetchPromise) return this.theatricalFetchPromise;
+        this.theatricalFetchPromise = (async () => {
+          try {
+            const [npRes, upRes] = await Promise.allSettled([
+              fetch(`${TMDB_BASE_URL}/movie/now_playing?api_key=${TMDB_API_KEY}&region=BR&language=pt-BR&page=1`),
+              fetch(`${TMDB_BASE_URL}/movie/upcoming?api_key=${TMDB_API_KEY}&region=BR&language=pt-BR&page=1`)
+            ]);
+            if (npRes.status === "fulfilled" && npRes.value.ok) {
+              const data = await npRes.value.json();
+              const results = data.results || [];
+              for (const item of results) {
+                if (item.id) this.nowPlayingIds.add(String(item.id));
+                if (item.title) this.nowPlayingTitles.add(this.normalizeTitle(item.title));
+                if (item.original_title) this.nowPlayingTitles.add(this.normalizeTitle(item.original_title));
+              }
+            }
+            if (upRes.status === "fulfilled" && upRes.value.ok) {
+              const data = await upRes.value.json();
+              const results = data.results || [];
+              for (const item of results) {
+                if (item.id) this.upcomingIds.add(String(item.id));
+                if (item.title) this.upcomingTitles.add(this.normalizeTitle(item.title));
+                if (item.original_title) this.upcomingTitles.add(this.normalizeTitle(item.original_title));
+              }
+            }
+            this.theatricalListsLoaded = true;
+          } catch (err) {
+            console.warn("[TheatricalFilter] Falha ao carregar listas teatrais BR:", err);
+          } finally {
+            this.theatricalFetchPromise = null;
+          }
+        })();
+        return this.theatricalFetchPromise;
+      }
+      normalizeTitle(t) {
+        return (t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      }
+      /**
+       * Verifica se o item pertence a obras notoriamente não lançadas ou em cartaz
+       */
+      isKnownUnreleasedOrTheatrical(item) {
+        if (!item) return false;
+        const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+        return Boolean(
+          item.releaseDate && item.releaseDate > todayStr || Number(item.year) > (/* @__PURE__ */ new Date()).getFullYear()
+        );
+      }
+      /**
+       * Verifica se o item está em exibição confirmada nos cinemas
+       */
+      isKnownInTheaters(item) {
+        if (!item) return false;
+        if (item.inTheaters === true) return true;
+        if (item.tmdbId && this.nowPlayingIds.has(String(item.tmdbId))) return true;
+        const rawTmdbId = item.id?.startsWith("tmdb-") ? item.id.replace("tmdb-", "") : null;
+        if (rawTmdbId && this.nowPlayingIds.has(rawTmdbId)) return true;
+        const normTitle = this.normalizeTitle(item.title);
+        if (this.nowPlayingTitles.has(normTitle)) return true;
+        if (item.originalTitle) {
+          const normOrig = this.normalizeTitle(item.originalTitle);
+          if (this.nowPlayingTitles.has(normOrig)) return true;
+        }
+        return false;
+      }
+      /**
+       * Verifica se o item está na lista de próximos lançamentos nos cinemas
+       */
+      isKnownUpcoming(item) {
+        if (!item) return false;
+        if (item.tmdbId && this.upcomingIds.has(String(item.tmdbId))) return true;
+        const rawTmdbId = item.id?.startsWith("tmdb-") ? item.id.replace("tmdb-", "") : null;
+        if (rawTmdbId && this.upcomingIds.has(rawTmdbId)) return true;
+        const normTitle = this.normalizeTitle(item.title);
+        if (this.upcomingTitles.has(normTitle)) return true;
+        if (item.originalTitle) {
+          const normOrig = this.normalizeTitle(item.originalTitle);
+          if (this.upcomingTitles.has(normOrig)) return true;
+        }
+        return false;
+      }
+      /**
+       * Avalia de forma assíncrona se um filme pode ou não ser exibido no catálogo público
+       */
+      async evaluateMovie(item) {
+        if (!item) {
+          return {
+            id: "invalid",
+            region: "BR",
+            title: "Desconhecido",
+            status: "UPCOMING",
+            allowed: false,
+            reason: "Item inv\xE1lido ou nulo",
+            evidence: ["invalid_item"],
+            evaluatedAt: Date.now(),
+            expiresAt: Date.now() + 24 * 60 * 60 * 1e3
+          };
+        }
+        if (item.type === "S\xC9RIE" /* SERIES */) {
+          return {
+            id: item.id,
+            tmdbId: item.tmdbId,
+            region: "BR",
+            title: item.title,
+            status: "NOT_APPLICABLE",
+            allowed: true,
+            reason: "S\xE9rie de TV / Epis\xF3dios \u2014 N\xE3o possui janela cinematogr\xE1fica exclusiva",
+            evidence: ["content_type_series"],
+            evaluatedAt: Date.now(),
+            expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1e3
+            // 30 dias
+          };
+        }
+        const cacheKey = item.tmdbId ? `tmdb-${item.tmdbId}` : item.imdbId || item.id;
+        const cached = this.cache.get(cacheKey);
+        const now = Date.now();
+        if (cached && now < cached.expiresAt) {
+          if (cached.status === "IN_THEATERS" || cached.status === "THEATRICAL_STATUS_UNKNOWN") {
+            return { ...cached, allowed: true };
+          }
+          return cached;
+        }
+        const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+        const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+        const itemYear = Number(item.year) || currentYear;
+        await this.loadNowPlayingInBrazil();
+        if (!catalogEligibilityService.isCatalogVisibleNow(item)) {
+          const visibleFrom = catalogEligibilityService.getCatalogVisibleFrom(item) || "2026-11-20T00:00:00-03:00";
+          const evaluation = {
+            id: item.id,
+            tmdbId: item.tmdbId,
+            region: "BR",
+            title: item.title,
+            status: "UPCOMING",
+            allowed: false,
+            reason: `Exibi\xE7\xE3o p\xFAblica programada para retornar em ${visibleFrom}`,
+            evidence: ["catalog_scheduled_visibility"],
+            evaluatedAt: Date.now(),
+            expiresAt: Date.parse(visibleFrom)
+          };
+          this.cache.set(cacheKey, evaluation);
+          this.saveToStorage();
+          return evaluation;
+        }
+        if (item.releaseDate && item.releaseDate > todayStr) {
+          const evaluation = {
+            id: item.id,
+            tmdbId: item.tmdbId,
+            region: "BR",
+            title: item.title,
+            status: "UPCOMING",
+            allowed: false,
+            reason: `Filme ainda n\xE3o lan\xE7ado comercialmente (Previs\xE3o de estreia: ${item.releaseDate})`,
+            evidence: ["future_release_date", `date_${item.releaseDate}`],
+            theatricalDate: item.releaseDate,
+            evaluatedAt: now,
+            expiresAt: now + 12 * 60 * 60 * 1e3
+          };
+          this.cache.set(cacheKey, evaluation);
+          this.saveToStorage();
+          return evaluation;
+        }
+        if (this.isKnownUnreleasedOrTheatrical(item)) {
+          const evaluation = {
+            id: item.id,
+            tmdbId: item.tmdbId,
+            region: "BR",
+            title: item.title,
+            status: "UPCOMING",
+            allowed: false,
+            reason: "T\xEDtulo confirmado em produ\xE7\xE3o/aguardando lan\xE7amento cinematogr\xE1fico futuro oficial",
+            evidence: ["known_unreleased_blockbuster"],
+            evaluatedAt: now,
+            expiresAt: now + 24 * 60 * 60 * 1e3
+          };
+          this.cache.set(cacheKey, evaluation);
+          this.saveToStorage();
+          return evaluation;
+        }
+        if (this.isKnownInTheaters(item)) {
+          const evaluation = {
+            id: item.id,
+            tmdbId: item.tmdbId,
+            region: "BR",
+            title: item.title,
+            status: "IN_THEATERS",
+            allowed: true,
+            reason: "Em exibi\xE7\xE3o nos cinemas brasileiros; fontes ainda precisam ser validadas",
+            evidence: ["now_playing_brazil_active", "commercial_theatrical_run"],
+            evaluatedAt: now,
+            expiresAt: now + 12 * 60 * 60 * 1e3
+          };
+          this.cache.set(cacheKey, evaluation);
+          this.saveToStorage();
+          return evaluation;
+        }
+        if (this.isKnownUpcoming(item)) {
+          const evaluation = {
+            id: item.id,
+            tmdbId: item.tmdbId,
+            region: "BR",
+            title: item.title,
+            status: "UPCOMING",
+            allowed: false,
+            reason: "Presente no calend\xE1rio oficial de pr\xF3ximas estreias nos cinemas brasileiros",
+            evidence: ["upcoming_brazil_active"],
+            evaluatedAt: now,
+            expiresAt: now + 12 * 60 * 60 * 1e3
+          };
+          this.cache.set(cacheKey, evaluation);
+          this.saveToStorage();
+          return evaluation;
+        }
+        if (itemYear > currentYear) {
+          const evaluation = {
+            id: item.id,
+            tmdbId: item.tmdbId,
+            region: "BR",
+            title: item.title,
+            status: "UPCOMING",
+            allowed: false,
+            reason: `Filme ainda n\xE3o lan\xE7ado comercialmente (Previs\xE3o de estreia: ${itemYear})`,
+            evidence: ["future_year_release"],
+            evaluatedAt: now,
+            expiresAt: now + 12 * 60 * 60 * 1e3
+          };
+          this.cache.set(cacheKey, evaluation);
+          this.saveToStorage();
+          return evaluation;
+        }
+        if (itemYear < currentYear - 1) {
+          const evaluation = {
+            id: item.id,
+            tmdbId: item.tmdbId,
+            region: "BR",
+            title: item.title,
+            status: "POST_THEATRICAL",
+            allowed: true,
+            reason: `Cat\xE1logo de ano anterior (${itemYear}) \u2014 Fora de qualquer janela cinematogr\xE1fica`,
+            evidence: ["back_catalog_movie", "not_in_theaters"],
+            evaluatedAt: now,
+            expiresAt: now + 30 * 24 * 60 * 60 * 1e3
+            // 30 dias
+          };
+          this.cache.set(cacheKey, evaluation);
+          this.saveToStorage();
+          return evaluation;
+        }
+        const tmdbIdNum = item.tmdbId ? parseInt(item.tmdbId, 10) : item.id.startsWith("tmdb-") ? parseInt(item.id.replace("tmdb-", ""), 10) : NaN;
+        if (!isNaN(tmdbIdNum) && tmdbIdNum > 0) {
+          try {
+            const [datesRes, detailsRes] = await Promise.allSettled([
+              fetch(`${TMDB_BASE_URL}/movie/${tmdbIdNum}/release_dates?api_key=${TMDB_API_KEY}`),
+              fetch(`${TMDB_BASE_URL}/movie/${tmdbIdNum}?api_key=${TMDB_API_KEY}&language=pt-BR`)
+            ]);
+            if (detailsRes.status === "fulfilled" && detailsRes.value.ok) {
+              const detailsData = await detailsRes.value.json();
+              if (detailsData.status && detailsData.status !== "Released") {
+                const evaluation = {
+                  id: item.id,
+                  tmdbId: item.tmdbId,
+                  region: "BR",
+                  title: item.title,
+                  status: "UPCOMING",
+                  allowed: false,
+                  reason: `Status de produ\xE7\xE3o n\xE3o lan\xE7ado no TMDB (${detailsData.status})`,
+                  evidence: [`tmdb_status_${detailsData.status}`],
+                  evaluatedAt: now,
+                  expiresAt: now + 24 * 60 * 60 * 1e3
+                };
+                this.cache.set(cacheKey, evaluation);
+                this.saveToStorage();
+                return evaluation;
+              }
+              if (detailsData.release_date && detailsData.release_date > todayStr) {
+                const evaluation = {
+                  id: item.id,
+                  tmdbId: item.tmdbId,
+                  region: "BR",
+                  title: item.title,
+                  status: "UPCOMING",
+                  allowed: false,
+                  reason: `Estreia nos cinemas prevista para ${detailsData.release_date}`,
+                  evidence: [`tmdb_details_future_date_${detailsData.release_date}`],
+                  theatricalDate: detailsData.release_date,
+                  evaluatedAt: now,
+                  expiresAt: now + 24 * 60 * 60 * 1e3
+                };
+                this.cache.set(cacheKey, evaluation);
+                this.saveToStorage();
+                return evaluation;
+              }
+            }
+            if (datesRes.status === "fulfilled" && datesRes.value.ok) {
+              const data = await datesRes.value.json();
+              const countries = data.results || [];
+              const brData = countries.find((c) => c.iso_3166_1 === "BR");
+              const usData = countries.find((c) => c.iso_3166_1 === "US");
+              let theatricalDate;
+              let digitalDate;
+              const evidence = [];
+              const extractDates = (countryObj, countryCode) => {
+                if (!countryObj?.release_dates) return;
+                for (const rd of countryObj.release_dates) {
+                  const rDate = (rd.release_date || "").slice(0, 10);
+                  if (rd.type === 1 || rd.type === 2 || rd.type === 3) {
+                    if (!theatricalDate || rDate < theatricalDate) {
+                      theatricalDate = rDate;
+                      evidence.push(`theatrical_${countryCode}_${rDate}`);
+                    }
+                  }
+                  if (rd.type === 4 || rd.type === 5 || rd.type === 6) {
+                    if (!digitalDate || rDate < digitalDate) {
+                      digitalDate = rDate;
+                      evidence.push(`digital_${countryCode}_${rDate}`);
+                    }
+                  }
+                }
+              };
+              if (brData) extractDates(brData, "BR");
+              if (usData && (!digitalDate || !theatricalDate)) extractDates(usData, "US");
+              if (theatricalDate && theatricalDate > todayStr) {
+                const evaluation = {
+                  id: item.id,
+                  tmdbId: item.tmdbId,
+                  region: "BR",
+                  title: item.title,
+                  status: "UPCOMING",
+                  allowed: false,
+                  reason: `Estreia nos cinemas prevista para ${theatricalDate}`,
+                  evidence: [...evidence, "theatrical_future_date"],
+                  theatricalDate,
+                  digitalDate,
+                  evaluatedAt: now,
+                  expiresAt: now + 24 * 60 * 60 * 1e3
+                };
+                this.cache.set(cacheKey, evaluation);
+                this.saveToStorage();
+                return evaluation;
+              }
+              if (digitalDate && digitalDate <= todayStr) {
+                const evaluation = {
+                  id: item.id,
+                  tmdbId: item.tmdbId,
+                  region: "BR",
+                  title: item.title,
+                  status: "DIGITAL_RELEASED",
+                  allowed: true,
+                  reason: `Lan\xE7amento digital oficial dispon\xEDvel desde ${digitalDate}`,
+                  evidence: [...evidence, "digital_release_active"],
+                  theatricalDate,
+                  digitalDate,
+                  evaluatedAt: now,
+                  expiresAt: now + 7 * 24 * 60 * 60 * 1e3
+                  // 7 dias
+                };
+                this.cache.set(cacheKey, evaluation);
+                this.saveToStorage();
+                return evaluation;
+              }
+              if (theatricalDate) {
+                const diffDays = Math.floor((now - new Date(theatricalDate).getTime()) / (1e3 * 60 * 60 * 24));
+                if (diffDays < 70) {
+                  const evaluation = {
+                    id: item.id,
+                    tmdbId: item.tmdbId,
+                    region: "BR",
+                    title: item.title,
+                    status: "IN_THEATERS",
+                    allowed: true,
+                    reason: `Em cartaz nos cinemas h\xE1 ${diffDays} dias; fontes ainda precisam ser validadas`,
+                    evidence: [...evidence, `${diffDays}_days_theatrical_window`],
+                    theatricalDate,
+                    evaluatedAt: now,
+                    expiresAt: now + 12 * 60 * 60 * 1e3
+                  };
+                  this.cache.set(cacheKey, evaluation);
+                  this.saveToStorage();
+                  return evaluation;
+                } else if (diffDays < 95) {
+                  const evaluation = {
+                    id: item.id,
+                    tmdbId: item.tmdbId,
+                    region: "BR",
+                    title: item.title,
+                    status: "THEATRICAL_STATUS_UNKNOWN",
+                    allowed: true,
+                    reason: `Per\xEDodo de transi\xE7\xE3o de cinema (${diffDays} dias); fontes ainda precisam ser validadas`,
+                    evidence: [...evidence, "theatrical_status_uncertain"],
+                    theatricalDate,
+                    evaluatedAt: now,
+                    expiresAt: now + 6 * 60 * 60 * 1e3
+                  };
+                  this.cache.set(cacheKey, evaluation);
+                  this.saveToStorage();
+                  return evaluation;
+                } else {
+                  const evaluation = {
+                    id: item.id,
+                    tmdbId: item.tmdbId,
+                    region: "BR",
+                    title: item.title,
+                    status: "POST_THEATRICAL",
+                    allowed: true,
+                    reason: `Janela de exibi\xE7\xE3o nos cinemas finalizada (${diffDays} dias desde o lan\xE7amento)`,
+                    evidence: [...evidence, "theatrical_circuit_closed"],
+                    theatricalDate,
+                    evaluatedAt: now,
+                    expiresAt: now + 14 * 24 * 60 * 60 * 1e3
+                    // 14 dias
+                  };
+                  this.cache.set(cacheKey, evaluation);
+                  this.saveToStorage();
+                  return evaluation;
+                }
+              }
+            }
+          } catch (err) {
+            console.warn(`[TheatricalFilter] Falha na API ao consultar datas de ${item.title}:`, err);
+          }
+        }
+        const fallbackEvaluation = {
+          id: item.id,
+          tmdbId: item.tmdbId,
+          region: "BR",
+          title: item.title,
+          status: "POST_THEATRICAL",
+          allowed: true,
+          reason: "Sem ind\xEDcio de exibi\xE7\xE3o cinematogr\xE1fica ativa no Brasil",
+          evidence: ["heuristic_fallback_allowed"],
+          evaluatedAt: now,
+          expiresAt: now + 24 * 60 * 60 * 1e3
+        };
+        this.cache.set(cacheKey, fallbackEvaluation);
+        this.saveToStorage();
+        return fallbackEvaluation;
+      }
+      /**
+       * Avaliação instantânea síncrona com base no cache e heurísticas imediatas.
+       * Executa sem requisições para evitar esconder títulos já lançados.
+       */
+      isMovieAllowedSync(item) {
+        if (!item) return false;
+        if (item.type === "S\xC9RIE" /* SERIES */) return true;
+        if (!catalogEligibilityService.isCatalogVisibleNow(item)) {
+          return false;
+        }
+        const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+        const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
+        const itemYear = Number(item.year) || currentYear;
+        if (itemYear > currentYear) return false;
+        if (item.releaseDate && item.releaseDate > todayStr) return false;
+        if (this.isKnownUnreleasedOrTheatrical(item)) return false;
+        if (!this.isKnownInTheaters(item) && this.isKnownUpcoming(item)) {
+          return false;
+        }
+        if (this.isKnownInTheaters(item)) return true;
+        const cacheKey = item.tmdbId ? `tmdb-${item.tmdbId}` : item.imdbId || item.id;
+        const cached = this.cache.get(cacheKey);
+        if (cached) {
+          return cached.status === "IN_THEATERS" || cached.status === "THEATRICAL_STATUS_UNKNOWN" || cached.allowed;
+        }
+        if (itemYear < currentYear - 1) return true;
+        return true;
+      }
+      /**
+       * Avalia de forma assíncrona se o filme é permitido
+       */
+      async isMovieAllowed(item) {
+        const res = await this.evaluateMovie(item);
+        return res.allowed;
+      }
+      /**
+       * Filtra uma lista de itens removendo filmes ainda não lançados
+       */
+      async filterAllowedMovies(items) {
+        if (!items || items.length === 0) return [];
+        const evaluations = await Promise.all(items.map((it) => this.evaluateMovie(it)));
+        return items.filter((_, idx) => evaluations[idx].allowed);
+      }
+      /**
+       * Filtro síncrono rápido para views e renderizadores de UI
+       */
+      filterAllowedMoviesSync(items) {
+        if (!items || items.length === 0) return [];
+        return items.filter((it) => this.isMovieAllowedSync(it));
+      }
+      clearCache() {
+        this.cache.clear();
+        if (typeof window !== "undefined" && window.localStorage) {
+          localStorage.removeItem(STORAGE_KEY);
+          localStorage.removeItem("zapitv_theatrical_evaluations");
+        }
+      }
+      /**
+       * Injeta manualmente uma avaliação no cache (usado para testes ou override de segurança)
+       */
+      setMockEvaluation(key, evaluation) {
+        this.cache.set(key, evaluation);
+      }
+    };
+    theatricalFilterService = new TheatricalFilterService();
+  }
+});
+
+// src/core/anilist/aniListClient.ts
+var GRAPHQL_ENDPOINT, CACHE_TTL_MS, AniListClient, aniListClient;
+var init_aniListClient = __esm({
+  "src/core/anilist/aniListClient.ts"() {
+    init_types();
+    init_LruCache();
+    GRAPHQL_ENDPOINT = "https://graphql.anilist.co";
+    CACHE_TTL_MS = 15 * 60 * 1e3;
+    AniListClient = class _AniListClient {
+      constructor() {
+        this.cache = new LruCache(100, CACHE_TTL_MS);
+      }
+      static getInstance() {
+        if (!_AniListClient.instance) {
+          _AniListClient.instance = new _AniListClient();
+        }
+        return _AniListClient.instance;
+      }
+      /**
+       * Executa uma consulta GraphQL com timeout e tratamento resiliente de erros
+       */
+      async executeQuery(query, variables) {
+        const cacheKey = JSON.stringify({ query, variables });
+        const cached = this.cache.get(cacheKey);
+        if (cached) return cached;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6e3);
+        try {
+          const response = await fetch(GRAPHQL_ENDPOINT, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json"
+            },
+            body: JSON.stringify({ query, variables }),
+            signal: controller.signal
+          });
+          if (!response.ok) {
+            if (response.status === 429) {
+              console.warn("[AniListClient] Rate limit atingido no AniList. Usando fallback silencioso.");
+            } else {
+              console.warn(`[AniListClient] Erro HTTP ${response.status} da API AniList`);
+            }
+            return null;
+          }
+          const json = await response.json();
+          if (json.errors && json.errors.length > 0) {
+            console.warn("[AniListClient] Erros GraphQL retornados:", json.errors[0]?.message);
+            return null;
+          }
+          const data = json.data;
+          if (data) {
+            this.cache.set(cacheKey, data);
+          }
+          return data;
+        } catch (err) {
+          if (err.name !== "AbortError") {
+            console.warn("[AniListClient] Falha de comunica\xE7\xE3o com AniList:", err.message || err);
+          }
+          return null;
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+      /**
+       * Converte um registro oficial do AniList em um ContentItem padronizado do ZapiTV
+       */
+      convertAniListToContentItem(media2) {
+        const isMovie = media2.format === "MOVIE";
+        const mainTitle = media2.title.english || media2.title.romaji || media2.title.native || "Anime";
+        const origTitle = media2.title.native || media2.title.romaji || void 0;
+        const year = media2.seasonYear || media2.startDate?.year || (/* @__PURE__ */ new Date()).getFullYear();
+        const poster = media2.coverImage?.extraLarge || media2.coverImage?.large || media2.coverImage?.medium || "";
+        const backdrop = media2.bannerImage || poster;
+        const rating = media2.averageScore ? Number((media2.averageScore / 10).toFixed(1)) : 8;
+        const genres = Array.from(/* @__PURE__ */ new Set(["Anime", ...media2.genres || []]));
+        const cleanDesc = (media2.description || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim();
+        const episodeCount = media2.episodes || (isMovie ? 1 : 12);
+        const episodes2 = isMovie ? void 0 : Array.from({ length: Math.min(episodeCount, 1500) }, (_, idx) => {
+          const epNum = idx + 1;
+          return {
+            id: `ep-${epNum}`,
+            number: epNum,
+            title: `Epis\xF3dio ${epNum}`,
+            description: `Epis\xF3dio ${epNum} de ${mainTitle}`,
+            image: poster
+          };
+        });
+        return {
+          id: `anilist-${media2.id}`,
+          canonicalId: `anime:anilist:${media2.id}`,
+          aniListId: media2.id,
+          malId: media2.idMal || void 0,
+          title: mainTitle,
+          originalTitle: origTitle,
+          type: "ANIME" /* ANIME */,
+          mediaFormat: isMovie ? "movie" : "series",
+          year,
+          rating,
+          image: poster,
+          backdrop,
+          description: cleanDesc,
+          overview: cleanDesc,
+          genres,
+          seasonsCount: 1,
+          episodes: episodes2,
+          isFeatured: false,
+          availabilityStatus: "declared"
+        };
+      }
+      /**
+       * Pesquisa animes por termo com paginação
+       */
+      async searchAnime(query, page = 1, perPage = 20) {
+        if (!query || query.trim().length === 0) return [];
+        const gql = `
+      query ($search: String, $page: Int, $perPage: Int) {
+        Page(page: $page, perPage: $perPage) {
+          media(search: $search, type: ANIME, sort: SEARCH_MATCH) {
+            id
+            idMal
+            title {
+              romaji
+              english
+              native
+            }
+            format
+            status
+            episodes
+            seasonYear
+            startDate {
+              year
+            }
+            coverImage {
+              extraLarge
+              large
+              medium
+            }
+            bannerImage
+            genres
+            averageScore
+            description
+          }
+        }
+      }
+    `;
+        const data = await this.executeQuery(gql, {
+          search: query.trim(),
+          page,
+          perPage
+        });
+        if (!data?.Page?.media) return [];
+        return data.Page.media.map((m) => this.convertAniListToContentItem(m));
+      }
+      /**
+       * Obtém os animes mais populares do AniList
+       */
+      async getPopularAnimes(page = 1, perPage = 20) {
+        const gql = `
+      query ($page: Int, $perPage: Int) {
+        Page(page: $page, perPage: $perPage) {
+          media(type: ANIME, sort: POPULARITY_DESC) {
+            id
+            idMal
+            title {
+              romaji
+              english
+              native
+            }
+            format
+            status
+            episodes
+            seasonYear
+            startDate {
+              year
+            }
+            coverImage {
+              extraLarge
+              large
+            }
+            bannerImage
+            genres
+            averageScore
+            description
+          }
+        }
+      }
+    `;
+        const data = await this.executeQuery(gql, { page, perPage });
+        if (!data?.Page?.media) return [];
+        return data.Page.media.map((m) => this.convertAniListToContentItem(m));
+      }
+      /**
+       * Obtém detalhes de um anime por AniList ID
+       */
+      async getAnimeById(id) {
+        const gql = `
+      query ($id: Int) {
+        Media(id: $id, type: ANIME) {
+          id
+          idMal
+          title {
+            romaji
+            english
+            native
+          }
+          format
+          status
+          episodes
+          seasonYear
+          startDate {
+            year
+          }
+          coverImage {
+            extraLarge
+            large
+          }
+          bannerImage
+          genres
+          averageScore
+          description
+        }
+      }
+    `;
+        const data = await this.executeQuery(gql, { id });
+        if (!data?.Media) return null;
+        return this.convertAniListToContentItem(data.Media);
+      }
+      /**
+       * Obtém detalhes de um anime por MyAnimeList (MAL) ID
+       */
+      async getAnimeByMalId(malId) {
+        const gql = `
+      query ($idMal: Int) {
+        Media(idMal: $idMal, type: ANIME) {
+          id
+          idMal
+          title {
+            romaji
+            english
+            native
+          }
+          format
+          status
+          episodes
+          seasonYear
+          startDate {
+            year
+          }
+          coverImage {
+            extraLarge
+            large
+          }
+          bannerImage
+          genres
+          averageScore
+          description
+        }
+      }
+    `;
+        const data = await this.executeQuery(gql, { idMal: malId });
+        if (!data?.Media) return null;
+        return this.convertAniListToContentItem(data.Media);
+      }
+    };
+    aniListClient = AniListClient.getInstance();
+  }
+});
+
+// src/core/catalog/catalogDeduplication.ts
+function normalizeCatalogText(text2) {
+  if (!text2) return "";
+  return text2.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "").trim();
+}
+function getCanonicalKeysForItem(item) {
+  if (!item) return [];
+  const keys = /* @__PURE__ */ new Set();
+  if (item.canonicalId) {
+    keys.add(`canonical:${item.canonicalId.trim().toLowerCase()}`);
+  }
+  try {
+    const resolved = canonicalCatalogMaster.resolveCanonicalId(item);
+    if (resolved) {
+      keys.add(`canonical:${resolved.trim().toLowerCase()}`);
+    }
+  } catch {
+  }
+  if (item.imdbId && /^tt\d+$/i.test(item.imdbId.trim())) {
+    keys.add(`imdb:${item.imdbId.trim().toLowerCase()}`);
+  } else if (item.imdbId && /^\d{6,10}$/.test(item.imdbId.trim())) {
+    keys.add(`imdb:tt${item.imdbId.trim()}`);
+  }
+  if (item.id && /^tt\d+$/i.test(item.id.trim())) {
+    keys.add(`imdb:${item.id.trim().toLowerCase()}`);
+  }
+  const imdbInIdMatch = String(item.id || "").match(/^(?:movie|series|anime)[-_](?:tt)?(\d{6,10})$/i);
+  if (imdbInIdMatch) {
+    keys.add(`imdb:tt${imdbInIdMatch[1]}`);
+  }
+  const isMovie = item.type === "FILME" /* MOVIE */ || item.type === "movie" || item.type === "FILME" || item.mediaFormat === "movie";
+  const isSeries = item.type === "S\xC9RIE" /* SERIES */ || item.type === "series" || item.type === "tv" || item.type === "S\xC9RIE" || item.mediaFormat === "series";
+  const isAnime = item.type === "ANIME" /* ANIME */ || item.type === "anime" || item.type === "ANIME" || Boolean(item.aniListId) || Boolean(item.malId) || item.genres?.some((g) => g.toLowerCase() === "anime");
+  const cat = isAnime ? "anime" : isMovie ? "movie" : "series";
+  const tmdbMediaType = isMovie ? "movie" : "tv";
+  if (item.tmdbId) {
+    keys.add(`tmdb:${tmdbMediaType}:${String(item.tmdbId).trim().toLowerCase()}`);
+  }
+  const tmdbMatch = String(item.id || "").match(/^tmdb-(?:movie-|tv-|anime-)?(\d+)/i);
+  if (tmdbMatch) {
+    keys.add(`tmdb:${tmdbMediaType}:${tmdbMatch[1]}`);
+  }
+  if (item.aniListId) {
+    keys.add(`anilist:${item.aniListId}`);
+  }
+  const aniMatch = String(item.id || "").match(/^anilist-(\d+)/i);
+  if (aniMatch) {
+    keys.add(`anilist:${aniMatch[1]}`);
+  }
+  if (item.malId) {
+    keys.add(`mal:${item.malId}`);
+  }
+  if (item.id) {
+    keys.add(`id:${tmdbMediaType}:${item.id.trim().toLowerCase()}`);
+  }
+  const year = Number(item.year) || 0;
+  const titlesToProcess = [item.title, item.originalTitle].filter(Boolean);
+  for (const rawTitle of titlesToProcess) {
+    const norm = normalizeCatalogText(rawTitle);
+    if (!norm) continue;
+    if (year > 0) {
+      keys.add(`title:${cat}:${norm}:${year}`);
+      keys.add(`title_bucket:${cat}:${norm}:${year}`);
+      keys.add(`title_bucket:${cat}:${norm}:${year - 1}`);
+    } else {
+      keys.add(`title_only:${cat}:${norm}`);
+    }
+    const parts = rawTitle.split(/[:–—|-]/);
+    if (parts.length > 1) {
+      const primaryPart = parts[0].trim();
+      const normPrimary = normalizeCatalogText(primaryPart);
+      if (normPrimary && normPrimary.length >= 4 && normPrimary !== norm) {
+        if (year > 0) {
+          keys.add(`title:${cat}:${normPrimary}:${year}`);
+          keys.add(`title_bucket:${cat}:${normPrimary}:${year}`);
+          keys.add(`title_bucket:${cat}:${normPrimary}:${year - 1}`);
+        }
+      }
+    }
+  }
+  return Array.from(keys);
+}
+function deduplicateContentItems(items) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const result = [];
+  const seenCanonicalKeys = /* @__PURE__ */ new Set();
+  const itemByIndex = /* @__PURE__ */ new Map();
+  for (const item of items) {
+    if (!item || !item.id && !item.title) continue;
+    const keys = getCanonicalKeysForItem(item);
+    let matchedItem;
+    for (const key of keys) {
+      if (itemByIndex.has(key)) {
+        matchedItem = itemByIndex.get(key);
+        break;
+      }
+    }
+    if (matchedItem) {
+      if (!matchedItem.imdbId && item.imdbId) matchedItem.imdbId = item.imdbId;
+      if (!matchedItem.tmdbId && item.tmdbId) matchedItem.tmdbId = item.tmdbId;
+      if (!matchedItem.aniListId && item.aniListId) matchedItem.aniListId = item.aniListId;
+      if (!matchedItem.malId && item.malId) matchedItem.malId = item.malId;
+      if (!matchedItem.canonicalId && item.canonicalId) matchedItem.canonicalId = item.canonicalId;
+      if (!matchedItem.backdrop && item.backdrop) matchedItem.backdrop = item.backdrop;
+      if (!matchedItem.image && item.image) matchedItem.image = item.image;
+      if (!matchedItem.genres || matchedItem.genres.length === 0) {
+        if (item.genres) matchedItem.genres = item.genres;
+      } else if (item.genres && Array.isArray(item.genres)) {
+        const merged = new Set(matchedItem.genres);
+        for (const g of item.genres) {
+          if (g && typeof g === "string") merged.add(g);
+        }
+        matchedItem.genres = Array.from(merged);
+      }
+      if (!matchedItem.overview && item.overview) matchedItem.overview = item.overview;
+      if (!matchedItem.description && item.description) matchedItem.description = item.description;
+      if ((!matchedItem.episodes || matchedItem.episodes.length === 0) && item.episodes) matchedItem.episodes = item.episodes;
+      for (const key of keys) {
+        seenCanonicalKeys.add(key);
+        itemByIndex.set(key, matchedItem);
+      }
+      continue;
+    }
+    for (const key of keys) {
+      seenCanonicalKeys.add(key);
+      itemByIndex.set(key, item);
+    }
+    result.push(item);
+  }
+  return result;
+}
+var init_catalogDeduplication = __esm({
+  "src/core/catalog/catalogDeduplication.ts"() {
+    init_CanonicalCatalogMaster();
+    init_types();
   }
 });
 
@@ -14142,6 +14390,7 @@ var init_localSearchIndexService = __esm({
     init_AdultContentService();
     init_BannedContentRegistry();
     init_CanonicalCatalogMaster();
+    init_CatalogEligibilityService();
     LocalSearchIndexService = class _LocalSearchIndexService {
       constructor() {
         this.indexedMap = /* @__PURE__ */ new Map();
@@ -14229,6 +14478,7 @@ var init_localSearchIndexService = __esm({
         const scoredMatches = [];
         for (const indexed of this.indexedMap.values()) {
           if (bannedContentRegistry.isBanned(indexed.item)) continue;
+          if (!catalogEligibilityService.isItemPubliclyPlayableSync(indexed.item)) continue;
           if (indexed.isAdult && !allowAdult) continue;
           if (category !== "all") {
             if (category === "movies") {
@@ -21941,6 +22191,14 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       engineUrl: null,
       status: "standalone_web",
       message: "Executando em ambiente Web direto. Transmiss\xF5es diretas HLS/MP4 nativas est\xE3o ativas com reprodu\xE7\xE3o imediata."
+    });
+  });
+  app2.get("/api/time", (req, res) => {
+    const now = /* @__PURE__ */ new Date();
+    res.json({
+      iso: now.toISOString(),
+      epoch: now.getTime(),
+      timezone: "America/Sao_Paulo"
     });
   });
   app2.get("/api/health", (req, res) => {

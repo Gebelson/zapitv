@@ -370,6 +370,18 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     });
   }, []);
 
+  const [catalogEligibilityVersion, setCatalogEligibilityVersion] = useState(0);
+  useEffect(() => {
+    return catalogEligibilityService.subscribe(() => {
+      setCatalogEligibilityVersion(v => v + 1);
+      catalogSnapshotManager.clearCachedSnapshot();
+      setCatalogSnapshots({});
+      recommendationEngine.invalidateCache();
+      setFeaturedSelection(featuredRankingService.getFeaturedSelectionSync());
+      setHeroCarouselItems(heroCarouselStore.getCarouselItems(contentRef.current));
+    });
+  }, []);
+
   useEffect(() => {
     if (activeProfile?.id) {
       userPreferenceStore.setProfileMetadata(activeProfile.id, { isChild: activeProfile.isChild === true });
@@ -503,7 +515,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
     const unique = deduplicateContentItems(genreFiltered);
     return catalogEligibilityService.filterEligibleItemsSync(unique, { allowAdult: isAdultGenre });
-  }, [content, popularMovies, popularSeries, animeItems]);
+  }, [content, popularMovies, popularSeries, animeItems, catalogEligibilityVersion]);
 
   // Função geradora de chave canônica por visualização e filtros
   const getSnapshotKeyForView = useCallback((view: 'movies' | 'series' | 'animes', genre = selectedGenre, sort?: CatalogSortOption) => {
@@ -1555,7 +1567,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   // Filtro centralizado de elegibilidade e reprodução real
   const allowedContent = useMemo(() => {
     return catalogEligibilityService.filterEligibleItemsSync(content);
-  }, [content]);
+  }, [content, catalogEligibilityVersion]);
 
   // Memoize row items to prevent filtering 48,000 items on every render
   const netflixItems = useMemo(() => allowedContent.filter(i => i.platform?.includes('Netflix')), [allowedContent]);
@@ -2088,7 +2100,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       activeProfile?.isChild === true,
       customSections
     );
-  }, [trendingItems, popularMovies, popularSeries, animeItems, content, continueWatchingList, activeProfile?.id, activeProfile?.isChild, customSections]);
+  }, [trendingItems, popularMovies, popularSeries, animeItems, content, continueWatchingList, activeProfile?.id, activeProfile?.isChild, customSections, catalogEligibilityVersion]);
 
   const filteredContent = useMemo(() => {
     let baseFiltered = content;
@@ -2190,7 +2202,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   }, [
     catalogSnapshots, snapshotKey, currentView, categorySorts, selectedGenre,
     getEligibleBrowseItems, getSnapshotKeyForView, submittedSearchQuery, liveSearchResults, content,
-    allowedContent, trendingItems, favoritesSet, myListSet, activeProfile?.id, activeProfile?.isChild
+    allowedContent, trendingItems, favoritesSet, myListSet, activeProfile?.id, activeProfile?.isChild,
+    catalogEligibilityVersion
   ]);
 
   // Rolagem Infinita Automática Estabilizada (Infinite Scroll — revela lotes em memória instantaneamente e carrega mais da rede sob demanda)

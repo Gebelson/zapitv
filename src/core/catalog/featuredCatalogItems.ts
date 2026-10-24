@@ -245,7 +245,8 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     genres: ['Aventura', 'Fantasia', 'Drama'],
     imdbId: 'tt33764258',
     tmdbId: '1368337',
-    isFeatured: true
+    isFeatured: true,
+    catalogVisibleFrom: '2026-11-20T00:00:00-03:00'
   },
 
   // 14. OBSESSÃO (1976 - tt0074991) — Disponível

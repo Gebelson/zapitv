@@ -52,6 +52,7 @@ export interface ContentItem {
   ageRating?: string; // Classificação Indicativa
   inTheaters?: boolean; // Títulos em cartaz nos cinemas
   isAdult?: boolean; // Conteúdo adulto / pornográfico explícito (restrito +18)
+  catalogVisibleFrom?: string; // Data ISO-8601 a partir da qual o título é visível no catálogo (ex: 2026-11-20T00:00:00-03:00)
 
   // Disponibilidade e Verificação de Áudio Real
   availabilityStatus?: 'verified' | 'declared' | 'unavailable' | 'unreleased'; // 'Disponível e testado' | 'Fonte declarada' | 'Indisponível' | 'Não lançado'

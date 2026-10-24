@@ -1,5 +1,7 @@
 import { ContentItem, ContentType } from '../../../types';
 import { TMDB_API_KEY, TMDB_BASE_URL } from '../tmdb/tmdbClient';
+import { trustedTimeService } from '../time/trustedTimeService';
+import { catalogEligibilityService } from './CatalogEligibilityService';
 
 export type TheatricalStatus = 
   | 'UPCOMING'                  // Ainda não lançado comercialmente no Brasil ou mundialmente
@@ -63,6 +65,18 @@ class TheatricalFilterService {
     }
   }
 
+
+  public clearCacheForKeys(keys: string[]): void {
+    for (const key of keys) {
+      this.cache.delete(key);
+      this.cache.delete(`tmdb-${key}`);
+      this.cache.delete('movie-a-odisseia-2026');
+      this.cache.delete('tt33764258');
+      this.cache.delete('1368337');
+    }
+    this.saveToStorage();
+  }
+
   private saveToStorage() {
     if (typeof window === 'undefined' || !window.localStorage) return;
     try {
@@ -84,7 +98,7 @@ class TheatricalFilterService {
     const lower = text.toLowerCase();
 
     // 1. Termos inequívocos de gravação de sala
-    if (/\b(camrip|cam-rip|telesync|hdcam|hd-ts|hdts|telecine|dvdscr|screener)\b/i.test(lower)) {
+    if (/\b(camrip|cam-rip|telesync|tele-?sync|hdcam|hd-ts|hdts|hdtc|hd-tc|tc|telecine|tele-?cine|dvdscr|screener)\b/i.test(lower)) {
       return true;
     }
 
@@ -279,6 +293,26 @@ class TheatricalFilterService {
 
     // Carrega a lista atual de sessões e lançamentos dos cinemas brasileiros em paralelo
     await this.loadNowPlayingInBrazil();
+
+
+    if (!catalogEligibilityService.isCatalogVisibleNow(item)) {
+      const visibleFrom = catalogEligibilityService.getCatalogVisibleFrom(item) || '2026-11-20T00:00:00-03:00';
+      const evaluation: TheatricalEvaluation = {
+        id: item.id,
+        tmdbId: item.tmdbId,
+        region: 'BR',
+        title: item.title,
+        status: 'UPCOMING',
+        allowed: false,
+        reason: `Exibição pública programada para retornar em ${visibleFrom}`,
+        evidence: ['catalog_scheduled_visibility'],
+        evaluatedAt: Date.now(),
+        expiresAt: Date.parse(visibleFrom)
+      };
+      this.cache.set(cacheKey, evaluation);
+      this.saveToStorage();
+      return evaluation;
+    }
 
     // 2. Trava direta por data de lançamento futura (ex: 2026-12-16 > 2026-10-13)
     if (item.releaseDate && item.releaseDate > todayStr) {
@@ -612,6 +646,10 @@ class TheatricalFilterService {
   public isMovieAllowedSync(item: ContentItem): boolean {
     if (!item) return false;
     if (item.type === ContentType.SERIES) return true;
+
+    if (!catalogEligibilityService.isCatalogVisibleNow(item)) {
+      return false;
+    }
 
     const todayStr = new Date().toISOString().slice(0, 10);
     const currentYear = new Date().getFullYear();

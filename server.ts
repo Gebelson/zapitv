@@ -602,6 +602,15 @@ function createApp() {
 
 
   // API Routes
+  app.get("/api/time", (req, res) => {
+    const now = new Date();
+    res.json({
+      iso: now.toISOString(),
+      epoch: now.getTime(),
+      timezone: "America/Sao_Paulo"
+    });
+  });
+
   app.get("/api/health", (req, res) => {
     res.json({
       status: "ok",

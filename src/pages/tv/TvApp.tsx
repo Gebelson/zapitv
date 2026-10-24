@@ -100,6 +100,13 @@ export const TvApp: React.FC<TvAppProps> = ({
   }, []);
 
   // Aba ativa na navegação superior
+  const [catalogEligibilityTick, setCatalogEligibilityTick] = useState(0);
+  useEffect(() => {
+    return catalogEligibilityService.subscribe(() => {
+      setCatalogEligibilityTick(t => t + 1);
+    });
+  }, []);
+
   const [currentTab, setCurrentTab] = useState<TvTab>(() => {
     const path = location.pathname;
     if (path.includes('/filmes')) return 'movies';
@@ -238,7 +245,7 @@ export const TvApp: React.FC<TvAppProps> = ({
       ...canonicalCatalogMaster.getPublicCatalog('animes'),
     ];
     return catalogEligibilityService.filterEligibleItemsSync(deduplicateContentItems(combined));
-  }, [content, popularMovies, popularSeries, animeItems, trendingItems, featuredItems, releasedItems]);
+  }, [content, popularMovies, popularSeries, animeItems, trendingItems, featuredItems, releasedItems, catalogEligibilityTick]);
 
   // Itens da Minha Lista reais
   const myListItems = useMemo(() => {
@@ -329,6 +336,10 @@ export const TvApp: React.FC<TvAppProps> = ({
 
   // Execução de reprodução com rota persistente
   const handleStartPlay = useCallback((item: ContentItem, season?: number, episode?: number) => {
+    if (!catalogEligibilityService.isItemPubliclyPlayableSync(item)) {
+      setTvWatchNotFound(true);
+      return;
+    }
     if (!selectedDetailItem) tvNavigationManager.saveFocusSnapshot();
     const continuity = storageService.getPlaybackContinuity(item);
     const resolvedSeason = season ?? continuity.season ?? 1;

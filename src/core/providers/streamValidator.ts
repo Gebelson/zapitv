@@ -3,6 +3,7 @@ import { videoAdBlocker } from '../security/videoAdBlocker';
 import { streamQuarantineService } from '../security/streamQuarantineService';
 import { LruCache } from '../cache/LruCache';
 import { resolveValidationTargetUrl } from './validationTargetUrl';
+import { theatricalFilterService } from '../catalog/theatricalFilterService';
 
 export interface StreamValidationResult {
   valid: boolean;
@@ -599,6 +600,7 @@ class StreamValidator {
       if (!s.url && !s.infoHash) return false;
       if (s.url && this.isUrlBlacklisted(s.url)) return false;
       if (s.url && videoAdBlocker.isStreamBlocked(s.url)) return false;
+      if (theatricalFilterService.isCamRecording(`${s.name || ''} ${s.title || ''}`)) return false;
       return this.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles, episodeParams);
     });
   }

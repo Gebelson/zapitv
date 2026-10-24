@@ -23,6 +23,7 @@ import { ContentItem, ContentType, Profile } from '../../../types';
 import { adultContentService } from '../adult/AdultContentService';
 import { bannedContentRegistry } from '../catalog/BannedContentRegistry';
 import { canonicalCatalogMaster } from '../catalog/CanonicalCatalogMaster';
+import { catalogEligibilityService } from '../catalog/CatalogEligibilityService';
 
 export type SearchCategory = 'all' | 'movies' | 'series' | 'animes' | 'live';
 
@@ -174,6 +175,7 @@ export class LocalSearchIndexService {
     for (const indexed of this.indexedMap.values()) {
       // 1. Filtros de segurança e banimento
       if (bannedContentRegistry.isBanned(indexed.item)) continue;
+      if (!catalogEligibilityService.isItemPubliclyPlayableSync(indexed.item)) continue;
       if (indexed.isAdult && !allowAdult) continue;
 
       // 2. Filtro estrito de categoria

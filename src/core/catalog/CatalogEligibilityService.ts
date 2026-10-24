@@ -23,6 +23,7 @@ import { streamValidator } from '../providers/streamValidator';
 import { canonicalIdentityService } from '../identity/canonicalIdentity';
 import { adultContentService } from '../adult/AdultContentService';
 import { bannedContentRegistry } from './BannedContentRegistry';
+import { trustedTimeService } from '../time/trustedTimeService';
 
 export type ReleaseStatus = 
   | 'NOT_RELEASED'      // Ainda não lançado oficialmente (data futura)
@@ -121,6 +122,7 @@ class CatalogEligibilityService {
   private constructor() {
     this.loadFromStorage();
     this.seedVerifiedOpenItems();
+    this.setupScheduledVisibilityWatcher();
   }
 
   public static getInstance(): CatalogEligibilityService {
@@ -128,6 +130,57 @@ class CatalogEligibilityService {
       CatalogEligibilityService.instance = new CatalogEligibilityService();
     }
     return CatalogEligibilityService.instance;
+  }
+
+
+  /**
+   * Identifica canonicamente a obra cinematográfica A Odisseia (2026) pelos IDs oficiais
+   */
+  public isTheOdyssey2026(item?: { id?: string; imdbId?: string; tmdbId?: string | number; type?: ContentType | string; year?: number | string; title?: string } | null): boolean {
+    if (!item) return false;
+
+    const isMovie = item.type === ContentType.MOVIE || String(item.type || '').toUpperCase() === 'FILME' || String(item.type || '').toLowerCase() === 'movie';
+    const is2026 = Number(item.year) === 2026;
+    if (!isMovie || !is2026) return false;
+
+    const imdbId = (item.imdbId || '').trim().toLowerCase();
+    const tmdbId = String(item.tmdbId || '').trim();
+    const id = (item.id || '').trim().toLowerCase();
+
+    return (
+      imdbId === 'tt33764258' ||
+      tmdbId === '1368337' ||
+      id === 'movie-a-odisseia-2026' ||
+      id === 'tt33764258' ||
+      id === 'tmdb-1368337'
+    );
+  }
+
+  /**
+   * Retorna a data de agendamento de visibilidade pública se houver
+   */
+  public getCatalogVisibleFrom(item?: ContentItem | null): string | null {
+    if (!item) return null;
+    if (item.catalogVisibleFrom) return item.catalogVisibleFrom;
+    if (this.isTheOdyssey2026(item)) {
+      return '2026-11-20T00:00:00-03:00';
+    }
+    return null;
+  }
+
+  /**
+   * Verifica se a obra está liberada para exibição no catálogo com base no tempo confiável
+   */
+  public isCatalogVisibleNow(item?: ContentItem | null, referenceTimeMs?: number): boolean {
+    if (!item) return false;
+    const visibleFrom = this.getCatalogVisibleFrom(item);
+    if (!visibleFrom) return true;
+
+    const visibleFromEpoch = Date.parse(visibleFrom);
+    if (isNaN(visibleFromEpoch)) return true;
+
+    const now = referenceTimeMs !== undefined ? referenceTimeMs : trustedTimeService.getNow();
+    return now >= visibleFromEpoch;
   }
 
   public getCanonicalKey(item: { id?: string; imdbId?: string; tmdbId?: string | number; title?: string }): string {
@@ -270,14 +323,19 @@ class CatalogEligibilityService {
       return false;
     }
 
+
+    // 0.08 Bloqueio por agendamento de visibilidade pública (catalogVisibleFrom / A Odisseia 2026)
+    if (!this.isCatalogVisibleNow(item)) {
+      return false;
+    }
     // 0.1 Bloqueio explícito de itens marcados como indisponíveis
     if (item.availabilityStatus === 'unavailable') {
       return false;
     }
 
     const titleLower = item.title.trim().toLowerCase();
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const currentYear = new Date().getFullYear();
+    const todayStr = trustedTimeService.getIsoString().slice(0, 10);
+    const currentYear = trustedTimeService.getDate().getFullYear();
     const itemYear = Number(item.year) || currentYear;
 
     // 1. Bloqueio estrito de padrões não lançados ou obras futuras conhecidas
@@ -374,9 +432,44 @@ class CatalogEligibilityService {
       let releaseStatus: ReleaseStatus = 'RELEASED';
       let theatricalStatus: TheatricalStatus = 'NOT_APPLICABLE';
 
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const currentYear = new Date().getFullYear();
+      const todayStr = trustedTimeService.getIsoString().slice(0, 10);
+      const currentYear = trustedTimeService.getDate().getFullYear();
       const itemYear = Number(item.year) || currentYear;
+
+
+      // 0. Checa agendamento de visibilidade pública no catálogo (catalogVisibleFrom)
+      if (!this.isCatalogVisibleNow(item)) {
+        const visibleFrom = this.getCatalogVisibleFrom(item) || '2026-11-20T00:00:00-03:00';
+        const record: MediaEligibilityRecord = {
+          canonicalId: key,
+          title: item.title,
+          originalTitle: item.originalTitle,
+          mediaType,
+          year: itemYear,
+          releaseDate: item.releaseDate,
+          releaseStatus: 'NOT_RELEASED',
+          theatricalStatus: 'NOT_APPLICABLE',
+          playbackStatus: 'UNAVAILABLE_CONFIRMED',
+          isPubliclyPlayable: false,
+          rejectionReasons: [`Visibilidade no catálogo programada para ${visibleFrom}`],
+          candidateSourceCount: 0,
+          validSourceCount: 0,
+          rejectedSourceCount: 0,
+          providersChecked: [],
+          providersFailed: [],
+          episodes: [],
+          availableEpisodeCount: 0,
+          hasPtBrAudio: false,
+          hasOriginalAudio: false,
+          checkedAt: now,
+          expiresAt: Date.parse(visibleFrom)
+        };
+
+        this.records.set(key, record);
+        this.saveToStorage();
+        mediaAvailabilityIndex.markUnavailableConfirmed(key, mediaType, ['Agendamento de Catálogo'], item.title);
+        return record;
+      }
 
       // 1. Checa se o ano ou data é no futuro
       if (itemYear > currentYear || (item.releaseDate && item.releaseDate > todayStr)) {
@@ -598,7 +691,7 @@ class CatalogEligibilityService {
     const mediaType = item.type === ContentType.ANIME ? 'anime' : 'series';
 
     // 1. Checa data de lançamento do episódio específico
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = trustedTimeService.getIsoString().slice(0, 10);
     const epObj = item.episodes?.find(e => e.number === episodeNum);
     const epReleaseDate = (epObj as any)?.releaseDate;
 
@@ -742,6 +835,57 @@ class CatalogEligibilityService {
       seriesApproved,
       animesApproved
     };
+  }
+
+
+  private autoUnlocked = false;
+  private autoUnlockTimer: any = null;
+
+  public invalidateScheduledItemCaches(item?: ContentItem): void {
+    const keysToPurge = ['movie-a-odisseia-2026', 'tt33764258', 'tmdb-1368337'];
+    if (item?.id) keysToPurge.push(item.id.toLowerCase());
+    if (item?.imdbId) keysToPurge.push(item.imdbId.toLowerCase());
+    if (item?.tmdbId) keysToPurge.push(`tmdb-${item.tmdbId}`);
+
+    for (const k of keysToPurge) {
+      this.records.delete(k);
+    }
+    this.saveToStorage();
+
+    theatricalFilterService.clearCacheForKeys(keysToPurge);
+    this.notifyListeners();
+  }
+
+  public setupScheduledVisibilityWatcher(): void {
+    const targetEpoch = Date.parse('2026-11-20T00:00:00-03:00');
+    
+    const checkAndTrigger = () => {
+      const now = trustedTimeService.getNow();
+      if (now >= targetEpoch) {
+        if (!this.autoUnlocked) {
+          this.autoUnlocked = true;
+          this.invalidateScheduledItemCaches();
+        }
+      } else {
+        this.autoUnlocked = false;
+      }
+    };
+
+    checkAndTrigger();
+
+    if (typeof window !== 'undefined') {
+      const diff = targetEpoch - trustedTimeService.getNow();
+      if (diff > 0 && diff < 2147483600) {
+        this.autoUnlockTimer = setTimeout(checkAndTrigger, diff);
+      }
+      setInterval(checkAndTrigger, 30 * 1000);
+    }
+  }
+
+  public notifyListeners(): void {
+    for (const l of this.listeners) {
+      try { l(); } catch {}
+    }
   }
 
   public subscribe(listener: () => void): () => void {
