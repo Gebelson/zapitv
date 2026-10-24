@@ -241,7 +241,7 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
                       ? `Disponível em: ${activeChannel.externalProviderName}`
                       : epg.currentProgram.title}
                   </span>
-                  {!activeChannel.requiresExternalAccess && (
+                  {!activeChannel.requiresExternalAccess && epg.hasVerifiedSchedule && (
                     <span className="text-gray-400 text-[11px] font-normal shrink-0">
                       ({epg.formattedStartTime} - {epg.formattedEndTime})
                     </span>
@@ -249,7 +249,7 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
                 </div>
 
                 {/* Barra de Progresso Real */}
-                {!activeChannel.requiresExternalAccess && (
+                {!activeChannel.requiresExternalAccess && epg.hasVerifiedSchedule && (
                   <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden mt-1.5">
                     <div
                       className="h-full bg-[#007df7] transition-all duration-1000 ease-linear shadow-[0_0_8px_rgba(0,125,247,0.8)]"

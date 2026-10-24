@@ -241,17 +241,18 @@ export class EPGAggregator {
     }
 
     const template = VERIFIED_SCHEDULES[channel.id] || VERIFIED_SCHEDULES[channel.canonicalId || ''];
-    if (!template) {
+    if (!template || template.length === 0) {
       return [
         {
-          id: `${channel.id}-full`,
-          title: `Transmissão Ao Vivo — ${channel.name}`,
-          description: channel.description || 'Programação contínua 24h em alta definição.',
-          startTime: '00:00',
-          endTime: '23:59',
+          id: `${channel.id}-unavailable`,
+          title: 'Programação não disponível',
+          description: 'Informações de grade não disponíveis no momento para este canal.',
+          startTime: '--:--',
+          endTime: '--:--',
           startMinutes: 0,
           endMinutes: 1440,
-          category: channel.categoryLabel
+          category: channel.categoryLabel,
+          isFallback: true
         }
       ];
     }
@@ -275,10 +276,31 @@ export class EPGAggregator {
   }
 
   /**
-   * Calcula o estado EPG em tempo real com barra de progresso real
+   * Calcula o estado EPG em tempo real com dados reais no fuso America/Sao_Paulo
    */
   public getCurrentEpgState(channel: LiveChannel): CurrentEpgState {
+    const hasVerified = Boolean(
+      (channel.programs && channel.programs.length > 0) ||
+      VERIFIED_SCHEDULES[channel.id] ||
+      VERIFIED_SCHEDULES[channel.canonicalId || '']
+    );
+
     const schedule = this.getDailySchedule(channel);
+
+    if (!hasVerified) {
+      const fallbackProg = schedule[0];
+      return {
+        currentProgram: fallbackProg,
+        nextProgram: undefined,
+        progressPercent: 0,
+        elapsedMinutes: 0,
+        remainingMinutes: 0,
+        formattedStartTime: '--:--',
+        formattedEndTime: '--:--',
+        hasVerifiedSchedule: false
+      };
+    }
+
     const nowMinutes = this.getCurrentBrazilMinutes();
 
     let currentIdx = -1;
@@ -315,7 +337,8 @@ export class EPGAggregator {
       elapsedMinutes: Math.floor(elapsed),
       remainingMinutes: Math.ceil(remaining),
       formattedStartTime: currentProgram.startTime,
-      formattedEndTime: currentProgram.endTime
+      formattedEndTime: currentProgram.endTime,
+      hasVerifiedSchedule: true
     };
   }
 }

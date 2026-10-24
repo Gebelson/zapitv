@@ -3,10 +3,11 @@ import Hls from 'hls.js';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, 
   Settings, AlertCircle, RefreshCw, Radio, ChevronLeft, ChevronRight, X,
-  PictureInPicture2
+  PictureInPicture2, ExternalLink, ShieldCheck
 } from 'lucide-react';
-import { LiveChannel } from '../../core/livetv/types';
+import { LiveChannel, LiveStreamSource } from '../../core/livetv/types';
 import { channelHealthService } from '../../core/livetv/channelHealthService';
+import { channelSourceResolver } from '../../core/livetv/ChannelSourceResolver';
 import { liveTvPreferences } from '../../core/livetv/liveTvPreferences';
 import { ZapiLoader } from '../common/ZapiLoader';
 import { pipService } from '../../core/pip/pipService';
@@ -44,6 +45,10 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [activeSourceUrl, setActiveSourceUrl] = useState('');
+  const [isUsingFallback, setIsUsingFallback] = useState(false);
+  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
+
   const [volume, setVolume] = useState(() => liveTvPreferences.getState().volume);
   const [isMuted, setIsMuted] = useState(initialMuted);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -53,7 +58,10 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [isPipActive, setIsPipActive] = useState(false);
   const [isPipSupported, setIsPipSupported] = useState(() => pipService.isPipSupported());
+
   const controlsTimeoutRef = useRef<any>(null);
+  const stallTimeoutRef = useRef<any>(null);
+  const lastPlayTimeRef = useRef<number>(0);
 
   // Monitora eventos Picture-in-Picture
   useEffect(() => {
@@ -98,13 +106,13 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+      containerRef.current.requestFullscreen().catch(() => {});
     } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      document.exitFullscreen().catch(() => {});
     }
   }, []);
 
-  // Monitora evento de tela cheia
+  // Monitora mudanças de tela cheia
   useEffect(() => {
     const handleFsChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
@@ -113,8 +121,25 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
-  // Inicializa a reprodução HLS
-  const initPlayback = useCallback(() => {
+  // Tenta próxima fonte de backup quando a atual falha
+  const tryNextFallbackSource = useCallback((failedUrl: string, reason: string) => {
+    channelHealthService.reportPlaybackFailure(channel, failedUrl, reason.includes('rede'));
+
+    const nextSource = channelSourceResolver.getNextSource(channel, failedUrl);
+    if (nextSource && nextSource.url && nextSource.url !== failedUrl) {
+      setFallbackNotice(`Alternando para fonte alternativa (${nextSource.quality || 'Backup'})...`);
+      setIsUsingFallback(true);
+      setTimeout(() => setFallbackNotice(null), 4000);
+      playStreamUrl(nextSource.url);
+    } else {
+      setHasError(true);
+      setErrorMessage(`Transmissão indisponível no momento. ${reason}`);
+      setIsLoading(false);
+    }
+  }, [channel]);
+
+  // Função interna para iniciar a reprodução de uma URL específica
+  const playStreamUrl = useCallback((rawTargetUrl: string) => {
     const video = videoRef.current;
     if (!video || !channel) return;
 
@@ -128,7 +153,9 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       hlsRef.current = null;
     }
 
-    const streamUrl = channelHealthService.getPlayableUrl(channel);
+    const streamUrl = channelHealthService.getPlayableUrl(rawTargetUrl);
+    setActiveSourceUrl(rawTargetUrl);
+
     if (!streamUrl) {
       setHasError(true);
       setErrorMessage('Endereço de transmissão não configurado.');
@@ -176,22 +203,21 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              hls.startLoad();
+              // Tenta recarregar uma vez; se falhar novamente, tenta fallback
+              tryNextFallbackSource(rawTargetUrl, 'Instabilidade de conexão com a fonte.');
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
               hls.recoverMediaError();
               break;
             default:
               hls.destroy();
-              setHasError(true);
-              setErrorMessage('Transmissão ao vivo temporariamente instável ou indisponível.');
-              setIsLoading(false);
+              tryNextFallbackSource(rawTargetUrl, 'Erro na decodificação do fluxo.');
               break;
           }
         }
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Suporte nativo Safari / iOS
+      // Suporte nativo Safari / iOS / Tizen nativo
       video.src = streamUrl;
       video.onloadedmetadata = () => {
         setIsLoading(false);
@@ -204,16 +230,29 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
         }
       };
       video.onerror = () => {
-        setHasError(true);
-        setErrorMessage('Falha ao reproduzir fluxo nativo HLS.');
-        setIsLoading(false);
+        tryNextFallbackSource(rawTargetUrl, 'Falha no decodificador nativo.');
       };
     } else {
       setHasError(true);
       setErrorMessage('Formato de transmissão não suportado neste navegador.');
       setIsLoading(false);
     }
-  }, [channel, isMuted, volume, autoPlay]);
+  }, [channel, isMuted, volume, autoPlay, tryNextFallbackSource]);
+
+  // Inicializa a reprodução utilizando a melhor fonte selecionada pelo ChannelSourceResolver
+  const initPlayback = useCallback(() => {
+    if (!channel) return;
+
+    if (channel.requiresExternalAccess) {
+      setIsLoading(false);
+      setHasError(false);
+      return;
+    }
+
+    const resolved = channelSourceResolver.resolveBestSource(channel);
+    setIsUsingFallback(resolved.isFallback);
+    playStreamUrl(resolved.primaryUrl);
+  }, [channel, playStreamUrl]);
 
   // Reinicia player quando o canal selecionado mudar
   useEffect(() => {
@@ -226,6 +265,9 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       }
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
+      }
+      if (stallTimeoutRef.current) {
+        clearTimeout(stallTimeoutRef.current);
       }
     };
   }, [channel.id]);
@@ -281,6 +323,54 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
     }
   };
 
+  // Se o canal requer acesso externo oficial (ex: SporTV, ESPN, Premiere, TV Globo ao vivo oficial)
+  if (channel.requiresExternalAccess) {
+    return (
+      <div
+        ref={containerRef}
+        className={`relative w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden font-sans ${
+          isFullscreen ? 'fixed inset-0 z-[5000]' : 'rounded-2xl border border-white/10'
+        }`}
+      >
+        <div className="w-20 h-20 rounded-2xl bg-white/10 p-3 mb-5 border border-white/15 backdrop-blur-md shadow-2xl flex items-center justify-center">
+          <img src={channel.logo} alt={channel.name} className="w-full h-full object-contain" />
+        </div>
+
+        <div className="flex items-center gap-2 mb-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          <span className="text-[11px] font-black uppercase tracking-widest text-emerald-400">
+            Transmissão Oficial Protegida
+          </span>
+        </div>
+
+        <h3 className="text-white text-xl md:text-2xl font-black mb-2">{channel.name}</h3>
+        <p className="text-gray-400 text-xs md:text-sm max-w-md mb-6 leading-relaxed">
+          {channel.description || 'Este canal transmite sua grade linear sob direitos de transmissão na plataforma autorizada oficial.'}
+        </p>
+
+        <a
+          href={channel.externalAccessUrl || '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-[#007df7] to-[#005bb5] hover:from-[#0069d9] hover:to-[#004a99] text-white rounded-xl text-xs md:text-sm font-bold uppercase tracking-wider transition-all shadow-xl shadow-[#007df7]/30 hover:scale-105"
+        >
+          <span>Abrir no {channel.externalProviderName || 'Provedor Oficial'}</span>
+          <ExternalLink className="w-4 h-4" />
+        </a>
+
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10"
+            title="Fechar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -299,10 +389,21 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
         onPlaying={() => {
           setIsLoading(false);
           setIsPlaying(true);
+          setHasError(false);
+          if (activeSourceUrl) {
+            channelHealthService.confirmPlayback(channel, activeSourceUrl);
+          }
         }}
         onWaiting={() => setIsLoading(true)}
         onPause={() => setIsPlaying(false)}
       />
+
+      {/* Notificação temporária de fallback de fonte */}
+      {fallbackNotice && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-amber-500/90 text-black text-xs font-bold rounded-full shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-top-2">
+          {fallbackNotice}
+        </div>
+      )}
 
       {/* Loading Buffering Spinner */}
       {isLoading && !hasError && (
@@ -314,17 +415,20 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
         </div>
       )}
 
-      {/* Tela de Erro / Indisponibilidade */}
+      {/* Tela de Erro / Indisponibilidade com Recuperação */}
       {hasError && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md p-6 text-center select-none">
           <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mb-4 text-red-500">
             <AlertCircle className="w-8 h-8" />
           </div>
-          <h4 className="text-white text-lg font-black mb-1">Canal Temporariamente Fora do Ar</h4>
+          <h4 className="text-white text-lg font-black mb-1">Transmissão Temporariamente Instável</h4>
           <p className="text-gray-400 text-xs max-w-sm mb-5 leading-relaxed">{errorMessage}</p>
           <div className="flex items-center gap-3">
             <button
-              onClick={initPlayback}
+              onClick={() => {
+                channelSourceResolver.clearFailedSources(channel.id);
+                initPlayback();
+              }}
               className="flex items-center gap-2 px-5 py-2.5 bg-[#007df7] hover:bg-[#0069d9] text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-lg shadow-[#007df7]/30"
             >
               <RefreshCw className="w-3.5 h-3.5" /> Tentar Reconectar
@@ -357,6 +461,11 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
               <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-600/90 text-white flex items-center gap-1 shadow-sm">
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" /> AO VIVO
               </span>
+              {isUsingFallback && (
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/80 text-black">
+                  Backup
+                </span>
+              )}
             </div>
             <span className="text-gray-400 text-xs font-medium">{channel.categoryLabel}</span>
           </div>
@@ -444,7 +553,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
           </div>
         </div>
 
-        {/* Lado Direito: Qualidade, Expandir / Tela Cheia */}
+        {/* Lado Direito: Qualidade, PiP, Expandir / Tela Cheia */}
         <div className="flex items-center gap-2">
           {/* Seletor de Qualidade */}
           <div className="relative">

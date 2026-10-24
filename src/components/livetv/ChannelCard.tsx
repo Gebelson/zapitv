@@ -172,8 +172,12 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
 
         {/* Horário & Próximo Programa */}
         <div className="flex items-center justify-between text-[10px] text-gray-400 font-medium">
-          <span>{epg.formattedStartTime} - {epg.formattedEndTime}</span>
-          {epg.nextProgram && !channel.requiresExternalAccess && (
+          {epg.hasVerifiedSchedule ? (
+            <span>{epg.formattedStartTime} - {epg.formattedEndTime}</span>
+          ) : (
+            <span>Grade em atualização</span>
+          )}
+          {epg.nextProgram && !channel.requiresExternalAccess && epg.hasVerifiedSchedule && (
             <span className="truncate max-w-[110px] text-gray-500">
               A seguir: {epg.nextProgram.title}
             </span>

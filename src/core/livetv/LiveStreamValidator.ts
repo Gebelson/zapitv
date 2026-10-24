@@ -33,6 +33,7 @@ export class LiveStreamValidator {
    * Verifica se o domínio é conhecido por ser parked/propaganda
    */
   public isParkedDomain(url: string): boolean {
+    if (!url) return true;
     try {
       const parsed = new URL(url);
       const host = parsed.hostname.toLowerCase();
@@ -62,7 +63,7 @@ export class LiveStreamValidator {
   }
 
   /**
-   * Valida ativamente a disponibilidade de uma URL de transmissão
+   * Valida ativamente a disponibilidade técnica de uma URL de transmissão (Etapa 1)
    */
   public async validateStreamUrl(url: string, timeoutMs = 4000): Promise<ChannelHealthStatus> {
     if (!url) return 'UNAVAILABLE';
@@ -149,6 +150,20 @@ export class LiveStreamValidator {
 
     this.pendingChecks.set(url, checkPromise);
     return checkPromise;
+  }
+
+  /**
+   * Confirmação de reprodução real em runtime pelo Player (Etapa 2)
+   */
+  public recordPlaybackSuccess(url: string): void {
+    if (!url) return;
+    this.cache.set(url, { status: 'AVAILABLE', timestamp: Date.now(), testedUrl: url });
+  }
+
+  public recordPlaybackFailure(url: string, isNetworkError = false): void {
+    if (!url) return;
+    const status: ChannelHealthStatus = isNetworkError ? 'UNSTABLE' : 'UNAVAILABLE';
+    this.cache.set(url, { status, timestamp: Date.now(), testedUrl: url });
   }
 
   public clearCache(): void {

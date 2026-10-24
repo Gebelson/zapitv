@@ -15291,16 +15291,12 @@ function sortStreamsByPtBrPriority(streams, options = { preferDubbed: true, allo
 // src/core/livetv/OfficialChannelProvider.ts
 var OfficialChannelProvider = class _OfficialChannelProvider {
   static {
-    this.PROVIDER_NAME = "Emissoras Oficiais & Acesso Livre";
+    this.PROVIDER_NAME = "ZapiTV Oficial & FAST";
   }
-  /**
-   * Catálogo de emissoras públicas, transmissões gratuitas e canais FAST brasileiros verificados.
-   * Não contém streams inventados ou duplicados indevidos.
-   */
   static getOfficialChannels() {
     return [
       // =========================================================================
-      // TV ABERTA, PÚBLICA & EDUCATIVA (Transmissões Livres Oficiais)
+      // TV ABERTA & PÚBLICA NACIONAL (Fontes HLS Oficiais e Independentes)
       // =========================================================================
       {
         id: "tv-cultura",
@@ -15308,13 +15304,13 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         tvgName: "TV Cultura",
         name: "TV Cultura",
         category: "cultura",
-        groupTitle: "Cultura",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/8/82/Cultura_logo_2013.svg",
+        groupTitle: "TV Aberta",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Logotipo_da_TV_Cultura.svg/512px-Logotipo_da_TV_Cultura.svg.png",
         url: "https://player-tvcultura.stream.uol.com.br/live/tvcultura.m3u8",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Refer\xEAncia nacional em programa\xE7\xE3o infantil, educativa, grandes debates no Roda Viva e jornalismo independente."
+        description: "Emissora p\xFAblica de refer\xEAncia nacional em educa\xE7\xE3o, jornalismo cr\xEDtico, infantil e cultura de alta qualidade."
       },
       {
         id: "cultura-fast",
@@ -15323,12 +15319,12 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "Cultura Fast (Funda\xE7\xE3o Padre Anchieta)",
         category: "cultura",
         groupTitle: "Cultura",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/8/82/Cultura_logo_2013.svg",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Logotipo_da_TV_Cultura.svg/512px-Logotipo_da_TV_Cultura.svg.png",
         url: "https://fpa-gateway.tvcultura.com.br:8181/memfs/606caef0-a290-413d-9f1f-8fcdb3a73831.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Sinal digital FAST da TV Cultura com o melhor do arquivo hist\xF3rico, teatro, m\xFAsica e document\xE1rios."
+        description: "Sinal digital cont\xEDnuo da Funda\xE7\xE3o Padre Anchieta com os melhores document\xE1rios, concertos e produ\xE7\xF5es culturais."
       },
       {
         id: "tv-brasil",
@@ -15342,21 +15338,21 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Emissora p\xFAblica da Empresa Brasil de Comunica\xE7\xE3o (EBC), com cobertura nacional, jornalismo, esportes e cultura."
+        description: "Canal p\xFAblico da Empresa Brasil de Comunica\xE7\xE3o (EBC), com informa\xE7\xE3o cidad\xE3, cinema nacional e programas educativos."
       },
       {
         id: "rede-brasil",
         tvgId: "RedeBrasil.br",
-        tvgName: "Rede Brasil",
+        tvgName: "Rede Brasil de Televis\xE3o",
         name: "Rede Brasil de Televis\xE3o (RBTV)",
         category: "filmes_series",
-        groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/d/d1/Marca_rede_brasil_rgb-color.png",
+        groupTitle: "TV Aberta",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Logotipo_da_Rede_Brasil_de_Televis%C3%A3o.svg/512px-Logotipo_da_Rede_Brasil_de_Televis%C3%A3o.svg.png",
         url: "https://video09.logicahost.com.br/redebrasiloficial/redebrasiloficial/playlist.m3u8",
         quality: "720p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "S\xE9ries cl\xE1ssicas dos anos 60 a 90, grandes filmes de cinema com dublagem brasileira e jornalismo."
+        description: "Emissora aberta consagrada com exibi\xE7\xF5es de s\xE9ries cl\xE1ssicas, filmes retr\xF4, animes nost\xE1lgicos e entretenimento."
       },
       {
         id: "sbt-interior",
@@ -15365,7 +15361,7 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "SBT (Sinal Aberto Regional)",
         category: "aberta",
         groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/SBT_logo.svg/512px-SBT_logo.svg.png",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/SBT_logo.svg/512px-SBT_logo.svg.png",
         url: "https://cdn.jmvstream.com/w/LVW-10801/LVW10801_Xvg4R0u57n/playlist.m3u8",
         quality: "720p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
@@ -15381,6 +15377,7 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         groupTitle: "TV Aberta",
         tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/TV_Senado_logo.svg/512px-TV_Senado_logo.svg.png",
         url: "https://cdn.jmvstream.com/w/LVW-9715/LVW9715_12B26T62tm/playlist.m3u8",
+        backupStreamUrls: ["http://45.162.64.114/TV_SENADO/index.m3u8"],
         quality: "720p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
@@ -15395,7 +15392,8 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         groupTitle: "TV Aberta",
         tvgLogo: "https://i.imgur.com/UpV2PRk.png",
         url: "https://stream3.camara.gov.br/tv1/manifest.m3u8",
-        quality: "720p",
+        backupStreamUrls: ["https://stream3.camara.gov.br/tv2/manifest.m3u8"],
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
         description: "Transmiss\xF5es oficiais ao vivo do plen\xE1rio e comiss\xF5es da C\xE2mara dos Deputados em Bras\xEDlia."
@@ -15408,11 +15406,11 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         category: "aberta",
         groupTitle: "TV Aberta",
         tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/TV_Justi%C3%A7a_logo.svg/512px-TV_Justi%C3%A7a_logo.svg.png",
-        url: "https://stream3.camara.gov.br/tv1/manifest.m3u8",
+        url: "http://45.162.64.114/TV_JUSTICA/index.m3u8",
         quality: "720p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Canal oficial do Poder Judici\xE1rio, com sess\xF5es plen\xE1rias do Supremo Tribunal Federal (STF) e debates."
+        description: "Canal oficial do Poder Judici\xE1rio coordenado pelo STF, com julgamentos em plen\xE1rio e debates jur\xEDdicos."
       },
       {
         id: "com-brasil",
@@ -15438,12 +15436,12 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "CNN Brasil (1080p Full HD)",
         category: "noticias",
         groupTitle: "Not\xEDcias",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/CNN_Brasil.svg/960px-CNN_Brasil.svg.png",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/CNN_Brasil_logo.svg/512px-CNN_Brasil_logo.svg.png",
         url: "https://d25usgadhphvwi.cloudfront.net/hls/main.m3u8",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Jornalismo 24 horas por dia com apura\xE7\xE3o em tempo real, debates pol\xEDticos, economia e an\xE1lise internacional."
+        description: "Transmiss\xE3o oficial ao vivo da CNN Brasil, l\xEDder em coberturas pol\xEDticas, debates e atualidades."
       },
       {
         id: "record-news",
@@ -15452,12 +15450,12 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "Record News",
         category: "noticias",
         groupTitle: "Not\xEDcias",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/4/46/Record_News_logo_2023.svg",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Record_News_logo_2016.svg/512px-Record_News_logo_2016.svg.png",
         url: "https://rnw-rn.otteravision.com/rnw/rn/rnw_rn.m3u8",
-        quality: "1080p",
+        quality: "720p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Principal canal aberto de not\xEDcias 24 horas por dia do Brasil, com transmiss\xF5es ao vivo cont\xEDnuas."
+        description: "Canal de not\xEDcias 24 horas da TV aberta no Brasil, com foco em seguran\xE7a, economia e pol\xEDtica nacional."
       },
       {
         id: "sbt-news",
@@ -15466,12 +15464,12 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "SBT News ao Vivo",
         category: "noticias",
         groupTitle: "Not\xEDcias",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/4/42/SBT_News_2025.svg",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/SBT_News_logo.png/512px-SBT_News_logo.png",
         url: "https://dai.google.com/linear/hls/event/1XSOdtQ0SH2G8OEmEfGgjQ/master.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Canal de not\xEDcias digital do SBT transmitido ao vivo com os fatos urgentes de Bras\xEDlia e das capitais."
+        description: "Sinal digital ao vivo do n\xFAcleo de jornalismo do SBT com os principais acontecimentos do pa\xEDs."
       },
       {
         id: "bmc-news",
@@ -15480,44 +15478,30 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "BM&C News (Economia e Finan\xE7as)",
         category: "noticias",
         groupTitle: "Not\xEDcias",
-        tvgLogo: "https://i.imgur.com/pOUY2Uz.png",
+        tvgLogo: "https://i.imgur.com/uG519N2.png",
         url: "https://jmp2.uk/plu-666c9c60a7efd40008f552f0.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Canal especializado em mercado financeiro, investimentos, cota\xE7\xF5es da B3, agro e economia global."
+        description: "Canal especializado em finan\xE7as, mercado de capitais, investimentos e neg\xF3cios no Brasil e no mundo."
       },
       {
         id: "pluto-tv-canal-uol",
-        tvgId: "PlutoTVCanalUOL.br",
+        tvgId: "CanalUOL.br",
         tvgName: "Canal UOL",
         name: "Canal UOL ao Vivo",
         category: "noticias",
         groupTitle: "Not\xEDcias",
-        tvgLogo: "https://images.pluto.tv/channels/64b9370b409629000802d32b/colorLogoPNG.png",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/25/Universo_Online_logo.svg/512px-Universo_Online_logo.svg.png",
         url: "https://jmp2.uk/plu-64b9370b409629000802d32b.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Not\xEDcias, colunistas de renome, opini\xE3o e entretenimento do portal UOL transmitido 24 horas."
-      },
-      // =========================================================================
-      // ESPORTES & CANAIS ESPORTIVOS AUTORIZADOS
-      // =========================================================================
-      {
-        id: "n-sports",
-        tvgId: "NSports.br",
-        tvgName: "N Sports",
-        name: "N Sports (1080p)",
-        category: "esportes",
-        groupTitle: "Esportes",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/NSports_logo_2024.png/512px-NSports_logo_2024.png",
-        url: "https://ogc-nsprt-tcl-roku-syndication.otteravision.com/ogc/nsprt/nsprt.m3u8",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Canal esportivo brasileiro transmitindo futsal, atletismo, basquete NBB, v\xF4lei e campeonatos nacionais."
+        description: "Jornalismo independente do portal UOL com an\xE1lises pol\xEDticas, colunistas de peso e entretenimento."
       },
+      // =========================================================================
+      // ESPORTES GRATUITOS (Fontes Verificadas)
+      // =========================================================================
       {
         id: "pluto-tv-esportes",
         tvgId: "PlutoTVEsportes.br",
@@ -15525,85 +15509,113 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "Pluto TV Esportes",
         category: "esportes",
         groupTitle: "Esportes",
-        tvgLogo: "https://images.pluto.tv/channels/5f32d2db0af67400077f29c4/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/5f32d2db0af67400077f29c4/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-5f32d2db0af67400077f29c4.m3u8",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Transmiss\xE3o cont\xEDnua com melhores momentos esportivos, torneios radicais e document\xE1rios de atletas."
+      },
+      {
+        id: "red-bull-tv-br",
+        tvgId: "RedBullTV.br",
+        tvgName: "Red Bull TV Brasil",
+        name: "Red Bull TV Brasil (1080p)",
+        category: "esportes",
+        groupTitle: "Esportes",
+        tvgLogo: "https://images.pluto.tv/channels/5e7cb84a172a0f0007da69e4/colorLogoPNG.png",
+        url: "https://d03ae6b5c6724c24867e97a3dc04934a.mediatailor.us-west-2.amazonaws.com/v1/master/ba62fe743df0fe93366eba3a257d792884136c7f/LINEAR-1026-WORBBRPTFAST-WHALETVPLUS/1026/hls/master/playlist.m3u8",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Canal oficial com esportes radicais mundiais, automobilismo, skate, surfe, festivais e dan\xE7a."
+      },
+      {
+        id: "fifa-plus-br",
+        tvgId: "FIFAPlus.br",
+        tvgName: "FIFA+ Brasil",
+        name: "FIFA+ Brasil (Oficial)",
+        category: "esportes",
+        groupTitle: "Esportes",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/FIFA%2B_(2025).svg/960px-FIFA%2B_(2025).svg.png",
+        url: "https://e3be9ac5.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/TEctYnJfRklGQVBsdXNQb3J0dWd1ZXNlX0hMUw/playlist.m3u8",
         quality: "720p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Destaques esportivos, eventos de lutas, automobilismo e competi\xE7\xF5es ao redor do mundo."
+        description: "Canal oficial da FIFA com partidas hist\xF3ricas de copas do mundo, document\xE1rios e jogos ao vivo em portugu\xEAs."
       },
       // =========================================================================
-      // FILMES, SÉRIES & ENTRETENIMENTO (Canais FAST Oficiais)
+      // FILMES, SÉRIES & ENTRETENIMENTO (FAST Gratuitos e Autorizados)
       // =========================================================================
       {
         id: "pluto-tv-cine-sucessos",
-        tvgId: "PlutoTVCineSucessos.br",
+        tvgId: "CineSucessos.br",
         tvgName: "Pluto TV Cine Sucessos",
         name: "Pluto TV Cine Sucessos",
         category: "filmes_series",
         groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/5f120e94a5714d00074576a1/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/5f120e94a5714d00074576a1/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-5f120e94a5714d00074576a1.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Grandes sucessos do cinema de Hollywood com dublagem em portugu\xEAs sem interrup\xE7\xF5es pagas."
+        description: "Grandes sucessos cinematogr\xE1ficos de Hollywood dublados em portugu\xEAs, 24 horas por dia."
       },
       {
         id: "pluto-tv-filmes-acao",
-        tvgId: "PlutoTVFilmesAcao.br",
+        tvgId: "FilmesAcao.br",
         tvgName: "Pluto TV Filmes A\xE7\xE3o",
         name: "Pluto TV Filmes A\xE7\xE3o",
         category: "filmes_series",
         groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/5f120f41b7d403000783a6d6/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/5f120f41b7d403000783a6d6/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-5f120f41b7d403000783a6d6.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Tiros, persegui\xE7\xF5es e muita adrenalina com os melhores astros de filmes de a\xE7\xE3o dublados."
+        description: "Filmes cheios de adrenalina, persegui\xE7\xF5es eletrizantes, artes marciais e suspense sem parar."
       },
       {
         id: "pluto-tv-cine-classicos",
-        tvgId: "PlutoTVCineClassicos.br",
+        tvgId: "CineClassicos.br",
         tvgName: "Pluto TV Cine Cl\xE1ssicos",
         name: "Pluto TV Cine Cl\xE1ssicos",
         category: "filmes_series",
         groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/5fa1612a669ba0000702017b/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/5fa1612a669ba0000702017b/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-5fa1612a669ba0000702017b.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Obras imortais da hist\xF3ria do cinema mundial que marcaram \xE9poca nas telonas."
+        description: "Obras imortais da hist\xF3ria do cinema, filmes premiados e lendas da era de ouro das telas."
       },
       {
         id: "pluto-tv-cine-comedia",
-        tvgId: "PlutoTVCineComedia.br",
+        tvgId: "CineComedia.br",
         tvgName: "Pluto TV Cine Com\xE9dia",
         name: "Pluto TV Cine Com\xE9dia",
         category: "filmes_series",
         groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/5f12101f0b12f00007844c7c/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/5f12101f0b12f00007844c7c/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-5f12101f0b12f00007844c7c.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Filmes hil\xE1rios e com\xE9dias imperd\xEDveis para animar o seu dia com muitas gargalhadas."
+        description: "Com\xE9dias hil\xE1rias, produ\xE7\xF5es leves e momentos inesquec\xEDveis para toda a fam\xEDlia."
       },
       {
         id: "pluto-tv-filmes-nacionais",
-        tvgId: "PlutoTVFilmesNacionais.br",
+        tvgId: "FilmesNacionais.br",
         tvgName: "Pluto TV Filmes Nacionais",
         name: "Pluto TV Filmes Nacionais",
         category: "filmes_series",
         groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/5f5a545d0dbf7f0007c09408/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/5f5a545d0dbf7f0007c09408/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-5f5a545d0dbf7f0007c09408.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Produ\xE7\xF5es originais do cinema brasileiro: dramas, com\xE9dias nacionais e hist\xF3rias da nossa terra."
+        description: "O melhor da dramaturgia, com\xE9dia e cinema brasileiro com os grandes nomes do pa\xEDs."
       },
       {
         id: "csi-miami-br",
@@ -15612,12 +15624,12 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "CSI: Miami (Canal 24h)",
         category: "filmes_series",
         groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/63eb9c5351f5d000085e8d7e/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/63eb9c5351f5d000085e8d7e/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-63eb9c5351f5d000085e8d7e.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Canal tem\xE1tico exclusivo com epis\xF3dios ininterruptos da s\xE9rie policial CSI: Miami dublada."
+        description: "Maratone as investiga\xE7\xF5es periciais de Horatio Caine sob o sol escaldante da Fl\xF3rida."
       },
       {
         id: "south-park-br",
@@ -15626,43 +15638,57 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "South Park (Canal 24h)",
         category: "filmes_series",
         groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/609ae66b359b270007869ff1/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/609ae66b359b270007869ff1/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-609ae66b359b270007869ff1.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Epis\xF3dios lend\xE1rios das temporadas cl\xE1ssicas de South Park com dublagem brasileira ic\xF4nica."
+        description: "A s\xE1tira mais \xE1cida e aclamada da anima\xE7\xE3o mundial dublada em portugu\xEAs ininterruptamente."
       },
       {
         id: "star-trek-br",
         tvgId: "StarTrek.br",
         tvgName: "Star Trek",
-        name: "Jornada nas Estrelas (Star Trek)",
+        name: "Star Trek (Jornada nas Estrelas 24h)",
         category: "filmes_series",
         groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://images.pluto.tv/channels/5f99ac4fded33000078f29ab/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-5f99ac4fded33000078f29ab.m3u8",
-        quality: "720p",
+        tvgLogo: "https://images.pluto.tv/channels/609aebb7359b270007869ff2/colorLogoSVG_1780355759776.svg",
+        url: "https://jmp2.uk/plu-609aebb7359b270007869ff2.m3u8",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Viaje pelo cosmos com as tripula\xE7\xF5es lend\xE1rias da Frota Estelar em epis\xF3dios 24h dublados."
+        description: "Explore novos mundos e civiliza\xE7\xF5es nas viagens lend\xE1rias da Frota Estelar com a tripula\xE7\xE3o da Enterprise."
+      },
+      {
+        id: "comedy-central-pluto",
+        tvgId: "ComedyCentralPluto.br",
+        tvgName: "Comedy Central Pluto TV",
+        name: "Comedy Central Pluto TV",
+        category: "filmes_series",
+        groupTitle: "Filmes & S\xE9ries",
+        tvgLogo: "https://images.pluto.tv/channels/5f357e91b18f0b00073583d2/colorLogoPNG.png",
+        url: "https://jmp2.uk/plu-5f357e91b18f0b00073583d2.m3u8",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Stand-up comedy, esquetes irreverentes e o melhor humor \xE1cido do Comedy Central em portugu\xEAs."
       },
       {
         id: "adrenalina-pura",
         tvgId: "AdrenalinaPura.br",
-        tvgName: "Adrenalina Pura",
-        name: "Adrenalina Pura Filmes",
+        tvgName: "Adrenalina Pura TV",
+        name: "Adrenalina Pura TV",
         category: "filmes_series",
         groupTitle: "Filmes & S\xE9ries",
-        tvgLogo: "https://i.imgur.com/Pvid2iH.png",
-        url: "https://jmp2.uk/plu-61b790b985706b00072cb797.m3u8",
-        quality: "720p",
+        tvgLogo: "https://images.pluto.tv/channels/633215fe3ef1800008f5d0c7/colorLogoSVG_1780355759776.svg",
+        url: "https://jmp2.uk/plu-633215fe3ef1800008f5d0c7.m3u8",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Cat\xE1logo ininterrupto de suspense, artes marciais e cinema de a\xE7\xE3o sem cobran\xE7as."
+        description: "Canal especializado nos maiores sucessos do cinema de a\xE7\xE3o, tiro, porrada e bombas."
       },
       // =========================================================================
-      // INFANTIL & ANIMAÇÃO
+      // INFANTIL & ANIMES (Fontes Oficiais Gratuitas em Português)
       // =========================================================================
       {
         id: "turma-da-monica",
@@ -15671,40 +15697,40 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "Turma da M\xF4nica (Canal 24h)",
         category: "infantil",
         groupTitle: "Infantil",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Logotipo_da_TV_Brasil.svg/512px-Logotipo_da_TV_Brasil.svg.png",
-        url: "https://jmp2.uk/plu-5f997e44949bc70007a6941e.m3u8",
-        quality: "720p",
+        tvgLogo: "https://images.pluto.tv/channels/61e88e285a73ef0007dbfcba/colorLogoSVG_1780355759776.svg",
+        url: "https://jmp2.uk/plu-61e88e285a73ef0007dbfcba.m3u8",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "M\xF4nica, Cebolinha, Casc\xE3o e Magali nas historinhas e aventuras animadas mais queridas do Brasil."
+        description: "M\xF4nica, Cebolinha, Casc\xE3o e Magali em historinhas divertidas do Bairro do Limoeiro sem parar."
       },
       {
         id: "naruto-dublado",
         tvgId: "Naruto.br",
         tvgName: "Naruto",
-        name: "Naruto (Anime 24h Dublado)",
+        name: "Naruto Dublado (Canal 24h)",
         category: "infantil",
-        groupTitle: "Infantil",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Naruto_logo.svg/512px-Naruto_logo.svg.png",
-        url: "https://jmp2.uk/plu-5f6df5a173d7340007c559f7.m3u8",
-        quality: "720p",
+        groupTitle: "Animes",
+        tvgLogo: "https://images.pluto.tv/channels/5f5a56d2e67df10007780447/colorLogoSVG_1780355759776.svg",
+        url: "https://jmp2.uk/plu-5f5a56d2e67df10007780447.m3u8",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "A jornada ninja de Naruto Uzumaki transmitida ininterruptamente com a cl\xE1ssica dublagem em portugu\xEAs."
+        description: "Acompanhe a trajet\xF3ria de Naruto Uzumaki para se tornar o Hokage da Aldeia da Folha."
       },
       {
         id: "one-piece-dublado",
         tvgId: "OnePiece.br",
         tvgName: "One Piece",
-        name: "One Piece (Anime 24h Dublado)",
+        name: "One Piece Dublado (Canal 24h)",
         category: "infantil",
-        groupTitle: "Infantil",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/One_Piece_Logo.svg/512px-One_Piece_Logo.svg.png",
-        url: "https://jmp2.uk/plu-624b1c8d4321e200073ee421.m3u8",
-        quality: "720p",
+        groupTitle: "Animes",
+        tvgLogo: "https://images.pluto.tv/channels/66c3a1005efc8d00089f6687/colorLogoSVG_1780355759776.svg",
+        url: "https://jmp2.uk/plu-66c3a1005efc8d00089f6687.m3u8",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Luffy e o Bando do Chap\xE9u de Palha pelos mares da Grand Line em transmiss\xE3o 24h dublada."
+        description: "Monkey D. Luffy e o Bando do Chap\xE9u de Palha em busca do tesouro supremo na Grand Line."
       },
       {
         id: "pluto-tv-anime",
@@ -15712,55 +15738,55 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         tvgName: "Pluto TV Anime",
         name: "Pluto TV Anime",
         category: "infantil",
-        groupTitle: "Infantil",
-        tvgLogo: "https://images.pluto.tv/channels/5f12136385bccc00070142ed/colorLogoPNG.png",
-        url: "https://jmp2.uk/plu-5f12136385bccc00070142ed.m3u8",
-        quality: "720p",
+        groupTitle: "Animes",
+        tvgLogo: "https://images.pluto.tv/channels/5f1211e481e85c00077ae9ee/colorLogoSVG_1780355759776.svg",
+        url: "https://jmp2.uk/plu-5f1211e481e85c00077ae9ee.m3u8",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Maratona cont\xEDnua de grandes animes, batalhas lend\xE1rias e universos fant\xE1sticos dublados."
+        description: "Sele\xE7\xE3o premium de animes de a\xE7\xE3o, fantasia e aventura dublados para o p\xFAblico brasileiro."
       },
       {
         id: "nickelodeon-classico",
-        tvgId: "NickelodeonClassico.br",
+        tvgId: "NickClassico.br",
         tvgName: "Nickelodeon Cl\xE1ssico",
-        name: "Nickelodeon Cl\xE1ssico",
+        name: "Nickelodeon Cl\xE1ssico (Nick Cl\xE1ssico)",
         category: "infantil",
         groupTitle: "Infantil",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Nickelodeon_2009_logo.svg/512px-Nickelodeon_2009_logo.svg.png",
-        url: "https://jmp2.uk/plu-6824ce10c5d53e1351ceb8d1.m3u8",
-        quality: "720p",
+        tvgLogo: "https://images.pluto.tv/channels/5f5a55639145fe0007f3ea0f/colorLogoSVG_1780355759776.svg",
+        url: "https://jmp2.uk/plu-5f5a55639145fe0007f3ea0f.m3u8",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Os desenhos mais memor\xE1veis da Nick: Rugrats, Hey Arnold!, CatDog e cl\xE1ssicos da anima\xE7\xE3o."
+        description: "Relembre desenhos inesquec\xEDveis da Nick como Rugrats, Hey Arnold!, CatDog e Jimmy Neutron."
       },
       {
         id: "nickelodeon-toons",
-        tvgId: "NickelodeonToons.br",
+        tvgId: "NickToons.br",
         tvgName: "Nickelodeon Toons",
         name: "Nickelodeon Toons",
         category: "infantil",
         groupTitle: "Infantil",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Nickelodeon_2009_logo.svg/512px-Nickelodeon_2009_logo.svg.png",
-        url: "https://jmp2.uk/plu-645951c0e94c38000802d2cb.m3u8",
-        quality: "720p",
+        tvgLogo: "https://images.pluto.tv/channels/6047faef6195ea0007d39369/colorLogoSVG_1780355759776.svg",
+        url: "https://jmp2.uk/plu-6047faef6195ea0007d39369.m3u8",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Anima\xE7\xE3o sem parar com Bob Esponja, Os Padrinhos M\xE1gicos e sucessos animados da garotada."
+        description: "Anima\xE7\xF5es hil\xE1rias da Nickelodeon com Bob Esponja, Os Padrinhos M\xE1gicos e The Loud House."
       },
       {
         id: "nick-jr-club",
         tvgId: "NickJrClub.br",
         tvgName: "Nick Jr. Club",
-        name: "Nick Jr. Club (Pr\xE9-Escolar)",
+        name: "Nick Jr. Club (Educativo Infantil)",
         category: "infantil",
         groupTitle: "Infantil",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Nickelodeon_2009_logo.svg/512px-Nickelodeon_2009_logo.svg.png",
-        url: "https://jmp2.uk/plu-6824ce95f09106f4b18f4114.m3u8",
-        quality: "720p",
+        tvgLogo: "https://images.pluto.tv/channels/5f5a56399145fe0007f3ea10/colorLogoSVG_1780355759776.svg",
+        url: "https://jmp2.uk/plu-5f5a56399145fe0007f3ea10.m3u8",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Conte\xFAdo seguro, educativo e carinhoso para beb\xEAs e crian\xE7as pequenas com a Patrulha Canina e amigos."
+        description: "Conte\xFAdos pr\xE9-escolares seguros e pedag\xF3gicos com Patrulha Canina, Dora e Pistas de Blue."
       },
       {
         id: "icarly-br",
@@ -15769,26 +15795,26 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "iCarly (Canal 24h)",
         category: "infantil",
         groupTitle: "Infantil",
-        tvgLogo: "https://images.pluto.tv/channels/620ff46e0a576e0007dc2f89/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/620ff46e0a576e0007dc2f89/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-620ff46e0a576e0007dc2f89.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Carly, Sam e Freddie comandam o webshow mais divertido da TV em epis\xF3dios 24h dublados."
+        description: "Carly, Sam e Freddie comandam o webcast mais maluco da televis\xE3o brasileira ininterruptamente."
       },
       {
         id: "kenan-and-kel",
-        tvgId: "KenanAndKel.br",
+        tvgId: "KenanKel.br",
         tvgName: "Kenan & Kel",
         name: "Kenan & Kel (Canal 24h)",
         category: "infantil",
         groupTitle: "Infantil",
-        tvgLogo: "https://images.pluto.tv/channels/5ffcc5130fd98c0007f2e216/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/5ffcc5130fd98c0007f2e216/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-5ffcc5130fd98c0007f2e216.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "As confus\xF5es imperd\xEDveis de Kenan e Kel e seu eterno amor por refrigerante de laranja."
+        description: "Quem gosta de refrigerante de laranja? As maiores trapalhadas de Kenan e Kel em Chicago."
       },
       {
         id: "desenhos-classicos",
@@ -15797,15 +15823,15 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "Pluto TV Desenhos Cl\xE1ssicos",
         category: "infantil",
         groupTitle: "Infantil",
-        tvgLogo: "https://images.pluto.tv/channels/655e5c4d2c46f3000877a54b/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/655e5c4d2c46f3000877a54b/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-655e5c4d2c46f3000877a54b.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Popeye, Betty Boop, Gasparzinho e as anima\xE7\xF5es pioneiras da era dourada da anima\xE7\xE3o."
+        description: "Popeye, Betty Boop, Gasparzinho e os cl\xE1ssicos da era de ouro da anima\xE7\xE3o mundial."
       },
       // =========================================================================
-      // MÚSICA & VARIEDADES
+      // MÚSICA & CULTURA POP
       // =========================================================================
       {
         id: "mtv-biggest-pop",
@@ -15814,12 +15840,12 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "MTV Biggest Pop Brasil",
         category: "musica",
         groupTitle: "M\xFAsica",
-        tvgLogo: "https://images.pluto.tv/channels/6047fbdbbb776a0007e7f2ff/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/6047fbdbbb776a0007e7f2ff/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-6047fbdbbb776a0007e7f2ff.m3u8",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Os maiores videoclipes pop nacionais e internacionais do momento em alta defini\xE7\xE3o."
+        description: "Os videoclipes mais tocados no topo dos rankings mundiais de pop, trap e m\xFAsica urbana."
       },
       {
         id: "mtv-classic-br",
@@ -15828,100 +15854,89 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "MTV Classic Brasil",
         category: "musica",
         groupTitle: "M\xFAsica",
-        tvgLogo: "https://images.pluto.tv/channels/66a01dcb8561260008b0a41d/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/66a01dcb8561260008b0a41d/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-66a01dcb8561260008b0a41d.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Hits inesquec\xEDveis dos anos 80, 90 e 2000 que moldaram a hist\xF3ria da m\xFAsica jovem."
+        description: "Viagem musical inesquec\xEDvel pelos hits emblem\xE1ticos dos anos 80, 90 e 2000 que marcaram gera\xE7\xF5es."
       },
       {
         id: "mtv-pluto-tv",
-        tvgId: "MTVPlutoTV.br",
+        tvgId: "MTVPluto.br",
         tvgName: "MTV Pluto TV",
         name: "MTV Pluto TV Brasil",
         category: "musica",
         groupTitle: "M\xFAsica",
-        tvgLogo: "https://images.pluto.tv/channels/5f1212fb81e85c00077ae9ef/colorLogoPNG_1759263027326.png",
+        tvgLogo: "https://images.pluto.tv/channels/5f1212fb81e85c00077ae9ef/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-5f1212fb81e85c00077ae9ef.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "A ess\xEAncia jovem da MTV: m\xFAsica, festivais ao vivo, entrevistas e cultura pop."
+        description: "Os realities mais emblem\xE1ticos da MTV, bastidores da m\xFAsica, tapetes vermelhos e premia\xE7\xF5es."
       },
+      // =========================================================================
+      // DOCUMENTÁRIOS, GASTRONOMIA & NATUREZA
+      // =========================================================================
       {
         id: "tastemade-brasil",
-        tvgId: "TastemadeBrasil.br",
+        tvgId: "Tastemade.br",
         tvgName: "Tastemade Brasil",
         name: "Tastemade Brasil (Culin\xE1ria e Viagens)",
         category: "cultura",
         groupTitle: "Cultura",
-        tvgLogo: "https://i.imgur.com/FPy4zF4.png",
+        tvgLogo: "https://images.pluto.tv/channels/5fd1419a3b4f4b000773ba85/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-5fd1419a3b4f4b000773ba85.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Receitas irresist\xEDveis, roteiros de viagens gastron\xF4micas e chefs renomados em programa\xE7\xE3o 24h."
+        description: "Gastronomia sofisticada, receitas f\xE1ceis, cultura do churrasco e viagens pelo mundo."
       },
       {
         id: "masterchef-brasil",
         tvgId: "MasterChef.br",
-        tvgName: "MasterChef",
+        tvgName: "MasterChef Brasil",
         name: "MasterChef Brasil (Canal 24h)",
         category: "cultura",
         groupTitle: "Cultura",
-        tvgLogo: "https://images.pluto.tv/channels/6077045b6031bd00078de127/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/6077045b6031bd00078de127/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-6077045b6031bd00078de127.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "As provas de elimina\xE7\xE3o, caixas misteriosas e desafios sob press\xE3o das temporadas do MasterChef."
+        description: "A maior competi\xE7\xE3o culin\xE1ria do Brasil com jurados exigentes e pratos de tirar o f\xF4lego."
       },
       {
         id: "smithsonian-channel",
-        tvgId: "SmithsonianChannel.br",
+        tvgId: "Smithsonian.br",
         tvgName: "Smithsonian Channel",
         name: "Smithsonian Channel (Document\xE1rios)",
         category: "documentarios",
         groupTitle: "Document\xE1rios",
-        tvgLogo: "https://images.pluto.tv/channels/6298bd10d88ef000073f16b7/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/6298bd10d88ef000073f16b7/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-6298bd10d88ef000073f16b7.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Ci\xEAncia, avia\xE7\xE3o, explora\xE7\xE3o espacial, arqueologia e hist\xF3ria natural com qualidade documental internacional."
+        description: "Document\xE1rios aprofundados sobre hist\xF3ria, avia\xE7\xE3o, ci\xEAncia avan\xE7ada, animais e explora\xE7\xE3o espacial."
       },
       {
         id: "pluto-tv-natureza",
-        tvgId: "PlutoTVNatureza.br",
+        tvgId: "PlutoNatureza.br",
         tvgName: "Pluto TV Natureza",
         name: "Pluto TV Natureza",
         category: "documentarios",
         groupTitle: "Document\xE1rios",
-        tvgLogo: "https://images.pluto.tv/channels/5f1213ba0ecebc00070e170f/colorLogoPNG.png",
+        tvgLogo: "https://images.pluto.tv/channels/5f1213ba0ecebc00070e170f/colorLogoSVG_1780355759776.svg",
         url: "https://jmp2.uk/plu-5f1213ba0ecebc00070e170f.m3u8",
-        quality: "720p",
+        quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Expedi\xE7\xF5es pelos biomas mais exuberantes do planeta Terra e o fascinante reino animal."
+        description: "Vida selvagem, ecossistemas fascinantes do planeta Terra e paisagens naturais em alta defini\xE7\xE3o."
       },
       // =========================================================================
-      // REGIONAIS & COMUNITÁRIOS (Transmissões Abertas)
+      // REGIONAIS & ESTADUAIS (Fontes Próprias Verificadas)
       // =========================================================================
-      {
-        id: "tv-alesp",
-        tvgId: "TVALESP.br",
-        tvgName: "TV ALESP",
-        name: "TV ALESP (S\xE3o Paulo)",
-        category: "regionais",
-        groupTitle: "Regionais",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Logotipo_da_TV_Brasil.svg/512px-Logotipo_da_TV_Brasil.svg.png",
-        url: "https://cdn.jmvstream.com/w/LVW-9715/LVW9715_12B26T62tm/playlist.m3u8",
-        quality: "720p",
-        provider: _OfficialChannelProvider.PROVIDER_NAME,
-        isOfficial: true,
-        description: "Emissora p\xFAblica da Assembleia Legislativa do Estado de S\xE3o Paulo, com debates e leis estaduais."
-      },
       {
         id: "tv-brasil-central",
         tvgId: "TVBrasilCentral.br",
@@ -15930,11 +15945,28 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         category: "regionais",
         groupTitle: "Regionais",
         tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Logotipo_da_TV_Brasil.svg/512px-Logotipo_da_TV_Brasil.svg.png",
-        url: "https://cdn.jmvstream.com/w/LVW-9715/LVW9715_12B26T62tm/playlist.m3u8",
+        url: "https://tbc.zoeweb.tv/tbc/tbc/chunklist.m3u8",
         quality: "720p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Canal p\xFAblico e educativo de Goi\xE1s, integrado \xE0 rede p\xFAblica de comunica\xE7\xE3o."
+        description: "Canal p\xFAblico e educativo de Goi\xE1s (TBC), com programa\xE7\xE3o regional, jornalismo estadual e cultura goiana."
+      },
+      {
+        id: "tv-alesp",
+        tvgId: "TVALESP.br",
+        tvgName: "TV ALESP",
+        name: "TV ALESP (S\xE3o Paulo)",
+        category: "regionais",
+        groupTitle: "Regionais",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Logo_da_Alesp.png/512px-Logo_da_Alesp.png",
+        url: "",
+        requiresExternalAccess: true,
+        externalAccessUrl: "https://www.al.sp.gov.br/transmissao/",
+        externalProviderName: "Assembleia Legislativa de S\xE3o Paulo",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Emissora p\xFAblica da Assembleia Legislativa do Estado de S\xE3o Paulo, com transmiss\xE3o oficial das sess\xF5es plen\xE1rias."
       },
       {
         id: "conecta-mais-tv",
@@ -15948,25 +15980,25 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         quality: "720p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Programa\xE7\xE3o regional e cultural conectando as comunidades do interior."
+        description: "Programa\xE7\xE3o regional com variedades, jornalismo local, comunidade e cultura."
       },
       {
         id: "eutv-regional",
         tvgId: "EUTV.br",
-        tvgName: "EUTV",
+        tvgName: "EUTV Brasil",
         name: "EUTV Brasil",
         category: "regionais",
         groupTitle: "Regionais",
-        tvgLogo: "https://i.imgur.com/8PxpamC.png",
+        tvgLogo: "https://i.imgur.com/mD2jZ2e.png",
         url: "https://cdn.jmvstream.com/w/LVW-8719/LVW8719_AcLVAxWy5J/playlist.m3u8",
         quality: "720p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Emissora regional com variedades, not\xEDcias comunit\xE1rias e atra\xE7\xF5es locais."
+        description: "Emissora comunit\xE1ria com entretenimento, cultura dos munic\xEDpios e informa\xE7\xE3o."
       },
       // =========================================================================
-      // GRANDES EMISSORAS NACIONAIS & SINAIS PAY-TV (Identificação Transparente)
-      // (Conforme seções 06, 25: Apresenta acesso oficial sem simular pirataria)
+      // CANAIS LINEARES NACIONAIS E PREMIUM (Acesso Oficial Protegido)
+      // Indicam de forma clara e transparente a origem oficial sem feeds piratas instáveis
       // =========================================================================
       {
         id: "globo-oficial",
@@ -15975,32 +16007,32 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "TV Globo (Sinal Nacional Ao Vivo)",
         category: "aberta",
         groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/TV_Globo_logo_2021.svg/512px-TV_Globo_logo_2021.svg.png",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/TV_Globo_logo.svg/512px-TV_Globo_logo.svg.png",
         url: "",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
         requiresExternalAccess: true,
         externalAccessUrl: "https://globoplay.globo.com/agora-na-tv/",
-        externalProviderName: "Globoplay (Transmiss\xE3o Oficial Gratuita)",
-        description: "A maior emissora do pa\xEDs: novelas das 9, Jornal Nacional, futebol ao vivo e entretenimento. Sinal linear aberto gratuito via Globoplay."
+        externalProviderName: "Globoplay Oficial (Gratuito com login)",
+        description: "Maior rede de televis\xE3o do Brasil, com novelas cl\xE1ssicas, jornalismo l\xEDder de audi\xEAncia e variedades."
       },
       {
         id: "sbt-nacional",
         tvgId: "SBTNacional.br",
-        tvgName: "SBT",
+        tvgName: "SBT Nacional",
         name: "SBT (Transmiss\xE3o Nacional Direta)",
         category: "aberta",
         groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/SBT_logo.svg/512px-SBT_logo.svg.png",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/SBT_logo.svg/512px-SBT_logo.svg.png",
         url: "",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
         requiresExternalAccess: true,
         externalAccessUrl: "https://sbtvideos.com.br/",
-        externalProviderName: "+SBT Oficial Gr\xE1tis",
-        description: "Sinal principal nacional do SBT: Programa Silvio Santos, Domingo Legal, Champions League e novelas no aplicativo oficial +SBT."
+        externalProviderName: "SBT V\xEDdeos (Transmiss\xE3o Direta)",
+        description: "Transmiss\xE3o da rede oficial do SBT com grandes programas de audit\xF3rio, novelas e humor\xEDsticos."
       },
       {
         id: "record-tv-oficial",
@@ -16009,41 +16041,41 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "Record TV (Sinal Nacional)",
         category: "aberta",
         groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Logotipo_da_Record.png/512px-Logotipo_da_Record.png",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/Record_logo_2023.svg/512px-Record_logo_2023.svg.png",
         url: "",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
         requiresExternalAccess: true,
         externalAccessUrl: "https://playplus.com/",
-        externalProviderName: "PlayPlus Oficial (Sinal Aberto Gr\xE1tis)",
-        description: "Jornalismo investigativo, novelas b\xEDblicas, Paulist\xE3o e reality shows na transmiss\xE3o linear gratuita da Record no PlayPlus."
+        externalProviderName: "PlayPlus Oficial (Record TV)",
+        description: "Transmiss\xE3o nacional da Record TV com jornalismo investigativo, novelas b\xEDblicas e realities."
       },
       {
         id: "band-nacional",
-        tvgId: "BandNacional.br",
+        tvgId: "Band.br",
         tvgName: "Band",
         name: "Rede Bandeirantes (Band Nacional)",
         category: "aberta",
         groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Band_logo_2018.svg/512px-Band_logo_2018.svg.png",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Rede_Bandeirantes_logo.svg/512px-Rede_Bandeirantes_logo.svg.png",
         url: "",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
         requiresExternalAccess: true,
         externalAccessUrl: "https://bandplay.com/",
-        externalProviderName: "Bandplay Oficial Gratuito",
-        description: "F\xF3rmula 1, Jogo Aberto, Jornal da Band e MasterChef transmitidos ao vivo gratuitamente na plataforma Bandplay."
+        externalProviderName: "BandPlay Oficial (Gratuito)",
+        description: "Cobertura esportiva com Jogo Aberto e Donos da Bola, automobilismo e o tradicional Jornal da Band."
       },
       {
         id: "redetv-nacional",
-        tvgId: "RedeTVNacional.br",
+        tvgId: "RedeTV.br",
         tvgName: "RedeTV!",
         name: "RedeTV! (Sinal Nacional Direto)",
         category: "aberta",
         groupTitle: "TV Aberta",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/RedeTV%21_logo_2019.svg/512px-RedeTV%21_logo_2019.svg.png",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/RedeTV%21_logo_2024.svg/512px-RedeTV%21_logo_2024.svg.png",
         url: "",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
@@ -16051,24 +16083,24 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         requiresExternalAccess: true,
         externalAccessUrl: "https://redetvgo.com.br/",
         externalProviderName: "RedeTV! Go Oficial",
-        description: "SuperPop, Opera\xE7\xE3o de Risco e NFL em transmiss\xE3o linear oficial pelo portal RedeTV! Go."
+        description: "Entretenimento, humor irreverente, debates de fim de noite e cobertura jornal\xEDstica popular."
       },
       {
         id: "ge-tv-oficial",
-        tvgId: "ge.tv.br",
+        tvgId: "geTV.br",
         tvgName: "ge tv",
         name: "ge tv (Globo Esporte)",
         category: "esportes",
         groupTitle: "Esportes",
-        tvgLogo: "https://s2-ge.glbimg.com/OqD0yL_y6hXk41t_Lq7p6U4aF7M=/1200x/smart/filters:cover():strip_icc()/i.s3.glbimg.com/v1/AUTH_bc8228b6673f488aa253bbcb03c80ec5/internal_photos/bs/2021/Y/r/v2o9r3S3mA2o8d4xY1Aw/marca-ge.png",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Globoesporte.com_logo.svg/512px-Globoesporte.com_logo.svg.png",
         url: "",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
         requiresExternalAccess: true,
         externalAccessUrl: "https://ge.globo.com/",
-        externalProviderName: "ge.globo Oficial",
-        description: "Canal de esportes 24h gratuito da Globo com debates, gols da rodada, cobertura esportiva e eventos livres."
+        externalProviderName: "Portal ge.globo Oficial",
+        description: "Transmiss\xE3o e compactos dos principais campeonatos estaduais, Brasileir\xE3o e futebol internacional."
       },
       {
         id: "sportv-oficial",
@@ -16077,15 +16109,15 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "SporTV (Acesso Oficial)",
         category: "esportes",
         groupTitle: "Esportes",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/SporTV_logo_2021.svg/512px-SporTV_logo_2021.svg.png",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/SporTV_logo_2021.svg/512px-SporTV_logo_2021.svg.png",
         url: "",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
         requiresExternalAccess: true,
         externalAccessUrl: "https://globoplay.globo.com/sportv/",
-        externalProviderName: "Globoplay + Canais ao Vivo",
-        description: "Canal fechado de esportes do Grupo Globo. Transmiss\xE3o linear restrita a assinantes oficiais do Globoplay."
+        externalProviderName: "Globoplay + Canais Ao Vivo",
+        description: "O principal canal de esportes do Brasil, com transmiss\xE3o do Brasileir\xE3o, Copa do Brasil e Jogos Ol\xEDmpicos."
       },
       {
         id: "sportv-2-oficial",
@@ -16094,15 +16126,15 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "SporTV 2 (Acesso Oficial)",
         category: "esportes",
         groupTitle: "Esportes",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/SporTV_logo_2021.svg/512px-SporTV_logo_2021.svg.png",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/SporTV_2_logo_2021.svg/512px-SporTV_2_logo_2021.svg.png",
         url: "",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
         requiresExternalAccess: true,
         externalAccessUrl: "https://globoplay.globo.com/sportv-2/",
-        externalProviderName: "Globoplay + Canais ao Vivo",
-        description: "Segundo canal linear SporTV, com eventos simult\xE2neos, v\xF4lei, basquete e automobilismo oficial."
+        externalProviderName: "Globoplay + Canais Ao Vivo",
+        description: "Transmiss\xF5es de automobilismo, voleibol, atletismo, t\xEAnis e competi\xE7\xF5es mundiais."
       },
       {
         id: "sportv-3-oficial",
@@ -16111,20 +16143,20 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         name: "SporTV 3 (Acesso Oficial)",
         category: "esportes",
         groupTitle: "Esportes",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/SporTV_logo_2021.svg/512px-SporTV_logo_2021.svg.png",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/SporTV_3_logo_2021.svg/512px-SporTV_3_logo_2021.svg.png",
         url: "",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
         requiresExternalAccess: true,
         externalAccessUrl: "https://globoplay.globo.com/sportv-3/",
-        externalProviderName: "Globoplay + Canais ao Vivo",
-        description: "Terceiro canal linear SporTV, especializado em esportes radicais, jud\xF4, t\xEAnis e ligas internacionais."
+        externalProviderName: "Globoplay + Canais Ao Vivo",
+        description: "Futsal, basquete NBB, e-Sports e esportes radicais com cobertura especializada."
       },
       {
         id: "espn-oficial",
         tvgId: "ESPN.br",
-        tvgName: "ESPN Brasil",
+        tvgName: "ESPN",
         name: "ESPN (Acesso Oficial)",
         category: "esportes",
         groupTitle: "Esportes",
@@ -16136,16 +16168,16 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         requiresExternalAccess: true,
         externalAccessUrl: "https://www.disneyplus.com/brand/espn",
         externalProviderName: "Disney+ / ESPN Oficial",
-        description: "L\xEDder mundial em esportes, com Premier League, NFL, NBA e La Liga. Transmiss\xE3o oficial dispon\xEDvel via Disney+."
+        description: "Transmiss\xE3o da Premier League, LaLiga, Champions League Feminina, NBA e NFL ao vivo."
       },
       {
         id: "premiere-oficial",
         tvgId: "Premiere.br",
-        tvgName: "Premiere Futebol",
+        tvgName: "Premiere",
         name: "Premiere (Acesso Oficial)",
         category: "esportes",
         groupTitle: "Esportes",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Premiere_logo_2021.svg/512px-Premiere_logo_2021.svg.png",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Premiere_logo_2021.svg/512px-Premiere_logo_2021.svg.png",
         url: "",
         quality: "1080p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
@@ -16153,7 +16185,7 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         requiresExternalAccess: true,
         externalAccessUrl: "https://premiere.globo.com/",
         externalProviderName: "Premiere Play Oficial",
-        description: "O melhor do futebol brasileiro: Brasileir\xE3o S\xE9ries A e B e Campeonatos Estaduais sob demanda oficial."
+        description: "A maior cobertura de futebol ao vivo do Brasil, com todos os jogos das S\xE9ries A e B do Brasileir\xE3o."
       }
     ];
   }

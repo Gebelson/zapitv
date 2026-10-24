@@ -6,9 +6,10 @@ import {
   X, Save, LayoutGrid, Plus, Film, Send, Download, Upload,
   Edit3, Trash, Star, Bell, Megaphone, CheckCircle, Info, AlertTriangle, Lock, Mail, Image as ImageIcon, CloudSync, Tv, Sparkles, Key, Play, Activity, Check,
   ShieldAlert, Ban, AlertOctagon, Flame, RefreshCw, FastForward, Clock, SkipForward,
-  Bug
+  Bug, Radio
 } from 'lucide-react';
 import { FeedbackAdminPanel } from '../src/components/admin/FeedbackAdminPanel';
+import { LiveTvAdminPanel } from '../src/components/admin/LiveTvAdminPanel';
 import { User, ContentItem, ContentType, SiteNotification } from '../types';
 import { providerRegistry, ProviderConfig } from '../src/core/providers/providerRegistry';
 import { StremioStream } from '../src/core/stremio/stremioTypes';
@@ -44,7 +45,7 @@ const AdminView: React.FC<AdminViewProps> = ({
   content, onAddContent, onUpdateContent, onDeleteContent,
   onSendGlobalNotification, onClearNotifications
 }) => {
-  const [activeTab, setActiveTab] = useState<'providers' | 'eligibility' | 'video_ads' | 'rankings' | 'skip_intervals' | 'users' | 'catalog' | 'notifications' | 'feedbacks' | 'database'>('providers');
+  const [activeTab, setActiveTab] = useState<'providers' | 'eligibility' | 'video_ads' | 'rankings' | 'skip_intervals' | 'users' | 'catalog' | 'notifications' | 'feedbacks' | 'database' | 'livetv'>('providers');
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingMedia, setEditingMedia] = useState<ContentItem | null>(null);
   const [showAddMedia, setShowAddMedia] = useState(false);
@@ -735,6 +736,7 @@ const AdminView: React.FC<AdminViewProps> = ({
         <div className="flex flex-wrap gap-2 p-1.5 rounded-2xl bg-black/10 backdrop-blur-md">
           {[
             { id: 'providers', label: 'PROVEDORES STREMIO', icon: Tv, color: 'bg-orange-600' },
+            { id: 'livetv', label: 'TV AO VIVO & CANAIS', icon: Radio, color: 'bg-emerald-600' },
             { id: 'eligibility', label: 'ELEGIBILIDADE & FONTES', icon: Activity, color: 'bg-indigo-600' },
             { id: 'video_ads', label: 'PROPAGANDA (1XBET)', icon: ShieldAlert, color: 'bg-red-600' },
             { id: 'rankings', label: 'EM DESTAQUE (IMDb)', icon: Flame, color: 'bg-amber-600' },
@@ -2418,6 +2420,8 @@ const AdminView: React.FC<AdminViewProps> = ({
           </div>
         ) : activeTab === 'feedbacks' ? (
           <FeedbackAdminPanel isDarkMode={isDarkMode} />
+        ) : activeTab === 'livetv' ? (
+          <LiveTvAdminPanel isDarkMode={isDarkMode} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className={`p-10 rounded-3xl border flex flex-col items-center text-center ${isDarkMode ? 'bg-[#151C26] border-gray-800' : 'bg-white shadow-xl'}`}>

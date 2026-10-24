@@ -22,6 +22,7 @@ export interface EpgProgram {
   endMinutes: number;   // Minutos desde 00:00 (fuso America/Sao_Paulo)
   category?: string;
   rating?: string;
+  isFallback?: boolean;
 }
 
 export interface CurrentEpgState {
@@ -32,15 +33,20 @@ export interface CurrentEpgState {
   remainingMinutes: number;
   formattedStartTime: string;
   formattedEndTime: string;
+  hasVerifiedSchedule: boolean;
 }
 
 export type ChannelHealthStatus = 
   | 'AVAILABLE' 
   | 'CHECKING' 
+  | 'UNSTABLE'
   | 'UNAVAILABLE' 
+  | 'EXTERNAL_ACCESS'
   | 'ERROR' 
   | 'EXPIRED' 
   | 'RESTRICTED';
+
+export type ChannelAccessType = 'internal' | 'external' | 'restricted';
 
 export interface LiveStreamSource {
   id: string;
@@ -52,6 +58,8 @@ export interface LiveStreamSource {
   isBackup?: boolean;
   status?: ChannelHealthStatus;
   resolutionHeight?: number;
+  lastChecked?: number;
+  failureCount?: number;
 }
 
 export interface LiveChannel {
@@ -66,8 +74,9 @@ export interface LiveChannel {
   category: LiveChannelCategory;
   categoryLabel: string;
   streamUrl: string; // Primary playable stream
-  sources?: LiveStreamSource[]; // All available fallback sources ranked by resolution
+  sources?: LiveStreamSource[]; // All available fallback sources ranked
   backupStreamUrls?: string[];
+  accessType?: ChannelAccessType;
   epgId?: string;
   quality: string; // '1080p' | '720p' | '480p' | 'Auto'
   isHd?: boolean;
@@ -81,6 +90,7 @@ export interface LiveChannel {
   country?: string; // 'BR'
   region?: string;
   broadcaster?: string;
+  isEnabled?: boolean;
 }
 
 export interface RawChannelInput {
@@ -99,6 +109,10 @@ export interface RawChannelInput {
   externalAccessUrl?: string;
   externalProviderName?: string;
   description?: string;
+  country?: string;
+  region?: string;
+  sources?: LiveStreamSource[];
+  backupStreamUrls?: string[];
 }
 
 export interface LiveTvPreferencesState {
@@ -109,6 +123,17 @@ export interface LiveTvPreferencesState {
   volume: number;
   isMuted: boolean;
   activeMode: 'programas' | 'televisao';
+}
+
+export interface LiveTVProviderConfig {
+  id: string;
+  name: string;
+  type: 'stremio' | 'm3u' | 'official';
+  url?: string;
+  enabled: boolean;
+  channelCount?: number;
+  lastSync?: number;
+  autoRefreshMinutes?: number;
 }
 
 export interface LiveTVProvider {

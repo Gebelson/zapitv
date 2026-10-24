@@ -1,4 +1,5 @@
 import { LiveChannel, LiveChannelCategory, LiveStreamSource, RawChannelInput } from './types';
+import { liveStreamValidator } from './LiveStreamValidator';
 
 export class ChannelNormalizer {
   private static instance: ChannelNormalizer;
@@ -21,12 +22,12 @@ export class ChannelNormalizer {
     if (c.includes('favorit')) return { category: 'favoritos', categoryLabel: 'Favoritos' };
     if (c.includes('esport') || c.includes('futebol') || c.includes('sports')) return { category: 'esportes', categoryLabel: 'Esportes' };
     if (c.includes('notic') || c.includes('news') || c.includes('jornal')) return { category: 'noticias', categoryLabel: 'Notícias' };
-    if (c.includes('infantil') || c.includes('kid') || c.includes('animac') || c.includes('desenho')) return { category: 'infantil', categoryLabel: 'Infantil' };
-    if (c.includes('filme') || c.includes('serie') || c.includes('cine') || c.includes('movie')) return { category: 'filmes_series', categoryLabel: 'Filmes & Séries' };
+    if (c.includes('infantil') || c.includes('kid') || c.includes('animac') || c.includes('desenho') || c.includes('anime')) return { category: 'infantil', categoryLabel: 'Infantil' };
+    if (c.includes('filme') || c.includes('serie') || c.includes('cine') || c.includes('movie') || c.includes('comedy')) return { category: 'filmes_series', categoryLabel: 'Filmes & Séries' };
     if (c.includes('cultur') || c.includes('arte')) return { category: 'cultura', categoryLabel: 'Cultura' };
     if (c.includes('educa') || c.includes('ensino')) return { category: 'educacao', categoryLabel: 'Educação' };
     if (c.includes('music') || c.includes('clip') || c.includes('show')) return { category: 'musica', categoryLabel: 'Música' };
-    if (c.includes('region') || c.includes('estado') || c.includes('local') || c.includes('sp') || c.includes('rj') || c.includes('go')) return { category: 'regionais', categoryLabel: 'Regionais' };
+    if (c.includes('region') || c.includes('estado') || c.includes('local') || c.includes('legislative')) return { category: 'regionais', categoryLabel: 'Regionais' };
     if (c.includes('doc') || c.includes('histori') || c.includes('naturez')) return { category: 'documentarios', categoryLabel: 'Documentários' };
 
     return { category: 'aberta', categoryLabel: 'TV Aberta' };
@@ -37,20 +38,37 @@ export class ChannelNormalizer {
    */
   public generateCanonicalSlug(name: string, tvgId?: string): string {
     if (tvgId) {
-      const cleanTvg = tvgId.toLowerCase().replace(/\.br$/, '').replace(/[^a-z0-9]+/g, '-');
-      if (cleanTvg.length > 2) return cleanTvg;
+      const cleanTvg = tvgId
+        .toLowerCase()
+        .replace(/\.br(@[a-z0-9]+)?$/i, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      if (cleanTvg.length >= 3) return cleanTvg;
     }
 
-    return name
+    let clean = name
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s*\(\d+p\)/gi, '')
+      .replace(/\s*\[.*?\]/g, '')
+      .replace(/\s*\(Brazil\)/gi, '')
+      .replace(/\s*\(Brasil\)/gi, '')
+      .trim();
+
+    if (clean !== 'tv brasil' && clean !== 'brasil' && clean.endsWith(' brasil')) {
+      clean = clean.replace(/\s+brasil$/i, '').trim();
+    } else if (clean !== 'tv brazil' && clean !== 'brazil' && clean.endsWith(' brazil')) {
+      clean = clean.replace(/\s+brazil$/i, '').trim();
+    }
+
+    return clean
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
   }
 
   /**
-   * Converte uma lista de RawChannelInput (de vários provedores) em LiveChannel[] únicos e deduplicados
+   * Converte uma lista de RawChannelInput em LiveChannel[] únicos e deduplicados
    */
   public normalizeAndDeduplicate(rawList: RawChannelInput[]): LiveChannel[] {
     const channelMap = new Map<string, LiveChannel>();
@@ -61,47 +79,92 @@ export class ChannelNormalizer {
       const canonicalId = raw.id || this.generateCanonicalSlug(raw.name, raw.tvgId);
       const { category, categoryLabel } = this.normalizeCategory(raw.category || raw.groupTitle);
 
-      const streamSource: LiveStreamSource = {
+      const isExternal = Boolean(raw.requiresExternalAccess);
+      const url = raw.url ? raw.url.trim() : '';
+
+      // Se for domínio estacionado inválido e tiver URL, ignore este stream
+      if (url && liveStreamValidator.isParkedDomain(url)) {
+        continue;
+      }
+
+      const streamSource: LiveStreamSource | null = url ? {
         id: `${canonicalId}-${raw.provider.replace(/\s+/g, '-').toLowerCase()}-${Math.random().toString(36).substring(2, 6)}`,
-        url: raw.url,
-        quality: raw.quality || '720p',
+        url: url,
+        quality: raw.quality || this.detectQuality(raw.name) || '720p',
         provider: raw.provider,
-        format: raw.url.includes('.mpd') ? 'dash' : 'hls',
+        format: url.includes('.mpd') ? 'dash' : 'hls',
         isOfficial: raw.isOfficial || false,
-        resolutionHeight: this.parseQualityNumber(raw.quality)
-      };
+        resolutionHeight: this.parseQualityNumber(raw.quality || this.detectQuality(raw.name))
+      } : null;
 
       if (!channelMap.has(canonicalId)) {
         // Primeiro registro deste canal canônico
+        const sources: LiveStreamSource[] = [];
+        if (streamSource) {
+          sources.push(streamSource);
+        }
+        if (raw.sources && Array.isArray(raw.sources)) {
+          for (const s of raw.sources) {
+            if (s.url && !sources.some(existing => existing.url === s.url)) {
+              sources.push(s);
+            }
+          }
+        }
+        if (raw.backupStreamUrls && Array.isArray(raw.backupStreamUrls)) {
+          for (let i = 0; i < raw.backupStreamUrls.length; i++) {
+            const bUrl = raw.backupStreamUrls[i];
+            if (bUrl && !sources.some(existing => existing.url === bUrl)) {
+              sources.push({
+                id: `${canonicalId}-backup-${i}`,
+                url: bUrl,
+                quality: '720p',
+                provider: raw.provider || 'Backup',
+                format: bUrl.includes('.mpd') ? 'dash' : 'hls',
+                isOfficial: raw.isOfficial || false,
+                isBackup: true,
+                resolutionHeight: 720
+              });
+            }
+          }
+        }
+
+        const initialStatus = isExternal
+          ? 'EXTERNAL_ACCESS'
+          : (sources.length > 0 ? 'AVAILABLE' : 'UNAVAILABLE');
+
         const newChannel: LiveChannel = {
           id: canonicalId,
           canonicalId: canonicalId,
           name: this.cleanChannelName(raw.name),
           shortName: this.extractShortName(raw.name),
-          description: raw.description || `Transmissão ao vivo de ${raw.name}.`,
+          description: raw.description || `Transmissão ao vivo de ${this.cleanChannelName(raw.name)}.`,
           logo: raw.tvgLogo || this.getDefaultLogoForChannel(canonicalId),
           fallbackLogo: this.getDefaultLogoForChannel(canonicalId),
           category: category,
           categoryLabel: categoryLabel,
-          streamUrl: raw.url,
-          sources: [streamSource],
-          backupStreamUrls: [],
+          streamUrl: sources[0]?.url || '',
+          sources: sources,
+          backupStreamUrls: sources.slice(1).map(s => s.url),
+          accessType: isExternal ? 'external' : 'internal',
           epgId: raw.tvgId || `${canonicalId}.br`,
-          quality: raw.quality || '1080p',
-          isHd: (raw.quality || '').includes('1080') || (raw.quality || '').includes('720'),
+          quality: sources[0]?.quality || raw.quality || '720p',
+          isHd: (sources[0]?.quality || raw.quality || '').includes('1080') || (sources[0]?.quality || raw.quality || '').includes('720'),
           isOfficial: raw.isOfficial || false,
-          requiresExternalAccess: raw.requiresExternalAccess || false,
+          requiresExternalAccess: isExternal,
           externalAccessUrl: raw.externalAccessUrl,
           externalProviderName: raw.externalProviderName,
-          status: raw.requiresExternalAccess ? 'AVAILABLE' : (raw.url ? 'AVAILABLE' : 'UNAVAILABLE')
+          status: initialStatus,
+          isEnabled: true,
+          country: raw.country || 'BR',
+          region: raw.region
         };
         channelMap.set(canonicalId, newChannel);
       } else {
-        // Canal já existe: mesclar e deduplicar streams
+        // Canal já existe: mesclar fontes preservando dados canônicos
         const existing = channelMap.get(canonicalId)!;
 
-        // Se o novo registro tiver logo melhor e o atual for genérico
-        if (raw.tvgLogo && !existing.logo.includes('wikimedia') && raw.tvgLogo.includes('wikimedia')) {
+        // Se o novo registro tiver logo oficial e o atual for genérico
+        if (raw.tvgLogo && (raw.tvgLogo.includes('wikimedia') || !existing.logo)) {
           existing.logo = raw.tvgLogo;
         }
 
@@ -111,22 +174,38 @@ export class ChannelNormalizer {
         }
 
         // Adicionar novo stream caso seja uma URL distinta
-        if (raw.url && !existing.sources?.some(s => s.url === raw.url)) {
+        if (streamSource && !existing.sources?.some(s => s.url === streamSource.url)) {
           existing.sources = existing.sources || [];
           existing.sources.push(streamSource);
 
-          // Reordenar sources por resolução (1080p > 720p > 480p)
-          existing.sources.sort((a, b) => (b.resolutionHeight || 720) - (a.resolutionHeight || 720));
+          // Ordenação: 1º isOfficial, 2º maior resolução
+          existing.sources.sort((a, b) => {
+            if (a.isOfficial && !b.isOfficial) return -1;
+            if (!a.isOfficial && b.isOfficial) return 1;
+            return (b.resolutionHeight || 720) - (a.resolutionHeight || 720);
+          });
 
-          // Atualizar streamUrl principal para o de maior resolução
-          existing.streamUrl = existing.sources[0].url;
+          // Atualizar stream principal e backups
+          if (!existing.streamUrl) {
+            existing.streamUrl = existing.sources[0].url;
+            existing.quality = existing.sources[0].quality;
+          }
           existing.backupStreamUrls = existing.sources.slice(1).map(s => s.url);
-          existing.quality = existing.sources[0].quality;
+          if (existing.status === 'UNAVAILABLE' && existing.sources.length > 0) {
+            existing.status = 'AVAILABLE';
+          }
         }
       }
     }
 
     return Array.from(channelMap.values());
+  }
+
+  private detectQuality(name: string): string | undefined {
+    if (name.includes('1080p') || name.includes('Full HD')) return '1080p';
+    if (name.includes('720p') || name.includes('HD')) return '720p';
+    if (name.includes('480p') || name.includes('SD')) return '480p';
+    return undefined;
   }
 
   private parseQualityNumber(q?: string): number {
@@ -140,41 +219,21 @@ export class ChannelNormalizer {
 
   private cleanChannelName(rawName: string): string {
     return rawName
-      .replace(/\[.*?\]/g, '')
-      .replace(/\(FHD\)|\(HD\)|\(SD\)|\(1080p\)|\(720p\)/gi, '')
-      .replace(/\|\s*BR\s*\|/gi, '')
-      .replace(/\s+/g, ' ')
+      .replace(/\s*\(\d+p\)/gi, '')
+      .replace(/\s*\[.*?\]/g, '')
+      .replace(/\s*\(Brazil\)/gi, '')
+      .replace(/\s*\(SD\)/gi, '')
+      .replace(/\s*\(HD\)/gi, '')
       .trim();
   }
 
   private extractShortName(rawName: string): string {
-    const clean = this.cleanChannelName(rawName);
-    const parts = clean.split(' ');
-    if (parts.length > 2) {
-      return parts.slice(0, 2).join(' ');
-    }
-    return clean;
+    const cleaned = this.cleanChannelName(rawName);
+    return cleaned.split('(')[0].split('-')[0].trim();
   }
 
   private getDefaultLogoForChannel(id: string): string {
-    const logos: Record<string, string> = {
-      'tv-brasil': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Logotipo_da_TV_Brasil.svg/512px-Logotipo_da_TV_Brasil.svg.png',
-      'tv-cultura': 'https://upload.wikimedia.org/wikipedia/commons/8/82/Cultura_logo_2013.svg',
-      'record-news': 'https://upload.wikimedia.org/wikipedia/commons/4/46/Record_News_logo_2023.svg',
-      'tv-camara': 'https://i.imgur.com/UpV2PRk.png',
-      'tv-senado': 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/TV_Senado_logo.svg/512px-TV_Senado_logo.svg.png',
-      'tv-justica': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/TV_Justi%C3%A7a_logo.svg/512px-TV_Justi%C3%A7a_logo.svg.png',
-      'rede-brasil': 'https://upload.wikimedia.org/wikipedia/commons/d/d1/Marca_rede_brasil_rgb-color.png',
-      'tv-aparecida': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/TV_Aparecida_logo_2015.svg/512px-TV_Aparecida_logo_2015.svg.png',
-      'rede-vida': 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Rede_Vida_logo_2016.svg/512px-Rede_Vida_logo_2016.svg.png',
-      'canal-futura': 'https://upload.wikimedia.org/wikipedia/commons/c/ce/Canal_Futura_2022.svg',
-      'tv-gazeta': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/TV_Gazeta_logo_2016.svg/512px-TV_Gazeta_logo_2016.svg.png',
-      'sbt': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/SBT_logo.svg/512px-SBT_logo.svg.png',
-      'band': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Band_logo_2018.svg/512px-Band_logo_2018.svg.png',
-      'redetv': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/RedeTV%21_logo_2019.svg/512px-RedeTV%21_logo_2019.svg.png'
-    };
-
-    return logos[id] || 'https://i.imgur.com/UpV2PRk.png';
+    return `https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=400&auto=format&fit=crop&q=80`;
   }
 }
 

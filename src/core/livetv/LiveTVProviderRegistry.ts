@@ -3,7 +3,15 @@ import { OfficialChannelProvider } from './OfficialChannelProvider';
 import { M3UProviderAdapter } from './M3UProviderAdapter';
 import { StremioLiveTVAdapter } from './StremioLiveTVAdapter';
 import { channelNormalizer } from './ChannelNormalizer';
-import { liveStreamValidator } from './LiveStreamValidator';
+
+interface ChannelOverride {
+  customStreamUrl?: string;
+  backupStreamUrls?: string[];
+  isEnabled?: boolean;
+}
+
+const STORAGE_KEY_PROVIDERS = 'zapitv_livetv_providers_v2';
+const STORAGE_KEY_OVERRIDES = 'zapitv_livetv_channel_overrides_v2';
 
 export class LiveTVProviderRegistry {
   private static instance: LiveTVProviderRegistry;
@@ -16,13 +24,17 @@ export class LiveTVProviderRegistry {
   private m3uAdapters: M3UProviderAdapter[] = [];
   private stremioAdapters: StremioLiveTVAdapter[] = [];
 
+  // Overrides de administração (canais editados/desativados pelo admin)
+  private channelOverrides = new Map<string, ChannelOverride>();
+
   private constructor() {
+    this.loadOverrides();
+    this.registerDefaultAdapters();
+
     // Carrega canais oficiais e normaliza inicialmente para disponibilidade síncrona imediata
     const officialRaw = OfficialChannelProvider.getOfficialChannels();
     this.channels = channelNormalizer.normalizeAndDeduplicate(officialRaw);
-    
-    // Registra adaptadores padrão
-    this.registerDefaultAdapters();
+    this.applyOverridesToChannels();
   }
 
   public static getInstance(): LiveTVProviderRegistry {
@@ -33,11 +45,179 @@ export class LiveTVProviderRegistry {
   }
 
   private registerDefaultAdapters(): void {
-    // Registra adaptador M3U para canais públicos brasileiros
-    this.m3uAdapters.push(new M3UProviderAdapter('IPTV Brasil Aberto'));
+    let loadedFromStorage = false;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY_PROVIDERS);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed.m3u)) {
+            for (const item of parsed.m3u) {
+              this.m3uAdapters.push(new M3UProviderAdapter(item.name, item.url, item.id, item.enabled));
+            }
+            loadedFromStorage = true;
+          }
+          if (Array.isArray(parsed.stremio)) {
+            for (const item of parsed.stremio) {
+              this.stremioAdapters.push(new StremioLiveTVAdapter(item.url, item.id, item.enabled));
+            }
+          }
+        }
+      } catch {}
+    }
 
-    // Registra adaptador Stremio Live Addon (AIOLiveTV / IPTV Addon Stremio endpoints)
-    this.stremioAdapters.push(new StremioLiveTVAdapter('/api/stremio/live'));
+    if (!loadedFromStorage || this.m3uAdapters.length === 0) {
+      // Registra adaptador M3U padrão para canais públicos brasileiros
+      this.m3uAdapters.push(new M3UProviderAdapter(
+        'IPTV Aberto (Brasil)',
+        M3UProviderAdapter.DEFAULT_BR_M3U,
+        'm3u-iptv-brasil-default',
+        true
+      ));
+    }
+  }
+
+  private persistProviders(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const data = {
+        m3u: this.m3uAdapters.map(a => ({
+          id: a.getId(),
+          name: a.getName(),
+          url: a.getUrl(),
+          enabled: a.isEnabled()
+        })),
+        stremio: this.stremioAdapters.map(a => ({
+          id: a.getId(),
+          name: a.getName(),
+          url: a.getUrl(),
+          enabled: a.isEnabled()
+        }))
+      };
+      localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(data));
+    } catch {}
+  }
+
+  private loadOverrides(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_OVERRIDES);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        this.channelOverrides = new Map(Object.entries(parsed));
+      }
+    } catch {}
+  }
+
+  private persistOverrides(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const obj = Object.fromEntries(this.channelOverrides);
+      localStorage.setItem(STORAGE_KEY_OVERRIDES, JSON.stringify(obj));
+    } catch {}
+  }
+
+  private applyOverridesToChannels(): void {
+    for (const channel of this.channels) {
+      const override = this.channelOverrides.get(channel.id);
+      if (override) {
+        if (override.customStreamUrl) {
+          channel.streamUrl = override.customStreamUrl;
+          if (!channel.sources) channel.sources = [];
+          if (!channel.sources.some(s => s.url === override.customStreamUrl)) {
+            channel.sources.unshift({
+              id: `${channel.id}-custom`,
+              url: override.customStreamUrl,
+              quality: '1080p',
+              provider: 'Admin Custom',
+              format: override.customStreamUrl.includes('.mpd') ? 'dash' : 'hls',
+              isOfficial: true,
+              resolutionHeight: 1080
+            });
+          }
+        }
+        if (override.backupStreamUrls) {
+          channel.backupStreamUrls = [...override.backupStreamUrls];
+        }
+        if (typeof override.isEnabled === 'boolean') {
+          channel.isEnabled = override.isEnabled;
+        }
+      }
+    }
+  }
+
+  public getM3UAdapters(): M3UProviderAdapter[] {
+    return [...this.m3uAdapters];
+  }
+
+  public getStremioAdapters(): StremioLiveTVAdapter[] {
+    return [...this.stremioAdapters];
+  }
+
+  public addM3UAdapter(name: string, url: string): M3UProviderAdapter {
+    const adapter = new M3UProviderAdapter(name, url);
+    this.m3uAdapters.push(adapter);
+    this.persistProviders();
+    this.refreshCatalog().catch(() => {});
+    return adapter;
+  }
+
+  public removeM3UAdapter(id: string): void {
+    this.m3uAdapters = this.m3uAdapters.filter(a => a.getId() !== id);
+    this.persistProviders();
+    this.refreshCatalog().catch(() => {});
+  }
+
+  public toggleM3UAdapter(id: string, enabled: boolean): void {
+    const adapter = this.m3uAdapters.find(a => a.getId() !== id);
+    if (adapter) {
+      adapter.setEnabled(enabled);
+      this.persistProviders();
+      this.refreshCatalog().catch(() => {});
+    }
+  }
+
+  public updateChannelStreamUrl(channelId: string, newUrl: string): void {
+    const existing = this.channelOverrides.get(channelId) || {};
+    existing.customStreamUrl = newUrl;
+    this.channelOverrides.set(channelId, existing);
+    this.persistOverrides();
+
+    const ch = this.channels.find(c => c.id === channelId);
+    if (ch) {
+      ch.streamUrl = newUrl;
+      this.notify();
+    }
+  }
+
+  public addChannelBackupUrl(channelId: string, backupUrl: string): void {
+    const existing = this.channelOverrides.get(channelId) || {};
+    const list = existing.backupStreamUrls || [];
+    if (!list.includes(backupUrl)) {
+      list.push(backupUrl);
+      existing.backupStreamUrls = list;
+      this.channelOverrides.set(channelId, existing);
+      this.persistOverrides();
+
+      const ch = this.channels.find(c => c.id === channelId);
+      if (ch) {
+        ch.backupStreamUrls = list;
+        this.notify();
+      }
+    }
+  }
+
+  public toggleChannelEnabled(channelId: string, enabled: boolean): void {
+    const existing = this.channelOverrides.get(channelId) || {};
+    existing.isEnabled = enabled;
+    this.channelOverrides.set(channelId, existing);
+    this.persistOverrides();
+
+    const ch = this.channels.find(c => c.id === channelId);
+    if (ch) {
+      ch.isEnabled = enabled;
+      this.notify();
+    }
   }
 
   /**
@@ -68,24 +248,28 @@ export class LiveTVProviderRegistry {
     const official = OfficialChannelProvider.getOfficialChannels();
     rawList.push(...official);
 
-    // 2. Provedores M3U externos (se configurados ou com cache)
+    // 2. Provedores M3U externos
     for (const m3u of this.m3uAdapters) {
-      try {
-        const m3uChannels = await m3u.fetchAndParse();
-        if (m3uChannels.length > 0) {
-          rawList.push(...m3uChannels);
-        }
-      } catch {}
+      if (m3u.isEnabled()) {
+        try {
+          const m3uChannels = await m3u.fetchAndParse();
+          if (m3uChannels.length > 0) {
+            rawList.push(...m3uChannels);
+          }
+        } catch {}
+      }
     }
 
     // 3. Provedores Stremio Live Addon
     for (const stremio of this.stremioAdapters) {
-      try {
-        const stremioChannels = await stremio.fetchCatalogChannels();
-        if (stremioChannels.length > 0) {
-          rawList.push(...stremioChannels);
-        }
-      } catch {}
+      if (stremio.isEnabled()) {
+        try {
+          const stremioChannels = await stremio.fetchCatalogChannels();
+          if (stremioChannels.length > 0) {
+            rawList.push(...stremioChannels);
+          }
+        } catch {}
+      }
     }
 
     // Normalizar e deduplicar em uma única lista canônica
@@ -100,11 +284,16 @@ export class LiveTVProviderRegistry {
     }
 
     this.channels = unified;
+    this.applyOverridesToChannels();
     this.notify();
     return this.channels;
   }
 
   public getAllChannels(): LiveChannel[] {
+    return this.channels.filter(c => c.isEnabled !== false);
+  }
+
+  public getAllChannelsIncludingDisabled(): LiveChannel[] {
     return [...this.channels];
   }
 
@@ -119,24 +308,26 @@ export class LiveTVProviderRegistry {
   }
 
   public getChannelsByCategory(category: LiveChannelCategory, favoriteIds: string[] = []): LiveChannel[] {
+    const visible = this.getAllChannels();
     if (category === 'todos') {
-      return this.channels;
+      return visible;
     }
     if (category === 'favoritos') {
-      return this.channels.filter(c => favoriteIds.includes(c.id));
+      return visible.filter(c => favoriteIds.includes(c.id));
     }
-    return this.channels.filter(c => c.category === category);
+    return visible.filter(c => c.category === category);
   }
 
   public getAvailableCount(): number {
-    return this.channels.filter(c => c.status === 'AVAILABLE').length;
+    return this.getAllChannels().filter(c => c.status === 'AVAILABLE' || c.status === 'EXTERNAL_ACCESS').length;
   }
 
   public searchChannels(query: string): LiveChannel[] {
     const q = query.toLowerCase().trim();
-    if (!q) return this.channels;
+    const visible = this.getAllChannels();
+    if (!q) return visible;
 
-    return this.channels.filter(c => 
+    return visible.filter(c => 
       c.name.toLowerCase().includes(q) ||
       c.categoryLabel.toLowerCase().includes(q) ||
       (c.description && c.description.toLowerCase().includes(q))
@@ -154,14 +345,14 @@ export class LiveTVProviderRegistry {
 
   public subscribe(listener: (channels: LiveChannel[]) => void): () => void {
     this.listeners.add(listener);
-    listener([...this.channels]);
+    listener(this.getAllChannels());
     return () => {
       this.listeners.delete(listener);
     };
   }
 
   private notify(): void {
-    const copy = [...this.channels];
+    const copy = this.getAllChannels();
     for (const listener of this.listeners) {
       try {
         listener(copy);

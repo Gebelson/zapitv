@@ -73,7 +73,7 @@ const ProgramasView: React.FC<ProgramasViewProps> = ({ isDarkMode, initialMode }
 
   // Contagem dinâmica real de canais disponíveis
   const availableCount = useMemo(() => {
-    return allChannels.filter(c => c.status === 'AVAILABLE').length;
+    return allChannels.filter(c => c.status === 'AVAILABLE' || c.status === 'EXTERNAL_ACCESS').length;
   }, [allChannels]);
 
   // Filtra canais por categoria selecionada e busca
