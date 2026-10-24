@@ -39,7 +39,7 @@ export class ChannelRegistry {
   }
 
   public getVerifiedAvailableChannels(): LiveChannel[] {
-    return liveTvProviderRegistry.getAllChannels().filter(c => c.status === 'AVAILABLE');
+    return liveTvProviderRegistry.getAllChannels().filter(c => c.status === 'AVAILABLE' || c.status === 'EXTERNAL_ACCESS');
   }
 
   public getAvailableCount(): number {

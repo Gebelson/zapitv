@@ -40,6 +40,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const activeChannelIdRef = useRef<string>(channel.id);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,9 +60,18 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   const [isPipActive, setIsPipActive] = useState(false);
   const [isPipSupported, setIsPipSupported] = useState(() => pipService.isPipSupported());
 
+  // Watchdog e métricas
   const controlsTimeoutRef = useRef<any>(null);
-  const stallTimeoutRef = useRef<any>(null);
-  const lastPlayTimeRef = useRef<number>(0);
+  const watchdogIntervalRef = useRef<any>(null);
+  const lastCurrentTimeRef = useRef<number>(0);
+  const stalledDurationRef = useRef<number>(0);
+  const networkRetryCountRef = useRef<number>(0);
+  const playStartTimeRef = useRef<number>(0);
+
+  // Mantém referência do canal ativo para evitar conflitos assíncronos
+  useEffect(() => {
+    activeChannelIdRef.current = channel.id;
+  }, [channel.id]);
 
   // Monitora eventos Picture-in-Picture
   useEffect(() => {
@@ -121,11 +131,42 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
-  // Tenta próxima fonte de backup quando a atual falha
-  const tryNextFallbackSource = useCallback((failedUrl: string, reason: string) => {
-    channelHealthService.reportPlaybackFailure(channel, failedUrl, reason.includes('rede'));
+  // Limpa completamente instâncias do player
+  const cleanupPlayer = useCallback(() => {
+    if (watchdogIntervalRef.current) {
+      clearInterval(watchdogIntervalRef.current);
+      watchdogIntervalRef.current = null;
+    }
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = null;
+    }
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.removeAttribute('src');
+      videoRef.current.load();
+    }
+    stalledDurationRef.current = 0;
+    lastCurrentTimeRef.current = 0;
+    networkRetryCountRef.current = 0;
+  }, []);
 
-    const nextSource = channelSourceResolver.getNextSource(channel, failedUrl);
+  // Tenta próxima fonte de backup quando a atual falha (Determinístico)
+  const tryNextFallbackSource = useCallback((failedUrl: string, reason: string) => {
+    // Se o canal já mudou durante a tentativa, cancela
+    if (activeChannelIdRef.current !== channel.id) return;
+
+    const nextSource = channelHealthService.handlePlaybackFailure(
+      channel,
+      failedUrl,
+      reason,
+      reason.toLowerCase().includes('conexão') || reason.toLowerCase().includes('rede')
+    );
+
     if (nextSource && nextSource.url && nextSource.url !== failedUrl) {
       setFallbackNotice(`Alternando para fonte alternativa (${nextSource.quality || 'Backup'})...`);
       setIsUsingFallback(true);
@@ -133,8 +174,9 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       playStreamUrl(nextSource.url);
     } else {
       setHasError(true);
-      setErrorMessage(`Transmissão indisponível no momento. ${reason}`);
+      setErrorMessage(reason || 'Transmissão indisponível no momento.');
       setIsLoading(false);
+      setIsPlaying(false);
     }
   }, [channel]);
 
@@ -143,15 +185,12 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
     const video = videoRef.current;
     if (!video || !channel) return;
 
+    cleanupPlayer();
+
     setIsLoading(true);
     setHasError(false);
     setErrorMessage('');
-
-    // Destrói instância prévia para evitar vazamentos de memória e sobreposição de áudio
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
+    playStartTimeRef.current = Date.now();
 
     const streamUrl = channelHealthService.getPlayableUrl(rawTargetUrl);
     setActiveSourceUrl(rawTargetUrl);
@@ -163,20 +202,32 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       return;
     }
 
+    // Preserva volume e mudo atuais do usuário
+    const currentPrefs = liveTvPreferences.getState();
     video.muted = isMuted;
-    video.volume = volume;
+    video.volume = currentPrefs.volume;
 
     if (streamUrl.includes('.m3u8') && Hls.isSupported()) {
+      // Perfil de reprodução ESTÁVEL:
+      // - lowLatencyMode: false para evitar buffer underruns em redes públicas
+      // - liveSyncDurationCount: 5 para margem segura contra oscilações de jitter
+      // - retries configurados com limites para evitar loops infinitos
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 30,
-        maxBufferLength: 30,
+        lowLatencyMode: false,
+        backBufferLength: 15,
+        maxBufferLength: 35,
         maxMaxBufferLength: 60,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 6,
-        manifestLoadingTimeOut: 10000,
-        levelLoadingTimeOut: 10000
+        liveSyncDurationCount: 5,
+        liveMaxLatencyDurationCount: 10,
+        manifestLoadingTimeOut: 12000,
+        manifestLoadingMaxRetry: 3,
+        levelLoadingTimeOut: 12000,
+        levelLoadingMaxRetry: 3,
+        fragLoadingTimeOut: 15000,
+        fragLoadingMaxRetry: 3,
+        abrEwmaDefaultEstimate: 2000000,
+        startLevel: -1
       });
 
       hlsRef.current = hls;
@@ -184,6 +235,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+        if (activeChannelIdRef.current !== channel.id) return;
         setIsLoading(false);
         const heights = data.levels.map(l => `${l.height}p`).filter(Boolean);
         const unique = Array.from(new Set(heights));
@@ -200,18 +252,42 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
+        if (activeChannelIdRef.current !== channel.id) return;
+
+        // Análise de códigos HTTP em respostas de rede
+        const responseCode = data.response?.code;
+        if (responseCode === 401 || responseCode === 403) {
+          hls.destroy();
+          tryNextFallbackSource(rawTargetUrl, 'Canal restrito ou requer autorização do provedor oficial.');
+          return;
+        }
+        if (responseCode === 404 || responseCode === 410) {
+          hls.destroy();
+          tryNextFallbackSource(rawTargetUrl, 'Transmissão não encontrada no provedor (404).');
+          return;
+        }
+
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              // Tenta recarregar uma vez; se falhar novamente, tenta fallback
-              tryNextFallbackSource(rawTargetUrl, 'Instabilidade de conexão com a fonte.');
+              // Tenta recarregar até 2 vezes com backoff; se persistir, aciona fallback
+              if (networkRetryCountRef.current < 2) {
+                networkRetryCountRef.current++;
+                hls.startLoad();
+              } else {
+                hls.destroy();
+                tryNextFallbackSource(rawTargetUrl, 'Instabilidade de conexão com o servidor de transmissão.');
+              }
               break;
+
             case Hls.ErrorTypes.MEDIA_ERROR:
+              // Recuperação de mídia interna do hls.js
               hls.recoverMediaError();
               break;
+
             default:
               hls.destroy();
-              tryNextFallbackSource(rawTargetUrl, 'Erro na decodificação do fluxo.');
+              tryNextFallbackSource(rawTargetUrl, 'Falha irrecuperável na decodificação do fluxo de vídeo.');
               break;
           }
         }
@@ -220,6 +296,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       // Suporte nativo Safari / iOS / Tizen nativo
       video.src = streamUrl;
       video.onloadedmetadata = () => {
+        if (activeChannelIdRef.current !== channel.id) return;
         setIsLoading(false);
         if (autoPlay) {
           video.play().then(() => setIsPlaying(true)).catch(() => {
@@ -230,14 +307,79 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
         }
       };
       video.onerror = () => {
-        tryNextFallbackSource(rawTargetUrl, 'Falha no decodificador nativo.');
+        if (activeChannelIdRef.current !== channel.id) return;
+        tryNextFallbackSource(rawTargetUrl, 'Falha no decodificador nativo de vídeo.');
       };
     } else {
       setHasError(true);
       setErrorMessage('Formato de transmissão não suportado neste navegador.');
       setIsLoading(false);
     }
-  }, [channel, isMuted, volume, autoPlay, tryNextFallbackSource]);
+
+    // Inicializa Watchdog de Reprodução e Prevenção de Buffering Infinito
+    watchdogIntervalRef.current = setInterval(() => {
+      const v = videoRef.current;
+      if (!v || activeChannelIdRef.current !== channel.id) return;
+
+      // Se o vídeo deveria estar tocando (não pausado pelo usuário e sem erro)
+      if (!v.paused && !v.ended) {
+        const curTime = v.currentTime;
+        const diff = Math.abs(curTime - lastCurrentTimeRef.current);
+
+        if (diff < 0.1) {
+          // O tempo não está avançando: STALL / BUFFERING
+          stalledDurationRef.current += 1;
+
+          // 1. Buffering breve (3 segundos): ativa spinner sem travar
+          if (stalledDurationRef.current === 3) {
+            setIsLoading(true);
+            channelHealthService.recordStall(channel, rawTargetUrl);
+          }
+
+          // 2. Buffering prolongado (6 segundos): Recuperação Nível 1
+          if (stalledDurationRef.current === 6) {
+            // Tenta avançar para a ponta do buffer se houver dados
+            if (v.buffered && v.buffered.length > 0) {
+              const bufEnd = v.buffered.end(v.buffered.length - 1);
+              if (bufEnd > curTime + 1) {
+                v.currentTime = bufEnd - 1.5;
+              }
+            }
+            if (hlsRef.current) {
+              hlsRef.current.startLoad();
+              // Se ABR estiver no modo Auto, tenta reduzir temporariamente a qualidade
+              if (hlsRef.current.autoLevelEnabled && hlsRef.current.currentLevel > 0) {
+                hlsRef.current.nextLevel = hlsRef.current.currentLevel - 1;
+              }
+            }
+          }
+
+          // 3. Estagnação severa (12 segundos): Recuperação Nível 2
+          if (stalledDurationRef.current === 12) {
+            if (hlsRef.current) {
+              hlsRef.current.recoverMediaError();
+            }
+          }
+
+          // 4. Timeout final (18 segundos): Falha confirmada da fonte
+          if (stalledDurationRef.current >= 18) {
+            cleanupPlayer();
+            tryNextFallbackSource(rawTargetUrl, 'A transmissão parou de responder (timeout de buffering).');
+          }
+        } else {
+          // O vídeo está avançando normalmente
+          if (stalledDurationRef.current > 0) {
+            stalledDurationRef.current = 0;
+            setIsLoading(false);
+          }
+          lastCurrentTimeRef.current = curTime;
+          // Registra duração contínua de reprodução bem-sucedida
+          channelHealthService.recordPlayDuration(rawTargetUrl, 1);
+        }
+      }
+    }, 1000);
+
+  }, [channel, isMuted, autoPlay, cleanupPlayer, tryNextFallbackSource]);
 
   // Inicializa a reprodução utilizando a melhor fonte selecionada pelo ChannelSourceResolver
   const initPlayback = useCallback(() => {
@@ -257,18 +399,8 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   // Reinicia player quando o canal selecionado mudar
   useEffect(() => {
     initPlayback();
-
     return () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-      if (stallTimeoutRef.current) {
-        clearTimeout(stallTimeoutRef.current);
-      }
+      cleanupPlayer();
     };
   }, [channel.id]);
 
@@ -390,11 +522,15 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
           setIsLoading(false);
           setIsPlaying(true);
           setHasError(false);
+          stalledDurationRef.current = 0;
           if (activeSourceUrl) {
-            channelHealthService.confirmPlayback(channel, activeSourceUrl);
+            const timeToFirstFrame = Date.now() - playStartTimeRef.current;
+            channelHealthService.confirmPlayback(channel, activeSourceUrl, timeToFirstFrame);
           }
         }}
-        onWaiting={() => setIsLoading(true)}
+        onWaiting={() => {
+          setIsLoading(true);
+        }}
         onPause={() => setIsPlaying(false)}
       />
 
@@ -421,7 +557,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
           <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mb-4 text-red-500">
             <AlertCircle className="w-8 h-8" />
           </div>
-          <h4 className="text-white text-lg font-black mb-1">Transmissão Temporariamente Instável</h4>
+          <h4 className="text-white text-lg font-black mb-1">Transmissão Indisponível no Momento</h4>
           <p className="text-gray-400 text-xs max-w-sm mb-5 leading-relaxed">{errorMessage}</p>
           <div className="flex items-center gap-3">
             <button
@@ -553,7 +689,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
           </div>
         </div>
 
-        {/* Lado Direito: Qualidade, PiP, Expandir / Tela Cheia */}
+        {/* Lado Direito: Qualidade, PiP, Tela Cheia */}
         <div className="flex items-center gap-2">
           {/* Seletor de Qualidade */}
           <div className="relative">

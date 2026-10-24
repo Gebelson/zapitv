@@ -86,15 +86,31 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
           }}
         />
 
-        {/* Badge AO VIVO ou ACESSO OFICIAL no canto superior esquerdo */}
+        {/* Badge de Status Canônico no canto superior esquerdo */}
         <div className="absolute top-2.5 left-2.5 z-10">
-          {channel.requiresExternalAccess ? (
+          {channel.requiresExternalAccess || channel.status === 'EXTERNAL_ACCESS' ? (
             <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/90 text-black flex items-center gap-1 shadow-md">
               <ShieldCheck className="w-3 h-3 text-black" /> Acesso Oficial
             </span>
-          ) : (
+          ) : channel.status === 'AVAILABLE' ? (
             <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-red-600/90 text-white flex items-center gap-1 shadow-md">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" /> AO VIVO
+            </span>
+          ) : channel.status === 'UNSTABLE' ? (
+            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/90 text-black flex items-center gap-1 shadow-md">
+              <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse" /> Instável
+            </span>
+          ) : channel.status === 'UNAVAILABLE' ? (
+            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-zinc-700/90 text-gray-300 flex items-center gap-1 shadow-md border border-white/10">
+              Indisponível
+            </span>
+          ) : channel.status === 'RESTRICTED' ? (
+            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-600/90 text-white flex items-center gap-1 shadow-md">
+              Restrito
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-600/90 text-white flex items-center gap-1 shadow-md">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Sintonizando
             </span>
           )}
         </div>

@@ -1,6 +1,6 @@
-import { LiveChannel, ChannelHealthStatus } from './types';
+import { LiveChannel, ChannelHealthStatus, LiveStreamSource } from './types';
 import { liveTvProviderRegistry } from './LiveTVProviderRegistry';
-import { liveStreamValidator } from './LiveStreamValidator';
+import { liveStreamValidator, StreamHealthMetrics } from './LiveStreamValidator';
 import { channelSourceResolver } from './ChannelSourceResolver';
 
 export class ChannelHealthService {
@@ -24,7 +24,7 @@ export class ChannelHealthService {
   /**
    * Valida ativamente a disponibilidade da transmissão do canal
    */
-  public async checkChannelHealth(channel: LiveChannel, timeoutMs = 4000): Promise<ChannelHealthStatus> {
+  public async checkChannelHealth(channel: LiveChannel, timeoutMs = 4500): Promise<ChannelHealthStatus> {
     if (channel.requiresExternalAccess) {
       liveTvProviderRegistry.updateChannelStatus(channel.id, 'EXTERNAL_ACCESS');
       return 'EXTERNAL_ACCESS';
@@ -40,45 +40,95 @@ export class ChannelHealthService {
       return 'UNAVAILABLE';
     }
 
+    let foundAvailable = false;
+    let anyUnstable = false;
+
     for (const url of testUrls) {
       const status = await liveStreamValidator.validateStreamUrl(url, timeoutMs);
       if (status === 'AVAILABLE') {
-        // Se a URL que funcionou for um backup, promove ela para stream principal
+        foundAvailable = true;
+        // Se a fonte funcional for um backup, promove ela para stream principal
         if (url !== channel.streamUrl) {
           channel.streamUrl = url;
         }
         liveTvProviderRegistry.updateChannelStatus(channel.id, 'AVAILABLE');
         return 'AVAILABLE';
+      } else if (status === 'UNSTABLE') {
+        anyUnstable = true;
       }
     }
 
-    liveTvProviderRegistry.updateChannelStatus(channel.id, 'UNAVAILABLE');
-    return 'UNAVAILABLE';
+    const finalStatus: ChannelHealthStatus = anyUnstable ? 'UNSTABLE' : 'UNAVAILABLE';
+    liveTvProviderRegistry.updateChannelStatus(channel.id, finalStatus);
+    return finalStatus;
   }
 
   /**
-   * Confirmação de reprodução real em runtime pelo Player (Etapa 2)
+   * Confirmação de reprodução real em runtime pelo Player com métricas de primeiro frame
    */
-  public confirmPlayback(channel: LiveChannel, activeUrl: string): void {
+  public confirmPlayback(channel: LiveChannel, activeUrl: string, timeToFirstFrameMs?: number): void {
     if (channel.requiresExternalAccess) {
       liveTvProviderRegistry.updateChannelStatus(channel.id, 'EXTERNAL_ACCESS');
       return;
     }
-    liveStreamValidator.recordPlaybackSuccess(activeUrl);
+    liveStreamValidator.recordPlaybackSuccess(activeUrl, timeToFirstFrameMs);
     liveTvProviderRegistry.updateChannelStatus(channel.id, 'AVAILABLE');
   }
 
   /**
-   * Registro de erro de reprodução real pelo Player (Etapa 2)
+   * Registro de travamento (stalling) detectado pelo player
    */
-  public reportPlaybackFailure(channel: LiveChannel, failedUrl: string, isNetwork = false): void {
-    liveStreamValidator.recordPlaybackFailure(failedUrl, isNetwork);
-    channelSourceResolver.markSourceFailed(channel.id, failedUrl);
+  public recordStall(channel: LiveChannel, activeUrl: string): void {
+    liveStreamValidator.recordStall(activeUrl);
+    const metrics = liveStreamValidator.getMetrics(activeUrl);
+    if (metrics && metrics.stallCount >= 3) {
+      liveTvProviderRegistry.updateChannelStatus(channel.id, 'UNSTABLE');
+    }
+  }
 
-    // Se o canal ainda tem fontes não testadas, marca como UNSTABLE; se todas falharem, UNAVAILABLE
+  /**
+   * Registro de duração acumulada de reprodução sem travamentos
+   */
+  public recordPlayDuration(activeUrl: string, seconds: number): void {
+    liveStreamValidator.recordPlayDuration(activeUrl, seconds);
+  }
+
+  /**
+   * Registro determinístico e unificado de falha de reprodução.
+   * Registra a falha uma única vez, atualiza métricas e seleciona a próxima fonte se houver.
+   */
+  public handlePlaybackFailure(
+    channel: LiveChannel,
+    failedUrl: string,
+    reason = 'Erro na transmissão',
+    isNetwork = false
+  ): LiveStreamSource | null {
+    // 1. Registra no validador de saúde
+    liveStreamValidator.recordPlaybackFailure(failedUrl, reason, isNetwork);
+
+    // 2. Registra no resolvedor de fontes e busca próximo backup
     const nextSource = channelSourceResolver.getNextSource(channel, failedUrl);
+
+    // 3. Atualiza o status do canal no catálogo
     const newStatus: ChannelHealthStatus = nextSource ? 'UNSTABLE' : 'UNAVAILABLE';
+    channel.status = newStatus;
     liveTvProviderRegistry.updateChannelStatus(channel.id, newStatus);
+
+    return nextSource;
+  }
+
+  /**
+   * Alias de compatibilidade com chamadas legadas
+   */
+  public reportPlaybackFailure(channel: LiveChannel, failedUrl: string, isNetwork = false): LiveStreamSource | null {
+    return this.handlePlaybackFailure(channel, failedUrl, 'Instabilidade de conexão', isNetwork);
+  }
+
+  /**
+   * Obtém métricas de saúde de uma fonte
+   */
+  public getSourceMetrics(url: string): StreamHealthMetrics | undefined {
+    return liveStreamValidator.getMetrics(url);
   }
 
   /**
@@ -86,13 +136,13 @@ export class ChannelHealthService {
    */
   public async verifyAllChannels(onProgress?: (completed: number, total: number) => void): Promise<void> {
     const channels = liveTvProviderRegistry.getAllChannels();
-    const batchSize = 4;
+    const batchSize = 3;
     let completed = 0;
 
     for (let i = 0; i < channels.length; i += batchSize) {
       const batch = channels.slice(i, i + batchSize);
       await Promise.allSettled(batch.map(async ch => {
-        await this.checkChannelHealth(ch, 3000);
+        await this.checkChannelHealth(ch, 3500);
         completed++;
         if (onProgress) onProgress(completed, channels.length);
       }));

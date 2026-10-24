@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Radio, Play, RefreshCw, CheckCircle, AlertTriangle, AlertCircle, 
   ExternalLink, Plus, Trash2, Edit3, Search, Filter, ShieldCheck, Eye, EyeOff, X,
-  Tv, Database, Globe
+  Tv, Database, Globe, Lock, Activity
 } from 'lucide-react';
 import { LiveChannel, LiveStreamSource, ChannelHealthStatus } from '../../core/livetv/types';
 import { liveTvProviderRegistry } from '../../core/livetv/LiveTVProviderRegistry';
@@ -25,6 +25,9 @@ export const LiveTvAdminPanel: React.FC<LiveTvAdminPanelProps> = ({ isDarkMode }
   // Estado de verificação em massa
   const [isCheckingMass, setIsCheckingMass] = useState(false);
   const [massProgress, setMassProgress] = useState<{ completed: number; total: number } | null>(null);
+
+  // Verificação individual
+  const [checkingChannelId, setCheckingChannelId] = useState<string | null>(null);
 
   // Modal de teste de player
   const [testingChannel, setTestingChannel] = useState<LiveChannel | null>(null);
@@ -57,9 +60,11 @@ export const LiveTvAdminPanel: React.FC<LiveTvAdminPanelProps> = ({ isDarkMode }
     const total = channels.length;
     const available = channels.filter(c => c.status === 'AVAILABLE').length;
     const external = channels.filter(c => c.status === 'EXTERNAL_ACCESS' || c.requiresExternalAccess).length;
-    const unstableOrDown = channels.filter(c => c.status === 'UNSTABLE' || c.status === 'UNAVAILABLE' || c.status === 'ERROR').length;
+    const unstable = channels.filter(c => c.status === 'UNSTABLE').length;
+    const unavailable = channels.filter(c => c.status === 'UNAVAILABLE' || c.status === 'ERROR').length;
+    const checking = channels.filter(c => c.status === 'CHECKING').length;
     const disabled = channels.filter(c => c.isEnabled === false).length;
-    return { total, available, external, unstableOrDown, disabled };
+    return { total, available, external, unstable, unavailable, checking, disabled };
   }, [channels]);
 
   // Filtros
@@ -68,7 +73,9 @@ export const LiveTvAdminPanel: React.FC<LiveTvAdminPanelProps> = ({ isDarkMode }
       if (selectedCategory !== 'all' && c.category !== selectedCategory) return false;
       if (selectedStatus === 'available' && c.status !== 'AVAILABLE') return false;
       if (selectedStatus === 'external' && !c.requiresExternalAccess && c.status !== 'EXTERNAL_ACCESS') return false;
-      if (selectedStatus === 'unstable' && c.status !== 'UNSTABLE' && c.status !== 'UNAVAILABLE' && c.status !== 'ERROR') return false;
+      if (selectedStatus === 'unstable' && c.status !== 'UNSTABLE') return false;
+      if (selectedStatus === 'unavailable' && c.status !== 'UNAVAILABLE' && c.status !== 'ERROR') return false;
+      if (selectedStatus === 'checking' && c.status !== 'CHECKING') return false;
       if (selectedStatus === 'disabled' && c.isEnabled !== false) return false;
 
       if (searchTerm) {
@@ -96,6 +103,16 @@ export const LiveTvAdminPanel: React.FC<LiveTvAdminPanelProps> = ({ isDarkMode }
     } finally {
       setIsCheckingMass(false);
       setMassProgress(null);
+    }
+  };
+
+  // Executa verificação individual de um canal
+  const handleCheckSingleChannel = async (channel: LiveChannel) => {
+    setCheckingChannelId(channel.id);
+    try {
+      await channelHealthService.checkChannelHealth(channel, 4500);
+    } finally {
+      setCheckingChannelId(null);
     }
   };
 
@@ -155,7 +172,7 @@ export const LiveTvAdminPanel: React.FC<LiveTvAdminPanelProps> = ({ isDarkMode }
     if (requiresExternal || status === 'EXTERNAL_ACCESS') {
       return (
         <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center gap-1">
-          <ShieldCheck className="w-3 h-3" /> Acesso Externo
+          <ShieldCheck className="w-3 h-3" /> Acesso Oficial
         </span>
       );
     }
@@ -178,6 +195,12 @@ export const LiveTvAdminPanel: React.FC<LiveTvAdminPanelProps> = ({ isDarkMode }
             <AlertTriangle className="w-3 h-3" /> Instável
           </span>
         );
+      case 'RESTRICTED':
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+            <Lock className="w-3 h-3" /> Restrito
+          </span>
+        );
       default:
         return (
           <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1">
@@ -187,48 +210,65 @@ export const LiveTvAdminPanel: React.FC<LiveTvAdminPanelProps> = ({ isDarkMode }
     }
   };
 
+  const formatLastChecked = (timestamp?: number) => {
+    if (!timestamp) return 'Pendente';
+    const diff = Math.floor((Date.now() - timestamp) / 1000);
+    if (diff < 60) return `Há ${diff}s`;
+    if (diff < 3600) return `Há ${Math.floor(diff / 60)}m`;
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
       {/* Cards de Métricas */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#0f121a] border-white/10' : 'bg-white border-gray-200'}`}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Total de Canais</span>
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+        <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#0f121a] border-white/10' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Total</span>
             <Radio className="w-4 h-4 text-[#007df7]" />
           </div>
-          <p className="text-3xl font-black text-white">{metrics.total}</p>
+          <p className="text-2xl font-black text-white">{metrics.total}</p>
         </div>
 
-        <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#0f121a] border-white/10' : 'bg-white border-gray-200'}`}>
-          <div className="flex items-center justify-between mb-2">
+        <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#0f121a] border-white/10' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-center justify-between mb-1.5">
             <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Disponíveis</span>
             <CheckCircle className="w-4 h-4 text-emerald-400" />
           </div>
-          <p className="text-3xl font-black text-emerald-400">{metrics.available}</p>
+          <p className="text-2xl font-black text-emerald-400">{metrics.available}</p>
         </div>
 
-        <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#0f121a] border-white/10' : 'bg-white border-gray-200'}`}>
-          <div className="flex items-center justify-between mb-2">
+        <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#0f121a] border-white/10' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-center justify-between mb-1.5">
             <span className="text-[10px] font-black uppercase tracking-widest text-purple-400">Acesso Oficial</span>
             <ShieldCheck className="w-4 h-4 text-purple-400" />
           </div>
-          <p className="text-3xl font-black text-purple-400">{metrics.external}</p>
+          <p className="text-2xl font-black text-purple-400">{metrics.external}</p>
         </div>
 
-        <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#0f121a] border-white/10' : 'bg-white border-gray-200'}`}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">Instáveis / Off</span>
+        <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#0f121a] border-white/10' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">Instáveis</span>
             <AlertTriangle className="w-4 h-4 text-amber-400" />
           </div>
-          <p className="text-3xl font-black text-amber-400">{metrics.unstableOrDown}</p>
+          <p className="text-2xl font-black text-amber-400">{metrics.unstable}</p>
         </div>
 
-        <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#0f121a] border-white/10' : 'bg-white border-gray-200'}`}>
-          <div className="flex items-center justify-between mb-2">
+        <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#0f121a] border-white/10' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-red-400">Indisponíveis</span>
+            <AlertCircle className="w-4 h-4 text-red-400" />
+          </div>
+          <p className="text-2xl font-black text-red-400">{metrics.unavailable}</p>
+        </div>
+
+        <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#0f121a] border-white/10' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-center justify-between mb-1.5">
             <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Desativados</span>
             <EyeOff className="w-4 h-4 text-gray-500" />
           </div>
-          <p className="text-3xl font-black text-gray-500">{metrics.disabled}</p>
+          <p className="text-2xl font-black text-gray-500">{metrics.disabled}</p>
         </div>
       </div>
 
@@ -291,8 +331,10 @@ export const LiveTvAdminPanel: React.FC<LiveTvAdminPanelProps> = ({ isDarkMode }
           >
             <option value="all" className="bg-[#0f121a]">Todos os Status</option>
             <option value="available" className="bg-[#0f121a]">Apenas Disponíveis</option>
-            <option value="external" className="bg-[#0f121a]">Apenas Acesso Externo</option>
-            <option value="unstable" className="bg-[#0f121a]">Instáveis / Fora do Ar</option>
+            <option value="external" className="bg-[#0f121a]">Apenas Acesso Oficial</option>
+            <option value="unstable" className="bg-[#0f121a]">Instáveis</option>
+            <option value="unavailable" className="bg-[#0f121a]">Indisponíveis</option>
+            <option value="checking" className="bg-[#0f121a]">Em Verificação</option>
             <option value="disabled" className="bg-[#0f121a]">Desativados</option>
           </select>
         </div>
@@ -305,100 +347,137 @@ export const LiveTvAdminPanel: React.FC<LiveTvAdminPanelProps> = ({ isDarkMode }
             <tr className="border-b border-white/10 bg-white/5 text-gray-400 font-black uppercase tracking-wider text-[10px]">
               <th className="py-3.5 px-4">Canal</th>
               <th className="py-3.5 px-4">Categoria</th>
+              <th className="py-3.5 px-4">Status & Diagnóstico</th>
               <th className="py-3.5 px-4">Stream Principal</th>
               <th className="py-3.5 px-4">Backups</th>
-              <th className="py-3.5 px-4">Status</th>
+              <th className="py-3.5 px-4">Última Checagem</th>
               <th className="py-3.5 px-4 text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {filteredChannels.map(channel => (
-              <tr 
-                key={channel.id} 
-                className={`transition-colors hover:bg-white/[0.02] ${
-                  channel.isEnabled === false ? 'opacity-40 bg-red-950/10' : ''
-                }`}
-              >
-                <td className="py-3 px-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-white/10 p-1 border border-white/10 flex items-center justify-center shrink-0">
-                      <img src={channel.logo} alt={channel.name} className="w-full h-full object-contain" />
+            {filteredChannels.map(channel => {
+              const metrics = channel.streamUrl ? liveStreamValidator.getMetrics(channel.streamUrl) : undefined;
+              const isCheckingThis = checkingChannelId === channel.id;
+
+              return (
+                <tr 
+                  key={channel.id} 
+                  className={`transition-colors hover:bg-white/[0.02] ${
+                    channel.isEnabled === false ? 'opacity-40 bg-red-950/10' : ''
+                  }`}
+                >
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-white/10 p-1 border border-white/10 flex items-center justify-center shrink-0">
+                        <img src={channel.logo} alt={channel.name} className="w-full h-full object-contain" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-white leading-tight">{channel.name}</p>
+                        <p className="text-[10px] text-gray-500 font-mono mt-0.5">{channel.id}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-bold text-white leading-tight">{channel.name}</p>
-                      <p className="text-[10px] text-gray-500 font-mono mt-0.5">{channel.id}</p>
+                  </td>
+
+                  <td className="py-3 px-4 text-gray-300 font-medium">
+                    {channel.categoryLabel}
+                  </td>
+
+                  <td className="py-3 px-4">
+                    <div className="space-y-1">
+                      <div>{getStatusBadge(channel.status, channel.requiresExternalAccess)}</div>
+                      {metrics?.lastFailureReason && (
+                        <p className="text-[10px] text-red-400 font-medium max-w-xs truncate" title={metrics.lastFailureReason}>
+                          {metrics.lastFailureReason}
+                        </p>
+                      )}
+                      {metrics && metrics.stallCount > 0 && (
+                        <p className="text-[10px] text-amber-400 font-medium">
+                          {metrics.stallCount} travamento(s) registrado(s)
+                        </p>
+                      )}
+                      {metrics?.latencyMs && metrics.latencyMs > 0 && (
+                        <p className="text-[10px] text-gray-400 font-mono">
+                          Latência: {metrics.latencyMs}ms
+                        </p>
+                      )}
                     </div>
-                  </div>
-                </td>
+                  </td>
 
-                <td className="py-3 px-4 text-gray-300 font-medium">
-                  {channel.categoryLabel}
-                </td>
+                  <td className="py-3 px-4">
+                    {channel.requiresExternalAccess ? (
+                      <span className="text-purple-400 font-semibold flex items-center gap-1 text-[11px]">
+                        <ExternalLink className="w-3 h-3" /> {channel.externalProviderName || 'Portal Oficial'}
+                      </span>
+                    ) : channel.streamUrl ? (
+                      <span className="text-gray-400 font-mono text-[11px] truncate max-w-xs block" title={channel.streamUrl}>
+                        {channel.streamUrl}
+                      </span>
+                    ) : (
+                      <span className="text-gray-500 italic">Nenhum stream</span>
+                    )}
+                  </td>
 
-                <td className="py-3 px-4">
-                  {channel.requiresExternalAccess ? (
-                    <span className="text-purple-400 font-semibold flex items-center gap-1 text-[11px]">
-                      <ExternalLink className="w-3 h-3" /> {channel.externalProviderName || 'Portal Oficial'}
-                    </span>
-                  ) : channel.streamUrl ? (
-                    <span className="text-gray-400 font-mono text-[11px] truncate max-w-xs block" title={channel.streamUrl}>
-                      {channel.streamUrl}
-                    </span>
-                  ) : (
-                    <span className="text-gray-500 italic">Nenhum stream</span>
-                  )}
-                </td>
+                  <td className="py-3 px-4 text-gray-400">
+                    {channel.backupStreamUrls && channel.backupStreamUrls.length > 0 ? (
+                      <span className="px-2 py-0.5 rounded-full bg-white/10 text-white font-bold text-[10px]">
+                        {channel.backupStreamUrls.length} backup(s)
+                      </span>
+                    ) : (
+                      <span className="text-gray-600 text-[11px]">Nenhum</span>
+                    )}
+                  </td>
 
-                <td className="py-3 px-4 text-gray-400">
-                  {channel.backupStreamUrls && channel.backupStreamUrls.length > 0 ? (
-                    <span className="px-2 py-0.5 rounded-full bg-white/10 text-white font-bold text-[10px]">
-                      {channel.backupStreamUrls.length} backup(s)
-                    </span>
-                  ) : (
-                    <span className="text-gray-600 text-[11px]">Nenhum</span>
-                  )}
-                </td>
+                  <td className="py-3 px-4 text-gray-400 text-[11px] font-mono">
+                    {formatLastChecked(channel.lastChecked || metrics?.timestamp)}
+                  </td>
 
-                <td className="py-3 px-4">
-                  {getStatusBadge(channel.status, channel.requiresExternalAccess)}
-                </td>
+                  <td className="py-3 px-4 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      {/* Botão de Checar Saúde Individual */}
+                      <button
+                        onClick={() => handleCheckSingleChannel(channel)}
+                        disabled={isCheckingThis}
+                        className="p-1.5 rounded-lg bg-white/10 hover:bg-blue-600 text-white transition-all disabled:opacity-50"
+                        title="Verificar Transmissão Agora"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isCheckingThis ? 'animate-spin text-blue-400' : ''}`} />
+                      </button>
 
-                <td className="py-3 px-4 text-right">
-                  <div className="flex items-center justify-end gap-1.5">
-                    {/* Botão de Testar Stream */}
-                    <button
-                      onClick={() => setTestingChannel(channel)}
-                      className="p-1.5 rounded-lg bg-white/10 hover:bg-[#007df7] text-white transition-all"
-                      title="Testar Reprodução"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-current" />
-                    </button>
+                      {/* Botão de Testar Stream no Player */}
+                      <button
+                        onClick={() => setTestingChannel(channel)}
+                        className="p-1.5 rounded-lg bg-white/10 hover:bg-[#007df7] text-white transition-all"
+                        title="Testar Reprodução"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                      </button>
 
-                    {/* Botão de Editar Fontes */}
-                    <button
-                      onClick={() => handleOpenEdit(channel)}
-                      className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-all"
-                      title="Editar Fontes do Canal"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
+                      {/* Botão de Editar Fontes */}
+                      <button
+                        onClick={() => handleOpenEdit(channel)}
+                        className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-all"
+                        title="Editar Fontes do Canal"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
 
-                    {/* Alternar Ativo/Inativo */}
-                    <button
-                      onClick={() => handleToggleChannel(channel)}
-                      className={`p-1.5 rounded-lg transition-all ${
-                        channel.isEnabled === false
-                          ? 'bg-red-500/20 text-red-400 hover:bg-red-500/40'
-                          : 'bg-white/10 hover:bg-white/20 text-gray-300'
-                      }`}
-                      title={channel.isEnabled === false ? 'Ativar Canal' : 'Desativar Canal'}
-                    >
-                      {channel.isEnabled === false ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      {/* Alternar Ativo/Inativo */}
+                      <button
+                        onClick={() => handleToggleChannel(channel)}
+                        className={`p-1.5 rounded-lg transition-all ${
+                          channel.isEnabled === false
+                            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/40'
+                            : 'bg-white/10 hover:bg-white/20 text-gray-300'
+                        }`}
+                        title={channel.isEnabled === false ? 'Ativar Canal' : 'Desativar Canal'}
+                      >
+                        {channel.isEnabled === false ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

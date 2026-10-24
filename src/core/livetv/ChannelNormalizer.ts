@@ -1,4 +1,4 @@
-import { LiveChannel, LiveChannelCategory, LiveStreamSource, RawChannelInput } from './types';
+import { LiveChannel, LiveChannelCategory, LiveStreamSource, RawChannelInput, ChannelHealthStatus } from './types';
 import { liveStreamValidator } from './LiveStreamValidator';
 
 export class ChannelNormalizer {
@@ -128,9 +128,16 @@ export class ChannelNormalizer {
           }
         }
 
-        const initialStatus = isExternal
-          ? 'EXTERNAL_ACCESS'
-          : (sources.length > 0 ? 'AVAILABLE' : 'UNAVAILABLE');
+        let initialStatus: ChannelHealthStatus;
+        if (isExternal) {
+          initialStatus = 'EXTERNAL_ACCESS';
+        } else if (sources.length === 0) {
+          initialStatus = 'UNAVAILABLE';
+        } else {
+          // Consulta cache de saúde prévio se houver
+          const cached = sources[0]?.url ? liveStreamValidator.getCachedStatus(sources[0].url) : null;
+          initialStatus = cached || 'CHECKING';
+        }
 
         const newChannel: LiveChannel = {
           id: canonicalId,
@@ -192,7 +199,8 @@ export class ChannelNormalizer {
           }
           existing.backupStreamUrls = existing.sources.slice(1).map(s => s.url);
           if (existing.status === 'UNAVAILABLE' && existing.sources.length > 0) {
-            existing.status = 'AVAILABLE';
+            const cached = liveStreamValidator.getCachedStatus(existing.sources[0].url);
+            existing.status = cached || 'CHECKING';
           }
         }
       }

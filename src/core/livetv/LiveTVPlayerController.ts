@@ -2,7 +2,7 @@
  * ZapiTV — LiveTVPlayerController
  * Controlador de ciclo de vida de reprodução de TV ao vivo.
  * Garante que apenas um stream esteja ativo por vez, evitando duplicação de áudio,
- * vazamentos de memória e tratando reconexões automáticas.
+ * vazamentos de memória e tratando reconexões automáticas com perfil estável.
  */
 
 import Hls from 'hls.js';
@@ -26,6 +26,7 @@ export class LiveTVPlayerController {
   private activeVideoElement: HTMLVideoElement | null = null;
   private currentChannel: LiveChannel | null = null;
   private stateListeners = new Set<(state: PlayerState) => void>();
+  private networkRetryCount = 0;
 
   private state: PlayerState = {
     isPlaying: false,
@@ -51,6 +52,7 @@ export class LiveTVPlayerController {
     this.cleanup();
     this.activeVideoElement = video;
     this.currentChannel = channel;
+    this.networkRetryCount = 0;
     this.state.isMuted = initialMuted;
     this.state.volume = liveTvPreferences.getState().volume;
     this.updateState({ isLoading: true, hasError: false, errorMessage: '' });
@@ -65,16 +67,23 @@ export class LiveTVPlayerController {
     video.volume = this.state.volume;
 
     if (streamUrl.includes('.m3u8') && Hls.isSupported()) {
+      // Perfil de reprodução ESTÁVEL unificado
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 20,
-        maxBufferLength: 20,
-        maxMaxBufferLength: 40,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 6,
-        manifestLoadingTimeOut: 10000,
-        levelLoadingTimeOut: 10000
+        lowLatencyMode: false,
+        backBufferLength: 15,
+        maxBufferLength: 35,
+        maxMaxBufferLength: 60,
+        liveSyncDurationCount: 5,
+        liveMaxLatencyDurationCount: 10,
+        manifestLoadingTimeOut: 12000,
+        manifestLoadingMaxRetry: 3,
+        levelLoadingTimeOut: 12000,
+        levelLoadingMaxRetry: 3,
+        fragLoadingTimeOut: 15000,
+        fragLoadingMaxRetry: 3,
+        abrEwmaDefaultEstimate: 2000000,
+        startLevel: -1
       });
 
       this.activeHls = hls;
@@ -91,18 +100,58 @@ export class LiveTVPlayerController {
 
         video.play().then(() => {
           this.updateState({ isPlaying: true });
+          channelHealthService.confirmPlayback(channel, streamUrl);
         }).catch(() => {
           video.muted = true;
           this.updateState({ isMuted: true });
-          video.play().then(() => this.updateState({ isPlaying: true })).catch(() => {});
+          video.play().then(() => {
+            this.updateState({ isPlaying: true });
+            channelHealthService.confirmPlayback(channel, streamUrl);
+          }).catch(() => {});
         });
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
+        const responseCode = data.response?.code;
+        if (responseCode === 401 || responseCode === 403) {
+          this.cleanup();
+          this.updateState({
+            hasError: true,
+            isLoading: false,
+            errorMessage: 'Canal restrito ou requer autorização do provedor.'
+          });
+          return;
+        }
+
+        if (responseCode === 404 || responseCode === 410) {
+          this.cleanup();
+          this.updateState({
+            hasError: true,
+            isLoading: false,
+            errorMessage: 'Transmissão não encontrada no provedor (404).'
+          });
+          return;
+        }
+
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              hls.startLoad();
+              if (this.networkRetryCount < 2) {
+                this.networkRetryCount++;
+                hls.startLoad();
+              } else {
+                this.cleanup();
+                const next = channelHealthService.handlePlaybackFailure(channel, streamUrl, 'Falha de conexão', true);
+                if (next && next.url) {
+                  this.attachVideo(video, { ...channel, streamUrl: next.url }, this.state.isMuted);
+                } else {
+                  this.updateState({
+                    hasError: true,
+                    isLoading: false,
+                    errorMessage: 'Transmissão ao vivo temporariamente instável.'
+                  });
+                }
+              }
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
               hls.recoverMediaError();
@@ -112,7 +161,7 @@ export class LiveTVPlayerController {
               this.updateState({
                 hasError: true,
                 isLoading: false,
-                errorMessage: 'Transmissão ao vivo temporariamente instável.'
+                errorMessage: 'Erro na decodificação do fluxo de vídeo.'
               });
               break;
           }
@@ -122,7 +171,10 @@ export class LiveTVPlayerController {
       video.src = streamUrl;
       video.onloadedmetadata = () => {
         this.updateState({ isLoading: false });
-        video.play().then(() => this.updateState({ isPlaying: true })).catch(() => {
+        video.play().then(() => {
+          this.updateState({ isPlaying: true });
+          channelHealthService.confirmPlayback(channel, streamUrl);
+        }).catch(() => {
           video.muted = true;
           this.updateState({ isMuted: true });
           video.play().catch(() => {});
@@ -198,6 +250,7 @@ export class LiveTVPlayerController {
     }
     this.currentChannel = null;
     this.state.isPlaying = false;
+    this.networkRetryCount = 0;
   }
 
   public subscribe(listener: (state: PlayerState) => void): () => void {
