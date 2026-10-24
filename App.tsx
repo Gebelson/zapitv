@@ -1739,7 +1739,35 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   useEffect(() => {
     db.keyValueStore.put({ key: 'zapitv_theme', value: isDarkMode });
-    document.body.className = isDarkMode ? 'dark text-white overflow-x-hidden no-scrollbar' : 'text-gray-900 overflow-x-hidden no-scrollbar';
+
+    const htmlEl = document.documentElement;
+    const bodyEl = document.body;
+    const rootEl = document.getElementById('root');
+    const bgColor = isDarkMode ? '#05070a' : '#F8F9FC';
+
+    // Fundo estrutural sólido permanente nas 3 camadas fundamentais (html, body, #root)
+    htmlEl.style.backgroundColor = bgColor;
+    bodyEl.style.backgroundColor = bgColor;
+    if (rootEl) {
+      rootEl.style.backgroundColor = bgColor;
+    }
+
+    // Gerencia classes temáticas preservando tv-mode e demais classes existentes no body
+    if (isDarkMode) {
+      htmlEl.classList.add('dark');
+      htmlEl.classList.remove('light');
+
+      bodyEl.classList.add('dark', 'text-white');
+      bodyEl.classList.remove('light', 'text-gray-900');
+    } else {
+      htmlEl.classList.add('light');
+      htmlEl.classList.remove('dark');
+
+      bodyEl.classList.add('light', 'text-gray-900');
+      bodyEl.classList.remove('dark', 'text-white');
+    }
+
+    bodyEl.classList.add('overflow-x-hidden', 'no-scrollbar');
   }, [isDarkMode]);
 
   // PERSISTÊNCIA LOCAL
@@ -2907,7 +2935,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   }
 
   return (
-    <div className={`min-h-screen relative ${isWatchRoute ? 'zapi-watch-route bg-black' : ''}`}>
+    <div className={`min-h-screen relative ${isDarkMode ? 'bg-[#05070a]' : 'bg-[#F8F9FC]'} ${isWatchRoute ? 'zapi-watch-route bg-black' : ''}`}>
       <AnimatedBackground isDarkMode={isDarkMode} />
       
       {isMobileViewport && !isWatchRoute ? (

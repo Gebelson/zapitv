@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+/* =========================================================================
+   ZAPITV — FUNDO ESTRUTURAL SÓLIDO PERMANENTE (PREVENÇÃO DE FLASH BRANCO DWM)
+   ========================================================================= */
+html,
+body,
+#root {
+  background-color: #05070a;
+}
+
+html.light,
+html.light body,
+html.light #root,
+body.light,
+body.light #root {
+  background-color: #F8F9FC;
+}
+
 /* Oculta o cursor em toda a árvore do player quando inativo por mais de 2s */
 .hide-cursor,
 .hide-cursor * {

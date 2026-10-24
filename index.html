@@ -17,6 +17,22 @@
     <link rel="dns-prefetch" href="https://v3-cinemeta.strem.io" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sora:wght@700&display=swap" rel="stylesheet">
     <style>
+      /* Fundo estrutural opaco permanente (html, body, #root) - previne piscada branca no DWM/Windows */
+      html, body, #root {
+        background-color: #05070a;
+        min-height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+
+      html.light,
+      html.light body,
+      html.light #root,
+      body.light,
+      body.light #root {
+        background-color: #F8F9FC;
+      }
+
       body {
         font-family: 'Inter', sans-serif;
         /* Remove scrollbar and prevent horizontal overflow */
@@ -56,8 +72,8 @@
       })();
     </script>
 </head>
-  <body class="bg-gray-50 text-gray-900 transition-colors duration-300 no-scrollbar">
-    <div id="root"></div>
+  <body class="dark text-white overflow-x-hidden no-scrollbar" style="background-color: #05070a;">
+    <div id="root" style="background-color: #05070a; min-height: 100vh;"></div>
   <script type="module" src="/index.tsx"></script>
   <script>
     if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {

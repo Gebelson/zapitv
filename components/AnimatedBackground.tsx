@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { tvModeService } from '../src/core/tv/tvModeService';
 
@@ -8,7 +7,7 @@ interface AnimatedBackgroundProps {
 
 const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ isDarkMode }) => {
   const isTv = tvModeService.isTvMode();
-  const [isVisible, setIsVisible] = useState(() => typeof document !== 'undefined' ? !document.hidden : true);
+  const [isVisible, setIsVisible] = useState(() => (typeof document !== 'undefined' ? !document.hidden : true));
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -19,21 +18,30 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ isDarkMode }) =
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
-  // Em Modo TV ou quando a aba está em segundo plano, utiliza gradiente estático de alta performance
-  if (isTv || !isVisible) {
+  const bgColor = isDarkMode ? '#05070a' : '#F8F9FC';
+
+  // Em Modo TV, utiliza gradiente estático de alta performance
+  if (isTv) {
     return (
-      <div className="fixed inset-0 -z-50 overflow-hidden pointer-events-none">
+      <div 
+        className="fixed inset-0 -z-50 overflow-hidden pointer-events-none"
+        style={{ backgroundColor: bgColor }}
+      >
         <div className={`absolute inset-0 ${isDarkMode ? 'bg-gradient-to-br from-[#05070a] via-[#080d17] to-[#05070a]' : 'bg-[#F8F9FC]'}`} />
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 -z-50 overflow-hidden pointer-events-none transform-gpu translate-z-0">
-      {/* Camada Base de Cor */}
-      <div className={`absolute inset-0 transition-colors duration-300 ${
-        isDarkMode ? 'bg-[#05070A]' : 'bg-[#F8F9FC]'
-      }`} />
+    <div 
+      className={`fixed inset-0 -z-50 overflow-hidden pointer-events-none transform-gpu translate-z-0 ${!isVisible ? 'animated-bg-paused' : ''}`}
+      style={{ backgroundColor: bgColor }}
+    >
+      {/* Camada Base de Cor Sólida e Permanente - Nunca desmontada */}
+      <div 
+        className="absolute inset-0 transition-colors duration-300" 
+        style={{ backgroundColor: bgColor }}
+      />
 
       {/* Container de Efeitos - Opacidade suave e blur balanceado para evitar sobrecarga de GPU */}
       <div className="absolute inset-0 w-full h-full filter blur-[80px] md:blur-[120px] opacity-30 transform-gpu contain-strict">
@@ -66,18 +74,18 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ isDarkMode }) =
             background: isDarkMode 
               ? 'radial-gradient(circle, rgba(236, 72, 153, 0.15) 0%, rgba(249, 115, 22, 0.05) 100%)'
               : 'radial-gradient(circle, rgba(244, 114, 182, 0.3) 0%, rgba(251, 146, 60, 0.2) 100%)',
-             animationDelay: '-10s'
+            animationDelay: '-10s'
           }}
         />
         
-         {/* Blob 4 - Accent Flutuante */}
-         <div 
+        {/* Blob 4 - Accent Flutuante */}
+        <div 
           className="absolute top-[40%] left-[40%] w-[40vw] h-[40vw] rounded-full mix-blend-overlay animate-blob-4 will-change-transform"
           style={{
             background: isDarkMode 
               ? 'radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, rgba(147, 51, 234, 0.2) 100%)'
               : 'radial-gradient(circle, rgba(96, 165, 250, 0.4) 0%, rgba(192, 132, 252, 0.4) 100%)',
-             animationDelay: '-2s'
+            animationDelay: '-2s'
           }}
         />
       </div>
@@ -115,10 +123,17 @@ const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ isDarkMode }) =
         .animate-blob-2 { animation: blob-2 40s infinite linear; }
         .animate-blob-3 { animation: blob-3 45s infinite linear; }
         .animate-blob-4 { animation: blob-4 30s infinite ease-in-out; }
+
+        /* Pausa as animações sem desmontar o DOM nem descartar texturas GPU ao minimizar ou alternar janela */
+        .animated-bg-paused .animate-blob-1,
+        .animated-bg-paused .animate-blob-2,
+        .animated-bg-paused .animate-blob-3,
+        .animated-bg-paused .animate-blob-4 {
+          animation-play-state: paused !important;
+        }
       `}</style>
     </div>
   );
 };
 
 export default React.memo(AnimatedBackground);
-
