@@ -15,13 +15,18 @@ interface VirtualizedCatalogGridProps {
   overscanRows?: number;
 }
 
+/**
+ * Mapeamento exato dos breakpoints responsivos da grade ZapiTV:
+ * grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7
+ * gap-3 sm:gap-4 md:gap-5 lg:gap-6
+ */
 function getGridColumns(width: number): { cols: number; gap: number } {
-  if (width >= 1536) return { cols: 7, gap: 24 };
-  if (width >= 1280) return { cols: 6, gap: 24 };
-  if (width >= 1024) return { cols: 5, gap: 24 };
-  if (width >= 768) return { cols: 4, gap: 20 };
-  if (width >= 640) return { cols: 3, gap: 16 };
-  return { cols: 2, gap: 12 };
+  if (width >= 1536) return { cols: 7, gap: 24 }; // 2xl (gap-6 = 24px)
+  if (width >= 1280) return { cols: 6, gap: 24 }; // xl (gap-6 = 24px)
+  if (width >= 1024) return { cols: 5, gap: 24 }; // lg (gap-6 = 24px)
+  if (width >= 768) return { cols: 4, gap: 20 };  // md (gap-5 = 20px)
+  if (width >= 640) return { cols: 3, gap: 16 };  // sm (gap-4 = 16px)
+  return { cols: 2, gap: 12 };                     // <640 (gap-3 = 12px)
 }
 
 export const VirtualizedCatalogGrid: React.FC<VirtualizedCatalogGridProps> = ({
@@ -37,16 +42,17 @@ export const VirtualizedCatalogGrid: React.FC<VirtualizedCatalogGridProps> = ({
   overscanRows = 2
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const sampleRowRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const firstCardRef = useRef<HTMLDivElement>(null);
 
   const [containerWidth, setContainerWidth] = useState<number>(() => {
     if (typeof window !== 'undefined') return window.innerWidth;
     return 1280;
   });
 
-  const [measuredRowHeight, setMeasuredRowHeight] = useState<number>(0);
+  const [measuredCardHeight, setMeasuredCardHeight] = useState<number>(0);
 
-  // Monitora largura do container de forma reativa
+  // Monitora largura do container de forma reativa com ResizeObserver
   useEffect(() => {
     const el = containerRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -65,58 +71,110 @@ export const VirtualizedCatalogGrid: React.FC<VirtualizedCatalogGridProps> = ({
 
   const { cols, gap } = useMemo(() => getGridColumns(containerWidth), [containerWidth]);
 
-  // Mede altura real de uma linha renderizada
-  const estimatedRowHeight = useMemo(() => {
-    if (measuredRowHeight > 0) return measuredRowHeight;
-    // Estimativa precisa baseada na proporção 2:3 + gap
-    const effectiveWidth = Math.max(300, containerWidth - (cols - 1) * gap);
-    const cardWidth = effectiveWidth / cols;
-    const cardHeight = cardWidth * 1.5;
-    return cardHeight + gap;
-  }, [measuredRowHeight, containerWidth, cols, gap]);
+  // Altura teórica calculada por geometria pura: largura disponível dividida pelas colunas, proporção 2:3 + gap vertical
+  const calculatedRowHeight = useMemo(() => {
+    const availableWidth = Math.max(280, containerWidth - (cols - 1) * gap);
+    const cardWidth = availableWidth / cols;
+    const cardHeight = cardWidth * 1.5; // proporção 2:3 exata de ContentCard (aspect-[2/3])
+    return Math.round(cardHeight + gap);
+  }, [containerWidth, cols, gap]);
+
+  // Mede a altura real de UM ÚNICO card no DOM (invariante em relação ao total de linhas montadas)
+  useEffect(() => {
+    if (firstCardRef.current) {
+      const h = firstCardRef.current.getBoundingClientRect().height;
+      if (h > 60 && Math.abs(h - measuredCardHeight) > 2) {
+        setMeasuredCardHeight(Math.round(h));
+      }
+    }
+  }, [containerWidth, items.length, measuredCardHeight]);
+
+  // Altura efetiva por linha: utiliza a medição real de um card (se disponível) ou o cálculo geométrico preciso
+  const effectiveRowHeight = useMemo(() => {
+    if (measuredCardHeight > 60) {
+      return measuredCardHeight + gap;
+    }
+    return calculatedRowHeight;
+  }, [measuredCardHeight, gap, calculatedRowHeight]);
 
   const totalRows = Math.ceil(items.length / cols);
 
-  // Intervalo de linhas visíveis (startRowIndex até endRowIndex)
-  const [visibleRange, setVisibleRange] = useState<{ startRow: number; endRow: number }>({
-    startRow: 0,
-    endRow: Math.min(totalRows, 6)
+  // Intervalo de linhas visíveis
+  const [visibleRange, setVisibleRange] = useState<{ startRow: number; endRow: number }>(() => {
+    const rowsInView = Math.ceil((typeof window !== 'undefined' ? window.innerHeight : 1080) / calculatedRowHeight);
+    return {
+      startRow: 0,
+      endRow: Math.min(totalRows, rowsInView + overscanRows)
+    };
   });
 
+  // Atualiza a janela visível no sistema de coordenadas correto do contêiner de rolagem ativo
   const updateVisibleRange = useCallback(() => {
-    const gridEl = containerRef.current;
-    if (!gridEl || totalRows === 0) return;
+    const containerEl = containerRef.current;
+    if (!containerEl || totalRows === 0) {
+      setVisibleRange(prev => (prev.startRow === 0 && prev.endRow === 0 ? prev : { startRow: 0, endRow: 0 }));
+      return;
+    }
 
-    const gridRect = gridEl.getBoundingClientRect();
-    const viewportHeight = scrollContainerRef?.current 
-      ? scrollContainerRef.current.clientHeight 
-      : (typeof window !== 'undefined' ? window.innerHeight : 1080);
+    const containerRect = containerEl.getBoundingClientRect();
+    const scroller = scrollContainerRef?.current;
+    const isScrollerScrollable = !!scroller && scroller.scrollHeight > scroller.clientHeight + 1;
 
-    const rowH = estimatedRowHeight;
+    let scrolledPastTop = 0;
+    let viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 1080;
+
+    if (isScrollerScrollable && scroller) {
+      const scrollerRect = scroller.getBoundingClientRect();
+      // Distância do topo do container em relação ao topo do viewport do scroller interno
+      const relativeTop = containerRect.top - scrollerRect.top;
+      scrolledPastTop = Math.max(0, -relativeTop);
+      viewportHeight = scroller.clientHeight || scrollerRect.height || 1080;
+    } else {
+      // Scroll padrão na janela (window / document)
+      scrolledPastTop = Math.max(0, -containerRect.top);
+      viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 1080;
+    }
+
+    const rowH = effectiveRowHeight;
     if (rowH <= 0) return;
 
-    // Distância do topo do grid em relação ao topo da área de visualização
-    const scrolledPastTop = Math.max(0, -gridRect.top);
+    // Linha inicial: baseada na distância rolada além do topo, com margem de respiro overscan
     const start = Math.max(0, Math.floor(scrolledPastTop / rowH) - overscanRows);
-    
-    const visibleBottom = Math.max(0, -gridRect.top + viewportHeight);
+    // Linha final: baseada no final da área visível do viewport, com margem de respiro overscan
+    const visibleBottom = scrolledPastTop + viewportHeight;
     const end = Math.min(totalRows, Math.ceil(visibleBottom / rowH) + overscanRows);
 
     setVisibleRange(prev => {
       if (prev.startRow === start && prev.endRow === end) return prev;
       return { startRow: start, endRow: end };
     });
-  }, [totalRows, estimatedRowHeight, overscanRows, scrollContainerRef]);
+  }, [totalRows, effectiveRowHeight, overscanRows, scrollContainerRef]);
 
-  // Registra medição precisa da linha no primeiro render ou após redimensionamento
+  // Reseta ou ajusta a janela visível ao mudar de categoria (currentView) ou quando os itens mudam
   useEffect(() => {
-    if (sampleRowRef.current) {
-      const h = sampleRowRef.current.getBoundingClientRect().height;
-      if (h > 100 && Math.abs(h - measuredRowHeight) > 4) {
-        setMeasuredRowHeight(h + gap);
+    setVisibleRange(prev => {
+      if (totalRows === 0) {
+        return { startRow: 0, endRow: 0 };
       }
-    }
-  }, [containerWidth, gap, measuredRowHeight, items.length]);
+      // Se a posição anterior excede o novo total de linhas (ex: transição de Filmes com 500 itens para Animes com 56 itens)
+      if (prev.startRow >= totalRows) {
+        const viewportHeight = scrollContainerRef?.current?.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 1080);
+        const rowsInView = Math.ceil(viewportHeight / effectiveRowHeight);
+        return {
+          startRow: 0,
+          endRow: Math.min(totalRows, rowsInView + overscanRows)
+        };
+      }
+      const validEnd = Math.min(totalRows, Math.max(prev.startRow + 1, prev.endRow));
+      if (validEnd !== prev.endRow) {
+        return { startRow: prev.startRow, endRow: validEnd };
+      }
+      return prev;
+    });
+
+    // Recalcula imediatamente a área visível
+    updateVisibleRange();
+  }, [currentView, totalRows, effectiveRowHeight, overscanRows, scrollContainerRef, updateVisibleRange]);
 
   // Listener de rolagem com requestAnimationFrame para fluidez máxima
   useEffect(() => {
@@ -153,19 +211,20 @@ export const VirtualizedCatalogGrid: React.FC<VirtualizedCatalogGridProps> = ({
     };
   }, [updateVisibleRange, scrollContainerRef]);
 
-  // Fatiamento dos itens visíveis
+  // Fatiamento dos itens estritamente dentro da janela visível
   const startIndex = visibleRange.startRow * cols;
   const endIndex = Math.min(items.length, visibleRange.endRow * cols);
   const visibleItems = useMemo(() => {
     return items.slice(startIndex, endIndex);
   }, [items, startIndex, endIndex]);
 
-  const topSpacerHeight = visibleRange.startRow * estimatedRowHeight;
-  const bottomSpacerHeight = Math.max(0, (totalRows - visibleRange.endRow) * estimatedRowHeight);
+  // Espaçadores virtuais superior e inferior (preservam altura e posições sem desmontar excessivamente)
+  const topSpacerHeight = visibleRange.startRow * effectiveRowHeight;
+  const bottomSpacerHeight = Math.max(0, (totalRows - visibleRange.endRow) * effectiveRowHeight);
 
   return (
     <div ref={containerRef} className="w-full relative">
-      {/* Espaçador Superior para preservar a altura e posição de rolagem */}
+      {/* Espaçador Superior proporcional às linhas anteriores */}
       {topSpacerHeight > 0 && (
         <div 
           style={{ height: `${topSpacerHeight}px` }} 
@@ -176,27 +235,33 @@ export const VirtualizedCatalogGrid: React.FC<VirtualizedCatalogGridProps> = ({
 
       {/* Grade Virtualizada Ativa (monta apenas cards no viewport + margem de respiro) */}
       <div 
-        ref={sampleRowRef}
+        ref={gridRef}
+        data-testid="virtualized-grid"
         className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6"
       >
         {visibleItems.map((item, idx) => {
           const itemKey = `browse-${currentView}-${item.canonicalId || item.imdbId || item.tmdbId || item.id}`;
           return (
-            <ContentCard
+            <div
               key={itemKey}
-              item={item}
-              isDarkMode={isDarkMode}
-              onItemClick={onItemClick}
-              isFavorite={favoritesSet.has(item.id)}
-              isInList={myListSet.has(item.id)}
-              onToggleFavorite={onToggleFavorite}
-              onToggleList={onToggleList}
-            />
+              ref={idx === 0 ? firstCardRef : undefined}
+              className="w-full"
+            >
+              <ContentCard
+                item={item}
+                isDarkMode={isDarkMode}
+                onItemClick={onItemClick}
+                isFavorite={favoritesSet.has(item.id)}
+                isInList={myListSet.has(item.id)}
+                onToggleFavorite={onToggleFavorite}
+                onToggleList={onToggleList}
+              />
+            </div>
           );
         })}
       </div>
 
-      {/* Espaçador Inferior para preservar a altura total do catálogo */}
+      {/* Espaçador Inferior proporcional às linhas restantes do catálogo */}
       {bottomSpacerHeight > 0 && (
         <div 
           style={{ height: `${bottomSpacerHeight}px` }} 

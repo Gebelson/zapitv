@@ -477,6 +477,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   useEffect(() => {
     setVisibleGridCount(42);
+    isAdvancingRef.current = false;
   }, [currentView, selectedGenre, currentCategorySort]);
 
   // Pré-aquece o chunk de ContentDetailModal após a montagem inicial para abertura instantânea (<16ms)
@@ -1098,7 +1099,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         moviesPageRef.current = nextPage;
         setMoviesPage(nextPage);
         let attempts = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 8;
         let newItems: ContentItem[] = [];
         let hasMore = true;
 
@@ -1111,7 +1112,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             newItems.push(...onlyMovies);
           }
 
-          if (newItems.length > 0 || !hasMore) {
+          if (newItems.length >= 20 || !hasMore) {
             break;
           }
 
@@ -1148,6 +1149,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             return updated;
           });
           setContent(prev => deduplicateContentItems([...prev, ...newItems]));
+          setVisibleGridCount(prev => Math.max(prev, visibleGridCountRef.current + newItems.length));
         }
 
         setHasMoreMovies(hasMore);
@@ -1156,7 +1158,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         seriesPageRef.current = nextPage;
         setSeriesPage(nextPage);
         let attempts = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 8;
         let newItems: ContentItem[] = [];
         let hasMore = true;
 
@@ -1169,7 +1171,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             newItems.push(...onlySeries);
           }
 
-          if (newItems.length > 0 || !hasMore) {
+          if (newItems.length >= 20 || !hasMore) {
             break;
           }
 
@@ -1206,6 +1208,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             return updated;
           });
           setContent(prev => deduplicateContentItems([...prev, ...newItems]));
+          setVisibleGridCount(prev => Math.max(prev, visibleGridCountRef.current + newItems.length));
         }
 
         setHasMoreSeries(hasMore);
@@ -1214,7 +1217,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         animesPageRef.current = nextPage;
         setAnimesPage(nextPage);
         let attempts = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 8;
         let newItems: ContentItem[] = [];
         let hasMore = true;
 
@@ -1227,7 +1230,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             newItems.push(...onlyAnimes);
           }
 
-          if (newItems.length > 0 || !hasMore) {
+          if (newItems.length >= 20 || !hasMore) {
             break;
           }
 
@@ -1264,6 +1267,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             return updated;
           });
           setContent(prev => deduplicateContentItems([...prev, ...newItems]));
+          setVisibleGridCount(prev => Math.max(prev, visibleGridCountRef.current + newItems.length));
         }
 
         setHasMoreAnimes(hasMore);
@@ -2353,74 +2357,102 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     isAdvancingRef.current = true;
     try {
       if (count < totalLocal) {
-        setVisibleGridCount(prev => prev + 42);
-        if (count + 42 >= totalLocal && hasRemote && !isLoadingMoreRef.current) {
+        // Revela o próximo lote de conteúdos locais já disponíveis em memória
+        const nextCount = Math.min(totalLocal, count + 42);
+        setVisibleGridCount(nextCount);
+        // Se ao revelar nos aproximamos do fim do acervo local e ainda há páginas remotas, pré-carrega sob demanda
+        if (nextCount + 42 >= totalLocal && hasRemote && !isLoadingMoreRef.current) {
           handleLoadMoreRef.current(currentView);
         }
       } else if (hasRemote && !isLoadingMoreRef.current) {
+        // Esgotou os itens locais: avança a contagem e busca mais da rede
         setVisibleGridCount(prev => prev + 42);
         handleLoadMoreRef.current(currentView);
       }
     } finally {
       setTimeout(() => {
         isAdvancingRef.current = false;
-      }, 250);
+      }, 150);
     }
   }, [currentView]);
 
   useEffect(() => {
-    const sentinel = sentinelRef.current;
-    const container = scrollContainerRef.current;
     const isBrowseView = currentView === 'movies' || currentView === 'series' || currentView === 'animes';
-
     if (!isBrowseView) return;
 
-    let observer: IntersectionObserver | null = null;
-    let mountTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-      if (typeof IntersectionObserver !== 'undefined' && sentinelRef.current) {
-        observer = new IntersectionObserver((entries) => {
-          const [entry] = entries;
-          if (entry && entry.isIntersecting) {
-            advanceCatalogWindow();
-          }
-        }, {
-          root: scrollContainerRef.current || null,
-          rootMargin: '600px',
-          threshold: 0.01
-        });
-        observer.observe(sentinelRef.current);
-      }
-    }, 100);
+    const checkAndAdvanceIfNeeded = () => {
+      if (isLoadingMoreRef.current || isAdvancingRef.current) return;
+      const count = visibleGridCountRef.current;
+      const totalLocal = filteredContentLengthRef.current;
+      const hasRemote = hasMoreRemoteRef.current;
+      if (count >= totalLocal && !hasRemote) return;
 
-    const handleScroll = () => {
-      if (!scrollContainerRef.current || currentViewRef.current !== currentView) return;
-      const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-      if (scrollTop + clientHeight >= scrollHeight - 700) {
-        advanceCatalogWindow();
+      const container = scrollContainerRef.current;
+      const isContainerScrollable = !!container && container.scrollHeight > container.clientHeight + 1;
+
+      if (isContainerScrollable && container) {
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        if (scrollTop + clientHeight >= scrollHeight - 800) {
+          advanceCatalogWindow();
+        }
+      } else if (typeof window !== 'undefined') {
+        const scrollPos = window.innerHeight + window.scrollY;
+        const docHeight = Math.max(
+          document.documentElement.scrollHeight,
+          document.body.scrollHeight,
+          document.documentElement.offsetHeight
+        );
+        if (scrollPos >= docHeight - 800) {
+          advanceCatalogWindow();
+        }
       }
     };
 
+    let observer: IntersectionObserver | null = null;
+    const target = sentinelRef.current;
+
+    if (typeof IntersectionObserver !== 'undefined' && target) {
+      const container = scrollContainerRef.current;
+      const isContainerScrollable = !!container && container.scrollHeight > container.clientHeight + 1;
+
+      observer = new IntersectionObserver((entries) => {
+        const [entry] = entries;
+        if (entry && entry.isIntersecting) {
+          advanceCatalogWindow();
+        }
+      }, {
+        root: isContainerScrollable ? container : null,
+        rootMargin: '600px',
+        threshold: 0.01
+      });
+      observer.observe(target);
+    }
+
+    const handleScroll = () => {
+      checkAndAdvanceIfNeeded();
+    };
+
+    const container = scrollContainerRef.current;
     if (container) {
       container.addEventListener('scroll', handleScroll, { passive: true });
     }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('scroll', handleScroll, { passive: true });
+      window.addEventListener('resize', handleScroll, { passive: true });
+    }
 
-    const handleWindowScroll = () => {
-      if (currentViewRef.current !== currentView) return;
-      const scrollPos = window.innerHeight + window.scrollY;
-      const threshold = document.documentElement.offsetHeight - 700;
-      if (scrollPos >= threshold) {
-        advanceCatalogWindow();
-      }
-    };
-    window.addEventListener('scroll', handleWindowScroll, { passive: true });
+    // Se o usuário já está próximo ao final (ou sentinela visível no viewport), dispara avanço imediatamente
+    checkAndAdvanceIfNeeded();
 
     return () => {
-      if (mountTimer) clearTimeout(mountTimer);
       if (observer) observer.disconnect();
       if (container) container.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('scroll', handleWindowScroll);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('resize', handleScroll);
+      }
     };
-  }, [currentView, advanceCatalogWindow]);
+  }, [currentView, advanceCatalogWindow, visibleGridCount, filteredContent.length, isLoadingMore]);
 
   const renderContent = () => {
     const gridClass = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6 px-3 sm:px-6 md:px-12 max-w-[2560px] mx-auto";
