@@ -1220,9 +1220,29 @@ var init_tmdbClient = __esm({
         }
         return void 0;
       }
-      async findByImdb(imdbId) {
+      async findByImdb(imdbId, expectedType) {
         try {
           const data = await this.request(`/find/${imdbId}?external_source=imdb_id`);
+          const wantsSeries = expectedType === "S\xC9RIE" /* SERIES */ || expectedType === "series" || expectedType === "anime";
+          const wantsMovie = expectedType === "FILME" /* MOVIE */ || expectedType === "movie";
+          if (wantsSeries) {
+            const tv2 = data.tv_results?.[0];
+            if (tv2) {
+              const item = formatContentItem(tv2, "S\xC9RIE" /* SERIES */);
+              item.imdbId = imdbId;
+              return item;
+            }
+            return null;
+          }
+          if (wantsMovie) {
+            const movie2 = data.movie_results?.[0];
+            if (movie2) {
+              const item = formatContentItem(movie2, "FILME" /* MOVIE */);
+              item.imdbId = imdbId;
+              return item;
+            }
+            return null;
+          }
           const movie = data.movie_results?.[0];
           if (movie) {
             const item = formatContentItem(movie, "FILME" /* MOVIE */);
@@ -4411,6 +4431,17 @@ var init_streamValidator = __esm({
         if (episodeParams?.season === 1 && rawCandidates.some((title) => /mushoku tensei/i.test(title)) && /\bmushoku tensei\s+iii\b/i.test(sTitle)) {
           return false;
         }
+        if (episodeParams && episodeParams.season > 0) {
+          const releaseYearMatch = sTitle.match(/\b(19\d{2}|20\d{2})\b/);
+          const hasEpisodeMarker = /\b(?:s\d{1,2}|t\d{1,2}|e\d{1,3}|ep\d{1,3}|season|temporada|epis[oó]dio)\b/i.test(combined);
+          if (releaseYearMatch && !hasEpisodeMarker) {
+            const movieReleaseTags = /\b(bluray|bdrip|brrip|dvdrip|remux)\b/i.test(sTitle);
+            if (movieReleaseTags) {
+              console.warn(`[StreamValidator] Fonte de filme rejeitada para requisi\xE7\xE3o de s\xE9rie: ${sTitle}`);
+              return false;
+            }
+          }
+        }
         for (const rule of KNOWN_UPSTREAM_MISMATCHES) {
           if (rawCandidates.some((cand) => rule.targetPattern.test(cand))) {
             if (rule.rejectStream(stream)) {
@@ -4426,20 +4457,16 @@ var init_streamValidator = __esm({
         const fenixMatch = sTitle.match(/🐦‍🔥\s*([^\n⏸️]+)/i);
         if (fenixMatch) {
           const declaredTitle = normalizeTitle(fenixMatch[1]);
-          const declaredWords = declaredTitle.split(" ").filter((w) => w.length >= 3);
           let matchesAny = declaredTitle === "a casa do dragao" && cleanCandidates.includes("house of the dragon");
           for (const cand of cleanCandidates) {
-            if (declaredTitle.includes(cand) || cand.includes(declaredTitle)) {
+            if (declaredTitle === cand || declaredTitle.startsWith(cand + " ") || declaredTitle.startsWith(cand + ":") || declaredTitle.startsWith(cand + " -")) {
               matchesAny = true;
               break;
             }
             const candWords = cand.split(" ").filter((w) => w.length >= 3);
-            if (candWords.length > 0 && declaredWords.length > 0) {
-              const hasOverlap = candWords.some((tw) => declaredTitle.includes(tw)) || declaredWords.some((dw) => cand.includes(dw));
-              if (hasOverlap) {
-                matchesAny = true;
-                break;
-              }
+            if (candWords.length >= 2 && candWords.every((cw) => declaredTitle.includes(cw))) {
+              matchesAny = true;
+              break;
             }
           }
           if (!matchesAny && cleanCandidates.length > 0) {
@@ -4451,8 +4478,11 @@ var init_streamValidator = __esm({
           const cleanSTitle = normalizeTitle(sTitle.replace(/\[[^\]]+\]/g, " "));
           const otherKnownSeries = ["ultraman", "aseria", "angel heart", "sparks of tomorrow", "black clover", "murai in love", "saving 80,000 gold"];
           const matchesTarget = cleanCandidates.some((cand) => {
-            const words = cand.split(" ").filter((w) => w.length >= 4);
-            return words.some((w) => cleanSTitle.includes(w));
+            const words = cand.split(" ").filter((w) => w.length >= 3);
+            if (words.length >= 2) {
+              return cleanSTitle.includes(cand) || words.every((w) => cleanSTitle.includes(w));
+            }
+            return cleanSTitle.includes(cand);
           });
           if (!matchesTarget && otherKnownSeries.some((t) => cleanSTitle.includes(t))) {
             console.warn(`[StreamValidator] Release torrent com t\xEDtulo trocado rejeitada: '${sTitle}' para '[${cleanCandidates.join(", ")}]'`);
@@ -4469,10 +4499,20 @@ var init_streamValidator = __esm({
         const normalize = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
         const cleanStream = normalize(streamText);
         const cleanTarget = normalize(targetTitle);
-        const targetWords = cleanTarget.split(/\s+/).filter((w) => w.length >= 4);
-        if (targetWords.length > 0 && !cleanStream.includes(cleanTarget)) {
-          const matchesAtLeastOne = targetWords.some((w) => cleanStream.includes(w));
-          if (!matchesAtLeastOne) {
+        const targetWords = cleanTarget.split(/\s+/).filter((w) => w.length >= 3);
+        if (targetWords.length >= 2) {
+          const allPresent = cleanStream.includes(cleanTarget) || targetWords.every((w) => cleanStream.includes(w));
+          if (!allPresent) {
+            return false;
+          }
+        } else if (targetWords.length === 1) {
+          const singleWord = targetWords[0];
+          const escaped = singleWord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const m = cleanStream.match(new RegExp(`(^|\\s)${escaped}(\\s|$)`, "i"));
+          if (!m) return false;
+          const after = cleanStream.slice(m.index + m[1].length + singleWord.length).trim();
+          const nextWord = after.split(/\s+/)[0];
+          if (nextWord && !/^(s\d+|e\d+|ep\d*|season|temporada|episodio|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|bluray|bdrip|webrip|webdl|web|dvdrip|x264|x265|dublado|legendado|dual|audio|pt|br)$/i.test(nextWord)) {
             return false;
           }
         }
@@ -6259,7 +6299,7 @@ var init_mediaSourceValidationService = __esm({
     init_videoAdBlocker();
     init_audioPreferenceService();
     init_subtitlePreferenceService();
-    STORAGE_VALIDATED_SOURCES_KEY = "zapitv_validated_sources_v3";
+    STORAGE_VALIDATED_SOURCES_KEY = "zapitv_validated_sources_v4";
     VALIDATION_CACHE_TTL_MS = 24 * 60 * 60 * 1e3;
     REJECTED_CACHE_TTL_MS = 6 * 60 * 60 * 1e3;
     MediaSourceValidationService = class _MediaSourceValidationService {
@@ -6486,7 +6526,7 @@ var init_mediaSourceValidationService = __esm({
         }
         if (context.canonicalIdentity) {
           const confEval = sourceConfidenceEngine.evaluate(stream, context.canonicalIdentity);
-          if (confEval.confidence === "REJECTED" || confEval.confidence === "QUARANTINED") {
+          if (!confEval.isMatch || confEval.confidence === "REJECTED" || confEval.confidence === "QUARANTINED") {
             return {
               mediaId: context.mediaId,
               sourceId: sourceKey,
@@ -10895,6 +10935,7 @@ var init_providerRegistry = __esm({
     init_subtitleService();
     init_sourceSelectionService();
     init_canonicalIdentity();
+    init_sourceConfidenceEngine();
     init_mediaLoadingTracker();
     init_mediaSourceValidationService();
     init_constants();
@@ -11184,7 +11225,7 @@ var init_providerRegistry = __esm({
        * Resolve todos os fluxos de reprodução para um item (filme ou série).
        */
       resolveStreams(type, id, episode, options) {
-        const cacheKey = JSON.stringify(["v6_identity", type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
+        const cacheKey = JSON.stringify(["v7_canonical_identity", type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
         const releaseListener = () => {
           const callback = options?.onProgressiveStreams;
           if (!callback) return;
@@ -11252,7 +11293,7 @@ var init_providerRegistry = __esm({
         return request;
       }
       async resolveStreamsFresh(type, id, episode, cacheKey, generation, options) {
-        const effectiveCacheKey = cacheKey || JSON.stringify(["v6_identity", type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
+        const effectiveCacheKey = cacheKey || JSON.stringify(["v7_canonical_identity", type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
         const effectiveGen = generation ?? this.cacheGeneration;
         const notifyProgressive = (currentStreams) => {
           const listeners = this.progressiveListeners.get(effectiveCacheKey);
@@ -11422,7 +11463,7 @@ var init_providerRegistry = __esm({
         if (!tmdbNum && imdbStr) {
           try {
             const found = await Promise.race([
-              tmdbService.findByImdb(imdbStr),
+              tmdbService.findByImdb(imdbStr, type),
               new Promise((resolve) => setTimeout(() => resolve(null), 2500))
             ]);
             if (found?.tmdbId) {
@@ -11438,17 +11479,46 @@ var init_providerRegistry = __esm({
               new Promise((resolve) => setTimeout(() => resolve([]), 2500))
             ]);
             if (searchResults && searchResults.length > 0) {
-              const match = searchResults.find((r) => r.imdbId || r.tmdbId) || searchResults[0];
-              if (match.tmdbId) {
-                tmdbNum = String(match.tmdbId).replace(/^tmdb-?/i, "");
-              } else if (match.id && !match.id.startsWith("open-") && !match.id.startsWith("local-")) {
-                if (/^\d+$/.test(match.id)) {
-                  tmdbNum = match.id;
+              const targetYear = id.year || openItem?.year || catalogItem?.year || 0;
+              const normTarget = canonicalIdentityService.normalizeTitle(targetTitle);
+              const typeMatches = searchResults.filter((r) => {
+                const rIsMovie = r.type === "FILME" /* MOVIE */ || r.mediaFormat === "movie";
+                return type === "movie" ? rIsMovie : !rIsMovie;
+              });
+              const validCandidates = typeMatches.filter((r) => {
+                const normTitle = canonicalIdentityService.normalizeTitle(r.title);
+                const normOrig = r.originalTitle ? canonicalIdentityService.normalizeTitle(r.originalTitle) : "";
+                const titleExact = normTitle === normTarget || normOrig === normTarget;
+                if (!titleExact) {
+                  const tTokens = canonicalIdentityService.extractSignificantTokens(normTarget);
+                  const rTokens = canonicalIdentityService.extractSignificantTokens(normTitle);
+                  if (tTokens.length >= 2 && rTokens.length >= 2) {
+                    const allTokensMatch = tTokens.every((t) => rTokens.includes(t)) && rTokens.every((t) => tTokens.includes(t));
+                    if (!allTokensMatch) return false;
+                  } else {
+                    return false;
+                  }
                 }
-              }
-              if (match.imdbId && !imdbStr) {
-                imdbStr = match.imdbId;
-                if (!altIds.includes(match.imdbId)) altIds.push(match.imdbId);
+                if (targetYear > 0 && r.year && r.year > 0 && Math.abs(r.year - targetYear) > 1) {
+                  return false;
+                }
+                return true;
+              });
+              const match = validCandidates[0];
+              if (match) {
+                if (match.tmdbId) {
+                  tmdbNum = String(match.tmdbId).replace(/^tmdb-?/i, "");
+                } else if (match.id && !match.id.startsWith("open-") && !match.id.startsWith("local-")) {
+                  if (/^\d+$/.test(match.id)) {
+                    tmdbNum = match.id;
+                  }
+                }
+                if (match.imdbId && !imdbStr) {
+                  imdbStr = match.imdbId;
+                  if (!altIds.includes(match.imdbId)) altIds.push(match.imdbId);
+                }
+              } else {
+                console.warn(`[ProviderRegistry] Busca de fallback por t\xEDtulo '${targetTitle}' n\xE3o encontrou resultado estritamente compat\xEDvel com tipo='${type}' e ano=${targetYear}. Nenhuma correspond\xEAncia for\xE7ada.`);
               }
             }
           } catch {
@@ -11524,7 +11594,10 @@ var init_providerRegistry = __esm({
                   if (addon.id === "fenixflix-animes" && /🐉\s*Malfoy/i.test(s.title || "")) continue;
                   if (s.ytId || s.url && (s.url.includes("youtube.com") || s.url.includes("youtu.be"))) continue;
                   if (streamValidator.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles, episode)) {
-                    return true;
+                    const conf = sourceConfidenceEngine.evaluate(s, identity);
+                    if (conf.isMatch) {
+                      return true;
+                    }
                   }
                 }
                 return false;
@@ -11732,7 +11805,7 @@ var init_providerRegistry = __esm({
               if (Array.isArray(result) && result.length > 0) {
                 collectedFromAddons.push(...result);
                 const combinedInterim = [...streams, ...collectedFromAddons];
-                const cleanInterim = streamValidator.filterCleanStreams(combinedInterim, targetTitle, originalTitle, alternateTitles, episode);
+                const cleanInterim = streamValidator.filterCleanStreams(combinedInterim, targetTitle, originalTitle, alternateTitles, episode).filter((s) => sourceConfidenceEngine.evaluate(s, identity).isMatch);
                 if (cleanInterim.length > 0) {
                   const engineOnline = localEngineCache.active;
                   const hasWebReady = cleanInterim.some((s) => !s.isTorrent && !s.url?.includes("127.0.0.1:11470") && !s.url?.includes("localhost:11470") || engineOnline);
@@ -11780,7 +11853,7 @@ var init_providerRegistry = __esm({
                 }
                 if (!options?.isRetryAttempt) {
                   const engineOnline = localEngineCache.active;
-                  const cleanInterim = streamValidator.filterCleanStreams([...streams, ...collectedFromAddons], targetTitle, originalTitle, alternateTitles, episode);
+                  const cleanInterim = streamValidator.filterCleanStreams([...streams, ...collectedFromAddons], targetTitle, originalTitle, alternateTitles, episode).filter((s) => sourceConfidenceEngine.evaluate(s, identity).isMatch);
                   const hasFrostStreamFinished = !sortedAddons.some((a) => a.id.includes("froststream")) || collectedFromAddons.some((s) => s.providerId?.includes("froststream"));
                   const culprits = cleanInterim.filter((s) => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
                   const hasWebReadyPtBr = culprits.length > 0;
@@ -11800,6 +11873,8 @@ var init_providerRegistry = __esm({
           rawStreamCount: streams.length
         });
         const cleanStreams = streamValidator.filterCleanStreams(streams, targetTitle, originalTitle, alternateTitles, episode).filter((s) => {
+          const conf = sourceConfidenceEngine.evaluate(s, identity);
+          if (!conf.isMatch) return false;
           if (s.ytId) return false;
           const u = (s.url || "").toLowerCase();
           const t = (s.title || "").toLowerCase();
@@ -13180,26 +13255,41 @@ var init_canonicalIdentity = __esm({
         const aliases = [item.title.toLowerCase()];
         if (item.originalTitle) {
           aliases.push(item.originalTitle.toLowerCase());
-          const origParts = item.originalTitle.split(/[:\-\–\—/|()]/);
-          origParts.forEach((p) => {
-            const clean2 = p.trim().toLowerCase();
-            if (clean2.length >= 3) aliases.push(clean2);
+        }
+        const extraAliases = item.alternateTitles || item.knownAliases;
+        if (Array.isArray(extraAliases)) {
+          extraAliases.forEach((alias) => {
+            if (typeof alias === "string" && alias.trim().length >= 3) {
+              aliases.push(alias.trim().toLowerCase());
+            }
           });
         }
-        const titleParts = item.title.split(/[:\-\–\—/|()]/);
-        titleParts.forEach((p) => {
-          const clean2 = p.trim().toLowerCase();
-          if (clean2.length >= 3) aliases.push(clean2);
-        });
-        const mainToken = this.extractSignificantTokens(item.title)[0];
-        if (mainToken && mainToken.length >= 4) {
-          aliases.push(mainToken.toLowerCase());
-        }
-        if (item.originalTitle) {
-          const origMainToken = this.extractSignificantTokens(item.originalTitle)[0];
-          if (origMainToken && origMainToken.length >= 4) {
-            aliases.push(origMainToken.toLowerCase());
+        const addSubTitleParts = (raw) => {
+          if (!raw) return;
+          const parts = raw.split(/[:\-\–\—/|]/);
+          if (parts.length > 1) {
+            parts.forEach((p) => {
+              const clean2 = p.trim().toLowerCase();
+              const tokens = this.extractSignificantTokens(clean2);
+              if (tokens.length >= 2 && clean2.length >= 8) {
+                aliases.push(clean2);
+              }
+            });
           }
+        };
+        addSubTitleParts(item.title);
+        addSubTitleParts(item.originalTitle);
+        if (epParams?.season && epParams.season > 1) {
+          const romanNumerals = ["", "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
+          const roman = romanNumerals[epParams.season];
+          if (roman) {
+            aliases.push(`${item.title.toLowerCase()} ${roman}`);
+            if (item.originalTitle) {
+              aliases.push(`${item.originalTitle.toLowerCase()} ${roman}`);
+            }
+          }
+          aliases.push(`${item.title.toLowerCase()} season ${epParams.season}`);
+          aliases.push(`${item.title.toLowerCase()} temporada ${epParams.season}`);
         }
         if (/doraemon/i.test(item.title)) {
           aliases.push("doraemon", "gato do futuro", "\u30C9\u30E9\u3048\u3082\u3093");
@@ -13260,12 +13350,15 @@ var init_canonicalIdentity = __esm({
 });
 
 // src/core/identity/sourceConfidenceEngine.ts
-var KNOWN_COLLISION_TITLES, SourceConfidenceEngine, sourceConfidenceEngine;
+var isKnownTechnicalOrReleaseWord, KNOWN_COLLISION_TITLES, SourceConfidenceEngine, sourceConfidenceEngine;
 var init_sourceConfidenceEngine = __esm({
   "src/core/identity/sourceConfidenceEngine.ts"() {
     init_canonicalIdentity();
     init_streamQuarantineService();
     init_types();
+    isKnownTechnicalOrReleaseWord = (word) => {
+      return /^(s\d+|e\d+|ep\d*|season|temporada|episodio|epis[oó]dio|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|360p|hd|sd|fhd|uhd|bluray|bdrip|brrip|webrip|webdl|web|hdtv|dvdrip|dvd|x264|x265|hevc|h264|h265|avc|aac|ac3|eac3|dts|mp4|mkv|avi|webm|dublado|legendado|dual|multi|audio|áudio|pt|br|ptbr|pob|eng|sub|softsub|hardsub|remux|complete|ita|spa|fra|ger|rus|jap|kor|nf|amzn|atvp|dnp|hmax|dsnp|repack|proper|ii|iii|iv|v|vi|vii|viii|ix|x|1st|2nd|3rd|4th|5th|part|cour)$/i.test(word);
+    };
     KNOWN_COLLISION_TITLES = [
       "sparks of tomorrow",
       "eternal aseria",
@@ -13279,6 +13372,42 @@ var init_sourceConfidenceEngine = __esm({
       "ultraman"
     ];
     SourceConfidenceEngine = class {
+      constructor() {
+        this.diagnosticHistory = [];
+        this.MAX_DIAGNOSTICS = 50;
+      }
+      getRecentDiagnostics() {
+        return [...this.diagnosticHistory];
+      }
+      clearDiagnostics() {
+        this.diagnosticHistory = [];
+      }
+      recordDiagnostic(stream, identity, result, declaredTitle) {
+        const record = {
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          targetTitle: identity.title,
+          targetImdbId: identity.imdbId,
+          targetTmdbId: identity.tmdbId,
+          targetType: identity.type,
+          season: identity.season,
+          episode: identity.episode,
+          providerId: stream.providerId,
+          providerName: stream.providerName,
+          streamTitle: stream.title || stream.name,
+          streamUrl: stream.url,
+          declaredTitle,
+          isMatch: result.isMatch,
+          confidence: result.confidence,
+          reasons: result.reasons
+        };
+        this.diagnosticHistory.unshift(record);
+        if (this.diagnosticHistory.length > this.MAX_DIAGNOSTICS) {
+          this.diagnosticHistory.pop();
+        }
+        if (!result.isMatch) {
+          console.warn(`[IdentityValidator] \u274C Fonte rejeitada para "${identity.title}" (${identity.type}${identity.year ? " " + identity.year : ""}): ${result.reasons.join(" \u2022 ")} [stream: ${stream.title || stream.name || stream.url}]`);
+        }
+      }
       /**
        * Avalia uma fonte de streaming contra a identidade canônica da obra solicitada.
        */
@@ -13292,13 +13421,15 @@ var init_sourceConfidenceEngine = __esm({
         const quarantineCheck = streamQuarantineService.evaluateQuarantine(stream, identity.title);
         if (quarantineCheck.isQuarantined) {
           reasons.push(quarantineCheck.reason || "Fonte bloqueada por quarentena");
-          return {
+          const evalResult2 = {
             stream,
             confidence: "QUARANTINED",
             isMatch: false,
             reasons,
             canonicalTitle: identity.title
           };
+          this.recordDiagnostic(stream, identity, evalResult2);
+          return evalResult2;
         }
         if (identity.isTheatricalUnreleased) {
           const isClaimingDigital = (combined.includes("web-dl") || combined.includes("webrip") || combined.includes("bluray") || combined.includes("amzn")) && !combined.includes("trailer") && !combined.includes("teaser");
@@ -13306,67 +13437,82 @@ var init_sourceConfidenceEngine = __esm({
             const reason = `Release digital para obra ainda n\xE3o lan\xE7ada: "${identity.title}"`;
             streamQuarantineService.quarantine(streamInfoHash || streamUrl, reason, "adult_troll", identity.title, stream.providerName);
             reasons.push(reason);
-            return {
+            const evalResult2 = {
               stream,
               confidence: "QUARANTINED",
               isMatch: false,
               reasons,
               canonicalTitle: identity.title
             };
+            this.recordDiagnostic(stream, identity, evalResult2);
+            return evalResult2;
           }
         }
         const isAcervoOficial = stream.providerId === "zapitv-verified";
         const episodeTag = streamTitle.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b)/i);
         if (episodeTag && identity.type === "FILME" /* MOVIE */) {
           reasons.push("Fonte epis\xF3dica oferecida para um filme");
-          return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+          const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+          this.recordDiagnostic(stream, identity, evalResult2);
+          return evalResult2;
         }
         if (episodeTag && identity.season && identity.episode && (Number(episodeTag[1] || episodeTag[3]) !== identity.season || Number(episodeTag[2] || episodeTag[4]) !== identity.episode)) {
           reasons.push("Temporada ou epis\xF3dio diferente do solicitado");
-          return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+          const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+          this.recordDiagnostic(stream, identity, evalResult2);
+          return evalResult2;
         }
         const absEpMatch = streamTitle.match(/\((?:ep|episode)\.?\s*(\d+)\)/i);
         if (absEpMatch && identity.season && identity.season > 1 && identity.episode) {
           const absEp = parseInt(absEpMatch[1], 10);
           if (absEp <= identity.episode) {
             reasons.push(`Epis\xF3dio absoluto (${absEp}) pertence \xE0 primeira temporada e n\xE3o \xE0 temporada ${identity.season}`);
-            return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+            const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+            this.recordDiagnostic(stream, identity, evalResult2);
+            return evalResult2;
           }
         }
         if (identity.season === 1 && /\b(?:clevatess\s+ii|mushoku\s+tensei\s+ii|2nd\s+season|3rd\s+season|sais(?:on)?\s*0*2)\b/i.test(streamTitle)) {
           reasons.push("Fonte pertence a uma temporada posterior e n\xE3o \xE0 primeira");
-          return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+          const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+          this.recordDiagnostic(stream, identity, evalResult2);
+          return evalResult2;
         }
         if (identity.type === "FILME" /* MOVIE */ && identity.year) {
           const releaseYear = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
           if (releaseYear && Math.abs(Number(releaseYear[1]) - identity.year) > 1) {
-            reasons.push("Ano da fonte diferente do filme solicitado");
-            return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+            reasons.push(`Ano da fonte (${releaseYear[1]}) diferente do filme solicitado (${identity.year})`);
+            const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+            this.recordDiagnostic(stream, identity, evalResult2);
+            return evalResult2;
           }
         }
         const declaredTitle = streamTitle.match(/🐦‍🔥\s*([^\n⏸️]+)/)?.[1]?.trim();
         if (declaredTitle) {
           const normalizedDeclared = canonicalIdentityService.normalizeTitle(declaredTitle);
-          const declaredParts = declaredTitle.split(/[:\-–—|]/).map((p) => canonicalIdentityService.normalizeTitle(p.trim())).filter((p) => p.length >= 3);
           const aliases = [identity.title, identity.originalTitle, ...identity.knownAliases || []].filter(Boolean).map((alias) => canonicalIdentityService.normalizeTitle(alias));
           const isMatch = aliases.some(
-            (alias) => normalizedDeclared === alias || declaredParts.includes(alias) || alias.length >= 5 && normalizedDeclared.startsWith(alias)
+            (alias) => normalizedDeclared === alias || normalizedDeclared.startsWith(alias + " ") || normalizedDeclared.startsWith(alias + ":") || normalizedDeclared.startsWith(alias + " -")
           );
           const isShippudenMismatch = normalizedDeclared.includes("shippuden") && !aliases.some((a) => a.includes("shippuden"));
           if (!isMatch || isShippudenMismatch) {
-            reasons.push("T\xEDtulo declarado pelo addon difere da obra solicitada");
-            return { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+            reasons.push(`T\xEDtulo declarado pelo addon ('${declaredTitle}') difere da obra solicitada ('${identity.title}')`);
+            const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+            this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
+            return evalResult2;
           }
         }
         if (isAcervoOficial) {
           reasons.push("Fonte can\xF4nica verificada pelo acervo oficial ZapiTV");
-          return {
+          const evalResult2 = {
             stream,
             confidence: "VERIFIED",
             isMatch: true,
             reasons,
             canonicalTitle: identity.title
           };
+          this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
+          return evalResult2;
         }
         const streamTitleToCheck = canonicalIdentityService.normalizeTitle(`${streamName} ${streamTitle} ${stream.description || ""}`);
         for (const collisionTitle of KNOWN_COLLISION_TITLES) {
@@ -13377,94 +13523,112 @@ var init_sourceConfidenceEngine = __esm({
             const cleanOrig = identity.originalTitle ? canonicalIdentityService.normalizeTitle(identity.originalTitle) : "";
             if (!cleanTarget.includes(cleanCollision) && !cleanOrig.includes(cleanCollision)) {
               reasons.push(`Obra incorreta detectada: stream cont\xE9m "${collisionTitle}"`);
-              return {
+              const evalResult2 = {
                 stream,
                 confidence: "REJECTED",
                 isMatch: false,
                 reasons,
                 canonicalTitle: identity.title
               };
+              this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
+              return evalResult2;
             }
           }
         }
         if (/resident evil/i.test(identity.title) && !/vendetta|damnation|degeneration|infinite darkness|death island/i.test(identity.title)) {
           if (/vendetta|damnation|degeneration|infinite darkness|death island/i.test(combined)) {
             reasons.push("Anima\xE7\xE3o 3D de Resident Evil n\xE3o pode substituir o filme live-action solicitado");
-            return {
+            const evalResult2 = {
               stream,
               confidence: "REJECTED",
               isMatch: false,
               reasons,
               canonicalTitle: identity.title
             };
+            this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
+            return evalResult2;
           }
         }
         const targetTokens = canonicalIdentityService.extractSignificantTokens(identity.title);
         const origTokens = identity.originalTitle ? canonicalIdentityService.extractSignificantTokens(identity.originalTitle) : [];
-        const cleanStreamTitle = canonicalIdentityService.normalizeTitle(`${streamTitle} ${stream.description || ""}`);
         const titleWords = new Set(canonicalIdentityService.extractSignificantTokens(`${streamName} ${streamTitle} ${stream.description || ""}`));
-        let aliasMatched = false;
-        for (const alias of identity.knownAliases) {
+        let matchedAlias = null;
+        const allAliases = [identity.title, identity.originalTitle, ...identity.knownAliases || []].filter(Boolean);
+        for (const alias of allAliases) {
           const cleanAlias = canonicalIdentityService.normalizeTitle(alias);
-          if (cleanAlias.length >= 3 && new RegExp(`(^|\\s)${cleanAlias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`).test(streamTitleToCheck)) {
-            aliasMatched = true;
+          if (cleanAlias.length < 3) continue;
+          const escaped = cleanAlias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const aliasRegex = new RegExp(`(^|\\s)${escaped}(\\s|$)`, "i");
+          const match = streamTitleToCheck.match(aliasRegex);
+          if (match) {
+            const aliasTokens = canonicalIdentityService.extractSignificantTokens(cleanAlias);
+            if (aliasTokens.length === 1 && match.index !== void 0) {
+              const matchPos = match.index + match[1].length;
+              const afterText = streamTitleToCheck.slice(matchPos + cleanAlias.length).trim();
+              const nextWord = afterText.split(/\s+/)[0];
+              if (nextWord && !isKnownTechnicalOrReleaseWord(nextWord)) {
+                continue;
+              }
+            }
+            matchedAlias = cleanAlias;
             break;
           }
         }
-        const matchingTarget = targetTokens.filter((token) => titleWords.has(token));
-        const matchingOrig = origTokens.filter((token) => titleWords.has(token));
-        const tokenOverlapRatio = targetTokens.length > 0 ? matchingTarget.length / targetTokens.length : 0;
-        const origOverlapRatio = origTokens.length > 0 ? matchingOrig.length / origTokens.length : 0;
-        const hasDistinctiveToken = [...matchingTarget, ...matchingOrig].some((t) => t.length >= 4);
-        const hasTitleCorrespondence = aliasMatched || tokenOverlapRatio >= 0.3 || origOverlapRatio >= 0.3 || hasDistinctiveToken;
-        if (!hasTitleCorrespondence) {
-          reasons.push(`T\xEDtulo do stream n\xE3o possui correspond\xEAncia com "${identity.title}"`);
-          return {
+        const allTargetTokensPresent = targetTokens.length >= 2 && targetTokens.every((t) => titleWords.has(t));
+        const allOrigTokensPresent = origTokens.length >= 2 && origTokens.every((t) => titleWords.has(t));
+        const isFullTitleMatch = Boolean(matchedAlias) || allTargetTokensPresent || allOrigTokensPresent;
+        if (!isFullTitleMatch) {
+          reasons.push(`T\xEDtulo do stream n\xE3o corresponde \xE0 obra solicitada "${identity.title}"`);
+          const evalResult2 = {
             stream,
             confidence: "REJECTED",
             isMatch: false,
             reasons,
             canonicalTitle: identity.title
           };
+          this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
+          return evalResult2;
+        }
+        if ((identity.type === "S\xC9RIE" /* SERIES */ || identity.type === "ANIME" /* ANIME */) && identity.year) {
+          const releaseYearMatch = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
+          if (releaseYearMatch) {
+            const foundYear = Number(releaseYearMatch[1]);
+            if (Math.abs(foundYear - identity.year) > 1 && !episodeTag) {
+              reasons.push(`Ano da fonte (${foundYear}) diverge da s\xE9rie (${identity.year}) sem identificador de epis\xF3dio`);
+              const evalResult2 = {
+                stream,
+                confidence: "REJECTED",
+                isMatch: false,
+                reasons,
+                canonicalTitle: identity.title
+              };
+              this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
+              return evalResult2;
+            }
+          }
         }
         if (identity.isChildFriendly) {
-          if (!aliasMatched && tokenOverlapRatio < 0.3 && origOverlapRatio < 0.3 && !hasDistinctiveToken) {
-            reasons.push("Conte\xFAdo infantil exige confirma\xE7\xE3o rigorosa de identidade");
-            return {
-              stream,
-              confidence: "REJECTED",
-              isMatch: false,
-              reasons,
-              canonicalTitle: identity.title
-            };
-          }
           reasons.push("Conte\xFAdo infantil: correspond\xEAncia aprovada com valida\xE7\xE3o cautelosa");
-          return {
+          const evalResult2 = {
             stream,
             confidence: "PROVISIONAL",
             isMatch: true,
             reasons,
             canonicalTitle: identity.title
           };
+          this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
+          return evalResult2;
         }
-        if (aliasMatched || tokenOverlapRatio >= 0.5) {
-          reasons.push(`Correspond\xEAncia de t\xEDtulo verificada (${Math.round(tokenOverlapRatio * 100)}% dos termos)`);
-          return {
-            stream,
-            confidence: "PROVISIONAL",
-            isMatch: true,
-            reasons,
-            canonicalTitle: identity.title
-          };
-        }
-        reasons.push("Informa\xE7\xF5es do stream incompletas ou correspond\xEAncia parcial");
-        return {
+        reasons.push(`Identidade confirmada para "${identity.title}"`);
+        const evalResult = {
           stream,
-          confidence: "SUSPICIOUS",
-          isMatch: false,
+          confidence: "PROVISIONAL",
+          isMatch: true,
           reasons,
           canonicalTitle: identity.title
         };
+        this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
+        return evalResult;
       }
       /**
        * Filtra e classifica uma lista de streams para a mídia solicitada
@@ -13522,7 +13686,7 @@ var init_sourceSelectionService = __esm({
               explanation: `\u{1F6A8} QUARENTENA: ${confEval.reasons.join(" \u2022 ")}`
             };
           }
-          if (confEval.confidence === "REJECTED") {
+          if (!confEval.isMatch || confEval.confidence === "REJECTED") {
             return {
               score: -5e5,
               priority: 6,
@@ -13531,7 +13695,7 @@ var init_sourceSelectionService = __esm({
               subtitleFormat: "unknown",
               audioAnalysis: { tier: "foreign", isDubbed: false, isPtBr: false, isDualAudio: false, language: "unknown", confidence: 0, reason: confEval.reasons.join(", ") },
               subtitleAnalysis: { format: "unknown", isHardsub: false, isClean: false, isSoftsub: false, hasPtSubtitle: false, confidence: 0, details: confEval.reasons.join(", ") },
-              explanation: `\u274C REJEITADO: ${confEval.reasons.join(" \u2022 ")}`
+              explanation: `\u274C REJEITADO (Identidade Incompat\xEDvel): ${confEval.reasons.join(" \u2022 ")}`
             };
           }
           if (options.identity.isChildFriendly && confEval.confidence !== "VERIFIED" && confEval.confidence !== "PROVISIONAL") {

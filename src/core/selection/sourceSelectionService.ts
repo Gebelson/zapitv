@@ -72,7 +72,7 @@ export class SourceSelectionService {
         };
       }
 
-      if (confEval.confidence === 'REJECTED') {
+      if (!confEval.isMatch || confEval.confidence === 'REJECTED') {
         return {
           score: -500000,
           priority: 6,
@@ -81,7 +81,7 @@ export class SourceSelectionService {
           subtitleFormat: 'unknown',
           audioAnalysis: { tier: 'foreign', isDubbed: false, isPtBr: false, isDualAudio: false, language: 'unknown', confidence: 0, reason: confEval.reasons.join(', ') },
           subtitleAnalysis: { format: 'unknown', isHardsub: false, isClean: false, isSoftsub: false, hasPtSubtitle: false, confidence: 0, details: confEval.reasons.join(', ') },
-          explanation: `❌ REJEITADO: ${confEval.reasons.join(' • ')}`
+          explanation: `❌ REJEITADO (Identidade Incompatível): ${confEval.reasons.join(' • ')}`
         };
       }
 

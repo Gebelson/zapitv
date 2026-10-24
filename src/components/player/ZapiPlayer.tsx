@@ -2443,14 +2443,22 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       } catch {}
     }
 
+    const canonicalIdentity = canonicalIdentityService.buildIdentity(activeItem, {
+      season: initialSeason,
+      episode: initialEpisode
+    });
+
     const originalLanguage = audioSelectionManager.detectOriginalLanguage(activeItem);
     const currentLanguage = currentStream
       ? audioSelectionManager.inspectStreamAudioLanguage(currentStream, originalLanguage) : 'unknown';
     const requiredLanguage = activeAudioId?.startsWith('stream-')
       ? activeAudioId.slice('stream-'.length) : currentLanguage;
+
+    // Garante que o fallback considere APENAS fontes cuja identidade corresponda comprovadamente à obra solicitada
     const remaining = streams
       .map((s, idx) => ({ s, idx }))
       .filter(({ s, idx }) => !triedIndicesRef.current.has(idx) &&
+        sourceConfidenceEngine.evaluate(s, canonicalIdentity).isMatch &&
         (requiredLanguage !== 'unknown'
           ? audioSelectionManager.inspectStreamAudioLanguage(s, originalLanguage) === requiredLanguage
           : true));
@@ -2462,7 +2470,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       // NUNCA disparar aviso de dublagem antes de confirmar que a próxima fonte é reproduzível!
       const anyRemaining = streams
         .map((s, idx) => ({ s, idx }))
-        .filter(({ idx }) => !triedIndicesRef.current.has(idx));
+        .filter(({ s, idx }) => !triedIndicesRef.current.has(idx) &&
+          sourceConfidenceEngine.evaluate(s, canonicalIdentity).isMatch);
       if (anyRemaining.length > 0) {
         nextCandidate = anyRemaining[0];
       }

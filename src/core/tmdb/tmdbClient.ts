@@ -291,9 +291,32 @@ class TMDBClientService {
     return undefined;
   }
 
-  public async findByImdb(imdbId: string): Promise<ContentItem | null> {
+  public async findByImdb(imdbId: string, expectedType?: ContentType | 'movie' | 'series' | 'anime'): Promise<ContentItem | null> {
     try {
       const data = await this.request(`/find/${imdbId}?external_source=imdb_id`);
+      const wantsSeries = expectedType === ContentType.SERIES || expectedType === 'series' || expectedType === 'anime';
+      const wantsMovie = expectedType === ContentType.MOVIE || expectedType === 'movie';
+
+      if (wantsSeries) {
+        const tv = data.tv_results?.[0];
+        if (tv) {
+          const item = formatContentItem(tv, ContentType.SERIES);
+          item.imdbId = imdbId;
+          return item;
+        }
+        return null;
+      }
+
+      if (wantsMovie) {
+        const movie = data.movie_results?.[0];
+        if (movie) {
+          const item = formatContentItem(movie, ContentType.MOVIE);
+          item.imdbId = imdbId;
+          return item;
+        }
+        return null;
+      }
+
       const movie = data.movie_results?.[0];
       if (movie) {
         const item = formatContentItem(movie, ContentType.MOVIE);

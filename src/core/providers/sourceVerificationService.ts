@@ -257,9 +257,36 @@ class SourceVerificationService {
         if (!resolvedImdbId && targetTitle) {
           const multi = await tmdbService.searchMulti(targetTitle);
           if (multi && multi.length > 0) {
-            const match = multi.find(m => m.imdbId || m.tmdbId) || multi[0];
-            if (match.imdbId) resolvedImdbId = match.imdbId;
-            if (match.tmdbId && !resolvedTmdbId) resolvedTmdbId = match.tmdbId;
+            const targetYear = item.year || 0;
+            const normTarget = canonicalIdentityService.normalizeTitle(targetTitle);
+            const typeMatches = multi.filter(r => {
+              const rIsMovie = r.type === ContentType.MOVIE || r.mediaFormat === 'movie';
+              return streamType === 'movie' ? rIsMovie : !rIsMovie;
+            });
+            const valid = typeMatches.filter(r => {
+              const normTitle = canonicalIdentityService.normalizeTitle(r.title);
+              const normOrig = r.originalTitle ? canonicalIdentityService.normalizeTitle(r.originalTitle) : '';
+              const titleExact = normTitle === normTarget || normOrig === normTarget;
+              if (!titleExact) {
+                const tTokens = canonicalIdentityService.extractSignificantTokens(normTarget);
+                const rTokens = canonicalIdentityService.extractSignificantTokens(normTitle);
+                if (tTokens.length >= 2 && rTokens.length >= 2) {
+                  const allMatch = tTokens.every(t => rTokens.includes(t)) && rTokens.every(t => tTokens.includes(t));
+                  if (!allMatch) return false;
+                } else {
+                  return false;
+                }
+              }
+              if (targetYear > 0 && r.year && r.year > 0 && Math.abs(r.year - targetYear) > 1) {
+                return false;
+              }
+              return true;
+            });
+            const match = valid[0];
+            if (match) {
+              if (match.imdbId) resolvedImdbId = match.imdbId;
+              if (match.tmdbId && !resolvedTmdbId) resolvedTmdbId = match.tmdbId;
+            }
           }
         }
       } catch (e: any) {

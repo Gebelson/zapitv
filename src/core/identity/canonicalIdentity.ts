@@ -74,28 +74,49 @@ export class CanonicalIdentityService {
     const aliases: string[] = [item.title.toLowerCase()];
     if (item.originalTitle) {
       aliases.push(item.originalTitle.toLowerCase());
-      const origParts = item.originalTitle.split(/[:\-\–\—/|()]/);
-      origParts.forEach(p => {
-        const clean = p.trim().toLowerCase();
-        if (clean.length >= 3) aliases.push(clean);
+    }
+
+    // Preserva títulos alternativos explícitos fornecidos por metadados confiáveis
+    const extraAliases = (item as any).alternateTitles || (item as any).knownAliases;
+    if (Array.isArray(extraAliases)) {
+      extraAliases.forEach((alias: any) => {
+        if (typeof alias === 'string' && alias.trim().length >= 3) {
+          aliases.push(alias.trim().toLowerCase());
+        }
       });
     }
-    const titleParts = item.title.split(/[:\-\–\—/|()]/);
-    titleParts.forEach(p => {
-      const clean = p.trim().toLowerCase();
-      if (clean.length >= 3) aliases.push(clean);
-    });
 
-    // Extrai o primeiro token significativo distintivo (ex: "Frieren", "Westworld", "Matrix")
-    const mainToken = this.extractSignificantTokens(item.title)[0];
-    if (mainToken && mainToken.length >= 4) {
-      aliases.push(mainToken.toLowerCase());
-    }
-    if (item.originalTitle) {
-      const origMainToken = this.extractSignificantTokens(item.originalTitle)[0];
-      if (origMainToken && origMainToken.length >= 4) {
-        aliases.push(origMainToken.toLowerCase());
+    // Adiciona variações completas de subtítulo apenas se a parte constituir um nome substancial
+    // e NUNCA palavras isoladas ou abreviações arbitrárias que gerem falsas colisões (ex: "Chicago" para "Chicago Typewriter")
+    const addSubTitleParts = (raw: string | undefined) => {
+      if (!raw) return;
+      const parts = raw.split(/[:\-\–\—/|]/);
+      if (parts.length > 1) {
+        parts.forEach(p => {
+          const clean = p.trim().toLowerCase();
+          const tokens = this.extractSignificantTokens(clean);
+          // Exige pelo menos 2 palavras significativas para que um subtítulo seja considerado um alias válido
+          if (tokens.length >= 2 && clean.length >= 8) {
+            aliases.push(clean);
+          }
+        });
       }
+    };
+    addSubTitleParts(item.title);
+    addSubTitleParts(item.originalTitle);
+
+    // Aliases oficiais para temporadas posteriores (ex: "Clevatess II", "Mushoku Tensei II" para temporada 2)
+    if (epParams?.season && epParams.season > 1) {
+      const romanNumerals = ['', 'i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
+      const roman = romanNumerals[epParams.season];
+      if (roman) {
+        aliases.push(`${item.title.toLowerCase()} ${roman}`);
+        if (item.originalTitle) {
+          aliases.push(`${item.originalTitle.toLowerCase()} ${roman}`);
+        }
+      }
+      aliases.push(`${item.title.toLowerCase()} season ${epParams.season}`);
+      aliases.push(`${item.title.toLowerCase()} temporada ${epParams.season}`);
     }
 
     // Aliases específicos conhecidos

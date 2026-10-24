@@ -9,6 +9,7 @@ import { subtitleService } from '../subtitles/subtitleService';
 import { smartRankStreams } from '../subtitles/streamSubtitleDetector';
 import { sourceSelectionService } from '../selection/sourceSelectionService';
 import { canonicalIdentityService } from '../identity/canonicalIdentity';
+import { sourceConfidenceEngine } from '../identity/sourceConfidenceEngine';
 import { mediaLoadingTracker } from '../tracking/mediaLoadingTracker';
 import { mediaSourceValidationService } from './mediaSourceValidationService';
 import { ContentItem } from '../../../types';
@@ -411,7 +412,7 @@ class ProviderRegistryService {
     episode?: { season: number; episode: number },
     options?: ResolveStreamsOptions
   ): Promise<StremioStream[]> {
-    const cacheKey = JSON.stringify(['v6_identity', type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
+    const cacheKey = JSON.stringify(['v7_canonical_identity', type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
 
     // 1. Registro de listener progressivo para este cacheKey
     const releaseListener = () => {
@@ -504,7 +505,7 @@ class ProviderRegistryService {
     generation?: number,
     options?: ResolveStreamsOptions
   ): Promise<StremioStream[]> {
-    const effectiveCacheKey = cacheKey || JSON.stringify(['v6_identity', type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
+    const effectiveCacheKey = cacheKey || JSON.stringify(['v7_canonical_identity', type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
     const effectiveGen = generation ?? this.cacheGeneration;
 
     const notifyProgressive = (currentStreams: StremioStream[]) => {
@@ -692,11 +693,11 @@ class ProviderRegistryService {
       imdbStr = rawTargetId;
     }
 
-    // Se temos IMDb mas não temos TMDB ID, resolve antecipadamente via TMDB
+    // Se temos IMDb mas não temos TMDB ID, resolve antecipadamente via TMDB respeitando o tipo
     if (!tmdbNum && imdbStr) {
       try {
         const found = await Promise.race([
-          tmdbService.findByImdb(imdbStr),
+          tmdbService.findByImdb(imdbStr, type),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500))
         ]);
         if (found?.tmdbId) {
@@ -705,7 +706,7 @@ class ProviderRegistryService {
       } catch {}
     }
 
-    // Se ainda não temos TMDB ID, busca por título no TMDB
+    // Se ainda não temos TMDB ID, busca estrita por título no TMDB preservando tipo e ano
     if (!tmdbNum && targetTitle) {
       try {
         const searchResults = await Promise.race([
@@ -713,17 +714,53 @@ class ProviderRegistryService {
           new Promise<ContentItem[]>((resolve) => setTimeout(() => resolve([]), 2500))
         ]);
         if (searchResults && searchResults.length > 0) {
-          const match = searchResults.find(r => r.imdbId || r.tmdbId) || searchResults[0];
-          if (match.tmdbId) {
-            tmdbNum = String(match.tmdbId).replace(/^tmdb-?/i, '');
-          } else if (match.id && !match.id.startsWith('open-') && !match.id.startsWith('local-')) {
-            if (/^\d+$/.test(match.id)) {
-              tmdbNum = match.id;
+          const targetYear = id.year || openItem?.year || catalogItem?.year || 0;
+          const normTarget = canonicalIdentityService.normalizeTitle(targetTitle);
+
+          // 1. Filtra estritamente pelo tipo correto (Série vs Filme)
+          const typeMatches = searchResults.filter(r => {
+            const rIsMovie = r.type === ContentType.MOVIE || r.mediaFormat === 'movie';
+            return type === 'movie' ? rIsMovie : !rIsMovie;
+          });
+
+          // 2. Compara título completo normalizado ou equivalência de todos os termos (NUNCA 1 palavra isolada)
+          const validCandidates = typeMatches.filter(r => {
+            const normTitle = canonicalIdentityService.normalizeTitle(r.title);
+            const normOrig = r.originalTitle ? canonicalIdentityService.normalizeTitle(r.originalTitle) : '';
+            const titleExact = normTitle === normTarget || normOrig === normTarget;
+            if (!titleExact) {
+              const tTokens = canonicalIdentityService.extractSignificantTokens(normTarget);
+              const rTokens = canonicalIdentityService.extractSignificantTokens(normTitle);
+              if (tTokens.length >= 2 && rTokens.length >= 2) {
+                const allTokensMatch = tTokens.every(t => rTokens.includes(t)) && rTokens.every(t => tTokens.includes(t));
+                if (!allTokensMatch) return false;
+              } else {
+                return false;
+              }
             }
-          }
-          if (match.imdbId && !imdbStr) {
-            imdbStr = match.imdbId;
-            if (!altIds.includes(match.imdbId)) altIds.push(match.imdbId);
+            // 3. Verifica ano de lançamento quando conhecido (diferença máxima de 1 ano)
+            if (targetYear > 0 && r.year && r.year > 0 && Math.abs(r.year - targetYear) > 1) {
+              return false;
+            }
+            return true;
+          });
+
+          // Se houver um candidato estritamente compatível, adota seus IDs
+          const match = validCandidates[0];
+          if (match) {
+            if (match.tmdbId) {
+              tmdbNum = String(match.tmdbId).replace(/^tmdb-?/i, '');
+            } else if (match.id && !match.id.startsWith('open-') && !match.id.startsWith('local-')) {
+              if (/^\d+$/.test(match.id)) {
+                tmdbNum = match.id;
+              }
+            }
+            if (match.imdbId && !imdbStr) {
+              imdbStr = match.imdbId;
+              if (!altIds.includes(match.imdbId)) altIds.push(match.imdbId);
+            }
+          } else {
+            console.warn(`[ProviderRegistry] Busca de fallback por título '${targetTitle}' não encontrou resultado estritamente compatível com tipo='${type}' e ano=${targetYear}. Nenhuma correspondência forçada.`);
           }
         }
       } catch {
@@ -824,7 +861,10 @@ class ProviderRegistryService {
               if (addon.id === 'fenixflix-animes' && /🐉\s*Malfoy/i.test(s.title || '')) continue;
               if (s.ytId || (s.url && (s.url.includes('youtube.com') || s.url.includes('youtu.be')))) continue;
               if (streamValidator.isStreamMatchingTargetTitle(s, targetTitle, originalTitle, alternateTitles, episode)) {
-                return true;
+                const conf = sourceConfidenceEngine.evaluate(s, identity);
+                if (conf.isMatch) {
+                  return true;
+                }
               }
             }
             return false;
@@ -1056,7 +1096,8 @@ class ProviderRegistryService {
             collectedFromAddons.push(...result);
             // Emite progresso em tempo real assim que novas fontes forem descobertas
             const combinedInterim = [...streams, ...collectedFromAddons];
-            const cleanInterim = streamValidator.filterCleanStreams(combinedInterim, targetTitle, originalTitle, alternateTitles, episode);
+            const cleanInterim = streamValidator.filterCleanStreams(combinedInterim, targetTitle, originalTitle, alternateTitles, episode)
+              .filter(s => sourceConfidenceEngine.evaluate(s, identity).isMatch);
             if (cleanInterim.length > 0) {
               const engineOnline = localEngineCache.active;
               const hasWebReady = cleanInterim.some(s => (!s.isTorrent && !s.url?.includes('127.0.0.1:11470') && !s.url?.includes('localhost:11470')) || engineOnline);
@@ -1110,7 +1151,8 @@ class ProviderRegistryService {
             }
             if (!options?.isRetryAttempt) {
               const engineOnline = localEngineCache.active;
-              const cleanInterim = streamValidator.filterCleanStreams([...streams, ...collectedFromAddons], targetTitle, originalTitle, alternateTitles, episode);
+              const cleanInterim = streamValidator.filterCleanStreams([...streams, ...collectedFromAddons], targetTitle, originalTitle, alternateTitles, episode)
+                .filter(s => sourceConfidenceEngine.evaluate(s, identity).isMatch);
               const hasFrostStreamFinished = !sortedAddons.some(a => a.id.includes('froststream')) || collectedFromAddons.some(s => s.providerId?.includes('froststream'));
               const culprits = cleanInterim.filter(s => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
               const hasWebReadyPtBr = culprits.length > 0;
@@ -1137,6 +1179,8 @@ class ProviderRegistryService {
     });
 
     const cleanStreams = streamValidator.filterCleanStreams(streams, targetTitle, originalTitle, alternateTitles, episode).filter(s => {
+      const conf = sourceConfidenceEngine.evaluate(s, identity);
+      if (!conf.isMatch) return false;
       if (s.ytId) return false;
       const u = (s.url || '').toLowerCase();
       const t = (s.title || '').toLowerCase();

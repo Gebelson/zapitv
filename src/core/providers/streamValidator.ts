@@ -450,6 +450,19 @@ class StreamValidator {
       return false;
     }
 
+    // Se o conteúdo solicitado é uma série (com episodeParams), rejeita fontes que são comprovadamente filmes isolados
+    if (episodeParams && episodeParams.season > 0) {
+      const releaseYearMatch = sTitle.match(/\b(19\d{2}|20\d{2})\b/);
+      const hasEpisodeMarker = /\b(?:s\d{1,2}|t\d{1,2}|e\d{1,3}|ep\d{1,3}|season|temporada|epis[oó]dio)\b/i.test(combined);
+      if (releaseYearMatch && !hasEpisodeMarker) {
+        const movieReleaseTags = /\b(bluray|bdrip|brrip|dvdrip|remux)\b/i.test(sTitle);
+        if (movieReleaseTags) {
+          console.warn(`[StreamValidator] Fonte de filme rejeitada para requisição de série: ${sTitle}`);
+          return false;
+        }
+      }
+    }
+
     // 2. Aplica regras de bloqueio de desvios conhecidos (ex: Doraemon -> Sparks of Tomorrow)
     for (const rule of KNOWN_UPSTREAM_MISMATCHES) {
       if (rawCandidates.some(cand => rule.targetPattern.test(cand))) {
@@ -476,24 +489,23 @@ class StreamValidator {
     const fenixMatch = sTitle.match(/🐦‍🔥\s*([^\n⏸️]+)/i);
     if (fenixMatch) {
       const declaredTitle = normalizeTitle(fenixMatch[1]);
-      const declaredWords = declaredTitle.split(' ').filter(w => w.length >= 3);
 
       // Tradução oficial exata; não aceitar correspondência por palavras vagas.
       let matchesAny = declaredTitle === 'a casa do dragao' &&
         cleanCandidates.includes('house of the dragon');
       for (const cand of cleanCandidates) {
-        if (declaredTitle.includes(cand) || cand.includes(declaredTitle)) {
+        if (declaredTitle === cand ||
+            declaredTitle.startsWith(cand + ' ') ||
+            declaredTitle.startsWith(cand + ':') ||
+            declaredTitle.startsWith(cand + ' -')) {
           matchesAny = true;
           break;
         }
+        // Para títulos com 2 ou mais termos (ex: "Chicago Typewriter"), TODOS os termos devem estar presentes
         const candWords = cand.split(' ').filter(w => w.length >= 3);
-        if (candWords.length > 0 && declaredWords.length > 0) {
-          const hasOverlap = candWords.some(tw => declaredTitle.includes(tw)) ||
-                             declaredWords.some(dw => cand.includes(dw));
-          if (hasOverlap) {
-            matchesAny = true;
-            break;
-          }
+        if (candWords.length >= 2 && candWords.every(cw => declaredTitle.includes(cw))) {
+          matchesAny = true;
+          break;
         }
       }
 
@@ -509,8 +521,11 @@ class StreamValidator {
       const otherKnownSeries = ['ultraman', 'aseria', 'angel heart', 'sparks of tomorrow', 'black clover', 'murai in love', 'saving 80,000 gold'];
 
       const matchesTarget = cleanCandidates.some(cand => {
-        const words = cand.split(' ').filter(w => w.length >= 4);
-        return words.some(w => cleanSTitle.includes(w));
+        const words = cand.split(' ').filter(w => w.length >= 3);
+        if (words.length >= 2) {
+          return cleanSTitle.includes(cand) || words.every(w => cleanSTitle.includes(w));
+        }
+        return cleanSTitle.includes(cand);
       });
 
       if (!matchesTarget && otherKnownSeries.some(t => cleanSTitle.includes(t))) {
@@ -535,11 +550,21 @@ class StreamValidator {
     const cleanStream = normalize(streamText);
     const cleanTarget = normalize(targetTitle);
 
-    // Se o stream contiver o título ou palavras-chave
-    const targetWords = cleanTarget.split(/\s+/).filter(w => w.length >= 4);
-    if (targetWords.length > 0 && !cleanStream.includes(cleanTarget)) {
-      const matchesAtLeastOne = targetWords.some(w => cleanStream.includes(w));
-      if (!matchesAtLeastOne) {
+    // Validação estrita: exige correspondência de frase completa ou de TODOS os termos significativos
+    const targetWords = cleanTarget.split(/\s+/).filter(w => w.length >= 3);
+    if (targetWords.length >= 2) {
+      const allPresent = cleanStream.includes(cleanTarget) || targetWords.every(w => cleanStream.includes(w));
+      if (!allPresent) {
+        return false;
+      }
+    } else if (targetWords.length === 1) {
+      const singleWord = targetWords[0];
+      const escaped = singleWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const m = cleanStream.match(new RegExp(`(^|\\s)${escaped}(\\s|$)`, 'i'));
+      if (!m) return false;
+      const after = cleanStream.slice(m.index! + m[1].length + singleWord.length).trim();
+      const nextWord = after.split(/\s+/)[0];
+      if (nextWord && !/^(s\d+|e\d+|ep\d*|season|temporada|episodio|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|bluray|bdrip|webrip|webdl|web|dvdrip|x264|x265|dublado|legendado|dual|audio|pt|br)$/i.test(nextWord)) {
         return false;
       }
     }

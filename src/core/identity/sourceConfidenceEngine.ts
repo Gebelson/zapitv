@@ -25,6 +25,29 @@ export interface StreamConfidenceEvaluation {
   canonicalTitle: string;
 }
 
+export interface IdentityValidationRecord {
+  timestamp: string;
+  targetTitle: string;
+  targetImdbId?: string;
+  targetTmdbId?: string;
+  targetType: string;
+  season?: number;
+  episode?: number;
+  providerId?: string;
+  providerName?: string;
+  streamTitle?: string;
+  streamUrl?: string;
+  declaredTitle?: string;
+  isMatch: boolean;
+  confidence: SourceConfidence;
+  reasons: string[];
+}
+
+// Termos técnicos, resoluções e tags de release que podem legitimamente suceder um título sem indicar outra obra
+const isKnownTechnicalOrReleaseWord = (word: string): boolean => {
+  return /^(s\d+|e\d+|ep\d*|season|temporada|episodio|epis[oó]dio|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|360p|hd|sd|fhd|uhd|bluray|bdrip|brrip|webrip|webdl|web|hdtv|dvdrip|dvd|x264|x265|hevc|h264|h265|avc|aac|ac3|eac3|dts|mp4|mkv|avi|webm|dublado|legendado|dual|multi|audio|áudio|pt|br|ptbr|pob|eng|sub|softsub|hardsub|remux|complete|ita|spa|fra|ger|rus|jap|kor|nf|amzn|atvp|dnp|hmax|dsnp|repack|proper|ii|iii|iv|v|vi|vii|viii|ix|x|1st|2nd|3rd|4th|5th|part|cour)$/i.test(word);
+};
+
 // Obras conhecidas que costumam colidir erroneamente em scrapers de torrents/animes
 const KNOWN_COLLISION_TITLES = [
   'sparks of tomorrow',
@@ -40,6 +63,51 @@ const KNOWN_COLLISION_TITLES = [
 ];
 
 export class SourceConfidenceEngine {
+  private diagnosticHistory: IdentityValidationRecord[] = [];
+  private readonly MAX_DIAGNOSTICS = 50;
+
+  public getRecentDiagnostics(): IdentityValidationRecord[] {
+    return [...this.diagnosticHistory];
+  }
+
+  public clearDiagnostics(): void {
+    this.diagnosticHistory = [];
+  }
+
+  private recordDiagnostic(
+    stream: StremioStream,
+    identity: CanonicalMediaIdentity,
+    result: StreamConfidenceEvaluation,
+    declaredTitle?: string
+  ): void {
+    const record: IdentityValidationRecord = {
+      timestamp: new Date().toISOString(),
+      targetTitle: identity.title,
+      targetImdbId: identity.imdbId,
+      targetTmdbId: identity.tmdbId,
+      targetType: identity.type,
+      season: identity.season,
+      episode: identity.episode,
+      providerId: stream.providerId,
+      providerName: stream.providerName,
+      streamTitle: stream.title || stream.name,
+      streamUrl: stream.url,
+      declaredTitle,
+      isMatch: result.isMatch,
+      confidence: result.confidence,
+      reasons: result.reasons
+    };
+
+    this.diagnosticHistory.unshift(record);
+    if (this.diagnosticHistory.length > this.MAX_DIAGNOSTICS) {
+      this.diagnosticHistory.pop();
+    }
+
+    if (!result.isMatch) {
+      console.warn(`[IdentityValidator] ❌ Fonte rejeitada para "${identity.title}" (${identity.type}${identity.year ? ' ' + identity.year : ''}): ${result.reasons.join(' • ')} [stream: ${stream.title || stream.name || stream.url}]`);
+    }
+  }
+
   /**
    * Avalia uma fonte de streaming contra a identidade canônica da obra solicitada.
    */
@@ -58,13 +126,15 @@ export class SourceConfidenceEngine {
     const quarantineCheck = streamQuarantineService.evaluateQuarantine(stream, identity.title);
     if (quarantineCheck.isQuarantined) {
       reasons.push(quarantineCheck.reason || 'Fonte bloqueada por quarentena');
-      return {
+      const evalResult: StreamConfidenceEvaluation = {
         stream,
         confidence: 'QUARANTINED',
         isMatch: false,
         reasons,
         canonicalTitle: identity.title
       };
+      this.recordDiagnostic(stream, identity, evalResult);
+      return evalResult;
     }
 
     // 2. Filmes cuja estreia ainda está no futuro (proteção contra fontes falsas)
@@ -78,30 +148,34 @@ export class SourceConfidenceEngine {
         const reason = `Release digital para obra ainda não lançada: "${identity.title}"`;
         streamQuarantineService.quarantine(streamInfoHash || streamUrl, reason, 'adult_troll', identity.title, stream.providerName);
         reasons.push(reason);
-        return {
+        const evalResult: StreamConfidenceEvaluation = {
           stream,
           confidence: 'QUARANTINED',
           isMatch: false,
           reasons,
           canonicalTitle: identity.title
         };
+        this.recordDiagnostic(stream, identity, evalResult);
+        return evalResult;
       }
     }
 
     // 3. FONTES VERIFICADAS DO ACERVO OFICIAL ZAPITV / CDN DIRETO
-    // Apenas a entrada local associada por ID exato pode ser considerada verificada.
-    // Nome do provedor e domínio de hospedagem não provam qual vídeo foi servido.
     const isAcervoOficial = stream.providerId === 'zapitv-verified';
 
     const episodeTag = streamTitle.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b)/i);
     if (episodeTag && identity.type === ContentType.MOVIE) {
       reasons.push('Fonte episódica oferecida para um filme');
-      return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+      const evalResult: StreamConfidenceEvaluation = { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+      this.recordDiagnostic(stream, identity, evalResult);
+      return evalResult;
     }
     if (episodeTag && identity.season && identity.episode &&
         (Number(episodeTag[1] || episodeTag[3]) !== identity.season || Number(episodeTag[2] || episodeTag[4]) !== identity.episode)) {
       reasons.push('Temporada ou episódio diferente do solicitado');
-      return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+      const evalResult: StreamConfidenceEvaluation = { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+      this.recordDiagnostic(stream, identity, evalResult);
+      return evalResult;
     }
 
     // Detecção de episódio absoluto de outra temporada (ex: anime T2 E1 com tag '(Ep. 1)')
@@ -110,59 +184,69 @@ export class SourceConfidenceEngine {
       const absEp = parseInt(absEpMatch[1], 10);
       if (absEp <= identity.episode) {
         reasons.push(`Episódio absoluto (${absEp}) pertence à primeira temporada e não à temporada ${identity.season}`);
-        return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+        const evalResult: StreamConfidenceEvaluation = { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+        this.recordDiagnostic(stream, identity, evalResult);
+        return evalResult;
       }
     }
 
     if (identity.season === 1 && /\b(?:clevatess\s+ii|mushoku\s+tensei\s+ii|2nd\s+season|3rd\s+season|sais(?:on)?\s*0*2)\b/i.test(streamTitle)) {
       reasons.push('Fonte pertence a uma temporada posterior e não à primeira');
-      return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+      const evalResult: StreamConfidenceEvaluation = { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+      this.recordDiagnostic(stream, identity, evalResult);
+      return evalResult;
     }
 
     if (identity.type === ContentType.MOVIE && identity.year) {
       const releaseYear = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
       if (releaseYear && Math.abs(Number(releaseYear[1]) - identity.year) > 1) {
-        reasons.push('Ano da fonte diferente do filme solicitado');
-        return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+        reasons.push(`Ano da fonte (${releaseYear[1]}) diferente do filme solicitado (${identity.year})`);
+        const evalResult: StreamConfidenceEvaluation = { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+        this.recordDiagnostic(stream, identity, evalResult);
+        return evalResult;
       }
     }
 
-    // Addons que separam explicitamente o título da obra na primeira linha
-    // precisam corresponder ao título canônico inteiro ou à sua parte principal
+    // Addons que separam explicitamente o título da obra na primeira linha (ex: FenixFlix)
+    // precisam corresponder ao título canônico inteiro (não aceita prefixo insuficiente nem sobreposição de 1 palavra)
     const declaredTitle = streamTitle.match(/🐦‍🔥\s*([^\n⏸️]+)/)?.[1]?.trim();
     if (declaredTitle) {
       const normalizedDeclared = canonicalIdentityService.normalizeTitle(declaredTitle);
-      const declaredParts = declaredTitle.split(/[:\-–—|]/).map(p => canonicalIdentityService.normalizeTitle(p.trim())).filter(p => p.length >= 3);
       const aliases = [identity.title, identity.originalTitle, ...(identity.knownAliases || [])].filter(Boolean)
         .map(alias => canonicalIdentityService.normalizeTitle(alias!));
 
       const isMatch = aliases.some(alias =>
         normalizedDeclared === alias ||
-        declaredParts.includes(alias) ||
-        (alias.length >= 5 && normalizedDeclared.startsWith(alias))
+        normalizedDeclared.startsWith(alias + ' ') ||
+        normalizedDeclared.startsWith(alias + ':') ||
+        normalizedDeclared.startsWith(alias + ' -')
       );
 
       // Verificação de segurança: não permitir substituição de Naruto clássico por Shippuden
       const isShippudenMismatch = normalizedDeclared.includes('shippuden') && !aliases.some(a => a.includes('shippuden'));
 
       if (!isMatch || isShippudenMismatch) {
-        reasons.push('Título declarado pelo addon difere da obra solicitada');
-        return { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+        reasons.push(`Título declarado pelo addon ('${declaredTitle}') difere da obra solicitada ('${identity.title}')`);
+        const evalResult: StreamConfidenceEvaluation = { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+        this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
+        return evalResult;
       }
     }
 
     if (isAcervoOficial) {
       reasons.push('Fonte canônica verificada pelo acervo oficial ZapiTV');
-      return {
+      const evalResult: StreamConfidenceEvaluation = {
         stream,
         confidence: 'VERIFIED',
         isMatch: true,
         reasons,
         canonicalTitle: identity.title
       };
+      this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
+      return evalResult;
     }
 
-    // 4. DETECÇÃO DE OBRAS COMPLETAMENTE DIFERENTES (Colisão de Títulos)
+    // 4. DETECÇÃO DE OBRAS COMPLETAMENTE DIFERENTES (Colisão de Títulos Conhecidas)
     const streamTitleToCheck = canonicalIdentityService.normalizeTitle(`${streamName} ${streamTitle} ${stream.description || ''}`);
     for (const collisionTitle of KNOWN_COLLISION_TITLES) {
       const cleanCollision = canonicalIdentityService.normalizeTitle(collisionTitle);
@@ -173,13 +257,15 @@ export class SourceConfidenceEngine {
         const cleanOrig = identity.originalTitle ? canonicalIdentityService.normalizeTitle(identity.originalTitle) : '';
         if (!cleanTarget.includes(cleanCollision) && !cleanOrig.includes(cleanCollision)) {
           reasons.push(`Obra incorreta detectada: stream contém "${collisionTitle}"`);
-          return {
+          const evalResult: StreamConfidenceEvaluation = {
             stream,
             confidence: 'REJECTED',
             isMatch: false,
             reasons,
             canonicalTitle: identity.title
           };
+          this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
+          return evalResult;
         }
       }
     }
@@ -188,99 +274,118 @@ export class SourceConfidenceEngine {
     if (/resident evil/i.test(identity.title) && !/vendetta|damnation|degeneration|infinite darkness|death island/i.test(identity.title)) {
       if (/vendetta|damnation|degeneration|infinite darkness|death island/i.test(combined)) {
         reasons.push('Animação 3D de Resident Evil não pode substituir o filme live-action solicitado');
-        return {
+        const evalResult: StreamConfidenceEvaluation = {
           stream,
           confidence: 'REJECTED',
           isMatch: false,
           reasons,
           canonicalTitle: identity.title
         };
+        this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
+        return evalResult;
       }
     }
 
-    // 5. VALIDAÇÃO DE SOBREPOSIÇÃO DE TÍTULO (Positive Title Overlap)
+    // 5. VALIDAÇÃO ESTRITA DE TÍTULO (Título Completo ou Alias Canônico Oficial)
+    // NUNCA aceita sobreposição parcial de palavras (ex: "Chicago" NÃO corresponde a "Chicago Typewriter")
     const targetTokens = canonicalIdentityService.extractSignificantTokens(identity.title);
     const origTokens = identity.originalTitle ? canonicalIdentityService.extractSignificantTokens(identity.originalTitle) : [];
-    const cleanStreamTitle = canonicalIdentityService.normalizeTitle(`${streamTitle} ${stream.description || ''}`);
     const titleWords = new Set(canonicalIdentityService.extractSignificantTokens(`${streamName} ${streamTitle} ${stream.description || ''}`));
 
-    // Verifica se algum alias canônico coincide
-    let aliasMatched = false;
-    for (const alias of identity.knownAliases) {
+    let matchedAlias: string | null = null;
+    const allAliases = [identity.title, identity.originalTitle, ...(identity.knownAliases || [])].filter(Boolean) as string[];
+
+    for (const alias of allAliases) {
       const cleanAlias = canonicalIdentityService.normalizeTitle(alias);
-      if (cleanAlias.length >= 3 && new RegExp(`(^|\\s)${cleanAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`).test(streamTitleToCheck)) {
-        aliasMatched = true;
+      if (cleanAlias.length < 3) continue;
+
+      const escaped = cleanAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const aliasRegex = new RegExp(`(^|\\s)${escaped}(\\s|$)`, 'i');
+      const match = streamTitleToCheck.match(aliasRegex);
+
+      if (match) {
+        // Se o alias possui apenas 1 palavra (ex: "chicago"), precisamos garantir que o stream
+        // não é uma obra com título composto mais longo (ex: "chicago typewriter", "chicago fire", "chicago p.d.")
+        const aliasTokens = canonicalIdentityService.extractSignificantTokens(cleanAlias);
+        if (aliasTokens.length === 1 && match.index !== undefined) {
+          const matchPos = match.index + match[1].length;
+          const afterText = streamTitleToCheck.slice(matchPos + cleanAlias.length).trim();
+          const nextWord = afterText.split(/\s+/)[0];
+          if (nextWord && !isKnownTechnicalOrReleaseWord(nextWord)) {
+            // A palavra seguinte faz parte de um título composto diferente
+            continue;
+          }
+        }
+        matchedAlias = cleanAlias;
         break;
       }
     }
 
-    // Verifica sobreposição de tokens de título nacional ou original
-    const matchingTarget = targetTokens.filter(token => titleWords.has(token));
-    const matchingOrig = origTokens.filter(token => titleWords.has(token));
-    const tokenOverlapRatio = targetTokens.length > 0 ? (matchingTarget.length / targetTokens.length) : 0;
-    const origOverlapRatio = origTokens.length > 0 ? (matchingOrig.length / origTokens.length) : 0;
+    // Se o título tem múltiplas palavras (ex: "Chicago Typewriter"), exige que TODOS os tokens distintivos estejam presentes
+    const allTargetTokensPresent = targetTokens.length >= 2 && targetTokens.every(t => titleWords.has(t));
+    const allOrigTokensPresent = origTokens.length >= 2 && origTokens.every(t => titleWords.has(t));
 
-    // Se qualquer token distintivo (comprimento >= 4) do título nacional ou original estiver presente no stream
-    const hasDistinctiveToken = [...matchingTarget, ...matchingOrig].some(t => t.length >= 4);
+    const isFullTitleMatch = Boolean(matchedAlias) || allTargetTokensPresent || allOrigTokensPresent;
 
-    const hasTitleCorrespondence = aliasMatched || tokenOverlapRatio >= 0.3 || origOverlapRatio >= 0.3 || hasDistinctiveToken;
-
-    if (!hasTitleCorrespondence) {
-      reasons.push(`Título do stream não possui correspondência com "${identity.title}"`);
-      return {
+    if (!isFullTitleMatch) {
+      reasons.push(`Título do stream não corresponde à obra solicitada "${identity.title}"`);
+      const evalResult: StreamConfidenceEvaluation = {
         stream,
         confidence: 'REJECTED',
         isMatch: false,
         reasons,
         canonicalTitle: identity.title
       };
+      this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
+      return evalResult;
     }
 
-    // 6. REGRA CONSERVADORA PARA CONTEÚDO INFANTIL / FAMILIAR
-    if (identity.isChildFriendly) {
-      // Para produções infantis, a correspondência deve ser explícita
-      if (!aliasMatched && tokenOverlapRatio < 0.3 && origOverlapRatio < 0.3 && !hasDistinctiveToken) {
-        reasons.push('Conteúdo infantil exige confirmação rigorosa de identidade');
-        return {
-          stream,
-          confidence: 'REJECTED',
-          isMatch: false,
-          reasons,
-          canonicalTitle: identity.title
-        };
+    // 6. VALIDAÇÃO DE ANO PARA SÉRIES E ANIMES
+    // Impede que filmes antigos com mesmo nome passem como episódios de uma série
+    if ((identity.type === ContentType.SERIES || identity.type === ContentType.ANIME) && identity.year) {
+      const releaseYearMatch = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
+      if (releaseYearMatch) {
+        const foundYear = Number(releaseYearMatch[1]);
+        if (Math.abs(foundYear - identity.year) > 1 && !episodeTag) {
+          reasons.push(`Ano da fonte (${foundYear}) diverge da série (${identity.year}) sem identificador de episódio`);
+          const evalResult: StreamConfidenceEvaluation = {
+            stream,
+            confidence: 'REJECTED',
+            isMatch: false,
+            reasons,
+            canonicalTitle: identity.title
+          };
+          this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
+          return evalResult;
+        }
       }
-      
-      // Se não for do acervo oficial, classifica no máximo como PROVISIONAL (nunca auto-aprova fontes obscuras)
+    }
+
+    // 7. REGRA CONSERVADORA PARA CONTEÚDO INFANTIL / FAMILIAR
+    if (identity.isChildFriendly) {
       reasons.push('Conteúdo infantil: correspondência aprovada com validação cautelosa');
-      return {
+      const evalResult: StreamConfidenceEvaluation = {
         stream,
         confidence: 'PROVISIONAL',
         isMatch: true,
         reasons,
         canonicalTitle: identity.title
       };
+      this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
+      return evalResult;
     }
 
-    // 7. CLASSIFICAÇÃO PARA DEMAIS PRODUÇÕES
-    if (aliasMatched || tokenOverlapRatio >= 0.5) {
-      reasons.push(`Correspondência de título verificada (${Math.round(tokenOverlapRatio * 100)}% dos termos)`);
-      return {
-        stream,
-        confidence: 'PROVISIONAL',
-        isMatch: true,
-        reasons,
-        canonicalTitle: identity.title
-      };
-    }
-
-    reasons.push('Informações do stream incompletas ou correspondência parcial');
-    return {
+    // 8. CLASSIFICAÇÃO PARA DEMAIS PRODUÇÕES
+    reasons.push(`Identidade confirmada para "${identity.title}"`);
+    const evalResult: StreamConfidenceEvaluation = {
       stream,
-      confidence: 'SUSPICIOUS',
-      isMatch: false,
+      confidence: 'PROVISIONAL',
+      isMatch: true,
       reasons,
       canonicalTitle: identity.title
     };
+    this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
+    return evalResult;
   }
 
   /**

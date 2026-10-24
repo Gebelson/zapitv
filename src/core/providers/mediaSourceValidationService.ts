@@ -64,7 +64,7 @@ export interface SourceValidationContext {
   hasExternalPtSub?: boolean;
 }
 
-const STORAGE_VALIDATED_SOURCES_KEY = 'zapitv_validated_sources_v3';
+const STORAGE_VALIDATED_SOURCES_KEY = 'zapitv_validated_sources_v4';
 const VALIDATION_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h para fontes válidas
 const REJECTED_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6h para fontes rejeitadas
 
@@ -334,7 +334,7 @@ export class MediaSourceValidationService {
     // 4. Verificação de Identidade Canônica da Obra (REGRA 7 — Identidade Correta)
     if (context.canonicalIdentity) {
       const confEval = sourceConfidenceEngine.evaluate(stream, context.canonicalIdentity);
-      if (confEval.confidence === 'REJECTED' || confEval.confidence === 'QUARANTINED') {
+      if (!confEval.isMatch || confEval.confidence === 'REJECTED' || confEval.confidence === 'QUARANTINED') {
         return {
           mediaId: context.mediaId,
           sourceId: sourceKey,
