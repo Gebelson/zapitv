@@ -341,11 +341,18 @@ async function runSearchResponsivenessSuite() {
     const tIndexDuration = performance.now() - tIndexStart;
     console.log(`     Tempo de indexação de 5.000 itens: ${tIndexDuration.toFixed(2)}ms`);
 
-    // Busca sobre 5.000 itens
-    const tSearchStart = performance.now();
-    const bigResults = searchService.searchLocalInstant('Volume 425', 'all', bigCatalog);
-    const tSearchDuration = performance.now() - tSearchStart;
-    console.log(`     Tempo de busca sobre 5.000 itens: ${tSearchDuration.toFixed(3)}ms`);
+    // Consultas distintas evitam cache e a mediana reduz oscilações do runner.
+    const searchDurations: number[] = [];
+    let bigResults: ContentItem[] = [];
+    for (let volume = 425; volume < 430; volume++) {
+      const tSearchStart = performance.now();
+      const results = searchService.searchLocalInstant(`Volume ${volume}`, 'all', bigCatalog);
+      searchDurations.push(performance.now() - tSearchStart);
+      if (volume === 425) bigResults = results;
+    }
+    searchDurations.sort((a, b) => a - b);
+    const tSearchDuration = searchDurations[2];
+    console.log(`     Tempo mediano de busca sobre 5.000 itens: ${tSearchDuration.toFixed(3)}ms (máximo ${searchDurations[4].toFixed(3)}ms)`);
 
     // Limites de tempo dependem da CPU do executor; o build valida a correção,
     // enquanto o job de desempenho do CI avalia os limites separadamente.
