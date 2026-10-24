@@ -1,14 +1,16 @@
 {
-  "weekKey": "2026-W43",
-  "weekLabel": "Semana 43 (Outubro de 2026)",
+  "weekKey": "M-2026-10",
+  "weekLabel": "Outubro de 2026",
   "monthKey": "2026-10",
   "monthLabel": "Outubro de 2026",
-  "referenceDate": "2026-10-19",
-  "lastUpdatedAt": 1792128087831,
-  "lastCheckedAt": 1792128087831,
-  "nextScheduledUpdate": 1792400400000,
-  "nextScheduledUpdateFormatted": "Segunda-feira, 19/10/2026 às 06:00 (BRT)",
-  "sourceReference": "IMDb MOVIEmeter & TVmeter (Ranking Semanal)",
+  "monthlyStatusLabel": "Outubro de 2026 · Parcial",
+  "isPartialMonth": true,
+  "referenceDate": "2026-10-24",
+  "lastUpdatedAt": 1792881519455,
+  "lastCheckedAt": 1792881519455,
+  "nextScheduledUpdate": 1793005200000,
+  "nextScheduledUpdateFormatted": "Segunda-feira, 26/10/2026 às 06:00 (BRT)",
+  "sourceReference": "IMDb MOVIEmeter & TVmeter (Mensal Consolidado) + AniList",
   "updateStatus": "SUCCESS",
   "isProvisionalWeekly": false,
   "featuredMovies": [
@@ -31,12 +33,13 @@
       "isFeatured": true,
       "availabilityStatus": "verified",
       "audioStatus": "pt-br-dubbed",
+      "canonicalId": "movie:imdb:tt31454558",
       "imdbRank": 2,
       "displayRank": 1,
       "heroTags": [
         {
           "id": "rank-1",
-          "text": "#1 Em Destaque (IMDb #2)",
+          "text": "#1 Em Destaque (Outubro de 2026)",
           "color": "#007df7",
           "style": "solid"
         }
@@ -61,42 +64,13 @@
       "isFeatured": true,
       "availabilityStatus": "verified",
       "audioStatus": "pt-br-dubbed",
+      "canonicalId": "movie:imdb:tt21440780",
       "imdbRank": 3,
       "displayRank": 2,
       "heroTags": [
         {
           "id": "rank-2",
-          "text": "#2 Em Destaque (IMDb #3)",
-          "color": "#007df7",
-          "style": "solid"
-        }
-      ]
-    },
-    {
-      "id": "movie-verity-2026",
-      "title": "Verity",
-      "originalTitle": "Verity",
-      "type": "FILME",
-      "rating": 8.1,
-      "year": 2026,
-      "image": "https://image.tmdb.org/t/p/w500/6Qf3sylInJeyK0fFTfjprnGIXCF.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/6Qf3sylInJeyK0fFTfjprnGIXCF.jpg",
-      "description": "Uma escritora em dificuldades financeiras aceita a proposta de concluir a série de sucesso de uma famosa autora incapacitada, descobrindo segredos aterrorizantes em seus manuscritos.",
-      "genres": [
-        "Romance",
-        "Mistério",
-        "Drama"
-      ],
-      "imdbId": "tt15888806",
-      "isFeatured": true,
-      "availabilityStatus": "verified",
-      "audioStatus": "pt-br-dubbed",
-      "imdbRank": 4,
-      "displayRank": 3,
-      "heroTags": [
-        {
-          "id": "rank-3",
-          "text": "#3 Em Destaque (IMDb #4)",
+          "text": "#2 Em Destaque (Outubro de 2026)",
           "color": "#007df7",
           "style": "solid"
         }
@@ -120,12 +94,13 @@
       "isFeatured": true,
       "availabilityStatus": "verified",
       "audioStatus": "pt-br-dubbed",
+      "canonicalId": "movie:imdb:tt28704204",
       "imdbRank": 5,
-      "displayRank": 4,
+      "displayRank": 3,
       "heroTags": [
         {
-          "id": "rank-4",
-          "text": "#4 Em Destaque (IMDb #5)",
+          "id": "rank-3",
+          "text": "#3 Em Destaque (Outubro de 2026)",
           "color": "#007df7",
           "style": "solid"
         }
@@ -149,12 +124,13 @@
       "isFeatured": true,
       "availabilityStatus": "verified",
       "audioStatus": "pt-br-dubbed",
+      "canonicalId": "movie:imdb:tt31828574",
       "imdbRank": 6,
-      "displayRank": 5,
+      "displayRank": 4,
       "heroTags": [
         {
-          "id": "rank-5",
-          "text": "#5 Em Destaque (IMDb #6)",
+          "id": "rank-4",
+          "text": "#4 Em Destaque (Outubro de 2026)",
           "color": "#007df7",
           "style": "solid"
         }
@@ -180,12 +156,13 @@
       "isFeatured": true,
       "availabilityStatus": "verified",
       "audioStatus": "pt-br-dubbed",
+      "canonicalId": "movie:imdb:tt13000574",
       "imdbRank": 7,
-      "displayRank": 6,
+      "displayRank": 5,
       "heroTags": [
         {
-          "id": "rank-6",
-          "text": "#6 Em Destaque (IMDb #7)",
+          "id": "rank-5",
+          "text": "#5 Em Destaque (Outubro de 2026)",
           "color": "#007df7",
           "style": "solid"
         }
@@ -210,12 +187,13 @@
       "isFeatured": true,
       "availabilityStatus": "verified",
       "audioStatus": "pt-br-dubbed",
+      "canonicalId": "movie:imdb:tt0100935",
       "imdbRank": 9,
-      "displayRank": 7,
+      "displayRank": 6,
       "heroTags": [
         {
-          "id": "rank-7",
-          "text": "#7 Em Destaque (IMDb #9)",
+          "id": "rank-6",
+          "text": "#6 Em Destaque (Outubro de 2026)",
           "color": "#007df7",
           "style": "solid"
         }
@@ -239,12 +217,13 @@
       "isFeatured": true,
       "availabilityStatus": "verified",
       "audioStatus": "pt-br-dubbed",
+      "canonicalId": "movie:imdb:tt11464826",
       "imdbRank": 10,
-      "displayRank": 8,
+      "displayRank": 7,
       "heroTags": [
         {
-          "id": "rank-8",
-          "text": "#8 Em Destaque (IMDb #10)",
+          "id": "rank-7",
+          "text": "#7 Em Destaque (Outubro de 2026)",
           "color": "#007df7",
           "style": "solid"
         }
@@ -269,12 +248,13 @@
       "isFeatured": true,
       "availabilityStatus": "verified",
       "audioStatus": "pt-br-dubbed",
+      "canonicalId": "movie:imdb:tt1392796",
       "imdbRank": 11,
-      "displayRank": 9,
+      "displayRank": 8,
       "heroTags": [
         {
-          "id": "rank-9",
-          "text": "#9 Em Destaque (IMDb #11)",
+          "id": "rank-8",
+          "text": "#8 Em Destaque (Outubro de 2026)",
           "color": "#007df7",
           "style": "solid"
         }
@@ -299,12 +279,44 @@
       "isFeatured": true,
       "availabilityStatus": "verified",
       "audioStatus": "pt-br-dubbed",
+      "canonicalId": "movie:imdb:tt11576182",
       "imdbRank": 12,
+      "displayRank": 9,
+      "heroTags": [
+        {
+          "id": "rank-9",
+          "text": "#9 Em Destaque (Outubro de 2026)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "movie-obsession-1976",
+      "title": "Obsessão",
+      "originalTitle": "Obsession",
+      "type": "FILME",
+      "rating": 7,
+      "year": 1976,
+      "image": "https://images.metahub.space/poster/medium/tt0074991/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt0074991/img",
+      "description": "Um empresário assombrado pelo sequestro e morte de sua esposa conhece uma mulher idêntica anos depois na Itália. Obra-prima de suspense dirigida por Brian De Palma.",
+      "genres": [
+        "Mistério",
+        "Drama",
+        "Suspense"
+      ],
+      "imdbId": "tt0074991",
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "canonicalId": "movie:imdb:tt0074991",
+      "imdbRank": 14,
       "displayRank": 10,
       "heroTags": [
         {
           "id": "rank-10",
-          "text": "#10 Em Destaque (IMDb #12)",
+          "text": "#10 Em Destaque (Outubro de 2026)",
           "color": "#007df7",
           "style": "solid"
         }
@@ -312,6 +324,47 @@
     }
   ],
   "featuredSeries": [
+    {
+      "id": "series-a-leste-do-eden-2026",
+      "title": "A Leste do Éden",
+      "originalTitle": "East of Eden",
+      "type": "SÉRIE",
+      "rating": 7.8,
+      "year": 2026,
+      "image": "https://image.tmdb.org/t/p/w500/axdUor6gLMTrrB1UF4Qfy0TTSyX.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/70RZX7kNjA0Qjn6HigB1oMvFJ8R.jpg",
+      "description": "Adaptação do épico clássico de John Steinbeck sobre duas famílias cujas histórias se entrelaçam no vale de Salinas.",
+      "genres": [
+        "Drama",
+        "Histórico"
+      ],
+      "imdbId": "tt21097264",
+      "tmdbId": "258165",
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "seasonsCount": 1,
+      "episodes": [
+        {
+          "id": "eden-s1e1",
+          "number": 1,
+          "title": "Irmãos",
+          "description": "Depois que o acaso coloca Cathy Ames na vida dos irmãos Trask, todos precisam lidar com uma batalha interna entre o bem e o mal.",
+          "image": "https://images.metahub.space/poster/medium/tt21097264/img"
+        }
+      ],
+      "canonicalId": "series:imdb:tt21097264",
+      "imdbRank": 3,
+      "displayRank": 1,
+      "heroTags": [
+        {
+          "id": "rank-1",
+          "text": "#1 Em Destaque (Outubro de 2026)",
+          "color": "#c084fc",
+          "style": "solid"
+        }
+      ]
+    },
     {
       "id": "series-ted-lasso",
       "title": "Ted Lasso",
@@ -348,13 +401,14 @@
           "image": "https://images.metahub.space/poster/medium/tt10986410/img"
         }
       ],
+      "canonicalId": "series:imdb:tt10986410",
       "imdbRank": 5,
-      "displayRank": 1,
+      "displayRank": 2,
       "heroTags": [
         {
-          "id": "rank-1",
-          "text": "#1 Em Destaque (IMDb #5)",
-          "color": "#007df7",
+          "id": "rank-2",
+          "text": "#2 Em Destaque (Outubro de 2026)",
+          "color": "#c084fc",
           "style": "solid"
         }
       ]
@@ -395,13 +449,14 @@
           "image": "https://images.metahub.space/poster/medium/tt5875444/img"
         }
       ],
+      "canonicalId": "series:imdb:tt5875444",
       "imdbRank": 7,
-      "displayRank": 2,
+      "displayRank": 3,
       "heroTags": [
         {
-          "id": "rank-2",
-          "text": "#2 Em Destaque (IMDb #7)",
-          "color": "#007df7",
+          "id": "rank-3",
+          "text": "#3 Em Destaque (Outubro de 2026)",
+          "color": "#c084fc",
           "style": "solid"
         }
       ]
@@ -435,13 +490,14 @@
           "image": "https://images.metahub.space/poster/medium/tt13207736/img"
         }
       ],
+      "canonicalId": "series:imdb:tt13207736",
       "imdbRank": 9,
-      "displayRank": 3,
+      "displayRank": 4,
       "heroTags": [
         {
-          "id": "rank-3",
-          "text": "#3 Em Destaque (IMDb #9)",
-          "color": "#007df7",
+          "id": "rank-4",
+          "text": "#4 Em Destaque (Outubro de 2026)",
+          "color": "#c084fc",
           "style": "solid"
         }
       ]
@@ -475,13 +531,14 @@
           "image": "https://images.metahub.space/poster/medium/tt1844624/img"
         }
       ],
+      "canonicalId": "series:imdb:tt1844624",
       "imdbRank": 10,
-      "displayRank": 4,
+      "displayRank": 5,
       "heroTags": [
         {
-          "id": "rank-4",
-          "text": "#4 Em Destaque (IMDb #10)",
-          "color": "#007df7",
+          "id": "rank-5",
+          "text": "#5 Em Destaque (Outubro de 2026)",
+          "color": "#c084fc",
           "style": "solid"
         }
       ]
@@ -516,13 +573,14 @@
           "image": "https://image.tmdb.org/t/p/w500/e5enRsAImbGcsT0BksqwurjA6CZ.jpg"
         }
       ],
+      "canonicalId": "series:imdb:tt16066148",
       "imdbRank": 11,
-      "displayRank": 5,
+      "displayRank": 6,
       "heroTags": [
         {
-          "id": "rank-5",
-          "text": "#5 Em Destaque (IMDb #11)",
-          "color": "#007df7",
+          "id": "rank-6",
+          "text": "#6 Em Destaque (Outubro de 2026)",
+          "color": "#c084fc",
           "style": "solid"
         }
       ]
@@ -556,13 +614,14 @@
           "image": "https://images.metahub.space/poster/medium/tt1196946/img"
         }
       ],
-      "imdbRank": 14,
-      "displayRank": 6,
+      "canonicalId": "series:imdb:tt1196946",
+      "imdbRank": 12,
+      "displayRank": 7,
       "heroTags": [
         {
-          "id": "rank-6",
-          "text": "#6 Em Destaque (IMDb #14)",
-          "color": "#007df7",
+          "id": "rank-7",
+          "text": "#7 Em Destaque (Outubro de 2026)",
+          "color": "#c084fc",
           "style": "solid"
         }
       ]
@@ -597,13 +656,14 @@
           "image": "https://images.metahub.space/poster/medium/tt0944947/img"
         }
       ],
-      "imdbRank": 15,
-      "displayRank": 7,
+      "canonicalId": "series:imdb:tt0944947",
+      "imdbRank": 13,
+      "displayRank": 8,
       "heroTags": [
         {
-          "id": "rank-7",
-          "text": "#7 Em Destaque (IMDb #15)",
-          "color": "#007df7",
+          "id": "rank-8",
+          "text": "#8 Em Destaque (Outubro de 2026)",
+          "color": "#c084fc",
           "style": "solid"
         }
       ]
@@ -637,13 +697,14 @@
           "image": "https://images.metahub.space/poster/medium/tt9288030/img"
         }
       ],
-      "imdbRank": 16,
-      "displayRank": 8,
+      "canonicalId": "series:imdb:tt9288030",
+      "imdbRank": 14,
+      "displayRank": 9,
       "heroTags": [
         {
-          "id": "rank-8",
-          "text": "#8 Em Destaque (IMDb #16)",
-          "color": "#007df7",
+          "id": "rank-9",
+          "text": "#9 Em Destaque (Outubro de 2026)",
+          "color": "#c084fc",
           "style": "solid"
         }
       ]
@@ -677,61 +738,3021 @@
           "image": "https://images.metahub.space/poster/medium/tt13111078/img"
         }
       ],
-      "imdbRank": 18,
-      "displayRank": 9,
+      "canonicalId": "series:imdb:tt13111078",
+      "imdbRank": 15,
+      "displayRank": 10,
       "heroTags": [
         {
-          "id": "rank-9",
-          "text": "#9 Em Destaque (IMDb #18)",
-          "color": "#007df7",
+          "id": "rank-10",
+          "text": "#10 Em Destaque (Outubro de 2026)",
+          "color": "#c084fc",
           "style": "solid"
         }
       ]
-    },
+    }
+  ],
+  "featuredAnimes": [
     {
-      "id": "series-silo",
-      "title": "Silo",
-      "originalTitle": "Silo",
-      "type": "SÉRIE",
-      "rating": 8.1,
-      "year": 2023,
-      "image": "https://images.metahub.space/poster/medium/tt14688458/img",
-      "backdrop": "https://images.metahub.space/background/medium/tt14688458/img",
-      "description": "Em um futuro tóxico e devastado, uma comunidade de milhares de pessoas vive em um gigantesco silo subterrâneo de 144 andares com regras rigorosas.",
+      "id": "anime-solo-leveling",
+      "canonicalId": "anime:anilist:151807",
+      "title": "Solo Leveling",
+      "originalTitle": "Ore dake Level Up na Ken",
+      "type": "ANIME",
+      "mediaFormat": "series",
+      "rating": 8.7,
+      "year": 2024,
+      "image": "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/gJL5iqPyZzgvI1Vb9k4PqB6fF6C.jpg",
+      "description": "Em um mundo onde caçadores despertam habilidades sobrenaturais, Sung Jin-woo, o caçador mais fraco da humanidade, recebe uma chance única de subir de nível sem limites.",
       "genres": [
-        "Ficção Científica",
-        "Drama",
-        "Mistério"
+        "Anime",
+        "Ação",
+        "Aventura",
+        "Fantasia"
       ],
-      "imdbId": "tt14688458",
+      "aniListId": 151807,
+      "tmdbId": "127532",
+      "malId": 52299,
       "seasonsCount": 2,
       "isFeatured": true,
       "availabilityStatus": "verified",
       "audioStatus": "pt-br-dubbed",
       "episodes": [
         {
-          "id": "silo-s1e1",
+          "id": "solo-s1e1",
           "number": 1,
-          "title": "Dia da Liberdade",
-          "description": "O xerife Holston toma uma decisão fatídica após anos desconfiando das narrativas oficiais sobre a superfície.",
-          "image": "https://images.metahub.space/poster/medium/tt14688458/img"
+          "title": "Estou Acostumado",
+          "description": "Sung Jin-woo lidera um grupo de expedição rumo a uma dungeon dupla com consequências fatais.",
+          "image": "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg"
         }
       ],
-      "imdbRank": 19,
+      "imdbId": "anilist-151807",
+      "imdbRank": 1,
+      "displayRank": 1,
+      "heroTags": [
+        {
+          "id": "rank-1",
+          "text": "#1 Em Destaque (Outubro de 2026)",
+          "color": "#06b6d4",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "anime-jujutsu-kaisen",
+      "canonicalId": "anime:anilist:113415",
+      "title": "Jujutsu Kaisen",
+      "originalTitle": "Jujutsu Kaisen",
+      "type": "ANIME",
+      "mediaFormat": "series",
+      "rating": 8.6,
+      "year": 2020,
+      "image": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/gmECX1Dv3y54wQ8o3t300gJ8uVp.jpg",
+      "description": "Yuji Itadori engole um dedo amaldiçoado de Ryomen Sukuna e ingressa na Escola de Feitiçaria de Tóquio para expurgar maldições ameaçadoras.",
+      "genres": [
+        "Anime",
+        "Ação",
+        "Sobrenatural",
+        "Fantasia"
+      ],
+      "aniListId": 113415,
+      "tmdbId": "95479",
+      "malId": 40748,
+      "seasonsCount": 2,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "jjk-s1e1",
+          "number": 1,
+          "title": "Ryomen Sukuna",
+          "description": "Yuji Itadori quebra o selo de um talismã amaldiçoado para salvar seus colegas de escola.",
+          "image": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg"
+        }
+      ],
+      "imdbId": "anilist-113415",
+      "imdbRank": 2,
+      "displayRank": 2,
+      "heroTags": [
+        {
+          "id": "rank-2",
+          "text": "#2 Em Destaque (Outubro de 2026)",
+          "color": "#06b6d4",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "anime-demon-slayer",
+      "canonicalId": "anime:anilist:101922",
+      "title": "Demon Slayer: Kimetsu no Yaiba",
+      "originalTitle": "Kimetsu no Yaiba",
+      "type": "ANIME",
+      "mediaFormat": "series",
+      "rating": 8.6,
+      "year": 2019,
+      "image": "https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH6SzQEJGP6tjBuYj.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/nTvM4mhqZlHIvPtPRum9WXfa729.jpg",
+      "description": "Tanjiro Kamado parte em uma jornada para se tornar um exterminador de demônios e devolver a humanidade de sua irmã Nezuko.",
+      "genres": [
+        "Anime",
+        "Ação",
+        "Fantasia",
+        "Histórico"
+      ],
+      "aniListId": 101922,
+      "tmdbId": "85937",
+      "malId": 38000,
+      "seasonsCount": 4,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "ds-s1e1",
+          "number": 1,
+          "title": "Crueldade",
+          "description": "Tanjiro retorna da cidade e encontra sua família atacada por um demônio devorador de homens.",
+          "image": "https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH6SzQEJGP6tjBuYj.jpg"
+        }
+      ],
+      "imdbId": "anilist-101922",
+      "imdbRank": 3,
+      "displayRank": 3,
+      "heroTags": [
+        {
+          "id": "rank-3",
+          "text": "#3 Em Destaque (Outubro de 2026)",
+          "color": "#06b6d4",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "anime-dandadan",
+      "canonicalId": "anime:anilist:171018",
+      "title": "Dandadan",
+      "originalTitle": "Dan Da Dan",
+      "type": "ANIME",
+      "mediaFormat": "series",
+      "rating": 8.5,
+      "year": 2024,
+      "image": "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/1vKxVp97TqCjO1w9wE0K3G8kU9V.jpg",
+      "description": "Momo Ayase e Okarun desafiam suas crenças em fantasmas e alienígenas, desencadeando confrontos hilários e insanos no Japão.",
+      "genres": [
+        "Anime",
+        "Ação",
+        "Comédia",
+        "Sobrenatural"
+      ],
+      "aniListId": 171018,
+      "tmdbId": "240411",
+      "malId": 57334,
+      "seasonsCount": 1,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "ddd-s1e1",
+          "number": 1,
+          "title": "Isso é o Amor Começando?",
+          "description": "Momo e Okarun apostam para ver quem encontra alienígenas ou espíritos primeiro.",
+          "image": "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg"
+        }
+      ],
+      "imdbId": "anilist-171018",
+      "imdbRank": 4,
+      "displayRank": 4,
+      "heroTags": [
+        {
+          "id": "rank-4",
+          "text": "#4 Em Destaque (Outubro de 2026)",
+          "color": "#06b6d4",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "anime-bleach-tybw",
+      "canonicalId": "anime:anilist:114446",
+      "title": "Bleach: Thousand-Year Blood War",
+      "originalTitle": "Bleach: Sennen Kessen-hen",
+      "type": "ANIME",
+      "mediaFormat": "series",
+      "rating": 8.9,
+      "year": 2022,
+      "image": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/9pkbtK1kLhR1wzZg27v8O9eU4hV.jpg",
+      "description": "A guerra milenar entre os Shinigamis da Soul Society e o exército Quincy liderado por Yhwach chega ao seu clímax destrutivo.",
+      "genres": [
+        "Anime",
+        "Ação",
+        "Aventura",
+        "Sobrenatural"
+      ],
+      "aniListId": 114446,
+      "tmdbId": "13916",
+      "malId": 41467,
+      "seasonsCount": 3,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "bleach-tybw-s1e1",
+          "number": 1,
+          "title": "Guerra de Sangue",
+          "description": "A Soul Society é surpreendida por um ataque coordenado do Wandenreich.",
+          "image": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg"
+        }
+      ],
+      "imdbId": "anilist-114446",
+      "imdbRank": 5,
+      "displayRank": 5,
+      "heroTags": [
+        {
+          "id": "rank-5",
+          "text": "#5 Em Destaque (Outubro de 2026)",
+          "color": "#06b6d4",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "anime-frieren",
+      "canonicalId": "anime:anilist:154587",
+      "title": "Frieren: Beyond Journey's End",
+      "originalTitle": "Sousou no Frieren",
+      "type": "ANIME",
+      "mediaFormat": "series",
+      "rating": 9.1,
+      "year": 2023,
+      "image": "https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBPd.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/4HodYYKEIsGOdinkGi2Ucz6X9i0.jpg",
+      "description": "Após derrotar o Rei Demônio, a maga elfa Frieren embarca em uma peregrinação contemplativa sobre o tempo e a brevidade da vida humana.",
+      "genres": [
+        "Anime",
+        "Aventura",
+        "Drama",
+        "Fantasia"
+      ],
+      "aniListId": 154587,
+      "tmdbId": "209867",
+      "malId": 52991,
+      "seasonsCount": 1,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "frieren-s1e1",
+          "number": 1,
+          "title": "O Fim da Jornada",
+          "description": "Frieren e o grupo dos heróis celebram o retorno triunfal após dez anos de campanha.",
+          "image": "https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBPd.jpg"
+        }
+      ],
+      "imdbId": "anilist-154587",
+      "imdbRank": 6,
+      "displayRank": 6,
+      "heroTags": [
+        {
+          "id": "rank-6",
+          "text": "#6 Em Destaque (Outubro de 2026)",
+          "color": "#06b6d4",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "anime-chainsaw-man",
+      "canonicalId": "anime:anilist:127230",
+      "title": "Chainsaw Man",
+      "originalTitle": "Chainsaw Man",
+      "type": "ANIME",
+      "mediaFormat": "series",
+      "rating": 8.5,
+      "year": 2022,
+      "image": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/vI3a3n07Jq9g6iK2k69uP8wV7hX.jpg",
+      "description": "Denji renasce como um híbrido motosserra após se fundir com seu cachorro demônio Pochita e entra para a Segurança Pública.",
+      "genres": [
+        "Anime",
+        "Ação",
+        "Sobrenatural",
+        "Horror"
+      ],
+      "aniListId": 127230,
+      "tmdbId": "114410",
+      "malId": 44511,
+      "seasonsCount": 1,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "csm-s1e1",
+          "number": 1,
+          "title": "Cachorro e Motosserra",
+          "description": "Denji trabalha caçando demônios para pagar as dívidas deixadas por seu falecido pai.",
+          "image": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg"
+        }
+      ],
+      "imdbId": "anilist-127230",
+      "imdbRank": 7,
+      "displayRank": 7,
+      "heroTags": [
+        {
+          "id": "rank-7",
+          "text": "#7 Em Destaque (Outubro de 2026)",
+          "color": "#06b6d4",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "anime-attack-on-titan",
+      "canonicalId": "anime:anilist:16498",
+      "title": "Attack on Titan",
+      "originalTitle": "Shingeki no Kyojin",
+      "type": "ANIME",
+      "mediaFormat": "series",
+      "rating": 9,
+      "year": 2013,
+      "image": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/hP9cKk97kFh7g1w9w7h5g1kL2.jpg",
+      "description": "Eren Yeager e a Tropa de Exploração lutam desesperadamente pela sobrevivência humana contra gigantes devoradores de homens.",
+      "genres": [
+        "Anime",
+        "Ação",
+        "Drama",
+        "Fantasia"
+      ],
+      "aniListId": 16498,
+      "tmdbId": "1429",
+      "malId": 16498,
+      "seasonsCount": 4,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "aot-s1e1",
+          "number": 1,
+          "title": "Para Você, Daqui a 2.000 Anos",
+          "description": "A Muralha Maria é rompida pelo Titã Colossal e o caos engole a cidade de Shiganshina.",
+          "image": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg"
+        }
+      ],
+      "imdbId": "anilist-16498",
+      "imdbRank": 8,
+      "displayRank": 8,
+      "heroTags": [
+        {
+          "id": "rank-8",
+          "text": "#8 Em Destaque (Outubro de 2026)",
+          "color": "#06b6d4",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "anime-one-piece",
+      "canonicalId": "anime:anilist:21",
+      "title": "One Piece",
+      "originalTitle": "One Piece",
+      "type": "ANIME",
+      "mediaFormat": "series",
+      "rating": 8.9,
+      "year": 1999,
+      "image": "https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/4MCKNAc6AbWjEsM2crWsNmecOCU.jpg",
+      "description": "Monkey D. Luffy navega pelos mares com o bando do Chapéu de Palha em busca do tesouro supremo e o título de Rei dos Piratas.",
+      "genres": [
+        "Anime",
+        "Ação",
+        "Aventura",
+        "Comédia"
+      ],
+      "aniListId": 21,
+      "tmdbId": "37854",
+      "malId": 21,
+      "seasonsCount": 21,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "op-s1e1",
+          "number": 1,
+          "title": "Eu Sou Luffy! O Homem Que Será o Rei dos Piratas!",
+          "description": "Luffy emerge de um barril e conhece Koby a bordo do navio da terrível capitã Alvida.",
+          "image": "https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg"
+        }
+      ],
+      "imdbId": "anilist-21",
+      "imdbRank": 9,
+      "displayRank": 9,
+      "heroTags": [
+        {
+          "id": "rank-9",
+          "text": "#9 Em Destaque (Outubro de 2026)",
+          "color": "#06b6d4",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "anime-spy-family",
+      "canonicalId": "anime:anilist:140960",
+      "title": "Spy x Family",
+      "originalTitle": "Spy × Family",
+      "type": "ANIME",
+      "mediaFormat": "series",
+      "rating": 8.4,
+      "year": 2022,
+      "image": "https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq1.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/179rKqc8kE3P0x4H2e1wV8x5h7Z.jpg",
+      "description": "Um espião mestre precisa forjar uma família de mentira para cumprir sua missão secreta, sem saber que sua filha lê mentes e sua esposa é uma assassina de aluguel.",
+      "genres": [
+        "Anime",
+        "Comédia",
+        "Ação",
+        "Espionagem"
+      ],
+      "aniListId": 140960,
+      "tmdbId": "120089",
+      "malId": 50273,
+      "seasonsCount": 2,
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "episodes": [
+        {
+          "id": "sxf-s1e1",
+          "number": 1,
+          "title": "Operação Strix",
+          "description": "O agente Twilight adota a pequena Anya em um orfanato para ingressar na elite de Berlint.",
+          "image": "https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq1.jpg"
+        }
+      ],
+      "imdbId": "anilist-140960",
+      "imdbRank": 10,
       "displayRank": 10,
       "heroTags": [
         {
           "id": "rank-10",
-          "text": "#10 Em Destaque (IMDb #19)",
-          "color": "#007df7",
+          "text": "#10 Em Destaque (Outubro de 2026)",
+          "color": "#06b6d4",
           "style": "solid"
         }
       ]
     }
   ],
+  "monthlyRanking": {
+    "monthKey": "2026-10",
+    "monthLabel": "Outubro de 2026",
+    "year": 2026,
+    "month": 10,
+    "isCurrentMonth": true,
+    "statusLabel": "Outubro de 2026 · Parcial",
+    "lastUpdatedAt": 1792881519455,
+    "nextScheduledUpdate": 1793005200000,
+    "nextScheduledUpdateFormatted": "Segunda-feira, 26/10/2026 às 06:00 (BRT)",
+    "movies": [
+      {
+        "position": 1,
+        "canonicalId": "movie:imdb:tt31454558",
+        "mediaType": "movie",
+        "title": "Digger",
+        "originalTitle": "Digger",
+        "year": 2026,
+        "poster": "https://image.tmdb.org/t/p/w500/1ATXKrIPJyKNwnJ6lcG088Sa6zi.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/b7t3r39Oll5qPxBKzLZ8eHMBD7l.jpg",
+        "rating": 7.8,
+        "item": {
+          "id": "movie-digger-2026",
+          "title": "Digger",
+          "originalTitle": "Digger",
+          "type": "FILME",
+          "rating": 7.8,
+          "year": 2026,
+          "image": "https://image.tmdb.org/t/p/w500/1ATXKrIPJyKNwnJ6lcG088Sa6zi.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/b7t3r39Oll5qPxBKzLZ8eHMBD7l.jpg",
+          "description": "Em uma região montanhosa e remota, um homem solitário se vê diante de conflitos do passado quando seu filho reaparece inesperadamente.",
+          "genres": [
+            "Aventura",
+            "Drama",
+            "Ação"
+          ],
+          "imdbId": "tt31454558",
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "canonicalId": "movie:imdb:tt31454558",
+          "imdbRank": 2,
+          "displayRank": 1,
+          "heroTags": [
+            {
+              "id": "rank-1",
+              "text": "#1 Em Destaque (Outubro de 2026)",
+              "color": "#007df7",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 198,
+        "source": "imdb-moviemeter",
+        "originalPosition": 2,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 2,
+        "canonicalId": "movie:imdb:tt21440780",
+        "mediaType": "movie",
+        "title": "Outra Mamãe",
+        "originalTitle": "Another Mother",
+        "year": 2026,
+        "poster": "https://images.metahub.space/poster/medium/tt21440780/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt21440780/img",
+        "rating": 7.4,
+        "item": {
+          "id": "movie-outra-mamae-2026",
+          "title": "Outra Mamãe",
+          "originalTitle": "Another Mother",
+          "type": "FILME",
+          "rating": 7.4,
+          "year": 2026,
+          "image": "https://images.metahub.space/poster/medium/tt21440780/img",
+          "backdrop": "https://images.metahub.space/background/medium/tt21440780/img",
+          "description": "Após uma perda devastadora, uma mulher descobre verdades perturbadoras sobre a nova família que tenta acolhê-la.",
+          "genres": [
+            "Suspense",
+            "Mistério",
+            "Drama"
+          ],
+          "imdbId": "tt21440780",
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "canonicalId": "movie:imdb:tt21440780",
+          "imdbRank": 3,
+          "displayRank": 2,
+          "heroTags": [
+            {
+              "id": "rank-2",
+              "text": "#2 Em Destaque (Outubro de 2026)",
+              "color": "#007df7",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 196,
+        "source": "imdb-moviemeter",
+        "originalPosition": 3,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 3,
+        "canonicalId": "movie:imdb:tt28704204",
+        "mediaType": "movie",
+        "title": "O Exorcista: Mártires",
+        "originalTitle": "The Exorcist: Martyrs",
+        "year": 2026,
+        "poster": "https://image.tmdb.org/t/p/w500/i3kvS445sWWIhuxgXywPuUcsoP0.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/ePIY6b8TlIjqFzK1JKANPhxUIPn.jpg",
+        "rating": 7.2,
+        "item": {
+          "id": "movie-exorcista-martires-2026",
+          "title": "O Exorcista: Mártires",
+          "originalTitle": "The Exorcist: Martyrs",
+          "type": "FILME",
+          "rating": 7.2,
+          "year": 2026,
+          "image": "https://image.tmdb.org/t/p/w500/i3kvS445sWWIhuxgXywPuUcsoP0.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/ePIY6b8TlIjqFzK1JKANPhxUIPn.jpg",
+          "description": "Capítulo aterrorizante da saga onde padres e especialistas espirituais enfrentam manifestações demoníacas em comunidades isoladas.",
+          "genres": [
+            "Terror",
+            "Mistério"
+          ],
+          "imdbId": "tt28704204",
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "canonicalId": "movie:imdb:tt28704204",
+          "imdbRank": 5,
+          "displayRank": 3,
+          "heroTags": [
+            {
+              "id": "rank-3",
+              "text": "#3 Em Destaque (Outubro de 2026)",
+              "color": "#007df7",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 192,
+        "source": "imdb-moviemeter",
+        "originalPosition": 5,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 4,
+        "canonicalId": "movie:imdb:tt31828574",
+        "mediaType": "movie",
+        "title": "Matchbox: O Filme",
+        "originalTitle": "Matchbox",
+        "year": 2026,
+        "poster": "https://image.tmdb.org/t/p/w500/lFKA4GMz36dImEy3DQPdPF7G4V9.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/y6RIuwuxLG3Nsb37KUj5yatnTIp.jpg",
+        "rating": 7.5,
+        "item": {
+          "id": "movie-matchbox-2026",
+          "title": "Matchbox: O Filme",
+          "originalTitle": "Matchbox",
+          "type": "FILME",
+          "rating": 7.5,
+          "year": 2026,
+          "image": "https://image.tmdb.org/t/p/w500/lFKA4GMz36dImEy3DQPdPF7G4V9.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/y6RIuwuxLG3Nsb37KUj5yatnTIp.jpg",
+          "description": "Ação em alta velocidade inspirada na lendária linha de veículos e pistas radicais, com perseguições cinematográficas alucinantes.",
+          "genres": [
+            "Ação",
+            "Aventura"
+          ],
+          "imdbId": "tt31828574",
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "canonicalId": "movie:imdb:tt31828574",
+          "imdbRank": 6,
+          "displayRank": 4,
+          "heroTags": [
+            {
+              "id": "rank-4",
+              "text": "#4 Em Destaque (Outubro de 2026)",
+              "color": "#007df7",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 190,
+        "source": "imdb-moviemeter",
+        "originalPosition": 6,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 5,
+        "canonicalId": "movie:imdb:tt13000574",
+        "mediaType": "movie",
+        "title": "Resident Evil",
+        "originalTitle": "Resident Evil",
+        "year": 2026,
+        "poster": "https://image.tmdb.org/t/p/w500/gQ76UL64RQe3oHwiwHwODTC23g4.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/3icyRAqgakNcQn6aDVz9libFmBA.jpg",
+        "rating": 7.6,
+        "item": {
+          "id": "movie-resident-evil-2026",
+          "title": "Resident Evil",
+          "originalTitle": "Resident Evil",
+          "type": "FILME",
+          "rating": 7.6,
+          "year": 2026,
+          "image": "https://image.tmdb.org/t/p/w500/gQ76UL64RQe3oHwiwHwODTC23g4.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/3icyRAqgakNcQn6aDVz9libFmBA.jpg",
+          "description": "Nova adaptação cinematográfica da icônica franquia de terror e sobrevivência da Capcom com fidelidade máxima à atmosfera sombria.",
+          "genres": [
+            "Ação",
+            "Terror",
+            "Ficção Científica"
+          ],
+          "tmdbId": "1423191",
+          "imdbId": "tt13000574",
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "canonicalId": "movie:imdb:tt13000574",
+          "imdbRank": 7,
+          "displayRank": 5,
+          "heroTags": [
+            {
+              "id": "rank-5",
+              "text": "#5 Em Destaque (Outubro de 2026)",
+              "color": "#007df7",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 188,
+        "source": "imdb-moviemeter",
+        "originalPosition": 7,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 6,
+        "canonicalId": "movie:imdb:tt0100935",
+        "mediaType": "movie",
+        "title": "Coração Selvagem",
+        "originalTitle": "Wild at Heart",
+        "year": 1990,
+        "poster": "https://images.metahub.space/poster/medium/tt0100935/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt0100935/img",
+        "rating": 7.2,
+        "item": {
+          "id": "movie-wild-at-heart-1990",
+          "title": "Coração Selvagem",
+          "originalTitle": "Wild at Heart",
+          "type": "FILME",
+          "rating": 7.2,
+          "year": 1990,
+          "image": "https://images.metahub.space/poster/medium/tt0100935/img",
+          "backdrop": "https://images.metahub.space/background/medium/tt0100935/img",
+          "description": "Jovens amantes fogem pela estrada enquanto a mãe controladora da garota contrata assassinos e detetives para caçá-los. Clássico cult de David Lynch com Nicolas Cage e Laura Dern.",
+          "genres": [
+            "Crime",
+            "Drama",
+            "Romance"
+          ],
+          "imdbId": "tt0100935",
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "canonicalId": "movie:imdb:tt0100935",
+          "imdbRank": 9,
+          "displayRank": 6,
+          "heroTags": [
+            {
+              "id": "rank-6",
+              "text": "#6 Em Destaque (Outubro de 2026)",
+              "color": "#007df7",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 184,
+        "source": "imdb-moviemeter",
+        "originalPosition": 9,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 7,
+        "canonicalId": "movie:imdb:tt11464826",
+        "mediaType": "movie",
+        "title": "O Outro Lado das Redes",
+        "originalTitle": "The Social Dilemma",
+        "year": 2020,
+        "poster": "https://images.metahub.space/poster/medium/tt11464826/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt11464826/img",
+        "rating": 7.6,
+        "item": {
+          "id": "movie-social-dilemma-2020",
+          "title": "O Outro Lado das Redes",
+          "originalTitle": "The Social Dilemma",
+          "type": "FILME",
+          "rating": 7.6,
+          "year": 2020,
+          "image": "https://images.metahub.space/poster/medium/tt11464826/img",
+          "backdrop": "https://images.metahub.space/background/medium/tt11464826/img",
+          "description": "Especialistas em tecnologia e ex-executivos do Vale do Silício revelam o impacto perigoso e manipulador das redes sociais sobre a psicologia humana e a sociedade.",
+          "genres": [
+            "Documentário",
+            "Drama"
+          ],
+          "imdbId": "tt11464826",
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "canonicalId": "movie:imdb:tt11464826",
+          "imdbRank": 10,
+          "displayRank": 7,
+          "heroTags": [
+            {
+              "id": "rank-7",
+              "text": "#7 Em Destaque (Outubro de 2026)",
+              "color": "#007df7",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 182,
+        "source": "imdb-moviemeter",
+        "originalPosition": 10,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 8,
+        "canonicalId": "movie:imdb:tt1392796",
+        "mediaType": "movie",
+        "title": "Unabomber",
+        "originalTitle": "Unabomber",
+        "year": 2026,
+        "poster": "https://image.tmdb.org/t/p/w500/39aMkR8Y5vhCG9dTkjiqRl8AVqp.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/58D9nalUYW5L5K0guw7hcpsEJBH.jpg",
+        "rating": 7.7,
+        "item": {
+          "id": "movie-unabomber-2026",
+          "title": "Unabomber",
+          "originalTitle": "Unabomber",
+          "type": "FILME",
+          "rating": 7.7,
+          "year": 2026,
+          "image": "https://image.tmdb.org/t/p/w500/39aMkR8Y5vhCG9dTkjiqRl8AVqp.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/58D9nalUYW5L5K0guw7hcpsEJBH.jpg",
+          "description": "A história real da caçada do FBI ao terrorista matemático Ted Kaczynski e a revolução dos métodos de análise linguística forense.",
+          "genres": [
+            "Biografia",
+            "Crime",
+            "Drama"
+          ],
+          "imdbId": "tt1392796",
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "canonicalId": "movie:imdb:tt1392796",
+          "imdbRank": 11,
+          "displayRank": 8,
+          "heroTags": [
+            {
+              "id": "rank-8",
+              "text": "#8 Em Destaque (Outubro de 2026)",
+              "color": "#007df7",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 180,
+        "source": "imdb-moviemeter",
+        "originalPosition": 11,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 9,
+        "canonicalId": "movie:imdb:tt11576182",
+        "mediaType": "movie",
+        "title": "Dia D",
+        "originalTitle": "D-Day",
+        "year": 2026,
+        "poster": "https://image.tmdb.org/t/p/w500/2EjUTEnnoC0sK5j5FS7dC3vOZcl.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/2EjUTEnnoC0sK5j5FS7dC3vOZcl.jpg",
+        "rating": 7.5,
+        "item": {
+          "id": "movie-dia-d-2026",
+          "title": "Dia D",
+          "originalTitle": "D-Day",
+          "type": "FILME",
+          "rating": 7.5,
+          "year": 2026,
+          "image": "https://image.tmdb.org/t/p/w500/2EjUTEnnoC0sK5j5FS7dC3vOZcl.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/2EjUTEnnoC0sK5j5FS7dC3vOZcl.jpg",
+          "description": "A reconstituição cinematográfica da Operação Overlord e o desembarque dos aliados na Normandia durante a Segunda Guerra Mundial.",
+          "genres": [
+            "Guerra",
+            "História",
+            "Drama"
+          ],
+          "imdbId": "tt11576182",
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "canonicalId": "movie:imdb:tt11576182",
+          "imdbRank": 12,
+          "displayRank": 9,
+          "heroTags": [
+            {
+              "id": "rank-9",
+              "text": "#9 Em Destaque (Outubro de 2026)",
+              "color": "#007df7",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 178,
+        "source": "imdb-moviemeter",
+        "originalPosition": 12,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 10,
+        "canonicalId": "movie:imdb:tt0074991",
+        "mediaType": "movie",
+        "title": "Obsessão",
+        "originalTitle": "Obsession",
+        "year": 1976,
+        "poster": "https://images.metahub.space/poster/medium/tt0074991/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt0074991/img",
+        "rating": 7,
+        "item": {
+          "id": "movie-obsession-1976",
+          "title": "Obsessão",
+          "originalTitle": "Obsession",
+          "type": "FILME",
+          "rating": 7,
+          "year": 1976,
+          "image": "https://images.metahub.space/poster/medium/tt0074991/img",
+          "backdrop": "https://images.metahub.space/background/medium/tt0074991/img",
+          "description": "Um empresário assombrado pelo sequestro e morte de sua esposa conhece uma mulher idêntica anos depois na Itália. Obra-prima de suspense dirigida por Brian De Palma.",
+          "genres": [
+            "Mistério",
+            "Drama",
+            "Suspense"
+          ],
+          "imdbId": "tt0074991",
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "canonicalId": "movie:imdb:tt0074991",
+          "imdbRank": 14,
+          "displayRank": 10,
+          "heroTags": [
+            {
+              "id": "rank-10",
+              "text": "#10 Em Destaque (Outubro de 2026)",
+              "color": "#007df7",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 174,
+        "source": "imdb-moviemeter",
+        "originalPosition": 14,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      }
+    ],
+    "series": [
+      {
+        "position": 1,
+        "canonicalId": "series:imdb:tt21097264",
+        "mediaType": "series",
+        "title": "A Leste do Éden",
+        "originalTitle": "East of Eden",
+        "year": 2026,
+        "poster": "https://image.tmdb.org/t/p/w500/axdUor6gLMTrrB1UF4Qfy0TTSyX.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/70RZX7kNjA0Qjn6HigB1oMvFJ8R.jpg",
+        "rating": 7.8,
+        "item": {
+          "id": "series-a-leste-do-eden-2026",
+          "title": "A Leste do Éden",
+          "originalTitle": "East of Eden",
+          "type": "SÉRIE",
+          "rating": 7.8,
+          "year": 2026,
+          "image": "https://image.tmdb.org/t/p/w500/axdUor6gLMTrrB1UF4Qfy0TTSyX.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/70RZX7kNjA0Qjn6HigB1oMvFJ8R.jpg",
+          "description": "Adaptação do épico clássico de John Steinbeck sobre duas famílias cujas histórias se entrelaçam no vale de Salinas.",
+          "genres": [
+            "Drama",
+            "Histórico"
+          ],
+          "imdbId": "tt21097264",
+          "tmdbId": "258165",
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "seasonsCount": 1,
+          "episodes": [
+            {
+              "id": "eden-s1e1",
+              "number": 1,
+              "title": "Irmãos",
+              "description": "Depois que o acaso coloca Cathy Ames na vida dos irmãos Trask, todos precisam lidar com uma batalha interna entre o bem e o mal.",
+              "image": "https://images.metahub.space/poster/medium/tt21097264/img"
+            }
+          ],
+          "canonicalId": "series:imdb:tt21097264",
+          "imdbRank": 3,
+          "displayRank": 1,
+          "heroTags": [
+            {
+              "id": "rank-1",
+              "text": "#1 Em Destaque (Outubro de 2026)",
+              "color": "#c084fc",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 196,
+        "source": "imdb-tvmeter",
+        "originalPosition": 3,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 2,
+        "canonicalId": "series:imdb:tt10986410",
+        "mediaType": "series",
+        "title": "Ted Lasso",
+        "originalTitle": "Ted Lasso",
+        "year": 2020,
+        "poster": "https://images.metahub.space/poster/medium/tt10986410/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt10986410/img",
+        "rating": 8.8,
+        "item": {
+          "id": "series-ted-lasso",
+          "title": "Ted Lasso",
+          "originalTitle": "Ted Lasso",
+          "type": "SÉRIE",
+          "rating": 8.8,
+          "year": 2020,
+          "image": "https://images.metahub.space/poster/medium/tt10986410/img",
+          "backdrop": "https://images.metahub.space/background/medium/tt10986410/img",
+          "description": "O treinador de futebol americano Ted Lasso é contratado para comandar um time de futebol britânico na Premier League com muito otimismo e empatia.",
+          "genres": [
+            "Comédia",
+            "Drama",
+            "Esporte"
+          ],
+          "imdbId": "tt10986410",
+          "seasonsCount": 3,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "ted-lasso-s1e1",
+              "number": 1,
+              "title": "Piloto",
+              "description": "Ted Lasso chega à Inglaterra para treinar o AFC Richmond, surpreendendo os torcedores e a mídia cética.",
+              "image": "https://images.metahub.space/poster/medium/tt10986410/img"
+            },
+            {
+              "id": "ted-lasso-s1e2",
+              "number": 2,
+              "title": "Biscoitos",
+              "description": "Ted tenta conquistar Rebecca com doces caseiros enquanto resolve conflitos no vestiário.",
+              "image": "https://images.metahub.space/poster/medium/tt10986410/img"
+            }
+          ],
+          "canonicalId": "series:imdb:tt10986410",
+          "imdbRank": 5,
+          "displayRank": 2,
+          "heroTags": [
+            {
+              "id": "rank-2",
+              "text": "#2 Em Destaque (Outubro de 2026)",
+              "color": "#c084fc",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 192,
+        "source": "imdb-tvmeter",
+        "originalPosition": 5,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 3,
+        "canonicalId": "series:imdb:tt5875444",
+        "mediaType": "series",
+        "title": "Slow Horses",
+        "originalTitle": "Slow Horses",
+        "year": 2022,
+        "poster": "https://images.metahub.space/poster/medium/tt5875444/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt5875444/img",
+        "rating": 8.3,
+        "item": {
+          "id": "series-slow-horses",
+          "title": "Slow Horses",
+          "originalTitle": "Slow Horses",
+          "type": "SÉRIE",
+          "rating": 8.3,
+          "year": 2022,
+          "image": "https://images.metahub.space/poster/medium/tt5875444/img",
+          "backdrop": "https://images.metahub.space/background/medium/tt5875444/img",
+          "description": "Uma equipe disfuncional de agentes do MI5 que cometeram erros em suas carreiras tenta proteger o Reino Unido sob a liderança do beberrão e brilhante Jackson Lamb.",
+          "genres": [
+            "Suspense",
+            "Drama",
+            "Crime"
+          ],
+          "imdbId": "tt5875444",
+          "seasonsCount": 4,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "slow-horses-s1e1",
+              "number": 1,
+              "title": "Slough House",
+              "description": "Após um exercício de treinamento fracassado, River Cartwright é banido para a Slough House.",
+              "image": "https://images.metahub.space/poster/medium/tt5875444/img"
+            },
+            {
+              "id": "slow-horses-s1e2",
+              "number": 2,
+              "title": "Work Drinks",
+              "description": "A equipe se envolve no caso do sequestro de um estudante universitário.",
+              "image": "https://images.metahub.space/poster/medium/tt5875444/img"
+            }
+          ],
+          "canonicalId": "series:imdb:tt5875444",
+          "imdbRank": 7,
+          "displayRank": 3,
+          "heroTags": [
+            {
+              "id": "rank-3",
+              "text": "#3 Em Destaque (Outubro de 2026)",
+              "color": "#c084fc",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 188,
+        "source": "imdb-tvmeter",
+        "originalPosition": 7,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 4,
+        "canonicalId": "series:imdb:tt13207736",
+        "mediaType": "series",
+        "title": "Monstros",
+        "originalTitle": "Monsters",
+        "year": 2022,
+        "poster": "https://images.metahub.space/poster/medium/tt13207736/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt13207736/img",
+        "rating": 7.9,
+        "item": {
+          "id": "series-monstros",
+          "title": "Monstros",
+          "originalTitle": "Monsters",
+          "type": "SÉRIE",
+          "rating": 7.9,
+          "year": 2022,
+          "image": "https://images.metahub.space/poster/medium/tt13207736/img",
+          "backdrop": "https://images.metahub.space/background/medium/tt13207736/img",
+          "description": "Série antológica sobre crimes reais que chocaram a sociedade, explorando a psicologia e a dinâmica dos julgamentos.",
+          "genres": [
+            "Biografia",
+            "Crime",
+            "Drama"
+          ],
+          "imdbId": "tt13207736",
+          "seasonsCount": 2,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "monsters-s1e1",
+              "number": 1,
+              "title": "Episódio 1",
+              "description": "O início das investigações de um caso que paralisou a opinião pública.",
+              "image": "https://images.metahub.space/poster/medium/tt13207736/img"
+            }
+          ],
+          "canonicalId": "series:imdb:tt13207736",
+          "imdbRank": 9,
+          "displayRank": 4,
+          "heroTags": [
+            {
+              "id": "rank-4",
+              "text": "#4 Em Destaque (Outubro de 2026)",
+              "color": "#c084fc",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 184,
+        "source": "imdb-tvmeter",
+        "originalPosition": 9,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 5,
+        "canonicalId": "series:imdb:tt1844624",
+        "mediaType": "series",
+        "title": "História de Horror Americana",
+        "originalTitle": "American Horror Story",
+        "year": 2011,
+        "poster": "https://images.metahub.space/poster/medium/tt1844624/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt1844624/img",
+        "rating": 8,
+        "item": {
+          "id": "series-ahs",
+          "title": "História de Horror Americana",
+          "originalTitle": "American Horror Story",
+          "type": "SÉRIE",
+          "rating": 8,
+          "year": 2011,
+          "image": "https://images.metahub.space/poster/medium/tt1844624/img",
+          "backdrop": "https://images.metahub.space/background/medium/tt1844624/img",
+          "description": "Série antológica criada por Ryan Murphy que explora diferentes mitos, casas assombradas, asilos, covens e lendas urbanas de horror.",
+          "genres": [
+            "Terror",
+            "Drama",
+            "Mistério"
+          ],
+          "imdbId": "tt1844624",
+          "seasonsCount": 12,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "ahs-s1e1",
+              "number": 1,
+              "title": "Piloto: Murder House",
+              "description": "A família Harmon muda-se de Boston para Los Angeles para recomeçar suas vidas em uma mansão com passado macabro.",
+              "image": "https://images.metahub.space/poster/medium/tt1844624/img"
+            }
+          ],
+          "canonicalId": "series:imdb:tt1844624",
+          "imdbRank": 10,
+          "displayRank": 5,
+          "heroTags": [
+            {
+              "id": "rank-5",
+              "text": "#5 Em Destaque (Outubro de 2026)",
+              "color": "#c084fc",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 182,
+        "source": "imdb-tvmeter",
+        "originalPosition": 10,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 6,
+        "canonicalId": "series:imdb:tt16066148",
+        "mediaType": "series",
+        "title": "Magnatas do Crime",
+        "originalTitle": "The Gentlemen",
+        "year": 2024,
+        "poster": "https://image.tmdb.org/t/p/w500/e5enRsAImbGcsT0BksqwurjA6CZ.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/l6PSAWVLyaZzwviMwBgYQOPVJ6Y.jpg",
+        "rating": 8.1,
+        "item": {
+          "id": "series-the-gentlemen",
+          "title": "Magnatas do Crime",
+          "originalTitle": "The Gentlemen",
+          "type": "SÉRIE",
+          "rating": 8.1,
+          "year": 2024,
+          "image": "https://image.tmdb.org/t/p/w500/e5enRsAImbGcsT0BksqwurjA6CZ.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/l6PSAWVLyaZzwviMwBgYQOPVJ6Y.jpg",
+          "description": "Eddie Horniman herda inesperadamente a vasta propriedade rural do pai, descobrindo que ela faz parte de um império bilionário da cannabis.",
+          "genres": [
+            "Ação",
+            "Comédia",
+            "Crime"
+          ],
+          "imdbId": "tt16066148",
+          "tmdbId": "125244",
+          "seasonsCount": 1,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "gentlemen-s1e1",
+              "number": 1,
+              "title": "Refinado e Perigoso",
+              "description": "Eddie descobre que o negócio secreto da família vem acompanhado de gângsteres excêntricos e perigosos.",
+              "image": "https://image.tmdb.org/t/p/w500/e5enRsAImbGcsT0BksqwurjA6CZ.jpg"
+            }
+          ],
+          "canonicalId": "series:imdb:tt16066148",
+          "imdbRank": 11,
+          "displayRank": 6,
+          "heroTags": [
+            {
+              "id": "rank-6",
+              "text": "#6 Em Destaque (Outubro de 2026)",
+              "color": "#c084fc",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 180,
+        "source": "imdb-tvmeter",
+        "originalPosition": 11,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 7,
+        "canonicalId": "series:imdb:tt1196946",
+        "mediaType": "series",
+        "title": "O Mentalista",
+        "originalTitle": "The Mentalist",
+        "year": 2008,
+        "poster": "https://images.metahub.space/poster/medium/tt1196946/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt1196946/img",
+        "rating": 8.2,
+        "item": {
+          "id": "series-the-mentalist",
+          "title": "O Mentalista",
+          "originalTitle": "The Mentalist",
+          "type": "SÉRIE",
+          "rating": 8.2,
+          "year": 2008,
+          "image": "https://images.metahub.space/poster/medium/tt1196946/img",
+          "backdrop": "https://images.metahub.space/background/medium/tt1196946/img",
+          "description": "Patrick Jane, um ex-falso médium com impressionante poder de observação e dedução, atua como consultor do CBI enquanto busca vingança contra o serial killer Red John.",
+          "genres": [
+            "Crime",
+            "Drama",
+            "Mistério"
+          ],
+          "imdbId": "tt1196946",
+          "seasonsCount": 7,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "mentalist-s1e1",
+              "number": 1,
+              "title": "Piloto",
+              "description": "Patrick Jane ajuda a equipe do CBI liderada por Teresa Lisbon a investigar o homicídio da esposa de um jogador de golfe.",
+              "image": "https://images.metahub.space/poster/medium/tt1196946/img"
+            }
+          ],
+          "canonicalId": "series:imdb:tt1196946",
+          "imdbRank": 12,
+          "displayRank": 7,
+          "heroTags": [
+            {
+              "id": "rank-7",
+              "text": "#7 Em Destaque (Outubro de 2026)",
+              "color": "#c084fc",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 176,
+        "source": "imdb-tvmeter",
+        "originalPosition": 12,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 8,
+        "canonicalId": "series:imdb:tt0944947",
+        "mediaType": "series",
+        "title": "Game of Thrones",
+        "originalTitle": "Game of Thrones",
+        "year": 2011,
+        "poster": "https://images.metahub.space/poster/medium/tt0944947/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt0944947/img",
+        "rating": 9.2,
+        "item": {
+          "id": "series-game-of-thrones-2011",
+          "title": "Game of Thrones",
+          "originalTitle": "Game of Thrones",
+          "type": "SÉRIE",
+          "rating": 9.2,
+          "year": 2011,
+          "image": "https://images.metahub.space/poster/medium/tt0944947/img",
+          "backdrop": "https://images.metahub.space/background/medium/tt0944947/img",
+          "description": "Nove famílias nobres lutam pelo controle do Trono de Ferro de Westeros enquanto um inimigo ancestral desperta além da Muralha.",
+          "genres": [
+            "Ação",
+            "Aventura",
+            "Drama",
+            "Fantasia"
+          ],
+          "imdbId": "tt0944947",
+          "seasonsCount": 8,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "got-s1e1",
+              "number": 1,
+              "title": "O Inverno Está Chegando",
+              "description": "Lorde Ned Stark recebe a visita do Rei Robert Baratheon em Winterfell para assumir o cargo de Mão do Rei.",
+              "image": "https://images.metahub.space/poster/medium/tt0944947/img"
+            }
+          ],
+          "canonicalId": "series:imdb:tt0944947",
+          "imdbRank": 13,
+          "displayRank": 8,
+          "heroTags": [
+            {
+              "id": "rank-8",
+              "text": "#8 Em Destaque (Outubro de 2026)",
+              "color": "#c084fc",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 174,
+        "source": "imdb-tvmeter",
+        "originalPosition": 13,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 9,
+        "canonicalId": "series:imdb:tt9288030",
+        "mediaType": "series",
+        "title": "Reacher",
+        "originalTitle": "Reacher",
+        "year": 2022,
+        "poster": "https://images.metahub.space/poster/medium/tt9288030/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt9288030/img",
+        "rating": 8.1,
+        "item": {
+          "id": "series-reacher",
+          "title": "Reacher",
+          "originalTitle": "Reacher",
+          "type": "SÉRIE",
+          "rating": 8.1,
+          "year": 2022,
+          "image": "https://images.metahub.space/poster/medium/tt9288030/img",
+          "backdrop": "https://images.metahub.space/background/medium/tt9288030/img",
+          "description": "O veterano da polícia militar Jack Reacher viaja sem rumo pelos Estados Unidos e resolve mistérios violentos usando inteligência e força bruta.",
+          "genres": [
+            "Ação",
+            "Crime",
+            "Drama"
+          ],
+          "imdbId": "tt9288030",
+          "seasonsCount": 2,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "reacher-s1e1",
+              "number": 1,
+              "title": "Bem-vindo a Margrave",
+              "description": "Reacher é preso logo após desembarcar em uma pacata cidade da Geórgia acusado de um assassinato brutal.",
+              "image": "https://images.metahub.space/poster/medium/tt9288030/img"
+            }
+          ],
+          "canonicalId": "series:imdb:tt9288030",
+          "imdbRank": 14,
+          "displayRank": 9,
+          "heroTags": [
+            {
+              "id": "rank-9",
+              "text": "#9 Em Destaque (Outubro de 2026)",
+              "color": "#c084fc",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 172,
+        "source": "imdb-tvmeter",
+        "originalPosition": 14,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      },
+      {
+        "position": 10,
+        "canonicalId": "series:imdb:tt13111078",
+        "mediaType": "series",
+        "title": "Operação Lioness",
+        "originalTitle": "Special Ops: Lioness",
+        "year": 2023,
+        "poster": "https://images.metahub.space/poster/medium/tt13111078/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt13111078/img",
+        "rating": 7.8,
+        "item": {
+          "id": "series-lioness",
+          "title": "Operação Lioness",
+          "originalTitle": "Special Ops: Lioness",
+          "type": "SÉRIE",
+          "rating": 7.8,
+          "year": 2023,
+          "image": "https://images.metahub.space/poster/medium/tt13111078/img",
+          "backdrop": "https://images.metahub.space/background/medium/tt13111078/img",
+          "description": "Criada por Taylor Sheridan, a série acompanha o programa de agentes secretas da CIA que se infiltram em círculos terroristas globais.",
+          "genres": [
+            "Ação",
+            "Drama",
+            "Suspense"
+          ],
+          "imdbId": "tt13111078",
+          "seasonsCount": 2,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "lioness-s1e1",
+              "number": 1,
+              "title": "Soldados Sacrificiais",
+              "description": "Joe recruta uma jovem fuzileira naval para se aproximar da filha de um financista do terrorismo.",
+              "image": "https://images.metahub.space/poster/medium/tt13111078/img"
+            }
+          ],
+          "canonicalId": "series:imdb:tt13111078",
+          "imdbRank": 15,
+          "displayRank": 10,
+          "heroTags": [
+            {
+              "id": "rank-10",
+              "text": "#10 Em Destaque (Outubro de 2026)",
+              "color": "#c084fc",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 169,
+        "source": "imdb-tvmeter",
+        "originalPosition": 15,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519454
+      }
+    ],
+    "animes": [
+      {
+        "position": 1,
+        "canonicalId": "anime:anilist:151807",
+        "mediaType": "anime",
+        "title": "Solo Leveling",
+        "originalTitle": "Ore dake Level Up na Ken",
+        "year": 2024,
+        "poster": "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/gJL5iqPyZzgvI1Vb9k4PqB6fF6C.jpg",
+        "rating": 8.7,
+        "item": {
+          "id": "anime-solo-leveling",
+          "canonicalId": "anime:anilist:151807",
+          "title": "Solo Leveling",
+          "originalTitle": "Ore dake Level Up na Ken",
+          "type": "ANIME",
+          "mediaFormat": "series",
+          "rating": 8.7,
+          "year": 2024,
+          "image": "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/gJL5iqPyZzgvI1Vb9k4PqB6fF6C.jpg",
+          "description": "Em um mundo onde caçadores despertam habilidades sobrenaturais, Sung Jin-woo, o caçador mais fraco da humanidade, recebe uma chance única de subir de nível sem limites.",
+          "genres": [
+            "Anime",
+            "Ação",
+            "Aventura",
+            "Fantasia"
+          ],
+          "aniListId": 151807,
+          "tmdbId": "127532",
+          "malId": 52299,
+          "seasonsCount": 2,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "solo-s1e1",
+              "number": 1,
+              "title": "Estou Acostumado",
+              "description": "Sung Jin-woo lidera um grupo de expedição rumo a uma dungeon dupla com consequências fatais.",
+              "image": "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg"
+            }
+          ],
+          "imdbId": "anilist-151807",
+          "imdbRank": 1,
+          "displayRank": 1,
+          "heroTags": [
+            {
+              "id": "rank-1",
+              "text": "#1 Em Destaque (Outubro de 2026)",
+              "color": "#06b6d4",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 1082,
+        "source": "anilist",
+        "originalPosition": 1,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519455
+      },
+      {
+        "position": 2,
+        "canonicalId": "anime:anilist:113415",
+        "mediaType": "anime",
+        "title": "Jujutsu Kaisen",
+        "originalTitle": "Jujutsu Kaisen",
+        "year": 2020,
+        "poster": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/gmECX1Dv3y54wQ8o3t300gJ8uVp.jpg",
+        "rating": 8.6,
+        "item": {
+          "id": "anime-jujutsu-kaisen",
+          "canonicalId": "anime:anilist:113415",
+          "title": "Jujutsu Kaisen",
+          "originalTitle": "Jujutsu Kaisen",
+          "type": "ANIME",
+          "mediaFormat": "series",
+          "rating": 8.6,
+          "year": 2020,
+          "image": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/gmECX1Dv3y54wQ8o3t300gJ8uVp.jpg",
+          "description": "Yuji Itadori engole um dedo amaldiçoado de Ryomen Sukuna e ingressa na Escola de Feitiçaria de Tóquio para expurgar maldições ameaçadoras.",
+          "genres": [
+            "Anime",
+            "Ação",
+            "Sobrenatural",
+            "Fantasia"
+          ],
+          "aniListId": 113415,
+          "tmdbId": "95479",
+          "malId": 40748,
+          "seasonsCount": 2,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "jjk-s1e1",
+              "number": 1,
+              "title": "Ryomen Sukuna",
+              "description": "Yuji Itadori quebra o selo de um talismã amaldiçoado para salvar seus colegas de escola.",
+              "image": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg"
+            }
+          ],
+          "imdbId": "anilist-113415",
+          "imdbRank": 2,
+          "displayRank": 2,
+          "heroTags": [
+            {
+              "id": "rank-2",
+              "text": "#2 Em Destaque (Outubro de 2026)",
+              "color": "#06b6d4",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 1056,
+        "source": "anilist",
+        "originalPosition": 2,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519455
+      },
+      {
+        "position": 3,
+        "canonicalId": "anime:anilist:101922",
+        "mediaType": "anime",
+        "title": "Demon Slayer: Kimetsu no Yaiba",
+        "originalTitle": "Kimetsu no Yaiba",
+        "year": 2019,
+        "poster": "https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH6SzQEJGP6tjBuYj.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/nTvM4mhqZlHIvPtPRum9WXfa729.jpg",
+        "rating": 8.6,
+        "item": {
+          "id": "anime-demon-slayer",
+          "canonicalId": "anime:anilist:101922",
+          "title": "Demon Slayer: Kimetsu no Yaiba",
+          "originalTitle": "Kimetsu no Yaiba",
+          "type": "ANIME",
+          "mediaFormat": "series",
+          "rating": 8.6,
+          "year": 2019,
+          "image": "https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH6SzQEJGP6tjBuYj.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/nTvM4mhqZlHIvPtPRum9WXfa729.jpg",
+          "description": "Tanjiro Kamado parte em uma jornada para se tornar um exterminador de demônios e devolver a humanidade de sua irmã Nezuko.",
+          "genres": [
+            "Anime",
+            "Ação",
+            "Fantasia",
+            "Histórico"
+          ],
+          "aniListId": 101922,
+          "tmdbId": "85937",
+          "malId": 38000,
+          "seasonsCount": 4,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "ds-s1e1",
+              "number": 1,
+              "title": "Crueldade",
+              "description": "Tanjiro retorna da cidade e encontra sua família atacada por um demônio devorador de homens.",
+              "image": "https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH6SzQEJGP6tjBuYj.jpg"
+            }
+          ],
+          "imdbId": "anilist-101922",
+          "imdbRank": 3,
+          "displayRank": 3,
+          "heroTags": [
+            {
+              "id": "rank-3",
+              "text": "#3 Em Destaque (Outubro de 2026)",
+              "color": "#06b6d4",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 1049,
+        "source": "anilist",
+        "originalPosition": 3,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519455
+      },
+      {
+        "position": 4,
+        "canonicalId": "anime:anilist:171018",
+        "mediaType": "anime",
+        "title": "Dandadan",
+        "originalTitle": "Dan Da Dan",
+        "year": 2024,
+        "poster": "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/1vKxVp97TqCjO1w9wE0K3G8kU9V.jpg",
+        "rating": 8.5,
+        "item": {
+          "id": "anime-dandadan",
+          "canonicalId": "anime:anilist:171018",
+          "title": "Dandadan",
+          "originalTitle": "Dan Da Dan",
+          "type": "ANIME",
+          "mediaFormat": "series",
+          "rating": 8.5,
+          "year": 2024,
+          "image": "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/1vKxVp97TqCjO1w9wE0K3G8kU9V.jpg",
+          "description": "Momo Ayase e Okarun desafiam suas crenças em fantasmas e alienígenas, desencadeando confrontos hilários e insanos no Japão.",
+          "genres": [
+            "Anime",
+            "Ação",
+            "Comédia",
+            "Sobrenatural"
+          ],
+          "aniListId": 171018,
+          "tmdbId": "240411",
+          "malId": 57334,
+          "seasonsCount": 1,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "ddd-s1e1",
+              "number": 1,
+              "title": "Isso é o Amor Começando?",
+              "description": "Momo e Okarun apostam para ver quem encontra alienígenas ou espíritos primeiro.",
+              "image": "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg"
+            }
+          ],
+          "imdbId": "anilist-171018",
+          "imdbRank": 4,
+          "displayRank": 4,
+          "heroTags": [
+            {
+              "id": "rank-4",
+              "text": "#4 Em Destaque (Outubro de 2026)",
+              "color": "#06b6d4",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 1032,
+        "source": "anilist",
+        "originalPosition": 4,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519455
+      },
+      {
+        "position": 5,
+        "canonicalId": "anime:anilist:114446",
+        "mediaType": "anime",
+        "title": "Bleach: Thousand-Year Blood War",
+        "originalTitle": "Bleach: Sennen Kessen-hen",
+        "year": 2022,
+        "poster": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/9pkbtK1kLhR1wzZg27v8O9eU4hV.jpg",
+        "rating": 8.9,
+        "item": {
+          "id": "anime-bleach-tybw",
+          "canonicalId": "anime:anilist:114446",
+          "title": "Bleach: Thousand-Year Blood War",
+          "originalTitle": "Bleach: Sennen Kessen-hen",
+          "type": "ANIME",
+          "mediaFormat": "series",
+          "rating": 8.9,
+          "year": 2022,
+          "image": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/9pkbtK1kLhR1wzZg27v8O9eU4hV.jpg",
+          "description": "A guerra milenar entre os Shinigamis da Soul Society e o exército Quincy liderado por Yhwach chega ao seu clímax destrutivo.",
+          "genres": [
+            "Anime",
+            "Ação",
+            "Aventura",
+            "Sobrenatural"
+          ],
+          "aniListId": 114446,
+          "tmdbId": "13916",
+          "malId": 41467,
+          "seasonsCount": 3,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "bleach-tybw-s1e1",
+              "number": 1,
+              "title": "Guerra de Sangue",
+              "description": "A Soul Society é surpreendida por um ataque coordenado do Wandenreich.",
+              "image": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg"
+            }
+          ],
+          "imdbId": "anilist-114446",
+          "imdbRank": 5,
+          "displayRank": 5,
+          "heroTags": [
+            {
+              "id": "rank-5",
+              "text": "#5 Em Destaque (Outubro de 2026)",
+              "color": "#06b6d4",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 1024,
+        "source": "anilist",
+        "originalPosition": 5,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519455
+      },
+      {
+        "position": 6,
+        "canonicalId": "anime:anilist:154587",
+        "mediaType": "anime",
+        "title": "Frieren: Beyond Journey's End",
+        "originalTitle": "Sousou no Frieren",
+        "year": 2023,
+        "poster": "https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBPd.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/4HodYYKEIsGOdinkGi2Ucz6X9i0.jpg",
+        "rating": 9.1,
+        "item": {
+          "id": "anime-frieren",
+          "canonicalId": "anime:anilist:154587",
+          "title": "Frieren: Beyond Journey's End",
+          "originalTitle": "Sousou no Frieren",
+          "type": "ANIME",
+          "mediaFormat": "series",
+          "rating": 9.1,
+          "year": 2023,
+          "image": "https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBPd.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/4HodYYKEIsGOdinkGi2Ucz6X9i0.jpg",
+          "description": "Após derrotar o Rei Demônio, a maga elfa Frieren embarca em uma peregrinação contemplativa sobre o tempo e a brevidade da vida humana.",
+          "genres": [
+            "Anime",
+            "Aventura",
+            "Drama",
+            "Fantasia"
+          ],
+          "aniListId": 154587,
+          "tmdbId": "209867",
+          "malId": 52991,
+          "seasonsCount": 1,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "frieren-s1e1",
+              "number": 1,
+              "title": "O Fim da Jornada",
+              "description": "Frieren e o grupo dos heróis celebram o retorno triunfal após dez anos de campanha.",
+              "image": "https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBPd.jpg"
+            }
+          ],
+          "imdbId": "anilist-154587",
+          "imdbRank": 6,
+          "displayRank": 6,
+          "heroTags": [
+            {
+              "id": "rank-6",
+              "text": "#6 Em Destaque (Outubro de 2026)",
+              "color": "#06b6d4",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 1013,
+        "source": "anilist",
+        "originalPosition": 6,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519455
+      },
+      {
+        "position": 7,
+        "canonicalId": "anime:anilist:127230",
+        "mediaType": "anime",
+        "title": "Chainsaw Man",
+        "originalTitle": "Chainsaw Man",
+        "year": 2022,
+        "poster": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/vI3a3n07Jq9g6iK2k69uP8wV7hX.jpg",
+        "rating": 8.5,
+        "item": {
+          "id": "anime-chainsaw-man",
+          "canonicalId": "anime:anilist:127230",
+          "title": "Chainsaw Man",
+          "originalTitle": "Chainsaw Man",
+          "type": "ANIME",
+          "mediaFormat": "series",
+          "rating": 8.5,
+          "year": 2022,
+          "image": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/vI3a3n07Jq9g6iK2k69uP8wV7hX.jpg",
+          "description": "Denji renasce como um híbrido motosserra após se fundir com seu cachorro demônio Pochita e entra para a Segurança Pública.",
+          "genres": [
+            "Anime",
+            "Ação",
+            "Sobrenatural",
+            "Horror"
+          ],
+          "aniListId": 127230,
+          "tmdbId": "114410",
+          "malId": 44511,
+          "seasonsCount": 1,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "csm-s1e1",
+              "number": 1,
+              "title": "Cachorro e Motosserra",
+              "description": "Denji trabalha caçando demônios para pagar as dívidas deixadas por seu falecido pai.",
+              "image": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg"
+            }
+          ],
+          "imdbId": "anilist-127230",
+          "imdbRank": 7,
+          "displayRank": 7,
+          "heroTags": [
+            {
+              "id": "rank-7",
+              "text": "#7 Em Destaque (Outubro de 2026)",
+              "color": "#06b6d4",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 994,
+        "source": "anilist",
+        "originalPosition": 7,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519455
+      },
+      {
+        "position": 8,
+        "canonicalId": "anime:anilist:16498",
+        "mediaType": "anime",
+        "title": "Attack on Titan",
+        "originalTitle": "Shingeki no Kyojin",
+        "year": 2013,
+        "poster": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/hP9cKk97kFh7g1w9w7h5g1kL2.jpg",
+        "rating": 9,
+        "item": {
+          "id": "anime-attack-on-titan",
+          "canonicalId": "anime:anilist:16498",
+          "title": "Attack on Titan",
+          "originalTitle": "Shingeki no Kyojin",
+          "type": "ANIME",
+          "mediaFormat": "series",
+          "rating": 9,
+          "year": 2013,
+          "image": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/hP9cKk97kFh7g1w9w7h5g1kL2.jpg",
+          "description": "Eren Yeager e a Tropa de Exploração lutam desesperadamente pela sobrevivência humana contra gigantes devoradores de homens.",
+          "genres": [
+            "Anime",
+            "Ação",
+            "Drama",
+            "Fantasia"
+          ],
+          "aniListId": 16498,
+          "tmdbId": "1429",
+          "malId": 16498,
+          "seasonsCount": 4,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "aot-s1e1",
+              "number": 1,
+              "title": "Para Você, Daqui a 2.000 Anos",
+              "description": "A Muralha Maria é rompida pelo Titã Colossal e o caos engole a cidade de Shiganshina.",
+              "image": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg"
+            }
+          ],
+          "imdbId": "anilist-16498",
+          "imdbRank": 8,
+          "displayRank": 8,
+          "heroTags": [
+            {
+              "id": "rank-8",
+              "text": "#8 Em Destaque (Outubro de 2026)",
+              "color": "#06b6d4",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 983,
+        "source": "anilist",
+        "originalPosition": 8,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519455
+      },
+      {
+        "position": 9,
+        "canonicalId": "anime:anilist:21",
+        "mediaType": "anime",
+        "title": "One Piece",
+        "originalTitle": "One Piece",
+        "year": 1999,
+        "poster": "https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/4MCKNAc6AbWjEsM2crWsNmecOCU.jpg",
+        "rating": 8.9,
+        "item": {
+          "id": "anime-one-piece",
+          "canonicalId": "anime:anilist:21",
+          "title": "One Piece",
+          "originalTitle": "One Piece",
+          "type": "ANIME",
+          "mediaFormat": "series",
+          "rating": 8.9,
+          "year": 1999,
+          "image": "https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/4MCKNAc6AbWjEsM2crWsNmecOCU.jpg",
+          "description": "Monkey D. Luffy navega pelos mares com o bando do Chapéu de Palha em busca do tesouro supremo e o título de Rei dos Piratas.",
+          "genres": [
+            "Anime",
+            "Ação",
+            "Aventura",
+            "Comédia"
+          ],
+          "aniListId": 21,
+          "tmdbId": "37854",
+          "malId": 21,
+          "seasonsCount": 21,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "op-s1e1",
+              "number": 1,
+              "title": "Eu Sou Luffy! O Homem Que Será o Rei dos Piratas!",
+              "description": "Luffy emerge de um barril e conhece Koby a bordo do navio da terrível capitã Alvida.",
+              "image": "https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg"
+            }
+          ],
+          "imdbId": "anilist-21",
+          "imdbRank": 9,
+          "displayRank": 9,
+          "heroTags": [
+            {
+              "id": "rank-9",
+              "text": "#9 Em Destaque (Outubro de 2026)",
+              "color": "#06b6d4",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 971,
+        "source": "anilist",
+        "originalPosition": 9,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519455
+      },
+      {
+        "position": 10,
+        "canonicalId": "anime:anilist:140960",
+        "mediaType": "anime",
+        "title": "Spy x Family",
+        "originalTitle": "Spy × Family",
+        "year": 2022,
+        "poster": "https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq1.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/179rKqc8kE3P0x4H2e1wV8x5h7Z.jpg",
+        "rating": 8.4,
+        "item": {
+          "id": "anime-spy-family",
+          "canonicalId": "anime:anilist:140960",
+          "title": "Spy x Family",
+          "originalTitle": "Spy × Family",
+          "type": "ANIME",
+          "mediaFormat": "series",
+          "rating": 8.4,
+          "year": 2022,
+          "image": "https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq1.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/179rKqc8kE3P0x4H2e1wV8x5h7Z.jpg",
+          "description": "Um espião mestre precisa forjar uma família de mentira para cumprir sua missão secreta, sem saber que sua filha lê mentes e sua esposa é uma assassina de aluguel.",
+          "genres": [
+            "Anime",
+            "Comédia",
+            "Ação",
+            "Espionagem"
+          ],
+          "aniListId": 140960,
+          "tmdbId": "120089",
+          "malId": 50273,
+          "seasonsCount": 2,
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "episodes": [
+            {
+              "id": "sxf-s1e1",
+              "number": 1,
+              "title": "Operação Strix",
+              "description": "O agente Twilight adota a pequena Anya em um orfanato para ingressar na elite de Berlint.",
+              "image": "https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq1.jpg"
+            }
+          ],
+          "imdbId": "anilist-140960",
+          "imdbRank": 10,
+          "displayRank": 10,
+          "heroTags": [
+            {
+              "id": "rank-10",
+              "text": "#10 Em Destaque (Outubro de 2026)",
+              "color": "#06b6d4",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 956,
+        "source": "anilist",
+        "originalPosition": 10,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792881519455
+      }
+    ],
+    "totalCandidatesEvaluated": {
+      "movies": 30,
+      "series": 30,
+      "animes": 15
+    },
+    "auditTrail": {
+      "approvedMovies": [
+        {
+          "imdbId": "tt31454558",
+          "title": "Digger",
+          "imdbTitle": "Digger",
+          "canonicalTitle": "Digger",
+          "year": 2026,
+          "mediaType": "movie",
+          "imdbRank": 2,
+          "displayRank": 1,
+          "rankPosition": 2,
+          "finalPosition": 1,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "movie-digger-2026",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 198
+        },
+        {
+          "imdbId": "tt21440780",
+          "title": "Outra Mamãe",
+          "imdbTitle": "Outra Mamãe",
+          "canonicalTitle": "Outra Mamãe",
+          "year": 2026,
+          "mediaType": "movie",
+          "imdbRank": 3,
+          "displayRank": 2,
+          "rankPosition": 3,
+          "finalPosition": 2,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "movie-outra-mamae-2026",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 196
+        },
+        {
+          "imdbId": "tt28704204",
+          "title": "O Exorcista: Mártires",
+          "imdbTitle": "O Exorcista: Mártires",
+          "canonicalTitle": "O Exorcista: Mártires",
+          "year": 2026,
+          "mediaType": "movie",
+          "imdbRank": 5,
+          "displayRank": 3,
+          "rankPosition": 5,
+          "finalPosition": 3,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "movie-exorcista-martires-2026",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 192
+        },
+        {
+          "imdbId": "tt31828574",
+          "title": "Matchbox: O Filme",
+          "imdbTitle": "Matchbox: O Filme",
+          "canonicalTitle": "Matchbox: O Filme",
+          "year": 2026,
+          "mediaType": "movie",
+          "imdbRank": 6,
+          "displayRank": 4,
+          "rankPosition": 6,
+          "finalPosition": 4,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "movie-matchbox-2026",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 190
+        },
+        {
+          "imdbId": "tt13000574",
+          "title": "Resident Evil",
+          "imdbTitle": "Resident Evil",
+          "canonicalTitle": "Resident Evil",
+          "year": 2026,
+          "mediaType": "movie",
+          "imdbRank": 7,
+          "displayRank": 5,
+          "rankPosition": 7,
+          "finalPosition": 5,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "movie-resident-evil-2026",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 188
+        },
+        {
+          "imdbId": "tt0100935",
+          "title": "Coração Selvagem",
+          "imdbTitle": "Coração Selvagem",
+          "canonicalTitle": "Coração Selvagem",
+          "year": 1990,
+          "mediaType": "movie",
+          "imdbRank": 9,
+          "displayRank": 6,
+          "rankPosition": 9,
+          "finalPosition": 6,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "movie-wild-at-heart-1990",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 184
+        },
+        {
+          "imdbId": "tt11464826",
+          "title": "O Outro Lado das Redes",
+          "imdbTitle": "O Outro Lado das Redes",
+          "canonicalTitle": "O Outro Lado das Redes",
+          "year": 2020,
+          "mediaType": "movie",
+          "imdbRank": 10,
+          "displayRank": 7,
+          "rankPosition": 10,
+          "finalPosition": 7,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "movie-social-dilemma-2020",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 182
+        },
+        {
+          "imdbId": "tt1392796",
+          "title": "Unabomber",
+          "imdbTitle": "Unabomber",
+          "canonicalTitle": "Unabomber",
+          "year": 2026,
+          "mediaType": "movie",
+          "imdbRank": 11,
+          "displayRank": 8,
+          "rankPosition": 11,
+          "finalPosition": 8,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "movie-unabomber-2026",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 180
+        },
+        {
+          "imdbId": "tt11576182",
+          "title": "Dia D",
+          "imdbTitle": "Dia D",
+          "canonicalTitle": "Dia D",
+          "year": 2026,
+          "mediaType": "movie",
+          "imdbRank": 12,
+          "displayRank": 9,
+          "rankPosition": 12,
+          "finalPosition": 9,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "movie-dia-d-2026",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 178
+        },
+        {
+          "imdbId": "tt0074991",
+          "title": "Obsessão",
+          "imdbTitle": "Obsessão",
+          "canonicalTitle": "Obsessão",
+          "year": 1976,
+          "mediaType": "movie",
+          "imdbRank": 14,
+          "displayRank": 10,
+          "rankPosition": 14,
+          "finalPosition": 10,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "movie-obsession-1976",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 174
+        }
+      ],
+      "rejectedMovies": [
+        {
+          "imdbId": "tt29971038",
+          "title": "Sobrevivência",
+          "canonicalTitle": "Sobrevivência",
+          "year": 2026,
+          "mediaType": "movie",
+          "rankPosition": 1,
+          "status": "REJECTED",
+          "isIncluded": false,
+          "canonicalId": "movie-sobrevivencia-2026",
+          "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+          "score": 200
+        },
+        {
+          "imdbId": "tt32261958",
+          "title": "Verity",
+          "canonicalTitle": "Verity",
+          "year": 2026,
+          "mediaType": "movie",
+          "rankPosition": 4,
+          "status": "REJECTED",
+          "isIncluded": false,
+          "canonicalId": "movie-verity-2026",
+          "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+          "score": 194
+        },
+        {
+          "imdbId": "tt20221436",
+          "title": "Homem-Aranha: Um Novo Dia",
+          "canonicalTitle": "Homem-Aranha: Um Novo Dia",
+          "year": 2026,
+          "mediaType": "movie",
+          "rankPosition": 8,
+          "status": "REJECTED",
+          "isIncluded": false,
+          "canonicalId": "movie-spiderman-new-day-2026",
+          "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+          "score": 186
+        },
+        {
+          "imdbId": "tt33764258",
+          "title": "A Odisseia",
+          "canonicalTitle": "A Odisseia",
+          "year": 2026,
+          "mediaType": "movie",
+          "rankPosition": 13,
+          "status": "REJECTED",
+          "isIncluded": false,
+          "canonicalId": "movie-a-odisseia-2026",
+          "rejectionReason": "Conteúdo temporariamente oculto no catálogo público até 20/11/2026 às 00h00 BRT",
+          "score": 176
+        }
+      ],
+      "approvedSeries": [
+        {
+          "imdbId": "tt21097264",
+          "title": "A Leste do Éden",
+          "imdbTitle": "A Leste do Éden",
+          "canonicalTitle": "A Leste do Éden",
+          "year": 2026,
+          "mediaType": "series",
+          "imdbRank": 3,
+          "displayRank": 1,
+          "rankPosition": 3,
+          "finalPosition": 1,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "series-a-leste-do-eden-2026",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 196
+        },
+        {
+          "imdbId": "tt10986410",
+          "title": "Ted Lasso",
+          "imdbTitle": "Ted Lasso",
+          "canonicalTitle": "Ted Lasso",
+          "year": 2020,
+          "mediaType": "series",
+          "imdbRank": 5,
+          "displayRank": 2,
+          "rankPosition": 5,
+          "finalPosition": 2,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "series-ted-lasso",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 192
+        },
+        {
+          "imdbId": "tt5875444",
+          "title": "Slow Horses",
+          "imdbTitle": "Slow Horses",
+          "canonicalTitle": "Slow Horses",
+          "year": 2022,
+          "mediaType": "series",
+          "imdbRank": 7,
+          "displayRank": 3,
+          "rankPosition": 7,
+          "finalPosition": 3,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "series-slow-horses",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 188
+        },
+        {
+          "imdbId": "tt13207736",
+          "title": "Monstros",
+          "imdbTitle": "Monstros",
+          "canonicalTitle": "Monstros",
+          "year": 2022,
+          "mediaType": "series",
+          "imdbRank": 9,
+          "displayRank": 4,
+          "rankPosition": 9,
+          "finalPosition": 4,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "series-monstros",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 184
+        },
+        {
+          "imdbId": "tt1844624",
+          "title": "História de Horror Americana",
+          "imdbTitle": "História de Horror Americana",
+          "canonicalTitle": "História de Horror Americana",
+          "year": 2011,
+          "mediaType": "series",
+          "imdbRank": 10,
+          "displayRank": 5,
+          "rankPosition": 10,
+          "finalPosition": 5,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "series-ahs",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 182
+        },
+        {
+          "imdbId": "tt16066148",
+          "title": "Magnatas do Crime",
+          "imdbTitle": "Magnatas do Crime",
+          "canonicalTitle": "Magnatas do Crime",
+          "year": 2024,
+          "mediaType": "series",
+          "imdbRank": 11,
+          "displayRank": 6,
+          "rankPosition": 11,
+          "finalPosition": 6,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "series-the-gentlemen",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 180
+        },
+        {
+          "imdbId": "tt1196946",
+          "title": "O Mentalista",
+          "imdbTitle": "O Mentalista",
+          "canonicalTitle": "O Mentalista",
+          "year": 2008,
+          "mediaType": "series",
+          "imdbRank": 12,
+          "displayRank": 7,
+          "rankPosition": 12,
+          "finalPosition": 7,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "series-the-mentalist",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 176
+        },
+        {
+          "imdbId": "tt0944947",
+          "title": "Game of Thrones",
+          "imdbTitle": "Game of Thrones",
+          "canonicalTitle": "Game of Thrones",
+          "year": 2011,
+          "mediaType": "series",
+          "imdbRank": 13,
+          "displayRank": 8,
+          "rankPosition": 13,
+          "finalPosition": 8,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "series-game-of-thrones-2011",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 174
+        },
+        {
+          "imdbId": "tt9288030",
+          "title": "Reacher",
+          "imdbTitle": "Reacher",
+          "canonicalTitle": "Reacher",
+          "year": 2022,
+          "mediaType": "series",
+          "imdbRank": 14,
+          "displayRank": 9,
+          "rankPosition": 14,
+          "finalPosition": 9,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "series-reacher",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 172
+        },
+        {
+          "imdbId": "tt13111078",
+          "title": "Operação Lioness",
+          "imdbTitle": "Operação Lioness",
+          "canonicalTitle": "Operação Lioness",
+          "year": 2023,
+          "mediaType": "series",
+          "imdbRank": 15,
+          "displayRank": 10,
+          "rankPosition": 15,
+          "finalPosition": 10,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "series-lioness",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 169
+        }
+      ],
+      "rejectedSeries": [
+        {
+          "imdbId": "tt30147890",
+          "title": "Carrie: A Estranha",
+          "canonicalTitle": "Carrie: A Estranha",
+          "year": 2026,
+          "mediaType": "series",
+          "rankPosition": 1,
+          "status": "REJECTED",
+          "isIncluded": false,
+          "canonicalId": "series-carrie-2026",
+          "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+          "score": 200
+        },
+        {
+          "imdbId": "tt32159846",
+          "title": "Profundezas",
+          "canonicalTitle": "Profundezas",
+          "year": 2026,
+          "mediaType": "series",
+          "rankPosition": 2,
+          "status": "REJECTED",
+          "isIncluded": false,
+          "canonicalId": "series-profundezas-2026",
+          "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+          "score": 198
+        },
+        {
+          "imdbId": "tt26540670",
+          "title": "Lanternas",
+          "canonicalTitle": "Lanternas",
+          "year": 2026,
+          "mediaType": "series",
+          "rankPosition": 4,
+          "status": "REJECTED",
+          "isIncluded": false,
+          "canonicalId": "series-lanternas-2026",
+          "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+          "score": 194
+        },
+        {
+          "imdbId": "tt28289508",
+          "title": "Terra de Máfia",
+          "canonicalTitle": "Terra de Máfia",
+          "year": 2026,
+          "mediaType": "series",
+          "rankPosition": 6,
+          "status": "REJECTED",
+          "isIncluded": false,
+          "canonicalId": "series-terra-de-mafia-2026",
+          "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+          "score": 190
+        },
+        {
+          "imdbId": "tt29458920",
+          "title": "War",
+          "canonicalTitle": "War",
+          "year": 2026,
+          "mediaType": "series",
+          "rankPosition": 8,
+          "status": "REJECTED",
+          "isIncluded": false,
+          "canonicalId": "series-war-2026",
+          "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+          "score": 186
+        }
+      ],
+      "approvedAnimes": [
+        {
+          "imdbId": "anilist-151807",
+          "aniListId": 151807,
+          "tmdbId": "127532",
+          "title": "Solo Leveling",
+          "imdbTitle": "Solo Leveling",
+          "canonicalTitle": "Solo Leveling",
+          "year": 2024,
+          "mediaType": "anime",
+          "imdbRank": 1,
+          "displayRank": 1,
+          "rankPosition": 1,
+          "finalPosition": 1,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "anime-solo-leveling",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 1082
+        },
+        {
+          "imdbId": "anilist-113415",
+          "aniListId": 113415,
+          "tmdbId": "95479",
+          "title": "Jujutsu Kaisen",
+          "imdbTitle": "Jujutsu Kaisen",
+          "canonicalTitle": "Jujutsu Kaisen",
+          "year": 2020,
+          "mediaType": "anime",
+          "imdbRank": 2,
+          "displayRank": 2,
+          "rankPosition": 2,
+          "finalPosition": 2,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "anime-jujutsu-kaisen",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 1056
+        },
+        {
+          "imdbId": "anilist-101922",
+          "aniListId": 101922,
+          "tmdbId": "85937",
+          "title": "Demon Slayer: Kimetsu no Yaiba",
+          "imdbTitle": "Demon Slayer: Kimetsu no Yaiba",
+          "canonicalTitle": "Demon Slayer: Kimetsu no Yaiba",
+          "year": 2019,
+          "mediaType": "anime",
+          "imdbRank": 3,
+          "displayRank": 3,
+          "rankPosition": 3,
+          "finalPosition": 3,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "anime-demon-slayer",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 1049
+        },
+        {
+          "imdbId": "anilist-171018",
+          "aniListId": 171018,
+          "tmdbId": "240411",
+          "title": "Dandadan",
+          "imdbTitle": "Dandadan",
+          "canonicalTitle": "Dandadan",
+          "year": 2024,
+          "mediaType": "anime",
+          "imdbRank": 4,
+          "displayRank": 4,
+          "rankPosition": 4,
+          "finalPosition": 4,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "anime-dandadan",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 1032
+        },
+        {
+          "imdbId": "anilist-114446",
+          "aniListId": 114446,
+          "tmdbId": "13916",
+          "title": "Bleach: Thousand-Year Blood War",
+          "imdbTitle": "Bleach: Thousand-Year Blood War",
+          "canonicalTitle": "Bleach: Thousand-Year Blood War",
+          "year": 2022,
+          "mediaType": "anime",
+          "imdbRank": 5,
+          "displayRank": 5,
+          "rankPosition": 5,
+          "finalPosition": 5,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "anime-bleach-tybw",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 1024
+        },
+        {
+          "imdbId": "anilist-154587",
+          "aniListId": 154587,
+          "tmdbId": "209867",
+          "title": "Frieren: Beyond Journey's End",
+          "imdbTitle": "Frieren: Beyond Journey's End",
+          "canonicalTitle": "Frieren: Beyond Journey's End",
+          "year": 2023,
+          "mediaType": "anime",
+          "imdbRank": 6,
+          "displayRank": 6,
+          "rankPosition": 6,
+          "finalPosition": 6,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "anime-frieren",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 1013
+        },
+        {
+          "imdbId": "anilist-127230",
+          "aniListId": 127230,
+          "tmdbId": "114410",
+          "title": "Chainsaw Man",
+          "imdbTitle": "Chainsaw Man",
+          "canonicalTitle": "Chainsaw Man",
+          "year": 2022,
+          "mediaType": "anime",
+          "imdbRank": 7,
+          "displayRank": 7,
+          "rankPosition": 7,
+          "finalPosition": 7,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "anime-chainsaw-man",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 994
+        },
+        {
+          "imdbId": "anilist-16498",
+          "aniListId": 16498,
+          "tmdbId": "1429",
+          "title": "Attack on Titan",
+          "imdbTitle": "Attack on Titan",
+          "canonicalTitle": "Attack on Titan",
+          "year": 2013,
+          "mediaType": "anime",
+          "imdbRank": 8,
+          "displayRank": 8,
+          "rankPosition": 8,
+          "finalPosition": 8,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "anime-attack-on-titan",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 983
+        },
+        {
+          "imdbId": "anilist-21",
+          "aniListId": 21,
+          "tmdbId": "37854",
+          "title": "One Piece",
+          "imdbTitle": "One Piece",
+          "canonicalTitle": "One Piece",
+          "year": 1999,
+          "mediaType": "anime",
+          "imdbRank": 9,
+          "displayRank": 9,
+          "rankPosition": 9,
+          "finalPosition": 9,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "anime-one-piece",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 971
+        },
+        {
+          "imdbId": "anilist-140960",
+          "aniListId": 140960,
+          "tmdbId": "120089",
+          "title": "Spy x Family",
+          "imdbTitle": "Spy x Family",
+          "canonicalTitle": "Spy x Family",
+          "year": 2022,
+          "mediaType": "anime",
+          "imdbRank": 10,
+          "displayRank": 10,
+          "rankPosition": 10,
+          "finalPosition": 10,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "anime-spy-family",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 956
+        }
+      ],
+      "rejectedAnimes": []
+    }
+  },
   "totalCandidatesEvaluated": {
     "movies": 30,
-    "series": 30
+    "series": 30,
+    "animes": 15
   },
   "auditTrail": {
     "approvedMovies": [
@@ -752,7 +3773,8 @@
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 198
       },
       {
         "imdbId": "tt21440780",
@@ -771,26 +3793,8 @@
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
-      },
-      {
-        "imdbId": "tt15888806",
-        "title": "Verity",
-        "imdbTitle": "Verity",
-        "canonicalTitle": "Verity",
-        "year": 2026,
-        "mediaType": "movie",
-        "imdbRank": 4,
-        "displayRank": 3,
-        "rankPosition": 4,
-        "finalPosition": 3,
-        "status": "APPROVED",
-        "isIncluded": true,
-        "canonicalId": "movie-verity-2026",
-        "availabilityStatus": "verified",
-        "hasAudioPtBr": true,
-        "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 196
       },
       {
         "imdbId": "tt28704204",
@@ -800,16 +3804,17 @@
         "year": 2026,
         "mediaType": "movie",
         "imdbRank": 5,
-        "displayRank": 4,
+        "displayRank": 3,
         "rankPosition": 5,
-        "finalPosition": 4,
+        "finalPosition": 3,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-exorcista-martires-2026",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 192
       },
       {
         "imdbId": "tt31828574",
@@ -819,16 +3824,17 @@
         "year": 2026,
         "mediaType": "movie",
         "imdbRank": 6,
-        "displayRank": 5,
+        "displayRank": 4,
         "rankPosition": 6,
-        "finalPosition": 5,
+        "finalPosition": 4,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-matchbox-2026",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 190
       },
       {
         "imdbId": "tt13000574",
@@ -838,16 +3844,17 @@
         "year": 2026,
         "mediaType": "movie",
         "imdbRank": 7,
-        "displayRank": 6,
+        "displayRank": 5,
         "rankPosition": 7,
-        "finalPosition": 6,
+        "finalPosition": 5,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-resident-evil-2026",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 188
       },
       {
         "imdbId": "tt0100935",
@@ -857,16 +3864,17 @@
         "year": 1990,
         "mediaType": "movie",
         "imdbRank": 9,
-        "displayRank": 7,
+        "displayRank": 6,
         "rankPosition": 9,
-        "finalPosition": 7,
+        "finalPosition": 6,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-wild-at-heart-1990",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 184
       },
       {
         "imdbId": "tt11464826",
@@ -876,16 +3884,17 @@
         "year": 2020,
         "mediaType": "movie",
         "imdbRank": 10,
-        "displayRank": 8,
+        "displayRank": 7,
         "rankPosition": 10,
-        "finalPosition": 8,
+        "finalPosition": 7,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-social-dilemma-2020",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 182
       },
       {
         "imdbId": "tt1392796",
@@ -895,16 +3904,17 @@
         "year": 2026,
         "mediaType": "movie",
         "imdbRank": 11,
-        "displayRank": 9,
+        "displayRank": 8,
         "rankPosition": 11,
-        "finalPosition": 9,
+        "finalPosition": 8,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-unabomber-2026",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 180
       },
       {
         "imdbId": "tt11576182",
@@ -914,51 +3924,114 @@
         "year": 2026,
         "mediaType": "movie",
         "imdbRank": 12,
-        "displayRank": 10,
+        "displayRank": 9,
         "rankPosition": 12,
-        "finalPosition": 10,
+        "finalPosition": 9,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-dia-d-2026",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 178
+      },
+      {
+        "imdbId": "tt0074991",
+        "title": "Obsessão",
+        "imdbTitle": "Obsessão",
+        "canonicalTitle": "Obsessão",
+        "year": 1976,
+        "mediaType": "movie",
+        "imdbRank": 14,
+        "displayRank": 10,
+        "rankPosition": 14,
+        "finalPosition": 10,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "movie-obsession-1976",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 174
       }
     ],
     "rejectedMovies": [
       {
         "imdbId": "tt29971038",
         "title": "Sobrevivência",
-        "imdbTitle": "Sobrevivência",
         "canonicalTitle": "Sobrevivência",
         "year": 2026,
         "mediaType": "movie",
-        "imdbRank": 1,
         "rankPosition": 1,
         "status": "REJECTED",
         "isIncluded": false,
         "canonicalId": "movie-sobrevivencia-2026",
-        "availabilityStatus": "theatrical_window",
-        "rejectionReason": "Filme em cartaz nos cinemas brasileiros ou aguarda lançamento digital oficial"
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+        "score": 200
+      },
+      {
+        "imdbId": "tt32261958",
+        "title": "Verity",
+        "canonicalTitle": "Verity",
+        "year": 2026,
+        "mediaType": "movie",
+        "rankPosition": 4,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "movie-verity-2026",
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+        "score": 194
       },
       {
         "imdbId": "tt20221436",
         "title": "Homem-Aranha: Um Novo Dia",
-        "imdbTitle": "Homem-Aranha: Um Novo Dia",
         "canonicalTitle": "Homem-Aranha: Um Novo Dia",
         "year": 2026,
         "mediaType": "movie",
-        "imdbRank": 8,
         "rankPosition": 8,
         "status": "REJECTED",
         "isIncluded": false,
         "canonicalId": "movie-spiderman-new-day-2026",
-        "availabilityStatus": "theatrical_window",
-        "rejectionReason": "Filme em cartaz nos cinemas brasileiros ou aguarda lançamento digital oficial"
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+        "score": 186
+      },
+      {
+        "imdbId": "tt33764258",
+        "title": "A Odisseia",
+        "canonicalTitle": "A Odisseia",
+        "year": 2026,
+        "mediaType": "movie",
+        "rankPosition": 13,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "movie-a-odisseia-2026",
+        "rejectionReason": "Conteúdo temporariamente oculto no catálogo público até 20/11/2026 às 00h00 BRT",
+        "score": 176
       }
     ],
     "approvedSeries": [
+      {
+        "imdbId": "tt21097264",
+        "title": "A Leste do Éden",
+        "imdbTitle": "A Leste do Éden",
+        "canonicalTitle": "A Leste do Éden",
+        "year": 2026,
+        "mediaType": "series",
+        "imdbRank": 3,
+        "displayRank": 1,
+        "rankPosition": 3,
+        "finalPosition": 1,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "series-a-leste-do-eden-2026",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 196
+      },
       {
         "imdbId": "tt10986410",
         "title": "Ted Lasso",
@@ -967,16 +4040,17 @@
         "year": 2020,
         "mediaType": "series",
         "imdbRank": 5,
-        "displayRank": 1,
+        "displayRank": 2,
         "rankPosition": 5,
-        "finalPosition": 1,
+        "finalPosition": 2,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "series-ted-lasso",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 192
       },
       {
         "imdbId": "tt5875444",
@@ -986,16 +4060,17 @@
         "year": 2022,
         "mediaType": "series",
         "imdbRank": 7,
-        "displayRank": 2,
+        "displayRank": 3,
         "rankPosition": 7,
-        "finalPosition": 2,
+        "finalPosition": 3,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "series-slow-horses",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 188
       },
       {
         "imdbId": "tt13207736",
@@ -1005,16 +4080,17 @@
         "year": 2022,
         "mediaType": "series",
         "imdbRank": 9,
-        "displayRank": 3,
+        "displayRank": 4,
         "rankPosition": 9,
-        "finalPosition": 3,
+        "finalPosition": 4,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "series-monstros",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 184
       },
       {
         "imdbId": "tt1844624",
@@ -1024,16 +4100,17 @@
         "year": 2011,
         "mediaType": "series",
         "imdbRank": 10,
-        "displayRank": 4,
+        "displayRank": 5,
         "rankPosition": 10,
-        "finalPosition": 4,
+        "finalPosition": 5,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "series-ahs",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 182
       },
       {
         "imdbId": "tt16066148",
@@ -1043,16 +4120,17 @@
         "year": 2024,
         "mediaType": "series",
         "imdbRank": 11,
-        "displayRank": 5,
+        "displayRank": 6,
         "rankPosition": 11,
-        "finalPosition": 5,
+        "finalPosition": 6,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "series-the-gentlemen",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 180
       },
       {
         "imdbId": "tt1196946",
@@ -1061,17 +4139,18 @@
         "canonicalTitle": "O Mentalista",
         "year": 2008,
         "mediaType": "series",
-        "imdbRank": 14,
-        "displayRank": 6,
-        "rankPosition": 14,
-        "finalPosition": 6,
+        "imdbRank": 12,
+        "displayRank": 7,
+        "rankPosition": 12,
+        "finalPosition": 7,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "series-the-mentalist",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 176
       },
       {
         "imdbId": "tt0944947",
@@ -1080,17 +4159,18 @@
         "canonicalTitle": "Game of Thrones",
         "year": 2011,
         "mediaType": "series",
-        "imdbRank": 15,
-        "displayRank": 7,
-        "rankPosition": 15,
-        "finalPosition": 7,
+        "imdbRank": 13,
+        "displayRank": 8,
+        "rankPosition": 13,
+        "finalPosition": 8,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "series-game-of-thrones-2011",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 174
       },
       {
         "imdbId": "tt9288030",
@@ -1099,17 +4179,18 @@
         "canonicalTitle": "Reacher",
         "year": 2022,
         "mediaType": "series",
-        "imdbRank": 16,
-        "displayRank": 8,
-        "rankPosition": 16,
-        "finalPosition": 8,
+        "imdbRank": 14,
+        "displayRank": 9,
+        "rankPosition": 14,
+        "finalPosition": 9,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "series-reacher",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 172
       },
       {
         "imdbId": "tt13111078",
@@ -1118,174 +4199,309 @@
         "canonicalTitle": "Operação Lioness",
         "year": 2023,
         "mediaType": "series",
-        "imdbRank": 18,
-        "displayRank": 9,
-        "rankPosition": 18,
-        "finalPosition": 9,
+        "imdbRank": 15,
+        "displayRank": 10,
+        "rankPosition": 15,
+        "finalPosition": 10,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "series-lioness",
         "availabilityStatus": "verified",
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
-      },
-      {
-        "imdbId": "tt14688458",
-        "title": "Silo",
-        "imdbTitle": "Silo",
-        "canonicalTitle": "Silo",
-        "year": 2023,
-        "mediaType": "series",
-        "imdbRank": 19,
-        "displayRank": 10,
-        "rankPosition": 19,
-        "finalPosition": 10,
-        "status": "APPROVED",
-        "isIncluded": true,
-        "canonicalId": "series-silo",
-        "availabilityStatus": "verified",
-        "hasAudioPtBr": true,
-        "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1
+        "verifiedSourcesCount": 1,
+        "score": 169
       }
     ],
     "rejectedSeries": [
       {
         "imdbId": "tt30147890",
         "title": "Carrie: A Estranha",
-        "imdbTitle": "Carrie: A Estranha",
         "canonicalTitle": "Carrie: A Estranha",
         "year": 2026,
         "mediaType": "series",
-        "imdbRank": 1,
         "rankPosition": 1,
         "status": "REJECTED",
         "isIncluded": false,
         "canonicalId": "series-carrie-2026",
-        "availabilityStatus": "no_source",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+        "score": 200
       },
       {
         "imdbId": "tt32159846",
         "title": "Profundezas",
-        "imdbTitle": "Profundezas",
         "canonicalTitle": "Profundezas",
         "year": 2026,
         "mediaType": "series",
-        "imdbRank": 2,
         "rankPosition": 2,
         "status": "REJECTED",
         "isIncluded": false,
         "canonicalId": "series-profundezas-2026",
-        "availabilityStatus": "no_source",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
-      },
-      {
-        "imdbId": "tt22020214",
-        "title": "A Leste do Éden",
-        "imdbTitle": "A Leste do Éden",
-        "canonicalTitle": "A Leste do Éden",
-        "year": 2026,
-        "mediaType": "series",
-        "imdbRank": 3,
-        "rankPosition": 3,
-        "status": "REJECTED",
-        "isIncluded": false,
-        "canonicalId": "series-a-leste-do-eden-2026",
-        "availabilityStatus": "no_source",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+        "score": 198
       },
       {
         "imdbId": "tt26540670",
         "title": "Lanternas",
-        "imdbTitle": "Lanternas",
         "canonicalTitle": "Lanternas",
         "year": 2026,
         "mediaType": "series",
-        "imdbRank": 4,
         "rankPosition": 4,
         "status": "REJECTED",
         "isIncluded": false,
         "canonicalId": "series-lanternas-2026",
-        "availabilityStatus": "no_source",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+        "score": 194
       },
       {
         "imdbId": "tt28289508",
         "title": "Terra de Máfia",
-        "imdbTitle": "Terra de Máfia",
         "canonicalTitle": "Terra de Máfia",
         "year": 2026,
         "mediaType": "series",
-        "imdbRank": 6,
         "rankPosition": 6,
         "status": "REJECTED",
         "isIncluded": false,
         "canonicalId": "series-terra-de-mafia-2026",
-        "availabilityStatus": "no_source",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+        "score": 190
       },
       {
         "imdbId": "tt29458920",
         "title": "War",
-        "imdbTitle": "War",
         "canonicalTitle": "War",
         "year": 2026,
         "mediaType": "series",
-        "imdbRank": 8,
         "rankPosition": 8,
         "status": "REJECTED",
         "isIncluded": false,
         "canonicalId": "series-war-2026",
-        "availabilityStatus": "no_source",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
-      },
-      {
-        "imdbId": "tt32567812",
-        "title": "Avatar: Os Sete Refúgios",
-        "imdbTitle": "Avatar: Os Sete Refúgios",
-        "canonicalTitle": "Avatar: Os Sete Refúgios",
-        "year": 2026,
-        "mediaType": "series",
-        "imdbRank": 12,
-        "rankPosition": 12,
-        "status": "REJECTED",
-        "isIncluded": false,
-        "canonicalId": "series-avatar-sete-refugios-2026",
-        "availabilityStatus": "no_source",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
-      },
-      {
-        "imdbId": "tt33314545",
-        "title": "Neagley: Detetive Particular",
-        "imdbTitle": "Neagley: Detetive Particular",
-        "canonicalTitle": "Neagley: Detetive Particular",
-        "year": 2026,
-        "mediaType": "series",
-        "imdbRank": 13,
-        "rankPosition": 13,
-        "status": "REJECTED",
-        "isIncluded": false,
-        "canonicalId": "series-neagley-2026",
-        "availabilityStatus": "no_source",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
-      },
-      {
-        "imdbId": "tt31854290",
-        "title": "O Segredo de Widow's Bay",
-        "imdbTitle": "O Segredo de Widow's Bay",
-        "canonicalTitle": "O Segredo de Widow's Bay",
-        "year": 2026,
-        "mediaType": "series",
-        "imdbRank": 17,
-        "rankPosition": 17,
-        "status": "REJECTED",
-        "isIncluded": false,
-        "canonicalId": "series-widows-bay-2026",
-        "availabilityStatus": "no_source",
-        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis no ZapiTV"
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+        "score": 186
       }
-    ]
+    ],
+    "approvedAnimes": [
+      {
+        "imdbId": "anilist-151807",
+        "aniListId": 151807,
+        "tmdbId": "127532",
+        "title": "Solo Leveling",
+        "imdbTitle": "Solo Leveling",
+        "canonicalTitle": "Solo Leveling",
+        "year": 2024,
+        "mediaType": "anime",
+        "imdbRank": 1,
+        "displayRank": 1,
+        "rankPosition": 1,
+        "finalPosition": 1,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-solo-leveling",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 1082
+      },
+      {
+        "imdbId": "anilist-113415",
+        "aniListId": 113415,
+        "tmdbId": "95479",
+        "title": "Jujutsu Kaisen",
+        "imdbTitle": "Jujutsu Kaisen",
+        "canonicalTitle": "Jujutsu Kaisen",
+        "year": 2020,
+        "mediaType": "anime",
+        "imdbRank": 2,
+        "displayRank": 2,
+        "rankPosition": 2,
+        "finalPosition": 2,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-jujutsu-kaisen",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 1056
+      },
+      {
+        "imdbId": "anilist-101922",
+        "aniListId": 101922,
+        "tmdbId": "85937",
+        "title": "Demon Slayer: Kimetsu no Yaiba",
+        "imdbTitle": "Demon Slayer: Kimetsu no Yaiba",
+        "canonicalTitle": "Demon Slayer: Kimetsu no Yaiba",
+        "year": 2019,
+        "mediaType": "anime",
+        "imdbRank": 3,
+        "displayRank": 3,
+        "rankPosition": 3,
+        "finalPosition": 3,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-demon-slayer",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 1049
+      },
+      {
+        "imdbId": "anilist-171018",
+        "aniListId": 171018,
+        "tmdbId": "240411",
+        "title": "Dandadan",
+        "imdbTitle": "Dandadan",
+        "canonicalTitle": "Dandadan",
+        "year": 2024,
+        "mediaType": "anime",
+        "imdbRank": 4,
+        "displayRank": 4,
+        "rankPosition": 4,
+        "finalPosition": 4,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-dandadan",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 1032
+      },
+      {
+        "imdbId": "anilist-114446",
+        "aniListId": 114446,
+        "tmdbId": "13916",
+        "title": "Bleach: Thousand-Year Blood War",
+        "imdbTitle": "Bleach: Thousand-Year Blood War",
+        "canonicalTitle": "Bleach: Thousand-Year Blood War",
+        "year": 2022,
+        "mediaType": "anime",
+        "imdbRank": 5,
+        "displayRank": 5,
+        "rankPosition": 5,
+        "finalPosition": 5,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-bleach-tybw",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 1024
+      },
+      {
+        "imdbId": "anilist-154587",
+        "aniListId": 154587,
+        "tmdbId": "209867",
+        "title": "Frieren: Beyond Journey's End",
+        "imdbTitle": "Frieren: Beyond Journey's End",
+        "canonicalTitle": "Frieren: Beyond Journey's End",
+        "year": 2023,
+        "mediaType": "anime",
+        "imdbRank": 6,
+        "displayRank": 6,
+        "rankPosition": 6,
+        "finalPosition": 6,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-frieren",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 1013
+      },
+      {
+        "imdbId": "anilist-127230",
+        "aniListId": 127230,
+        "tmdbId": "114410",
+        "title": "Chainsaw Man",
+        "imdbTitle": "Chainsaw Man",
+        "canonicalTitle": "Chainsaw Man",
+        "year": 2022,
+        "mediaType": "anime",
+        "imdbRank": 7,
+        "displayRank": 7,
+        "rankPosition": 7,
+        "finalPosition": 7,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-chainsaw-man",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 994
+      },
+      {
+        "imdbId": "anilist-16498",
+        "aniListId": 16498,
+        "tmdbId": "1429",
+        "title": "Attack on Titan",
+        "imdbTitle": "Attack on Titan",
+        "canonicalTitle": "Attack on Titan",
+        "year": 2013,
+        "mediaType": "anime",
+        "imdbRank": 8,
+        "displayRank": 8,
+        "rankPosition": 8,
+        "finalPosition": 8,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-attack-on-titan",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 983
+      },
+      {
+        "imdbId": "anilist-21",
+        "aniListId": 21,
+        "tmdbId": "37854",
+        "title": "One Piece",
+        "imdbTitle": "One Piece",
+        "canonicalTitle": "One Piece",
+        "year": 1999,
+        "mediaType": "anime",
+        "imdbRank": 9,
+        "displayRank": 9,
+        "rankPosition": 9,
+        "finalPosition": 9,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-one-piece",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 971
+      },
+      {
+        "imdbId": "anilist-140960",
+        "aniListId": 140960,
+        "tmdbId": "120089",
+        "title": "Spy x Family",
+        "imdbTitle": "Spy x Family",
+        "canonicalTitle": "Spy x Family",
+        "year": 2022,
+        "mediaType": "anime",
+        "imdbRank": 10,
+        "displayRank": 10,
+        "rankPosition": 10,
+        "finalPosition": 10,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "anime-spy-family",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 956
+      }
+    ],
+    "rejectedAnimes": []
   }
 }

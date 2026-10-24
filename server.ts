@@ -1023,7 +1023,20 @@ function createApp() {
       try {
         if (fs.existsSync(FEATURED_CACHE_FILE)) {
           const raw = fs.readFileSync(FEATURED_CACHE_FILE, "utf-8");
-          if (raw) return JSON.parse(raw);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (
+              parsed &&
+              Array.isArray(parsed.featuredMovies) && parsed.featuredMovies.length === 10 &&
+              Array.isArray(parsed.featuredSeries) && parsed.featuredSeries.length === 10 &&
+              Array.isArray(parsed.featuredAnimes) && parsed.featuredAnimes.length === 10
+            ) {
+              const hasCollision = parsed.featuredAnimes.some((a: any) =>
+                a.id === 'anime-solo-leveling' && a.tmdbId === '209867'
+              );
+              if (!hasCollision) return parsed;
+            }
+          }
         }
       } catch (e) {
         console.warn("[Server] Falha ao carregar cache do Em Destaque do disco:", e);

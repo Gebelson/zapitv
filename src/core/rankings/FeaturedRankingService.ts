@@ -31,7 +31,7 @@ import { FEATURED_CATALOG_ITEMS } from '../catalog/featuredCatalogItems';
 import { searchService } from '../search/searchService';
 import { filmesData } from '../../../constants';
 
-export const STORAGE_KEY_FEATURED_SELECTION = 'zapitv_featured_ranking_selection_v3';
+export const STORAGE_KEY_FEATURED_SELECTION = 'zapitv_featured_ranking_selection_v4';
 export const EVENT_FEATURED_RANKING_UPDATED = 'zapitv_featured_ranking_updated';
 
 export interface FeaturedStorageAdapter {
@@ -784,6 +784,7 @@ class FeaturedRankingService {
       // Limpeza de versões anteriores obsoletas para impedir descompasso com os rankings do IMDb
       localStorage.removeItem('zapitv_featured_ranking_selection_v1');
       localStorage.removeItem('zapitv_featured_ranking_selection_v2');
+      localStorage.removeItem('zapitv_featured_ranking_selection_v3');
 
       const raw = localStorage.getItem(STORAGE_KEY_FEATURED_SELECTION);
       if (raw) {
@@ -794,12 +795,17 @@ class FeaturedRankingService {
           Array.isArray(parsed.featuredMovies) &&
           parsed.featuredMovies.length === 10 &&
           Array.isArray(parsed.featuredSeries) &&
-          parsed.featuredSeries.length === 10
+          parsed.featuredSeries.length === 10 &&
+          Array.isArray(parsed.featuredAnimes) &&
+          parsed.featuredAnimes.length === 10
         ) {
           const hasOutdatedSeries = parsed.featuredSeries.some((s: any) => 
             s.title === 'Pinguim' || s.title === 'Disclaimer' || s.title === 'The Pitt' || s.title === 'O Urso'
           );
-          if (!hasOutdatedSeries) {
+          const hasInvalidAnimeCollision = parsed.featuredAnimes.some((a: any) =>
+            a.id === 'anime-solo-leveling' && a.tmdbId === '209867'
+          );
+          if (!hasOutdatedSeries && !hasInvalidAnimeCollision) {
             this.cachedSelection = parsed;
             return;
           }

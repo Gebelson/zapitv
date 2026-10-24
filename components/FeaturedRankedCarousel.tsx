@@ -2,7 +2,6 @@ import React, { useRef, useState, useEffect, useCallback, useMemo, memo } from '
 import { ChevronLeft, ChevronRight, Play, Heart, Bookmark, Star } from 'lucide-react';
 import { ContentItem, ContentType } from '../types';
 import { posterRecoveryService } from '../src/core/catalog/PosterRecoveryService';
-import { storageService } from '../src/core/storage/storageService';
 import { uiSoundService } from '../src/core/audio/uiSoundService';
 
 export interface RankedItem {
@@ -24,7 +23,15 @@ export interface FeaturedRankedCarouselProps {
   emptyMessage?: string;
 }
 
-// Subcomponente individual do card com número gigante integrado
+/**
+ * RankedCard
+ * Subcomponente individual do card do ranking.
+ * Unidade visual coesa: [ NÚMERO DISCRETO PROPORCIONAL + CAPA CINEMATOGRÁFICA ]
+ * - Bounding box com largura fixa e uniforme para todos os ranks (1 a 10).
+ * - O número fica posicionado à esquerda e parcialmente atrás da capa (z-0).
+ * - Altura do número proporcional ao pôster (~65%), contorno cinza-azulado (#64748b) e preenchimento escuro (#070c18).
+ * - Número 10 possui kerning e escala ajustados para manter rigorosamente a mesma largura externa.
+ */
 const RankedCard = memo<{
   rankedItem: RankedItem;
   isDarkMode: boolean;
@@ -51,10 +58,9 @@ const RankedCard = memo<{
   });
   const [hasImageError, setHasImageError] = useState(false);
 
-  // Proporção de sobreposição personalizada para número de 2 dígitos (10)
   const isDoubleDigit = rank >= 10;
 
-  // Determina gênero ou tipo para o subtítulo
+  // Gênero ou tipo de mídia para o rótulo
   const genreLabel = item.genres && item.genres.length > 0 
     ? item.genres.slice(0, 2).join(' • ') 
     : (item.type === ContentType.SERIES ? 'Série' : 'Filme');
@@ -73,7 +79,7 @@ const RankedCard = memo<{
 
   return (
     <div
-      className="relative flex items-end flex-shrink-0 select-none group/ranked cursor-pointer transition-transform duration-300"
+      className="relative flex items-end flex-shrink-0 select-none group/ranked cursor-pointer transition-transform duration-300 w-[190px] sm:w-[225px] md:w-[250px] lg:w-[280px] xl:w-[295px]"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={handleClick}
@@ -89,36 +95,39 @@ const RankedCard = memo<{
     >
       {/* 
         ========================================================================
-        NÚMERO GIGANTE (Elemento Protagonista do Redesign)
-        - Posicionado à esquerda e parcialmente atrás da capa (z-0)
-        - Tipografia monumental e pesada com -webkit-text-stroke elegante
-        - Altura visual próxima à altura do pôster
+        NÚMERO DO RANKING
+        - Fica à esquerda da capa, parcialmente atrás dela (z-0)
+        - Altura proporcional ao pôster (~60-65% da altura)
+        - Contorno cinza-azulado (#64748b) discreto com iluminação azul (#38bdf8) no hover
+        - Preenchimento azul-escuro fechado (#070c18)
+        - Para rank 10: escala ajustada (-12%) e kerning apertado (-0.15em)
         ========================================================================
       */}
       <div 
-        className={`relative z-0 flex items-end select-none pointer-events-none mb-0 ${
-          isDoubleDigit 
-            ? '-mr-14 sm:-mr-20 md:-mr-26 lg:-mr-32' 
-            : '-mr-10 sm:-mr-14 md:-mr-18 lg:-mr-22'
-        }`}
+        className="absolute left-0 bottom-[-2px] sm:bottom-[-4px] z-0 flex items-end select-none pointer-events-none"
         style={{
-          marginRight: isDoubleDigit ? '-120px' : '-80px'
+          width: isDoubleDigit ? '60%' : '48%',
+          justifyContent: 'flex-start'
         }}
       >
         <span
-          className="font-black select-none text-[220px] sm:text-[280px] md:text-[340px] lg:text-[400px] xl:text-[430px]"
+          className={`font-black select-none ${
+            isDoubleDigit
+              ? 'text-[115px] sm:text-[135px] md:text-[150px] lg:text-[170px] xl:text-[180px]'
+              : 'text-[130px] sm:text-[155px] md:text-[175px] lg:text-[195px] xl:text-[205px]'
+          }`}
           style={{
-            lineHeight: 0.72,
-            fontFamily: "'Sora', 'Impact', sans-serif",
-            color: isDarkMode ? '#060910' : '#0d131f',
-            WebkitTextFillColor: isDarkMode ? '#060910' : '#0d131f',
+            lineHeight: 0.74,
+            fontFamily: "'Sora', 'Impact', 'Arial Black', sans-serif",
+            color: isDarkMode ? '#070c18' : '#0f172a',
+            WebkitTextFillColor: isDarkMode ? '#070c18' : '#0f172a',
             WebkitTextStroke: isHovered 
-              ? '4.5px #38bdf8' 
-              : '4.5px #52657e',
+              ? '2.5px #38bdf8' 
+              : '2.5px #64748b',
             filter: isHovered
-              ? 'drop-shadow(0 12px 28px rgba(0, 125, 247, 0.45))'
-              : 'drop-shadow(0 10px 22px rgba(0,0,0,0.9))',
-            letterSpacing: isDoubleDigit ? '-0.16em' : '-0.05em',
+              ? 'drop-shadow(0 10px 22px rgba(0, 125, 247, 0.45))'
+              : 'drop-shadow(0 6px 14px rgba(0, 0, 0, 0.85))',
+            letterSpacing: isDoubleDigit ? '-0.15em' : '-0.05em',
             transition: 'all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
             display: 'inline-block'
           }}
@@ -129,18 +138,19 @@ const RankedCard = memo<{
 
       {/* 
         ========================================================================
-        PÔSTER DA OBRA (Sobrepõe parcialmente o número à esquerda, z-10)
+        PÔSTER DA OBRA
+        - Alinhado rigidamente à direita do card (ml-auto)
         - Proporção 2:3 rígida e cinematográfica
-        - Largura de ~260-285px em desktop
-        - Hover suave com brilho azul da identidade ZapiTV
+        - z-10 sobrepondo parcialmente o número à esquerda
+        - Efeito de hover suave com brilho e borda azul ZapiTV
         ========================================================================
       */}
       <div
-        className={`relative z-10 w-[155px] sm:w-[200px] md:w-[240px] lg:w-[265px] xl:w-[285px] aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ${
+        className={`ml-auto relative z-10 w-[140px] sm:w-[168px] md:w-[188px] lg:w-[210px] xl:w-[220px] aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ${
           isDarkMode ? 'bg-slate-900 border border-white/10' : 'bg-slate-200 border border-black/10'
         } ${
           isHovered
-            ? 'scale-[1.03] border-[#007df7]/80 shadow-[0_15px_45px_rgba(0,125,247,0.35)] z-20'
+            ? 'scale-[1.03] border-[#007df7]/80 shadow-[0_15px_40px_rgba(0,125,247,0.35)] z-20'
             : 'border-white/10 shadow-black/80'
         }`}
       >
@@ -190,12 +200,12 @@ const RankedCard = memo<{
         {/* 
           ========================================================================
           OVERLAY INTERATIVO NO HOVER
-          - Ações de Favoritar (Heart) e Minha Lista (Bookmark)
-          - Botão de Play Central com estética ZapiTV
-          - Título, ano e gênero destacados
+          - Favoritar e Minha Lista
+          - Botão Play ZapiTV
+          - Metadados elegantes
           ========================================================================
         */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-0 group-hover/ranked:opacity-100 transition-opacity duration-300 p-4 sm:p-5 flex flex-col justify-between z-20">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-0 group-hover/ranked:opacity-100 transition-opacity duration-300 p-4 flex flex-col justify-between z-20">
           {/* Botões de Ação Superiores */}
           <div className="flex justify-end gap-2 relative z-30">
             <button
@@ -235,20 +245,20 @@ const RankedCard = memo<{
 
           {/* Botão Play Central */}
           <div className="flex items-center justify-center pointer-events-none">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#007df7] text-white flex items-center justify-center shadow-2xl shadow-[#007df7]/50 transform scale-90 group-hover/ranked:scale-100 transition-transform duration-300 pointer-events-auto">
-              <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-white ml-0.5" />
+            <div className="w-12 h-12 rounded-full bg-[#007df7] text-white flex items-center justify-center shadow-2xl shadow-[#007df7]/50 transform scale-90 group-hover/ranked:scale-100 transition-transform duration-300 pointer-events-auto">
+              <Play className="w-5 h-5 fill-white ml-0.5" />
             </div>
           </div>
 
           {/* Informações Inferiores */}
           <div className="text-white relative z-30 pointer-events-none">
-            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-[#007df7] block mb-1">
+            <span className="text-[10px] font-black uppercase tracking-wider text-[#007df7] block mb-1">
               {genreLabel}
             </span>
-            <h4 className="font-black text-sm sm:text-base text-white leading-tight mb-1 line-clamp-2 drop-shadow-md">
+            <h4 className="font-black text-xs sm:text-sm text-white leading-tight mb-1 line-clamp-2 drop-shadow-md">
               {item.title}
             </h4>
-            <div className="flex items-center gap-2 text-xs font-semibold text-gray-300">
+            <div className="flex items-center gap-2 text-[11px] font-semibold text-gray-300">
               <span className="text-amber-400 font-bold flex items-center gap-0.5">
                 ★ {ratingStr}
               </span>
@@ -292,7 +302,7 @@ export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
   const isInfinite = items.length >= 4;
 
   // Triplicar ordenadamente os itens (Block 0: clone, Block 1: principal, Block 2: clone)
-  // Total máximo de 30 itens, custo de memória e DOM insignificante
+  // Permite rolagem circular infinita perfeita para esquerda e direita
   const renderList = useMemo(() => {
     if (!isInfinite) return items;
     return [
@@ -302,25 +312,29 @@ export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
     ];
   }, [items, isInfinite]);
 
-  // Mede métricas do conjunto completo (largura de 1 bloco de N itens com gaps)
+  // Mede subpixel-accurate layout metrics via DOM offsetLeft
   const getBlockMetrics = useCallback(() => {
     if (!sliderRef.current || !isInfinite || items.length === 0) {
       return { totalBlockWidth: 0, unitWidth: 0 };
     }
     const container = sliderRef.current;
-    const firstChild = container.children[0] as HTMLElement;
-    if (!firstChild) return { totalBlockWidth: 0, unitWidth: 0 };
+    const children = container.children;
+    if (children.length < items.length * 2) {
+      return { totalBlockWidth: 0, unitWidth: 0 };
+    }
 
-    const style = window.getComputedStyle(container);
-    const gap = parseFloat(style.gap || '32');
-    const childWidth = firstChild.getBoundingClientRect().width;
-    const unitWidth = childWidth + gap;
-    const totalBlockWidth = unitWidth * items.length;
+    const firstCard = children[0] as HTMLElement;
+    const block1Card = children[items.length] as HTMLElement;
+    if (!firstCard || !block1Card) return { totalBlockWidth: 0, unitWidth: 0 };
+
+    // Distância geométrica exata entre o 1º card do Bloco 0 e o 1º card do Bloco 1
+    const totalBlockWidth = block1Card.offsetLeft - firstCard.offsetLeft;
+    const unitWidth = totalBlockWidth / items.length;
 
     return { totalBlockWidth, unitWidth };
   }, [isInfinite, items.length]);
 
-  // Inicializa a rolagem na posição exata de início do Bloco 1 (conjunto principal)
+  // Inicializa o scroll RIGOROSAMENTE alinhado ao Item 1 do Bloco 1 (sem exibir o 10 na frente)
   useEffect(() => {
     if (!sliderRef.current) return;
     if (!isInfinite) {
@@ -329,18 +343,27 @@ export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
       return;
     }
 
-    const timer = setTimeout(() => {
+    const alignToItem1 = () => {
+      if (!sliderRef.current) return;
       const { totalBlockWidth } = getBlockMetrics();
-      if (sliderRef.current && totalBlockWidth > 0) {
+      if (totalBlockWidth > 0) {
         sliderRef.current.style.scrollBehavior = 'auto';
         sliderRef.current.scrollLeft = totalBlockWidth;
       }
-    }, 50);
+    };
 
-    return () => clearTimeout(timer);
+    // Alinhamento imediato + requestAnimationFrame + timeout defensivo para garantir cálculo após reflow
+    alignToItem1();
+    const rId = requestAnimationFrame(alignToItem1);
+    const timer = setTimeout(alignToItem1, 60);
+
+    return () => {
+      cancelAnimationFrame(rId);
+      clearTimeout(timer);
+    };
   }, [isInfinite, items, getBlockMetrics]);
 
-  // Navegação suave por botões com reposicionamento modular sem corte
+  // Navegação suave por botões com transição modular perfeita
   const scrollByButton = useCallback((direction: 'left' | 'right') => {
     if (!sliderRef.current) return;
     const container = sliderRef.current;
@@ -348,15 +371,17 @@ export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
     const { totalBlockWidth, unitWidth } = getBlockMetrics();
     if (totalBlockWidth === 0 || unitWidth === 0) return;
 
-    // Avança proporcionalmente por página visível (~75% da largura da janela ou ~2 cartões)
-    const moveAmount = Math.max(container.clientWidth * 0.75, unitWidth * 2);
+    // Avança ~2 a 3 cards por clique dependendo do tamanho da tela
+    const cardsToMove = Math.max(1, Math.min(3, Math.floor(container.clientWidth / unitWidth) || 2));
+    const moveAmount = cardsToMove * unitWidth;
     const current = container.scrollLeft;
 
     uiSoundService.play(direction === 'left' ? 'slideLeft' : 'slideRight');
+    isNavigating.current = true;
 
     if (direction === 'right') {
       let target = current + moveAmount;
-      // Se ultrapassar o final do bloco 1, normaliza instantaneamente para o bloco 0 antes de deslizar
+      // Se ultrapassar o bloco 2, normaliza para o bloco 1 antes de deslizar
       if (target >= 2 * totalBlockWidth) {
         container.style.scrollBehavior = 'auto';
         container.scrollLeft = current - totalBlockWidth;
@@ -366,7 +391,7 @@ export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
       container.scrollLeft = target;
     } else {
       let target = current - moveAmount;
-      // Se for antes do início do bloco 1, normaliza instantaneamente para o bloco 2 antes de deslizar
+      // Se recuar antes do bloco 1, normaliza para o bloco 2 antes de deslizar
       if (target < totalBlockWidth) {
         container.style.scrollBehavior = 'auto';
         container.scrollLeft = current + totalBlockWidth;
@@ -375,9 +400,14 @@ export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
       container.style.scrollBehavior = 'smooth';
       container.scrollLeft = target;
     }
+
+    // Libera a trava de navegação após a animação de deslizamento
+    setTimeout(() => {
+      isNavigating.current = false;
+    }, 450);
   }, [getBlockMetrics]);
 
-  // Monitor contínuo de normalização modular para scroll com trackpad ou drag manual
+  // Monitor de normalização para scroll livre via trackpad ou mouse drag
   const handleScroll = useCallback(() => {
     if (!isInfinite || !sliderRef.current || isNavigating.current) return;
     const container = sliderRef.current;
@@ -392,7 +422,7 @@ export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
       container.scrollLeft = current - totalBlockWidth;
     } 
     // Se estiver muito à esquerda (no bloco 0)
-    else if (current < totalBlockWidth - 100) {
+    else if (current < totalBlockWidth * 0.5) {
       container.style.scrollBehavior = 'auto';
       container.scrollLeft = current + totalBlockWidth;
     }
@@ -458,13 +488,7 @@ export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
 
   return (
     <section className="relative group/ranked-section select-none space-y-4 sm:space-y-6">
-      {/* 
-        ========================================================================
-        CABEÇALHO DA SEÇÃO
-        - Título e subtítulo alinhados
-        - Controles de navegação lateral ZapiTV
-        ========================================================================
-      */}
+      {/* Cabeçalho da Seção */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {Icon && (
@@ -486,7 +510,7 @@ export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
           </div>
         </div>
 
-        {/* Setas Laterais de Navegação do Carrossel */}
+        {/* Setas de Navegação do Carrossel */}
         {isInfinite && (
           <div className="hidden sm:flex items-center gap-2.5 z-30">
             <button
@@ -507,14 +531,7 @@ export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
         )}
       </div>
 
-      {/* 
-        ========================================================================
-        TRILHA HORIZONTAL DO CARROSSEL
-        - Rolagem contínua infinita
-        - Suporte a arraste com mouse e toque
-        - Snapping sutil e fluido
-        ========================================================================
-      */}
+      {/* Trilha Horizontal do Carrossel */}
       <div className="relative overflow-visible">
         <div
           ref={sliderRef}
@@ -525,16 +542,15 @@ export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
           onMouseLeave={handleMouseLeave}
           onKeyDown={handleKeyDown}
           tabIndex={0}
-          className="flex items-end gap-6 sm:gap-8 md:gap-10 lg:gap-12 overflow-x-auto scrollbar-none py-6 sm:py-8 px-2 cursor-grab active:cursor-grabbing focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500/50 rounded-2xl"
+          className="flex items-end gap-4 sm:gap-5 md:gap-6 lg:gap-7 xl:gap-8 overflow-x-auto scrollbar-none py-6 sm:py-8 px-2 cursor-grab active:cursor-grabbing focus:outline-none focus-visible:ring-1 focus-visible:ring-blue-500/50 rounded-2xl"
           style={{
-            WebkitOverflowScrolling: 'touch',
-            scrollSnapType: isDown.current ? 'none' : 'x proximity'
+            WebkitOverflowScrolling: 'touch'
           }}
         >
           {renderList.map((rankedItem: any) => (
             <div 
               key={rankedItem.instanceId || `item-${rankedItem.rank}-${rankedItem.item.id}`}
-              style={{ scrollSnapAlign: 'start' }}
+              className="flex-shrink-0"
             >
               <RankedCard
                 rankedItem={rankedItem}

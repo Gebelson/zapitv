@@ -52,7 +52,7 @@ export const OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS: AniListMonthlySnapshot[] = [
         popularityRank: 1,
         trendingRank: 1,
         format: 'TV',
-        tmdbId: '209867',
+        tmdbId: '127532',
         malId: 52299,
         referenceDate: '2026-10-15',
         capturedAt: 1792118400000

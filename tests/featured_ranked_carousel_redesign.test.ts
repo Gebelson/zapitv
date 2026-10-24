@@ -14,18 +14,32 @@ assert.ok(selection, 'Seleção do FeaturedRankingService deve existir');
 
 const rawMovies = selection.featuredMovies || [];
 const rawSeries = selection.featuredSeries || [];
+const rawAnimes = selection.featuredAnimes || [];
 
 const eligibleMovies = catalogEligibilityService.filterEligibleItemsSync(
   deduplicateContentItems(rawMovies.filter(it => searchService.isMovieItem(it)))
 );
 const eligibleSeries = catalogEligibilityService.filterEligibleItemsSync(
-  deduplicateContentItems(rawSeries.filter(it => searchService.isSeriesItem(it)))
+  deduplicateContentItems(rawSeries.filter(it => searchService.isSeriesItem(it) && !searchService.isAnimeItem(it)))
+);
+const eligibleAnimes = catalogEligibilityService.filterEligibleItemsSync(
+  deduplicateContentItems(rawAnimes.filter(it => searchService.isAnimeItem(it)))
 );
 
 assert.ok(eligibleMovies.length >= 10, `Deve possuir ao menos 10 filmes elegíveis (encontrados: ${eligibleMovies.length})`);
 assert.ok(eligibleSeries.length >= 10, `Deve possuir ao menos 10 séries elegíveis (encontradas: ${eligibleSeries.length})`);
+assert.ok(eligibleAnimes.length >= 10, `Deve possuir ao menos 10 animes elegíveis (encontrados: ${eligibleAnimes.length})`);
 
-console.log(`  -> Filmes elegíveis: ${eligibleMovies.length}, Séries elegíveis: ${eligibleSeries.length}`);
+console.log(`  -> Filmes elegíveis: ${eligibleMovies.length}, Séries elegíveis: ${eligibleSeries.length}, Animes elegíveis: ${eligibleAnimes.length}`);
+
+// Validação de não-colisão Solo Leveling vs Frieren
+const solo = eligibleAnimes.find(a => a.id === 'anime-solo-leveling');
+const frieren = eligibleAnimes.find(a => a.id === 'anime-frieren');
+assert.ok(solo, 'Solo Leveling deve estar presente no catálogo de animes');
+assert.ok(frieren, 'Frieren deve estar presente no catálogo de animes');
+assert.strictEqual(solo.tmdbId, '127532', 'TMDB ID de Solo Leveling deve ser 127532');
+assert.strictEqual(frieren.tmdbId, '209867', 'TMDB ID de Frieren deve ser 209867');
+console.log('  -> Desduplicação validada: Solo Leveling e Frieren coexistem com 10 animes completos.');
 
 // 2. Associação estrita dos Números de 1 a 10 no Ranking
 console.log('\n2. Verificando correspondência dos números de 1 a 10 no ranking oficial...');
@@ -148,6 +162,15 @@ assert.ok(appCode.includes('case \'home\':'), 'Rota home deve permanecer preserv
 assert.ok(appCode.includes('ContentRow'), 'ContentRow tradicional da home preservado');
 
 console.log('  -> Home, Smart TV e carrosséis tradicionais intactos.');
+
+// 9. Verificação de Geometria e Estilização dos Números e Cards
+console.log('\n9. Verificando geometria de largura uniforme e estilização refinada dos números...');
+assert.ok(carouselCode.includes('#64748b'), 'Deve possuir contorno cinza-azulado discreto (#64748b)');
+assert.ok(carouselCode.includes('#070c18'), 'Deve possuir preenchimento azul-escuro fechado (#070c18)');
+assert.ok(carouselCode.includes('w-[190px] sm:w-[225px] md:w-[250px] lg:w-[280px] xl:w-[295px]'), 'Deve possuir bounding box uniforme com largura fixa para todos os cards');
+assert.ok(carouselCode.includes('ml-auto relative z-10'), 'Pôster deve ser alinhado à direita com z-10 sobrepondo o número');
+assert.ok(carouselCode.includes('sliderRef.current.scrollLeft = totalBlockWidth'), 'Posição inicial de rolagem deve começar rigorosamente no Item 1 (totalBlockWidth)');
+console.log('  -> Geometria uniforme, números proporcionais e alinhamento inicial ao Item 1 validados com sucesso.');
 
 console.log('\n=== TODOS OS TESTES DO REDESIGN PASSARAM COM SUCESSO! ===\n');
 process.exit(0);

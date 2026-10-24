@@ -942,7 +942,7 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
 // ANIMES — CURADORIA CANÔNICA OFICIAL (ANILIST + TMDB + CATÁLOGO ZAPITV)
 // =========================================================================
 export const FEATURED_ANIME_ITEMS: ContentItem[] = [
-  // 1. SOLO LEVELING (aniList: 151807 / tmdb: 209867 / mal: 52299)
+  // 1. SOLO LEVELING (aniList: 151807 / tmdb: 127532 / mal: 52299)
   {
     id: 'anime-solo-leveling',
     canonicalId: 'anime:anilist:151807',
@@ -957,7 +957,7 @@ export const FEATURED_ANIME_ITEMS: ContentItem[] = [
     description: 'Em um mundo onde caçadores despertam habilidades sobrenaturais, Sung Jin-woo, o caçador mais fraco da humanidade, recebe uma chance única de subir de nível sem limites.',
     genres: ['Anime', 'Ação', 'Aventura', 'Fantasia'],
     aniListId: 151807,
-    tmdbId: '209867',
+    tmdbId: '127532',
     malId: 52299,
     seasonsCount: 2,
     isFeatured: true,

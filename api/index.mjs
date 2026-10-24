@@ -6671,7 +6671,7 @@ var init_featuredCatalogItems = __esm({
       }
     ];
     FEATURED_ANIME_ITEMS = [
-      // 1. SOLO LEVELING (aniList: 151807 / tmdb: 209867 / mal: 52299)
+      // 1. SOLO LEVELING (aniList: 151807 / tmdb: 127532 / mal: 52299)
       {
         id: "anime-solo-leveling",
         canonicalId: "anime:anilist:151807",
@@ -6686,7 +6686,7 @@ var init_featuredCatalogItems = __esm({
         description: "Em um mundo onde ca\xE7adores despertam habilidades sobrenaturais, Sung Jin-woo, o ca\xE7ador mais fraco da humanidade, recebe uma chance \xFAnica de subir de n\xEDvel sem limites.",
         genres: ["Anime", "A\xE7\xE3o", "Aventura", "Fantasia"],
         aniListId: 151807,
-        tmdbId: "209867",
+        tmdbId: "127532",
         malId: 52299,
         seasonsCount: 2,
         isFeatured: true,
@@ -18267,7 +18267,7 @@ var OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS = [
         popularityRank: 1,
         trendingRank: 1,
         format: "TV",
-        tmdbId: "209867",
+        tmdbId: "127532",
         malId: 52299,
         referenceDate: "2026-10-15",
         capturedAt: 17921184e5
@@ -19282,7 +19282,7 @@ init_theatricalFilterService();
 init_CatalogEligibilityService();
 init_MediaAvailabilityIndex();
 init_searchService();
-var STORAGE_KEY_FEATURED_SELECTION = "zapitv_featured_ranking_selection_v3";
+var STORAGE_KEY_FEATURED_SELECTION = "zapitv_featured_ranking_selection_v4";
 var EVENT_FEATURED_RANKING_UPDATED = "zapitv_featured_ranking_updated";
 var FeaturedRankingService = class _FeaturedRankingService {
   constructor() {
@@ -19906,14 +19906,18 @@ var FeaturedRankingService = class _FeaturedRankingService {
     try {
       localStorage.removeItem("zapitv_featured_ranking_selection_v1");
       localStorage.removeItem("zapitv_featured_ranking_selection_v2");
+      localStorage.removeItem("zapitv_featured_ranking_selection_v3");
       const raw = localStorage.getItem(STORAGE_KEY_FEATURED_SELECTION);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.monthKey && Array.isArray(parsed.featuredMovies) && parsed.featuredMovies.length === 10 && Array.isArray(parsed.featuredSeries) && parsed.featuredSeries.length === 10) {
+        if (parsed && parsed.monthKey && Array.isArray(parsed.featuredMovies) && parsed.featuredMovies.length === 10 && Array.isArray(parsed.featuredSeries) && parsed.featuredSeries.length === 10 && Array.isArray(parsed.featuredAnimes) && parsed.featuredAnimes.length === 10) {
           const hasOutdatedSeries = parsed.featuredSeries.some(
             (s) => s.title === "Pinguim" || s.title === "Disclaimer" || s.title === "The Pitt" || s.title === "O Urso"
           );
-          if (!hasOutdatedSeries) {
+          const hasInvalidAnimeCollision = parsed.featuredAnimes.some(
+            (a) => a.id === "anime-solo-leveling" && a.tmdbId === "209867"
+          );
+          if (!hasOutdatedSeries && !hasInvalidAnimeCollision) {
             this.cachedSelection = parsed;
             return;
           }
@@ -23966,7 +23970,15 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       try {
         if (fs4.existsSync(FEATURED_CACHE_FILE)) {
           const raw = fs4.readFileSync(FEATURED_CACHE_FILE, "utf-8");
-          if (raw) return JSON.parse(raw);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && Array.isArray(parsed.featuredMovies) && parsed.featuredMovies.length === 10 && Array.isArray(parsed.featuredSeries) && parsed.featuredSeries.length === 10 && Array.isArray(parsed.featuredAnimes) && parsed.featuredAnimes.length === 10) {
+              const hasCollision = parsed.featuredAnimes.some(
+                (a) => a.id === "anime-solo-leveling" && a.tmdbId === "209867"
+              );
+              if (!hasCollision) return parsed;
+            }
+          }
         }
       } catch (e) {
         console.warn("[Server] Falha ao carregar cache do Em Destaque do disco:", e);
