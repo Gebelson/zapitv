@@ -48,6 +48,8 @@ import { WatchPartyService } from './src/core/watchparty/WatchPartyService';
 import { tvModeService } from './src/core/tv/tvModeService';
 import { tvNavigationManager } from './src/core/tv/tvNavigationManager';
 import { TvRemoteDiagnosticOverlay } from './src/components/tv/TvRemoteDiagnosticOverlay';
+import { useIsMobileViewport } from './src/core/mobile/mobileViewportService';
+import { MobileLayout } from './src/components/mobile';
 
 const ProfileView = React.lazy(() => import('./components/ProfileView'));
 const AdminView = React.lazy(() => import('./components/AdminView'));
@@ -151,6 +153,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const matchActorDetail = matchPath('/atores/:id', location.pathname);
   const matchWatchParty = matchPath('/sala/:roomId', location.pathname);
 
+  const isMobileViewport = useIsMobileViewport(768);
+
   // Derivação automática da view com base no pathname
   // Matchers para rotas de reprodução persistente (/assistir/...)
   const parsedWatch = useMemo(() => parseWatchRoute(location.pathname), [location.pathname]);
@@ -161,6 +165,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     if (path.startsWith('/tv')) return 'tv';
     if (isWatchRoute) return 'home';
     if (path === '/' || path.startsWith('/sala')) return 'home';
+    if (path.startsWith('/explorar')) return 'explore';
+    if (path.startsWith('/buscar')) return 'search';
+    if (path.startsWith('/minha-zapitv')) return 'my-zapitv';
     if (path.startsWith('/em-destaque')) return 'featured';
     if (path.startsWith('/filmes')) return 'movies';
     if (path.startsWith('/series')) return 'series';
@@ -240,6 +247,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
     switch (view) {
       case 'home': routeTo('/'); break;
+      case 'explore': routeTo('/explorar'); break;
+      case 'search': routeTo('/buscar'); break;
+      case 'my-zapitv': routeTo('/minha-zapitv'); break;
       case 'featured': routeTo('/em-destaque'); break;
       case 'movies': routeTo('/filmes'); break;
       case 'series': routeTo('/series'); break;
@@ -2758,6 +2768,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             />
           </ViewWrapper>
         );
+      case 'explore':
+        navigate('/filmes', { replace: true });
+        return null;
+      case 'search':
+        navigate('/', { replace: true });
+        return null;
+      case 'my-zapitv':
+        navigate('/perfil', { replace: true });
+        return null;
       case 'notfound':
       default:
         return <ViewWrapper><NotFoundPage isDarkMode={isDarkMode} /></ViewWrapper>;
@@ -2815,92 +2834,125 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     <div className={`min-h-screen relative ${isWatchRoute ? 'zapi-watch-route bg-black' : ''}`}>
       <AnimatedBackground isDarkMode={isDarkMode} />
       
-      <Sidebar 
-        currentView={currentView} 
-        setCurrentView={(view) => {
-          searchService.cancelPending();
-          setCurrentView(view);
-          setIsMobileMenuOpen(false);
-          setSelectedGenre(''); 
-          setSearchQuery('');
-          setSubmittedSearchQuery('');
-          setLiveSearchResults([]);
-        }} 
-        isDarkMode={isDarkMode} 
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => {
-          uiSoundService.play(isSidebarCollapsed ? 'sidebarOpen' : 'sidebarClose');
-          setIsSidebarCollapsed(!isSidebarCollapsed);
-        }}
-        isMobileMenuOpen={isMobileMenuOpen}
-        onToggleMobileMenu={() => {
-          uiSoundService.play(isMobileMenuOpen ? 'sidebarClose' : 'sidebarOpen');
-          setIsMobileMenuOpen(!isMobileMenuOpen);
-        }}
-        activeProfile={activeProfile}
-      />
-      
-      <main className={`transition-[margin] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-[margin] ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} min-h-screen flex flex-col relative z-10`}>
-        <Header 
-          isDarkMode={isDarkMode} 
-          setIsDarkMode={setIsDarkMode} 
-          currentUser={currentUser} 
+      {isMobileViewport && !isWatchRoute ? (
+        <MobileLayout
+          currentView={currentView}
+          isDarkMode={isDarkMode}
+          setIsDarkMode={setIsDarkMode}
+          currentUser={currentUser}
           activeProfile={activeProfile}
-          currentView={currentView}
-          setCurrentView={(view) => {
-            searchService.cancelPending();
-            setCurrentView(view);
-            setSearchQuery('');
-            setSubmittedSearchQuery('');
-            setLiveSearchResults([]);
-          }} 
-          onSwitchProfile={() => { setActiveProfile(null); setCurrentView('profile-selector'); }}
-          onSelectProfile={(p) => { setActiveProfile(p); setCurrentView('home'); }}
-          searchQuery={searchQuery} 
-          setSearchQuery={setSearchQuery}
-          onSearchSubmit={(q) => {
-            searchHistoryService.addSearch(q);
-            setSubmittedSearchQuery(q);
-          }}
-          onClearSearch={() => {
-            setSubmittedSearchQuery('');
-            setLiveSearchResults([]);
-          }}
-          onSelectContent={handleSelectContent}
-          allContent={content}
-          notifications={siteNotifications}
+          onSwitchProfile={() => { setActiveProfile(null); handleNavigateView('profile-selector'); }}
+          onSelectProfile={(p) => { setActiveProfile(p); handleNavigateView('home'); }}
           onLogout={handleLogout}
-          onToggleMobileMenu={() => {
-            if (!isMobileMenuOpen) uiSoundService.play('sidebarOpen');
-            setIsMobileMenuOpen(true);
-          }}
+          notifications={siteNotifications}
+          onSelectContent={handleSelectContent}
+          onPlayClick={handlePlayFromHero}
+          allContent={allowedContent}
+          myList={myList}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
+          onToggleList={toggleMyList}
+          heroItems={heroCarouselItems.length > 0 ? heroCarouselItems : heroCarouselStore.getCarouselItems(content)}
+          trendingItems={trendingItems}
+          personalizedRows={personalizedHomeRows}
+          featuredSelection={featuredSelection}
           onOpenDiagnostics={() => setIsDiagnosticModalOpen(true)}
+          hasOpenModal={Boolean(selectedContent || isDiagnosticModalOpen)}
+          onCloseModal={() => {
+            if (selectedContent) handleCloseDetailModal();
+            else if (isDiagnosticModalOpen) setIsDiagnosticModalOpen(false);
+          }}
         />
-        
-        <ScrollToTop 
-          dependency={`${currentView}-${submittedSearchQuery}`} 
-          currentView={currentView}
-          searchQuery={submittedSearchQuery}
-          targetRef={scrollContainerRef} 
-        />
+      ) : (
+        <>
+          <Sidebar 
+            currentView={currentView} 
+            setCurrentView={(view) => {
+              searchService.cancelPending();
+              setCurrentView(view);
+              setIsMobileMenuOpen(false);
+              setSelectedGenre(''); 
+              setSearchQuery('');
+              setSubmittedSearchQuery('');
+              setLiveSearchResults([]);
+            }} 
+            isDarkMode={isDarkMode} 
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapse={() => {
+              uiSoundService.play(isSidebarCollapsed ? 'sidebarOpen' : 'sidebarClose');
+              setIsSidebarCollapsed(!isSidebarCollapsed);
+            }}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onToggleMobileMenu={() => {
+              uiSoundService.play(isMobileMenuOpen ? 'sidebarClose' : 'sidebarOpen');
+              setIsMobileMenuOpen(!isMobileMenuOpen);
+            }}
+            activeProfile={activeProfile}
+          />
+          
+          <main className={`transition-[margin] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-[margin] ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} min-h-screen flex flex-col relative z-10`}>
+            <Header 
+              isDarkMode={isDarkMode} 
+              setIsDarkMode={setIsDarkMode} 
+              currentUser={currentUser} 
+              activeProfile={activeProfile}
+              currentView={currentView}
+              setCurrentView={(view) => {
+                searchService.cancelPending();
+                setCurrentView(view);
+                setSearchQuery('');
+                setSubmittedSearchQuery('');
+                setLiveSearchResults([]);
+              }} 
+              onSwitchProfile={() => { setActiveProfile(null); setCurrentView('profile-selector'); }}
+              onSelectProfile={(p) => { setActiveProfile(p); setCurrentView('home'); }}
+              searchQuery={searchQuery} 
+              setSearchQuery={setSearchQuery}
+              onSearchSubmit={(q) => {
+                searchHistoryService.addSearch(q);
+                setSubmittedSearchQuery(q);
+              }}
+              onClearSearch={() => {
+                setSubmittedSearchQuery('');
+                setLiveSearchResults([]);
+              }}
+              onSelectContent={handleSelectContent}
+              allContent={content}
+              notifications={siteNotifications}
+              onLogout={handleLogout}
+              onToggleMobileMenu={() => {
+                if (!isMobileMenuOpen) uiSoundService.play('sidebarOpen');
+                setIsMobileMenuOpen(true);
+              }}
+              onOpenDiagnostics={() => setIsDiagnosticModalOpen(true)}
+            />
+            
+            <ScrollToTop 
+              dependency={`${currentView}-${submittedSearchQuery}`} 
+              currentView={currentView}
+              searchQuery={submittedSearchQuery}
+              targetRef={scrollContainerRef} 
+            />
 
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-20 scroll-smooth transform-gpu">
-          {isCatalogLoading && trendingItems.length === 0 ? (
-            <div key="catalog-initial-loader" className="min-h-[75vh] flex flex-col items-center justify-center select-none">
-              <ZapiLoader size="xl" />
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pb-20 scroll-smooth transform-gpu">
+              {isCatalogLoading && trendingItems.length === 0 ? (
+                <div key="catalog-initial-loader" className="min-h-[75vh] flex flex-col items-center justify-center select-none">
+                  <ZapiLoader size="xl" />
+                </div>
+              ) : (
+                <div key={`active-view-${submittedSearchQuery ? 'search' : currentView}`}>
+                  <React.Suspense fallback={<div className="min-h-[75vh] flex items-center justify-center"><ZapiLoader size="xl" /></div>}>
+                    {viewContent}
+                  </React.Suspense>
+                </div>
+              )}
             </div>
-          ) : (
-            <div key={`active-view-${submittedSearchQuery ? 'search' : currentView}`}>
-              <React.Suspense fallback={<div className="min-h-[75vh] flex items-center justify-center"><ZapiLoader size="xl" /></div>}>
-                {viewContent}
-              </React.Suspense>
-            </div>
-          )}
-        </div>
-      </main>
+          </main>
+        </>
+      )}
 
       {/* Admin Button (Floating) */}
-      {currentUser.role === 'admin' && (
+      {currentUser.role === 'admin' && !isMobileViewport && (
         <button 
           onClick={() => {
             if (currentView === 'admin') {

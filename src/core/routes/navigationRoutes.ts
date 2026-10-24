@@ -2,6 +2,9 @@ import { ContentItem, ContentType } from '../../../types';
 
 export const ROUTES = {
   HOME: '/',
+  EXPLORE: '/explorar',
+  SEARCH: '/buscar',
+  MY_ZAPITV: '/minha-zapitv',
   FEATURED: '/em-destaque',
   MOVIES: '/filmes',
   MOVIE_DETAIL: '/filmes/:id',
