@@ -10,7 +10,6 @@ import { tvModeService } from '../src/core/tv/tvModeService';
 
 interface ContentRowProps {
   title: string;
-  subtitle?: string;
   items: ContentItem[];
   isDarkMode: boolean;
   onItemClick?: (item: ContentItem) => void;
@@ -25,7 +24,6 @@ interface ContentRowProps {
 
 const ContentRow: React.FC<ContentRowProps> = ({ 
   title, 
-  subtitle,
   items, 
   isDarkMode, 
   onItemClick,
@@ -260,36 +258,29 @@ const ContentRow: React.FC<ContentRowProps> = ({
   return (
     <section ref={sectionRef} className="relative group/section select-none">
       <div className="flex items-center justify-between mb-3 md:mb-6 px-3 sm:px-6 md:px-12">
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-3 group/title">
-            <h3 className={`text-base sm:text-xl md:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-              {title}
-            </h3>
-            {isAdmin && (
-              <div className="flex items-center gap-1 opacity-0 group-hover/section:opacity-100 transition-opacity">
-                {onEditTitle && (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); onEditTitle(); }}
-                    className={`p-2 rounded-lg transition-all scale-90 hover:scale-100 ${isDarkMode ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-black/5 text-gray-900 hover:bg-black/10'}`}
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                )}
-                {onDeleteSection && (
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); if(confirm('Tem certeza?')) onDeleteSection(); }}
-                    className={`p-2 rounded-lg transition-all scale-90 hover:scale-100 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          {subtitle && (
-            <p className={`text-xs sm:text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              {subtitle}
-            </p>
+        <div className="flex items-center gap-3 group/title">
+          <h3 className={`text-base sm:text-xl md:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            {title}
+          </h3>
+          {isAdmin && (
+            <div className="flex items-center gap-1 opacity-0 group-hover/section:opacity-100 transition-opacity">
+              {onEditTitle && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onEditTitle(); }}
+                  className={`p-2 rounded-lg transition-all scale-90 hover:scale-100 ${isDarkMode ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-black/5 text-gray-900 hover:bg-black/10'}`}
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+              )}
+              {onDeleteSection && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); if(confirm('Tem certeza?')) onDeleteSection(); }}
+                  className={`p-2 rounded-lg transition-all scale-90 hover:scale-100 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           )}
         </div>
         

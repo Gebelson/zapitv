@@ -6,7 +6,6 @@ import { uiSoundService } from '../../core/audio/uiSoundService';
 
 interface MobileRankedRowProps {
   title: string;
-  subtitle?: string;
   items: Array<{ item: ContentItem; rank: number } | ContentItem>;
   onItemClick: (item: ContentItem) => void;
   icon?: React.ComponentType<{ className?: string }>;
@@ -14,7 +13,6 @@ interface MobileRankedRowProps {
 
 export const MobileRankedRow: React.FC<MobileRankedRowProps> = ({
   title,
-  subtitle,
   items,
   onItemClick,
   icon: Icon = Flame
@@ -34,21 +32,14 @@ export const MobileRankedRow: React.FC<MobileRankedRowProps> = ({
   return (
     <section className="my-5 select-none" aria-label={title}>
       <div className="px-4 mb-2 flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-1.5">
-            <Icon className="w-4 h-4 text-[#007df7]" />
-            <h3
-              className="text-base sm:text-lg font-black text-white tracking-tight"
-              style={{ fontFamily: "'Sora', sans-serif" }}
-            >
-              {title}
-            </h3>
-          </div>
-          {subtitle && (
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              {subtitle}
-            </p>
-          )}
+        <div className="flex items-center gap-1.5">
+          <Icon className="w-4 h-4 text-[#007df7]" />
+          <h3
+            className="text-base sm:text-lg font-black text-white tracking-tight"
+            style={{ fontFamily: "'Sora', sans-serif" }}
+          >
+            {title}
+          </h3>
         </div>
       </div>
 

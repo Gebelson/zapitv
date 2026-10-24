@@ -12,7 +12,6 @@ export interface RankedItem {
 
 export interface FeaturedRankedCarouselProps {
   title: string;
-  subtitle?: string;
   icon?: React.ComponentType<{ className?: string }>;
   iconColor?: string;
   items: RankedItem[];
@@ -271,7 +270,6 @@ RankedCard.displayName = 'RankedCard';
  */
 export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
   title,
-  subtitle,
   icon: Icon,
   iconColor = '#007df7',
   items,
@@ -485,11 +483,6 @@ export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
             <h3 className="text-lg sm:text-xl md:text-2xl font-black text-white tracking-tight leading-tight">
               {title}
             </h3>
-            {subtitle && (
-              <p className="text-xs sm:text-sm font-medium text-gray-400 mt-0.5">
-                {subtitle}
-              </p>
-            )}
           </div>
         </div>
 

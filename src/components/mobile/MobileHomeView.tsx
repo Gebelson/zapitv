@@ -124,7 +124,6 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
       {continueWatchingItems.length > 0 && (
         <MobileContentRow
           title="Continuar Assistindo"
-          subtitle="Retome de onde você parou"
           items={continueWatchingItems}
           onItemClick={onSelectContent}
           showProgress={true}
@@ -135,7 +134,6 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
       {trendingItems.length > 0 && (
         <MobileContentRow
           title="Em Alta Agora"
-          subtitle="Os mais buscados e assistidos na ZapiTV"
           items={trendingItems.slice(0, 15)}
           onItemClick={onSelectContent}
         />
@@ -145,7 +143,6 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
       {top10Movies.length > 0 && (
         <MobileRankedRow
           title="Top 10 do Mês"
-          subtitle="Classificação mensal consolidada"
           items={top10Movies}
           onItemClick={onSelectContent}
           icon={Flame}
@@ -157,7 +154,6 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
         <MobileContentRow
           key={`mobile-rec-${row.id}`}
           title={row.title}
-          subtitle={row.subtitle}
           items={row.items}
           onItemClick={onSelectContent}
         />

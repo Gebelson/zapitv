@@ -121,7 +121,6 @@ export const MobileMyZapiView: React.FC<MobileMyZapiViewProps> = ({
       {continueWatchingItems.length > 0 && (
         <MobileContentRow
           title="Continuar Assistindo"
-          subtitle="Em andamento"
           items={continueWatchingItems}
           onItemClick={onSelectContent}
           showProgress={true}
@@ -132,7 +131,6 @@ export const MobileMyZapiView: React.FC<MobileMyZapiViewProps> = ({
       {myListItems.length > 0 && (
         <MobileContentRow
           title="Minha Lista"
-          subtitle={`${myListItems.length} salvos para assistir`}
           items={myListItems}
           onItemClick={onSelectContent}
         />
@@ -142,7 +140,6 @@ export const MobileMyZapiView: React.FC<MobileMyZapiViewProps> = ({
       {favoriteItems.length > 0 && (
         <MobileContentRow
           title="Meus Favoritos"
-          subtitle={`${favoriteItems.length} produções curtidas`}
           items={favoriteItems}
           onItemClick={onSelectContent}
         />

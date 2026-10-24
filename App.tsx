@@ -2523,7 +2523,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                   <ContentRow 
                     key={`rec-row-${row.id}`}
                     title={row.title}
-                    subtitle={row.subtitle}
                     items={catalogEligibilityService.filterEligibleItemsSync(row.items)}
                     isDarkMode={isDarkMode}
                     onItemClick={handleSelectContent}
@@ -2647,7 +2646,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               {/* SEÇÃO 1: TOP 10 FILMES DO MÊS (CARROSSEL HORIZONTAL RANKING) */}
               <FeaturedRankedCarousel
                 title="Top 10 Filmes do Mês"
-                subtitle={`${monthlyStatusLabel} · Filmes mais populares e aclamados`}
                 icon={Film}
                 iconColor="#007df7"
                 items={displayMovies}
@@ -2663,7 +2661,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               {/* SEÇÃO 2: TOP 10 SÉRIES DO MÊS (CARROSSEL HORIZONTAL RANKING) */}
               <FeaturedRankedCarousel
                 title="Top 10 Séries do Mês"
-                subtitle={`${monthlyStatusLabel} · Séries mais assistidas e aclamadas`}
                 icon={Tv}
                 iconColor="#c084fc"
                 items={displaySeries}
@@ -2679,7 +2676,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               {/* SEÇÃO 3: TOP 10 ANIMES DO MÊS (CARROSSEL HORIZONTAL RANKING) */}
               <FeaturedRankedCarousel
                 title="Top 10 Animes do Mês"
-                subtitle={`${monthlyStatusLabel} · Animes mais populares e tendências da temporada`}
                 icon={Flame}
                 iconColor="#06b6d4"
                 items={displayAnimes}

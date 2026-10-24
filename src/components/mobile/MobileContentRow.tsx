@@ -5,7 +5,6 @@ import { uiSoundService } from '../../core/audio/uiSoundService';
 
 interface MobileContentRowProps {
   title: string;
-  subtitle?: string;
   items: ContentItem[];
   onItemClick: (item: ContentItem) => void;
   showProgress?: boolean;
@@ -13,7 +12,6 @@ interface MobileContentRowProps {
 
 export const MobileContentRow: React.FC<MobileContentRowProps> = ({
   title,
-  subtitle,
   items,
   onItemClick,
   showProgress = false
@@ -26,20 +24,13 @@ export const MobileContentRow: React.FC<MobileContentRowProps> = ({
   return (
     <section className="my-4 sm:my-6 select-none" aria-label={title}>
       {/* Cabeçalho da Linha */}
-      <div className="px-4 mb-2 flex items-baseline justify-between">
-        <div>
-          <h3
-            className="text-base sm:text-lg font-black text-white tracking-tight"
-            style={{ fontFamily: "'Sora', sans-serif" }}
-          >
-            {title}
-          </h3>
-          {subtitle && (
-            <p className="text-[11px] text-slate-400 mt-0.5 font-normal">
-              {subtitle}
-            </p>
-          )}
-        </div>
+      <div className="px-4 mb-2 flex items-center justify-between">
+        <h3
+          className="text-base sm:text-lg font-black text-white tracking-tight"
+          style={{ fontFamily: "'Sora', sans-serif" }}
+        >
+          {title}
+        </h3>
       </div>
 
       {/* Trilho de Cards com Scroll Horizontal Táctil */}

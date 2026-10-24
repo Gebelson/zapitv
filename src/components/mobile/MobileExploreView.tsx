@@ -139,7 +139,6 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
           {featuredSelection?.featuredMovies && featuredSelection.featuredMovies.length > 0 && (
             <MobileRankedRow
               title="Top 10 Filmes do Mês"
-              subtitle="Mais populares e aclamados"
               items={featuredSelection.featuredMovies.slice(0, 10)}
               onItemClick={onSelectContent}
               icon={Film}
@@ -149,7 +148,6 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
           {featuredSelection?.featuredSeries && featuredSelection.featuredSeries.length > 0 && (
             <MobileRankedRow
               title="Top 10 Séries do Mês"
-              subtitle="Séries mais assistidas do mês"
               items={featuredSelection.featuredSeries.slice(0, 10)}
               onItemClick={onSelectContent}
               icon={Tv}
@@ -159,7 +157,6 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
           {featuredSelection?.featuredAnimes && featuredSelection.featuredAnimes.length > 0 && (
             <MobileRankedRow
               title="Top 10 Animes do Mês"
-              subtitle="Tendências e animes da temporada"
               items={featuredSelection.featuredAnimes.slice(0, 10)}
               onItemClick={onSelectContent}
               icon={Sparkles}
