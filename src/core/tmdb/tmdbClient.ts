@@ -493,7 +493,11 @@ class TMDBClientService {
     };
   }
 
-  public async searchMulti(query: string): Promise<ContentItem[]> {
+  public async searchMulti(
+    query: string, 
+    signal?: AbortSignal,
+    onPartialResults?: (items: ContentItem[]) => void
+  ): Promise<ContentItem[]> {
     if (!query || !query.trim()) return [];
     const trimmed = query.trim();
 
@@ -512,11 +516,29 @@ class TMDBClientService {
 
     const normalized = encodeURIComponent(trimmed);
 
-    // 2. Busca Híbrida: TMDB (PT-BR) + Cinemeta Filmes + Cinemeta Séries em paralelo
+    // 2. Busca Híbrida Não-Bloqueante: TMDB (PT-BR) + Cinemeta Filmes + Cinemeta Séries em paralelo
+    const tmdbPromise = this.request(`/search/multi?query=${normalized}`, 5000, signal);
+    const cineMoviePromise = this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`, signal);
+    const cineSeriesPromise = this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal);
+
+    // Emissão rápida de resultados parciais assim que o TMDB responder (geralmente < 200ms)
+    if (onPartialResults) {
+      tmdbPromise.then(res => {
+        if (res?.results && Array.isArray(res.results)) {
+          const partial = res.results
+            .filter((r: any) => r.media_type === 'movie' || r.media_type === 'tv')
+            .map((r: any) => formatContentItem(r));
+          if (partial.length > 0) {
+            onPartialResults(partial);
+          }
+        }
+      }).catch(() => {});
+    }
+
     const [tmdbRes, cineMovieRes, cineSeriesRes] = await Promise.allSettled([
-      this.request(`/search/multi?query=${normalized}`),
-      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`),
-      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`)
+      tmdbPromise,
+      cineMoviePromise,
+      cineSeriesPromise
     ]);
 
     const results: ContentItem[] = [];
@@ -580,7 +602,11 @@ class TMDBClientService {
     return results;
   }
 
-  public async searchMovies(query: string, signal?: AbortSignal): Promise<ContentItem[]> {
+  public async searchMovies(
+    query: string, 
+    signal?: AbortSignal,
+    onPartialResults?: (items: ContentItem[]) => void
+  ): Promise<ContentItem[]> {
     if (!query || !query.trim()) return [];
     const trimmed = query.trim();
     if (/^tt\d+$/i.test(trimmed)) {
@@ -595,9 +621,26 @@ class TMDBClientService {
     }
 
     const normalized = encodeURIComponent(trimmed);
+    const tmdbPromise = this.request(`/search/movie?query=${normalized}`, 5000, signal);
+    const cinePromise = this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`, signal);
+
+    if (onPartialResults) {
+      tmdbPromise.then(res => {
+        if (res?.results && Array.isArray(res.results)) {
+          const partial = res.results.map((r: any) => {
+            const isAnime = r.original_language === 'ja' && (r.genre_ids?.includes(16) || r.genres?.some((g: any) => g.id === 16));
+            const item = formatContentItem(r, isAnime ? ContentType.ANIME : ContentType.MOVIE);
+            item.mediaFormat = 'movie';
+            return item;
+          });
+          if (partial.length > 0) onPartialResults(partial);
+        }
+      }).catch(() => {});
+    }
+
     const [tmdbRes, cineMovieRes] = await Promise.allSettled([
-      this.request(`/search/movie?query=${normalized}`, 8000, signal),
-      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`, signal)
+      tmdbPromise,
+      cinePromise
     ]);
 
     const results: ContentItem[] = [];
@@ -640,7 +683,11 @@ class TMDBClientService {
     return results;
   }
 
-  public async searchSeries(query: string, signal?: AbortSignal): Promise<ContentItem[]> {
+  public async searchSeries(
+    query: string, 
+    signal?: AbortSignal,
+    onPartialResults?: (items: ContentItem[]) => void
+  ): Promise<ContentItem[]> {
     if (!query || !query.trim()) return [];
     const trimmed = query.trim();
     if (/^tt\d+$/i.test(trimmed)) {
@@ -655,9 +702,28 @@ class TMDBClientService {
     }
 
     const normalized = encodeURIComponent(trimmed);
+    const tmdbPromise = this.request(`/search/tv?query=${normalized}`, 5000, signal);
+    const cinePromise = this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal);
+
+    if (onPartialResults) {
+      tmdbPromise.then(res => {
+        if (res?.results && Array.isArray(res.results)) {
+          const partial = res.results
+            .filter((r: any) => !(r.original_language === 'ja' && (r.genre_ids?.includes(16) || r.genres?.some((g: any) => g.id === 16))))
+            .map((r: any) => {
+              const item = formatContentItem(r, ContentType.SERIES);
+              item.type = ContentType.SERIES;
+              return item;
+            })
+            .filter((item: ContentItem) => item.type !== ContentType.ANIME && !item.genres?.includes('Anime'));
+          if (partial.length > 0) onPartialResults(partial);
+        }
+      }).catch(() => {});
+    }
+
     const [tmdbRes, cineSeriesRes] = await Promise.allSettled([
-      this.request(`/search/tv?query=${normalized}`, 8000, signal),
-      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal)
+      tmdbPromise,
+      cinePromise
     ]);
 
     const results: ContentItem[] = [];
@@ -704,7 +770,11 @@ class TMDBClientService {
     return results;
   }
 
-  public async searchAnimes(query: string, signal?: AbortSignal): Promise<ContentItem[]> {
+  public async searchAnimes(
+    query: string, 
+    signal?: AbortSignal,
+    onPartialResults?: (items: ContentItem[]) => void
+  ): Promise<ContentItem[]> {
     if (!query || !query.trim()) return [];
     const trimmed = query.trim();
     if (/^tt\d+$/i.test(trimmed)) {
@@ -714,10 +784,23 @@ class TMDBClientService {
     }
 
     const normalized = encodeURIComponent(trimmed);
+    const tmdbTvPromise = this.request(`/search/tv?query=${normalized}`, 5000, signal);
+    const tmdbMoviePromise = this.request(`/search/movie?query=${normalized}`, 5000, signal);
+    const cinePromise = this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal);
+
+    if (onPartialResults) {
+      Promise.race([tmdbTvPromise, tmdbMoviePromise]).then(res => {
+        if (res?.results && Array.isArray(res.results)) {
+          const partial = res.results.map((r: any) => formatContentItem(r, ContentType.ANIME));
+          if (partial.length > 0) onPartialResults(partial);
+        }
+      }).catch(() => {});
+    }
+
     const [tmdbTvRes, tmdbMovieRes, cineSeriesRes] = await Promise.allSettled([
-      this.request(`/search/tv?query=${normalized}`, 8000, signal),
-      this.request(`/search/movie?query=${normalized}`, 8000, signal),
-      this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal)
+      tmdbTvPromise,
+      tmdbMoviePromise,
+      cinePromise
     ]);
 
     const results: ContentItem[] = [];

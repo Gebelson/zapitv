@@ -1395,7 +1395,7 @@ var init_tmdbClient = __esm({
           total: data.total_results || 2e4
         };
       }
-      async searchMulti(query) {
+      async searchMulti(query, signal, onPartialResults) {
         if (!query || !query.trim()) return [];
         const trimmed = query.trim();
         if (/^tt\d+$/i.test(trimmed)) {
@@ -1409,10 +1409,24 @@ var init_tmdbClient = __esm({
           if (cine) return [formatCinemetaItem(cine)];
         }
         const normalized = encodeURIComponent(trimmed);
+        const tmdbPromise = this.request(`/search/multi?query=${normalized}`, 5e3, signal);
+        const cineMoviePromise = this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`, signal);
+        const cineSeriesPromise = this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal);
+        if (onPartialResults) {
+          tmdbPromise.then((res) => {
+            if (res?.results && Array.isArray(res.results)) {
+              const partial = res.results.filter((r) => r.media_type === "movie" || r.media_type === "tv").map((r) => formatContentItem(r));
+              if (partial.length > 0) {
+                onPartialResults(partial);
+              }
+            }
+          }).catch(() => {
+          });
+        }
         const [tmdbRes, cineMovieRes, cineSeriesRes] = await Promise.allSettled([
-          this.request(`/search/multi?query=${normalized}`),
-          this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`),
-          this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`)
+          tmdbPromise,
+          cineMoviePromise,
+          cineSeriesPromise
         ]);
         const results = [];
         const seenIds = /* @__PURE__ */ new Set();
@@ -1465,7 +1479,7 @@ var init_tmdbClient = __esm({
         }
         return results;
       }
-      async searchMovies(query, signal) {
+      async searchMovies(query, signal, onPartialResults) {
         if (!query || !query.trim()) return [];
         const trimmed = query.trim();
         if (/^tt\d+$/i.test(trimmed)) {
@@ -1479,9 +1493,25 @@ var init_tmdbClient = __esm({
           return [];
         }
         const normalized = encodeURIComponent(trimmed);
+        const tmdbPromise = this.request(`/search/movie?query=${normalized}`, 5e3, signal);
+        const cinePromise = this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`, signal);
+        if (onPartialResults) {
+          tmdbPromise.then((res) => {
+            if (res?.results && Array.isArray(res.results)) {
+              const partial = res.results.map((r) => {
+                const isAnime = r.original_language === "ja" && (r.genre_ids?.includes(16) || r.genres?.some((g) => g.id === 16));
+                const item = formatContentItem(r, isAnime ? "ANIME" /* ANIME */ : "FILME" /* MOVIE */);
+                item.mediaFormat = "movie";
+                return item;
+              });
+              if (partial.length > 0) onPartialResults(partial);
+            }
+          }).catch(() => {
+          });
+        }
         const [tmdbRes, cineMovieRes] = await Promise.allSettled([
-          this.request(`/search/movie?query=${normalized}`, 8e3, signal),
-          this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/movie/top/search=${normalized}.json`, signal)
+          tmdbPromise,
+          cinePromise
         ]);
         const results = [];
         const seenIds = /* @__PURE__ */ new Set();
@@ -1517,7 +1547,7 @@ var init_tmdbClient = __esm({
         }
         return results;
       }
-      async searchSeries(query, signal) {
+      async searchSeries(query, signal, onPartialResults) {
         if (!query || !query.trim()) return [];
         const trimmed = query.trim();
         if (/^tt\d+$/i.test(trimmed)) {
@@ -1531,9 +1561,24 @@ var init_tmdbClient = __esm({
           return [];
         }
         const normalized = encodeURIComponent(trimmed);
+        const tmdbPromise = this.request(`/search/tv?query=${normalized}`, 5e3, signal);
+        const cinePromise = this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal);
+        if (onPartialResults) {
+          tmdbPromise.then((res) => {
+            if (res?.results && Array.isArray(res.results)) {
+              const partial = res.results.filter((r) => !(r.original_language === "ja" && (r.genre_ids?.includes(16) || r.genres?.some((g) => g.id === 16)))).map((r) => {
+                const item = formatContentItem(r, "S\xC9RIE" /* SERIES */);
+                item.type = "S\xC9RIE" /* SERIES */;
+                return item;
+              }).filter((item) => item.type !== "ANIME" /* ANIME */ && !item.genres?.includes("Anime"));
+              if (partial.length > 0) onPartialResults(partial);
+            }
+          }).catch(() => {
+          });
+        }
         const [tmdbRes, cineSeriesRes] = await Promise.allSettled([
-          this.request(`/search/tv?query=${normalized}`, 8e3, signal),
-          this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal)
+          tmdbPromise,
+          cinePromise
         ]);
         const results = [];
         const seenIds = /* @__PURE__ */ new Set();
@@ -1572,7 +1617,7 @@ var init_tmdbClient = __esm({
         }
         return results;
       }
-      async searchAnimes(query, signal) {
+      async searchAnimes(query, signal, onPartialResults) {
         if (!query || !query.trim()) return [];
         const trimmed = query.trim();
         if (/^tt\d+$/i.test(trimmed)) {
@@ -1581,10 +1626,22 @@ var init_tmdbClient = __esm({
           return [];
         }
         const normalized = encodeURIComponent(trimmed);
+        const tmdbTvPromise = this.request(`/search/tv?query=${normalized}`, 5e3, signal);
+        const tmdbMoviePromise = this.request(`/search/movie?query=${normalized}`, 5e3, signal);
+        const cinePromise = this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal);
+        if (onPartialResults) {
+          Promise.race([tmdbTvPromise, tmdbMoviePromise]).then((res) => {
+            if (res?.results && Array.isArray(res.results)) {
+              const partial = res.results.map((r) => formatContentItem(r, "ANIME" /* ANIME */));
+              if (partial.length > 0) onPartialResults(partial);
+            }
+          }).catch(() => {
+          });
+        }
         const [tmdbTvRes, tmdbMovieRes, cineSeriesRes] = await Promise.allSettled([
-          this.request(`/search/tv?query=${normalized}`, 8e3, signal),
-          this.request(`/search/movie?query=${normalized}`, 8e3, signal),
-          this.searchCinemeta(`${CINEMETA_BASE_URL}/catalog/series/top/search=${normalized}.json`, signal)
+          tmdbTvPromise,
+          tmdbMoviePromise,
+          cinePromise
         ]);
         const results = [];
         const seenIds = /* @__PURE__ */ new Set();
@@ -14073,6 +14130,197 @@ var init_CatalogReleaseStore = __esm({
   }
 });
 
+// src/core/search/localSearchIndexService.ts
+function normalizeSearchQuery(text2) {
+  if (!text2) return "";
+  return text2.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+var LocalSearchIndexService, localSearchIndexService;
+var init_localSearchIndexService = __esm({
+  "src/core/search/localSearchIndexService.ts"() {
+    init_types();
+    init_AdultContentService();
+    init_BannedContentRegistry();
+    init_CanonicalCatalogMaster();
+    LocalSearchIndexService = class _LocalSearchIndexService {
+      constructor() {
+        this.indexedMap = /* @__PURE__ */ new Map();
+        this.lastCatalogCount = 0;
+        this.lastCatalogFingerprint = "";
+      }
+      static getInstance() {
+        if (!_LocalSearchIndexService.instance) {
+          _LocalSearchIndexService.instance = new _LocalSearchIndexService();
+        }
+        return _LocalSearchIndexService.instance;
+      }
+      /**
+       * Sincroniza o acervo em memória com o índice incrementalmente.
+       * Não reprocessa itens já indexados, garantindo custo O(novos_itens).
+       */
+      syncCatalog(items) {
+        if (!items || items.length === 0) return;
+        if (items.length === this.lastCatalogCount) {
+          const sample = `${items[0]?.id}_${items[Math.floor(items.length / 2)]?.id}_${items[items.length - 1]?.id}_${items.length}`;
+          if (sample === this.lastCatalogFingerprint) {
+            return;
+          }
+          this.lastCatalogFingerprint = sample;
+        } else {
+          this.lastCatalogCount = items.length;
+          this.lastCatalogFingerprint = `${items[0]?.id}_${items[Math.floor(items.length / 2)]?.id}_${items[items.length - 1]?.id}_${items.length}`;
+        }
+        for (const item of items) {
+          if (!item || !item.id || !item.title) continue;
+          if (this.indexedMap.has(item.id)) continue;
+          const normTitle = normalizeSearchQuery(item.title);
+          const titleWords = normTitle.split(" ").filter((w) => w.length > 0);
+          const normOrig = item.originalTitle ? normalizeSearchQuery(item.originalTitle) : "";
+          const origWords = normOrig ? normOrig.split(" ").filter((w) => w.length > 0) : [];
+          const aliases = [];
+          if (item.canonicalId) aliases.push(normalizeSearchQuery(item.canonicalId));
+          if (item.imdbId) aliases.push(normalizeSearchQuery(item.imdbId));
+          if (item.tmdbId) aliases.push(normalizeSearchQuery(item.tmdbId));
+          const genres = (item.genres || []).map((g) => normalizeSearchQuery(g)).filter(Boolean);
+          const actors = (item.cast || []).map((a) => normalizeSearchQuery(a)).filter(Boolean);
+          const director = item.director ? normalizeSearchQuery(item.director) : "";
+          let canonicalId = item.canonicalId || item.imdbId || item.id;
+          try {
+            const resolved = canonicalCatalogMaster.resolveCanonicalId(item);
+            if (resolved) canonicalId = resolved;
+          } catch {
+          }
+          this.indexedMap.set(item.id, {
+            id: item.id,
+            item,
+            canonicalId,
+            normalizedTitle: normTitle,
+            titleWords,
+            normalizedOriginalTitle: normOrig,
+            originalTitleWords: origWords,
+            normalizedAliases: aliases,
+            normalizedGenres: genres,
+            normalizedActors: actors,
+            normalizedDirector: director,
+            type: item.type,
+            year: item.year,
+            rating: item.rating || 0,
+            isFeatured: item.isFeatured === true,
+            isAdult: adultContentService.isAdultContent(item)
+          });
+        }
+      }
+      /**
+       * Executa busca local instantânea em memória com pontuação hierárquica e filtros de categoria.
+       */
+      searchInstant(query, category, options) {
+        const rawQuery = (query || "").trim();
+        if (rawQuery.length < 2) return [];
+        if (adultContentService.isIllegalOrExploitative(rawQuery)) return [];
+        if (bannedContentRegistry.isBannedTitle(rawQuery) || bannedContentRegistry.isBannedKeyOrId(rawQuery)) return [];
+        const normQuery = normalizeSearchQuery(rawQuery);
+        if (normQuery.length < 2) return [];
+        const queryWords = normQuery.split(" ").filter((w) => w.length > 0);
+        const limit = options?.limit || 10;
+        const userProfile = options?.userProfile;
+        const isIntentionalAdult = adultContentService.isIntentionalAdultSearch(normQuery);
+        const isChildProfile = userProfile ? userProfile.isChild === true : false;
+        const allowAdult = isIntentionalAdult && !isChildProfile && adultContentService.isAgeConfirmed(userProfile?.id);
+        const scoredMatches = [];
+        for (const indexed of this.indexedMap.values()) {
+          if (bannedContentRegistry.isBanned(indexed.item)) continue;
+          if (indexed.isAdult && !allowAdult) continue;
+          if (category !== "all") {
+            if (category === "movies") {
+              const match = options?.isMovieCheck ? options.isMovieCheck(indexed.item) : indexed.type === "FILME" /* MOVIE */;
+              if (!match) continue;
+            } else if (category === "series") {
+              const match = options?.isSeriesCheck ? options.isSeriesCheck(indexed.item) : indexed.type === "S\xC9RIE" /* SERIES */;
+              if (!match) continue;
+            } else if (category === "animes") {
+              const match = options?.isAnimeCheck ? options.isAnimeCheck(indexed.item) : indexed.type === "ANIME" /* ANIME */;
+              if (!match) continue;
+            } else if (category === "live") {
+              if (!String(indexed.item.type || "").toLowerCase().includes("live")) continue;
+            }
+          }
+          let matchScore = 0;
+          if (indexed.normalizedTitle === normQuery) {
+            matchScore = 1200;
+          } else if (indexed.normalizedTitle.startsWith(normQuery)) {
+            matchScore = 900;
+          } else if (indexed.titleWords.some((w) => w.startsWith(normQuery))) {
+            matchScore = 700;
+          } else if (indexed.normalizedTitle.includes(normQuery)) {
+            matchScore = 500;
+          } else if (queryWords.length > 1 && queryWords.every((qw) => indexed.normalizedTitle.includes(qw))) {
+            matchScore = 400;
+          }
+          if (matchScore === 0 && indexed.normalizedOriginalTitle) {
+            if (indexed.normalizedOriginalTitle === normQuery) {
+              matchScore = 1e3;
+            } else if (indexed.normalizedOriginalTitle.startsWith(normQuery)) {
+              matchScore = 800;
+            } else if (indexed.originalTitleWords.some((w) => w.startsWith(normQuery))) {
+              matchScore = 650;
+            } else if (indexed.normalizedOriginalTitle.includes(normQuery)) {
+              matchScore = 450;
+            }
+          }
+          if (matchScore === 0) {
+            if (indexed.normalizedAliases.some((a) => a.startsWith(normQuery) || a.includes(normQuery))) {
+              matchScore = 350;
+            }
+          }
+          if (matchScore === 0) {
+            const matchingGenre = indexed.normalizedGenres.find((g) => g === normQuery || g.startsWith(normQuery));
+            if (matchingGenre) {
+              matchScore = 300;
+            }
+          }
+          if (matchScore === 0 && indexed.normalizedActors.length > 0) {
+            const actorMatch = indexed.normalizedActors.find((a) => a === normQuery || a.startsWith(normQuery) || a.includes(normQuery));
+            if (actorMatch) {
+              matchScore = 250;
+            }
+          }
+          if (matchScore === 0 && indexed.normalizedDirector) {
+            if (indexed.normalizedDirector.includes(normQuery)) {
+              matchScore = 200;
+            }
+          }
+          if (matchScore > 0) {
+            matchScore += Math.min(25, indexed.rating * 2.5);
+            if (indexed.isFeatured) matchScore += 20;
+            scoredMatches.push({
+              item: indexed.item,
+              score: matchScore
+            });
+          }
+        }
+        if (scoredMatches.length === 0) return [];
+        scoredMatches.sort((a, b) => b.score - a.score);
+        return scoredMatches.slice(0, limit).map((m) => m.item);
+      }
+      /**
+       * Limpa o índice local em memória
+       */
+      clear() {
+        this.indexedMap.clear();
+        this.lastCatalogCount = 0;
+        this.lastCatalogFingerprint = "";
+      }
+      /**
+       * Retorna o total de itens indexados
+       */
+      size() {
+        return this.indexedMap.size;
+      }
+    };
+    localSearchIndexService = LocalSearchIndexService.getInstance();
+  }
+});
+
 // src/core/search/searchService.ts
 var CACHE_TTL_MS3, KNOWN_ANIME_FRANCHISES, LIVE_ACTION_MARKERS, SearchService, searchService;
 var init_searchService = __esm({
@@ -14086,6 +14334,7 @@ var init_searchService = __esm({
     init_LruCache();
     init_aniListClient();
     init_CanonicalCatalogMaster();
+    init_localSearchIndexService();
     CACHE_TTL_MS3 = 10 * 60 * 1e3;
     KNOWN_ANIME_FRANCHISES = [
       /\bnaruto\b/i,
@@ -14143,7 +14392,13 @@ var init_searchService = __esm({
       constructor() {
         this.cache = new LruCache(60, CACHE_TTL_MS3);
         this.actorCache = new LruCache(60, CACHE_TTL_MS3);
-        this.activeAbortController = null;
+        // Controladores de cancelamento isolados para evitar interferência entre operações
+        this.headerController = null;
+        this.pageSearchController = null;
+        this.actorController = null;
+        // Identificadores de versão para descartar respostas de requisições obsoletas
+        this.headerSearchVersion = 0;
+        this.pageSearchVersion = 0;
       }
       static getInstance() {
         if (!_SearchService.instance) {
@@ -14220,7 +14475,6 @@ var init_searchService = __esm({
       }
       /**
        * Classificação canônica: item é anime (produção de animação japonesa)?
-       * Abrange tanto animes seriados quanto longas-metragens/filmes de anime.
        */
       isAnimeItem(item) {
         if (!item || !item.title) return false;
@@ -14235,14 +14489,14 @@ var init_searchService = __esm({
         return false;
       }
       /**
-       * Classificação canônica: item é filme de anime (longa-metragem de anime japonês)?
+       * Classificação canônica: item é filme de anime?
        */
       isAnimeMovieItem(item) {
         if (!item || !this.isAnimeItem(item)) return false;
         return item.mediaFormat === "movie";
       }
       /**
-       * Classificação canônica: item é anime seriado (série de TV em anime)?
+       * Classificação canônica: item é anime seriado?
        */
       isAnimeSeriesItem(item) {
         if (!item || !this.isAnimeItem(item)) return false;
@@ -14250,8 +14504,6 @@ var init_searchService = __esm({
       }
       /**
        * Classificação canônica: item é filme?
-       * Inclui filmes convencionais e longas-metragens de anime (filmes de anime).
-       * Exclui terminantemente séries de TV e animes seriados.
        */
       isMovieItem(item, includeAnimeMovies = false) {
         if (!item) return false;
@@ -14263,8 +14515,7 @@ var init_searchService = __esm({
         return item.type === "FILME" /* MOVIE */ || typeStr === "MOVIE" || typeStr === "FILME" || item.mediaFormat === "movie";
       }
       /**
-       * Classificação canônica: item é série de TV convencional (não anime)?
-       * Exclui filmes e qualquer produção de anime.
+       * Classificação canônica: item é série de TV convencional?
        */
       isSeriesItem(item) {
         if (!item) return false;
@@ -14273,31 +14524,209 @@ var init_searchService = __esm({
         const typeStr = String(item.type || "").toUpperCase();
         return item.type === "S\xC9RIE" /* SERIES */ || typeStr === "SERIES" || typeStr === "S\xC9RIE" || typeStr === "TV" || item.mediaFormat === "series";
       }
+      // ============================================================================
+      // CANCELAMENTO E CONTROLE DE REQUISIÇÕES INDEPENDENTES
+      // ============================================================================
       /**
-       * Cancela quaisquer requisições de pesquisa pendentes
+       * Cancela apenas requisições em segundo plano de sugestões do Header
+       */
+      cancelHeaderSuggestions() {
+        if (this.headerController) {
+          this.headerController.abort();
+          this.headerController = null;
+        }
+        if (this.actorController) {
+          this.actorController.abort();
+          this.actorController = null;
+        }
+        this.headerSearchVersion++;
+      }
+      /**
+       * Cancela apenas requisições da página principal de resultados
+       */
+      cancelPageSearch() {
+        if (this.pageSearchController) {
+          this.pageSearchController.abort();
+          this.pageSearchController = null;
+        }
+        this.pageSearchVersion++;
+      }
+      /**
+       * Cancela todas as requisições de busca pendentes (ex: ao mudar de página ou rota)
        */
       cancelPending() {
-        if (this.activeAbortController) {
-          this.activeAbortController.abort();
-          this.activeAbortController = null;
+        this.cancelHeaderSuggestions();
+        this.cancelPageSearch();
+      }
+      // ============================================================================
+      // BUSCA LOCAL INSTANTÂNEA EM MEMÓRIA (< 5ms)
+      // ============================================================================
+      /**
+       * Executa busca local instantânea em memória usando o índice indexado.
+       * Não dispara nenhuma requisição de rede e responde imediatamente à digitação.
+       */
+      searchLocalInstant(query, category, localCatalog = [], userProfile, limit = 6) {
+        const trimmed = (query || "").trim();
+        if (trimmed.length < 2) return [];
+        const releases = catalogReleaseStore.getReleases();
+        const allLocal = releases.length > 0 ? [...localCatalog, ...releases] : localCatalog;
+        localSearchIndexService.syncCatalog(allLocal);
+        return localSearchIndexService.searchInstant(trimmed, category, {
+          limit,
+          userProfile,
+          isMovieCheck: (it) => this.isMovieItem(it),
+          isSeriesCheck: (it) => this.isSeriesItem(it),
+          isAnimeCheck: (it) => this.isAnimeItem(it)
+        });
+      }
+      // ============================================================================
+      // BUSCA REMOTA EM SEGUNDO PLANO (NÃO-BLOQUEANTE)
+      // ============================================================================
+      /**
+       * Busca sugestões remotas no TMDB / Cinemeta sem esperar atores ou travar o catálogo local
+       */
+      async searchRemoteSuggestions(query, category, limit = 6, signal) {
+        const trimmed = (query || "").trim();
+        if (trimmed.length < 2) return [];
+        const normQuery = trimmed.toLowerCase();
+        const cacheKey = `remotesug:${category}:${normQuery}`;
+        const now = Date.now();
+        const cached = this.cache.get(cacheKey);
+        if (cached && now - cached.timestamp < CACHE_TTL_MS3) {
+          return cached.items.slice(0, limit);
+        }
+        try {
+          let rawResults = [];
+          switch (category) {
+            case "movies":
+              rawResults = await tmdbService.searchMovies(trimmed, signal);
+              rawResults = rawResults.filter((it) => this.isMovieItem(it));
+              break;
+            case "series":
+              rawResults = await tmdbService.searchSeries(trimmed, signal);
+              rawResults = rawResults.filter((it) => this.isSeriesItem(it));
+              break;
+            case "animes": {
+              const [tmdbList, aniListList] = await Promise.allSettled([
+                tmdbService.searchAnimes(trimmed, signal),
+                aniListClient.searchAnime(trimmed, 1, 10)
+              ]);
+              const tList = tmdbList.status === "fulfilled" ? tmdbList.value : [];
+              const aList = aniListList.status === "fulfilled" ? aniListList.value : [];
+              rawResults = [...tList, ...aList].filter((it) => this.isAnimeItem(it));
+              break;
+            }
+            case "all":
+            default:
+              rawResults = await tmdbService.searchMulti(trimmed, signal);
+              for (const item of rawResults) {
+                if (this.isAnimeItem(item)) {
+                  item.type = "ANIME" /* ANIME */;
+                }
+              }
+              break;
+          }
+          const clean2 = bannedContentRegistry.filterCleanItems(rawResults).filter((it) => !adultContentService.isAdultContent(it));
+          const eligible = catalogEligibilityService.filterEligibleItemsSync(clean2);
+          this.cache.set(cacheKey, { timestamp: now, items: eligible });
+          return eligible.slice(0, limit);
+        } catch (e) {
+          if (e?.name === "AbortError" || signal?.aborted) return [];
+          return [];
         }
       }
       /**
-       * Executa a pesquisa contextual direcionada na origem (TMDB + Cinemeta)
+       * Pesquisa atores e atrizes com cache em memória e controlador próprio
        */
-      async search(query, category, localCatalog = [], userProfile) {
-        const trimmed = query.trim();
+      async searchPersons(query, signal) {
+        const trimmed = (query || "").trim();
+        if (trimmed.length < 2) return [];
+        const normKey = trimmed.toLowerCase();
+        const now = Date.now();
+        const cached = this.actorCache.get(normKey);
+        if (cached && now - cached.timestamp < CACHE_TTL_MS3) {
+          return cached.actors;
+        }
+        try {
+          const actors = await tmdbService.searchPersons(trimmed, signal);
+          this.actorCache.set(normKey, { timestamp: now, actors });
+          return actors;
+        } catch {
+          return [];
+        }
+      }
+      /**
+       * Retorna sugestões combinadas com prioridade total para os títulos locais
+       */
+      async getSearchSuggestionsWithActors(query, category, limit = 6, localCatalog = []) {
+        const trimmed = (query || "").trim();
+        if (trimmed.length < 2) {
+          return { items: [], actors: [] };
+        }
+        const localItems = this.searchLocalInstant(trimmed, category, localCatalog, void 0, limit);
+        this.cancelHeaderSuggestions();
+        const version = this.headerSearchVersion;
+        const controller = new AbortController();
+        this.headerController = controller;
+        try {
+          const [remoteItemsRes, actorsRes] = await Promise.allSettled([
+            this.searchRemoteSuggestions(trimmed, category, limit, controller.signal),
+            this.searchPersons(trimmed, controller.signal)
+          ]);
+          if (version !== this.headerSearchVersion) {
+            return { items: localItems, actors: [] };
+          }
+          const remoteItems = remoteItemsRes.status === "fulfilled" ? remoteItemsRes.value : [];
+          const actors = actorsRes.status === "fulfilled" ? actorsRes.value : [];
+          const existingIds = new Set(localItems.map((it) => it.id));
+          const existingTitles = new Set(localItems.map((it) => it.title.toLowerCase().trim()));
+          const combined = [...localItems];
+          for (const rItem of remoteItems) {
+            if (combined.length >= limit) break;
+            const normT = rItem.title.toLowerCase().trim();
+            if (!existingIds.has(rItem.id) && !existingTitles.has(normT)) {
+              combined.push(rItem);
+              existingIds.add(rItem.id);
+              existingTitles.add(normT);
+            }
+          }
+          return {
+            items: combined.slice(0, limit),
+            actors: actors.slice(0, 3)
+          };
+        } catch {
+          return { items: localItems, actors: [] };
+        } finally {
+          if (this.headerController === controller) {
+            this.headerController = null;
+          }
+        }
+      }
+      // ============================================================================
+      // BUSCA COMPLETA DA PÁGINA COM ATUALIZAÇÃO PROGRESSIVA
+      // ============================================================================
+      /**
+       * Executa a pesquisa da página de resultados.
+       * Se onPartialResults for fornecido, emite os resultados locais IMEDIATAMENTE (0ms)
+       * antes mesmo de aguardar as respostas remotas.
+       */
+      async search(query, category, localCatalog = [], userProfile, onPartialResults) {
+        const trimmed = (query || "").trim();
         if (!trimmed) {
-          this.cancelPending();
+          this.cancelPageSearch();
           return [];
         }
         if (adultContentService.isIllegalOrExploitative(trimmed)) {
-          this.cancelPending();
+          this.cancelPageSearch();
           return [];
         }
         if (bannedContentRegistry.isBannedTitle(trimmed) || bannedContentRegistry.isBannedKeyOrId(trimmed)) {
-          this.cancelPending();
+          this.cancelPageSearch();
           return [];
+        }
+        const localMatches = this.searchLocalInstant(trimmed, category, localCatalog, userProfile, 40);
+        if (localMatches.length > 0 && onPartialResults) {
+          onPartialResults(localMatches);
         }
         const availableTitles = localCatalog ? localCatalog.map((it) => it.title) : [];
         const isIntentionalAdult = adultContentService.isIntentionalAdultSearch(trimmed, availableTitles);
@@ -14308,27 +14737,43 @@ var init_searchService = __esm({
         const now = Date.now();
         const cached = this.cache.get(cacheKey);
         if (cached && now - cached.timestamp < CACHE_TTL_MS3) {
-          return cached.items;
+          const mergedCache = this.mergeResults(localMatches, cached.items);
+          if (onPartialResults) onPartialResults(mergedCache);
+          return mergedCache;
         }
-        this.cancelPending();
+        this.cancelPageSearch();
+        const version = this.pageSearchVersion;
         const controller = new AbortController();
-        this.activeAbortController = controller;
+        this.pageSearchController = controller;
         try {
           let rawResults = [];
           switch (category) {
-            case "movies": {
-              rawResults = await tmdbService.searchMovies(trimmed, controller.signal);
+            case "movies":
+              rawResults = await tmdbService.searchMovies(trimmed, controller.signal, (partial) => {
+                if (version === this.pageSearchVersion && onPartialResults) {
+                  const cleanPart = this.filterAndCleanResults(partial, allowAdult, category);
+                  onPartialResults(this.mergeResults(localMatches, cleanPart));
+                }
+              });
               rawResults = rawResults.filter((it) => this.isMovieItem(it));
               break;
-            }
-            case "series": {
-              rawResults = await tmdbService.searchSeries(trimmed, controller.signal);
+            case "series":
+              rawResults = await tmdbService.searchSeries(trimmed, controller.signal, (partial) => {
+                if (version === this.pageSearchVersion && onPartialResults) {
+                  const cleanPart = this.filterAndCleanResults(partial, allowAdult, category);
+                  onPartialResults(this.mergeResults(localMatches, cleanPart));
+                }
+              });
               rawResults = rawResults.filter((it) => this.isSeriesItem(it));
               break;
-            }
             case "animes": {
               const [tmdbRes, anilistRes] = await Promise.allSettled([
-                tmdbService.searchAnimes(trimmed, controller.signal),
+                tmdbService.searchAnimes(trimmed, controller.signal, (partial) => {
+                  if (version === this.pageSearchVersion && onPartialResults) {
+                    const cleanPart = this.filterAndCleanResults(partial, allowAdult, category);
+                    onPartialResults(this.mergeResults(localMatches, cleanPart));
+                  }
+                }),
                 aniListClient.searchAnime(trimmed, 1, 15)
               ]);
               const tmdbList = tmdbRes.status === "fulfilled" ? tmdbRes.value : [];
@@ -14337,135 +14782,97 @@ var init_searchService = __esm({
               break;
             }
             case "all":
-            default: {
-              rawResults = await tmdbService.searchMulti(trimmed);
+            default:
+              rawResults = await tmdbService.searchMulti(trimmed, controller.signal, (partial) => {
+                if (version === this.pageSearchVersion && onPartialResults) {
+                  const cleanPart = this.filterAndCleanResults(partial, allowAdult, category);
+                  onPartialResults(this.mergeResults(localMatches, cleanPart));
+                }
+              });
               for (const item of rawResults) {
                 if (this.isAnimeItem(item)) {
                   item.type = "ANIME" /* ANIME */;
                 }
               }
               break;
-            }
           }
-          const releases = catalogReleaseStore.getReleases();
-          const combinedLocal = [...localCatalog || [], ...releases];
-          if (combinedLocal.length > 0) {
-            const localMatches = this.filterLocalCatalog(trimmed, category, combinedLocal, userProfile);
-            const existingTitles = new Set(rawResults.map((r) => r.title.toLowerCase().trim()));
-            for (const loc of localMatches) {
-              if (!existingTitles.has(loc.title.toLowerCase().trim())) {
-                rawResults.unshift(loc);
-                existingTitles.add(loc.title.toLowerCase().trim());
-              }
-            }
+          if (version !== this.pageSearchVersion) {
+            return localMatches;
           }
-          if (!allowAdult) {
-            rawResults = rawResults.filter((it) => !adultContentService.isAdultContent(it));
-          }
-          rawResults = bannedContentRegistry.filterCleanItems(rawResults);
-          const eligible = catalogEligibilityService.filterEligibleItemsSync(rawResults, { allowAdult });
-          for (const item of eligible) {
+          const cleanRemote = this.filterAndCleanResults(rawResults, allowAdult, category);
+          const merged = this.mergeResults(localMatches, cleanRemote);
+          for (const item of merged) {
             canonicalCatalogMaster.registerItem(item);
           }
-          this.cache.set(cacheKey, {
-            timestamp: now,
-            items: eligible
-          });
-          return eligible;
+          this.cache.set(cacheKey, { timestamp: now, items: merged });
+          if (onPartialResults) {
+            onPartialResults(merged);
+          }
+          return merged;
         } catch (e) {
           if (e?.name === "AbortError" || controller.signal.aborted) {
-            return [];
+            return localMatches;
           }
           console.warn(`[SearchService] Erro na busca (${category}):`, e);
-          const localFallback = this.filterLocalCatalog(trimmed, category, localCatalog, userProfile);
-          return catalogEligibilityService.filterEligibleItemsSync(localFallback, { allowAdult });
+          return localMatches;
         } finally {
-          if (this.activeAbortController === controller) {
-            this.activeAbortController = null;
+          if (this.pageSearchController === controller) {
+            this.pageSearchController = null;
           }
         }
       }
-      /**
-       * Filtra o acervo local em memória respeitando rigorosamente a categoria e proteção adulta
-       */
-      filterLocalCatalog(query, category, items, userProfile) {
-        if (!items || items.length === 0) return [];
-        const norm = query.toLowerCase().trim();
-        if (adultContentService.isIllegalOrExploitative(norm)) {
-          return [];
+      filterAndCleanResults(items, allowAdult, category) {
+        let list = items;
+        if (!allowAdult) {
+          list = list.filter((it) => !adultContentService.isAdultContent(it));
         }
-        const availableTitles = items.map((it) => it.title);
-        const isIntentionalAdult = adultContentService.isIntentionalAdultSearch(norm, availableTitles);
-        const isChildProfile = userProfile ? userProfile.isChild === true : false;
-        const allowAdult = isIntentionalAdult && !isChildProfile && adultContentService.isAgeConfirmed();
-        return items.filter((item) => {
-          if (bannedContentRegistry.isBanned(item)) {
-            return false;
+        list = bannedContentRegistry.filterCleanItems(list);
+        list = catalogEligibilityService.filterEligibleItemsSync(list, { allowAdult });
+        if (category === "movies") {
+          list = list.filter((it) => this.isMovieItem(it));
+        } else if (category === "series") {
+          list = list.filter((it) => this.isSeriesItem(it));
+        } else if (category === "animes") {
+          list = list.filter((it) => this.isAnimeItem(it));
+        }
+        return list;
+      }
+      mergeResults(primary, secondary) {
+        const existingIds = new Set(primary.map((it) => it.id));
+        const existingTitles = new Set(primary.map((it) => it.title.toLowerCase().trim()));
+        const result = [...primary];
+        for (const item of secondary) {
+          const normT = item.title.toLowerCase().trim();
+          if (!existingIds.has(item.id) && !existingTitles.has(normT)) {
+            result.push(item);
+            existingIds.add(item.id);
+            existingTitles.add(normT);
           }
-          const isAdult = adultContentService.isAdultContent(item);
-          if (isAdult && !allowAdult) return false;
-          const titleMatch = item.title?.toLowerCase().includes(norm) || item.originalTitle && item.originalTitle.toLowerCase().includes(norm);
-          if (!titleMatch) return false;
-          switch (category) {
-            case "movies":
-              return this.isMovieItem(item);
-            case "series":
-              return this.isSeriesItem(item);
-            case "animes":
-              return this.isAnimeItem(item);
-            case "all":
-              return true;
-            default:
-              return true;
-          }
-        });
+        }
+        return result;
       }
       /**
        * Fornece sugestões rápidas para dropdown / autocomplete
        */
       async getSuggestions(query, category, limit = 6, localCatalog = []) {
+        const local = this.searchLocalInstant(query, category, localCatalog, void 0, limit);
+        if (local.length >= limit) return local;
         const results = await this.search(query, category, localCatalog);
         return results.slice(0, limit);
       }
       /**
-       * Pesquisa atores e atrizes com cache em memória
+       * Filtra o acervo local em memória respeitando rigorosamente a categoria e proteção adulta
        */
-      async searchPersons(query, signal) {
-        const trimmed = query.trim();
-        if (trimmed.length < 2) return [];
-        const normKey = trimmed.toLowerCase();
-        const now = Date.now();
-        const cached = this.actorCache.get(normKey);
-        if (cached && now - cached.timestamp < CACHE_TTL_MS3) {
-          return cached.actors;
-        }
-        const actors = await tmdbService.searchPersons(trimmed, signal);
-        this.actorCache.set(normKey, { timestamp: now, actors });
-        return actors;
+      filterLocalCatalog(query, category, items, userProfile) {
+        return this.searchLocalInstant(query, category, items, userProfile, 50);
       }
       /**
-       * Fornece sugestões completas de busca contendo produções (filmes/séries) e pessoas (atores/atrizes)
-       */
-      async getSearchSuggestionsWithActors(query, category, limit = 6, localCatalog = []) {
-        const trimmed = query.trim();
-        if (trimmed.length < 2) {
-          return { items: [], actors: [] };
-        }
-        const [items, allActors] = await Promise.all([
-          this.getSuggestions(trimmed, category, limit, localCatalog),
-          this.searchPersons(trimmed)
-        ]);
-        return {
-          items,
-          actors: allActors.slice(0, 3)
-        };
-      }
-      /**
-       * Limpa o cache de busca
+       * Limpa todos os caches de busca e o índice local
        */
       clearCache() {
         this.cache.clear();
         this.actorCache.clear();
+        localSearchIndexService.clear();
       }
     };
     searchService = SearchService.getInstance();

@@ -110,38 +110,71 @@ const Header: React.FC<HeaderProps> = ({
     };
   }, []);
 
-  // Busca sugestões com debounce enquanto o usuário digita (produções e atores/atrizes)
+  // Busca sugestões instantâneas locais + busca remota desacoplada em segundo plano
   useEffect(() => {
     const trimmed = searchQuery.trim();
     if (trimmed.length < 2) {
       setSuggestions([]);
       setSuggestedActors([]);
       setShowSearchDropdown(false);
+      searchService.cancelHeaderSuggestions();
       return;
     }
 
+    // 1. IMEDIATO (0ms): Mostra sugestões locais do catálogo em memória sem esperar rede
+    const local = searchService.searchLocalInstant(trimmed, searchCategory, allContent, activeProfile, 5);
+    if (local.length > 0) {
+      setSuggestions(local);
+      setShowSearchDropdown(true);
+    }
+
     let active = true;
-    const timer = setTimeout(async () => {
-      try {
-        const { items, actors } = await searchService.getSearchSuggestionsWithActors(trimmed, searchCategory, 5, allContent);
-        if (active) {
-          setSuggestions(items);
-          setSuggestedActors(actors);
-          setShowSearchDropdown(items.length > 0 || actors.length > 0);
-        }
-      } catch {
-        if (active) {
-          setSuggestions([]);
-          setSuggestedActors([]);
-        }
-      }
-    }, 200);
+    const controller = new AbortController();
+
+    // 2. SEGUNDO PLANO: Consultas remotas independentes (TMDB/Cinemeta e Atores)
+    const timer = setTimeout(() => {
+      // Busca títulos remotos
+      searchService.searchRemoteSuggestions(trimmed, searchCategory, 5, controller.signal)
+        .then((remoteItems) => {
+          if (!active) return;
+          setSuggestions((prev) => {
+            const existingIds = new Set(prev.map(i => i.id));
+            const existingTitles = new Set(prev.map(i => i.title.toLowerCase().trim()));
+            const combined = [...prev];
+            for (const r of remoteItems) {
+              if (combined.length >= 6) break;
+              const nt = r.title.toLowerCase().trim();
+              if (!existingIds.has(r.id) && !existingTitles.has(nt)) {
+                combined.push(r);
+                existingIds.add(r.id);
+                existingTitles.add(nt);
+              }
+            }
+            return combined;
+          });
+          setShowSearchDropdown(true);
+        })
+        .catch(() => {});
+
+      // Busca atores e atrizes de forma independente (não atrasa filmes/séries)
+      searchService.searchPersons(trimmed, controller.signal)
+        .then((actors) => {
+          if (!active) return;
+          setSuggestedActors(actors.slice(0, 3));
+          if (actors.length > 0) {
+            setShowSearchDropdown(true);
+          }
+        })
+        .catch(() => {});
+    }, 150);
 
     return () => {
       active = false;
       clearTimeout(timer);
+      controller.abort();
+      searchService.cancelHeaderSuggestions();
     };
-  }, [searchQuery, searchCategory, allContent]);
+  }, [searchQuery, searchCategory, allContent, activeProfile]);
 
   // Lógica de Troca de Perfil com PIN
   const handleProfileSwitchRequest = (profile: Profile) => {
@@ -360,8 +393,19 @@ const Header: React.FC<HeaderProps> = ({
             onChange={(e) => {
               const val = e.target.value;
               setSearchQuery(val);
-              if (!val.trim()) {
+              const trimmed = val.trim();
+              if (trimmed.length >= 2) {
+                // Instantâneo local no primeiro caractere digitado
+                const local = searchService.searchLocalInstant(trimmed, searchCategory, allContent, activeProfile, 5);
+                if (local.length > 0) {
+                  setSuggestions(local);
+                  setShowSearchDropdown(true);
+                }
+                setShowHistoryDropdown(false);
+              } else if (!trimmed) {
                 setShowSearchDropdown(false);
+                setSuggestions([]);
+                setSuggestedActors([]);
                 const hist = searchHistoryService.getHistory();
                 setSearchHistory(hist);
                 if (hist.length > 0) {
@@ -371,6 +415,7 @@ const Header: React.FC<HeaderProps> = ({
                   onClearSearch();
                 }
               } else {
+                setShowSearchDropdown(false);
                 setShowHistoryDropdown(false);
               }
             }}
@@ -379,6 +424,7 @@ const Header: React.FC<HeaderProps> = ({
                 setShowSearchDropdown(false);
                 setShowHistoryDropdown(false);
               } else if (e.key === 'Enter') {
+                searchService.cancelHeaderSuggestions();
                 setShowSearchDropdown(false);
                 setShowHistoryDropdown(false);
                 const trimmed = searchQuery.trim();

@@ -2,16 +2,18 @@
  * ZAPITV — ADVANCED CONTEXTUAL SEARCH SERVICE
  * 
  * Governa a pesquisa do ZapiTV com filtros automáticos por categoria/página:
- * - Filmes: Exclusivamente filmes (não-anime), excluindo séries e animes.
+ * - Filmes: Exclusivamente filmes (não-anime), incluindo longas de animação ocidentais.
  * - Séries: Exclusivamente séries de TV (não-anime), incluindo animações ocidentais e live-actions.
  * - Animes: Exclusivamente produções de anime japonês (séries e filmes de anime).
  * - Global / Home: Pesquisa aberta devidamente categorizada.
  * 
- * Recursos:
- * - Cancelamento automático de requisições pendentes (AbortController) ao mudar página ou termo.
- * - Cache contextual por (categoria + termo normalizado) com TTL de 10 minutos.
- * - Integração com CatalogEligibilityService (disponibilidade real e sem títulos futuros).
- * - Sugestões rápidas para dropdown com debouncing controlado.
+ * Recursos de Alta Performance e Responsividade:
+ * - Pesquisa local instantânea em memória via LocalSearchIndexService (< 5ms).
+ * - Desacoplamento total entre resultados locais e consultas de rede em segundo plano.
+ * - Cancelamento independente por contexto (Header vs Página de Resultados vs Atores).
+ * - Versionamento de requisições para descarte atômico de respostas obsoletas.
+ * - Integração contínua com CatalogEligibilityService, sem títulos futuros e sem camrips.
+ * - Emissão progressiva de resultados parciais para eliminação de telas de espera.
  */
 
 import { ContentItem, ContentType, AppView, Profile, ActorPerson } from '../../../types';
@@ -23,6 +25,7 @@ import { bannedContentRegistry } from '../catalog/BannedContentRegistry';
 import { LruCache } from '../cache/LruCache';
 import { aniListClient } from '../anilist/aniListClient';
 import { canonicalCatalogMaster } from '../catalog/CanonicalCatalogMaster';
+import { localSearchIndexService } from './localSearchIndexService';
 
 export type SearchCategory = 'all' | 'movies' | 'series' | 'animes' | 'live';
 
@@ -91,7 +94,15 @@ class SearchService {
   private static instance: SearchService;
   private cache = new LruCache<string, CacheEntry>(60, CACHE_TTL_MS);
   private actorCache = new LruCache<string, { timestamp: number; actors: ActorPerson[] }>(60, CACHE_TTL_MS);
-  private activeAbortController: AbortController | null = null;
+
+  // Controladores de cancelamento isolados para evitar interferência entre operações
+  private headerController: AbortController | null = null;
+  private pageSearchController: AbortController | null = null;
+  private actorController: AbortController | null = null;
+
+  // Identificadores de versão para descartar respostas de requisições obsoletas
+  private headerSearchVersion = 0;
+  private pageSearchVersion = 0;
 
   private constructor() {}
 
@@ -174,12 +185,11 @@ class SearchService {
 
   /**
    * Classificação canônica: item é anime (produção de animação japonesa)?
-   * Abrange tanto animes seriados quanto longas-metragens/filmes de anime.
    */
   public isAnimeItem(item: ContentItem): boolean {
     if (!item || !item.title) return false;
 
-    // Se tiver marcação explícita de live action, não é anime (é série ou filme convencional)
+    // Se tiver marcação explícita de live action, não é anime
     const titleLower = item.title.toLowerCase();
     const isLive = LIVE_ACTION_MARKERS.some(m => m.test(titleLower));
     if (isLive) return false;
@@ -187,7 +197,6 @@ class SearchService {
     if (item.type === ContentType.ANIME) return true;
     if (item.genres?.some(g => g.toLowerCase() === 'anime')) return true;
 
-    // Se corresponder a uma franquia de anime conhecida
     if (KNOWN_ANIME_FRANCHISES.some(pat => pat.test(titleLower) || (item.originalTitle && pat.test(item.originalTitle)))) {
       return true;
     }
@@ -196,7 +205,7 @@ class SearchService {
   }
 
   /**
-   * Classificação canônica: item é filme de anime (longa-metragem de anime japonês)?
+   * Classificação canônica: item é filme de anime?
    */
   public isAnimeMovieItem(item: ContentItem): boolean {
     if (!item || !this.isAnimeItem(item)) return false;
@@ -204,7 +213,7 @@ class SearchService {
   }
 
   /**
-   * Classificação canônica: item é anime seriado (série de TV em anime)?
+   * Classificação canônica: item é anime seriado?
    */
   public isAnimeSeriesItem(item: ContentItem): boolean {
     if (!item || !this.isAnimeItem(item)) return false;
@@ -213,8 +222,6 @@ class SearchService {
 
   /**
    * Classificação canônica: item é filme?
-   * Inclui filmes convencionais e longas-metragens de anime (filmes de anime).
-   * Exclui terminantemente séries de TV e animes seriados.
    */
   public isMovieItem(item: ContentItem, includeAnimeMovies = false): boolean {
     if (!item) return false;
@@ -227,8 +234,7 @@ class SearchService {
   }
 
   /**
-   * Classificação canônica: item é série de TV convencional (não anime)?
-   * Exclui filmes e qualquer produção de anime.
+   * Classificação canônica: item é série de TV convencional?
    */
   public isSeriesItem(item: ContentItem): boolean {
     if (!item) return false;
@@ -238,209 +244,418 @@ class SearchService {
     return item.type === ContentType.SERIES || typeStr === 'SERIES' || typeStr === 'SÉRIE' || typeStr === 'TV' || item.mediaFormat === 'series';
   }
 
+  // ============================================================================
+  // CANCELAMENTO E CONTROLE DE REQUISIÇÕES INDEPENDENTES
+  // ============================================================================
+
   /**
-   * Cancela quaisquer requisições de pesquisa pendentes
+   * Cancela apenas requisições em segundo plano de sugestões do Header
    */
-  public cancelPending(): void {
-    if (this.activeAbortController) {
-      this.activeAbortController.abort();
-      this.activeAbortController = null;
+  public cancelHeaderSuggestions(): void {
+    if (this.headerController) {
+      this.headerController.abort();
+      this.headerController = null;
     }
+    if (this.actorController) {
+      this.actorController.abort();
+      this.actorController = null;
+    }
+    this.headerSearchVersion++;
   }
 
   /**
-   * Executa a pesquisa contextual direcionada na origem (TMDB + Cinemeta)
+   * Cancela apenas requisições da página principal de resultados
    */
-  public async search(
-    query: string, 
-    category: SearchCategory, 
+  public cancelPageSearch(): void {
+    if (this.pageSearchController) {
+      this.pageSearchController.abort();
+      this.pageSearchController = null;
+    }
+    this.pageSearchVersion++;
+  }
+
+  /**
+   * Cancela todas as requisições de busca pendentes (ex: ao mudar de página ou rota)
+   */
+  public cancelPending(): void {
+    this.cancelHeaderSuggestions();
+    this.cancelPageSearch();
+  }
+
+  // ============================================================================
+  // BUSCA LOCAL INSTANTÂNEA EM MEMÓRIA (< 5ms)
+  // ============================================================================
+
+  /**
+   * Executa busca local instantânea em memória usando o índice indexado.
+   * Não dispara nenhuma requisição de rede e responde imediatamente à digitação.
+   */
+  public searchLocalInstant(
+    query: string,
+    category: SearchCategory,
     localCatalog: ContentItem[] = [],
-    userProfile?: Profile | null
+    userProfile?: Profile | null,
+    limit = 6
+  ): ContentItem[] {
+    const trimmed = (query || '').trim();
+    if (trimmed.length < 2) return [];
+
+    // Inclui lançamentos aprovados no catálogo local para busca imediata
+    const releases = catalogReleaseStore.getReleases();
+    const allLocal = releases.length > 0 ? [...localCatalog, ...releases] : localCatalog;
+
+    localSearchIndexService.syncCatalog(allLocal);
+
+    return localSearchIndexService.searchInstant(trimmed, category, {
+      limit,
+      userProfile,
+      isMovieCheck: it => this.isMovieItem(it),
+      isSeriesCheck: it => this.isSeriesItem(it),
+      isAnimeCheck: it => this.isAnimeItem(it)
+    });
+  }
+
+  // ============================================================================
+  // BUSCA REMOTA EM SEGUNDO PLANO (NÃO-BLOQUEANTE)
+  // ============================================================================
+
+  /**
+   * Busca sugestões remotas no TMDB / Cinemeta sem esperar atores ou travar o catálogo local
+   */
+  public async searchRemoteSuggestions(
+    query: string,
+    category: SearchCategory,
+    limit = 6,
+    signal?: AbortSignal
   ): Promise<ContentItem[]> {
-    const trimmed = query.trim();
-    if (!trimmed) {
-      this.cancelPending();
-      return [];
-    }
-
-    // Bloqueio absoluto para buscas ilegais ou exploração (Regra 5)
-    if (adultContentService.isIllegalOrExploitative(trimmed)) {
-      this.cancelPending();
-      return [];
-    }
-
-    // Bloqueio irrestrito de conteúdos banidos (Big Buck Bunny, Caminandes, etc.)
-    if (bannedContentRegistry.isBannedTitle(trimmed) || bannedContentRegistry.isBannedKeyOrId(trimmed)) {
-      this.cancelPending();
-      return [];
-    }
-
-    const availableTitles = localCatalog ? localCatalog.map(it => it.title) : [];
-    const isIntentionalAdult = adultContentService.isIntentionalAdultSearch(trimmed, availableTitles);
-    const isChildProfile = userProfile ? userProfile.isChild === true : false;
-    // Conteúdos adultos só são liberados com busca intencional direta, sem ser perfil infantil e com maioridade confirmada (+18)
-    const allowAdult = isIntentionalAdult && !isChildProfile && adultContentService.isAgeConfirmed();
+    const trimmed = (query || '').trim();
+    if (trimmed.length < 2) return [];
 
     const normQuery = trimmed.toLowerCase();
-    const cacheKey = `${category}:${normQuery}:${allowAdult ? 'adult' : 'safe'}`;
+    const cacheKey = `remotesug:${category}:${normQuery}`;
     const now = Date.now();
 
-    // 1. Verifica cache em memória
     const cached = this.cache.get(cacheKey);
     if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
-      return cached.items;
+      return cached.items.slice(0, limit);
     }
-
-    // 2. Cancela buscas anteriores em andamento
-    this.cancelPending();
-    const controller = new AbortController();
-    this.activeAbortController = controller;
 
     try {
       let rawResults: ContentItem[] = [];
 
-      // 3. Chamada direcionada na origem por categoria
       switch (category) {
-        case 'movies': {
-          rawResults = await tmdbService.searchMovies(trimmed, controller.signal);
-          // Garante exclusão estrita de séries e animes
+        case 'movies':
+          rawResults = await tmdbService.searchMovies(trimmed, signal);
           rawResults = rawResults.filter(it => this.isMovieItem(it));
           break;
-        }
-
-        case 'series': {
-          rawResults = await tmdbService.searchSeries(trimmed, controller.signal);
-          // Garante exclusão estrita de filmes e animes
+        case 'series':
+          rawResults = await tmdbService.searchSeries(trimmed, signal);
           rawResults = rawResults.filter(it => this.isSeriesItem(it));
           break;
-        }
-
         case 'animes': {
-          const [tmdbRes, anilistRes] = await Promise.allSettled([
-            tmdbService.searchAnimes(trimmed, controller.signal),
-            aniListClient.searchAnime(trimmed, 1, 15)
+          const [tmdbList, aniListList] = await Promise.allSettled([
+            tmdbService.searchAnimes(trimmed, signal),
+            aniListClient.searchAnime(trimmed, 1, 10)
           ]);
-          const tmdbList = tmdbRes.status === 'fulfilled' ? tmdbRes.value : [];
-          const aniListList = anilistRes.status === 'fulfilled' ? anilistRes.value : [];
-          // Garante exclusão de live-actions e animações ocidentais
-          rawResults = [...tmdbList, ...aniListList].filter(it => this.isAnimeItem(it));
+          const tList = tmdbList.status === 'fulfilled' ? tmdbList.value : [];
+          const aList = aniListList.status === 'fulfilled' ? aniListList.value : [];
+          rawResults = [...tList, ...aList].filter(it => this.isAnimeItem(it));
           break;
         }
-
         case 'all':
-        default: {
-          rawResults = await tmdbService.searchMulti(trimmed);
+        default:
+          rawResults = await tmdbService.searchMulti(trimmed, signal);
           for (const item of rawResults) {
             if (this.isAnimeItem(item)) {
               item.type = ContentType.ANIME;
             }
           }
           break;
-        }
       }
 
-      // 4. Incorpora resultados locais e lançamentos aprovados compatíveis com a categoria
-      const releases = catalogReleaseStore.getReleases();
-      const combinedLocal = [...(localCatalog || []), ...releases];
-      if (combinedLocal.length > 0) {
-        const localMatches = this.filterLocalCatalog(trimmed, category, combinedLocal, userProfile);
-        const existingTitles = new Set(rawResults.map(r => r.title.toLowerCase().trim()));
-        for (const loc of localMatches) {
-          if (!existingTitles.has(loc.title.toLowerCase().trim())) {
-            rawResults.unshift(loc);
-            existingTitles.add(loc.title.toLowerCase().trim());
-          }
-        }
-      }
+      // Filtros de segurança e elegibilidade
+      const clean = bannedContentRegistry.filterCleanItems(rawResults)
+        .filter(it => !adultContentService.isAdultContent(it));
+      const eligible = catalogEligibilityService.filterEligibleItemsSync(clean);
 
-      // 5. Isolamento e filtragem de conteúdo adulto por padrão
-      if (!allowAdult) {
-        rawResults = rawResults.filter(it => !adultContentService.isAdultContent(it));
-      }
-
-      // 5.5 Eliminação estrita de conteúdos banidos (Big Buck Bunny, Caminandes, etc.)
-      rawResults = bannedContentRegistry.filterCleanItems(rawResults);
-
-      // 6. Filtro central de elegibilidade pública e reprodução real
-      const eligible = catalogEligibilityService.filterEligibleItemsSync(rawResults, { allowAdult });
-
-      // Registra no Catálogo Mestre Canônico
-      for (const item of eligible) {
-        canonicalCatalogMaster.registerItem(item);
-      }
-
-      // Salva no cache contextual
-      this.cache.set(cacheKey, {
-        timestamp: now,
-        items: eligible
-      });
-
-      return eligible;
+      this.cache.set(cacheKey, { timestamp: now, items: eligible });
+      return eligible.slice(0, limit);
     } catch (e: any) {
-      if (e?.name === 'AbortError' || controller.signal.aborted) {
-        return [];
-      }
-      console.warn(`[SearchService] Erro na busca (${category}):`, e);
-      // Fallback local estritamente dentro da categoria
-      const localFallback = this.filterLocalCatalog(trimmed, category, localCatalog, userProfile);
-      return catalogEligibilityService.filterEligibleItemsSync(localFallback, { allowAdult });
-    } finally {
-      if (this.activeAbortController === controller) {
-        this.activeAbortController = null;
-      }
+      if (e?.name === 'AbortError' || signal?.aborted) return [];
+      return [];
     }
   }
 
   /**
-   * Filtra o acervo local em memória respeitando rigorosamente a categoria e proteção adulta
+   * Pesquisa atores e atrizes com cache em memória e controlador próprio
    */
-  public filterLocalCatalog(
+  public async searchPersons(query: string, signal?: AbortSignal): Promise<ActorPerson[]> {
+    const trimmed = (query || '').trim();
+    if (trimmed.length < 2) return [];
+
+    const normKey = trimmed.toLowerCase();
+    const now = Date.now();
+    const cached = this.actorCache.get(normKey);
+    if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
+      return cached.actors;
+    }
+
+    try {
+      const actors = await tmdbService.searchPersons(trimmed, signal);
+      this.actorCache.set(normKey, { timestamp: now, actors });
+      return actors;
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Retorna sugestões combinadas com prioridade total para os títulos locais
+   */
+  public async getSearchSuggestionsWithActors(
+    query: string,
+    category: SearchCategory,
+    limit = 6,
+    localCatalog: ContentItem[] = []
+  ): Promise<{ items: ContentItem[]; actors: ActorPerson[] }> {
+    const trimmed = (query || '').trim();
+    if (trimmed.length < 2) {
+      return { items: [], actors: [] };
+    }
+
+    // 1. Resposta local instantânea
+    const localItems = this.searchLocalInstant(trimmed, category, localCatalog, undefined, limit);
+
+    // 2. Cria controller com versionamento para esta sessão de busca
+    this.cancelHeaderSuggestions();
+    const version = this.headerSearchVersion;
+    const controller = new AbortController();
+    this.headerController = controller;
+
+    try {
+      const [remoteItemsRes, actorsRes] = await Promise.allSettled([
+        this.searchRemoteSuggestions(trimmed, category, limit, controller.signal),
+        this.searchPersons(trimmed, controller.signal)
+      ]);
+
+      if (version !== this.headerSearchVersion) {
+        return { items: localItems, actors: [] };
+      }
+
+      const remoteItems = remoteItemsRes.status === 'fulfilled' ? remoteItemsRes.value : [];
+      const actors = actorsRes.status === 'fulfilled' ? actorsRes.value : [];
+
+      // Mescla priorizando itens locais no topo
+      const existingIds = new Set(localItems.map(it => it.id));
+      const existingTitles = new Set(localItems.map(it => it.title.toLowerCase().trim()));
+      const combined = [...localItems];
+
+      for (const rItem of remoteItems) {
+        if (combined.length >= limit) break;
+        const normT = rItem.title.toLowerCase().trim();
+        if (!existingIds.has(rItem.id) && !existingTitles.has(normT)) {
+          combined.push(rItem);
+          existingIds.add(rItem.id);
+          existingTitles.add(normT);
+        }
+      }
+
+      return {
+        items: combined.slice(0, limit),
+        actors: actors.slice(0, 3)
+      };
+    } catch {
+      return { items: localItems, actors: [] };
+    } finally {
+      if (this.headerController === controller) {
+        this.headerController = null;
+      }
+    }
+  }
+
+  // ============================================================================
+  // BUSCA COMPLETA DA PÁGINA COM ATUALIZAÇÃO PROGRESSIVA
+  // ============================================================================
+
+  /**
+   * Executa a pesquisa da página de resultados.
+   * Se onPartialResults for fornecido, emite os resultados locais IMEDIATAMENTE (0ms)
+   * antes mesmo de aguardar as respostas remotas.
+   */
+  public async search(
     query: string, 
     category: SearchCategory, 
-    items: ContentItem[],
-    userProfile?: Profile | null
-  ): ContentItem[] {
-    if (!items || items.length === 0) return [];
-    const norm = query.toLowerCase().trim();
-
-    if (adultContentService.isIllegalOrExploitative(norm)) {
+    localCatalog: ContentItem[] = [],
+    userProfile?: Profile | null,
+    onPartialResults?: (items: ContentItem[]) => void
+  ): Promise<ContentItem[]> {
+    const trimmed = (query || '').trim();
+    if (!trimmed) {
+      this.cancelPageSearch();
       return [];
     }
 
-    const availableTitles = items.map(it => it.title);
-    const isIntentionalAdult = adultContentService.isIntentionalAdultSearch(norm, availableTitles);
+    // Bloqueio absoluto para buscas ilegais ou de exploração
+    if (adultContentService.isIllegalOrExploitative(trimmed)) {
+      this.cancelPageSearch();
+      return [];
+    }
+
+    if (bannedContentRegistry.isBannedTitle(trimmed) || bannedContentRegistry.isBannedKeyOrId(trimmed)) {
+      this.cancelPageSearch();
+      return [];
+    }
+
+    // 1. Emissão imediata dos resultados locais em memória
+    const localMatches = this.searchLocalInstant(trimmed, category, localCatalog, userProfile, 40);
+    if (localMatches.length > 0 && onPartialResults) {
+      onPartialResults(localMatches);
+    }
+
+    const availableTitles = localCatalog ? localCatalog.map(it => it.title) : [];
+    const isIntentionalAdult = adultContentService.isIntentionalAdultSearch(trimmed, availableTitles);
     const isChildProfile = userProfile ? userProfile.isChild === true : false;
     const allowAdult = isIntentionalAdult && !isChildProfile && adultContentService.isAgeConfirmed();
 
-    return items.filter(item => {
-      // Bloqueio irrestrito de conteúdos banidos
-      if (bannedContentRegistry.isBanned(item)) {
-        return false;
-      }
+    const normQuery = trimmed.toLowerCase();
+    const cacheKey = `${category}:${normQuery}:${allowAdult ? 'adult' : 'safe'}`;
+    const now = Date.now();
 
-      // Isolamento por padrão: oculta adultos se não for busca intencional autorizada
-      const isAdult = adultContentService.isAdultContent(item);
-      if (isAdult && !allowAdult) return false;
+    // Cache em memória
+    const cached = this.cache.get(cacheKey);
+    if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
+      const mergedCache = this.mergeResults(localMatches, cached.items);
+      if (onPartialResults) onPartialResults(mergedCache);
+      return mergedCache;
+    }
 
-      // 1. Match de texto
-      const titleMatch = item.title?.toLowerCase().includes(norm) ||
-        (item.originalTitle && item.originalTitle.toLowerCase().includes(norm));
-      if (!titleMatch) return false;
+    // Cancela buscas anteriores da página e cria novo controller com versionamento
+    this.cancelPageSearch();
+    const version = this.pageSearchVersion;
+    const controller = new AbortController();
+    this.pageSearchController = controller;
 
-      // 2. Filtro estrito de categoria
+    try {
+      let rawResults: ContentItem[] = [];
+
       switch (category) {
         case 'movies':
-          return this.isMovieItem(item);
+          rawResults = await tmdbService.searchMovies(trimmed, controller.signal, (partial) => {
+            if (version === this.pageSearchVersion && onPartialResults) {
+              const cleanPart = this.filterAndCleanResults(partial, allowAdult, category);
+              onPartialResults(this.mergeResults(localMatches, cleanPart));
+            }
+          });
+          rawResults = rawResults.filter(it => this.isMovieItem(it));
+          break;
+
         case 'series':
-          return this.isSeriesItem(item);
-        case 'animes':
-          return this.isAnimeItem(item);
+          rawResults = await tmdbService.searchSeries(trimmed, controller.signal, (partial) => {
+            if (version === this.pageSearchVersion && onPartialResults) {
+              const cleanPart = this.filterAndCleanResults(partial, allowAdult, category);
+              onPartialResults(this.mergeResults(localMatches, cleanPart));
+            }
+          });
+          rawResults = rawResults.filter(it => this.isSeriesItem(it));
+          break;
+
+        case 'animes': {
+          const [tmdbRes, anilistRes] = await Promise.allSettled([
+            tmdbService.searchAnimes(trimmed, controller.signal, (partial) => {
+              if (version === this.pageSearchVersion && onPartialResults) {
+                const cleanPart = this.filterAndCleanResults(partial, allowAdult, category);
+                onPartialResults(this.mergeResults(localMatches, cleanPart));
+              }
+            }),
+            aniListClient.searchAnime(trimmed, 1, 15)
+          ]);
+          const tmdbList = tmdbRes.status === 'fulfilled' ? tmdbRes.value : [];
+          const aniListList = anilistRes.status === 'fulfilled' ? anilistRes.value : [];
+          rawResults = [...tmdbList, ...aniListList].filter(it => this.isAnimeItem(it));
+          break;
+        }
+
         case 'all':
-          return true;
         default:
-          return true;
+          rawResults = await tmdbService.searchMulti(trimmed, controller.signal, (partial) => {
+            if (version === this.pageSearchVersion && onPartialResults) {
+              const cleanPart = this.filterAndCleanResults(partial, allowAdult, category);
+              onPartialResults(this.mergeResults(localMatches, cleanPart));
+            }
+          });
+          for (const item of rawResults) {
+            if (this.isAnimeItem(item)) {
+              item.type = ContentType.ANIME;
+            }
+          }
+          break;
       }
-    });
+
+      if (version !== this.pageSearchVersion) {
+        return localMatches;
+      }
+
+      const cleanRemote = this.filterAndCleanResults(rawResults, allowAdult, category);
+      const merged = this.mergeResults(localMatches, cleanRemote);
+
+      // Registra no Catálogo Mestre Canônico
+      for (const item of merged) {
+        canonicalCatalogMaster.registerItem(item);
+      }
+
+      this.cache.set(cacheKey, { timestamp: now, items: merged });
+
+      if (onPartialResults) {
+        onPartialResults(merged);
+      }
+
+      return merged;
+    } catch (e: any) {
+      if (e?.name === 'AbortError' || controller.signal.aborted) {
+        return localMatches;
+      }
+      console.warn(`[SearchService] Erro na busca (${category}):`, e);
+      return localMatches;
+    } finally {
+      if (this.pageSearchController === controller) {
+        this.pageSearchController = null;
+      }
+    }
+  }
+
+  private filterAndCleanResults(items: ContentItem[], allowAdult: boolean, category: SearchCategory): ContentItem[] {
+    let list = items;
+    if (!allowAdult) {
+      list = list.filter(it => !adultContentService.isAdultContent(it));
+    }
+    list = bannedContentRegistry.filterCleanItems(list);
+    list = catalogEligibilityService.filterEligibleItemsSync(list, { allowAdult });
+
+    if (category === 'movies') {
+      list = list.filter(it => this.isMovieItem(it));
+    } else if (category === 'series') {
+      list = list.filter(it => this.isSeriesItem(it));
+    } else if (category === 'animes') {
+      list = list.filter(it => this.isAnimeItem(it));
+    }
+
+    return list;
+  }
+
+  private mergeResults(primary: ContentItem[], secondary: ContentItem[]): ContentItem[] {
+    const existingIds = new Set(primary.map(it => it.id));
+    const existingTitles = new Set(primary.map(it => it.title.toLowerCase().trim()));
+    const result = [...primary];
+
+    for (const item of secondary) {
+      const normT = item.title.toLowerCase().trim();
+      if (!existingIds.has(item.id) && !existingTitles.has(normT)) {
+        result.push(item);
+        existingIds.add(item.id);
+        existingTitles.add(normT);
+      }
+    }
+    return result;
   }
 
   /**
@@ -452,61 +667,32 @@ class SearchService {
     limit = 6,
     localCatalog: ContentItem[] = []
   ): Promise<ContentItem[]> {
+    const local = this.searchLocalInstant(query, category, localCatalog, undefined, limit);
+    if (local.length >= limit) return local;
+
     const results = await this.search(query, category, localCatalog);
     return results.slice(0, limit);
   }
 
   /**
-   * Pesquisa atores e atrizes com cache em memória
+   * Filtra o acervo local em memória respeitando rigorosamente a categoria e proteção adulta
    */
-  public async searchPersons(query: string, signal?: AbortSignal): Promise<ActorPerson[]> {
-    const trimmed = query.trim();
-    if (trimmed.length < 2) return [];
-
-    const normKey = trimmed.toLowerCase();
-    const now = Date.now();
-    const cached = this.actorCache.get(normKey);
-    if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
-      return cached.actors;
-    }
-
-    const actors = await tmdbService.searchPersons(trimmed, signal);
-    this.actorCache.set(normKey, { timestamp: now, actors });
-    return actors;
+  public filterLocalCatalog(
+    query: string, 
+    category: SearchCategory, 
+    items: ContentItem[],
+    userProfile?: Profile | null
+  ): ContentItem[] {
+    return this.searchLocalInstant(query, category, items, userProfile, 50);
   }
 
   /**
-   * Fornece sugestões completas de busca contendo produções (filmes/séries) e pessoas (atores/atrizes)
-   */
-  public async getSearchSuggestionsWithActors(
-    query: string,
-    category: SearchCategory,
-    limit = 6,
-    localCatalog: ContentItem[] = []
-  ): Promise<{ items: ContentItem[]; actors: ActorPerson[] }> {
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      return { items: [], actors: [] };
-    }
-
-    const [items, allActors] = await Promise.all([
-      this.getSuggestions(trimmed, category, limit, localCatalog),
-      this.searchPersons(trimmed)
-    ]);
-
-    // Retorna até 3 atores mais relevantes com foto e títulos conhecidos
-    return {
-      items,
-      actors: allActors.slice(0, 3)
-    };
-  }
-
-  /**
-   * Limpa o cache de busca
+   * Limpa todos os caches de busca e o índice local
    */
   public clearCache(): void {
     this.cache.clear();
     this.actorCache.clear();
+    localSearchIndexService.clear();
   }
 }
 

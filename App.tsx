@@ -1564,62 +1564,75 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const recentItems = useMemo(() => allowedContent.slice().reverse(), [allowedContent]);
   const premiumItems = useMemo(() => allowedContent.slice(0, 12), [allowedContent]);
 
-  // A busca na página só roda quando o usuário submete a busca (Enter ou clicar em Ver todos os resultados)
+  // A busca na página de resultados é exibida imediatamente com os itens locais (< 5ms)
+  // e complementada de forma não-bloqueante pelas fontes externas e atores
   useEffect(() => {
-    if (!submittedSearchQuery.trim()) {
+    const trimmed = submittedSearchQuery.trim();
+    if (!trimmed) {
       setLiveSearchResults([]);
       setLiveSearchActors([]);
       return;
     }
-    let active = true;
-    const runSearch = async () => {
-      try {
-        const category = searchService.mapAppViewToCategory(currentView);
-        const [results, foundActors] = await Promise.all([
-          searchService.search(submittedSearchQuery, category, contentRef.current, activeProfile),
-          searchService.searchPersons(submittedSearchQuery)
-        ]);
 
+    const category = searchService.mapAppViewToCategory(currentView);
+
+    // 1. FASE IMEDIATA (0ms): Mostra resultados locais em memória sem esperar rede
+    const localMatches = searchService.searchLocalInstant(trimmed, category, contentRef.current, activeProfile, 50);
+    setLiveSearchResults(localMatches);
+
+    let active = true;
+
+    // 2. FASE NÃO-BLOQUEANTE: Atores carregados de forma independente (não atrasa produções)
+    searchService.searchPersons(trimmed)
+      .then(foundActors => {
         if (active) {
           setLiveSearchActors(foundActors || []);
-          const isAdultSearch = adultContentService.isIntentionalAdultSearch(submittedSearchQuery, contentRef.current.map(i => i.title));
-          const allowAdult = isAdultSearch && !activeProfile?.isChild && adultContentService.isAgeConfirmed(activeProfile?.id);
-          const eligibleResults = catalogEligibilityService.filterEligibleItemsSync(results, { allowAdult });
-          setLiveSearchResults(eligibleResults);
+        }
+      })
+      .catch(() => {});
 
-          // UNIFICAÇÃO COM O ÍNDICE CENTRAL DO CATÁLOGO:
-          // Registra os itens elegíveis não-adultos no acervo popular geral (isolamento estrito de adulto)
-          const nonAdultResults = eligibleResults.filter(i => !adultContentService.isAdultContent(i));
-          if (nonAdultResults.length > 0) {
-            setContent(prev => deduplicateContentItems([...prev, ...nonAdultResults]));
+    // 3. FASE NÃO-BLOQUEANTE: Conteúdos remotos acrescentados progressivamente conforme chegam
+    searchService.search(trimmed, category, contentRef.current, activeProfile, (partialResults) => {
+      if (active) {
+        setLiveSearchResults(partialResults);
+      }
+    }).then(finalResults => {
+      if (!active) return;
+      setLiveSearchResults(finalResults);
 
-            const newMovies = nonAdultResults.filter(i => searchService.isMovieItem(i));
-            if (newMovies.length > 0) {
-              setPopularMovies(prev => deduplicateContentItems([...prev, ...newMovies]));
-            }
-            const newSeries = nonAdultResults.filter(i => searchService.isSeriesItem(i));
-            if (newSeries.length > 0) {
-              setPopularSeries(prev => deduplicateContentItems([...prev, ...newSeries]));
-            }
-            const newAnimes = nonAdultResults.filter(i => searchService.isAnimeItem(i));
-            if (newAnimes.length > 0) {
-              setAnimeItems(prev => deduplicateContentItems([...prev, ...newAnimes]));
-            }
+      // UNIFICAÇÃO COM O ÍNDICE CENTRAL DO CATÁLOGO:
+      // Apenas adiciona ao estado se houver títulos genuinamente novos (evita invalidar Home desnecessariamente)
+      const nonAdultResults = finalResults.filter(i => !adultContentService.isAdultContent(i));
+      if (nonAdultResults.length > 0) {
+        const existingIds = new Set(contentRef.current.map(i => i.id));
+        const trulyNewItems = nonAdultResults.filter(i => !existingIds.has(i.id));
+
+        if (trulyNewItems.length > 0) {
+          setContent(prev => deduplicateContentItems([...prev, ...trulyNewItems]));
+
+          const newMovies = trulyNewItems.filter(i => searchService.isMovieItem(i));
+          if (newMovies.length > 0) {
+            setPopularMovies(prev => deduplicateContentItems([...prev, ...newMovies]));
+          }
+          const newSeries = trulyNewItems.filter(i => searchService.isSeriesItem(i));
+          if (newSeries.length > 0) {
+            setPopularSeries(prev => deduplicateContentItems([...prev, ...newSeries]));
+          }
+          const newAnimes = trulyNewItems.filter(i => searchService.isAnimeItem(i));
+          if (newAnimes.length > 0) {
+            setAnimeItems(prev => deduplicateContentItems([...prev, ...newAnimes]));
           }
         }
-      } catch (e) {
-        if (active) {
-          setLiveSearchResults([]);
-          setLiveSearchActors([]);
-        }
       }
-    };
-    runSearch();
+    }).catch(() => {
+      // Falha de rede não apaga os resultados locais já exibidos
+    });
+
     return () => {
       active = false;
-      searchService.cancelPending();
+      searchService.cancelPageSearch();
     };
-  }, [submittedSearchQuery, currentView]);
+  }, [submittedSearchQuery, currentView, activeProfile]);
 
   useEffect(() => {
     db.keyValueStore.put({ key: 'zapitv_theme', value: isDarkMode });
