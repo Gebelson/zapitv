@@ -1,4 +1,5 @@
 import { hybridRecommendationEngine } from '../src/core/recommendations/hybridRecommendationEngine';
+import { recommendationEngine } from '../src/core/recommendations/recommendationEngine';
 import { collaborativeEngine } from '../src/core/recommendations/CollaborativeEngine';
 import { CollaborativeTrainer } from '../src/core/recommendations/CollaborativeTrainer';
 import { consentManager } from '../src/core/recommendations/consentManager';
@@ -144,8 +145,12 @@ async function runHybridRecommendationSuite() {
     assert('Retorna ranking para todos os candidatos no cold start', coldRanked.length === 7);
     assert('Alpha colaborativo é rigorosamente 0.0 no cold start', coldRanked.every(r => r.collaborativeWeight === 0.0));
     assert('isCollaborativeActive é false no cold start', coldRanked.every(r => r.isCollaborativeActive === false));
+    const contentDirect = recommendationEngine.rankCandidates(mockCatalog.filter(c => !c.isAdult), userPreferenceStore.getPreferencesSync('cold_user_test'));
     assert('Score híbrido equivale exatamente ao score de conteúdo', 
-      coldRanked.every(r => Math.abs(r.finalScore - r.breakdown.affinity * 0.40 - r.breakdown.similarity * 0.20 - r.breakdown.popularity * 0.15 - r.breakdown.novelty * 0.10 - r.breakdown.rating * 0.10 - r.breakdown.audio * 0.05) < 0.05));
+      coldRanked.every(r => {
+        const direct = contentDirect.find(c => c.item.id === r.item.id);
+        return direct && Math.abs(r.finalScore - direct.finalScore) < 0.001;
+      }));
   }
 
   // --------------------------------------------------------------------------

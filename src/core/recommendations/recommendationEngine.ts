@@ -25,6 +25,7 @@ import { adultContentService } from '../adult/AdultContentService';
 import { deduplicateContentItems } from '../catalog/catalogDeduplication';
 import { searchService } from '../search/searchService';
 import { bannedContentRegistry } from '../catalog/BannedContentRegistry';
+import { editorialCuratorService } from './editorialCuratorService';
 
 /**
  * Detecta de forma canônica se uma obra é animação, desenho animado ou conteúdo infantil/família.
@@ -124,6 +125,7 @@ export class RecommendationEngine {
   public invalidateCache(): void {
     this.cache.clear();
     this.currentVersion++;
+    editorialCuratorService.invalidateCache();
   }
 
   // ============================================================================
@@ -641,216 +643,13 @@ export class RecommendationEngine {
     profileId: string = 'default',
     continueWatchingItems: ContentItem[] = []
   ): PersonalizedRow[] {
-    const cacheKey = `${profileId}_homerows_${catalog.length}_cw${continueWatchingItems.length}_v${this.currentVersion}`;
-    const cached = this.cache.get(cacheKey);
-    if (cached && cached.rows && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
-      return cached.rows;
-    }
-
     const profile = userPreferenceStore.getPreferencesSync(profileId);
-    const isColdStart = profile.interactionCount === 0 || profile.totalEngagementScore <= 0.1;
-
-    // Gerar candidatos elegíveis globais
-    const allEligible = this.generateCandidates(catalog, profile, { category: 'all', allowAdult: false });
-    const scoredGlobal = this.rankCandidates(allEligible, profile);
-
-    const rows: PersonalizedRow[] = [];
-
-    // FILEIRA 1: Continuar Assistindo (Preservação estrita se houver itens)
-    if (continueWatchingItems.length > 0) {
-      const validContinuity = catalogEligibilityService.filterEligibleItemsSync(continueWatchingItems);
-      if (validContinuity.length > 0) {
-        rows.push({
-          id: 'continue_watching',
-          title: 'Continuar Assistindo',
-          subtitle: 'Continue de onde você parou',
-          items: deduplicateContentItems(validContinuity),
-          reasonType: 'continue_watching'
-        });
-      }
-    }
-
-    if (isColdStart) {
-      // -------------------------------------------------------------
-      // COLD START: Novos Usuários (Popularidade, Diversidade e Qualidade)
-      // -------------------------------------------------------------
-      // Row 1: Em Alta no ZapiTV
-      const trendingPool = scoredGlobal.filter(sc => sc.item.isFeatured || (sc.item.imdbRank && sc.item.imdbRank <= 50));
-      const trendingItems = this.diversityRerank(
-        trendingPool.length > 0 ? trendingPool : scoredGlobal.slice(0, 20),
-        20
-      );
-      if (trendingItems.length > 0) {
-        rows.push({
-          id: 'trending_cold',
-          title: 'Em Alta no ZapiTV',
-          subtitle: 'Os títulos mais assistidos e comentados da semana',
-          items: trendingItems,
-          reasonType: 'trending'
-        });
-      }
-
-      // Row 2: Filmes Populares
-      const popularMovies = this.diversityRerank(
-        scoredGlobal.filter(sc => sc.item.type === ContentType.MOVIE),
-        20
-      );
-      if (popularMovies.length > 0) {
-        rows.push({
-          id: 'popular_movies_cold',
-          title: 'Filmes Populares',
-          subtitle: 'Grandes sucessos do cinema para você curtir',
-          items: popularMovies,
-          reasonType: 'top_recommendations'
-        });
-      }
-
-      // Row 3: Séries Imperdíveis
-      const popularSeries = this.diversityRerank(
-        scoredGlobal.filter(sc => sc.item.type === ContentType.SERIES),
-        20
-      );
-      if (popularSeries.length > 0) {
-        rows.push({
-          id: 'popular_series_cold',
-          title: 'Séries Imperdíveis',
-          subtitle: 'Histórias envolventes para maratonar',
-          items: popularSeries,
-          reasonType: 'top_recommendations'
-        });
-      }
-
-      // Row 4: Animes de Sucesso
-      const popularAnimes = this.diversityRerank(
-        scoredGlobal.filter(sc => sc.item.type === ContentType.ANIME),
-        20
-      );
-      if (popularAnimes.length > 0) {
-        rows.push({
-          id: 'popular_animes_cold',
-          title: 'Animes de Sucesso',
-          subtitle: 'As melhores animações japonesas',
-          items: popularAnimes,
-          reasonType: 'top_recommendations'
-        });
-      }
-
-      // Row 5: Aclamados pela Crítica
-      const criticallyAcclaimed = this.diversityRerank(
-        scoredGlobal.filter(sc => sc.item.rating >= 8.0),
-        20
-      );
-      if (criticallyAcclaimed.length > 0) {
-        rows.push({
-          id: 'critically_acclaimed_cold',
-          title: 'Aclamados pela Crítica',
-          subtitle: 'Obras consagradas com as maiores notas do IMDb e TMDB',
-          items: criticallyAcclaimed,
-          reasonType: 'critically_acclaimed'
-        });
-      }
-    } else {
-      // -------------------------------------------------------------
-      // USUÁRIO COM HISTÓRICO: Recomendações Personalizadas Ponderadas
-      // -------------------------------------------------------------
-      // Row 1: Recomendados para Você
-      const topPicks = this.diversityRerank(scoredGlobal, 20);
-      if (topPicks.length > 0) {
-        rows.push({
-          id: 'recommended_for_you',
-          title: 'Recomendados para Você',
-          subtitle: 'Selecionados a partir do seu estilo e histórico de reprodução',
-          items: topPicks,
-          reasonType: 'top_recommendations'
-        });
-      }
-
-      // Row 2: "Porque você assistiu [Último Título Concluído ou Favorito]"
-      const referenceId = profile.completedContentIds[profile.completedContentIds.length - 1] ||
-                          profile.watchedContentIds[profile.watchedContentIds.length - 1] ||
-                          profile.favoriteContentIds[0];
-
-      if (referenceId) {
-        const referenceItem = catalog.find(i => i.id === referenceId);
-        if (referenceItem) {
-          // Candidatos similares ao item de referência
-          const similarCandidates = scoredGlobal
-            .filter(sc => sc.item.id !== referenceItem.id &&
-              sc.item.genres?.some(g => referenceItem.genres?.includes(g))
-            );
-          const becauseYouWatched = this.diversityRerank(similarCandidates, 18);
-          if (becauseYouWatched.length >= 3) {
-            rows.push({
-              id: `because_watched_${referenceItem.id}`,
-              title: `Porque você assistiu ${referenceItem.title}`,
-              subtitle: 'Títulos com narrativa, atmosfera e temas semelhantes',
-              items: becauseYouWatched,
-              reasonType: 'because_you_watched',
-              sourceTitle: referenceItem.title
-            });
-          }
-        }
-      }
-
-      // Row 3: Gênero de maior afinidade do usuário
-      const sortedAffinities = Object.entries(profile.genreAffinities)
-        .sort((a, b) => b[1] - a[1])
-        .filter(([genre, score]) => score > 0.3 && genre !== 'Adulto');
-
-      if (sortedAffinities.length > 0) {
-        const [topGenre] = sortedAffinities[0];
-        const genreCandidates = scoredGlobal.filter(sc => sc.item.genres?.includes(topGenre));
-        const genrePicks = this.diversityRerank(genreCandidates, 18);
-        if (genrePicks.length >= 3) {
-          rows.push({
-            id: `top_genre_${topGenre.toLowerCase().replace(/\s+/g, '_')}`,
-            title: `Seu Gosto: ${topGenre}`,
-            subtitle: `As melhores produções de ${topGenre.toLowerCase()} para seu perfil`,
-            items: genrePicks,
-            reasonType: 'genre_affinity'
-          });
-        }
-      }
-
-      // Row 4: Aclamados pela Crítica
-      const topRated = this.diversityRerank(
-        scoredGlobal.filter(sc => sc.item.rating >= 8.0),
-        18
-      );
-      if (topRated.length > 0) {
-        rows.push({
-          id: 'critically_acclaimed',
-          title: 'Aclamados pela Crítica',
-          subtitle: 'Histórias premiadas com excelência de avaliação',
-          items: topRated,
-          reasonType: 'critically_acclaimed'
-        });
-      }
-
-      // Row 5: Em Alta no ZapiTV
-      const trendingPool = scoredGlobal.filter(sc => sc.item.isFeatured || (sc.item.imdbRank && sc.item.imdbRank <= 50));
-      const trending = this.diversityRerank(
-        trendingPool.length > 0 ? trendingPool : scoredGlobal.slice(0, 18),
-        18
-      );
-      if (trending.length > 0) {
-        rows.push({
-          id: 'trending_personalized',
-          title: 'Em Alta no ZapiTV',
-          subtitle: 'Os títulos mais procurados pela comunidade',
-          items: trending,
-          reasonType: 'trending'
-        });
-      }
-    }
-
-    this.cache.set(cacheKey, {
-      timestamp: Date.now(),
-      items: [],
-      rows
-    });
-
-    return rows;
+    return editorialCuratorService.buildHomeEditorialRows(
+      catalog,
+      profileId,
+      continueWatchingItems,
+      profile.isChild === true
+    );
   }
 }
 

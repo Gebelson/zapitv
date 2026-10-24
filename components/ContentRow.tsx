@@ -10,6 +10,7 @@ import { tvModeService } from '../src/core/tv/tvModeService';
 
 interface ContentRowProps {
   title: string;
+  subtitle?: string;
   items: ContentItem[];
   isDarkMode: boolean;
   onItemClick?: (item: ContentItem) => void;
@@ -24,6 +25,7 @@ interface ContentRowProps {
 
 const ContentRow: React.FC<ContentRowProps> = ({ 
   title, 
+  subtitle,
   items, 
   isDarkMode, 
   onItemClick,
@@ -38,9 +40,9 @@ const ContentRow: React.FC<ContentRowProps> = ({
   const sliderRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const [shouldRenderCards, setShouldRenderCards] = useState(false);
+  const savedScrollLeftRef = useRef<number>(0);
 
   useEffect(() => {
-    if (shouldRenderCards) return;
     if (typeof IntersectionObserver === 'undefined') {
       setShouldRenderCards(true);
       return;
@@ -48,11 +50,22 @@ const ContentRow: React.FC<ContentRowProps> = ({
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) {
         setShouldRenderCards(true);
-        observer.disconnect();
+      } else {
+        if (sliderRef.current && sliderRef.current.scrollLeft > 0) {
+          savedScrollLeftRef.current = sliderRef.current.scrollLeft;
+        }
+        setShouldRenderCards(false);
       }
-    }, { rootMargin: '500px' });
+    }, { rootMargin: '800px 0px' });
     if (sectionRef.current) observer.observe(sectionRef.current);
     return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (shouldRenderCards && sliderRef.current && savedScrollLeftRef.current > 0) {
+      sliderRef.current.style.scrollBehavior = 'auto';
+      sliderRef.current.scrollLeft = savedScrollLeftRef.current;
+    }
   }, [shouldRenderCards]);
   
   // Logic Refs
@@ -77,35 +90,38 @@ const ContentRow: React.FC<ContentRowProps> = ({
   const isTv = tvModeService.isTvMode();
   const isInfinite = !isTv && uniqueItems.length > 8;
 
-  // Limita a base do loop infinito a 20 itens para evitar montar centenas de cards desnecessários
-  const carouselBaseItems = useMemo(() => {
-    if (!isInfinite) return uniqueItems;
-    return uniqueItems.length > 20 ? uniqueItems.slice(0, 20) : uniqueItems;
-  }, [uniqueItems, isInfinite]);
+  // Buffer proporcional de segurança para loop contínuo sem multiplicar excessivamente o DOM
+  const bufferSize = useMemo(() => {
+    if (!isInfinite || uniqueItems.length < 8) return 0;
+    return Math.min(8, Math.floor(uniqueItems.length / 2));
+  }, [isInfinite, uniqueItems.length]);
 
-  // Uma cópia de cada lado mantém o loop sem montar cinco vezes todos os cards.
-  const multiplier = isInfinite ? 3 : 1;
   const extendedItems = useMemo(() => {
-    if (!isInfinite) return uniqueItems;
-    return Array(multiplier).fill(carouselBaseItems).flat();
-  }, [uniqueItems, carouselBaseItems, isInfinite, multiplier]);
+    if (!isInfinite || bufferSize === 0) return uniqueItems;
+    const prefix = uniqueItems.slice(-bufferSize);
+    const suffix = uniqueItems.slice(0, bufferSize);
+    return [...prefix, ...uniqueItems, ...suffix];
+  }, [uniqueItems, isInfinite, bufferSize]);
 
-  const getSetWidth = useCallback(() => {
-    if (!sliderRef.current || !isInfinite || carouselBaseItems.length === 0) return 0;
+  const getSetMetrics = useCallback(() => {
+    if (!sliderRef.current || !isInfinite || uniqueItems.length === 0) return { setWidth: 0, bufferWidth: 0 };
     const container = sliderRef.current;
     const firstItem = container.children[0] as HTMLElement;
     
-    if (!firstItem) return 0;
+    if (!firstItem) return { setWidth: 0, bufferWidth: 0 };
     
-    // getBoundingClientRect é mais preciso que offsetWidth
     const itemWidth = firstItem.getBoundingClientRect().width;
     const style = window.getComputedStyle(container);
     const gap = parseFloat(style.gap || '0'); 
-    
-    return carouselBaseItems.length * (itemWidth + gap);
-  }, [carouselBaseItems.length, isInfinite]);
+    const unitWidth = itemWidth + gap;
 
-  // Inicializa posição no centro apenas se for infinito; senão mantém na posição inicial (0)
+    return {
+      setWidth: uniqueItems.length * unitWidth,
+      bufferWidth: bufferSize * unitWidth
+    };
+  }, [uniqueItems.length, isInfinite, bufferSize]);
+
+  // Inicializa a posição de rolagem exatamente no início da lista real (após o prefixo)
   useEffect(() => {
     if (!isInfinite) {
       if (sliderRef.current) {
@@ -116,14 +132,14 @@ const ContentRow: React.FC<ContentRowProps> = ({
     }
 
     const timer = setTimeout(() => {
-      const setWidth = getSetWidth();
-      if (sliderRef.current && setWidth > 0) {
+      const { bufferWidth } = getSetMetrics();
+      if (sliderRef.current && bufferWidth > 0 && sliderRef.current.scrollLeft === 0) {
         sliderRef.current.style.scrollBehavior = 'auto';
-        sliderRef.current.scrollLeft = setWidth * Math.floor(multiplier / 2);
+        sliderRef.current.scrollLeft = bufferWidth;
       }
     }, 100);
     return () => clearTimeout(timer);
-  }, [isInfinite, multiplier, getSetWidth, shouldRenderCards]);
+  }, [isInfinite, bufferSize, getSetMetrics, shouldRenderCards]);
 
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -137,21 +153,20 @@ const ContentRow: React.FC<ContentRowProps> = ({
       const container = sliderRef.current;
       if (!container) return;
       
-      const setWidth = getSetWidth();
-      if (setWidth === 0) return;
+      const { setWidth, bufferWidth } = getSetMetrics();
+      if (setWidth === 0 || bufferWidth === 0) return;
       
       const currentScroll = container.scrollLeft;
       
-      const leftBound = setWidth * 0.5;
-      const rightBound = setWidth * 2.2;
-
-      if (currentScroll < leftBound || currentScroll > rightBound) {
-        const relativeScroll = currentScroll % setWidth;
+      if (currentScroll < bufferWidth * 0.3) {
         container.style.scrollBehavior = 'auto';
-        container.scrollLeft = (setWidth * Math.floor(multiplier / 2)) + relativeScroll;
+        container.scrollLeft = currentScroll + setWidth;
+      } else if (currentScroll > bufferWidth + setWidth * 0.7) {
+        container.style.scrollBehavior = 'auto';
+        container.scrollLeft = currentScroll - setWidth;
       }
     }, 150);
-  }, [isInfinite, uniqueItems.length, multiplier, getSetWidth]);
+  }, [isInfinite, uniqueItems.length, getSetMetrics]);
 
   // --- LÓGICA DO DRAGGABLE SLIDE ---
 
@@ -245,29 +260,36 @@ const ContentRow: React.FC<ContentRowProps> = ({
   return (
     <section ref={sectionRef} className="relative group/section select-none">
       <div className="flex items-center justify-between mb-3 md:mb-6 px-3 sm:px-6 md:px-12">
-        <div className="flex items-center gap-3 group/title">
-          <h3 className={`text-base sm:text-xl md:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-            {title}
-          </h3>
-          {isAdmin && (
-            <div className="flex items-center gap-1 opacity-0 group-hover/section:opacity-100 transition-opacity">
-              {onEditTitle && (
-                <button 
-                  onClick={(e) => { e.stopPropagation(); onEditTitle(); }}
-                  className={`p-2 rounded-lg transition-all scale-90 hover:scale-100 ${isDarkMode ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-black/5 text-gray-900 hover:bg-black/10'}`}
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-              )}
-              {onDeleteSection && (
-                <button 
-                  onClick={(e) => { e.stopPropagation(); if(confirm('Tem certeza?')) onDeleteSection(); }}
-                  className={`p-2 rounded-lg transition-all scale-90 hover:scale-100 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-3 group/title">
+            <h3 className={`text-base sm:text-xl md:text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              {title}
+            </h3>
+            {isAdmin && (
+              <div className="flex items-center gap-1 opacity-0 group-hover/section:opacity-100 transition-opacity">
+                {onEditTitle && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onEditTitle(); }}
+                    className={`p-2 rounded-lg transition-all scale-90 hover:scale-100 ${isDarkMode ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-black/5 text-gray-900 hover:bg-black/10'}`}
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                )}
+                {onDeleteSection && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); if(confirm('Tem certeza?')) onDeleteSection(); }}
+                    className={`p-2 rounded-lg transition-all scale-90 hover:scale-100 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          {subtitle && (
+            <p className={`text-xs sm:text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              {subtitle}
+            </p>
           )}
         </div>
         

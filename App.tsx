@@ -2072,9 +2072,10 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       allAvailable,
       activeProfile?.id || 'default',
       cwItems,
-      activeProfile?.isChild === true
+      activeProfile?.isChild === true,
+      customSections
     );
-  }, [trendingItems, popularMovies, popularSeries, animeItems, content, continueWatchingList, activeProfile?.id, activeProfile?.isChild]);
+  }, [trendingItems, popularMovies, popularSeries, animeItems, content, continueWatchingList, activeProfile?.id, activeProfile?.isChild, customSections]);
 
   const filteredContent = useMemo(() => {
     let baseFiltered = content;
@@ -2405,6 +2406,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                   <ContentRow 
                     key={`rec-row-${row.id}`}
                     title={row.title}
+                    subtitle={row.subtitle}
                     items={catalogEligibilityService.filterEligibleItemsSync(row.items)}
                     isDarkMode={isDarkMode}
                     onItemClick={handleSelectContent}

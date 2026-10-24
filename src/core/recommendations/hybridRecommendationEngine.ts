@@ -17,6 +17,7 @@ import { userPreferenceStore } from './userPreferenceStore';
 import { catalogEligibilityService } from '../catalog/CatalogEligibilityService';
 import { deduplicateContentItems } from '../catalog/catalogDeduplication';
 import { searchService } from '../search/searchService';
+import { editorialCuratorService } from './editorialCuratorService';
 import {
   PersonalizedRow,
   ScoredCandidate,
@@ -38,6 +39,7 @@ export class HybridRecommendationEngine {
     this.cache.clear();
     this.currentVersion++;
     recommendationEngine.invalidateCache();
+    editorialCuratorService.invalidateCache();
   }
 
   /**
@@ -178,171 +180,16 @@ export class HybridRecommendationEngine {
     catalog: ContentItem[],
     profileId: string = 'default',
     continueWatchingItems: ContentItem[] = [],
-    isChild: boolean = false
+    isChild: boolean = false,
+    customSections: any[] = []
   ): PersonalizedRow[] {
-    const cacheKey = `${profileId}_${isChild ? 'child' : 'adult'}_hybridrows_${catalog.length}_cw${continueWatchingItems.length}_v${this.currentVersion}`;
-    const cached = this.cache.get(cacheKey);
-    if (cached && cached.rows && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
-      return cached.rows;
-    }
-
-    const profile = userPreferenceStore.getPreferencesSync(profileId);
-    if (isChild) {
-      profile.isChild = true;
-    }
-    const allEligible = recommendationEngine.generateCandidates(catalog, profile, { category: 'all', allowAdult: false });
-    const hybridScoredGlobal = this.rankCandidatesHybrid(allEligible, profileId, { isChild });
-
-    const rows: PersonalizedRow[] = [];
-
-    // FILEIRA 1: Continuar Assistindo (Preservação estrita se houver itens)
-    if (continueWatchingItems.length > 0) {
-      const validContinuity = catalogEligibilityService.filterEligibleItemsSync(continueWatchingItems);
-      if (validContinuity.length > 0) {
-        rows.push({
-          id: 'continue_watching',
-          title: 'Continuar Assistindo',
-          subtitle: 'Continue de onde você parou',
-          items: deduplicateContentItems(validContinuity),
-          reasonType: 'continue_watching'
-        });
-      }
-    }
-
-    const isColdStart = profile.interactionCount === 0 || profile.totalEngagementScore <= 0.1;
-
-    if (isColdStart) {
-      // Em Cold Start, utiliza as fileiras equilibradas do RecommendationEngine
-      const baseRows = recommendationEngine.getPersonalizedHomeRows(catalog, profileId, []);
-      for (const r of baseRows) {
-        if (r.reasonType !== 'continue_watching') {
-          rows.push(r);
-        }
-      }
-    } else {
-      // -------------------------------------------------------------
-      // USUÁRIO COM HISTÓRICO: Fileiras Híbridas Ponderadas
-      // -------------------------------------------------------------
-
-      // Row 1: Recomendados para Você (Picks Híbridos)
-      const topPicks = recommendationEngine.diversityRerank(hybridScoredGlobal, 20);
-      if (topPicks.length > 0) {
-        rows.push({
-          id: 'recommended_for_you_hybrid',
-          title: 'Recomendados para Você',
-          subtitle: 'Personalizado a partir do seu estilo e dos títulos que você mais curte',
-          items: topPicks,
-          reasonType: 'top_recommendations'
-        });
-      }
-
-      // Row 2: Fileira Colaborativa ou "Porque você assistiu X"
-      const referenceId = profile.completedContentIds[profile.completedContentIds.length - 1] ||
-                          profile.watchedContentIds[profile.watchedContentIds.length - 1] ||
-                          profile.favoriteContentIds[0];
-
-      if (referenceId) {
-        const referenceItem = catalog.find(i => i.id === referenceId);
-        if (referenceItem) {
-          const model = collaborativeEngine.getModel();
-          const hasCollabLinks = model && model.isActivated && model.itemSimilarities[referenceId]?.length > 0;
-
-          if (hasCollabLinks) {
-            // Títulos co-recorrentes colaborativos da comunidade
-            const targetIds = new Set(model.itemSimilarities[referenceId].map(t => t.targetId));
-            const collabCandidates = hybridScoredGlobal.filter(sc => targetIds.has(sc.item.id) && sc.item.id !== referenceId);
-            const collabRowItems = recommendationEngine.diversityRerank(collabCandidates, 18);
-
-            if (collabRowItems.length >= 2) {
-              rows.push({
-                id: `collab_watched_${referenceItem.id}`,
-                title: `Quem curtiu ${referenceItem.title} também assistiu`,
-                subtitle: 'Descobertas baseadas em padrões coletivos de quem tem gosto parecido',
-                items: collabRowItems,
-                reasonType: 'because_you_watched',
-                sourceTitle: referenceItem.title
-              });
-            }
-          } else {
-            // Fallback baseado em conteúdo
-            const similarCandidates = hybridScoredGlobal.filter(sc => 
-              sc.item.id !== referenceItem.id &&
-              sc.item.genres?.some(g => referenceItem.genres?.includes(g))
-            );
-            const becauseWatched = recommendationEngine.diversityRerank(similarCandidates, 18);
-            if (becauseWatched.length >= 3) {
-              rows.push({
-                id: `because_watched_${referenceItem.id}`,
-                title: `Porque você assistiu ${referenceItem.title}`,
-                subtitle: 'Títulos com narrativa, atmosfera e temas semelhantes',
-                items: becauseWatched,
-                reasonType: 'because_you_watched',
-                sourceTitle: referenceItem.title
-              });
-            }
-          }
-        }
-      }
-
-      // Row 3: Gênero de maior afinidade do usuário
-      const sortedAffinities = Object.entries(profile.genreAffinities)
-        .sort((a, b) => b[1] - a[1])
-        .filter(([genre, score]) => score > 0.3 && genre !== 'Adulto');
-
-      if (sortedAffinities.length > 0) {
-        const [topGenre] = sortedAffinities[0];
-        const genreCandidates = hybridScoredGlobal.filter(sc => sc.item.genres?.includes(topGenre));
-        const genrePicks = recommendationEngine.diversityRerank(genreCandidates, 18);
-        if (genrePicks.length >= 3) {
-          rows.push({
-            id: `top_genre_${topGenre.toLowerCase().replace(/\s+/g, '_')}`,
-            title: `Seu Gosto: ${topGenre}`,
-            subtitle: `As melhores produções de ${topGenre.toLowerCase()} para seu perfil`,
-            items: genrePicks,
-            reasonType: 'genre_affinity'
-          });
-        }
-      }
-
-      // Row 4: Aclamados pela Crítica
-      const topRated = recommendationEngine.diversityRerank(
-        hybridScoredGlobal.filter(sc => sc.item.rating >= 8.0),
-        18
-      );
-      if (topRated.length > 0) {
-        rows.push({
-          id: 'critically_acclaimed',
-          title: 'Aclamados pela Crítica',
-          subtitle: 'Histórias premiadas com excelência de avaliação',
-          items: topRated,
-          reasonType: 'critically_acclaimed'
-        });
-      }
-
-      // Row 5: Em Alta no ZapiTV
-      const trendingPool = hybridScoredGlobal.filter(sc => sc.item.isFeatured || (sc.item.imdbRank && sc.item.imdbRank <= 50));
-      const trending = recommendationEngine.diversityRerank(
-        trendingPool.length > 0 ? trendingPool : hybridScoredGlobal.slice(0, 18),
-        18
-      );
-      if (trending.length > 0) {
-        rows.push({
-          id: 'trending_personalized',
-          title: 'Em Alta no ZapiTV',
-          subtitle: 'Os títulos mais procurados pela comunidade',
-          items: trending,
-          reasonType: 'trending'
-        });
-      }
-    }
-
-    this.cache.set(cacheKey, {
-      timestamp: Date.now(),
-      items: [],
-      rows
-    });
-
-    return rows;
+    return editorialCuratorService.buildHomeEditorialRows(
+      catalog,
+      profileId,
+      continueWatchingItems,
+      isChild,
+      customSections
+    );
   }
 }
 
