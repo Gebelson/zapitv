@@ -162,6 +162,7 @@ interface ContentDetailModalProps {
   initialEpisode?: number;
   autoPlayInitialEpisode?: boolean;
   playerOnly?: boolean;
+  originRoute?: string | null;
 }
 
 function uniqueEpisodes<T extends { number: number }>(episodes: T[]): T[] {
@@ -175,7 +176,7 @@ function uniqueEpisodes<T extends { number: number }>(episodes: T[]): T[] {
 
 export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({ 
   item: initialItem, onClose, isDarkMode, myList, favorites, onToggleList, onToggleFavorite, allContent,
-  initialSeason, initialEpisode, autoPlayInitialEpisode, playerOnly = false
+  initialSeason, initialEpisode, autoPlayInitialEpisode, playerOnly = false, originRoute
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -443,7 +444,18 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     return storageService.getPlaybackContinuity(item, totalSeasons, episodes.length);
   }, [item, totalSeasons, episodes.length, progressVersion]);
 
+  const isClosingRef = useRef(false);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    };
+  }, []);
+
   const handleClose = useCallback(() => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
     mobileFullscreenService.exitMobileFullscreen().catch(() => {});
     uiSoundService.play('detailClose');
     playbackRequestIdRef.current++;
@@ -458,7 +470,8 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     }
     setPlaybackSessionId('');
     setSessionIntroPlayed(false);
-    setTimeout(() => {
+    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    closeTimeoutRef.current = setTimeout(() => {
       onClose();
     }, 280);
   }, [cancelAllPendingRequests, item.id, onClose, playbackSessionId]);
@@ -472,6 +485,13 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     }
   }, [isPlaying, playerOnly, handleClose]);
 
+  const modalOriginRouteRef = useRef<string | null>(originRoute || null);
+  useEffect(() => {
+    if (originRoute && !parseWatchRoute(originRoute).isWatch) {
+      modalOriginRouteRef.current = originRoute;
+    }
+  }, [originRoute]);
+
   const handleClosePlayer = useCallback(() => {
     mobileFullscreenService.exitMobileFullscreen().catch(() => {});
     playbackRequestIdRef.current++;
@@ -482,6 +502,8 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       setIsPlaying(false);
       setResolvedStreams([]);
     }
+    isClosingRef.current = false;
+    setIsClosing(false);
     if (playbackSessionId) {
       playbackSessionService.endSession(playbackSessionId);
     } else {
@@ -495,17 +517,22 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       if (isTv) {
         navigate('/tv', { replace: true });
       } else {
-        navigate(getContentRoute(item), { replace: true });
+        const fallbackRoute = getContentRoute(item);
+        const origin = originRoute || modalOriginRouteRef.current;
+        const returnRoute = origin && !parseWatchRoute(origin).isWatch
+          ? origin
+          : fallbackRoute;
+        navigate(returnRoute, { replace: true });
       }
     }
 
     if (playerOnly && isTv) onClose();
-  }, [cancelAllPendingRequests, playbackSessionId, playerOnly, onClose, location.pathname, navigate, item]);
+  }, [cancelAllPendingRequests, playbackSessionId, playerOnly, onClose, location.pathname, navigate, item, originRoute]);
 
   // Click outside to close (apenas quando não estiver no player e nenhum modal flutuante estiver aberto)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (showFeedbackModal || showWatchPartyModal) return;
+      if (isClosingRef.current || showFeedbackModal || showWatchPartyModal) return;
 
       if (modalRef.current && !modalRef.current.contains(event.target as Node) && !isPlaying) {
         handleClose();
@@ -518,6 +545,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   // Tecla Escape: fecha a janela de detalhes apenas se nenhum modal flutuante e o player não estiverem abertos
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isClosingRef.current) return;
       if (e.key === 'Escape' && !isPlaying && !showFeedbackModal && !showWatchPartyModal) {
         handleClose();
       }
@@ -525,6 +553,23 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleClose, isPlaying, showFeedbackModal, showWatchPartyModal]);
+
+  // Sincronização com o botão Voltar do navegador caso saia da rota de assistir sem fechar o modal
+  useEffect(() => {
+    const isWatch = parseWatchRoute(location.pathname).isWatch;
+    if (!isWatch && isPlaying && !playerOnly) {
+      setIsPlaying(false);
+      setResolvedStreams([]);
+      isClosingRef.current = false;
+      setIsClosing(false);
+      if (playbackSessionId) {
+        playbackSessionService.endSession(playbackSessionId);
+      } else {
+        playbackSessionService.endSession();
+      }
+      setPlaybackSessionId('');
+    }
+  }, [location.pathname, isPlaying, playerOnly, playbackSessionId]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';

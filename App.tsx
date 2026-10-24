@@ -224,6 +224,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   const handleNavigateView = useCallback((view: AppView) => {
     setSelectedContent(null);
+    if (closedContentIdRef.current) closedContentIdRef.current = null;
+    if (detailOriginRouteRef.current) detailOriginRouteRef.current = null;
     searchService.cancelPending();
     setIsMobileMenuOpen(false);
     setSelectedGenre('');
@@ -1332,7 +1334,27 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   });
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
   const [watchRouteNotFound, setWatchRouteNotFound] = useState(false);
+  const detailOriginRouteRef = useRef<string | null>(null);
+  const closedContentIdRef = useRef<string | null>(null);
+  const prevDetailRoutePathRef = useRef<string>(location.pathname);
 
+  // Monitora alterações de rota: se saiu de uma rota profunda de detalhes (ex: /filmes/:id via browser back) para catálogo (/filmes), limpa modal
+  useEffect(() => {
+    const prevPath = prevDetailRoutePathRef.current;
+    const isPrevWatch = parseWatchRoute(prevPath).isWatch;
+    const isPrevDetail = Boolean(
+      matchPath('/filmes/:id', prevPath) ||
+      matchPath('/series/:id', prevPath) ||
+      matchPath('/series/:id/temporada/:season/episodio/:episode', prevPath) ||
+      matchPath('/animes/:id', prevPath) ||
+      matchPath('/animes/:id/temporada/:season/episodio/:episode', prevPath)
+    );
+
+    if (isPrevDetail && !isPrevWatch && !activeDetailId && !isWatchRoute && selectedContent) {
+      setSelectedContent(null);
+    }
+    prevDetailRoutePathRef.current = location.pathname;
+  }, [activeDetailId, isWatchRoute, selectedContent, location.pathname]);
 
   // Abertura in-loco de detalhes: abre o modal preservando a rota, página atual, scroll e contexto
   const handleSelectContent = useCallback((item: ContentItem) => {
@@ -1353,10 +1375,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     if (tvModeService.isTvMode()) {
       tvNavigationManager.saveFocusSnapshot();
     }
+    closedContentIdRef.current = null;
+    detailOriginRouteRef.current = location.pathname + location.search;
     setSelectedContent(item);
     uiSoundService.play('detailOpen');
     return true;
-  }, [activeProfile]);
+  }, [activeProfile, location.pathname, location.search]);
 
   const handlePlayFromHero = useCallback((item: ContentItem) => {
     if (!handleSelectContent(item)) return;
@@ -1365,24 +1389,48 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   }, [handleSelectContent, navigate]);
 
   const handleCloseDetailModal = useCallback(() => {
-    setSelectedContent(null);
-    const path = location.pathname;
-    // Apenas limpa a URL se o usuário tiver acessado diretamente por deep link (/filmes/:id, etc.)
-    if (path.startsWith('/filmes/')) {
-      navigate('/filmes', { replace: true });
-    } else if (path.startsWith('/series/')) {
-      navigate('/series', { replace: true });
-    } else if (path.startsWith('/animes/')) {
-      navigate('/animes', { replace: true });
+    const currentId = selectedContent?.id || activeDetailId;
+    if (currentId) {
+      closedContentIdRef.current = String(currentId);
     }
-    // Para todas as outras páginas (/, /em-destaque, /minha-lista, etc.),
-    // NÃO executa navegação nem navigate(-1), mantendo o usuário exatamente onde ele estava!
-  }, [location.pathname, navigate]);
+    setSelectedContent(null);
+
+    const origin = detailOriginRouteRef.current;
+    detailOriginRouteRef.current = null;
+
+    // Se temos uma rota de origem prévia que não seja rota de assistir nem rota profunda de detalhes
+    if (origin && !parseWatchRoute(origin).isWatch && !matchPath('/filmes/:id', origin) && !matchPath('/series/:id', origin) && !matchPath('/animes/:id', origin)) {
+      if (location.pathname !== origin) {
+        navigate(origin, { replace: true });
+      }
+    } else {
+      const path = location.pathname;
+      // Apenas limpa a URL se o usuário tiver acessado diretamente por deep link (/filmes/:id, etc.)
+      if (path.startsWith('/filmes/')) {
+        navigate('/filmes', { replace: true });
+      } else if (path.startsWith('/series/')) {
+        navigate('/series', { replace: true });
+      } else if (path.startsWith('/animes/')) {
+        navigate('/animes', { replace: true });
+      }
+    }
+  }, [selectedContent, activeDetailId, location.pathname, navigate]);
 
   // Sincronização de conteúdo EXCLUSIVAMENTE para links diretos/profundos na URL (/filmes/:id, /series/:id, /animes/:id, etc.)
   useEffect(() => {
     if (!activeDetailId) {
       if (isWatchRoute) setWatchRouteNotFound(true);
+      closedContentIdRef.current = null;
+      return;
+    }
+
+    // Se o usuário acabou de fechar explicitamente este item, não o restaura pela URL
+    if (closedContentIdRef.current && (
+      closedContentIdRef.current === activeDetailId ||
+      selectedContent?.id === closedContentIdRef.current ||
+      selectedContent?.imdbId === closedContentIdRef.current ||
+      selectedContent?.tmdbId === closedContentIdRef.current
+    )) {
       return;
     }
 
@@ -1416,7 +1464,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       );
 
       if (localFound && acceptsRoute(localFound)) {
-        if (active) setSelectedContent(localFound);
+        if (active && closedContentIdRef.current !== activeDetailId) {
+          setSelectedContent(localFound);
+        }
         return;
       }
 
@@ -1434,7 +1484,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           details = res?.item || null;
         }
 
-        if (active && details && acceptsRoute(details)) {
+        if (active && closedContentIdRef.current !== activeDetailId && details && acceptsRoute(details)) {
           setSelectedContent(details);
         } else if (active && isWatchRoute) {
           setWatchRouteNotFound(true);
@@ -2834,6 +2884,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           initialEpisode={effectiveEpisodeNum}
           autoPlayInitialEpisode={effectiveAutoPlay}
           playerOnly={isWatchRoute}
+          originRoute={detailOriginRouteRef.current}
         /></React.Suspense>
       )}
 
