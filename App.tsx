@@ -7,6 +7,7 @@ import Header from './components/Header';
 import Hero from './components/Hero';
 import ContentRow from './components/ContentRow';
 import ContentCard from './components/ContentCard';
+import { FeaturedRankedCarousel } from './components/FeaturedRankedCarousel';
 import { VirtualizedCatalogGrid } from './src/components/catalog/VirtualizedCatalogGrid';
 import AnimatedBackground from './components/AnimatedBackground';
 import ScrollToTop from './components/ScrollToTop';
@@ -2502,19 +2503,29 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           deduplicateContentItems(rawSeries.filter(it => searchService.isSeriesItem(it)))
         );
 
-        const displayMovies = eligibleMovies
-          .filter(it => !selectedGenre || selectedGenre === 'Todos' || it.genres?.includes(selectedGenre))
-          .filter(it => !submittedSearchQuery || it.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()))
-          .slice(0, 10);
+        // Associa cada obra ao seu rank real (1 a 10) no Top 10 oficial
+        const top10MoviesWithRank = eligibleMovies.slice(0, 10).map((item, idx) => ({
+          item,
+          rank: idx + 1
+        }));
 
-        const displaySeries = eligibleSeries
-          .filter(it => !selectedGenre || selectedGenre === 'Todos' || it.genres?.includes(selectedGenre))
-          .filter(it => !submittedSearchQuery || it.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()))
-          .slice(0, 10);
+        const top10SeriesWithRank = eligibleSeries.slice(0, 10).map((item, idx) => ({
+          item,
+          rank: idx + 1
+        }));
+
+        // Preserva a classificação original dos títulos restantes mesmo com lacunas por gênero/busca
+        const displayMovies = top10MoviesWithRank
+          .filter(({ item }) => !selectedGenre || selectedGenre === 'Todos' || item.genres?.includes(selectedGenre))
+          .filter(({ item }) => !submittedSearchQuery || item.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()));
+
+        const displaySeries = top10SeriesWithRank
+          .filter(({ item }) => !selectedGenre || selectedGenre === 'Todos' || item.genres?.includes(selectedGenre))
+          .filter(({ item }) => !submittedSearchQuery || item.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()));
 
         return (
           <ViewWrapper>
-            <div className="px-3 sm:px-6 md:px-12 py-6 sm:py-8 pb-32 space-y-8 sm:space-y-12 md:space-y-16 max-w-[2560px] mx-auto">
+            <div className="px-3 sm:px-6 md:px-12 py-6 sm:py-8 pb-32 space-y-10 sm:space-y-14 md:space-y-18 max-w-[2560px] mx-auto">
               {/* Cabeçalho Principal da Página Em Destaque */}
               <div className={`flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 md:gap-7 pb-4 border-b ${isDarkMode ? 'border-white/10' : 'border-black/10'}`}>
                 <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
@@ -2525,69 +2536,37 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 </div>
               </div>
 
-              {/* SEÇÃO 1: FILMES EM DESTAQUE (TOP 10) */}
-              <div className="space-y-3 sm:space-y-4 md:space-y-6">
-                <div className="flex items-center gap-2 sm:gap-2.5">
-                  <Film className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-[#007df7]" />
-                  <h3 className="text-base sm:text-lg md:text-2xl font-black text-white tracking-tight">
-                    Filmes em Destaque
-                  </h3>
-                </div>
+              {/* SEÇÃO 1: FILMES EM DESTAQUE (TOP 10 CARROSSEL HORIZONTAL) */}
+              <FeaturedRankedCarousel
+                title="Filmes em Destaque"
+                subtitle="Os títulos mais populares e aclamados da semana"
+                icon={Film}
+                iconColor="#007df7"
+                items={displayMovies}
+                isDarkMode={isDarkMode}
+                onItemClick={handleSelectContent}
+                favorites={favorites}
+                myList={myList}
+                onToggleFavorite={toggleFavorite}
+                onToggleList={toggleMyList}
+                emptyMessage="Nenhum filme em destaque corresponde ao filtro selecionado."
+              />
 
-                {displayMovies.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-                    {displayMovies.map((item, idx) => (
-                      <ContentCard 
-                        key={`feat-movie-${item.imdbId || item.id}-${idx}`}
-                        item={item}
-                        rankPosition={idx + 1}
-                        isDarkMode={isDarkMode}
-                        onItemClick={handleSelectContent}
-                        isFavorite={favorites.includes(item.id)}
-                        isInList={myList.includes(item.id)}
-                        onToggleFavorite={toggleFavorite}
-                        onToggleList={toggleMyList}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-8 text-center bg-white/5 rounded-2xl border border-white/10 text-gray-400 text-sm">
-                    Nenhum filme em destaque corresponde ao filtro selecionado.
-                  </div>
-                )}
-              </div>
-
-              {/* SEÇÃO 2: SÉRIES EM DESTAQUE (TOP 10) */}
-              <div className="space-y-3 sm:space-y-4 md:space-y-6">
-                <div className="flex items-center gap-2 sm:gap-2.5">
-                  <Tv className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-purple-400" />
-                  <h3 className="text-base sm:text-lg md:text-2xl font-black text-white tracking-tight">
-                    Séries em Destaque
-                  </h3>
-                </div>
-
-                {displaySeries.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-                    {displaySeries.map((item, idx) => (
-                      <ContentCard 
-                        key={`feat-series-${item.imdbId || item.id}-${idx}`}
-                        item={item}
-                        rankPosition={idx + 1}
-                        isDarkMode={isDarkMode}
-                        onItemClick={handleSelectContent}
-                        isFavorite={favorites.includes(item.id)}
-                        isInList={myList.includes(item.id)}
-                        onToggleFavorite={toggleFavorite}
-                        onToggleList={toggleMyList}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-8 text-center bg-white/5 rounded-2xl border border-white/10 text-gray-400 text-sm">
-                    Nenhuma série em destaque corresponde ao filtro selecionado.
-                  </div>
-                )}
-              </div>
+              {/* SEÇÃO 2: SÉRIES EM DESTAQUE (TOP 10 CARROSSEL HORIZONTAL) */}
+              <FeaturedRankedCarousel
+                title="Séries em Destaque"
+                subtitle="As séries mais populares e aclamadas da semana"
+                icon={Tv}
+                iconColor="#c084fc"
+                items={displaySeries}
+                isDarkMode={isDarkMode}
+                onItemClick={handleSelectContent}
+                favorites={favorites}
+                myList={myList}
+                onToggleFavorite={toggleFavorite}
+                onToggleList={toggleMyList}
+                emptyMessage="Nenhuma série em destaque corresponde ao filtro selecionado."
+              />
             </div>
           </ViewWrapper>
         );
