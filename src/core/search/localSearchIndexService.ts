@@ -44,6 +44,8 @@ export interface IndexedContentItem {
   rating: number;
   isFeatured: boolean;
   isAdult: boolean;
+  isPlayable: boolean;
+  hasScheduledRelease: boolean;
 }
 
 export function normalizeSearchQuery(text?: string): string {
@@ -132,7 +134,9 @@ export class LocalSearchIndexService {
         year: item.year,
         rating: item.rating || 0,
         isFeatured: item.isFeatured === true,
-        isAdult: adultContentService.isAdultContent(item)
+        isAdult: adultContentService.isAdultContent(item),
+        isPlayable: catalogEligibilityService.isItemPubliclyPlayableSync(item),
+        hasScheduledRelease: Boolean(item.catalogVisibleFrom || catalogEligibilityService.isTheOdyssey2026(item))
       });
     }
   }
@@ -175,7 +179,7 @@ export class LocalSearchIndexService {
     for (const indexed of this.indexedMap.values()) {
       // 1. Filtros de segurança e banimento
       if (bannedContentRegistry.isBanned(indexed.item)) continue;
-      if (!catalogEligibilityService.isItemPubliclyPlayableSync(indexed.item)) continue;
+      if (indexed.hasScheduledRelease ? !catalogEligibilityService.isItemPubliclyPlayableSync(indexed.item) : !indexed.isPlayable) continue;
       if (indexed.isAdult && !allowAdult) continue;
 
       // 2. Filtro estrito de categoria

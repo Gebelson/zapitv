@@ -285,7 +285,7 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     audioStatus: 'pt-br-dubbed'
   },
 
-  // 16. BACKROOMS: UM NÃO-LUGAR (2026 - tt26657236)
+  // 16. BACKROOMS: UM NÃO-LUGAR (2026 - tt26658104)
   {
     id: 'movie-backrooms-2026',
     title: 'Backrooms: Um Não-Lugar',
@@ -297,14 +297,14 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     backdrop: 'https://image.tmdb.org/t/p/original/dqmMWNWfLnExDRpMtIMqI97GQFR.jpg',
     description: 'Ao cair fora da realidade, um jovem se encontra em um labirinto infinito de salas vazias e carpete úmido com entidades à espreita.',
     genres: ['Terror', 'Ficção Científica'],
-    imdbId: 'tt26657236',
+    imdbId: 'tt26658104',
     tmdbId: '1083381',
     isFeatured: true,
     availabilityStatus: 'verified',
     audioStatus: 'pt-br-dubbed'
   },
 
-  // 17. THE UPRISING: RISE OF ROBIN HOOD (2026 - tt27546684)
+  // 17. THE UPRISING: RISE OF ROBIN HOOD (2026 - tt18944118)
   {
     id: 'movie-the-uprising-2026',
     title: 'The Uprising: Rise of Robin Hood',
@@ -316,14 +316,14 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     backdrop: 'https://image.tmdb.org/t/p/original/y0reRTsewsPh0ePtgvDeLIsb5Wk.jpg',
     description: 'As origens sombrias e sangrentas da rebelião de Robin dos Bosques contra a corrupção da monarquia britânica.',
     genres: ['Ação', 'Aventura', 'Histórico'],
-    imdbId: 'tt27546684',
+    imdbId: 'tt18944118',
     tmdbId: '977942',
     isFeatured: true,
     availabilityStatus: 'verified',
     audioStatus: 'pt-br-dubbed'
   },
 
-  // 23. CARRIE, A ESTRANHA (1976 - tt0074285)
+  // 23. CARRIE, A ESTRANHA (1976 - tt0074296)
   {
     id: 'movie-carrie-1976',
     title: 'Carrie, a Estranha',
@@ -335,7 +335,7 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     backdrop: 'https://image.tmdb.org/t/p/original/jyrqiT3BaUQVcGnLRkCwopnkyKj.jpg',
     description: 'Carrie White, uma adolescente tímida e marginalizada com poderes telecinéticos, liberta sua fúria após uma humilhação traumática no baile escolar.',
     genres: ['Terror', 'Drama'],
-    imdbId: 'tt0074285',
+    imdbId: 'tt0074296',
     tmdbId: '7340',
     isFeatured: true,
     availabilityStatus: 'verified',
@@ -597,7 +597,7 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     ]
   },
 
-  // 11. MAGNATAS DO CRIME (2024- - tt13210838) — DISPONÍVEL (TVmeter #11)
+  // 11. MAGNATAS DO CRIME (2024- - tt16066148) — DISPONÍVEL (TVmeter #11)
   {
     id: 'series-the-gentlemen',
     title: 'Magnatas do Crime',
@@ -609,7 +609,7 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     backdrop: 'https://image.tmdb.org/t/p/original/l6PSAWVLyaZzwviMwBgYQOPVJ6Y.jpg',
     description: 'Eddie Horniman herda inesperadamente a vasta propriedade rural do pai, descobrindo que ela faz parte de um império bilionário da cannabis.',
     genres: ['Ação', 'Comédia', 'Crime'],
-    imdbId: 'tt13210838',
+    imdbId: 'tt16066148',
     tmdbId: '125244',
     seasonsCount: 1,
     isFeatured: true,
@@ -937,3 +937,396 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     ]
   }
 ];
+
+// =========================================================================
+// ANIMES — CURADORIA CANÔNICA OFICIAL (ANILIST + TMDB + CATÁLOGO ZAPITV)
+// =========================================================================
+export const FEATURED_ANIME_ITEMS: ContentItem[] = [
+  // 1. SOLO LEVELING (aniList: 151807 / tmdb: 209867 / mal: 52299)
+  {
+    id: 'anime-solo-leveling',
+    canonicalId: 'anime:anilist:151807',
+    title: 'Solo Leveling',
+    originalTitle: 'Ore dake Level Up na Ken',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 8.7,
+    year: 2024,
+    image: 'https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/gJL5iqPyZzgvI1Vb9k4PqB6fF6C.jpg',
+    description: 'Em um mundo onde caçadores despertam habilidades sobrenaturais, Sung Jin-woo, o caçador mais fraco da humanidade, recebe uma chance única de subir de nível sem limites.',
+    genres: ['Anime', 'Ação', 'Aventura', 'Fantasia'],
+    aniListId: 151807,
+    tmdbId: '209867',
+    malId: 52299,
+    seasonsCount: 2,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'solo-s1e1',
+        number: 1,
+        title: 'Estou Acostumado',
+        description: 'Sung Jin-woo lidera um grupo de expedição rumo a uma dungeon dupla com consequências fatais.',
+        image: 'https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg'
+      }
+    ]
+  },
+
+  // 2. JUJUTSU KAISEN (aniList: 113415 / tmdb: 95479 / mal: 40748)
+  {
+    id: 'anime-jujutsu-kaisen',
+    canonicalId: 'anime:anilist:113415',
+    title: 'Jujutsu Kaisen',
+    originalTitle: 'Jujutsu Kaisen',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 8.6,
+    year: 2020,
+    image: 'https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/gmECX1Dv3y54wQ8o3t300gJ8uVp.jpg',
+    description: 'Yuji Itadori engole um dedo amaldiçoado de Ryomen Sukuna e ingressa na Escola de Feitiçaria de Tóquio para expurgar maldições ameaçadoras.',
+    genres: ['Anime', 'Ação', 'Sobrenatural', 'Fantasia'],
+    aniListId: 113415,
+    tmdbId: '95479',
+    malId: 40748,
+    seasonsCount: 2,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'jjk-s1e1',
+        number: 1,
+        title: 'Ryomen Sukuna',
+        description: 'Yuji Itadori quebra o selo de um talismã amaldiçoado para salvar seus colegas de escola.',
+        image: 'https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg'
+      }
+    ]
+  },
+
+  // 3. DEMON SLAYER (aniList: 101922 / tmdb: 85937 / mal: 38000)
+  {
+    id: 'anime-demon-slayer',
+    canonicalId: 'anime:anilist:101922',
+    title: 'Demon Slayer: Kimetsu no Yaiba',
+    originalTitle: 'Kimetsu no Yaiba',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 8.6,
+    year: 2019,
+    image: 'https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH6SzQEJGP6tjBuYj.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/nTvM4mhqZlHIvPtPRum9WXfa729.jpg',
+    description: 'Tanjiro Kamado parte em uma jornada para se tornar um exterminador de demônios e devolver a humanidade de sua irmã Nezuko.',
+    genres: ['Anime', 'Ação', 'Fantasia', 'Histórico'],
+    aniListId: 101922,
+    tmdbId: '85937',
+    malId: 38000,
+    seasonsCount: 4,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'ds-s1e1',
+        number: 1,
+        title: 'Crueldade',
+        description: 'Tanjiro retorna da cidade e encontra sua família atacada por um demônio devorador de homens.',
+        image: 'https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH6SzQEJGP6tjBuYj.jpg'
+      }
+    ]
+  },
+
+  // 4. DANDADAN (aniList: 171018 / tmdb: 240411 / mal: 57334)
+  {
+    id: 'anime-dandadan',
+    canonicalId: 'anime:anilist:171018',
+    title: 'Dandadan',
+    originalTitle: 'Dan Da Dan',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 8.5,
+    year: 2024,
+    image: 'https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/1vKxVp97TqCjO1w9wE0K3G8kU9V.jpg',
+    description: 'Momo Ayase e Okarun desafiam suas crenças em fantasmas e alienígenas, desencadeando confrontos hilários e insanos no Japão.',
+    genres: ['Anime', 'Ação', 'Comédia', 'Sobrenatural'],
+    aniListId: 171018,
+    tmdbId: '240411',
+    malId: 57334,
+    seasonsCount: 1,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'ddd-s1e1',
+        number: 1,
+        title: 'Isso é o Amor Começando?',
+        description: 'Momo e Okarun apostam para ver quem encontra alienígenas ou espíritos primeiro.',
+        image: 'https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg'
+      }
+    ]
+  },
+
+  // 5. BLEACH: THOUSAND-YEAR BLOOD WAR (aniList: 114446 / tmdb: 13916 / mal: 41467)
+  {
+    id: 'anime-bleach-tybw',
+    canonicalId: 'anime:anilist:114446',
+    title: 'Bleach: Thousand-Year Blood War',
+    originalTitle: 'Bleach: Sennen Kessen-hen',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 8.9,
+    year: 2022,
+    image: 'https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/9pkbtK1kLhR1wzZg27v8O9eU4hV.jpg',
+    description: 'A guerra milenar entre os Shinigamis da Soul Society e o exército Quincy liderado por Yhwach chega ao seu clímax destrutivo.',
+    genres: ['Anime', 'Ação', 'Aventura', 'Sobrenatural'],
+    aniListId: 114446,
+    tmdbId: '13916',
+    malId: 41467,
+    seasonsCount: 3,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'bleach-tybw-s1e1',
+        number: 1,
+        title: 'Guerra de Sangue',
+        description: 'A Soul Society é surpreendida por um ataque coordenado do Wandenreich.',
+        image: 'https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg'
+      }
+    ]
+  },
+
+  // 6. FRIEREN: BEYOND JOURNEY'S END (aniList: 154587 / tmdb: 209867 / mal: 52991)
+  {
+    id: 'anime-frieren',
+    canonicalId: 'anime:anilist:154587',
+    title: "Frieren: Beyond Journey's End",
+    originalTitle: 'Sousou no Frieren',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 9.1,
+    year: 2023,
+    image: 'https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBPd.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/4HodYYKEIsGOdinkGi2Ucz6X9i0.jpg',
+    description: 'Após derrotar o Rei Demônio, a maga elfa Frieren embarca em uma peregrinação contemplativa sobre o tempo e a brevidade da vida humana.',
+    genres: ['Anime', 'Aventura', 'Drama', 'Fantasia'],
+    aniListId: 154587,
+    tmdbId: '209867',
+    malId: 52991,
+    seasonsCount: 1,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'frieren-s1e1',
+        number: 1,
+        title: 'O Fim da Jornada',
+        description: 'Frieren e o grupo dos heróis celebram o retorno triunfal após dez anos de campanha.',
+        image: 'https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBPd.jpg'
+      }
+    ]
+  },
+
+  // 7. CHAINSAW MAN (aniList: 127230 / tmdb: 114410 / mal: 44511)
+  {
+    id: 'anime-chainsaw-man',
+    canonicalId: 'anime:anilist:127230',
+    title: 'Chainsaw Man',
+    originalTitle: 'Chainsaw Man',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 8.5,
+    year: 2022,
+    image: 'https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/vI3a3n07Jq9g6iK2k69uP8wV7hX.jpg',
+    description: 'Denji renasce como um híbrido motosserra após se fundir com seu cachorro demônio Pochita e entra para a Segurança Pública.',
+    genres: ['Anime', 'Ação', 'Sobrenatural', 'Horror'],
+    aniListId: 127230,
+    tmdbId: '114410',
+    malId: 44511,
+    seasonsCount: 1,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'csm-s1e1',
+        number: 1,
+        title: 'Cachorro e Motosserra',
+        description: 'Denji trabalha caçando demônios para pagar as dívidas deixadas por seu falecido pai.',
+        image: 'https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg'
+      }
+    ]
+  },
+
+  // 8. ATTACK ON TITAN (aniList: 16498 / tmdb: 1429 / mal: 16498)
+  {
+    id: 'anime-attack-on-titan',
+    canonicalId: 'anime:anilist:16498',
+    title: 'Attack on Titan',
+    originalTitle: 'Shingeki no Kyojin',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 9.0,
+    year: 2013,
+    image: 'https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/hP9cKk97kFh7g1w9w7h5g1kL2.jpg',
+    description: 'Eren Yeager e a Tropa de Exploração lutam desesperadamente pela sobrevivência humana contra gigantes devoradores de homens.',
+    genres: ['Anime', 'Ação', 'Drama', 'Fantasia'],
+    aniListId: 16498,
+    tmdbId: '1429',
+    malId: 16498,
+    seasonsCount: 4,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'aot-s1e1',
+        number: 1,
+        title: 'Para Você, Daqui a 2.000 Anos',
+        description: 'A Muralha Maria é rompida pelo Titã Colossal e o caos engole a cidade de Shiganshina.',
+        image: 'https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg'
+      }
+    ]
+  },
+
+  // 9. ONE PIECE (aniList: 21 / tmdb: 37854 / mal: 21)
+  {
+    id: 'anime-one-piece',
+    canonicalId: 'anime:anilist:21',
+    title: 'One Piece',
+    originalTitle: 'One Piece',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 8.9,
+    year: 1999,
+    image: 'https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/4MCKNAc6AbWjEsM2crWsNmecOCU.jpg',
+    description: 'Monkey D. Luffy navega pelos mares com o bando do Chapéu de Palha em busca do tesouro supremo e o título de Rei dos Piratas.',
+    genres: ['Anime', 'Ação', 'Aventura', 'Comédia'],
+    aniListId: 21,
+    tmdbId: '37854',
+    malId: 21,
+    seasonsCount: 21,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'op-s1e1',
+        number: 1,
+        title: 'Eu Sou Luffy! O Homem Que Será o Rei dos Piratas!',
+        description: 'Luffy emerge de um barril e conhece Koby a bordo do navio da terrível capitã Alvida.',
+        image: 'https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg'
+      }
+    ]
+  },
+
+  // 10. SPY X FAMILY (aniList: 140960 / tmdb: 120089 / mal: 50273)
+  {
+    id: 'anime-spy-family',
+    canonicalId: 'anime:anilist:140960',
+    title: 'Spy x Family',
+    originalTitle: 'Spy × Family',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 8.4,
+    year: 2022,
+    image: 'https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq1.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/179rKqc8kE3P0x4H2e1wV8x5h7Z.jpg',
+    description: 'Um espião mestre precisa forjar uma família de mentira para cumprir sua missão secreta, sem saber que sua filha lê mentes e sua esposa é uma assassina de aluguel.',
+    genres: ['Anime', 'Comédia', 'Ação', 'Espionagem'],
+    aniListId: 140960,
+    tmdbId: '120089',
+    malId: 50273,
+    seasonsCount: 2,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'sxf-s1e1',
+        number: 1,
+        title: 'Operação Strix',
+        description: 'O agente Twilight adota a pequena Anya em um orfanato para ingressar na elite de Berlint.',
+        image: 'https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq1.jpg'
+      }
+    ]
+  },
+
+  // 11. KAIJU NO. 8 (aniList: 153288 / tmdb: 206586 / mal: 52588)
+  {
+    id: 'anime-kaiju-no-8',
+    canonicalId: 'anime:anilist:153288',
+    title: 'Kaiju No. 8',
+    originalTitle: 'Kaijuu 8-gou',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 8.3,
+    year: 2024,
+    image: 'https://image.tmdb.org/t/p/w500/fL6K0z0wYV8x1q9eX2xK1v8a7Z1.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/7kK1q2w8vK1m9x2eX2xK1v8a7Z2.jpg',
+    description: 'Kafka Hibino realiza o trabalho ingrato de limpar carcaças de monstros gigantes até que um parasita alienígena o transforma no primeiro homem-kaiju.',
+    genres: ['Anime', 'Ação', 'Ficção Científica'],
+    aniListId: 153288,
+    tmdbId: '206586',
+    malId: 52588,
+    seasonsCount: 1,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'k8-s1e1',
+        number: 1,
+        title: 'O Homem Que Se Tornou um Monstro',
+        description: 'Kafka reflete sobre seu sonho abandonado das Forças de Defesa enquanto limpa os restos de uma fera colossal.',
+        image: 'https://image.tmdb.org/t/p/w500/fL6K0z0wYV8x1q9eX2xK1v8a7Z1.jpg'
+      }
+    ]
+  },
+
+  // 12. BLUE LOCK (aniList: 163148 / tmdb: 136283 / mal: 50528)
+  {
+    id: 'anime-blue-lock',
+    canonicalId: 'anime:anilist:163148',
+    title: 'Blue Lock',
+    originalTitle: 'Blue Lock',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 8.2,
+    year: 2022,
+    image: 'https://image.tmdb.org/t/p/w500/i9pZkK9w8vK1m9x2eX2xK1v8a7Z3.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/9pZkK9w8vK1m9x2eX2xK1v8a7Z4.jpg',
+    description: 'Trezentos atacantes colegiais do Japão são confinados em uma prisão de treinamento de futebol para forjar o maior atacante egoísta do mundo.',
+    genres: ['Anime', 'Esporte', 'Ação', 'Drama'],
+    aniListId: 163148,
+    tmdbId: '136283',
+    malId: 50528,
+    seasonsCount: 2,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'bl-s1e1',
+        number: 1,
+        title: 'Sonho',
+        description: 'Yoichi Isagi recebe o convite misterioso da União Japonesa de Futebol para o projeto Blue Lock.',
+        image: 'https://image.tmdb.org/t/p/w500/i9pZkK9w8vK1m9x2eX2xK1v8a7Z3.jpg'
+      }
+    ]
+  }
+];
+
+// Mescla animes na lista global de itens canônicos
+FEATURED_CATALOG_ITEMS.push(...FEATURED_ANIME_ITEMS);
+

@@ -6,6 +6,7 @@ import { VERIFIED_OPEN_ITEMS } from "./src/core/catalog/verifiedCatalog.ts";
 import { classifyStream, checkOpenSubtitlesPtBr, sortStreamsByPtBrPriority } from "./src/core/audio/audioDetector.ts";
 import { OfficialChannelProvider } from "./src/core/livetv/OfficialChannelProvider.ts";
 import { featuredRankingService } from "./src/core/rankings/FeaturedRankingService.ts";
+import { monthlyFeaturedRankingService } from "./src/core/rankings/MonthlyFeaturedRankingService.ts";
 import { weeklyFeaturedScheduler } from "./src/core/rankings/WeeklyFeaturedScheduler.ts";
 import { imdbWeeklyRankingService } from "./src/core/rankings/IMDbWeeklyRankingService.ts";
 import { catalogReleaseScheduler } from "./src/core/catalog/CatalogReleaseScheduler.ts";
@@ -988,6 +989,33 @@ function createApp() {
   // FEATURED RANKINGS API (WEEKLY IMDb POPULARITY + REAL AVAILABILITY)
   // =========================================================================
   const FEATURED_CACHE_FILE = path.resolve(process.cwd(), "data", "featured_weekly_selection.json");
+  const MONTHLY_FEATURED_CACHE_FILE = path.resolve(process.cwd(), "data", "monthly_featured_rankings.json");
+
+  // Configuração de persistência dos rankings mensais
+  monthlyFeaturedRankingService.setStorageAdapter({
+    load: () => {
+      try {
+        if (fs.existsSync(MONTHLY_FEATURED_CACHE_FILE)) {
+          const raw = fs.readFileSync(MONTHLY_FEATURED_CACHE_FILE, "utf-8");
+          if (raw) return JSON.parse(raw);
+        }
+      } catch (e) {
+        console.warn("[Server] Falha ao carregar cache do ranking mensal do disco:", e);
+      }
+      return null;
+    },
+    save: (data) => {
+      try {
+        const dir = path.dirname(MONTHLY_FEATURED_CACHE_FILE);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        const tmpFile = `${MONTHLY_FEATURED_CACHE_FILE}.${Date.now()}.tmp`;
+        fs.writeFileSync(tmpFile, JSON.stringify(data, null, 2), "utf-8");
+        fs.renameSync(tmpFile, MONTHLY_FEATURED_CACHE_FILE);
+      } catch (e) {
+        console.warn("[Server] Falha ao persistir cache do ranking mensal no disco:", e);
+      }
+    }
+  });
 
   // Configuração de persistência em disco local para ambiente Node.js
   featuredRankingService.setStorageAdapter({
@@ -1025,6 +1053,28 @@ function createApp() {
     }
   });
 
+  app.get("/api/featured/monthly", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const monthQuery = typeof req.query.month === "string" ? req.query.month : undefined;
+      const snapshot = monthlyFeaturedRankingService.getMonthlyRankingSync(monthQuery);
+      res.json(snapshot);
+    } catch (err: any) {
+      res.status(500).json({ error: "Falha ao obter rankings mensais", details: err?.message });
+    }
+  });
+
+  app.post("/api/featured/monthly/refresh", requireMaintenanceAdmin, async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const monthQuery = typeof req.query.month === "string" ? req.query.month : undefined;
+      const snapshot = await monthlyFeaturedRankingService.refreshMonthlyRankings(monthQuery);
+      res.json(snapshot);
+    } catch (err: any) {
+      res.status(500).json({ error: "Falha ao atualizar rankings mensais", details: err?.message });
+    }
+  });
+
   app.post("/api/featured/refresh", requireMaintenanceAdmin, async (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
@@ -1040,17 +1090,21 @@ function createApp() {
     res.setHeader("Access-Control-Allow-Origin", "*");
 
     try {
-      console.log("[Server] Acionamento cron semanal de Em Destaque recebido...");
+      console.log("[Server] Acionamento cron de Em Destaque (Mensal + Semanal) recebido...");
+      const monthlyResult = await monthlyFeaturedRankingService.refreshMonthlyRankings();
       const result = await featuredRankingService.runWeeklyScheduledUpdate({ force: false });
       return res.json({
         success: true,
+        monthKey: monthlyResult.monthKey,
+        monthLabel: monthlyResult.monthLabel,
+        statusLabel: monthlyResult.statusLabel,
+        moviesCount: monthlyResult.movies.length,
+        seriesCount: monthlyResult.series.length,
+        animesCount: monthlyResult.animes.length,
         weekKey: result.weekKey,
         weekLabel: result.weekLabel,
-        referenceDate: result.referenceDate,
-        lastUpdatedAt: result.lastUpdatedAt,
-        nextScheduledUpdateFormatted: result.nextScheduledUpdateFormatted,
-        moviesCount: result.featuredMovies.length,
-        seriesCount: result.featuredSeries.length,
+        lastUpdatedAt: monthlyResult.lastUpdatedAt,
+        nextScheduledUpdateFormatted: monthlyResult.nextScheduledUpdateFormatted,
         status: result.updateStatus
       });
     } catch (err: any) {

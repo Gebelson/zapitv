@@ -452,6 +452,13 @@ export class CanonicalCatalogMaster {
   }
 
   /**
+   * Retorna todos os itens cadastrados no índice mestre sincronamente
+   */
+  public getAllItemsSync(): ContentItem[] {
+    return Array.from(this.masterRegistry.values()).map(e => e.item);
+  }
+
+  /**
    * Total de obras cadastradas no índice mestre (visíveis + internas)
    */
   public getTotalCount(): { total: number; publicCount: number; unreleasedCount: number } {

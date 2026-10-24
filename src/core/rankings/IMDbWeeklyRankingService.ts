@@ -17,7 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import { ContentItem } from '../../../types';
 
-export type RankingMediaType = 'movie' | 'series';
+export type RankingMediaType = 'movie' | 'series' | 'anime';
 
 export interface ImdbRankingEntry {
   imdbId: string;

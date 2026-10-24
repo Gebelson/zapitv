@@ -5780,7 +5780,7 @@ var init_mediaSourceValidationService = __esm({
 });
 
 // src/core/catalog/featuredCatalogItems.ts
-var FEATURED_CATALOG_ITEMS;
+var FEATURED_CATALOG_ITEMS, FEATURED_ANIME_ITEMS;
 var init_featuredCatalogItems = __esm({
   "src/core/catalog/featuredCatalogItems.ts"() {
     init_types();
@@ -6044,7 +6044,7 @@ var init_featuredCatalogItems = __esm({
         availabilityStatus: "verified",
         audioStatus: "pt-br-dubbed"
       },
-      // 16. BACKROOMS: UM NÃO-LUGAR (2026 - tt26657236)
+      // 16. BACKROOMS: UM NÃO-LUGAR (2026 - tt26658104)
       {
         id: "movie-backrooms-2026",
         title: "Backrooms: Um N\xE3o-Lugar",
@@ -6056,13 +6056,13 @@ var init_featuredCatalogItems = __esm({
         backdrop: "https://image.tmdb.org/t/p/original/dqmMWNWfLnExDRpMtIMqI97GQFR.jpg",
         description: "Ao cair fora da realidade, um jovem se encontra em um labirinto infinito de salas vazias e carpete \xFAmido com entidades \xE0 espreita.",
         genres: ["Terror", "Fic\xE7\xE3o Cient\xEDfica"],
-        imdbId: "tt26657236",
+        imdbId: "tt26658104",
         tmdbId: "1083381",
         isFeatured: true,
         availabilityStatus: "verified",
         audioStatus: "pt-br-dubbed"
       },
-      // 17. THE UPRISING: RISE OF ROBIN HOOD (2026 - tt27546684)
+      // 17. THE UPRISING: RISE OF ROBIN HOOD (2026 - tt18944118)
       {
         id: "movie-the-uprising-2026",
         title: "The Uprising: Rise of Robin Hood",
@@ -6074,13 +6074,13 @@ var init_featuredCatalogItems = __esm({
         backdrop: "https://image.tmdb.org/t/p/original/y0reRTsewsPh0ePtgvDeLIsb5Wk.jpg",
         description: "As origens sombrias e sangrentas da rebeli\xE3o de Robin dos Bosques contra a corrup\xE7\xE3o da monarquia brit\xE2nica.",
         genres: ["A\xE7\xE3o", "Aventura", "Hist\xF3rico"],
-        imdbId: "tt27546684",
+        imdbId: "tt18944118",
         tmdbId: "977942",
         isFeatured: true,
         availabilityStatus: "verified",
         audioStatus: "pt-br-dubbed"
       },
-      // 23. CARRIE, A ESTRANHA (1976 - tt0074285)
+      // 23. CARRIE, A ESTRANHA (1976 - tt0074296)
       {
         id: "movie-carrie-1976",
         title: "Carrie, a Estranha",
@@ -6092,7 +6092,7 @@ var init_featuredCatalogItems = __esm({
         backdrop: "https://image.tmdb.org/t/p/original/jyrqiT3BaUQVcGnLRkCwopnkyKj.jpg",
         description: "Carrie White, uma adolescente t\xEDmida e marginalizada com poderes telecin\xE9ticos, liberta sua f\xFAria ap\xF3s uma humilha\xE7\xE3o traum\xE1tica no baile escolar.",
         genres: ["Terror", "Drama"],
-        imdbId: "tt0074285",
+        imdbId: "tt0074296",
         tmdbId: "7340",
         isFeatured: true,
         availabilityStatus: "verified",
@@ -6342,7 +6342,7 @@ var init_featuredCatalogItems = __esm({
           }
         ]
       },
-      // 11. MAGNATAS DO CRIME (2024- - tt13210838) — DISPONÍVEL (TVmeter #11)
+      // 11. MAGNATAS DO CRIME (2024- - tt16066148) — DISPONÍVEL (TVmeter #11)
       {
         id: "series-the-gentlemen",
         title: "Magnatas do Crime",
@@ -6354,7 +6354,7 @@ var init_featuredCatalogItems = __esm({
         backdrop: "https://image.tmdb.org/t/p/original/l6PSAWVLyaZzwviMwBgYQOPVJ6Y.jpg",
         description: "Eddie Horniman herda inesperadamente a vasta propriedade rural do pai, descobrindo que ela faz parte de um imp\xE9rio bilion\xE1rio da cannabis.",
         genres: ["A\xE7\xE3o", "Com\xE9dia", "Crime"],
-        imdbId: "tt13210838",
+        imdbId: "tt16066148",
         tmdbId: "125244",
         seasonsCount: 1,
         isFeatured: true,
@@ -6670,6 +6670,381 @@ var init_featuredCatalogItems = __esm({
         ]
       }
     ];
+    FEATURED_ANIME_ITEMS = [
+      // 1. SOLO LEVELING (aniList: 151807 / tmdb: 209867 / mal: 52299)
+      {
+        id: "anime-solo-leveling",
+        canonicalId: "anime:anilist:151807",
+        title: "Solo Leveling",
+        originalTitle: "Ore dake Level Up na Ken",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 8.7,
+        year: 2024,
+        image: "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/gJL5iqPyZzgvI1Vb9k4PqB6fF6C.jpg",
+        description: "Em um mundo onde ca\xE7adores despertam habilidades sobrenaturais, Sung Jin-woo, o ca\xE7ador mais fraco da humanidade, recebe uma chance \xFAnica de subir de n\xEDvel sem limites.",
+        genres: ["Anime", "A\xE7\xE3o", "Aventura", "Fantasia"],
+        aniListId: 151807,
+        tmdbId: "209867",
+        malId: 52299,
+        seasonsCount: 2,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "solo-s1e1",
+            number: 1,
+            title: "Estou Acostumado",
+            description: "Sung Jin-woo lidera um grupo de expedi\xE7\xE3o rumo a uma dungeon dupla com consequ\xEAncias fatais.",
+            image: "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg"
+          }
+        ]
+      },
+      // 2. JUJUTSU KAISEN (aniList: 113415 / tmdb: 95479 / mal: 40748)
+      {
+        id: "anime-jujutsu-kaisen",
+        canonicalId: "anime:anilist:113415",
+        title: "Jujutsu Kaisen",
+        originalTitle: "Jujutsu Kaisen",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 8.6,
+        year: 2020,
+        image: "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/gmECX1Dv3y54wQ8o3t300gJ8uVp.jpg",
+        description: "Yuji Itadori engole um dedo amaldi\xE7oado de Ryomen Sukuna e ingressa na Escola de Feiti\xE7aria de T\xF3quio para expurgar maldi\xE7\xF5es amea\xE7adoras.",
+        genres: ["Anime", "A\xE7\xE3o", "Sobrenatural", "Fantasia"],
+        aniListId: 113415,
+        tmdbId: "95479",
+        malId: 40748,
+        seasonsCount: 2,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "jjk-s1e1",
+            number: 1,
+            title: "Ryomen Sukuna",
+            description: "Yuji Itadori quebra o selo de um talism\xE3 amaldi\xE7oado para salvar seus colegas de escola.",
+            image: "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg"
+          }
+        ]
+      },
+      // 3. DEMON SLAYER (aniList: 101922 / tmdb: 85937 / mal: 38000)
+      {
+        id: "anime-demon-slayer",
+        canonicalId: "anime:anilist:101922",
+        title: "Demon Slayer: Kimetsu no Yaiba",
+        originalTitle: "Kimetsu no Yaiba",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 8.6,
+        year: 2019,
+        image: "https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH6SzQEJGP6tjBuYj.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/nTvM4mhqZlHIvPtPRum9WXfa729.jpg",
+        description: "Tanjiro Kamado parte em uma jornada para se tornar um exterminador de dem\xF4nios e devolver a humanidade de sua irm\xE3 Nezuko.",
+        genres: ["Anime", "A\xE7\xE3o", "Fantasia", "Hist\xF3rico"],
+        aniListId: 101922,
+        tmdbId: "85937",
+        malId: 38e3,
+        seasonsCount: 4,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "ds-s1e1",
+            number: 1,
+            title: "Crueldade",
+            description: "Tanjiro retorna da cidade e encontra sua fam\xEDlia atacada por um dem\xF4nio devorador de homens.",
+            image: "https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH6SzQEJGP6tjBuYj.jpg"
+          }
+        ]
+      },
+      // 4. DANDADAN (aniList: 171018 / tmdb: 240411 / mal: 57334)
+      {
+        id: "anime-dandadan",
+        canonicalId: "anime:anilist:171018",
+        title: "Dandadan",
+        originalTitle: "Dan Da Dan",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 8.5,
+        year: 2024,
+        image: "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/1vKxVp97TqCjO1w9wE0K3G8kU9V.jpg",
+        description: "Momo Ayase e Okarun desafiam suas cren\xE7as em fantasmas e alien\xEDgenas, desencadeando confrontos hil\xE1rios e insanos no Jap\xE3o.",
+        genres: ["Anime", "A\xE7\xE3o", "Com\xE9dia", "Sobrenatural"],
+        aniListId: 171018,
+        tmdbId: "240411",
+        malId: 57334,
+        seasonsCount: 1,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "ddd-s1e1",
+            number: 1,
+            title: "Isso \xE9 o Amor Come\xE7ando?",
+            description: "Momo e Okarun apostam para ver quem encontra alien\xEDgenas ou esp\xEDritos primeiro.",
+            image: "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg"
+          }
+        ]
+      },
+      // 5. BLEACH: THOUSAND-YEAR BLOOD WAR (aniList: 114446 / tmdb: 13916 / mal: 41467)
+      {
+        id: "anime-bleach-tybw",
+        canonicalId: "anime:anilist:114446",
+        title: "Bleach: Thousand-Year Blood War",
+        originalTitle: "Bleach: Sennen Kessen-hen",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 8.9,
+        year: 2022,
+        image: "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/9pkbtK1kLhR1wzZg27v8O9eU4hV.jpg",
+        description: "A guerra milenar entre os Shinigamis da Soul Society e o ex\xE9rcito Quincy liderado por Yhwach chega ao seu cl\xEDmax destrutivo.",
+        genres: ["Anime", "A\xE7\xE3o", "Aventura", "Sobrenatural"],
+        aniListId: 114446,
+        tmdbId: "13916",
+        malId: 41467,
+        seasonsCount: 3,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "bleach-tybw-s1e1",
+            number: 1,
+            title: "Guerra de Sangue",
+            description: "A Soul Society \xE9 surpreendida por um ataque coordenado do Wandenreich.",
+            image: "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg"
+          }
+        ]
+      },
+      // 6. FRIEREN: BEYOND JOURNEY'S END (aniList: 154587 / tmdb: 209867 / mal: 52991)
+      {
+        id: "anime-frieren",
+        canonicalId: "anime:anilist:154587",
+        title: "Frieren: Beyond Journey's End",
+        originalTitle: "Sousou no Frieren",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 9.1,
+        year: 2023,
+        image: "https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBPd.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/4HodYYKEIsGOdinkGi2Ucz6X9i0.jpg",
+        description: "Ap\xF3s derrotar o Rei Dem\xF4nio, a maga elfa Frieren embarca em uma peregrina\xE7\xE3o contemplativa sobre o tempo e a brevidade da vida humana.",
+        genres: ["Anime", "Aventura", "Drama", "Fantasia"],
+        aniListId: 154587,
+        tmdbId: "209867",
+        malId: 52991,
+        seasonsCount: 1,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "frieren-s1e1",
+            number: 1,
+            title: "O Fim da Jornada",
+            description: "Frieren e o grupo dos her\xF3is celebram o retorno triunfal ap\xF3s dez anos de campanha.",
+            image: "https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBPd.jpg"
+          }
+        ]
+      },
+      // 7. CHAINSAW MAN (aniList: 127230 / tmdb: 114410 / mal: 44511)
+      {
+        id: "anime-chainsaw-man",
+        canonicalId: "anime:anilist:127230",
+        title: "Chainsaw Man",
+        originalTitle: "Chainsaw Man",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 8.5,
+        year: 2022,
+        image: "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/vI3a3n07Jq9g6iK2k69uP8wV7hX.jpg",
+        description: "Denji renasce como um h\xEDbrido motosserra ap\xF3s se fundir com seu cachorro dem\xF4nio Pochita e entra para a Seguran\xE7a P\xFAblica.",
+        genres: ["Anime", "A\xE7\xE3o", "Sobrenatural", "Horror"],
+        aniListId: 127230,
+        tmdbId: "114410",
+        malId: 44511,
+        seasonsCount: 1,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "csm-s1e1",
+            number: 1,
+            title: "Cachorro e Motosserra",
+            description: "Denji trabalha ca\xE7ando dem\xF4nios para pagar as d\xEDvidas deixadas por seu falecido pai.",
+            image: "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg"
+          }
+        ]
+      },
+      // 8. ATTACK ON TITAN (aniList: 16498 / tmdb: 1429 / mal: 16498)
+      {
+        id: "anime-attack-on-titan",
+        canonicalId: "anime:anilist:16498",
+        title: "Attack on Titan",
+        originalTitle: "Shingeki no Kyojin",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 9,
+        year: 2013,
+        image: "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/hP9cKk97kFh7g1w9w7h5g1kL2.jpg",
+        description: "Eren Yeager e a Tropa de Explora\xE7\xE3o lutam desesperadamente pela sobreviv\xEAncia humana contra gigantes devoradores de homens.",
+        genres: ["Anime", "A\xE7\xE3o", "Drama", "Fantasia"],
+        aniListId: 16498,
+        tmdbId: "1429",
+        malId: 16498,
+        seasonsCount: 4,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "aot-s1e1",
+            number: 1,
+            title: "Para Voc\xEA, Daqui a 2.000 Anos",
+            description: "A Muralha Maria \xE9 rompida pelo Tit\xE3 Colossal e o caos engole a cidade de Shiganshina.",
+            image: "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg"
+          }
+        ]
+      },
+      // 9. ONE PIECE (aniList: 21 / tmdb: 37854 / mal: 21)
+      {
+        id: "anime-one-piece",
+        canonicalId: "anime:anilist:21",
+        title: "One Piece",
+        originalTitle: "One Piece",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 8.9,
+        year: 1999,
+        image: "https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/4MCKNAc6AbWjEsM2crWsNmecOCU.jpg",
+        description: "Monkey D. Luffy navega pelos mares com o bando do Chap\xE9u de Palha em busca do tesouro supremo e o t\xEDtulo de Rei dos Piratas.",
+        genres: ["Anime", "A\xE7\xE3o", "Aventura", "Com\xE9dia"],
+        aniListId: 21,
+        tmdbId: "37854",
+        malId: 21,
+        seasonsCount: 21,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "op-s1e1",
+            number: 1,
+            title: "Eu Sou Luffy! O Homem Que Ser\xE1 o Rei dos Piratas!",
+            description: "Luffy emerge de um barril e conhece Koby a bordo do navio da terr\xEDvel capit\xE3 Alvida.",
+            image: "https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg"
+          }
+        ]
+      },
+      // 10. SPY X FAMILY (aniList: 140960 / tmdb: 120089 / mal: 50273)
+      {
+        id: "anime-spy-family",
+        canonicalId: "anime:anilist:140960",
+        title: "Spy x Family",
+        originalTitle: "Spy \xD7 Family",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 8.4,
+        year: 2022,
+        image: "https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq1.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/179rKqc8kE3P0x4H2e1wV8x5h7Z.jpg",
+        description: "Um espi\xE3o mestre precisa forjar uma fam\xEDlia de mentira para cumprir sua miss\xE3o secreta, sem saber que sua filha l\xEA mentes e sua esposa \xE9 uma assassina de aluguel.",
+        genres: ["Anime", "Com\xE9dia", "A\xE7\xE3o", "Espionagem"],
+        aniListId: 140960,
+        tmdbId: "120089",
+        malId: 50273,
+        seasonsCount: 2,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "sxf-s1e1",
+            number: 1,
+            title: "Opera\xE7\xE3o Strix",
+            description: "O agente Twilight adota a pequena Anya em um orfanato para ingressar na elite de Berlint.",
+            image: "https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq1.jpg"
+          }
+        ]
+      },
+      // 11. KAIJU NO. 8 (aniList: 153288 / tmdb: 206586 / mal: 52588)
+      {
+        id: "anime-kaiju-no-8",
+        canonicalId: "anime:anilist:153288",
+        title: "Kaiju No. 8",
+        originalTitle: "Kaijuu 8-gou",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 8.3,
+        year: 2024,
+        image: "https://image.tmdb.org/t/p/w500/fL6K0z0wYV8x1q9eX2xK1v8a7Z1.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/7kK1q2w8vK1m9x2eX2xK1v8a7Z2.jpg",
+        description: "Kafka Hibino realiza o trabalho ingrato de limpar carca\xE7as de monstros gigantes at\xE9 que um parasita alien\xEDgena o transforma no primeiro homem-kaiju.",
+        genres: ["Anime", "A\xE7\xE3o", "Fic\xE7\xE3o Cient\xEDfica"],
+        aniListId: 153288,
+        tmdbId: "206586",
+        malId: 52588,
+        seasonsCount: 1,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "k8-s1e1",
+            number: 1,
+            title: "O Homem Que Se Tornou um Monstro",
+            description: "Kafka reflete sobre seu sonho abandonado das For\xE7as de Defesa enquanto limpa os restos de uma fera colossal.",
+            image: "https://image.tmdb.org/t/p/w500/fL6K0z0wYV8x1q9eX2xK1v8a7Z1.jpg"
+          }
+        ]
+      },
+      // 12. BLUE LOCK (aniList: 163148 / tmdb: 136283 / mal: 50528)
+      {
+        id: "anime-blue-lock",
+        canonicalId: "anime:anilist:163148",
+        title: "Blue Lock",
+        originalTitle: "Blue Lock",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 8.2,
+        year: 2022,
+        image: "https://image.tmdb.org/t/p/w500/i9pZkK9w8vK1m9x2eX2xK1v8a7Z3.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/9pZkK9w8vK1m9x2eX2xK1v8a7Z4.jpg",
+        description: "Trezentos atacantes colegiais do Jap\xE3o s\xE3o confinados em uma pris\xE3o de treinamento de futebol para forjar o maior atacante ego\xEDsta do mundo.",
+        genres: ["Anime", "Esporte", "A\xE7\xE3o", "Drama"],
+        aniListId: 163148,
+        tmdbId: "136283",
+        malId: 50528,
+        seasonsCount: 2,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "bl-s1e1",
+            number: 1,
+            title: "Sonho",
+            description: "Yoichi Isagi recebe o convite misterioso da Uni\xE3o Japonesa de Futebol para o projeto Blue Lock.",
+            image: "https://image.tmdb.org/t/p/w500/i9pZkK9w8vK1m9x2eX2xK1v8a7Z3.jpg"
+          }
+        ]
+      }
+    ];
+    FEATURED_CATALOG_ITEMS.push(...FEATURED_ANIME_ITEMS);
   }
 });
 
@@ -13427,6 +13802,12 @@ var init_CanonicalCatalogMaster = __esm({
         return Array.from(this.masterRegistry.values());
       }
       /**
+       * Retorna todos os itens cadastrados no índice mestre sincronamente
+       */
+      getAllItemsSync() {
+        return Array.from(this.masterRegistry.values()).map((e) => e.item);
+      }
+      /**
        * Total de obras cadastradas no índice mestre (visíveis + internas)
        */
       getTotalCount() {
@@ -14455,7 +14836,9 @@ var init_localSearchIndexService = __esm({
             year: item.year,
             rating: item.rating || 0,
             isFeatured: item.isFeatured === true,
-            isAdult: adultContentService.isAdultContent(item)
+            isAdult: adultContentService.isAdultContent(item),
+            isPlayable: catalogEligibilityService.isItemPubliclyPlayableSync(item),
+            hasScheduledRelease: Boolean(item.catalogVisibleFrom || catalogEligibilityService.isTheOdyssey2026(item))
           });
         }
       }
@@ -14478,7 +14861,7 @@ var init_localSearchIndexService = __esm({
         const scoredMatches = [];
         for (const indexed of this.indexedMap.values()) {
           if (bannedContentRegistry.isBanned(indexed.item)) continue;
-          if (!catalogEligibilityService.isItemPubliclyPlayableSync(indexed.item)) continue;
+          if (indexed.hasScheduledRelease ? !catalogEligibilityService.isItemPubliclyPlayableSync(indexed.item) : !indexed.isPlayable) continue;
           if (indexed.isAdult && !allowAdult) continue;
           if (category !== "all") {
             if (category === "movies") {
@@ -17838,14 +18221,1044 @@ var IMDbWeeklyRankingService = class _IMDbWeeklyRankingService {
 };
 var imdbWeeklyRankingService = IMDbWeeklyRankingService.getInstance();
 
+// src/core/rankings/anilistRankingSnapshots.ts
+var OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS = [
+  // =========================================================================
+  // OUTUBRO DE 2026 — SNAPSHOT OFICIAL ANILIST (TRENDING & POPULARITY)
+  // =========================================================================
+  {
+    id: "snapshot-anime-2026-10",
+    monthKey: "2026-10",
+    monthLabel: "Outubro de 2026",
+    referenceDate: "2026-10-15",
+    capturedAt: 17921184e5,
+    source: "official-snapshot",
+    items: [
+      {
+        position: 1,
+        aniListId: 151807,
+        title: "Solo Leveling",
+        romajiTitle: "Ore dake Level Up na Ken",
+        year: 2024,
+        score: 98.5,
+        popularityRank: 1,
+        trendingRank: 1,
+        format: "TV",
+        tmdbId: "209867",
+        malId: 52299,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 2,
+        aniListId: 113415,
+        title: "Jujutsu Kaisen",
+        romajiTitle: "Jujutsu Kaisen",
+        year: 2020,
+        score: 96.2,
+        popularityRank: 2,
+        trendingRank: 2,
+        format: "TV",
+        tmdbId: "95479",
+        malId: 40748,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 3,
+        aniListId: 101922,
+        title: "Demon Slayer: Kimetsu no Yaiba",
+        romajiTitle: "Kimetsu no Yaiba",
+        year: 2019,
+        score: 95.8,
+        popularityRank: 3,
+        trendingRank: 3,
+        format: "TV",
+        tmdbId: "85937",
+        malId: 38e3,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 4,
+        aniListId: 171018,
+        title: "Dandadan",
+        romajiTitle: "Dan Da Dan",
+        year: 2024,
+        score: 94.4,
+        popularityRank: 4,
+        trendingRank: 4,
+        format: "TV",
+        tmdbId: "240411",
+        malId: 57334,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 5,
+        aniListId: 114446,
+        title: "Bleach: Thousand-Year Blood War",
+        romajiTitle: "Bleach: Sennen Kessen-hen",
+        year: 2022,
+        score: 93.9,
+        popularityRank: 5,
+        trendingRank: 5,
+        format: "TV",
+        tmdbId: "13916",
+        malId: 41467,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 6,
+        aniListId: 154587,
+        title: "Frieren: Beyond Journey's End",
+        romajiTitle: "Sousou no Frieren",
+        year: 2023,
+        score: 93.1,
+        popularityRank: 6,
+        trendingRank: 6,
+        format: "TV",
+        tmdbId: "209867",
+        malId: 52991,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 7,
+        aniListId: 127230,
+        title: "Chainsaw Man",
+        romajiTitle: "Chainsaw Man",
+        year: 2022,
+        score: 91.5,
+        popularityRank: 7,
+        trendingRank: 7,
+        format: "TV",
+        tmdbId: "114410",
+        malId: 44511,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 8,
+        aniListId: 16498,
+        title: "Attack on Titan",
+        romajiTitle: "Shingeki no Kyojin",
+        year: 2013,
+        score: 90.7,
+        popularityRank: 8,
+        trendingRank: 8,
+        format: "TV",
+        tmdbId: "1429",
+        malId: 16498,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 9,
+        aniListId: 21,
+        title: "One Piece",
+        romajiTitle: "One Piece",
+        year: 1999,
+        score: 89.8,
+        popularityRank: 9,
+        trendingRank: 9,
+        format: "TV",
+        tmdbId: "37854",
+        malId: 21,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 10,
+        aniListId: 140960,
+        title: "Spy x Family",
+        romajiTitle: "Spy \xD7 Family",
+        year: 2022,
+        score: 88.6,
+        popularityRank: 10,
+        trendingRank: 10,
+        format: "TV",
+        tmdbId: "120089",
+        malId: 50273,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 11,
+        aniListId: 153288,
+        title: "Kaiju No. 8",
+        romajiTitle: "Kaijuu 8-gou",
+        year: 2024,
+        score: 87.2,
+        popularityRank: 11,
+        trendingRank: 11,
+        format: "TV",
+        tmdbId: "206586",
+        malId: 52588,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 12,
+        aniListId: 163148,
+        title: "Blue Lock",
+        romajiTitle: "Blue Lock",
+        year: 2022,
+        score: 86.4,
+        popularityRank: 12,
+        trendingRank: 12,
+        format: "TV",
+        tmdbId: "136283",
+        malId: 50528,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 13,
+        aniListId: 1735,
+        title: "Naruto Shippuden",
+        romajiTitle: "Naruto: Shippuuden",
+        year: 2007,
+        score: 85.1,
+        popularityRank: 13,
+        trendingRank: 13,
+        format: "TV",
+        tmdbId: "31910",
+        malId: 1735,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 14,
+        aniListId: 21459,
+        title: "My Hero Academia",
+        romajiTitle: "Boku no Hero Academia",
+        year: 2016,
+        score: 84.3,
+        popularityRank: 14,
+        trendingRank: 14,
+        format: "TV",
+        tmdbId: "65930",
+        malId: 31964,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      },
+      {
+        position: 15,
+        aniListId: 1535,
+        title: "Death Note",
+        romajiTitle: "Death Note",
+        year: 2006,
+        score: 83.5,
+        popularityRank: 15,
+        trendingRank: 15,
+        format: "TV",
+        tmdbId: "1399",
+        malId: 1535,
+        referenceDate: "2026-10-15",
+        capturedAt: 17921184e5
+      }
+    ]
+  },
+  // =========================================================================
+  // SETEMBRO DE 2026 — HISTÓRICO CONSOLIDADO ANILIST (MÊS ANTERIOR)
+  // =========================================================================
+  {
+    id: "snapshot-anime-2026-09",
+    monthKey: "2026-09",
+    monthLabel: "Setembro de 2026",
+    referenceDate: "2026-09-30",
+    capturedAt: 17908224e5,
+    source: "official-snapshot",
+    items: [
+      { position: 1, aniListId: 151807, title: "Solo Leveling", year: 2024, score: 98.1, popularityRank: 1, trendingRank: 1, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
+      { position: 2, aniListId: 113415, title: "Jujutsu Kaisen", year: 2020, score: 96, popularityRank: 2, trendingRank: 2, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
+      { position: 3, aniListId: 101922, title: "Demon Slayer: Kimetsu no Yaiba", year: 2019, score: 95.5, popularityRank: 3, trendingRank: 3, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
+      { position: 4, aniListId: 154587, title: "Frieren: Beyond Journey's End", year: 2023, score: 93.8, popularityRank: 4, trendingRank: 4, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
+      { position: 5, aniListId: 114446, title: "Bleach: Thousand-Year Blood War", year: 2022, score: 93.2, popularityRank: 5, trendingRank: 5, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
+      { position: 6, aniListId: 171018, title: "Dandadan", year: 2024, score: 92.9, popularityRank: 6, trendingRank: 6, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
+      { position: 7, aniListId: 127230, title: "Chainsaw Man", year: 2022, score: 91.2, popularityRank: 7, trendingRank: 7, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
+      { position: 8, aniListId: 16498, title: "Attack on Titan", year: 2013, score: 90.4, popularityRank: 8, trendingRank: 8, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
+      { position: 9, aniListId: 21, title: "One Piece", year: 1999, score: 89.5, popularityRank: 9, trendingRank: 9, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
+      { position: 10, aniListId: 140960, title: "Spy x Family", year: 2022, score: 88, popularityRank: 10, trendingRank: 10, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 }
+    ]
+  }
+];
+
+// src/core/rankings/MonthlyFeaturedRankingService.ts
+init_CanonicalCatalogMaster();
+init_theatricalFilterService();
+init_CatalogEligibilityService();
+init_MediaAvailabilityIndex();
+init_featuredCatalogItems();
+init_verifiedCatalog();
+init_constants();
+init_searchService();
+init_aniListClient();
+var STORAGE_KEY_MONTHLY_RANKINGS = "zapitv_monthly_featured_rankings_v1";
+var EVENT_MONTHLY_RANKING_UPDATED = "zapitv_monthly_ranking_updated";
+var MonthlyFeaturedRankingService = class _MonthlyFeaturedRankingService {
+  constructor() {
+    this.imdbWeeklySnapshots = [...OFFICIAL_IMDB_WEEKLY_SNAPSHOTS];
+    this.anilistMonthlySnapshots = [...OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS];
+    this.cachedMonthlySnapshot = null;
+    this.storageAdapter = null;
+    this.isProcessing = false;
+    this.loadFromStorage();
+    if (!this.cachedMonthlySnapshot) {
+      this.recomputeMonthlyRankingsSync();
+    }
+  }
+  static getInstance() {
+    if (!_MonthlyFeaturedRankingService.instance) {
+      _MonthlyFeaturedRankingService.instance = new _MonthlyFeaturedRankingService();
+    }
+    return _MonthlyFeaturedRankingService.instance;
+  }
+  /**
+   * Registra adaptador de persistência customizado (ex: em disco no Node.js)
+   */
+  setStorageAdapter(adapter) {
+    this.storageAdapter = adapter;
+    const loaded = adapter.load();
+    if (loaded) {
+      this.cachedMonthlySnapshot = loaded;
+    }
+  }
+  /**
+   * Converte uma data de calendário para o fuso oficial de Brasília (America/Sao_Paulo)
+   * Derivação 100% dinâmica sem valores fixos de monthKey.
+   */
+  getSaoPauloCalendar(targetDate = /* @__PURE__ */ new Date(), queryMonthKey) {
+    const formatter = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    });
+    const parts = formatter.formatToParts(targetDate);
+    let year = targetDate.getFullYear();
+    let month = targetDate.getMonth() + 1;
+    let day = targetDate.getDate();
+    let hour = targetDate.getHours();
+    let minute = targetDate.getMinutes();
+    for (const p of parts) {
+      if (p.type === "year") year = parseInt(p.value, 10);
+      else if (p.type === "month") month = parseInt(p.value, 10);
+      else if (p.type === "day") day = parseInt(p.value, 10);
+      else if (p.type === "hour") hour = parseInt(p.value, 10);
+      else if (p.type === "minute") minute = parseInt(p.value, 10);
+    }
+    const currentRealMonthKey = `${year}-${String(month).padStart(2, "0")}`;
+    const effectiveMonthKey = queryMonthKey || currentRealMonthKey;
+    let targetYear = year;
+    let targetMonth = month;
+    if (queryMonthKey && /^\d{4}-\d{2}$/.test(queryMonthKey)) {
+      const [y, m] = queryMonthKey.split("-").map(Number);
+      targetYear = y;
+      targetMonth = m;
+    }
+    const monthNames = [
+      "Janeiro",
+      "Fevereiro",
+      "Mar\xE7o",
+      "Abril",
+      "Maio",
+      "Junho",
+      "Julho",
+      "Agosto",
+      "Setembro",
+      "Outubro",
+      "Novembro",
+      "Dezembro"
+    ];
+    const monthName = monthNames[Math.max(0, Math.min(11, targetMonth - 1))];
+    const monthLabel = `${monthName} de ${targetYear}`;
+    const isCurrentMonth = effectiveMonthKey === currentRealMonthKey;
+    const statusLabel = isCurrentMonth ? `${monthLabel} \xB7 Parcial` : monthLabel;
+    return {
+      year: targetYear,
+      month: targetMonth,
+      day,
+      hour,
+      minute,
+      monthKey: effectiveMonthKey,
+      monthName,
+      monthLabel,
+      statusLabel,
+      isCurrentMonth
+    };
+  }
+  /**
+   * Consolida e pontua os candidatos de Filmes ou Séries a partir dos snapshots semanais do mês
+   */
+  consolidateWeeklySnapshots(monthKey, rankType) {
+    const relevantSnapshots = this.imdbWeeklySnapshots.filter(
+      (s) => s.monthKey === monthKey && s.rankType === rankType
+    );
+    const candidatesMap = /* @__PURE__ */ new Map();
+    const sortedSnapshots = [...relevantSnapshots].sort((a, b) => a.capturedAt - b.capturedAt);
+    for (const snapshot of sortedSnapshots) {
+      for (const item of snapshot.items) {
+        const cleanId = String(item.imdbId || "").trim().toLowerCase();
+        if (!cleanId) continue;
+        const points = Math.max(1, 101 - item.position);
+        let candidate = candidatesMap.get(cleanId);
+        if (!candidate) {
+          candidate = {
+            imdbId: item.imdbId,
+            title: item.title,
+            originalTitle: item.originalTitle,
+            year: item.year,
+            rankType,
+            cumulativeScore: points,
+            bestPosition: item.position,
+            appearancesCount: 1,
+            originalPositions: [item.position],
+            source: item.source
+          };
+          candidatesMap.set(cleanId, candidate);
+        } else {
+          candidate.cumulativeScore += points;
+          candidate.appearancesCount += 1;
+          candidate.originalPositions.push(item.position);
+          if (item.position < candidate.bestPosition) {
+            candidate.bestPosition = item.position;
+          }
+        }
+      }
+    }
+    if (candidatesMap.size === 0) {
+      const fallbackSnapshots = this.imdbWeeklySnapshots.filter((s) => s.rankType === rankType).sort((a, b) => b.capturedAt - a.capturedAt);
+      if (fallbackSnapshots.length > 0) {
+        const latest = fallbackSnapshots[0];
+        for (const item of latest.items) {
+          const cleanId = String(item.imdbId || "").trim().toLowerCase();
+          if (!cleanId) continue;
+          const points = Math.max(1, 101 - item.position);
+          candidatesMap.set(cleanId, {
+            imdbId: item.imdbId,
+            title: item.title,
+            originalTitle: item.originalTitle,
+            year: item.year,
+            rankType,
+            cumulativeScore: points,
+            bestPosition: item.position,
+            appearancesCount: 1,
+            originalPositions: [item.position],
+            source: item.source
+          });
+        }
+      }
+    }
+    return Array.from(candidatesMap.values()).sort((a, b) => {
+      if (b.cumulativeScore !== a.cumulativeScore) {
+        return b.cumulativeScore - a.cumulativeScore;
+      }
+      if (a.bestPosition !== b.bestPosition) {
+        return a.bestPosition - b.bestPosition;
+      }
+      if (b.appearancesCount !== a.appearancesCount) {
+        return b.appearancesCount - a.appearancesCount;
+      }
+      const lastA = a.originalPositions[a.originalPositions.length - 1] ?? 100;
+      const lastB = b.originalPositions[b.originalPositions.length - 1] ?? 100;
+      return lastA - lastB;
+    });
+  }
+  /**
+   * Consolida e pontua os candidatos de Animes a partir dos dados e tendências do AniList
+   */
+  consolidateAniListCandidates(monthKey) {
+    const relevantSnapshot = this.anilistMonthlySnapshots.find((s) => s.monthKey === monthKey) || this.anilistMonthlySnapshots[0];
+    const candidates = [];
+    if (relevantSnapshot) {
+      for (const it of relevantSnapshot.items) {
+        const calcScore = Math.round(it.score * 10 + Math.max(1, 100 - it.trendingRank * 3));
+        candidates.push({
+          imdbId: `anilist-${it.aniListId}`,
+          aniListId: it.aniListId,
+          tmdbId: it.tmdbId,
+          title: it.title,
+          originalTitle: it.romajiTitle || it.nativeTitle,
+          year: it.year,
+          rankType: "anime",
+          cumulativeScore: calcScore,
+          bestPosition: it.position,
+          appearancesCount: 1,
+          originalPositions: [it.position],
+          source: "anilist"
+        });
+      }
+    }
+    return candidates.sort((a, b) => b.cumulativeScore - a.cumulativeScore);
+  }
+  /**
+   * Encontra a correspondência canônica de uma obra no catálogo unificado
+   * Prioridade rigorosa a identificadores exatos (IMDb ID, AniList ID, TMDB ID),
+   * nunca permitindo correspondências vagas de títulos ou remakes de anos divergentes.
+   */
+  findCanonicalItem(candidate, catalog) {
+    const candImdb = (candidate.imdbId || "").trim().toLowerCase();
+    const candAniList = candidate.aniListId;
+    const candTmdb = candidate.tmdbId ? String(candidate.tmdbId).trim() : void 0;
+    const candYear = candidate.year;
+    const candType = candidate.rankType;
+    if (candType === "anime" && candAniList) {
+      const matchAni = catalog.find((c) => {
+        if (c.aniListId && c.aniListId === candAniList) return true;
+        if (c.id && (c.id === `anime-anilist-${candAniList}` || c.id === `anilist-${candAniList}` || c.id === `anime:${candAniList}`)) return true;
+        if (c.canonicalId && c.canonicalId.includes(`anilist:${candAniList}`)) return true;
+        return false;
+      });
+      if (matchAni) return matchAni;
+    }
+    if (candImdb && candImdb.startsWith("tt")) {
+      const matchImdb = catalog.find((c) => {
+        const itemImdb = (c.imdbId || "").trim().toLowerCase();
+        if (itemImdb && itemImdb === candImdb) return true;
+        if (c.id && c.id.toLowerCase().includes(candImdb)) return true;
+        if (c.canonicalId && c.canonicalId.toLowerCase().includes(candImdb)) return true;
+        return false;
+      });
+      if (matchImdb) return matchImdb;
+    }
+    if (candTmdb) {
+      const matchTmdb = catalog.find((c) => {
+        if (c.tmdbId && String(c.tmdbId).trim() === candTmdb) return true;
+        if (c.id && c.id.includes(`tmdb-${candTmdb}`)) return true;
+        return false;
+      });
+      if (matchTmdb) return matchTmdb;
+    }
+    const normalize = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "").trim();
+    const normCandTitle = normalize(candidate.title);
+    const normCandOrig = candidate.originalTitle ? normalize(candidate.originalTitle) : "";
+    const textMatch = catalog.find((c) => {
+      if (candType === "movie" && !searchService.isMovieItem(c)) return false;
+      if (candType === "series" && (!searchService.isSeriesItem(c) || searchService.isAnimeItem(c))) return false;
+      if (candType === "anime" && !searchService.isAnimeItem(c)) return false;
+      if (candYear && c.year && Math.abs(c.year - candYear) > 1) {
+        return false;
+      }
+      const normTitle = normalize(c.title);
+      const normOrig = c.originalTitle ? normalize(c.originalTitle) : "";
+      const matches = normTitle === normCandTitle || normCandOrig && normTitle === normCandOrig || normOrig && normOrig === normCandTitle || normCandOrig && normOrig && normOrig === normCandOrig;
+      return matches;
+    });
+    return textMatch || null;
+  }
+  /**
+   * Resolve o Top 10 Mensal Oficial de uma categoria com verificação estrita de elegibilidade.
+   * Se um candidato for rejeitado, avança para o próximo da classificação mensal até completar 10.
+   */
+  resolveTop10Category(candidates, category, catalog, calendar) {
+    const rankedItems = [];
+    const audit = [];
+    const targetCount = 10;
+    const currentYear = calendar.year;
+    const todayStr = `${calendar.year}-${String(calendar.month).padStart(2, "0")}-${String(calendar.day).padStart(2, "0")}`;
+    const seenIds = /* @__PURE__ */ new Set();
+    for (let i = 0; i < candidates.length; i++) {
+      const cand = candidates[i];
+      const rankPosition = cand.bestPosition || i + 1;
+      const catalogItem = this.findCanonicalItem(cand, catalog);
+      if (!catalogItem) {
+        audit.push({
+          imdbId: cand.imdbId,
+          aniListId: cand.aniListId,
+          tmdbId: cand.tmdbId,
+          title: cand.title,
+          imdbTitle: cand.title,
+          year: cand.year,
+          mediaType: category,
+          rankPosition,
+          status: "REJECTED",
+          isIncluded: false,
+          availabilityStatus: "not_in_catalog",
+          rejectionReason: "Obra n\xE3o indexada no cat\xE1logo da ZapiTV",
+          score: cand.cumulativeScore
+        });
+        continue;
+      }
+      if (seenIds.has(catalogItem.id) || catalogItem.canonicalId && seenIds.has(catalogItem.canonicalId)) {
+        continue;
+      }
+      if (category === "movie") {
+        if (!searchService.isMovieItem(catalogItem)) {
+          audit.push({
+            imdbId: cand.imdbId,
+            title: cand.title,
+            canonicalTitle: catalogItem.title,
+            year: cand.year,
+            mediaType: "movie",
+            rankPosition,
+            status: "REJECTED",
+            isIncluded: false,
+            canonicalId: catalogItem.id,
+            rejectionReason: "Conte\xFAdo n\xE3o \xE9 um longa-metragem convencional",
+            score: cand.cumulativeScore
+          });
+          continue;
+        }
+      } else if (category === "series") {
+        if (searchService.isAnimeItem(catalogItem)) {
+          audit.push({
+            imdbId: cand.imdbId,
+            title: cand.title,
+            canonicalTitle: catalogItem.title,
+            year: cand.year,
+            mediaType: "series",
+            rankPosition,
+            status: "REJECTED",
+            isIncluded: false,
+            canonicalId: catalogItem.id,
+            rejectionReason: "Anime exclu\xEDdo do ranking de S\xE9ries (alocado no Top 10 Animes)",
+            score: cand.cumulativeScore
+          });
+          continue;
+        }
+        if (!searchService.isSeriesItem(catalogItem)) {
+          audit.push({
+            imdbId: cand.imdbId,
+            title: cand.title,
+            canonicalTitle: catalogItem.title,
+            year: cand.year,
+            mediaType: "series",
+            rankPosition,
+            status: "REJECTED",
+            isIncluded: false,
+            canonicalId: catalogItem.id,
+            rejectionReason: "Conte\xFAdo n\xE3o \xE9 uma s\xE9rie seriada de televis\xE3o",
+            score: cand.cumulativeScore
+          });
+          continue;
+        }
+      } else if (category === "anime") {
+        if (!searchService.isAnimeItem(catalogItem)) {
+          audit.push({
+            aniListId: cand.aniListId,
+            imdbId: cand.imdbId,
+            title: cand.title,
+            canonicalTitle: catalogItem.title,
+            year: cand.year,
+            mediaType: "anime",
+            rankPosition,
+            status: "REJECTED",
+            isIncluded: false,
+            canonicalId: catalogItem.id,
+            rejectionReason: "Conte\xFAdo n\xE3o \xE9 uma produ\xE7\xE3o de anima\xE7\xE3o japonesa (Anime)",
+            score: cand.cumulativeScore
+          });
+          continue;
+        }
+      }
+      const isOdyssey2026 = (catalogItem.imdbId === "tt33764258" || catalogItem.tmdbId === "1368337" || catalogItem.id.includes("odisseia")) && catalogItem.year === 2026;
+      if (isOdyssey2026) {
+        const releaseTimeBRT = (/* @__PURE__ */ new Date("2026-11-20T00:00:00-03:00")).getTime();
+        const nowTime = Date.now();
+        if (nowTime < releaseTimeBRT) {
+          audit.push({
+            imdbId: cand.imdbId,
+            title: cand.title,
+            canonicalTitle: catalogItem.title,
+            year: cand.year,
+            mediaType: category,
+            rankPosition,
+            status: "REJECTED",
+            isIncluded: false,
+            canonicalId: catalogItem.id,
+            rejectionReason: "Conte\xFAdo temporariamente oculto no cat\xE1logo p\xFAblico at\xE9 20/11/2026 \xE0s 00h00 BRT",
+            score: cand.cumulativeScore
+          });
+          continue;
+        }
+      }
+      const itemYear = Number(catalogItem.year || cand.year) || currentYear;
+      const isFuture = itemYear > currentYear || catalogItem.releaseDate && catalogItem.releaseDate > todayStr;
+      if (isFuture) {
+        audit.push({
+          imdbId: cand.imdbId,
+          title: cand.title,
+          canonicalTitle: catalogItem.title,
+          year: cand.year,
+          mediaType: category,
+          rankPosition,
+          status: "REJECTED",
+          isIncluded: false,
+          canonicalId: catalogItem.id,
+          rejectionReason: "T\xEDtulo ainda n\xE3o lan\xE7ado comercialmente (data de estreia futura)",
+          score: cand.cumulativeScore
+        });
+        continue;
+      }
+      if (category === "movie") {
+        const isTheatricallyAllowed = theatricalFilterService.isMovieAllowedSync(catalogItem);
+        if (!isTheatricallyAllowed) {
+          audit.push({
+            imdbId: cand.imdbId,
+            title: cand.title,
+            canonicalTitle: catalogItem.title,
+            year: cand.year,
+            mediaType: "movie",
+            rankPosition,
+            status: "REJECTED",
+            isIncluded: false,
+            canonicalId: catalogItem.id,
+            rejectionReason: "Filme em cartaz nos cinemas sem janela de streaming liberada",
+            score: cand.cumulativeScore
+          });
+          continue;
+        }
+      }
+      const isPlayable = catalogEligibilityService.isItemPubliclyPlayableSync(catalogItem);
+      const availKey = catalogEligibilityService.getCanonicalKey(catalogItem);
+      const availRec = mediaAvailabilityIndex.getRecord(availKey);
+      const isExplicitlyUnavailable = catalogItem.availabilityStatus === "unavailable" || catalogItem.availabilityStatus === "unreleased" || availRec && availRec.status === "UNAVAILABLE_CONFIRMED";
+      const hasConfirmedSources = Boolean(
+        catalogItem.id.startsWith("open-") || catalogItem.id.startsWith("anime-") || catalogItem.availabilityStatus === "verified" || catalogItem.verifiedStreams && catalogItem.verifiedStreams.length > 0 || catalogItem.videoUrl && catalogItem.videoUrl.trim().length > 0 || availRec && availRec.status === "AVAILABLE" && availRec.validatedSourceCount > 0
+      );
+      if (!isPlayable || isExplicitlyUnavailable || !hasConfirmedSources) {
+        audit.push({
+          imdbId: cand.imdbId,
+          title: cand.title,
+          canonicalTitle: catalogItem.title,
+          year: cand.year,
+          mediaType: category,
+          rankPosition,
+          status: "REJECTED",
+          isIncluded: false,
+          canonicalId: catalogItem.id,
+          rejectionReason: "Sem fontes v\xE1lidas ou reproduz\xEDveis dispon\xEDveis na ZapiTV",
+          score: cand.cumulativeScore
+        });
+        continue;
+      }
+      if (category === "series" || category === "anime" && catalogItem.mediaFormat !== "movie") {
+        const hasEpisodes = catalogItem.episodes && catalogItem.episodes.length > 0 || catalogItem.availabilityStatus === "verified" || availRec && (availRec.availableEpisodeCount ?? 0) > 0;
+        if (!hasEpisodes) {
+          audit.push({
+            imdbId: cand.imdbId,
+            title: cand.title,
+            canonicalTitle: catalogItem.title,
+            year: cand.year,
+            mediaType: category,
+            rankPosition,
+            status: "REJECTED",
+            isIncluded: false,
+            canonicalId: catalogItem.id,
+            rejectionReason: "S\xE9rie sem epis\xF3dios dispon\xEDveis e reproduz\xEDveis",
+            score: cand.cumulativeScore
+          });
+          continue;
+        }
+      }
+      const finalRank = rankedItems.length + 1;
+      seenIds.add(catalogItem.id);
+      if (catalogItem.canonicalId) seenIds.add(catalogItem.canonicalId);
+      const enrichedContentItem = {
+        ...catalogItem,
+        imdbId: cand.imdbId || catalogItem.imdbId,
+        isFeatured: true,
+        imdbRank: rankPosition,
+        displayRank: finalRank,
+        heroTags: [
+          ...catalogItem.heroTags || [],
+          {
+            id: `rank-${finalRank}`,
+            text: `#${finalRank} Em Destaque (${calendar.monthLabel})`,
+            color: category === "movie" ? "#007df7" : category === "series" ? "#c084fc" : "#06b6d4",
+            style: "solid"
+          }
+        ]
+      };
+      const rankedItem = {
+        position: finalRank,
+        canonicalId: catalogItem.canonicalId || catalogItem.id,
+        mediaType: category,
+        title: catalogItem.title,
+        originalTitle: catalogItem.originalTitle || cand.originalTitle,
+        year: catalogItem.year || cand.year,
+        poster: catalogItem.image,
+        backdrop: catalogItem.backdrop,
+        rating: catalogItem.rating,
+        item: enrichedContentItem,
+        calculatedScore: cand.cumulativeScore,
+        source: cand.source || (category === "anime" ? "anilist" : "imdb-consolidated"),
+        originalPosition: rankPosition,
+        monthKey: calendar.monthKey,
+        monthLabel: calendar.monthLabel,
+        isPartial: calendar.isCurrentMonth,
+        validationStatus: "verified",
+        updatedAt: Date.now()
+      };
+      rankedItems.push(rankedItem);
+      audit.push({
+        imdbId: cand.imdbId,
+        aniListId: cand.aniListId,
+        tmdbId: cand.tmdbId,
+        title: catalogItem.title,
+        imdbTitle: cand.title,
+        canonicalTitle: catalogItem.title,
+        year: catalogItem.year,
+        mediaType: category,
+        imdbRank: rankPosition,
+        displayRank: finalRank,
+        rankPosition,
+        finalPosition: finalRank,
+        status: "APPROVED",
+        isIncluded: true,
+        canonicalId: catalogItem.id,
+        availabilityStatus: catalogItem.availabilityStatus || "verified",
+        hasAudioPtBr: catalogItem.audioStatus === "pt-br-dubbed" || catalogItem.audioStatus === "pt-br-original",
+        audioStatus: catalogItem.audioStatus || "other",
+        verifiedSourcesCount: (catalogItem.verifiedStreams || []).length || 1,
+        score: cand.cumulativeScore
+      });
+      if (rankedItems.length >= targetCount) {
+        break;
+      }
+    }
+    return { rankedItems, audit };
+  }
+  /**
+   * Constrói o catálogo mestre ordenado garantindo que metadados canônicos validados
+   * tenham estrita prioridade sobre entradas estáticas legadas.
+   */
+  buildUnifiedCatalog(customCatalog) {
+    const catalogMap = /* @__PURE__ */ new Map();
+    const masterItems = canonicalCatalogMaster.getAllItemsSync ? canonicalCatalogMaster.getAllItemsSync() : [];
+    masterItems.forEach((it) => {
+      if (it && it.id) catalogMap.set(it.id, it);
+    });
+    if (customCatalog && Array.isArray(customCatalog)) {
+      customCatalog.forEach((it) => {
+        if (it && it.id && !catalogMap.has(it.id)) catalogMap.set(it.id, it);
+      });
+    }
+    VERIFIED_OPEN_ITEMS.forEach((it) => {
+      if (it && it.id && !catalogMap.has(it.id)) catalogMap.set(it.id, it);
+    });
+    filmesData.forEach((it) => {
+      if (it && it.id && !catalogMap.has(it.id)) catalogMap.set(it.id, it);
+    });
+    FEATURED_CATALOG_ITEMS.forEach((it) => {
+      if (it && it.id && !catalogMap.has(it.id)) {
+        catalogMap.set(it.id, it);
+      }
+    });
+    return Array.from(catalogMap.values());
+  }
+  /**
+   * Recalcula sincronicamente os 3 Rankings Mensais (Filmes, Séries e Animes)
+   */
+  recomputeMonthlyRankingsSync(queryMonthKey, customCatalog) {
+    const calendar = this.getSaoPauloCalendar(/* @__PURE__ */ new Date(), queryMonthKey);
+    const fullCatalog = this.buildUnifiedCatalog(customCatalog);
+    const movieCandidates = this.consolidateWeeklySnapshots(calendar.monthKey, "movie");
+    const moviesResult = this.resolveTop10Category(movieCandidates, "movie", fullCatalog, calendar);
+    const seriesCandidates = this.consolidateWeeklySnapshots(calendar.monthKey, "series");
+    const seriesResult = this.resolveTop10Category(seriesCandidates, "series", fullCatalog, calendar);
+    const animeCandidates = this.consolidateAniListCandidates(calendar.monthKey);
+    const animesResult = this.resolveTop10Category(animeCandidates, "anime", fullCatalog, calendar);
+    const nextDate = this.getNextScheduledUpdateDate();
+    const snapshot = {
+      monthKey: calendar.monthKey,
+      monthLabel: calendar.monthLabel,
+      year: calendar.year,
+      month: calendar.month,
+      isCurrentMonth: calendar.isCurrentMonth,
+      statusLabel: calendar.statusLabel,
+      lastUpdatedAt: Date.now(),
+      nextScheduledUpdate: nextDate.getTime(),
+      nextScheduledUpdateFormatted: this.formatNextScheduledRun(nextDate),
+      movies: moviesResult.rankedItems,
+      series: seriesResult.rankedItems,
+      animes: animesResult.rankedItems,
+      totalCandidatesEvaluated: {
+        movies: movieCandidates.length,
+        series: seriesCandidates.length,
+        animes: animeCandidates.length
+      },
+      auditTrail: {
+        approvedMovies: moviesResult.audit.filter((a) => a.status === "APPROVED"),
+        rejectedMovies: moviesResult.audit.filter((a) => a.status === "REJECTED"),
+        approvedSeries: seriesResult.audit.filter((a) => a.status === "APPROVED"),
+        rejectedSeries: seriesResult.audit.filter((a) => a.status === "REJECTED"),
+        approvedAnimes: animesResult.audit.filter((a) => a.status === "APPROVED"),
+        rejectedAnimes: animesResult.audit.filter((a) => a.status === "REJECTED")
+      }
+    };
+    this.cachedMonthlySnapshot = snapshot;
+    this.saveToStorage(snapshot);
+    this.dispatchUpdateEvent(snapshot);
+    return snapshot;
+  }
+  /**
+   * Obtém a data da próxima atualização semanal ou mensal agendada (segunda-feira ou dia 1 às 06:00 BRT)
+   */
+  getNextScheduledUpdateDate(fromTime = /* @__PURE__ */ new Date()) {
+    const d = new Date(fromTime.getTime());
+    const currentDay = d.getUTCDay();
+    const currentHour = d.getUTCHours();
+    const currentMinute = d.getUTCMinutes();
+    let daysUntilMonday = (1 - currentDay + 7) % 7;
+    if (daysUntilMonday === 0) {
+      if (currentHour > 9 || currentHour === 9 && currentMinute > 0) {
+        daysUntilMonday = 7;
+      }
+    }
+    const target = new Date(d.getTime());
+    target.setUTCDate(d.getUTCDate() + daysUntilMonday);
+    target.setUTCHours(9, 0, 0, 0);
+    return target;
+  }
+  formatNextScheduledRun(target) {
+    const brtTime = new Date(target.getTime() - 3 * 60 * 60 * 1e3);
+    const days = ["Domingo", "Segunda-feira", "Ter\xE7a-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "S\xE1bado"];
+    const dayName = days[target.getUTCDay()];
+    const day = String(brtTime.getUTCDate()).padStart(2, "0");
+    const month = String(brtTime.getUTCMonth() + 1).padStart(2, "0");
+    const year = brtTime.getUTCFullYear();
+    const hour = String(brtTime.getUTCHours()).padStart(2, "0");
+    const minute = String(brtTime.getUTCMinutes()).padStart(2, "0");
+    return `${dayName}, ${day}/${month}/${year} \xE0s ${hour}:${minute} (BRT)`;
+  }
+  /**
+   * Obtém o snapshot mensal atual de forma síncrona
+   */
+  getMonthlyRankingSync(queryMonthKey) {
+    if (!this.cachedMonthlySnapshot || queryMonthKey && this.cachedMonthlySnapshot.monthKey !== queryMonthKey) {
+      return this.recomputeMonthlyRankingsSync(queryMonthKey);
+    }
+    return this.cachedMonthlySnapshot;
+  }
+  /**
+   * Atualização assíncrona enriquecendo com AniList online se disponível
+   */
+  async refreshMonthlyRankings(queryMonthKey) {
+    if (this.isProcessing) {
+      return this.getMonthlyRankingSync(queryMonthKey);
+    }
+    this.isProcessing = true;
+    try {
+      try {
+        const liveAnimes = await aniListClient.getPopularAnimes(1, 20);
+        if (liveAnimes && liveAnimes.length > 0) {
+          liveAnimes.forEach((anime) => {
+            canonicalCatalogMaster.registerItem(anime);
+          });
+        }
+      } catch (e) {
+        console.warn("[MonthlyFeaturedRankingService] AniList live fetch skipped:", e);
+      }
+      return this.recomputeMonthlyRankingsSync(queryMonthKey);
+    } finally {
+      this.isProcessing = false;
+    }
+  }
+  /**
+   * Converte o snapshot mensal em formato compatível com FeaturedSelectionResult
+   */
+  toFeaturedSelectionResult(snapshot) {
+    return {
+      weekKey: `M-${snapshot.monthKey}`,
+      weekLabel: snapshot.monthLabel,
+      monthKey: snapshot.monthKey,
+      monthLabel: snapshot.monthLabel,
+      monthlyStatusLabel: snapshot.statusLabel,
+      isPartialMonth: snapshot.isCurrentMonth,
+      referenceDate: new Date(snapshot.lastUpdatedAt).toISOString().slice(0, 10),
+      lastUpdatedAt: snapshot.lastUpdatedAt,
+      lastCheckedAt: Date.now(),
+      nextScheduledUpdate: snapshot.nextScheduledUpdate,
+      nextScheduledUpdateFormatted: snapshot.nextScheduledUpdateFormatted,
+      sourceReference: "IMDb MOVIEmeter & TVmeter (Mensal Consolidado) + AniList",
+      updateStatus: "SUCCESS",
+      isProvisionalWeekly: false,
+      featuredMovies: snapshot.movies.map((m) => m.item),
+      featuredSeries: snapshot.series.map((s) => s.item),
+      featuredAnimes: snapshot.animes.map((a) => a.item),
+      monthlyRanking: snapshot,
+      totalCandidatesEvaluated: {
+        movies: snapshot.totalCandidatesEvaluated.movies,
+        series: snapshot.totalCandidatesEvaluated.series,
+        animes: snapshot.totalCandidatesEvaluated.animes
+      },
+      auditTrail: {
+        approvedMovies: snapshot.auditTrail.approvedMovies,
+        rejectedMovies: snapshot.auditTrail.rejectedMovies,
+        approvedSeries: snapshot.auditTrail.approvedSeries,
+        rejectedSeries: snapshot.auditTrail.rejectedSeries,
+        approvedAnimes: snapshot.auditTrail.approvedAnimes,
+        rejectedAnimes: snapshot.auditTrail.rejectedAnimes
+      }
+    };
+  }
+  loadFromStorage() {
+    if (this.storageAdapter) {
+      const data = this.storageAdapter.load();
+      if (data) {
+        this.cachedMonthlySnapshot = data;
+        return;
+      }
+    }
+    if (typeof window !== "undefined" && window.localStorage) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_MONTHLY_RANKINGS);
+        if (raw) {
+          this.cachedMonthlySnapshot = JSON.parse(raw);
+        }
+      } catch (e) {
+        console.warn("[MonthlyFeaturedRankingService] Falha ao ler cache do localStorage:", e);
+      }
+    }
+  }
+  saveToStorage(snapshot) {
+    if (this.storageAdapter) {
+      this.storageAdapter.save(snapshot);
+    }
+    if (typeof window !== "undefined" && window.localStorage) {
+      try {
+        localStorage.setItem(STORAGE_KEY_MONTHLY_RANKINGS, JSON.stringify(snapshot));
+      } catch (e) {
+        console.warn("[MonthlyFeaturedRankingService] Falha ao persistir no localStorage:", e);
+      }
+    }
+  }
+  dispatchUpdateEvent(snapshot) {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(EVENT_MONTHLY_RANKING_UPDATED, { detail: snapshot }));
+    }
+  }
+  subscribe(listener) {
+    if (typeof window === "undefined") return () => {
+    };
+    const handler = (e) => {
+      const custom = e;
+      if (custom.detail) {
+        listener(custom.detail);
+      } else if (this.cachedMonthlySnapshot) {
+        listener(this.cachedMonthlySnapshot);
+      }
+    };
+    window.addEventListener(EVENT_MONTHLY_RANKING_UPDATED, handler);
+    return () => {
+      window.removeEventListener(EVENT_MONTHLY_RANKING_UPDATED, handler);
+    };
+  }
+};
+var monthlyFeaturedRankingService = MonthlyFeaturedRankingService.getInstance();
+
 // src/core/rankings/FeaturedRankingService.ts
 init_theatricalFilterService();
 init_CatalogEligibilityService();
 init_MediaAvailabilityIndex();
-init_verifiedCatalog();
-init_featuredCatalogItems();
 init_searchService();
-init_constants();
 var STORAGE_KEY_FEATURED_SELECTION = "zapitv_featured_ranking_selection_v3";
 var EVENT_FEATURED_RANKING_UPDATED = "zapitv_featured_ranking_updated";
 var FeaturedRankingService = class _FeaturedRankingService {
@@ -17973,11 +19386,13 @@ var FeaturedRankingService = class _FeaturedRankingService {
   }
   /**
    * Consolida os snapshots semanais do mês utilizando a fórmula ponderada de popularidade
-   * (Mantido para retrocompatibilidade analítica)
+   * Derivação dinâmica do calendário no fuso America/Sao_Paulo (sem mês estático)
    */
-  computeMonthlyConsolidatedRanking(monthKey = "2026-10", rankType = "movie") {
+  computeMonthlyConsolidatedRanking(monthKey, rankType = "movie") {
+    const calendar = monthlyFeaturedRankingService.getSaoPauloCalendar(/* @__PURE__ */ new Date(), monthKey);
+    const effectiveMonthKey = calendar.monthKey;
     const relevantSnapshots = this.weeklySnapshots.filter(
-      (s) => s.monthKey === monthKey && s.rankType === rankType
+      (s) => s.monthKey === effectiveMonthKey && s.rankType === rankType
     );
     const isProvisionalWeekly = relevantSnapshots.length <= 1;
     const candidatesMap = /* @__PURE__ */ new Map();
@@ -18016,15 +19431,9 @@ var FeaturedRankingService = class _FeaturedRankingService {
       }
       return a.bestPosition - b.bestPosition;
     });
-    const monthNames = {
-      "2026-10": "Outubro de 2026",
-      "2026-09": "Setembro de 2026",
-      "2026-11": "Novembro de 2026",
-      "2026-12": "Dezembro de 2026"
-    };
     return {
-      monthKey,
-      monthLabel: monthNames[monthKey] || `M\xEAs ${monthKey}`,
+      monthKey: effectiveMonthKey,
+      monthLabel: calendar.monthLabel,
       rankType,
       isProvisionalWeekly,
       snapshotsIncluded: relevantSnapshots.map((s) => s.id),
@@ -18298,68 +19707,51 @@ var FeaturedRankingService = class _FeaturedRankingService {
     return { approvedItems, audit };
   }
   /**
-   * Recalcula a seleção semanal de Em Destaque com o catálogo completo disponível
+   * Recalcula a seleção de Em Destaque com o catálogo completo disponível
+   * utilizando a consolidação mensal autêntica (Filmes, Séries e Animes)
    */
   recomputeFeaturedSelectionSync(customCatalog) {
-    const catalogMap = /* @__PURE__ */ new Map();
-    FEATURED_CATALOG_ITEMS.forEach((it) => catalogMap.set(it.id, it));
-    VERIFIED_OPEN_ITEMS.forEach((it) => {
-      if (!catalogMap.has(it.id)) catalogMap.set(it.id, it);
-    });
-    filmesData.forEach((it) => {
-      if (!catalogMap.has(it.id)) catalogMap.set(it.id, it);
-    });
-    if (customCatalog && Array.isArray(customCatalog)) {
-      customCatalog.forEach((it) => {
-        if (!catalogMap.has(it.id)) catalogMap.set(it.id, it);
-      });
-    }
-    const fullCatalog = Array.from(catalogMap.values());
-    const moviesWeekly = this.computeWeeklyRanking("movie");
-    const seriesWeekly = this.computeWeeklyRanking("series");
-    const moviesResult = this.resolveEligibleTop10(moviesWeekly.candidates, "movie", fullCatalog);
-    const seriesResult = this.resolveEligibleTop10(seriesWeekly.candidates, "series", fullCatalog);
-    const movieRankingIds = new Set(moviesWeekly.candidates.map((c) => c.imdbId.toLowerCase()));
-    for (const item of moviesResult.approvedItems) {
-      if (!item.imdbId || !movieRankingIds.has(item.imdbId.toLowerCase())) {
-        throw new Error(`[Assertiva Falhou] Filme '${item.title}' (${item.imdbId}) fora do ranking IMDb MOVIEmeter`);
-      }
-    }
-    const tvRankingIds = new Set(seriesWeekly.candidates.map((c) => c.imdbId.toLowerCase()));
-    for (const item of seriesResult.approvedItems) {
-      if (!item.imdbId || !tvRankingIds.has(item.imdbId.toLowerCase())) {
-        throw new Error(`[Assertiva Falhou] S\xE9rie '${item.title}' (${item.imdbId}) fora do ranking IMDb TVmeter`);
-      }
-    }
-    const approvedMovies = moviesResult.audit.filter((a) => a.status === "APPROVED");
-    const rejectedMovies = moviesResult.audit.filter((a) => a.status === "REJECTED");
-    const approvedSeries = seriesResult.audit.filter((a) => a.status === "APPROVED");
-    const rejectedSeries = seriesResult.audit.filter((a) => a.status === "REJECTED");
+    const calendar = monthlyFeaturedRankingService.getSaoPauloCalendar();
+    const fullCatalog = monthlyFeaturedRankingService.buildUnifiedCatalog(customCatalog);
+    const monthlySnap = monthlyFeaturedRankingService.recomputeMonthlyRankingsSync(calendar.monthKey, fullCatalog);
+    const approvedMovies = monthlySnap.auditTrail.approvedMovies;
+    const rejectedMovies = monthlySnap.auditTrail.rejectedMovies;
+    const approvedSeries = monthlySnap.auditTrail.approvedSeries;
+    const rejectedSeries = monthlySnap.auditTrail.rejectedSeries;
+    const approvedAnimes = monthlySnap.auditTrail.approvedAnimes;
+    const rejectedAnimes = monthlySnap.auditTrail.rejectedAnimes;
     const nextDate = this.getNextMonday6AMBRT();
     const result = {
-      weekKey: moviesWeekly.snapshot.weekKey || "2026-W41",
-      weekLabel: moviesWeekly.snapshot.weekLabel || "Semana 41 (Outubro de 2026)",
-      monthKey: moviesWeekly.snapshot.monthKey || "2026-10",
-      monthLabel: "Outubro de 2026",
-      referenceDate: moviesWeekly.snapshot.referenceDate,
+      weekKey: `M-${monthlySnap.monthKey}`,
+      weekLabel: monthlySnap.monthLabel,
+      monthKey: monthlySnap.monthKey,
+      monthLabel: monthlySnap.monthLabel,
+      monthlyStatusLabel: monthlySnap.statusLabel,
+      isPartialMonth: monthlySnap.isCurrentMonth,
+      referenceDate: new Date(monthlySnap.lastUpdatedAt).toISOString().slice(0, 10),
       lastUpdatedAt: Date.now(),
       lastCheckedAt: Date.now(),
       nextScheduledUpdate: nextDate.getTime(),
       nextScheduledUpdateFormatted: this.formatNextScheduledRun(nextDate),
-      sourceReference: "IMDb MOVIEmeter & TVmeter (Ranking Semanal)",
+      sourceReference: "IMDb MOVIEmeter & TVmeter (Mensal Consolidado) + AniList",
       updateStatus: "SUCCESS",
       isProvisionalWeekly: false,
-      featuredMovies: moviesResult.approvedItems,
-      featuredSeries: seriesResult.approvedItems,
+      featuredMovies: monthlySnap.movies.map((m) => m.item),
+      featuredSeries: monthlySnap.series.map((s) => s.item),
+      featuredAnimes: monthlySnap.animes.map((a) => a.item),
+      monthlyRanking: monthlySnap,
       totalCandidatesEvaluated: {
-        movies: moviesWeekly.candidates.length,
-        series: seriesWeekly.candidates.length
+        movies: monthlySnap.totalCandidatesEvaluated.movies,
+        series: monthlySnap.totalCandidatesEvaluated.series,
+        animes: monthlySnap.totalCandidatesEvaluated.animes
       },
       auditTrail: {
         approvedMovies,
         rejectedMovies,
         approvedSeries,
-        rejectedSeries
+        rejectedSeries,
+        approvedAnimes,
+        rejectedAnimes
       }
     };
     this.cachedSelection = result;
@@ -18494,7 +19886,7 @@ var FeaturedRankingService = class _FeaturedRankingService {
       const raw = localStorage.getItem(STORAGE_KEY_FEATURED_SELECTION);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.referenceDate === "2026-10-12" && Array.isArray(parsed.featuredMovies) && parsed.featuredMovies.length === 10 && Array.isArray(parsed.featuredSeries) && parsed.featuredSeries.length === 10) {
+        if (parsed && parsed.monthKey && Array.isArray(parsed.featuredMovies) && parsed.featuredMovies.length === 10 && Array.isArray(parsed.featuredSeries) && parsed.featuredSeries.length === 10) {
           const hasOutdatedSeries = parsed.featuredSeries.some(
             (s) => s.title === "Pinguim" || s.title === "Disclaimer" || s.title === "The Pitt" || s.title === "O Urso"
           );
@@ -22521,6 +23913,31 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     }
   });
   const FEATURED_CACHE_FILE = path4.resolve(process.cwd(), "data", "featured_weekly_selection.json");
+  const MONTHLY_FEATURED_CACHE_FILE = path4.resolve(process.cwd(), "data", "monthly_featured_rankings.json");
+  monthlyFeaturedRankingService.setStorageAdapter({
+    load: () => {
+      try {
+        if (fs4.existsSync(MONTHLY_FEATURED_CACHE_FILE)) {
+          const raw = fs4.readFileSync(MONTHLY_FEATURED_CACHE_FILE, "utf-8");
+          if (raw) return JSON.parse(raw);
+        }
+      } catch (e) {
+        console.warn("[Server] Falha ao carregar cache do ranking mensal do disco:", e);
+      }
+      return null;
+    },
+    save: (data) => {
+      try {
+        const dir = path4.dirname(MONTHLY_FEATURED_CACHE_FILE);
+        if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
+        const tmpFile = `${MONTHLY_FEATURED_CACHE_FILE}.${Date.now()}.tmp`;
+        fs4.writeFileSync(tmpFile, JSON.stringify(data, null, 2), "utf-8");
+        fs4.renameSync(tmpFile, MONTHLY_FEATURED_CACHE_FILE);
+      } catch (e) {
+        console.warn("[Server] Falha ao persistir cache do ranking mensal no disco:", e);
+      }
+    }
+  });
   featuredRankingService.setStorageAdapter({
     load: () => {
       try {
@@ -22554,6 +23971,26 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       res.status(500).json({ error: "Falha ao obter rankings em destaque", details: err?.message });
     }
   });
+  app2.get("/api/featured/monthly", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const monthQuery = typeof req.query.month === "string" ? req.query.month : void 0;
+      const snapshot = monthlyFeaturedRankingService.getMonthlyRankingSync(monthQuery);
+      res.json(snapshot);
+    } catch (err) {
+      res.status(500).json({ error: "Falha ao obter rankings mensais", details: err?.message });
+    }
+  });
+  app2.post("/api/featured/monthly/refresh", requireMaintenanceAdmin, async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    try {
+      const monthQuery = typeof req.query.month === "string" ? req.query.month : void 0;
+      const snapshot = await monthlyFeaturedRankingService.refreshMonthlyRankings(monthQuery);
+      res.json(snapshot);
+    } catch (err) {
+      res.status(500).json({ error: "Falha ao atualizar rankings mensais", details: err?.message });
+    }
+  });
   app2.post("/api/featured/refresh", requireMaintenanceAdmin, async (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
@@ -22566,17 +24003,21 @@ ${s.name?.split("\n")[1] || "1080p"}`,
   const handleFeaturedCron = async (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
-      console.log("[Server] Acionamento cron semanal de Em Destaque recebido...");
+      console.log("[Server] Acionamento cron de Em Destaque (Mensal + Semanal) recebido...");
+      const monthlyResult = await monthlyFeaturedRankingService.refreshMonthlyRankings();
       const result = await featuredRankingService.runWeeklyScheduledUpdate({ force: false });
       return res.json({
         success: true,
+        monthKey: monthlyResult.monthKey,
+        monthLabel: monthlyResult.monthLabel,
+        statusLabel: monthlyResult.statusLabel,
+        moviesCount: monthlyResult.movies.length,
+        seriesCount: monthlyResult.series.length,
+        animesCount: monthlyResult.animes.length,
         weekKey: result.weekKey,
         weekLabel: result.weekLabel,
-        referenceDate: result.referenceDate,
-        lastUpdatedAt: result.lastUpdatedAt,
-        nextScheduledUpdateFormatted: result.nextScheduledUpdateFormatted,
-        moviesCount: result.featuredMovies.length,
-        seriesCount: result.featuredSeries.length,
+        lastUpdatedAt: monthlyResult.lastUpdatedAt,
+        nextScheduledUpdateFormatted: monthlyResult.nextScheduledUpdateFormatted,
         status: result.updateStatus
       });
     } catch (err) {

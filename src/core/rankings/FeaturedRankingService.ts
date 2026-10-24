@@ -21,6 +21,8 @@ import {
 } from './featuredRankingTypes';
 import { OFFICIAL_IMDB_WEEKLY_SNAPSHOTS } from './imdbRankingSnapshots';
 import { imdbWeeklyRankingService } from './IMDbWeeklyRankingService';
+import { monthlyFeaturedRankingService } from './MonthlyFeaturedRankingService';
+import { canonicalCatalogMaster } from '../catalog/CanonicalCatalogMaster';
 import { theatricalFilterService } from '../catalog/theatricalFilterService';
 import { catalogEligibilityService } from '../catalog/CatalogEligibilityService';
 import { mediaAvailabilityIndex } from '../catalog/MediaAvailabilityIndex';
@@ -181,14 +183,16 @@ class FeaturedRankingService {
 
   /**
    * Consolida os snapshots semanais do mês utilizando a fórmula ponderada de popularidade
-   * (Mantido para retrocompatibilidade analítica)
+   * Derivação dinâmica do calendário no fuso America/Sao_Paulo (sem mês estático)
    */
   public computeMonthlyConsolidatedRanking(
-    monthKey: string = '2026-10',
+    monthKey?: string,
     rankType: RankingMediaType = 'movie'
   ): ConsolidatedMonthlyRanking {
+    const calendar = monthlyFeaturedRankingService.getSaoPauloCalendar(new Date(), monthKey);
+    const effectiveMonthKey = calendar.monthKey;
     const relevantSnapshots = this.weeklySnapshots.filter(
-      s => s.monthKey === monthKey && s.rankType === rankType
+      s => s.monthKey === effectiveMonthKey && s.rankType === rankType
     );
 
     const isProvisionalWeekly = relevantSnapshots.length <= 1;
@@ -233,16 +237,9 @@ class FeaturedRankingService {
       return a.bestPosition - b.bestPosition;
     });
 
-    const monthNames: Record<string, string> = {
-      '2026-10': 'Outubro de 2026',
-      '2026-09': 'Setembro de 2026',
-      '2026-11': 'Novembro de 2026',
-      '2026-12': 'Dezembro de 2026'
-    };
-
     return {
-      monthKey,
-      monthLabel: monthNames[monthKey] || `Mês ${monthKey}`,
+      monthKey: effectiveMonthKey,
+      monthLabel: calendar.monthLabel,
       rankType,
       isProvisionalWeekly,
       snapshotsIncluded: relevantSnapshots.map(s => s.id),
@@ -574,79 +571,56 @@ class FeaturedRankingService {
   }
 
   /**
-   * Recalcula a seleção semanal de Em Destaque com o catálogo completo disponível
+   * Recalcula a seleção de Em Destaque com o catálogo completo disponível
+   * utilizando a consolidação mensal autêntica (Filmes, Séries e Animes)
    */
   public recomputeFeaturedSelectionSync(customCatalog?: ContentItem[]): FeaturedSelectionResult {
-    const catalogMap = new Map<string, ContentItem>();
-    FEATURED_CATALOG_ITEMS.forEach(it => catalogMap.set(it.id, it));
-    VERIFIED_OPEN_ITEMS.forEach(it => {
-      if (!catalogMap.has(it.id)) catalogMap.set(it.id, it);
-    });
-    filmesData.forEach(it => {
-      if (!catalogMap.has(it.id)) catalogMap.set(it.id, it);
-    });
-    if (customCatalog && Array.isArray(customCatalog)) {
-      customCatalog.forEach(it => {
-        if (!catalogMap.has(it.id)) catalogMap.set(it.id, it);
-      });
-    }
-    const fullCatalog = Array.from(catalogMap.values());
+    const calendar = monthlyFeaturedRankingService.getSaoPauloCalendar();
+    const fullCatalog = monthlyFeaturedRankingService.buildUnifiedCatalog(customCatalog);
 
-    // Obtém o ranking semanal mais recente
-    const moviesWeekly = this.computeWeeklyRanking('movie');
-    const seriesWeekly = this.computeWeeklyRanking('series');
+    // Executa a consolidação mensal oficial
+    const monthlySnap = monthlyFeaturedRankingService.recomputeMonthlyRankingsSync(calendar.monthKey, fullCatalog);
 
-    const moviesResult = this.resolveEligibleTop10(moviesWeekly.candidates, 'movie', fullCatalog);
-    const seriesResult = this.resolveEligibleTop10(seriesWeekly.candidates, 'series', fullCatalog);
-
-    // =========================================================================
-    // ASSERTIVAS OBRIGATÓRIAS (Seção 14 da Especificação Oficial)
-    // =========================================================================
-    const movieRankingIds = new Set(moviesWeekly.candidates.map(c => c.imdbId.toLowerCase()));
-    for (const item of moviesResult.approvedItems) {
-      if (!item.imdbId || !movieRankingIds.has(item.imdbId.toLowerCase())) {
-        throw new Error(`[Assertiva Falhou] Filme '${item.title}' (${item.imdbId}) fora do ranking IMDb MOVIEmeter`);
-      }
-    }
-
-    const tvRankingIds = new Set(seriesWeekly.candidates.map(c => c.imdbId.toLowerCase()));
-    for (const item of seriesResult.approvedItems) {
-      if (!item.imdbId || !tvRankingIds.has(item.imdbId.toLowerCase())) {
-        throw new Error(`[Assertiva Falhou] Série '${item.title}' (${item.imdbId}) fora do ranking IMDb TVmeter`);
-      }
-    }
-
-    const approvedMovies = moviesResult.audit.filter(a => a.status === 'APPROVED');
-    const rejectedMovies = moviesResult.audit.filter(a => a.status === 'REJECTED');
-    const approvedSeries = seriesResult.audit.filter(a => a.status === 'APPROVED');
-    const rejectedSeries = seriesResult.audit.filter(a => a.status === 'REJECTED');
+    const approvedMovies = monthlySnap.auditTrail.approvedMovies;
+    const rejectedMovies = monthlySnap.auditTrail.rejectedMovies;
+    const approvedSeries = monthlySnap.auditTrail.approvedSeries;
+    const rejectedSeries = monthlySnap.auditTrail.rejectedSeries;
+    const approvedAnimes = monthlySnap.auditTrail.approvedAnimes;
+    const rejectedAnimes = monthlySnap.auditTrail.rejectedAnimes;
 
     const nextDate = this.getNextMonday6AMBRT();
 
     const result: FeaturedSelectionResult = {
-      weekKey: moviesWeekly.snapshot.weekKey || '2026-W41',
-      weekLabel: moviesWeekly.snapshot.weekLabel || 'Semana 41 (Outubro de 2026)',
-      monthKey: moviesWeekly.snapshot.monthKey || '2026-10',
-      monthLabel: 'Outubro de 2026',
-      referenceDate: moviesWeekly.snapshot.referenceDate,
+      weekKey: `M-${monthlySnap.monthKey}`,
+      weekLabel: monthlySnap.monthLabel,
+      monthKey: monthlySnap.monthKey,
+      monthLabel: monthlySnap.monthLabel,
+      monthlyStatusLabel: monthlySnap.statusLabel,
+      isPartialMonth: monthlySnap.isCurrentMonth,
+      referenceDate: new Date(monthlySnap.lastUpdatedAt).toISOString().slice(0, 10),
       lastUpdatedAt: Date.now(),
       lastCheckedAt: Date.now(),
       nextScheduledUpdate: nextDate.getTime(),
       nextScheduledUpdateFormatted: this.formatNextScheduledRun(nextDate),
-      sourceReference: 'IMDb MOVIEmeter & TVmeter (Ranking Semanal)',
+      sourceReference: 'IMDb MOVIEmeter & TVmeter (Mensal Consolidado) + AniList',
       updateStatus: 'SUCCESS',
       isProvisionalWeekly: false,
-      featuredMovies: moviesResult.approvedItems,
-      featuredSeries: seriesResult.approvedItems,
+      featuredMovies: monthlySnap.movies.map(m => m.item),
+      featuredSeries: monthlySnap.series.map(s => s.item),
+      featuredAnimes: monthlySnap.animes.map(a => a.item),
+      monthlyRanking: monthlySnap,
       totalCandidatesEvaluated: {
-        movies: moviesWeekly.candidates.length,
-        series: seriesWeekly.candidates.length
+        movies: monthlySnap.totalCandidatesEvaluated.movies,
+        series: monthlySnap.totalCandidatesEvaluated.series,
+        animes: monthlySnap.totalCandidatesEvaluated.animes
       },
       auditTrail: {
         approvedMovies,
         rejectedMovies,
         approvedSeries,
-        rejectedSeries
+        rejectedSeries,
+        approvedAnimes,
+        rejectedAnimes
       }
     };
 
@@ -816,7 +790,7 @@ class FeaturedRankingService {
         const parsed = JSON.parse(raw);
         if (
           parsed &&
-          parsed.referenceDate === '2026-10-12' &&
+          parsed.monthKey &&
           Array.isArray(parsed.featuredMovies) &&
           parsed.featuredMovies.length === 10 &&
           Array.isArray(parsed.featuredSeries) &&

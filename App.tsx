@@ -2495,12 +2495,16 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       case 'featured': {
         const rawMovies = featuredSelection?.featuredMovies || [];
         const rawSeries = featuredSelection?.featuredSeries || [];
+        const rawAnimes = featuredSelection?.featuredAnimes || [];
 
         const eligibleMovies = catalogEligibilityService.filterEligibleItemsSync(
           deduplicateContentItems(rawMovies.filter(it => searchService.isMovieItem(it)))
         );
         const eligibleSeries = catalogEligibilityService.filterEligibleItemsSync(
-          deduplicateContentItems(rawSeries.filter(it => searchService.isSeriesItem(it)))
+          deduplicateContentItems(rawSeries.filter(it => searchService.isSeriesItem(it) && !searchService.isAnimeItem(it)))
+        );
+        const eligibleAnimes = catalogEligibilityService.filterEligibleItemsSync(
+          deduplicateContentItems(rawAnimes.filter(it => searchService.isAnimeItem(it)))
         );
 
         // Associa cada obra ao seu rank real (1 a 10) no Top 10 oficial
@@ -2514,6 +2518,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           rank: idx + 1
         }));
 
+        const top10AnimesWithRank = eligibleAnimes.slice(0, 10).map((item, idx) => ({
+          item,
+          rank: idx + 1
+        }));
+
         // Preserva a classificação original dos títulos restantes mesmo com lacunas por gênero/busca
         const displayMovies = top10MoviesWithRank
           .filter(({ item }) => !selectedGenre || selectedGenre === 'Todos' || item.genres?.includes(selectedGenre))
@@ -2522,6 +2531,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         const displaySeries = top10SeriesWithRank
           .filter(({ item }) => !selectedGenre || selectedGenre === 'Todos' || item.genres?.includes(selectedGenre))
           .filter(({ item }) => !submittedSearchQuery || item.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()));
+
+        const displayAnimes = top10AnimesWithRank
+          .filter(({ item }) => !selectedGenre || selectedGenre === 'Todos' || item.genres?.includes(selectedGenre))
+          .filter(({ item }) => !submittedSearchQuery || item.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()));
+
+        const monthlyStatusLabel = featuredSelection?.monthlyStatusLabel || (featuredSelection?.monthLabel ? `${featuredSelection.monthLabel} · Parcial` : 'Mês Atual · Parcial');
 
         return (
           <ViewWrapper>
@@ -2532,14 +2547,17 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                   <h2 className={titleClass}>
                     Em Destaque
                   </h2>
+                  <span className="text-xs sm:text-sm font-semibold px-2.5 py-1 rounded-md bg-[#007df7]/15 text-[#007df7] border border-[#007df7]/30 tracking-wide">
+                    {monthlyStatusLabel}
+                  </span>
                   <GenreDropdown genres={availableGenres} selectedGenre={selectedGenre} onSelect={handleSelectGenre} isDarkMode={isDarkMode} />
                 </div>
               </div>
 
-              {/* SEÇÃO 1: FILMES EM DESTAQUE (TOP 10 CARROSSEL HORIZONTAL) */}
+              {/* SEÇÃO 1: TOP 10 FILMES DO MÊS (CARROSSEL HORIZONTAL RANKING) */}
               <FeaturedRankedCarousel
-                title="Filmes em Destaque"
-                subtitle="Os títulos mais populares e aclamados da semana"
+                title="Top 10 Filmes do Mês"
+                subtitle={`${monthlyStatusLabel} · Filmes mais populares e aclamados`}
                 icon={Film}
                 iconColor="#007df7"
                 items={displayMovies}
@@ -2552,10 +2570,10 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 emptyMessage="Nenhum filme em destaque corresponde ao filtro selecionado."
               />
 
-              {/* SEÇÃO 2: SÉRIES EM DESTAQUE (TOP 10 CARROSSEL HORIZONTAL) */}
+              {/* SEÇÃO 2: TOP 10 SÉRIES DO MÊS (CARROSSEL HORIZONTAL RANKING) */}
               <FeaturedRankedCarousel
-                title="Séries em Destaque"
-                subtitle="As séries mais populares e aclamadas da semana"
+                title="Top 10 Séries do Mês"
+                subtitle={`${monthlyStatusLabel} · Séries mais assistidas e aclamadas`}
                 icon={Tv}
                 iconColor="#c084fc"
                 items={displaySeries}
@@ -2566,6 +2584,22 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 onToggleFavorite={toggleFavorite}
                 onToggleList={toggleMyList}
                 emptyMessage="Nenhuma série em destaque corresponde ao filtro selecionado."
+              />
+
+              {/* SEÇÃO 3: TOP 10 ANIMES DO MÊS (CARROSSEL HORIZONTAL RANKING) */}
+              <FeaturedRankedCarousel
+                title="Top 10 Animes do Mês"
+                subtitle={`${monthlyStatusLabel} · Animes mais populares e tendências da temporada`}
+                icon={Flame}
+                iconColor="#06b6d4"
+                items={displayAnimes}
+                isDarkMode={isDarkMode}
+                onItemClick={handleSelectContent}
+                favorites={favorites}
+                myList={myList}
+                onToggleFavorite={toggleFavorite}
+                onToggleList={toggleMyList}
+                emptyMessage="Nenhum anime em destaque corresponde ao filtro selecionado."
               />
             </div>
           </ViewWrapper>

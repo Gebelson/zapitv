@@ -1,10 +1,11 @@
 /**
- * ZAPITV — TIPOS DO SISTEMA DE RANKINGS EM DESTAQUE (IMDb POPULARITY + REAL AVAILABILITY)
+ * ZAPITV — TIPOS DO SISTEMA DE RANKINGS EM DESTAQUE (IMDb + ANILIST + DISPONIBILIDADE REAL)
+ * Suporte a Rankings Mensais Independentes: Filmes, Séries e Animes
  */
 
 import { ContentItem } from '../../../types';
 
-export type RankingMediaType = 'movie' | 'series';
+export type RankingMediaType = 'movie' | 'series' | 'anime';
 
 export interface ImdbRankItem {
   rankType: RankingMediaType;
@@ -15,7 +16,7 @@ export interface ImdbRankItem {
   year?: number;              // Ano de lançamento
   referenceDate: string;      // Data de referência do ranking (YYYY-MM-DD)
   capturedAt: number;         // Timestamp da captura do snapshot
-  source: 'imdb-moviemeter' | 'imdb-tvmeter';
+  source: 'imdb-moviemeter' | 'imdb-tvmeter' | 'anilist' | 'admin-import';
 }
 
 export interface ImdbWeeklySnapshot {
@@ -49,6 +50,9 @@ export interface ConsolidatedMonthlyCandidate {
   bestPosition: number;        // Melhor posição atingida no mês
   appearancesCount: number;    // Quantidade de snapshots semanais em que o título apareceu
   originalPositions: number[]; // Posições registradas em cada snapshot do mês
+  source?: string;
+  aniListId?: number;
+  tmdbId?: string;
 }
 
 export interface ConsolidatedMonthlyRanking {
@@ -61,16 +65,18 @@ export interface ConsolidatedMonthlyRanking {
 }
 
 export interface FeaturedAuditItem {
-  imdbId: string;
+  imdbId?: string;
+  aniListId?: number;
+  tmdbId?: string;
   title: string;
   imdbTitle?: string;
   canonicalTitle?: string;
   year?: number;
   mediaType: RankingMediaType;
-  imdbRank: number;            // Posição original no ranking da semana IMDb
+  imdbRank?: number;           // Posição original no ranking IMDb/AniList
   displayRank?: number;        // Posição final atribuída no Top 10 (#1 a #10)
-  rankPosition: number;        // Compatibilidade: posição original IMDb
-  finalPosition?: number;      // Compatibilidade: posição final (#1 a #10)
+  rankPosition: number;        // Posição de origem no ranking avaliado
+  finalPosition?: number;      // Posição final (#1 a #10)
   status: 'APPROVED' | 'REJECTED';
   isIncluded: boolean;         // true se incluído no Top 10
   rejectionReason?: string;    // Motivo explícito de exclusão conforme regras de elegibilidade
@@ -79,34 +85,97 @@ export interface FeaturedAuditItem {
   hasAudioPtBr?: boolean;      // Disponibilidade de áudio PT-BR (não obrigatório para aprovação)
   audioStatus?: string;        // 'pt-br-dubbed' | 'pt-br-original' | 'other'
   verifiedSourcesCount?: number;
+  score?: number;
 }
 
 export type FeaturedUpdateStatus = 'SUCCESS' | 'IDLE' | 'UP_TO_DATE' | 'FALLBACK_RETAINED' | 'ERROR';
 
-export interface FeaturedSelectionResult {
-  weekKey: string;                           // ex: '2026-W42'
-  weekLabel: string;                         // ex: 'Semana 42 (Outubro de 2026)'
-  monthKey: string;                          // Retrocompatibilidade: '2026-10'
-  monthLabel: string;                        // Retrocompatibilidade: 'Outubro de 2026'
-  referenceDate: string;                     // ex: '2026-10-12'
-  lastUpdatedAt: number;                     // Timestamp ms da última publicação bem-sucedida
-  lastCheckedAt?: number;                    // Timestamp ms da última verificação executada
-  nextScheduledUpdate: number;               // Timestamp ms da próxima execução agendada (segunda 06:00 BRT)
-  nextScheduledUpdateFormatted: string;      // ex: 'Segunda-feira, 19/10/2026 às 06:00 (BRT)'
-  sourceReference: string;                   // ex: 'IMDb MOVIEmeter & TVmeter (Ranking Semanal)'
-  updateStatus: FeaturedUpdateStatus;        // Status da última operação de atualização
-  lastErrorReason?: string;                  // Detalhe de erro caso tenha ocorrido fallback
-  isProvisionalWeekly: boolean;
-  featuredMovies: ContentItem[];
-  featuredSeries: ContentItem[];
+/**
+ * Item individual classificado em um dos Top 10 Mensais Oficiais
+ */
+export interface MonthlyRankedItem {
+  position: number;            // Posição oficial no Top 10 da ZapiTV (1..10)
+  canonicalId: string;
+  mediaType: RankingMediaType;
+  title: string;
+  originalTitle?: string;
+  year?: number;
+  poster: string;
+  backdrop?: string;
+  rating?: number;
+  item: ContentItem;
+  calculatedScore: number;     // Pontuação mensal calculada pela fórmula oficial
+  source: string;              // 'imdb-moviemeter' | 'imdb-tvmeter' | 'anilist' | 'tmdb'
+  originalPosition?: number;   // Posição de origem no provedor
+  monthKey: string;            // '2026-10'
+  monthLabel: string;          // 'Outubro de 2026'
+  isPartial: boolean;          // true se o mês está em andamento ("Outubro de 2026 · Parcial")
+  validationStatus: string;
+  updatedAt: number;
+}
+
+/**
+ * Snapshot oficial de ranking mensal consolidado
+ */
+export interface MonthlyRankingSnapshot {
+  monthKey: string;            // '2026-10'
+  monthLabel: string;          // 'Outubro de 2026'
+  year: number;
+  month: number;               // 1..12
+  isCurrentMonth: boolean;
+  statusLabel: string;         // 'Outubro de 2026 · Parcial' ou 'Outubro de 2026'
+  lastUpdatedAt: number;
+  nextScheduledUpdate: number;
+  nextScheduledUpdateFormatted: string;
+  movies: MonthlyRankedItem[];
+  series: MonthlyRankedItem[];
+  animes: MonthlyRankedItem[];
   totalCandidatesEvaluated: {
     movies: number;
     series: number;
+    animes: number;
   };
   auditTrail: {
     approvedMovies: FeaturedAuditItem[];
     rejectedMovies: FeaturedAuditItem[];
     approvedSeries: FeaturedAuditItem[];
     rejectedSeries: FeaturedAuditItem[];
+    approvedAnimes: FeaturedAuditItem[];
+    rejectedAnimes: FeaturedAuditItem[];
+  };
+}
+
+export interface FeaturedSelectionResult {
+  weekKey: string;                           // ex: '2026-W42'
+  weekLabel: string;                         // ex: 'Semana 42 (Outubro de 2026)'
+  monthKey: string;                          // '2026-10' (derivado automaticamente)
+  monthLabel: string;                        // 'Outubro de 2026'
+  monthlyStatusLabel?: string;               // 'Outubro de 2026 · Parcial' ou 'Outubro de 2026'
+  isPartialMonth?: boolean;                  // true se mês em andamento
+  referenceDate: string;                     // ex: '2026-10-12'
+  lastUpdatedAt: number;                     // Timestamp ms da última publicação bem-sucedida
+  lastCheckedAt?: number;                    // Timestamp ms da última verificação executada
+  nextScheduledUpdate: number;               // Timestamp ms da próxima execução agendada (segunda 06:00 BRT)
+  nextScheduledUpdateFormatted: string;      // ex: 'Segunda-feira, 19/10/2026 às 06:00 (BRT)'
+  sourceReference: string;                   // 'IMDb MOVIEmeter & TVmeter (Mensal Consolidado) + AniList'
+  updateStatus: FeaturedUpdateStatus;        // Status da última operação de atualização
+  lastErrorReason?: string;                  // Detalhe de erro caso tenha ocorrido fallback
+  isProvisionalWeekly: boolean;
+  featuredMovies: ContentItem[];
+  featuredSeries: ContentItem[];
+  featuredAnimes: ContentItem[];
+  monthlyRanking?: MonthlyRankingSnapshot;
+  totalCandidatesEvaluated: {
+    movies: number;
+    series: number;
+    animes?: number;
+  };
+  auditTrail: {
+    approvedMovies: FeaturedAuditItem[];
+    rejectedMovies: FeaturedAuditItem[];
+    approvedSeries: FeaturedAuditItem[];
+    rejectedSeries: FeaturedAuditItem[];
+    approvedAnimes?: FeaturedAuditItem[];
+    rejectedAnimes?: FeaturedAuditItem[];
   };
 }
