@@ -69,6 +69,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const [scrollY, setScrollY] = useState(0);
+  const [isGenreMenuOpen, setIsGenreMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Mapeia a URL/View atual para uma das 5 abas principais
@@ -102,8 +103,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
     if (p.startsWith('/filmes')) return 'movies';
     if (p.startsWith('/series')) return 'series';
     if (p.startsWith('/animes')) return 'animes';
-    if (p.startsWith('/em-destaque')) return 'featured';
-    return 'all';
+    return 'movies';
   }, [location.pathname]);
 
   // Monitora rolagem para efeitos do header
@@ -118,6 +118,14 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   // Hierarquia do botão Voltar do Android
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
+      // Se houver menu de gêneros aberto, fecha o menu sem navegar
+      if (isGenreMenuOpen) {
+        e.preventDefault();
+        setIsGenreMenuOpen(false);
+        document.body.style.overflow = '';
+        return;
+      }
+
       // Se houver modal aberto (detalhes ou diagnóstico), fecha o modal sem trocar de rota
       if (hasOpenModal && onCloseModal) {
         e.preventDefault();
@@ -127,9 +135,11 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [hasOpenModal, onCloseModal]);
+  }, [isGenreMenuOpen, hasOpenModal, onCloseModal]);
 
   const handleSelectTab = (tab: MobileTab) => {
+    setIsGenreMenuOpen(false);
+    document.body.style.overflow = '';
     window.scrollTo({ top: 0, behavior: 'smooth' });
     if (activeTab === tab) return;
 
@@ -158,15 +168,17 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
       data-testid="mobile-layout-container"
       className={`min-h-screen ${isDarkMode ? 'bg-[#05070a] text-slate-100' : 'bg-[#F8F9FC] text-gray-900'} flex flex-col relative select-none`}
     >
-      {/* 1. Mobile Header (visível na Home e páginas gerais) */}
-      <MobileHeader
-        currentUser={currentUser}
-        activeProfile={activeProfile}
-        notifications={notifications}
-        isDarkMode={isDarkMode}
-        scrollY={scrollY}
-        onOpenProfile={() => handleSelectTab('my-zapitv')}
-      />
+      {/* 1. Mobile Header (visível na Home e páginas gerais, oculto com menu fullscreen de gêneros) */}
+      {!isGenreMenuOpen && (
+        <MobileHeader
+          currentUser={currentUser}
+          activeProfile={activeProfile}
+          notifications={notifications}
+          isDarkMode={isDarkMode}
+          scrollY={scrollY}
+          onOpenProfile={() => handleSelectTab('my-zapitv')}
+        />
+      )}
 
       {/* 2. Área Central de Conteúdo */}
       <main className="flex-1 w-full max-w-lg mx-auto">
@@ -193,6 +205,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             allContent={allContent}
             featuredSelection={featuredSelection}
             onSelectContent={onSelectContent}
+            isGenreMenuOpen={isGenreMenuOpen}
+            onToggleGenreMenu={setIsGenreMenuOpen}
           />
         )}
 
@@ -231,12 +245,14 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         )}
       </main>
 
-      {/* 3. Barra de Navegação Inferior Fixa */}
-      <MobileBottomNavigation
-        activeTab={activeTab}
-        onSelectTab={handleSelectTab}
-        unreadNotificationsCount={notifications.filter(n => !n.read).length}
-      />
+      {/* 3. Barra de Navegação Inferior Fixa (oculta com menu fullscreen de gêneros) */}
+      {!isGenreMenuOpen && (
+        <MobileBottomNavigation
+          activeTab={activeTab}
+          onSelectTab={handleSelectTab}
+          unreadNotificationsCount={notifications.filter(n => !n.read).length}
+        />
+      )}
     </div>
   );
 };

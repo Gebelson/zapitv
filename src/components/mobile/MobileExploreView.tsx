@@ -1,14 +1,15 @@
-import React, { useState, useMemo } from 'react';
-import { Film, Tv, Flame, Sparkles, Layers, Filter } from 'lucide-react';
-import { ContentItem, ContentType } from '../../../types';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
+import { Film, Tv, Sparkles, Radio, ChevronDown, X, Check } from 'lucide-react';
+import { ContentItem } from '../../../types';
 import { MobileCard } from './MobileCard';
-import { MobileRankedRow } from './MobileRankedRow';
 import { searchService } from '../../core/search/searchService';
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 
-export type ExploreCategory = 'all' | 'movies' | 'series' | 'animes' | 'featured';
+export type ExploreCategory = 'movies' | 'series' | 'animes' | 'live' | 'all' | 'featured';
 
 interface MobileExploreViewProps {
   initialCategory?: ExploreCategory;
@@ -16,39 +17,52 @@ interface MobileExploreViewProps {
   featuredSelection?: any;
   onSelectContent: (item: ContentItem) => void;
   availableGenres?: string[];
+  isGenreMenuOpen?: boolean;
+  onToggleGenreMenu?: (isOpen: boolean) => void;
 }
 
 export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
-  initialCategory = 'all',
+  initialCategory = 'movies',
   allContent,
-  featuredSelection,
   onSelectContent,
-  availableGenres = [
-    'Todos', 'Ação', 'Animação', 'Aventura', 'Comédia', 'Crime',
-    'Documentários', 'Drama', 'Fantasia', 'Ficção Científica',
-    'Mistério', 'Romance', 'Suspense', 'Terror'
-  ]
+  isGenreMenuOpen: controlledGenreMenuOpen,
+  onToggleGenreMenu
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState<ExploreCategory>(initialCategory);
-  const [selectedGenre, setSelectedGenre] = useState<string>('Todos');
+  const navigate = useNavigate();
 
-  const categories: Array<{ id: ExploreCategory; label: string; icon: React.ComponentType<{ className?: string }> }> = [
-    { id: 'all', label: 'Todos', icon: Layers },
-    { id: 'movies', label: 'Filmes', icon: Film },
-    { id: 'series', label: 'Séries', icon: Tv },
-    { id: 'animes', label: 'Animes', icon: Sparkles },
-    { id: 'featured', label: 'Em Destaque', icon: Flame }
+  // Mapeia categorias legadas ('all', 'featured') para a categoria padrão 'movies'
+  const resolveCategory = (cat: ExploreCategory): 'movies' | 'series' | 'animes' => {
+    if (cat === 'series') return 'series';
+    if (cat === 'animes') return 'animes';
+    return 'movies';
+  };
+
+  const [selectedCategory, setSelectedCategory] = useState<'movies' | 'series' | 'animes'>(
+    resolveCategory(initialCategory)
+  );
+  const [selectedGenre, setSelectedGenre] = useState<string>('Todos os gêneros');
+  const [internalGenreMenuOpen, setInternalGenreMenuOpen] = useState(false);
+
+  const isMenuOpen = controlledGenreMenuOpen !== undefined ? controlledGenreMenuOpen : internalGenreMenuOpen;
+
+  // Sincroniza categoria inicial vinda de rota
+  useEffect(() => {
+    if (initialCategory) {
+      setSelectedCategory(resolveCategory(initialCategory));
+    }
+  }, [initialCategory]);
+
+  // Lista dos 4 quadros fixos de navegação (Grid 2x2)
+  const exploreCards = [
+    { id: 'movies' as const, label: 'Filmes', icon: Film, subtitle: 'Longas e produções' },
+    { id: 'series' as const, label: 'Séries', icon: Tv, subtitle: 'Temporadas completas' },
+    { id: 'animes' as const, label: 'Animes', icon: Sparkles, subtitle: 'Animações japonesas' },
+    { id: 'live' as const, label: 'TV ao vivo', icon: Radio, subtitle: 'Canais e programas' }
   ];
 
-  // Filtra itens com estrita separação de categorias
-  const filteredItems = useMemo(() => {
-    if (selectedCategory === 'featured') {
-      return []; // Exibido por rankings dedicados abaixo
-    }
-
+  // Gêneros disponíveis calculados dinamicamente com base nos itens da categoria atual
+  const categoryGenres = useMemo(() => {
     let items = allContent;
-
-    // Filtro por categoria
     if (selectedCategory === 'movies') {
       items = items.filter(it => searchService.isMovieItem(it));
     } else if (selectedCategory === 'series') {
@@ -57,136 +71,312 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
       items = items.filter(it => searchService.isAnimeItem(it));
     }
 
-    // Filtro por gênero
-    if (selectedGenre && selectedGenre !== 'Todos') {
+    const genreSet = new Set<string>();
+    items.forEach(it => {
+      it.genres?.forEach(g => {
+        const clean = g?.trim();
+        if (clean && clean.toLowerCase() !== 'todos' && clean.toLowerCase() !== 'all') {
+          genreSet.add(clean);
+        }
+      });
+    });
+
+    const sorted = Array.from(genreSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+    const fallbackList = [
+      'Ação', 'Animação', 'Aventura', 'Comédia', 'Crime',
+      'Documentários', 'Drama', 'Fantasia', 'Ficção Científica',
+      'Mistério', 'Romance', 'Suspense', 'Terror'
+    ];
+
+    const list = sorted.length > 0 ? sorted : fallbackList;
+    return ['Todos os gêneros', ...list];
+  }, [allContent, selectedCategory]);
+
+  // Gerenciamento de abertura/fechamento do menu de gêneros em tela cheia
+  const setMenuState = useCallback((open: boolean) => {
+    setInternalGenreMenuOpen(open);
+    if (onToggleGenreMenu) {
+      onToggleGenreMenu(open);
+    }
+    if (open) {
+      document.body.style.overflow = 'hidden';
+      // Registra entrada de histórico para suportar botão Voltar do dispositivo
+      window.history.pushState({ genreMenuOpen: true }, '');
+    } else {
+      document.body.style.overflow = '';
+    }
+  }, [onToggleGenreMenu]);
+
+  const handleOpenGenreMenu = () => {
+    uiSoundService.play('click');
+    setMenuState(true);
+  };
+
+  const handleCloseGenreMenu = useCallback((shouldPopHistory: boolean = true) => {
+    uiSoundService.play('close');
+    setMenuState(false);
+    if (shouldPopHistory && window.history.state?.genreMenuOpen) {
+      window.history.back();
+    }
+  }, [setMenuState]);
+
+  // Suporte a teclado (Escape) e botão Voltar físico/navegador (popstate)
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleCloseGenreMenu();
+      }
+    };
+
+    const handlePopState = (e: PopStateEvent) => {
+      // Quando o usuário pressiona Voltar no Android, fecha o menu sem navegar
+      handleCloseGenreMenu(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('popstate', handlePopState);
+      document.body.style.overflow = '';
+    };
+  }, [isMenuOpen, handleCloseGenreMenu]);
+
+  // Seleção de um gênero pelo usuário
+  const handleSelectGenre = (genre: string) => {
+    uiSoundService.play('click');
+    setSelectedGenre(genre);
+    handleCloseGenreMenu();
+  };
+
+  // Troca de categoria com verificação de validade do gênero atual
+  const handleSelectCategory = (catId: 'movies' | 'series' | 'animes' | 'live') => {
+    uiSoundService.play('click');
+    if (catId === 'live') {
+      navigate('/programas');
+      return;
+    }
+
+    setSelectedCategory(catId);
+    navigate(catId === 'movies' ? '/filmes' : catId === 'series' ? '/series' : '/animes', { replace: true });
+
+    // Verifica se o gênero atual permanece válido na nova categoria selecionada
+    if (selectedGenre && selectedGenre !== 'Todos os gêneros') {
+      const nextCategoryItems = allContent.filter(it => {
+        if (catId === 'movies') return searchService.isMovieItem(it);
+        if (catId === 'series') return searchService.isSeriesItem(it) && !searchService.isAnimeItem(it);
+        if (catId === 'animes') return searchService.isAnimeItem(it);
+        return false;
+      });
+
+      const hasGenre = nextCategoryItems.some(it => it.genres?.includes(selectedGenre));
+      if (!hasGenre) {
+        setSelectedGenre('Todos os gêneros');
+      }
+    }
+  };
+
+  // Filtra itens com estrita separação de categorias e gêneros
+  const filteredItems = useMemo(() => {
+    let items = allContent;
+
+    if (selectedCategory === 'movies') {
+      items = items.filter(it => searchService.isMovieItem(it));
+    } else if (selectedCategory === 'series') {
+      items = items.filter(it => searchService.isSeriesItem(it) && !searchService.isAnimeItem(it));
+    } else if (selectedCategory === 'animes') {
+      items = items.filter(it => searchService.isAnimeItem(it));
+    }
+
+    if (selectedGenre && selectedGenre !== 'Todos os gêneros' && selectedGenre !== 'Todos') {
       items = items.filter(it => it.genres?.includes(selectedGenre));
     }
 
     return deduplicateContentItems(catalogEligibilityService.filterEligibleItemsSync(items));
   }, [allContent, selectedCategory, selectedGenre]);
 
+  const currentCategoryLabel =
+    selectedCategory === 'movies' ? 'Filmes' : selectedCategory === 'series' ? 'Séries' : 'Animes';
+
   return (
     <div className="pt-16 pb-28 px-4 w-full max-w-lg mx-auto select-none" data-testid="mobile-explore-view">
-      {/* Título da Seção */}
-      <div className="mb-3">
-        <h2
-          className="text-2xl font-black text-white tracking-tight"
+      {/* 1. Título da Seção (Apenas "Explorar" com borda fina horizontal, sem subtítulo) */}
+      <div className="mb-4">
+        <h1
+          className="text-2xl font-black text-white tracking-tight pb-3 border-b border-white/10"
           style={{ fontFamily: "'Sora', sans-serif" }}
         >
           Explorar
-        </h2>
-        <p className="text-xs text-slate-400 mt-0.5">
-          Catálogo completo por tipo de mídia e gênero
-        </p>
+        </h1>
       </div>
 
-      {/* Chips de Categoria Horizontal */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1.5 mb-2.5">
-        {categories.map(cat => {
-          const isActive = selectedCategory === cat.id;
-          const Icon = cat.icon;
+      {/* 2. Quatro Quadros Fixos de Navegação (Grade 2x2 sem rolagem horizontal) */}
+      <div
+        data-testid="explore-categories-grid"
+        className="grid grid-cols-2 gap-3 mb-4 w-full"
+        style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
+      >
+        {exploreCards.map(card => {
+          const isSelected = selectedCategory === card.id;
+          const Icon = card.icon;
 
           return (
             <button
-              key={cat.id}
+              key={card.id}
               type="button"
-              onClick={() => {
-                uiSoundService.play('click');
-                setSelectedCategory(cat.id);
-              }}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-[#007df7] text-white shadow-md shadow-[#007df7]/30 scale-[1.02]'
-                  : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'
+              data-testid={`explore-category-${card.id}`}
+              onClick={() => handleSelectCategory(card.id)}
+              className={`relative flex flex-col justify-between p-3.5 rounded-2xl transition-all cursor-pointer select-none text-left min-h-[82px] overflow-hidden ${
+                isSelected
+                  ? 'bg-gradient-to-br from-[#007df7]/25 to-[#007df7]/10 border-2 border-[#007df7] shadow-[0_0_24px_rgba(0,125,247,0.3)] text-white'
+                  : 'bg-[#07090E]/90 border border-white/10 hover:border-white/20 text-slate-300 active:scale-[0.98]'
               }`}
             >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-              <span>{cat.label}</span>
+              <div className="flex items-center justify-between w-full mb-2">
+                <div
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                    isSelected ? 'bg-[#007df7] text-white shadow-md shadow-[#007df7]/40' : 'bg-white/5 text-slate-300'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                </div>
+                {isSelected && (
+                  <span className="w-2 h-2 rounded-full bg-[#007df7] shadow-[0_0_8px_#007df7]" />
+                )}
+              </div>
+              <div>
+                <span className="text-sm font-bold tracking-tight text-white block">
+                  {card.label}
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium block leading-tight mt-0.5">
+                  {card.subtitle}
+                </span>
+              </div>
             </button>
           );
         })}
       </div>
 
-      {/* Chips de Gênero Horizontal (se não for Em Destaque) */}
-      {selectedCategory !== 'featured' && (
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 mb-4">
-          {availableGenres.map(genre => {
-            const isGenreActive = selectedGenre === genre;
-            return (
-              <button
-                key={genre}
-                type="button"
-                onClick={() => {
-                  uiSoundService.play('click');
-                  setSelectedGenre(genre);
-                }}
-                className={`px-3 py-1 rounded-full text-[11px] font-medium shrink-0 transition-all cursor-pointer ${
-                  isGenreActive
-                    ? 'bg-white/20 text-white font-bold border border-white/30'
-                    : 'bg-white/5 text-slate-400 hover:text-white border border-transparent'
-                }`}
-              >
-                {genre}
-              </button>
-            );
-          })}
+      {/* 3. Barra de Seleção de Gêneros (Estilo Prime Video) */}
+      <button
+        type="button"
+        data-testid="explore-genre-bar"
+        onClick={handleOpenGenreMenu}
+        aria-haspopup="dialog"
+        aria-expanded={isMenuOpen}
+        aria-label="Selecionar gênero"
+        className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 transition-colors mb-5 cursor-pointer text-left group"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400 font-medium">Gênero:</span>
+          <span className="text-sm font-semibold text-white tracking-wide">
+            {selectedGenre}
+          </span>
         </div>
-      )}
-
-      {/* Exibição: Em Destaque (Rankings Mensais) */}
-      {selectedCategory === 'featured' ? (
-        <div className="space-y-6 pt-2">
-          {featuredSelection?.featuredMovies && featuredSelection.featuredMovies.length > 0 && (
-            <MobileRankedRow
-              title="Top 10 Filmes do Mês"
-              items={featuredSelection.featuredMovies.slice(0, 10)}
-              onItemClick={onSelectContent}
-              icon={Film}
-            />
-          )}
-
-          {featuredSelection?.featuredSeries && featuredSelection.featuredSeries.length > 0 && (
-            <MobileRankedRow
-              title="Top 10 Séries do Mês"
-              items={featuredSelection.featuredSeries.slice(0, 10)}
-              onItemClick={onSelectContent}
-              icon={Tv}
-            />
-          )}
-
-          {featuredSelection?.featuredAnimes && featuredSelection.featuredAnimes.length > 0 && (
-            <MobileRankedRow
-              title="Top 10 Animes do Mês"
-              items={featuredSelection.featuredAnimes.slice(0, 10)}
-              onItemClick={onSelectContent}
-              icon={Sparkles}
-            />
-          )}
+        <div className="flex items-center gap-1.5 text-slate-400 group-hover:text-white transition-colors">
+          <ChevronDown className="w-4 h-4" />
         </div>
-      ) : (
-        /* Grid de Resultados do Catálogo */
-        <div className="w-full">
-          <div
-            className="w-full grid grid-cols-2 gap-3"
-            style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
-          >
-            {filteredItems.map(item => (
-              <MobileCard
-                key={`explore-grid-${item.id}`}
-                item={item}
-                onItemClick={onSelectContent}
-                variant="grid"
-              />
-            ))}
+      </button>
+
+      {/* 4. Grid de Conteúdos do Catálogo (Sem contadores de títulos) */}
+      <div className="w-full" data-testid="explore-content-grid">
+        <div
+          className="w-full grid grid-cols-2 gap-3"
+          style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
+        >
+          {filteredItems.map(item => (
+            <MobileCard
+              key={`explore-grid-${item.id}`}
+              item={item}
+              onItemClick={onSelectContent}
+              variant="grid"
+            />
+          ))}
+        </div>
+
+        {filteredItems.length === 0 && (
+          <div className="py-20 text-center text-slate-400 text-sm">
+            <p>Nenhum título encontrado para o gênero selecionado.</p>
           </div>
+        )}
+      </div>
 
-          {filteredItems.length === 0 && (
-            <div className="py-20 text-center text-slate-400 text-sm">
-              <p>Nenhum título encontrado com os filtros selecionados.</p>
+      {/* 5. Menu de Gêneros em Tela Cheia (Renderizado via Portal em document.body) */}
+      {isMenuOpen &&
+        createPortal(
+          <div
+            data-testid="mobile-genre-fullscreen-menu"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu de seleção de gêneros"
+            className="fixed inset-0 z-[999] bg-[#07090E] w-screen h-screen flex flex-col select-none overflow-hidden"
+          >
+            {/* Cabeçalho do Menu de Gêneros */}
+            <div className="pt-[max(1.5rem,env(safe-area-inset-top,0px))] px-6 pb-4 border-b border-white/10 shrink-0">
+              <span className="text-xs font-semibold text-[#007df7] uppercase tracking-wider block">
+                {currentCategoryLabel}
+              </span>
+              <h2
+                className="text-xl font-black text-white tracking-tight mt-0.5"
+                style={{ fontFamily: "'Sora', sans-serif" }}
+              >
+                Selecione um gênero
+              </h2>
             </div>
-          )}
-        </div>
-      )}
+
+            {/* Lista Vertical de Gêneros */}
+            <div
+              data-testid="mobile-genre-list"
+              className="flex-1 overflow-y-auto px-4 py-3 divide-y divide-white/5 pb-28"
+            >
+              {categoryGenres.map(genre => {
+                const isSelected = selectedGenre === genre;
+
+                return (
+                  <button
+                    key={genre}
+                    type="button"
+                    data-testid={`genre-option-${genre}`}
+                    onClick={() => handleSelectGenre(genre)}
+                    className={`w-full py-4 px-3 flex items-center justify-between text-left rounded-xl transition-all cursor-pointer ${
+                      isSelected
+                        ? 'text-[#007df7] font-bold bg-[#007df7]/10'
+                        : 'text-slate-200 hover:text-white font-medium hover:bg-white/5'
+                    }`}
+                  >
+                    <span className="text-base tracking-tight">{genre}</span>
+                    {isSelected && (
+                      <div className="w-6 h-6 rounded-full bg-[#007df7] flex items-center justify-center text-white shrink-0 shadow-sm">
+                        <Check className="w-4 h-4 stroke-[2.5]" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Gradiente sutil inferior para contraste */}
+            <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-[#07090E] via-[#07090E]/80 to-transparent z-20" />
+
+            {/* Botão de Fechar Centralizado */}
+            <div className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+              <button
+                type="button"
+                data-testid="close-genre-menu-btn"
+                onClick={() => handleCloseGenreMenu()}
+                aria-label="Fechar menu de gêneros"
+                className="w-13 h-13 rounded-full bg-slate-800/90 hover:bg-slate-700 active:scale-95 text-white flex items-center justify-center border border-white/20 shadow-2xl backdrop-blur-md cursor-pointer transition-all"
+              >
+                <X className="w-6 h-6 stroke-[2.5]" />
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

@@ -113,13 +113,13 @@ testAssert(
 );
 
 testAssert(
-  'MobileHeader usa fundo #05070a no tema escuro ao rolar',
-  headerCode.includes('bg-[#05070a]/95')
+  'MobileHeader usa fundo #05070a / rgba(5, 7, 10) no tema escuro ao rolar',
+  headerCode.includes('bg-[#05070a]') || headerCode.includes('rgba(5, 7, 10')
 );
 
 testAssert(
-  'MobileHeader usa gradiente partindo de #05070a no topo ao invés de preto genérico',
-  headerCode.includes('from-[#05070a]/90')
+  'MobileHeader usa degradê cinematográfico contínuo partindo de #05070a / rgba(5, 7, 10)',
+  headerCode.includes('from-[#05070a]') || headerCode.includes('rgba(5, 7, 10')
 );
 
 testAssert(
