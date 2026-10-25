@@ -57,8 +57,8 @@ const testAnimeCases: ContentItem[] = [
     year: 2022,
     image: 'https://image.tmdb.org/t/p/w500/broken_404_bleach.jpg',
     backdrop: 'https://image.tmdb.org/t/p/original/broken_404_bleach_bg.jpg',
-    aniListId: 114446,
-    tmdbId: '13916'
+    aniListId: 116674,
+    tmdbId: '30984'
   },
   {
     id: 'anime-blue-lock',
@@ -70,8 +70,8 @@ const testAnimeCases: ContentItem[] = [
     year: 2022,
     image: 'https://image.tmdb.org/t/p/w500/broken_404_bluelock.jpg',
     backdrop: 'https://image.tmdb.org/t/p/original/broken_404_bluelock_bg.jpg',
-    aniListId: 163148,
-    tmdbId: '136283'
+    aniListId: 137822,
+    tmdbId: '131041'
   },
   {
     id: 'anime-chainsaw-man',

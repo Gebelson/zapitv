@@ -8,6 +8,18 @@ const POSTER_CACHE_KEY_V3 = 'zapitv_poster_recovery_cache_v3';
 const POSTER_CACHE_KEY_V2 = 'zapitv_poster_recovery_cache_v2';
 export const NO_IMAGE_SENTINEL = '__NO_IMAGE__';
 
+export const CORRUPTED_POSTER_FRAGMENTS = [
+  'iigTJJskR1PcjjXqxdyJwVB3BoU', // Death Note poster associado indevidamente
+  'z8IPicmEKXUO4I2UDdMEqw7RqOE', // Death Note backdrop associado indevidamente
+  'bnTXjwOwdUz8MKFyQCNf0hG4fdL', // The Glory / A Lição poster associado indevidamente
+  'AjwoDj77HLlqcpwEGqsnvMXm5my'  // The Glory / A Lição backdrop associado indevidamente
+];
+
+export function isCorruptedPosterUrl(url: string | null | undefined): boolean {
+  if (!url || typeof url !== 'string') return false;
+  return CORRUPTED_POSTER_FRAGMENTS.some(frag => url.includes(frag));
+}
+
 // TTLs de segurança para o cache de recuperação de capas
 const NEGATIVE_TTL_MS = 3 * 60 * 1000; // 3 minutos para indisponibilidade temporária (nunca bloqueia para sempre)
 const VERIFIED_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias para URLs verificadas
@@ -133,21 +145,25 @@ export class PosterRecoveryService {
                   this.memoryCache.set(k, entry);
                 }
               } else if (typeof entry.url === 'string' && entry.url.startsWith('http')) {
-                if (!entry.url.includes('undefined') && !entry.url.includes('broken_404')) {
-                  this.memoryCache.set(k, {
-                    url: entry.url,
-                    status: entry.status || 'stored',
-                    timestamp: entry.timestamp || now,
-                    source: entry.source
-                  });
+                if (!entry.url.includes('undefined') && !entry.url.includes('broken_404') && !isCorruptedPosterUrl(entry.url)) {
+                  if (!k.includes('13916') && !k.includes('136283')) {
+                    this.memoryCache.set(k, {
+                      url: entry.url,
+                      status: entry.status || 'stored',
+                      timestamp: entry.timestamp || now,
+                      source: entry.source
+                    });
+                  }
                 }
               }
             } else if (typeof entry === 'string' && entry.startsWith('http')) {
-              this.memoryCache.set(k, {
-                url: entry,
-                status: 'stored',
-                timestamp: now
-              });
+              if (!isCorruptedPosterUrl(entry) && !k.includes('13916') && !k.includes('136283')) {
+                this.memoryCache.set(k, {
+                  url: entry,
+                  status: 'stored',
+                  timestamp: now
+                });
+              }
             }
           });
         }
@@ -163,7 +179,7 @@ export class PosterRecoveryService {
             // NUNCA importar marcadores negativos da v2 (elimina o bloqueio que causava capas com fundo escuro e Play)
             if (v === NO_IMAGE_SENTINEL || v === '__NO_IMAGE__') return;
             if (typeof v === 'string' && v.startsWith('http')) {
-              if (v.includes('undefined') || v.includes('broken_404') || (v.includes('metahub.space') && v.includes('tt31828574'))) return;
+              if (v.includes('undefined') || v.includes('broken_404') || isCorruptedPosterUrl(v) || k.includes('13916') || k.includes('136283') || (v.includes('metahub.space') && v.includes('tt31828574'))) return;
               if (!this.memoryCache.has(k)) {
                 this.memoryCache.set(k, {
                   url: v,
@@ -178,6 +194,9 @@ export class PosterRecoveryService {
         try { window.localStorage.removeItem(POSTER_CACHE_KEY_V2); } catch {}
         try { window.sessionStorage.removeItem(POSTER_CACHE_KEY_V2); } catch {}
       }
+
+      // 4. Executa saneamento ativo das imagens corrompidas conhecidas
+      this.sanitizeKnownCorruptedImages();
     } catch {
       // Ignora erro em ambientes restritos
     }
@@ -206,6 +225,23 @@ export class PosterRecoveryService {
         // Ignora erro de quota
       }
     }, 300);
+  }
+
+  /**
+   * Saneia o cache em memória e storage descartando associações incorretas conhecidas
+   */
+  public sanitizeKnownCorruptedImages(): void {
+    const keysToDelete: string[] = [];
+    this.memoryCache.forEach((entry, key) => {
+      if (isCorruptedPosterUrl(entry.url) || key.includes('13916') || key.includes('136283')) {
+        keysToDelete.push(key);
+      }
+    });
+
+    keysToDelete.forEach(k => this.memoryCache.delete(k));
+    if (keysToDelete.length > 0) {
+      this.saveStorageCache();
+    }
   }
 
   private getCacheKeys(item: ContentItem): string[] {
@@ -608,7 +644,7 @@ export class PosterRecoveryService {
 
       // ETAPA 2: URL original do conteúdo
       const rawPoster = item.image || item.poster;
-      if (rawPoster && rawPoster.startsWith('http') && !rawPoster.includes('broken_404')) {
+      if (rawPoster && rawPoster.startsWith('http') && !rawPoster.includes('broken_404') && !isCorruptedPosterUrl(rawPoster)) {
         diag.attempts.push(`original_poster:${rawPoster}`);
         if (await this.validateImageUrl(rawPoster)) {
           this.setCachedPoster(item, rawPoster, 'verified', 'original_poster');
@@ -621,9 +657,9 @@ export class PosterRecoveryService {
       }
 
       // ETAPA 3: Variação otimizada do pôster
-      if (rawPoster && rawPoster.startsWith('http') && !rawPoster.includes('broken_404')) {
+      if (rawPoster && rawPoster.startsWith('http') && !rawPoster.includes('broken_404') && !isCorruptedPosterUrl(rawPoster)) {
         const optPoster = tvPerformanceProfileService.getOptimizedPosterUrl(rawPoster);
-        if (optPoster && optPoster !== rawPoster) {
+        if (optPoster && optPoster !== rawPoster && !isCorruptedPosterUrl(optPoster)) {
           diag.attempts.push(`optimized_poster:${optPoster}`);
           if (await this.validateImageUrl(optPoster)) {
             this.setCachedPoster(item, optPoster, 'verified', 'optimized_poster');
@@ -640,7 +676,7 @@ export class PosterRecoveryService {
       const metaCandidates = [
         ...(Array.isArray(item.images) ? item.images : []),
         ...(Array.isArray(item.backdrops) ? item.backdrops : [])
-      ].filter((u): u is string => Boolean(u && typeof u === 'string' && u.startsWith('http') && !u.includes('broken_404')));
+      ].filter((u): u is string => Boolean(u && typeof u === 'string' && u.startsWith('http') && !u.includes('broken_404') && !isCorruptedPosterUrl(u)));
 
       for (const metaImg of metaCandidates) {
         diag.attempts.push(`metadata_candidate:${metaImg}`);
@@ -654,97 +690,7 @@ export class PosterRecoveryService {
         }
       }
 
-      // ETAPA 5: Recuperação pelo TMDB utilizando identificadores confiáveis
-      // 5A. Se tiver TMDB ID numérico
-      if (item.tmdbId && /^\d+$/.test(String(item.tmdbId).trim())) {
-        diag.attempts.push(`tmdb_id:${item.tmdbId}`);
-        try {
-          const data = await tmdbService.getDetails(String(item.tmdbId), isMovie ? ContentType.MOVIE : ContentType.SERIES);
-          if (data?.item?.image && data.item.image.startsWith('http') && data.item.image !== rawPoster) {
-            if (await this.validateImageUrl(data.item.image)) {
-              this.setCachedPoster(item, data.item.image, 'verified', 'tmdb_id_details');
-              diag.recoveredSource = 'tmdb_id_details';
-              diag.recoveredUrl = data.item.image;
-              diag.finalResult = 'SUCCESS';
-              logRecoveryDiagnostic(diag);
-              return data.item.image;
-            }
-          }
-
-          // Consulta endpoint de imagens do TMDB
-          const images = await tmdbService.getImages(item.tmdbId, isMovie);
-          for (const poster of images.posters) {
-            if (poster && poster.startsWith('http') && poster !== rawPoster && await this.validateImageUrl(poster)) {
-              this.setCachedPoster(item, poster, 'verified', 'tmdb_id_images');
-              diag.recoveredSource = 'tmdb_id_images';
-              diag.recoveredUrl = poster;
-              diag.finalResult = 'SUCCESS';
-              logRecoveryDiagnostic(diag);
-              return poster;
-            }
-          }
-        } catch {
-          // Continua
-        }
-      }
-
-      // 5B. Se tiver IMDb ID (tt...)
-      if (item.imdbId && /^tt\d+$/i.test(item.imdbId.trim())) {
-        diag.attempts.push(`tmdb_imdb:${item.imdbId.trim()}`);
-        try {
-          const tmdbItem = await tmdbService.findByImdb(item.imdbId.trim());
-          if (tmdbItem?.image && tmdbItem.image.startsWith('http') && tmdbItem.image !== rawPoster) {
-            if (await this.validateImageUrl(tmdbItem.image)) {
-              this.setCachedPoster(item, tmdbItem.image, 'verified', 'tmdb_imdb_find');
-              diag.recoveredSource = 'tmdb_imdb_find';
-              diag.recoveredUrl = tmdbItem.image;
-              diag.finalResult = 'SUCCESS';
-              logRecoveryDiagnostic(diag);
-              return tmdbItem.image;
-            }
-          }
-          if (tmdbItem?.tmdbId) {
-            const images = await tmdbService.getImages(tmdbItem.tmdbId, isMovie);
-            for (const poster of images.posters) {
-              if (poster && poster.startsWith('http') && poster !== rawPoster && await this.validateImageUrl(poster)) {
-                this.setCachedPoster(item, poster, 'verified', 'tmdb_imdb_images');
-                diag.recoveredSource = 'tmdb_imdb_images';
-                diag.recoveredUrl = poster;
-                diag.finalResult = 'SUCCESS';
-                logRecoveryDiagnostic(diag);
-                return poster;
-              }
-            }
-          }
-        } catch {
-          // Continua
-        }
-      }
-
-      // 5C. Busca rigorosa por título no TMDB (com sameCatalogWork)
-      const searchTitle = item.originalTitle || item.title;
-      if (searchTitle && searchTitle.trim().length >= 2) {
-        diag.attempts.push(`tmdb_search:${searchTitle.trim()}`);
-        try {
-          const candidates = await tmdbService.searchMulti(searchTitle.trim());
-          const match = candidates.find(cand => sameCatalogWork(cand, item) && ((cand.image && cand.image.startsWith('http')) || (cand.backdrop && cand.backdrop.startsWith('http'))));
-          if (match) {
-            const resolved = (match.image && match.image.startsWith('http') && match.image !== rawPoster) ? match.image : match.backdrop;
-            if (resolved && await this.validateImageUrl(resolved)) {
-              this.setCachedPoster(item, resolved, 'verified', 'tmdb_search_match');
-              diag.recoveredSource = 'tmdb_search_match';
-              diag.recoveredUrl = resolved;
-              diag.finalResult = 'SUCCESS';
-              logRecoveryDiagnostic(diag);
-              return resolved;
-            }
-          }
-        } catch {
-          // Continua
-        }
-      }
-
-      // ETAPA 6: Recuperação pelo AniList, especialmente para animes
+      // ETAPA 5: Para animes, prioridade absoluta para a base canônica AniList
       if (isAnime) {
         let targetAniListId = item.aniListId;
         if (!targetAniListId && item.canonicalId && item.canonicalId.includes('anilist:')) {
@@ -755,7 +701,7 @@ export class PosterRecoveryService {
         if (targetAniListId) {
           diag.attempts.push(`anilist_id:${targetAniListId}`);
           const anilistCover = await this.queryAniListById(targetAniListId);
-          if (anilistCover && await this.validateImageUrl(anilistCover)) {
+          if (anilistCover && !isCorruptedPosterUrl(anilistCover) && await this.validateImageUrl(anilistCover)) {
             this.setCachedPoster(item, anilistCover, 'verified', 'anilist_id');
             diag.recoveredSource = 'anilist_id';
             diag.recoveredUrl = anilistCover;
@@ -768,13 +714,109 @@ export class PosterRecoveryService {
         const animeTitle = item.originalTitle || item.title;
         diag.attempts.push(`anilist_title:${animeTitle}`);
         const anilistCoverByTitle = await this.queryAniList(animeTitle);
-        if (anilistCoverByTitle && await this.validateImageUrl(anilistCoverByTitle)) {
+        if (anilistCoverByTitle && !isCorruptedPosterUrl(anilistCoverByTitle) && await this.validateImageUrl(anilistCoverByTitle)) {
           this.setCachedPoster(item, anilistCoverByTitle, 'verified', 'anilist_title');
           diag.recoveredSource = 'anilist_title';
           diag.recoveredUrl = anilistCoverByTitle;
           diag.finalResult = 'SUCCESS';
           logRecoveryDiagnostic(diag);
           return anilistCoverByTitle;
+        }
+      }
+
+      // ETAPA 6: Recuperação pelo TMDB utilizando identificadores confiáveis
+      // 6A. Se tiver TMDB ID numérico
+      if (item.tmdbId && /^\d+$/.test(String(item.tmdbId).trim())) {
+        diag.attempts.push(`tmdb_id:${item.tmdbId}`);
+        try {
+          const data = await tmdbService.getDetails(String(item.tmdbId), isMovie ? ContentType.MOVIE : ContentType.SERIES);
+          const detailItem = data?.item;
+          // Validação estrita: Rejeita TMDB se a obra retornada não for o mesmo conteúdo do catálogo
+          if (detailItem && sameCatalogWork(detailItem, item)) {
+            if (detailItem.image && detailItem.image.startsWith('http') && detailItem.image !== rawPoster && !isCorruptedPosterUrl(detailItem.image)) {
+              if (await this.validateImageUrl(detailItem.image)) {
+                this.setCachedPoster(item, detailItem.image, 'verified', 'tmdb_id_details');
+                diag.recoveredSource = 'tmdb_id_details';
+                diag.recoveredUrl = detailItem.image;
+                diag.finalResult = 'SUCCESS';
+                logRecoveryDiagnostic(diag);
+                return detailItem.image;
+              }
+            }
+
+            // Consulta endpoint de imagens do TMDB
+            const images = await tmdbService.getImages(item.tmdbId, isMovie);
+            for (const poster of images.posters) {
+              if (poster && poster.startsWith('http') && poster !== rawPoster && !isCorruptedPosterUrl(poster) && await this.validateImageUrl(poster)) {
+                this.setCachedPoster(item, poster, 'verified', 'tmdb_id_images');
+                diag.recoveredSource = 'tmdb_id_images';
+                diag.recoveredUrl = poster;
+                diag.finalResult = 'SUCCESS';
+                logRecoveryDiagnostic(diag);
+                return poster;
+              }
+            }
+          }
+        } catch {
+          // Continua
+        }
+      }
+
+      // 6B. Se tiver IMDb ID (tt...)
+      if (item.imdbId && /^tt\d+$/i.test(item.imdbId.trim())) {
+        diag.attempts.push(`tmdb_imdb:${item.imdbId.trim()}`);
+        try {
+          const tmdbItem = await tmdbService.findByImdb(item.imdbId.trim());
+          if (tmdbItem && sameCatalogWork(tmdbItem, item)) {
+            if (tmdbItem.image && tmdbItem.image.startsWith('http') && tmdbItem.image !== rawPoster && !isCorruptedPosterUrl(tmdbItem.image)) {
+              if (await this.validateImageUrl(tmdbItem.image)) {
+                this.setCachedPoster(item, tmdbItem.image, 'verified', 'tmdb_imdb_find');
+                diag.recoveredSource = 'tmdb_imdb_find';
+                diag.recoveredUrl = tmdbItem.image;
+                diag.finalResult = 'SUCCESS';
+                logRecoveryDiagnostic(diag);
+                return tmdbItem.image;
+              }
+            }
+            if (tmdbItem.tmdbId) {
+              const images = await tmdbService.getImages(tmdbItem.tmdbId, isMovie);
+              for (const poster of images.posters) {
+                if (poster && poster.startsWith('http') && poster !== rawPoster && !isCorruptedPosterUrl(poster) && await this.validateImageUrl(poster)) {
+                  this.setCachedPoster(item, poster, 'verified', 'tmdb_imdb_images');
+                  diag.recoveredSource = 'tmdb_imdb_images';
+                  diag.recoveredUrl = poster;
+                  diag.finalResult = 'SUCCESS';
+                  logRecoveryDiagnostic(diag);
+                  return poster;
+                }
+              }
+            }
+          }
+        } catch {
+          // Continua
+        }
+      }
+
+      // 6C. Busca rigorosa por título no TMDB (com sameCatalogWork)
+      const searchTitle = item.originalTitle || item.title;
+      if (searchTitle && searchTitle.trim().length >= 2) {
+        diag.attempts.push(`tmdb_search:${searchTitle.trim()}`);
+        try {
+          const candidates = await tmdbService.searchMulti(searchTitle.trim());
+          const match = candidates.find(cand => sameCatalogWork(cand, item) && !isCorruptedPosterUrl(cand.image) && !isCorruptedPosterUrl(cand.backdrop) && ((cand.image && cand.image.startsWith('http')) || (cand.backdrop && cand.backdrop.startsWith('http'))));
+          if (match) {
+            const resolved = (match.image && match.image.startsWith('http') && match.image !== rawPoster) ? match.image : match.backdrop;
+            if (resolved && !isCorruptedPosterUrl(resolved) && await this.validateImageUrl(resolved)) {
+              this.setCachedPoster(item, resolved, 'verified', 'tmdb_search_match');
+              diag.recoveredSource = 'tmdb_search_match';
+              diag.recoveredUrl = resolved;
+              diag.finalResult = 'SUCCESS';
+              logRecoveryDiagnostic(diag);
+              return resolved;
+            }
+          }
+        } catch {
+          // Continua
         }
       }
 

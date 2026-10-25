@@ -104,7 +104,7 @@ export const OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS: AniListMonthlySnapshot[] = [
       },
       {
         position: 5,
-        aniListId: 114446,
+        aniListId: 116674,
         title: 'Bleach: Thousand-Year Blood War',
         romajiTitle: 'Bleach: Sennen Kessen-hen',
         year: 2022,
@@ -112,7 +112,7 @@ export const OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS: AniListMonthlySnapshot[] = [
         popularityRank: 5,
         trendingRank: 5,
         format: 'TV',
-        tmdbId: '13916',
+        tmdbId: '30984',
         malId: 41467,
         referenceDate: '2026-10-15',
         capturedAt: 1792118400000
@@ -209,7 +209,7 @@ export const OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS: AniListMonthlySnapshot[] = [
       },
       {
         position: 12,
-        aniListId: 163148,
+        aniListId: 137822,
         title: 'Blue Lock',
         romajiTitle: 'Blue Lock',
         year: 2022,
@@ -217,7 +217,7 @@ export const OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS: AniListMonthlySnapshot[] = [
         popularityRank: 12,
         trendingRank: 12,
         format: 'TV',
-        tmdbId: '136283',
+        tmdbId: '131041',
         malId: 50528,
         referenceDate: '2026-10-15',
         capturedAt: 1792118400000

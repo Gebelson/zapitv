@@ -1614,22 +1614,22 @@ export const FEATURED_ANIME_ITEMS: ContentItem[] = [
     ]
   },
 
-  // 5. BLEACH: THOUSAND-YEAR BLOOD WAR (aniList: 114446 / tmdb: 13916 / mal: 41467)
+  // 5. BLEACH: THOUSAND-YEAR BLOOD WAR (aniList: 116674 / tmdb: 30984 / mal: 41467)
   {
     id: 'anime-bleach-tybw',
-    canonicalId: 'anime:anilist:114446',
+    canonicalId: 'anime:anilist:116674',
     title: 'Bleach: Thousand-Year Blood War',
     originalTitle: 'Bleach: Sennen Kessen-hen',
     type: ContentType.ANIME,
     mediaFormat: 'series',
     rating: 8.9,
     year: 2022,
-    image: 'https://image.tmdb.org/t/p/w500/iigTJJskR1PcjjXqxdyJwVB3BoU.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/original/z8IPicmEKXUO4I2UDdMEqw7RqOE.jpg',
+    image: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx116674-p3zK4PUX2Aag.jpg',
+    backdrop: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/116674-l2YlIyJzvGSV.jpg',
     description: 'A guerra milenar entre os Shinigamis da Soul Society e o exército Quincy liderado por Yhwach chega ao seu clímax destrutivo.',
     genres: ['Anime', 'Ação', 'Aventura', 'Sobrenatural'],
-    aniListId: 114446,
-    tmdbId: '13916',
+    aniListId: 116674,
+    tmdbId: '30984',
     malId: 41467,
     seasonsCount: 3,
     isFeatured: true,
@@ -1641,7 +1641,7 @@ export const FEATURED_ANIME_ITEMS: ContentItem[] = [
         number: 1,
         title: 'Guerra de Sangue',
         description: 'A Soul Society é surpreendida por um ataque coordenado do Wandenreich.',
-        image: 'https://image.tmdb.org/t/p/w500/iigTJJskR1PcjjXqxdyJwVB3BoU.jpg'
+        image: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx116674-p3zK4PUX2Aag.jpg'
       }
     ]
   },
@@ -1838,22 +1838,22 @@ export const FEATURED_ANIME_ITEMS: ContentItem[] = [
     ]
   },
 
-  // 12. BLUE LOCK (aniList: 163148 / tmdb: 136283 / mal: 50528)
+  // 12. BLUE LOCK (aniList: 137822 / tmdb: 131041 / mal: 50528)
   {
     id: 'anime-blue-lock',
-    canonicalId: 'anime:anilist:163148',
+    canonicalId: 'anime:anilist:137822',
     title: 'Blue Lock',
     originalTitle: 'Blue Lock',
     type: ContentType.ANIME,
     mediaFormat: 'series',
     rating: 8.2,
     year: 2022,
-    image: 'https://image.tmdb.org/t/p/w500/bnTXjwOwdUz8MKFyQCNf0hG4fdL.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/original/AjwoDj77HLlqcpwEGqsnvMXm5my.jpg',
+    image: 'https://image.tmdb.org/t/p/w500/9aICTTHECyRwB2pBHm3rAj1SgGg.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/seMRyWVwIVBWbC9xaMzDMZJ8fUH.jpg',
     description: 'Trezentos atacantes colegiais do Japão são confinados em uma prisão de treinamento de futebol para forjar o maior atacante egoísta do mundo.',
     genres: ['Anime', 'Esporte', 'Ação', 'Drama'],
-    aniListId: 163148,
-    tmdbId: '136283',
+    aniListId: 137822,
+    tmdbId: '131041',
     malId: 50528,
     seasonsCount: 2,
     isFeatured: true,
@@ -1865,7 +1865,7 @@ export const FEATURED_ANIME_ITEMS: ContentItem[] = [
         number: 1,
         title: 'Sonho',
         description: 'Yoichi Isagi recebe o convite misterioso da União Japonesa de Futebol para o projeto Blue Lock.',
-        image: 'https://image.tmdb.org/t/p/w500/bnTXjwOwdUz8MKFyQCNf0hG4fdL.jpg'
+        image: 'https://image.tmdb.org/t/p/w500/9aICTTHECyRwB2pBHm3rAj1SgGg.jpg'
       }
     ]
   }

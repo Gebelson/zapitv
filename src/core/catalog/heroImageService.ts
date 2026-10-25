@@ -1,5 +1,5 @@
 import { ContentItem } from '../../../types';
-import { posterRecoveryService } from './PosterRecoveryService';
+import { posterRecoveryService, isCorruptedPosterUrl } from './PosterRecoveryService';
 import { isValidHeroImageUrl } from './heroCarouselStore';
 
 export const ZAPITV_HERO_FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80';
@@ -32,7 +32,7 @@ class HeroImageService {
   public isUrlFailed(url: string | null | undefined): boolean {
     if (!url || typeof url !== 'string') return true;
     const cleanUrl = url.trim();
-    if (!cleanUrl) return true;
+    if (!cleanUrl || isCorruptedPosterUrl(cleanUrl)) return true;
     const failedAt = this.failedUrlCache.get(cleanUrl);
     if (!failedAt) return false;
     if (Date.now() - failedAt > this.FAILURE_TTL_MS) {
@@ -100,7 +100,7 @@ class HeroImageService {
     const add = (candidate: any) => {
       if (isValidHeroImageUrl(candidate)) {
         const normalized = String(candidate).trim();
-        if (!seen.has(normalized)) {
+        if (!isCorruptedPosterUrl(normalized) && !seen.has(normalized)) {
           seen.add(normalized);
           candidates.push(normalized);
         }

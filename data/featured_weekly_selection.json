@@ -938,7 +938,7 @@
     },
     {
       "id": "anime-bleach-tybw",
-      "canonicalId": "anime:anilist:114446",
+      "canonicalId": "anime:anilist:116674",
       "title": "Bleach: Thousand-Year Blood War",
       "originalTitle": "Bleach: Sennen Kessen-hen",
       "type": "ANIME",
@@ -954,8 +954,8 @@
         "Aventura",
         "Sobrenatural"
       ],
-      "aniListId": 114446,
-      "tmdbId": "13916",
+      "aniListId": 116674,
+      "tmdbId": "30984",
       "malId": 41467,
       "seasonsCount": 3,
       "isFeatured": true,
@@ -970,7 +970,7 @@
           "image": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg"
         }
       ],
-      "imdbId": "anilist-114446",
+      "imdbId": "anilist-116674",
       "imdbRank": 5,
       "displayRank": 5,
       "heroTags": [
@@ -2604,7 +2604,7 @@
       },
       {
         "position": 5,
-        "canonicalId": "anime:anilist:114446",
+        "canonicalId": "anime:anilist:116674",
         "mediaType": "anime",
         "title": "Bleach: Thousand-Year Blood War",
         "originalTitle": "Bleach: Sennen Kessen-hen",
@@ -2614,7 +2614,7 @@
         "rating": 8.9,
         "item": {
           "id": "anime-bleach-tybw",
-          "canonicalId": "anime:anilist:114446",
+          "canonicalId": "anime:anilist:116674",
           "title": "Bleach: Thousand-Year Blood War",
           "originalTitle": "Bleach: Sennen Kessen-hen",
           "type": "ANIME",
@@ -2630,8 +2630,8 @@
             "Aventura",
             "Sobrenatural"
           ],
-          "aniListId": 114446,
-          "tmdbId": "13916",
+          "aniListId": 116674,
+          "tmdbId": "30984",
           "malId": 41467,
           "seasonsCount": 3,
           "isFeatured": true,
@@ -2646,7 +2646,7 @@
               "image": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg"
             }
           ],
-          "imdbId": "anilist-114446",
+          "imdbId": "anilist-116674",
           "imdbRank": 5,
           "displayRank": 5,
           "heroTags": [
@@ -3614,9 +3614,9 @@
           "score": 1032
         },
         {
-          "imdbId": "anilist-114446",
-          "aniListId": 114446,
-          "tmdbId": "13916",
+          "imdbId": "anilist-116674",
+          "aniListId": 116674,
+          "tmdbId": "30984",
           "title": "Bleach: Thousand-Year Blood War",
           "imdbTitle": "Bleach: Thousand-Year Blood War",
           "canonicalTitle": "Bleach: Thousand-Year Blood War",
@@ -4370,9 +4370,9 @@
         "score": 1032
       },
       {
-        "imdbId": "anilist-114446",
-        "aniListId": 114446,
-        "tmdbId": "13916",
+        "imdbId": "anilist-116674",
+        "aniListId": 116674,
+        "tmdbId": "30984",
         "title": "Bleach: Thousand-Year Blood War",
         "imdbTitle": "Bleach: Thousand-Year Blood War",
         "canonicalTitle": "Bleach: Thousand-Year Blood War",

@@ -224,7 +224,20 @@ export function formatCinemetaItem(raw: CinemetaMetaItem): ContentItem {
 }
 
 export function sameCatalogWork(a: ContentItem, b: ContentItem): boolean {
-  if (a.type !== b.type || (a.year && b.year && Math.abs(a.year - b.year) > 1)) return false;
+  if (!a || !b) return false;
+
+  const isAMovie = a.type === ContentType.MOVIE || a.mediaFormat === 'movie';
+  const isBMovie = b.type === ContentType.MOVIE || b.mediaFormat === 'movie';
+  if (isAMovie !== isBMovie) return false;
+
+  const isAAnime = a.type === ContentType.ANIME || Boolean(a.genres?.some(g => /anime|animação|animation/i.test(g)));
+  const isBAnime = b.type === ContentType.ANIME || Boolean(b.genres?.some(g => /anime|animação|animation/i.test(g)));
+  if (isAAnime !== isBAnime) return false;
+
+  if (a.type !== b.type && !isAAnime) return false;
+
+  if (a.year && b.year && Math.abs(a.year - b.year) > 1) return false;
+
   const normalize = (value: string) => value.toLowerCase().normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
   const titlesA = [a.title, a.originalTitle].filter(Boolean).map(value => normalize(value!));

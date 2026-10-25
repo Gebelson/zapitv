@@ -405,7 +405,7 @@ export const VERIFIED_STREAMING_EXCLUSIVES: PlatformMetadataEntry[] = [
     notes: 'Produção Original 20th Century / Disney+'
   },
   {
-    tmdbId: 13916,
+    tmdbId: 30984,
     imdbId: 'tt11995178',
     title: 'Bleach: Thousand-Year Blood War',
     year: 2022,
@@ -417,7 +417,7 @@ export const VERIFIED_STREAMING_EXCLUSIVES: PlatformMetadataEntry[] = [
     notes: 'Anime com distribuição exclusiva de streaming no Brasil via Disney+'
   },
   {
-    tmdbId: 13916,
+    tmdbId: 30984,
     imdbId: 'tt0434665',
     title: 'Bleach: Thousand-Year Blood War',
     year: 2022,
@@ -1111,7 +1111,7 @@ export const VERIFIED_STREAMING_EXCLUSIVES: PlatformMetadataEntry[] = [
     notes: 'Simulcast Oficial Crunchyroll'
   },
   {
-    tmdbId: 136283,
+    tmdbId: 131041,
     title: 'Blue Lock',
     year: 2022,
     mediaType: 'anime',

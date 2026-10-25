@@ -1127,7 +1127,15 @@ function formatCinemetaItem(raw) {
   };
 }
 function sameCatalogWork(a, b) {
-  if (a.type !== b.type || a.year && b.year && Math.abs(a.year - b.year) > 1) return false;
+  if (!a || !b) return false;
+  const isAMovie = a.type === "FILME" /* MOVIE */ || a.mediaFormat === "movie";
+  const isBMovie = b.type === "FILME" /* MOVIE */ || b.mediaFormat === "movie";
+  if (isAMovie !== isBMovie) return false;
+  const isAAnime = a.type === "ANIME" /* ANIME */ || Boolean(a.genres?.some((g) => /anime|animação|animation/i.test(g)));
+  const isBAnime = b.type === "ANIME" /* ANIME */ || Boolean(b.genres?.some((g) => /anime|animação|animation/i.test(g)));
+  if (isAAnime !== isBAnime) return false;
+  if (a.type !== b.type && !isAAnime) return false;
+  if (a.year && b.year && Math.abs(a.year - b.year) > 1) return false;
   const normalize = (value) => value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
   const titlesA = [a.title, a.originalTitle].filter(Boolean).map((value) => normalize(value));
   const titlesB = [b.title, b.originalTitle].filter(Boolean).map((value) => normalize(value));
@@ -7325,22 +7333,22 @@ var init_featuredCatalogItems = __esm({
           }
         ]
       },
-      // 5. BLEACH: THOUSAND-YEAR BLOOD WAR (aniList: 114446 / tmdb: 13916 / mal: 41467)
+      // 5. BLEACH: THOUSAND-YEAR BLOOD WAR (aniList: 116674 / tmdb: 30984 / mal: 41467)
       {
         id: "anime-bleach-tybw",
-        canonicalId: "anime:anilist:114446",
+        canonicalId: "anime:anilist:116674",
         title: "Bleach: Thousand-Year Blood War",
         originalTitle: "Bleach: Sennen Kessen-hen",
         type: "ANIME" /* ANIME */,
         mediaFormat: "series",
         rating: 8.9,
         year: 2022,
-        image: "https://image.tmdb.org/t/p/w500/iigTJJskR1PcjjXqxdyJwVB3BoU.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/z8IPicmEKXUO4I2UDdMEqw7RqOE.jpg",
+        image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx116674-p3zK4PUX2Aag.jpg",
+        backdrop: "https://s4.anilist.co/file/anilistcdn/media/anime/banner/116674-l2YlIyJzvGSV.jpg",
         description: "A guerra milenar entre os Shinigamis da Soul Society e o ex\xE9rcito Quincy liderado por Yhwach chega ao seu cl\xEDmax destrutivo.",
         genres: ["Anime", "A\xE7\xE3o", "Aventura", "Sobrenatural"],
-        aniListId: 114446,
-        tmdbId: "13916",
+        aniListId: 116674,
+        tmdbId: "30984",
         malId: 41467,
         seasonsCount: 3,
         isFeatured: true,
@@ -7352,7 +7360,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Guerra de Sangue",
             description: "A Soul Society \xE9 surpreendida por um ataque coordenado do Wandenreich.",
-            image: "https://image.tmdb.org/t/p/w500/iigTJJskR1PcjjXqxdyJwVB3BoU.jpg"
+            image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx116674-p3zK4PUX2Aag.jpg"
           }
         ]
       },
@@ -7542,22 +7550,22 @@ var init_featuredCatalogItems = __esm({
           }
         ]
       },
-      // 12. BLUE LOCK (aniList: 163148 / tmdb: 136283 / mal: 50528)
+      // 12. BLUE LOCK (aniList: 137822 / tmdb: 131041 / mal: 50528)
       {
         id: "anime-blue-lock",
-        canonicalId: "anime:anilist:163148",
+        canonicalId: "anime:anilist:137822",
         title: "Blue Lock",
         originalTitle: "Blue Lock",
         type: "ANIME" /* ANIME */,
         mediaFormat: "series",
         rating: 8.2,
         year: 2022,
-        image: "https://image.tmdb.org/t/p/w500/bnTXjwOwdUz8MKFyQCNf0hG4fdL.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/AjwoDj77HLlqcpwEGqsnvMXm5my.jpg",
+        image: "https://image.tmdb.org/t/p/w500/9aICTTHECyRwB2pBHm3rAj1SgGg.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/seMRyWVwIVBWbC9xaMzDMZJ8fUH.jpg",
         description: "Trezentos atacantes colegiais do Jap\xE3o s\xE3o confinados em uma pris\xE3o de treinamento de futebol para forjar o maior atacante ego\xEDsta do mundo.",
         genres: ["Anime", "Esporte", "A\xE7\xE3o", "Drama"],
-        aniListId: 163148,
-        tmdbId: "136283",
+        aniListId: 137822,
+        tmdbId: "131041",
         malId: 50528,
         seasonsCount: 2,
         isFeatured: true,
@@ -7569,7 +7577,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Sonho",
             description: "Yoichi Isagi recebe o convite misterioso da Uni\xE3o Japonesa de Futebol para o projeto Blue Lock.",
-            image: "https://image.tmdb.org/t/p/w500/bnTXjwOwdUz8MKFyQCNf0hG4fdL.jpg"
+            image: "https://image.tmdb.org/t/p/w500/9aICTTHECyRwB2pBHm3rAj1SgGg.jpg"
           }
         ]
       }
@@ -18849,7 +18857,7 @@ var OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS = [
       },
       {
         position: 5,
-        aniListId: 114446,
+        aniListId: 116674,
         title: "Bleach: Thousand-Year Blood War",
         romajiTitle: "Bleach: Sennen Kessen-hen",
         year: 2022,
@@ -18857,7 +18865,7 @@ var OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS = [
         popularityRank: 5,
         trendingRank: 5,
         format: "TV",
-        tmdbId: "13916",
+        tmdbId: "30984",
         malId: 41467,
         referenceDate: "2026-10-15",
         capturedAt: 17921184e5
@@ -18954,7 +18962,7 @@ var OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS = [
       },
       {
         position: 12,
-        aniListId: 163148,
+        aniListId: 137822,
         title: "Blue Lock",
         romajiTitle: "Blue Lock",
         year: 2022,
@@ -18962,7 +18970,7 @@ var OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS = [
         popularityRank: 12,
         trendingRank: 12,
         format: "TV",
-        tmdbId: "136283",
+        tmdbId: "131041",
         malId: 50528,
         referenceDate: "2026-10-15",
         capturedAt: 17921184e5
