@@ -2685,8 +2685,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           .filter(({ item }) => !selectedGenre || selectedGenre === 'Todos' || item.genres?.includes(selectedGenre))
           .filter(({ item }) => !submittedSearchQuery || item.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()));
 
-        const monthlyStatusLabel = featuredSelection?.monthlyStatusLabel || (featuredSelection?.monthLabel ? `${featuredSelection.monthLabel} · Parcial` : 'Mês Atual · Parcial');
-
         return (
           <ViewWrapper>
             <div className="px-3 sm:px-6 md:px-12 py-6 sm:py-8 pb-32 space-y-10 sm:space-y-14 md:space-y-18 max-w-[2560px] mx-auto">
@@ -2696,9 +2694,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                   <h2 className={titleClass}>
                     Em Destaque
                   </h2>
-                  <span className="text-xs sm:text-sm font-semibold px-2.5 py-1 rounded-md bg-[#007df7]/15 text-[#007df7] border border-[#007df7]/30 tracking-wide">
-                    {monthlyStatusLabel}
-                  </span>
                   <GenreDropdown genres={availableGenres} selectedGenre={selectedGenre} onSelect={handleSelectGenre} isDarkMode={isDarkMode} />
                 </div>
               </div>
