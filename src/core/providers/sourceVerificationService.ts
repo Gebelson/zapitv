@@ -3,6 +3,7 @@ import { ContentItem, ContentType } from '../../../types';
 import { providerRegistry, ProviderConfig } from './providerRegistry';
 import { tmdbService } from '../tmdb/tmdbClient';
 import { canonicalIdentityService } from '../identity/canonicalIdentity';
+import { sourceConfidenceEngine } from '../identity/sourceConfidenceEngine';
 import { streamValidator } from './streamValidator';
 import { sourceSelectionService } from '../selection/sourceSelectionService';
 import { isSourcePlayableHere } from './sourceReadiness';
@@ -171,6 +172,14 @@ class SourceVerificationService {
     };
 
     let phase1Streams: StremioStream[] = [];
+    const canonicalIdentity = canonicalIdentityService.buildIdentity(item, episode);
+
+    // Validação estrita de compatibilidade técnica e correspondência canônica de identidade
+    const isPlayableAndCanonicallyVerified = (s: StremioStream): boolean => {
+      if (!isSourcePlayableHere(s)) return false;
+      const evaluation = sourceConfidenceEngine.evaluate(s, canonicalIdentity);
+      return evaluation.isMatch && evaluation.confidence !== 'REJECTED' && evaluation.confidence !== 'QUARANTINED';
+    };
 
     try {
       phase1Streams = await providerRegistry.resolveStreams(
@@ -181,7 +190,7 @@ class SourceVerificationService {
           signal: options?.signal,
           onProgressiveStreams: (progressive) => {
             if (options?.signal?.aborted) return;
-            const playable = progressive?.filter(isSourcePlayableHere) || [];
+            const playable = progressive?.filter(isPlayableAndCanonicallyVerified) || [];
             if (playable.length > 0) {
               diagnostic.approvedStreamsCount = playable.length;
               options?.onProgressiveStreams?.(playable);
@@ -199,7 +208,7 @@ class SourceVerificationService {
     }
 
     diagnostic.phase1DurationMs = Date.now() - phase1Start;
-    const phase1Playable = phase1Streams.filter(isSourcePlayableHere);
+    const phase1Playable = phase1Streams.filter(isPlayableAndCanonicallyVerified);
     diagnostic.approvedStreamsCount = phase1Playable.length;
 
     // Se a primeira verificação encontrou fontes válidas, FINALIZA IMEDIATAMENTE (Requisito 3 e 9)
@@ -315,7 +324,7 @@ class SourceVerificationService {
           signal: options?.signal,
           onProgressiveStreams: (progressive) => {
             if (options?.signal?.aborted) return;
-            const playable = progressive?.filter(isSourcePlayableHere) || [];
+            const playable = progressive?.filter(isPlayableAndCanonicallyVerified) || [];
             if (playable.length > 0) {
               diagnostic.approvedStreamsCount = playable.length;
               options?.onProgressiveStreams?.(playable);
@@ -335,8 +344,8 @@ class SourceVerificationService {
     diagnostic.phase2DurationMs = Date.now() - phase2Start;
     diagnostic.totalDurationMs = Date.now() - overallStart;
 
-    // Se encontrou fontes em qualquer fase, o resultado é obrigatoriamente AVAILABLE
-    const finalStreams = phase2Streams.filter(isSourcePlayableHere);
+    // Se encontrou fontes em qualquer fase que atendam à validação canônica, retorna AVAILABLE
+    const finalStreams = phase2Streams.filter(isPlayableAndCanonicallyVerified);
     if (finalStreams.length > 0) {
       diagnostic.approvedStreamsCount = finalStreams.length;
       diagnostic.finalState = 'AVAILABLE';
@@ -349,7 +358,8 @@ class SourceVerificationService {
       };
     }
 
-    // Coleta fontes candidatas compatíveis com a web de ambas as fases
+    // Coleta fontes candidatas de ambas as fases verificando estritamente a identidade canônica
+    // REGRA MANDATÓRIA: Nenhum fallback pode contornar a validação canônica de identidade
     const candidatePool = [...phase2Streams, ...phase1Streams];
     const webReadyCandidates: StremioStream[] = [];
     const seenCandidateKeys = new Set<string>();
@@ -360,16 +370,20 @@ class SourceVerificationService {
       if (seenCandidateKeys.has(key)) continue;
       seenCandidateKeys.add(key);
 
-      const u = s.url.toLowerCase();
       // Descarta torrents e loopbacks sem motor local ativo
+      const u = s.url.toLowerCase();
       if (s.isTorrent || u.includes('127.0.0.1:11470') || u.includes('localhost:11470')) {
+        continue;
+      }
+
+      // Validação canônica estrita para qualquer candidato de fallback
+      if (!isPlayableAndCanonicallyVerified(s)) {
         continue;
       }
       webReadyCandidates.push(s);
     }
 
     if (webReadyCandidates.length > 0) {
-      // Fontes candidatas compatíveis encontradas: permite reprodução com fallback controlado
       diagnostic.approvedStreamsCount = webReadyCandidates.length;
       diagnostic.finalState = 'AVAILABLE';
       this.recordLog(diagnostic);

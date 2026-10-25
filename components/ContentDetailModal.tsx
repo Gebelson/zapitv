@@ -14,6 +14,7 @@ import { theatricalFilterService } from '../src/core/catalog/theatricalFilterSer
 import { mediaLoadingTracker } from '../src/core/tracking/mediaLoadingTracker';
 import { mediaAvailabilityIndex } from '../src/core/catalog/MediaAvailabilityIndex';
 import { canonicalIdentityService } from '../src/core/identity/canonicalIdentity';
+import { sourceConfidenceEngine } from '../src/core/identity/sourceConfidenceEngine';
 import { audioPreferenceService } from '../src/core/audio/audioPreferenceService';
 import { streamValidator } from '../src/core/providers/streamValidator';
 import { similarTitlesService } from '../src/core/recommendations/similarTitlesService';
@@ -887,21 +888,25 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
 
     // ETAPA 2: Verifica se já temos fontes pré-resolvidas em cache da etapa 1
     const prefetched = prefetchedSourcesRef.current;
+    const identityForPrefetch = canonicalIdentityService.buildIdentity(currentTargetItem, epParams);
+    const validPrefetchedStreams = (prefetched?.streams || []).filter(s =>
+      sourceConfidenceEngine.evaluate(s, identityForPrefetch).isMatch
+    );
     const hasReadyPrefetch = prefetched && 
       prefetched.targetKey === requestedKey && 
       prefetched.status === 'resolved' && 
-      prefetched.streams.length > 0 &&
+      validPrefetchedStreams.length > 0 &&
       !isAutoRetry;
 
     if (hasReadyPrefetch) {
-      // Fontes já prontas: passa imediatamente ao ZapiPlayer para pré-buffer durante a intro
+      // Fontes já prontas e com identidade canônica confirmada: passa ao ZapiPlayer
       setVerificationState('AVAILABLE');
-      setResolvedStreams(prefetched.streams);
+      setResolvedStreams(validPrefetchedStreams);
       setIsLoadingStreams(false);
       mediaLoadingTracker.recordEvent(traceId, 'CANDIDATES_FILTERED', 'ContentDetailModal', 'OK',
-        { streamCount: prefetched.streams.length, prefetched: true });
+        { streamCount: validPrefetchedStreams.length, prefetched: true });
       mediaLoadingTracker.transition(traceId, 'BUFFERING', {
-        streamCount: prefetched.streams.length,
+        streamCount: validPrefetchedStreams.length,
         prefetched: true
       });
       return;
@@ -931,16 +936,20 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
 
     try {
       let progressiveStreamsFound: StremioStream[] = [];
+      const playbackCanonicalIdentity = canonicalIdentityService.buildIdentity(currentTargetItem, epParams);
       const handleProgressive = (progressive: StremioStream[]) => {
         if (currentRequestId !== playbackRequestIdRef.current || playbackAbort.signal.aborted) return;
         if (progressive && progressive.length > 0) {
-          const hasWebReady = progressive.some(s => !s.isTorrent && !s.url?.includes('127.0.0.1:11470') && !s.url?.includes('localhost:11470'));
-          if (hasWebReady) {
-            progressiveStreamsFound = progressive;
-            setResolvedStreams(progressive);
+          const verifiedPlayable = progressive.filter(s =>
+            !s.isTorrent && !s.url?.includes('127.0.0.1:11470') && !s.url?.includes('localhost:11470') &&
+            sourceConfidenceEngine.evaluate(s, playbackCanonicalIdentity).isMatch
+          );
+          if (verifiedPlayable.length > 0) {
+            progressiveStreamsFound = verifiedPlayable;
+            setResolvedStreams(verifiedPlayable);
             setIsLoadingStreams(false);
             mediaLoadingTracker.transition(traceId, 'BUFFERING', {
-              streamCount: progressive.length,
+              streamCount: verifiedPlayable.length,
               progressive: true
             });
           }
@@ -970,10 +979,13 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
         return;
       }
 
-      // Se a verificação retornou fontes ou se fontes progressivas já foram validadas, preserva as fontes
-      const streams = (verificationResult.streams && verificationResult.streams.length > 0)
+      // Se a verificação retornou fontes ou se fontes progressivas já foram validadas, preserva as fontes canônicas
+      const rawCandidates = (verificationResult.streams && verificationResult.streams.length > 0)
         ? verificationResult.streams
         : (progressiveStreamsFound.length > 0 ? progressiveStreamsFound : []);
+      const streams = rawCandidates.filter(s =>
+        sourceConfidenceEngine.evaluate(s, playbackCanonicalIdentity).isMatch
+      );
 
       if (streams.length > 0) {
         setVerificationState('AVAILABLE');

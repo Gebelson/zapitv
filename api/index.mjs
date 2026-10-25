@@ -3329,6 +3329,21 @@ var init_streamValidator = __esm({
           }
           return false;
         }
+      },
+      // 7. Lupin (Série live-action Netflix 2021 com Omar Sy / tt2531336 / 96677)
+      // Rejeita terminantemente produções da animação Lupin III (The First, Part 1-6, Sansei, Cagliostro, etc.)
+      // quando a obra solicitada for a série live-action da Netflix.
+      {
+        targetPattern: /\blupin\b/i,
+        rejectStream: (s, rawCandidates = []) => {
+          const candText = (Array.isArray(rawCandidates) ? rawCandidates.join(" ") : String(rawCandidates || "")).toLowerCase();
+          const isTargetLupin3 = /\b(?:iii|the\s+third|the\s+first|sansei|cagliostro)\b/i.test(candText);
+          if (!isTargetLupin3) {
+            const text2 = `${s.name || ""} ${s.title || ""} ${s.description || ""} ${s.url || ""}`.toLowerCase();
+            return /\b(?:iii|the\s+third|the\s+first|sansei|cagliostro|part\s*[1-6]|anime)\b/i.test(text2);
+          }
+          return false;
+        }
       }
     ];
     StreamValidator = class {
@@ -3656,7 +3671,7 @@ var init_streamValidator = __esm({
           if (!m) return false;
           const after = cleanStream.slice(m.index + m[1].length + singleWord.length).trim();
           const nextWord = after.split(/\s+/)[0];
-          if (nextWord && !/^(s\d+|e\d+|ep\d*|season|temporada|episodio|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|bluray|bdrip|webrip|webdl|web|dvdrip|x264|x265|dublado|legendado|dual|audio|pt|br)$/i.test(nextWord)) {
+          if (nextWord && !/^(s\d+e\d+|s\d+|e\d+|ep\d*|t\d+ep?\d+|season|temporada|episodio|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|bluray|bdrip|webrip|webdl|web|dvdrip|x264|x265|dublado|legendado|dual|audio|pt|br)$/i.test(nextWord)) {
             return false;
           }
         }
@@ -5444,7 +5459,7 @@ var init_mediaSourceValidationService = __esm({
     init_videoAdBlocker();
     init_audioPreferenceService();
     init_subtitlePreferenceService();
-    STORAGE_VALIDATED_SOURCES_KEY = "zapitv_validated_sources_v4";
+    STORAGE_VALIDATED_SOURCES_KEY = "zapitv_validated_sources_v5_canonical";
     VALIDATION_CACHE_TTL_MS = 24 * 60 * 60 * 1e3;
     REJECTED_CACHE_TTL_MS = 6 * 60 * 60 * 1e3;
     MediaSourceValidationService = class _MediaSourceValidationService {
@@ -5482,6 +5497,12 @@ var init_mediaSourceValidationService = __esm({
                 if (item && item.sourceId && item.lastChecked) {
                   const ttl = item.availability === "rejected" ? REJECTED_CACHE_TTL_MS : VALIDATION_CACHE_TTL_MS;
                   if (now - item.lastChecked < ttl) {
+                    if (item.canonicalIdentity && item.originalStream) {
+                      const conf = sourceConfidenceEngine.evaluate(item.originalStream, item.canonicalIdentity);
+                      if (!conf.isMatch || conf.confidence === "REJECTED" || conf.confidence === "QUARANTINED") {
+                        continue;
+                      }
+                    }
                     this.cache.set(item.sourceId, item);
                   }
                 }
@@ -5823,6 +5844,12 @@ var init_mediaSourceValidationService = __esm({
           return source.resolutionsByAudioTrack[langCode];
         }
         return source.availableResolutions.length > 0 ? source.availableResolutions : ["1080p"];
+      }
+      /**
+       * Obtém registro em cache de uma fonte
+       */
+      getCachedSource(sourceKey) {
+        return this.cache.get(sourceKey);
       }
       /**
        * Invalida registros de uma fonte quando ocorre erro de reprodução
@@ -11636,7 +11663,7 @@ var init_providerRegistry = __esm({
             let providerSuccess = false;
             let providerStreamCount = 0;
             let providerError;
-            const addonTimeout = addon.id.includes("froststream") ? 15e3 : 1e4;
+            const addonTimeout = addon.id.includes("froststream") ? 7e3 : 4500;
             try {
               const client = new StremioClient(addon.url);
               let primaryQueryId = stremioId;
@@ -11663,12 +11690,12 @@ var init_providerRegistry = __esm({
                 client.getStreams(stremioType, primaryQueryId),
                 new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON")), addonTimeout))
               ]).catch(() => null);
-              const secondaryCandidates = primaryQueryId === stremioId ? altIds : [stremioId, ...altIds.filter((a) => a !== `tmdb:${tmdbNum}` && a !== tmdbNum)];
+              const secondaryCandidates = (primaryQueryId === stremioId ? altIds : [stremioId, ...altIds.filter((a) => a !== `tmdb:${tmdbNum}` && a !== tmdbNum)]).slice(0, 2);
               if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0) {
                 for (const altBase of secondaryCandidates) {
                   const altId = type === "series" || type === "anime" ? stremioEpisodeId(altBase, episode) : altBase;
                   try {
-                    const altTimeout = 6e3;
+                    const altTimeout = 2500;
                     const altRes = await Promise.race([
                       client.getStreams(stremioType, altId),
                       new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON_ALT")), altTimeout))
@@ -11686,7 +11713,7 @@ var init_providerRegistry = __esm({
                 try {
                   const altTypeRes = await Promise.race([
                     client.getStreams(altType, stremioId),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON_TYPE")), 5e3))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON_TYPE")), 2500))
                   ]).catch(() => null);
                   if (altTypeRes && Array.isArray(altTypeRes.streams) && hasMatchingStreams(altTypeRes.streams)) {
                     res = altTypeRes;
@@ -16091,6 +16118,9 @@ var init_canonicalIdentity = __esm({
         if (/odisseia|odyssey/i.test(item.title) || /odisseia|odyssey/i.test(item.originalTitle || "")) {
           aliases.push("odyssey", "the odyssey", "odisseia", "a odisseia", "odyssea");
         }
+        if (/sussurros.*cora[cç][aã]o|whisper.*heart|mimi.*sumaseba/i.test(item.title) || /sussurros.*cora[cç][aã]o|whisper.*heart|mimi.*sumaseba/i.test(item.originalTitle || "")) {
+          aliases.push("whisper of the heart", "mimi wo sumaseba", "sussurros do coracao");
+        }
         const canonicalId = item.canonicalId || canonicalCatalogMaster.buildCanonicalId(
           item.type,
           item.imdbId ? "imdb" : item.aniListId ? "anilist" : item.tmdbId ? "tmdb" : "local",
@@ -16135,16 +16165,30 @@ var init_canonicalIdentity = __esm({
 });
 
 // src/core/identity/sourceConfidenceEngine.ts
-var isKnownTechnicalOrReleaseWord, KNOWN_COLLISION_TITLES, SourceConfidenceEngine, sourceConfidenceEngine;
+var isKnownTechnicalOrReleaseWord, isDistinguishingTitleModifier, KNOWN_COLLISION_TITLES, SourceConfidenceEngine, sourceConfidenceEngine;
 var init_sourceConfidenceEngine = __esm({
   "src/core/identity/sourceConfidenceEngine.ts"() {
     init_canonicalIdentity();
     init_streamQuarantineService();
     init_types();
     isKnownTechnicalOrReleaseWord = (word) => {
-      return /^(s\d+|e\d+|ep\d*|season|temporada|episodio|epis[oó]dio|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|360p|hd|sd|fhd|uhd|bluray|bdrip|brrip|webrip|webdl|web|hdtv|dvdrip|dvd|x264|x265|hevc|h264|h265|avc|aac|ac3|eac3|dts|mp4|mkv|avi|webm|dublado|legendado|dual|multi|audio|áudio|pt|br|ptbr|pob|eng|sub|softsub|hardsub|remux|complete|ita|spa|fra|ger|rus|jap|kor|nf|amzn|atvp|dnp|hmax|dsnp|repack|proper|ii|iii|iv|v|vi|vii|viii|ix|x|1st|2nd|3rd|4th|5th|part|cour)$/i.test(word);
+      return /^(s\d+e\d+|s\d+|e\d+|ep\d*|t\d+ep?\d+|t\d+|\d+x\d+|season|temporada|episodio|epis[oó]dio|capitulo|cap[ií]tulo|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|360p|hd|sd|fhd|uhd|bluray|bdrip|brrip|webrip|webdl|web|hdtv|dvdrip|dvd|x264|x265|hevc|h264|h265|avc|aac|ac3|eac3|dts|mp4|mkv|avi|webm|dublado|legendado|dual|multi|audio|áudio|pt|br|ptbr|pob|eng|sub|softsub|hardsub|remux|complete|ita|spa|fra|ger|rus|jap|kor|nf|amzn|atvp|dnp|hmax|dsnp|repack|proper)$/i.test(word);
+    };
+    isDistinguishingTitleModifier = (word, isMovie = false, fullText = "") => {
+      if (isMovie && (word === "movie" || word === "filme")) return false;
+      if ((word === "first" || word === "1st" || word === "second" || word === "2nd" || word === "third" || word === "3rd") && new RegExp(`\\b${word}\\s+(?:season|temporada)\\b`, "i").test(fullText)) {
+        return false;
+      }
+      return /^(ii|iii|iv|v|vi|vii|viii|ix|x|1st|2nd|3rd|4th|5th|first|second|third|part|cour|origins|reboot|remake|shippuden|boruto|returns|forever|revelations|unlimited|sansei|movie|filme|alicization|alternative|progressive|underworld|ordinal)$/i.test(word);
     };
     KNOWN_COLLISION_TITLES = [
+      "lupin iii",
+      "lupin the third",
+      "lupin sansei",
+      "the cazalets",
+      "raven of the inner palace",
+      "koukyuu no karasu",
+      "jimihen",
       "sparks of tomorrow",
       "eternal aseria",
       "angel heart",
@@ -16234,14 +16278,35 @@ var init_sourceConfidenceEngine = __esm({
           }
         }
         const isAcervoOficial = stream.providerId === "zapitv-verified";
-        const episodeTag = streamTitle.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b)/i);
+        if (stream.imdbId && identity.imdbId && stream.imdbId.toLowerCase() !== identity.imdbId.toLowerCase()) {
+          reasons.push(`IMDb ID do stream (${stream.imdbId}) diverge da obra solicitada (${identity.imdbId})`);
+          const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+          this.recordDiagnostic(stream, identity, evalResult2);
+          return evalResult2;
+        }
+        if (stream.tmdbId && identity.tmdbId && String(stream.tmdbId) !== String(identity.tmdbId)) {
+          reasons.push(`TMDB ID do stream (${stream.tmdbId}) diverge da obra solicitada (${identity.tmdbId})`);
+          const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+          this.recordDiagnostic(stream, identity, evalResult2);
+          return evalResult2;
+        }
+        const declaredImdbInText = (streamTitle + " " + streamUrl).match(/\b(tt\d{7,10})\b/i)?.[1]?.toLowerCase();
+        if (declaredImdbInText && identity.imdbId && declaredImdbInText !== identity.imdbId.toLowerCase()) {
+          reasons.push(`IMDb ID identificado no stream (${declaredImdbInText}) diverge da obra solicitada (${identity.imdbId})`);
+          const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+          this.recordDiagnostic(stream, identity, evalResult2);
+          return evalResult2;
+        }
+        const episodeTag = streamTitle.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b|(\d{1,2})[ªa]?\s*temporada\s*(?:epis[oó]dio|ep)\s*(\d{1,3})\b|(?:temporada|season)\s*(\d{1,2})\s*(?:epis[oó]dio|ep|episode)\s*(\d{1,3})\b|\b(\d{1,2})x(\d{1,3})\b)/i);
+        const parsedSeason = episodeTag ? Number(episodeTag[1] || episodeTag[3] || episodeTag[5] || episodeTag[7] || episodeTag[9]) : void 0;
+        const parsedEpisode = episodeTag ? Number(episodeTag[2] || episodeTag[4] || episodeTag[6] || episodeTag[8] || episodeTag[10]) : void 0;
         if (episodeTag && identity.type === "FILME" /* MOVIE */) {
           reasons.push("Fonte epis\xF3dica oferecida para um filme");
           const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
           this.recordDiagnostic(stream, identity, evalResult2);
           return evalResult2;
         }
-        if (episodeTag && identity.season && identity.episode && (Number(episodeTag[1] || episodeTag[3]) !== identity.season || Number(episodeTag[2] || episodeTag[4]) !== identity.episode)) {
+        if (episodeTag && identity.season && identity.episode && (parsedSeason !== identity.season || parsedEpisode !== identity.episode)) {
           reasons.push("Temporada ou epis\xF3dio diferente do solicitado");
           const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
           this.recordDiagnostic(stream, identity, evalResult2);
@@ -16257,7 +16322,16 @@ var init_sourceConfidenceEngine = __esm({
             return evalResult2;
           }
         }
-        if (identity.season === 1 && /\b(?:clevatess\s+ii|mushoku\s+tensei\s+ii|2nd\s+season|3rd\s+season|sais(?:on)?\s*0*2)\b/i.test(streamTitle)) {
+        if ((identity.type === "S\xC9RIE" /* SERIES */ || identity.type === "ANIME" /* ANIME */) && identity.season) {
+          const isStandaloneMovieRelease = /\b(?:bluray|bdrip|brrip|dvdrip|remux|the\s+first|the\s+movie|o\s+filme)\b/i.test(streamTitle) && !episodeTag && !absEpMatch && !/\b(?:s\d+|e\d+|ep\d*|temporada|epis[oó]dio)\b/i.test(combined);
+          if (isStandaloneMovieRelease) {
+            reasons.push("Fonte de filme isolado n\xE3o corresponde \xE0 s\xE9rie/epis\xF3dio solicitado");
+            const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+            this.recordDiagnostic(stream, identity, evalResult2);
+            return evalResult2;
+          }
+        }
+        if (identity.season === 1 && /\b(?:clevatess\s+ii|mushoku\s+tensei\s+ii|sword\s+art\s+online\s+ii|2nd\s+season|3rd\s+season|sais(?:on)?\s*0*[2-9]|\bseason\s*0*[2-9]\b|\btemporada\s*0*[2-9]\b)\b/i.test(streamTitle)) {
           reasons.push("Fonte pertence a uma temporada posterior e n\xE3o \xE0 primeira");
           const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
           this.recordDiagnostic(stream, identity, evalResult2);
@@ -16286,18 +16360,6 @@ var init_sourceConfidenceEngine = __esm({
             this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
             return evalResult2;
           }
-        }
-        if (isAcervoOficial) {
-          reasons.push("Fonte can\xF4nica verificada pelo acervo oficial ZapiTV");
-          const evalResult2 = {
-            stream,
-            confidence: "VERIFIED",
-            isMatch: true,
-            reasons,
-            canonicalTitle: identity.title
-          };
-          this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
-          return evalResult2;
         }
         const streamTitleToCheck = canonicalIdentityService.normalizeTitle(`${streamName} ${streamTitle} ${stream.description || ""}`);
         for (const collisionTitle of KNOWN_COLLISION_TITLES) {
@@ -16361,18 +16423,53 @@ var init_sourceConfidenceEngine = __esm({
           const aliasRegex = new RegExp(`(^|\\s)${escaped}(\\s|$)`, "i");
           const match = streamTitleToCheck.match(aliasRegex);
           if (match) {
-            const aliasTokens = canonicalIdentityService.extractSignificantTokens(cleanAlias);
-            if (aliasTokens.length === 1 && match.index !== void 0) {
+            const aliasWords = cleanAlias.split(/\s+/).filter(Boolean);
+            if (aliasWords.length === 1 && match.index !== void 0) {
               const matchPos = match.index + match[1].length;
               const afterText = streamTitleToCheck.slice(matchPos + cleanAlias.length).trim();
               const nextWord = afterText.split(/\s+/)[0];
-              if (nextWord && !isKnownTechnicalOrReleaseWord(nextWord)) {
+              const isSeasonOrEpIndicator = /^\d+\s*(?:temporada|season|episodio|epis[oó]dio|ep|capitulo|cap[ií]tulo)\b/i.test(afterText) || /^(?:temporada|season|episodio|epis[oó]dio|ep)\s*\d+\b/i.test(afterText);
+              if (nextWord && !isKnownTechnicalOrReleaseWord(nextWord) && !isSeasonOrEpIndicator) {
                 continue;
+              }
+            } else if (aliasWords.length >= 2 && match.index !== void 0) {
+              const matchPos = match.index + match[1].length;
+              const afterText = streamTitleToCheck.slice(matchPos + cleanAlias.length).trim();
+              const nextWord = afterText.split(/\s+/)[0];
+              const isTargetMovie2 = identity.type === "FILME" /* MOVIE */;
+              const isMultiWordModifier = /^(?:the\s+movie|the\s+first|the\s+second|the\s+third)\b/i.test(afterText);
+              if (nextWord && (isDistinguishingTitleModifier(nextWord, isTargetMovie2, streamTitleToCheck) || isMultiWordModifier)) {
+                const aliasWordsSet = new Set(aliasWords);
+                if (!aliasWordsSet.has(nextWord.toLowerCase())) {
+                  continue;
+                }
               }
             }
             matchedAlias = cleanAlias;
             break;
           }
+        }
+        const allKnownTargetWords = /* @__PURE__ */ new Set();
+        targetTokens.forEach((t) => allKnownTargetWords.add(t));
+        origTokens.forEach((t) => allKnownTargetWords.add(t));
+        allAliases.forEach((a) => {
+          canonicalIdentityService.normalizeTitle(a).split(/\s+/).filter(Boolean).forEach((t) => allKnownTargetWords.add(t));
+        });
+        const isTargetMovie = identity.type === "FILME" /* MOVIE */;
+        const hasDistinguishingModifierNotInTarget = Array.from(titleWords).some(
+          (word) => isDistinguishingTitleModifier(word, isTargetMovie, streamTitleToCheck) && !allKnownTargetWords.has(word)
+        );
+        if (hasDistinguishingModifierNotInTarget) {
+          reasons.push("T\xEDtulo do stream cont\xE9m modificador de obra/sequ\xEAncia derivada n\xE3o pertencente \xE0 obra solicitada");
+          const evalResult2 = {
+            stream,
+            confidence: "REJECTED",
+            isMatch: false,
+            reasons,
+            canonicalTitle: identity.title
+          };
+          this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
+          return evalResult2;
         }
         const allTargetTokensPresent = targetTokens.length >= 2 && targetTokens.every((t) => titleWords.has(t));
         const allOrigTokensPresent = origTokens.length >= 2 && origTokens.every((t) => titleWords.has(t));

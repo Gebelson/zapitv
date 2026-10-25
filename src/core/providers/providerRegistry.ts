@@ -848,8 +848,8 @@ class ProviderRegistryService {
         let providerSuccess = false;
         let providerStreamCount = 0;
         let providerError: string | undefined;
-        // Timeout individual ágil por add-on (ampliado para 15s no FrostStream para scraping de fluxos HTTP diretos)
-        const addonTimeout = addon.id.includes('froststream') ? 15000 : 10000;
+        // Timeout individual ágil por add-on (otimizado para evitar acúmulo de espera)
+        const addonTimeout = addon.id.includes('froststream') ? 7000 : 4500;
 
         try {
           const client = new StremioClient(addon.url);
@@ -886,9 +886,9 @@ class ProviderRegistryService {
           ]).catch(() => null);
 
           // Fallback para IDs secundários se o primeiro não retornou nada ou não correspondeu ao título solicitado
-          const secondaryCandidates = primaryQueryId === stremioId
+          const secondaryCandidates = (primaryQueryId === stremioId
             ? altIds
-            : [stremioId, ...altIds.filter(a => a !== `tmdb:${tmdbNum}` && a !== tmdbNum)];
+            : [stremioId, ...altIds.filter(a => a !== `tmdb:${tmdbNum}` && a !== tmdbNum)]).slice(0, 2);
 
           if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0) {
             for (const altBase of secondaryCandidates) {
@@ -896,7 +896,7 @@ class ProviderRegistryService {
                 ? stremioEpisodeId(altBase, episode)
                 : altBase;
               try {
-                const altTimeout = 6000;
+                const altTimeout = 2500;
                 const altRes = await Promise.race([
                   client.getStreams(stremioType, altId),
                   new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON_ALT')), altTimeout))
@@ -914,7 +914,7 @@ class ProviderRegistryService {
             try {
               const altTypeRes = await Promise.race([
                 client.getStreams(altType, stremioId),
-                new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON_TYPE')), 5000))
+                new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON_TYPE')), 2500))
               ]).catch(() => null);
               if (altTypeRes && Array.isArray(altTypeRes.streams) && hasMatchingStreams(altTypeRes.streams)) {
                 res = altTypeRes;

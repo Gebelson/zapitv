@@ -68,6 +68,8 @@ export interface StremioStream {
   isTorrent?: boolean;
   isDirectVideo?: boolean;
   requiresEngine?: boolean;
+  imdbId?: string;
+  tmdbId?: string | number;
 }
 
 export interface StremioMetaVideo {

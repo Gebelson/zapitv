@@ -3971,6 +3971,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           return;
         }
 
+        // Validação canônica obrigatória antes de trocar de fonte
+        const canonicalIdentity = canonicalIdentityService.buildIdentity(itemRef.current, {
+          season: initialSeason,
+          episode: initialEpisode
+        });
+        if (!sourceConfidenceEngine.evaluate(streams[targetIndex], canonicalIdentity).isMatch) {
+          console.warn('[ZapiPlayer] Fonte de qualidade alternativa rejeitada por incompatibilidade de identidade.');
+          return;
+        }
+
         if (targetIndex !== selectedStreamIndex) {
           const video = videoRef.current;
           const resumeTime = video && video.currentTime > 0 ? video.currentTime : currentTime;
@@ -4050,6 +4060,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       }
 
       if (targetIndex !== undefined && targetIndex !== selectedStreamIndex) {
+        // Validação canônica obrigatória antes de trocar de fonte
+        const canonicalIdentity = canonicalIdentityService.buildIdentity(itemRef.current, {
+          season: initialSeason,
+          episode: initialEpisode
+        });
+        if (!sourceConfidenceEngine.evaluate(streams[targetIndex], canonicalIdentity).isMatch) {
+          console.warn('[ZapiPlayer] Fonte de áudio alternativa rejeitada por incompatibilidade de identidade.');
+          return;
+        }
+
         setIsSwitchingAudio(true);
         previousStreamIndexRef.current = selectedStreamIndex;
         previousActiveAudioIdRef.current = activeAudioId;

@@ -180,6 +180,21 @@ export const KNOWN_UPSTREAM_MISMATCHES: Array<{
 
       return false;
     }
+  },
+  // 7. Lupin (Série live-action Netflix 2021 com Omar Sy / tt2531336 / 96677)
+  // Rejeita terminantemente produções da animação Lupin III (The First, Part 1-6, Sansei, Cagliostro, etc.)
+  // quando a obra solicitada for a série live-action da Netflix.
+  {
+    targetPattern: /\blupin\b/i,
+    rejectStream: (s, rawCandidates = []) => {
+      const candText = (Array.isArray(rawCandidates) ? rawCandidates.join(' ') : String(rawCandidates || '')).toLowerCase();
+      const isTargetLupin3 = /\b(?:iii|the\s+third|the\s+first|sansei|cagliostro)\b/i.test(candText);
+      if (!isTargetLupin3) {
+        const text = `${s.name || ''} ${s.title || ''} ${s.description || ''} ${s.url || ''}`.toLowerCase();
+        return /\b(?:iii|the\s+third|the\s+first|sansei|cagliostro|part\s*[1-6]|anime)\b/i.test(text);
+      }
+      return false;
+    }
   }
 ];
 
@@ -621,7 +636,7 @@ class StreamValidator {
       if (!m) return false;
       const after = cleanStream.slice(m.index! + m[1].length + singleWord.length).trim();
       const nextWord = after.split(/\s+/)[0];
-      if (nextWord && !/^(s\d+|e\d+|ep\d*|season|temporada|episodio|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|bluray|bdrip|webrip|webdl|web|dvdrip|x264|x265|dublado|legendado|dual|audio|pt|br)$/i.test(nextWord)) {
+      if (nextWord && !/^(s\d+e\d+|s\d+|e\d+|ep\d*|t\d+ep?\d+|season|temporada|episodio|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|bluray|bdrip|webrip|webdl|web|dvdrip|x264|x265|dublado|legendado|dual|audio|pt|br)$/i.test(nextWord)) {
         return false;
       }
     }

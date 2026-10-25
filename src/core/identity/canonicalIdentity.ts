@@ -135,6 +135,9 @@ export class CanonicalIdentityService {
     if (/odisseia|odyssey/i.test(item.title) || /odisseia|odyssey/i.test(item.originalTitle || '')) {
       aliases.push('odyssey', 'the odyssey', 'odisseia', 'a odisseia', 'odyssea');
     }
+    if (/sussurros.*cora[cç][aã]o|whisper.*heart|mimi.*sumaseba/i.test(item.title) || /sussurros.*cora[cç][aã]o|whisper.*heart|mimi.*sumaseba/i.test(item.originalTitle || '')) {
+      aliases.push('whisper of the heart', 'mimi wo sumaseba', 'sussurros do coracao');
+    }
 
     const canonicalId = item.canonicalId || canonicalCatalogMaster.buildCanonicalId(
       item.type,

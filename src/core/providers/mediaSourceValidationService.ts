@@ -64,7 +64,7 @@ export interface SourceValidationContext {
   hasExternalPtSub?: boolean;
 }
 
-const STORAGE_VALIDATED_SOURCES_KEY = 'zapitv_validated_sources_v4';
+const STORAGE_VALIDATED_SOURCES_KEY = 'zapitv_validated_sources_v5_canonical';
 const VALIDATION_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h para fontes válidas
 const REJECTED_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6h para fontes rejeitadas
 
@@ -108,6 +108,13 @@ export class MediaSourceValidationService {
             if (item && item.sourceId && item.lastChecked) {
               const ttl = item.availability === 'rejected' ? REJECTED_CACHE_TTL_MS : VALIDATION_CACHE_TTL_MS;
               if (now - item.lastChecked < ttl) {
+                // Invalida do cache qualquer fonte que não atenda à política corrigida de identidade
+                if (item.canonicalIdentity && item.originalStream) {
+                  const conf = sourceConfidenceEngine.evaluate(item.originalStream, item.canonicalIdentity);
+                  if (!conf.isMatch || conf.confidence === 'REJECTED' || conf.confidence === 'QUARANTINED') {
+                    continue;
+                  }
+                }
                 this.cache.set(item.sourceId, item);
               }
             }
@@ -517,6 +524,13 @@ export class MediaSourceValidationService {
       return source.resolutionsByAudioTrack[langCode];
     }
     return source.availableResolutions.length > 0 ? source.availableResolutions : ['1080p'];
+  }
+
+  /**
+   * Obtém registro em cache de uma fonte
+   */
+  public getCachedSource(sourceKey: string): ValidatedSource | undefined {
+    return this.cache.get(sourceKey);
   }
 
   /**
