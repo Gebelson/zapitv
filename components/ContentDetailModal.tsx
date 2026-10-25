@@ -1310,12 +1310,12 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                         e.stopPropagation();
                         setShowWatchPartyModal(true);
                       }}
-                      className="h-11 sm:h-12 px-4 sm:px-5 bg-gradient-to-r from-cyan-600/20 to-[#007df7]/20 border border-cyan-500/30 hover:border-cyan-400 text-white hover:text-cyan-200 rounded-xl sm:rounded-2xl font-bold text-xs sm:text-sm md:text-base backdrop-blur-sm transition-all hover:scale-105 active:scale-95 cursor-pointer group shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-2 select-none box-border"
+                      className="w-11 h-11 sm:w-auto sm:h-12 p-0 sm:px-5 bg-gradient-to-r from-cyan-600/20 to-[#007df7]/20 border border-cyan-500/30 hover:border-cyan-400 text-white hover:text-cyan-200 rounded-full sm:rounded-2xl font-bold text-xs sm:text-sm md:text-base backdrop-blur-sm transition-all hover:scale-105 active:scale-95 cursor-pointer group shadow-lg shadow-cyan-500/10 flex items-center justify-center gap-0 sm:gap-2 select-none box-border shrink-0 aspect-square sm:aspect-auto"
                       title="Assistir em grupo com amigos em tempo real (Watch Party P2P Gratuita)"
                       ariaLabel="Grupo"
                     >
                       <Users className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400 group-hover:scale-110 transition-transform shrink-0" />
-                      <span>Grupo</span>
+                      <span className="hidden sm:inline">Grupo</span>
                     </DetailModalTvButton>
                   )}
 
