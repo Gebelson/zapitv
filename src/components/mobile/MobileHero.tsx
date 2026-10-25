@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Play, Plus, Check, Info } from 'lucide-react';
+import { Play, Info, Bookmark } from 'lucide-react';
 import { ContentItem } from '../../../types';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { heroCarouselStore, MAX_HERO_DISPLAY_COUNT } from '../../core/catalog/heroCarouselStore';
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { heroImageService, ZAPITV_HERO_FALLBACK_IMAGE } from '../../core/catalog/heroImageService';
+import { heroLogoService } from '../../core/catalog/heroLogoService';
 
 interface MobileHeroProps {
   featuredItems: ContentItem[];
@@ -17,6 +18,7 @@ interface MobileHeroProps {
 export interface ActiveHeroSlide {
   item: ContentItem;
   imageUrl: string;
+  logoUrl?: string | null;
   generation: number;
 }
 
@@ -47,22 +49,24 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
   const total = activeItems.length;
   const targetItem = activeItems[currentIndex % Math.max(1, total)] || activeItems[0];
 
-  // Slide ativo unificado mantendo item, imagem validada e geração rigorosamente sincronizados
+  // Slide ativo unificado mantendo item, imagem validada, logo e geração rigorosamente sincronizados
   const [displayedSlide, setDisplayedSlide] = useState<ActiveHeroSlide | null>(() => {
     const initialItem = activeItems[0];
     if (!initialItem) return null;
     const candidates = heroImageService.getCandidateUrls(initialItem);
     const initialUrl = candidates.find(u => !heroImageService.isUrlFailed(u)) || ZAPITV_HERO_FALLBACK_IMAGE;
+    const initialLogo = heroLogoService.getResolvedLogoSync(initialItem) || initialItem.logo || null;
     return {
       item: initialItem,
       imageUrl: initialUrl,
+      logoUrl: initialLogo,
       generation: 0
     };
   });
   const [prevSlide, setPrevSlide] = useState<ActiveHeroSlide | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Transição coordenada atômica: garante que título e imagem NUNCA pertençam a obras diferentes
+  // Transição coordenada atômica: garante que título/logo e imagem NUNCA pertençam a obras diferentes
   useEffect(() => {
     if (!targetItem) return;
 
@@ -74,22 +78,26 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
 
     const transitionToSlide = async () => {
       try {
-        const result = await heroImageService.resolveHeroImageForItem(targetItem, controller.signal);
+        const [imageResult, logoResult] = await Promise.all([
+          heroImageService.resolveHeroImageForItem(targetItem, controller.signal),
+          heroLogoService.resolveLogoForItem(targetItem, controller.signal)
+        ]);
         if (!isMounted || controller.signal.aborted || currentGen !== generationRef.current) {
           return;
         }
 
         // Se falhou completamente em todas as fontes e retornou o fallback institucional,
         // e há outros itens válidos no carrossel, ignora este item da rotação
-        if (result.isFallback && activeItems.length > 1) {
+        if (imageResult.isFallback && activeItems.length > 1) {
           setFailedItemIds(prev => new Set(prev).add(targetItem.id));
           return;
         }
 
-        const nextImageUrl = result.url;
+        const nextImageUrl = imageResult.url;
+        const nextLogoUrl = logoResult;
 
-        // Se o slide exibido já é este item com a imagem resolvida idêntica, nada a alterar
-        if (isSameItem && displayedSlide && displayedSlide.imageUrl === nextImageUrl) {
+        // Se o slide exibido já é este item com a imagem e logo resolvidas idênticas, nada a alterar
+        if (isSameItem && displayedSlide && displayedSlide.imageUrl === nextImageUrl && displayedSlide.logoUrl === nextLogoUrl) {
           return;
         }
 
@@ -102,6 +110,7 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
         setDisplayedSlide({
           item: targetItem,
           imageUrl: nextImageUrl,
+          logoUrl: nextLogoUrl,
           generation: currentGen
         });
         setIsTransitioning(true);
@@ -113,12 +122,13 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
           }
         }, 500);
 
-        // Pré-carrega o próximo slide antecipadamente
+        // Pré-carrega o próximo slide antecipadamente (imagem e logo)
         if (total > 1) {
           const nextIndex = (currentIndex + 1) % total;
           const nextItem = activeItems[nextIndex];
           if (nextItem && nextItem.id !== targetItem.id) {
             heroImageService.preloadHeroItem(nextItem);
+            heroLogoService.preloadLogoForItem(nextItem);
           }
         }
       } catch {
@@ -227,7 +237,7 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
       </div>
 
       {/* Conteúdo sobreposto */}
-      <div className="absolute inset-0 flex flex-col justify-end px-4 pb-4 z-10 max-w-lg mx-auto">
+      <div className="absolute inset-0 flex flex-col justify-end px-4 pb-[9px] z-10 max-w-lg mx-auto">
         {/* Metadados: Gêneros / Ano / Classificação */}
         <div className="flex items-center gap-1.5 flex-wrap mb-1.5 text-[11px] text-slate-300 font-medium">
           {slideItem.genres && slideItem.genres.length > 0 && (
@@ -246,24 +256,37 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
           )}
         </div>
 
-        {/* Título do Conteúdo */}
-        <h1
-          className="text-2xl xs:text-3xl font-black text-white leading-tight mb-2 line-clamp-2 drop-shadow-md"
-          style={{ fontFamily: "'Sora', sans-serif" }}
-        >
-          {slideItem.title}
-        </h1>
+        {/* Título ou Logo Oficial */}
+        <div className="min-h-[52px] xs:min-h-[58px] flex items-center justify-start mb-3.5">
+          {displayedSlide.logoUrl ? (
+            <h1 className="flex items-center">
+              <span className="sr-only">{slideItem.title}</span>
+              <img
+                key={`hero-logo-${slideItem.id}-${displayedSlide.logoUrl}`}
+                src={displayedSlide.logoUrl}
+                alt={slideItem.title}
+                className="h-11 xs:h-13 sm:h-14 max-h-14 max-w-[75%] sm:max-w-[280px] w-auto object-contain object-left drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] filter"
+                onError={() => {
+                  if (displayedSlide.logoUrl) {
+                    heroLogoService.markLogoFailed(displayedSlide.logoUrl);
+                  }
+                  setDisplayedSlide(prev => (prev ? { ...prev, logoUrl: null } : null));
+                }}
+              />
+            </h1>
+          ) : (
+            <h1
+              className="text-2xl xs:text-3xl font-black text-white leading-tight line-clamp-2 drop-shadow-md"
+              style={{ fontFamily: "'Sora', sans-serif" }}
+            >
+              {slideItem.title}
+            </h1>
+          )}
+        </div>
 
-        {/* Sinopse resumida (máximo 2 linhas) */}
-        {slideItem.description && (
-          <p className="text-xs text-slate-300/90 line-clamp-2 mb-3.5 leading-relaxed font-normal">
-            {slideItem.description}
-          </p>
-        )}
-
-        {/* Botões de Ação Principais */}
+        {/* Botões de Ação Principais (Ordem: 1. Assistir, 2. Detalhes, 3. Minha Lista) */}
         <div className="flex items-center gap-2.5 w-full">
-          {/* Assistir */}
+          {/* 1. Assistir */}
           {isPlayable ? (
             <button
               type="button"
@@ -291,7 +314,20 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
             </button>
           )}
 
-          {/* Minha Lista */}
+          {/* 2. Detalhes (Posição 2, somente ícone Info, 44x44) */}
+          <button
+            type="button"
+            onClick={() => {
+              uiSoundService.play('click');
+              if (onActionClick) onActionClick(slideItem);
+            }}
+            aria-label="Ver detalhes da obra"
+            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl bg-black/40 border border-white/20 text-white hover:bg-white/10 active:scale-95 transition-all flex items-center justify-center cursor-pointer shrink-0"
+          >
+            <Info className="w-5 h-5 text-white" />
+          </button>
+
+          {/* 3. Minha Lista (Posição 3, somente ícone Bookmark, 44x44) */}
           <button
             type="button"
             onClick={(e) => {
@@ -299,35 +335,25 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
               if (onToggleList) onToggleList(e, slideItem.id);
             }}
             aria-label={isInList ? 'Remover da minha lista' : 'Adicionar à minha lista'}
-            className={`py-3 px-4 rounded-xl border flex items-center justify-center gap-1.5 font-bold text-xs transition-all active:scale-95 cursor-pointer min-h-[44px] ${
+            className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl border flex items-center justify-center transition-all active:scale-95 cursor-pointer shrink-0 ${
               isInList
-                ? 'bg-[#007df7]/20 border-[#007df7] text-[#007df7]'
-                : 'bg-black/40 border-white/20 text-white hover:bg-white/10'
+                ? 'bg-[#007df7]/20 border-[#007df7]'
+                : 'bg-black/40 border-white/20 hover:bg-white/10'
             }`}
           >
-            {isInList ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            <span>Minha Lista</span>
+            <Bookmark
+              className={`w-5 h-5 transition-colors ${
+                isInList
+                  ? 'fill-[#007df7] text-[#007df7]'
+                  : 'text-white stroke-[1.8]'
+              }`}
+            />
           </button>
-
-          {/* Botão Info / Detalhes */}
-          {isPlayable && (
-            <button
-              type="button"
-              onClick={() => {
-                uiSoundService.play('click');
-                if (onActionClick) onActionClick(slideItem);
-              }}
-              aria-label="Mais informações da obra"
-              className="p-3 rounded-xl bg-black/40 border border-white/20 text-white hover:bg-white/10 active:scale-95 transition-transform flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer"
-            >
-              <Info className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
-        {/* Indicadores de slides (dots) */}
+        {/* Indicadores de slides (dots) posicionados discretamente mais baixos */}
         {total > 1 && (
-          <div className="flex items-center justify-center gap-1.5 mt-3">
+          <div className="flex items-center justify-center gap-1.5 mt-[19px]">
             {activeItems.map((_, idx) => (
               <button
                 key={idx}

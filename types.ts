@@ -37,6 +37,7 @@ export interface ContentItem {
   videoUrl?: string; // Custom video URL
   offlineAllowed?: boolean; // Permissão explícita de armazenamento offline para videoUrl
   originalTitle?: string;
+  originalLanguage?: string;
   duration?: number;
   overview?: string;
   poster?: string;
