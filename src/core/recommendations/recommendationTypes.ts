@@ -113,6 +113,7 @@ export interface PersonalizedRow {
     | 'critically_acclaimed'
     | 'trending'
     | 'new_releases'
-    | 'custom';
+    | 'custom'
+    | 'platform_exclusives';
   sourceTitle?: string;
 }

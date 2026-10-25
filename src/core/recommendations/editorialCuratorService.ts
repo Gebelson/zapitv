@@ -20,6 +20,8 @@ import { deduplicateContentItems, getCanonicalKeysForItem, normalizeCatalogText 
 import { bannedContentRegistry } from '../catalog/BannedContentRegistry';
 import { searchService } from '../search/searchService';
 import { canonicalCatalogMaster } from '../catalog/CanonicalCatalogMaster';
+import { streamingPlatformExclusivesService } from '../platforms/StreamingPlatformExclusivesService';
+import { StreamingPlatformId } from '../platforms/streamingExclusivesTypes';
 
 export interface EditorialRowDefinition {
   id: string;
@@ -344,59 +346,7 @@ export class EditorialCuratorService {
         score: (item) => (item.rating / 10) + (item.isFeatured ? 0.3 : 0)
       },
 
-      // --- 8. FILMES: SUSPENSE DE TIRAR O FÔLEGO ---
-      {
-        id: 'suspense_thriller_movies',
-        title: 'Suspense de Tirar o Fôlego',
-        subtitle: 'Tensão psicológica, reviravoltas imprevisíveis e mistérios',
-        reasonType: 'top_recommendations',
-        minItems: 4,
-        targetCount: 36,
-        isChildAppropriate: false,
-        filter: (item) => isLiveActionMovie(item) && !!item.genres?.some(g => /suspense|thriller|mistério|misterio|policial|crime/i.test(g)),
-        score: (item) => (item.rating / 10)
-      },
-
-      // --- 9. FILMES: FICÇÃO CIENTÍFICA ---
-      {
-        id: 'scifi_movies',
-        title: 'Para Quem Ama Ficção Científica',
-        subtitle: 'Viagens espaciais, futuros distópicos e tecnologias surpreendentes',
-        reasonType: 'top_recommendations',
-        minItems: 4,
-        targetCount: 36,
-        isChildAppropriate: false,
-        filter: (item) => isLiveActionMovie(item) && !!item.genres?.some(g => /ficção|ficcao|sci-fi|scifi/i.test(g)),
-        score: (item) => (item.rating / 10)
-      },
-
-      // --- 10. FILMES: COMÉDIAS PARA RELAXAR ---
-      {
-        id: 'comedy_movies',
-        title: 'Comédias para Relaxar',
-        subtitle: 'Boas risadas, humor inteligente e diversão garantida',
-        reasonType: 'top_recommendations',
-        minItems: 4,
-        targetCount: 36,
-        isChildAppropriate: true,
-        filter: (item) => isLiveActionMovie(item) && !!item.genres?.some(g => /comédia|comedia|comedy/i.test(g)),
-        score: (item) => (item.rating / 10)
-      },
-
-      // --- 11. FILMES: TERROR E SOBRENATURAL ---
-      {
-        id: 'horror_movies',
-        title: 'Filmes de Terror e Sobrenatural',
-        subtitle: 'Calafrios, presenças ocultas e sustos memoráveis',
-        reasonType: 'top_recommendations',
-        minItems: 4,
-        targetCount: 36,
-        isChildAppropriate: false,
-        filter: (item) => isLiveActionMovie(item) && !!item.genres?.some(g => /terror|horror/i.test(g)),
-        score: (item) => (item.rating / 10)
-      },
-
-      // --- 12. FILMES: PARA TODA A FAMÍLIA ---
+      // --- 8. FILMES: PARA TODA A FAMÍLIA ---
       {
         id: 'family_movies',
         title: 'Filmes para Toda a Família',
@@ -412,7 +362,85 @@ export class EditorialCuratorService {
         score: (item) => (item.rating / 10) + (isAnimation(item) ? 0.2 : 0)
       },
 
-      // --- 13. GRANDES CLÁSSICOS DO CINEMA (Ano <= 2005 e Rating >= 7.5) ---
+      // --- 9. FILMES: FICÇÃO CIENTÍFICA ---
+      {
+        id: 'scifi_movies',
+        title: 'Para Quem Ama Ficção Científica',
+        subtitle: 'Viagens espaciais, futuros distópicos e tecnologias surpreendentes',
+        reasonType: 'top_recommendations',
+        minItems: 4,
+        targetCount: 36,
+        isChildAppropriate: false,
+        filter: (item) => isLiveActionMovie(item) && !!item.genres?.some(g => /ficção|ficcao|sci-fi|scifi/i.test(g)),
+        score: (item) => (item.rating / 10)
+      },
+
+      // --- 10. SÉRIES: PARA MARATONAR ---
+      {
+        id: 'binge_series',
+        title: 'Séries para Maratonar',
+        subtitle: 'Episódios viciantes que você não vai conseguir parar de assistir',
+        reasonType: 'top_recommendations',
+        minItems: 4,
+        targetCount: 36,
+        isChildAppropriate: false,
+        filter: (item) => isLiveActionSeries(item) && item.rating >= 7.5,
+        score: (item) => (item.rating / 10) + (item.isFeatured ? 0.3 : 0)
+      },
+
+      // --- 11. SÉRIES: DRAMAS QUE PRENDEM ---
+      {
+        id: 'drama_series',
+        title: 'Dramas que Prendem',
+        subtitle: 'Relações intensas, conflitos profundos e atuações memoráveis',
+        reasonType: 'top_recommendations',
+        minItems: 4,
+        targetCount: 36,
+        isChildAppropriate: false,
+        filter: (item) => isLiveActionSeries(item) && !!item.genres?.some(g => /drama/i.test(g)),
+        score: (item) => (item.rating / 10)
+      },
+
+      // --- 12. ANIMES: ANIMES DE SUCESSO (Shounen, Ação, Aventura) ---
+      {
+        id: 'anime_hits',
+        title: 'Animes de Sucesso',
+        subtitle: 'Batalhas lendárias, superação e grandes sagas da animação japonesa',
+        reasonType: 'top_recommendations',
+        minItems: 3,
+        targetCount: 36,
+        isChildAppropriate: true,
+        filter: (item) => isAnime(item) && (!item.genres || item.genres.some(g => /ação|acao|aventura|shounen|shonen/i.test(g))),
+        score: (item) => (item.rating / 10) + (item.isFeatured ? 0.3 : 0)
+      },
+
+      // --- 13. FILMES: SUSPENSE DE TIRAR O FÔLEGO ---
+      {
+        id: 'suspense_thriller_movies',
+        title: 'Suspense de Tirar o Fôlego',
+        subtitle: 'Tensão psicológica, reviravoltas imprevisíveis e mistérios',
+        reasonType: 'top_recommendations',
+        minItems: 4,
+        targetCount: 36,
+        isChildAppropriate: false,
+        filter: (item) => isLiveActionMovie(item) && !!item.genres?.some(g => /suspense|thriller|mistério|misterio|policial|crime/i.test(g)),
+        score: (item) => (item.rating / 10)
+      },
+
+      // --- 14. FILMES: COMÉDIAS PARA RELAXAR ---
+      {
+        id: 'comedy_movies',
+        title: 'Comédias para Relaxar',
+        subtitle: 'Boas risadas, humor inteligente e diversão garantida',
+        reasonType: 'top_recommendations',
+        minItems: 4,
+        targetCount: 36,
+        isChildAppropriate: true,
+        filter: (item) => isLiveActionMovie(item) && !!item.genres?.some(g => /comédia|comedia|comedy/i.test(g)),
+        score: (item) => (item.rating / 10)
+      },
+
+      // --- 15. GRANDES CLÁSSICOS DO CINEMA (Ano <= 2005 e Rating >= 7.5) ---
       {
         id: 'classics_cinema',
         title: 'Grandes Clássicos do Cinema',
@@ -429,33 +457,20 @@ export class EditorialCuratorService {
         score: (item) => (item.rating / 10) + (item.rating >= 8.5 ? 0.3 : 0)
       },
 
-      // --- 14. SÉRIES: PARA MARATONAR ---
+      // --- 16. FILMES: TERROR E SOBRENATURAL ---
       {
-        id: 'binge_series',
-        title: 'Séries para Maratonar',
-        subtitle: 'Episódios viciantes que você não vai conseguir parar de assistir',
+        id: 'horror_movies',
+        title: 'Filmes de Terror e Sobrenatural',
+        subtitle: 'Calafrios, presenças ocultas e sustos memoráveis',
         reasonType: 'top_recommendations',
         minItems: 4,
         targetCount: 36,
         isChildAppropriate: false,
-        filter: (item) => isLiveActionSeries(item) && item.rating >= 7.5,
-        score: (item) => (item.rating / 10) + (item.isFeatured ? 0.3 : 0)
-      },
-
-      // --- 15. SÉRIES: DRAMAS QUE PRENDEM ---
-      {
-        id: 'drama_series',
-        title: 'Dramas que Prendem',
-        subtitle: 'Relações intensas, conflitos profundos e atuações memoráveis',
-        reasonType: 'top_recommendations',
-        minItems: 4,
-        targetCount: 36,
-        isChildAppropriate: false,
-        filter: (item) => isLiveActionSeries(item) && !!item.genres?.some(g => /drama/i.test(g)),
+        filter: (item) => isLiveActionMovie(item) && !!item.genres?.some(g => /terror|horror/i.test(g)),
         score: (item) => (item.rating / 10)
       },
 
-      // --- 16. SÉRIES: MISTÉRIOS E INVESTIGAÇÕES ---
+      // --- 17. SÉRIES: MISTÉRIOS E INVESTIGAÇÕES ---
       {
         id: 'mystery_series',
         title: 'Mistérios e Investigações',
@@ -468,7 +483,7 @@ export class EditorialCuratorService {
         score: (item) => (item.rating / 10)
       },
 
-      // --- 17. SÉRIES: MAIS BEM AVALIADAS ---
+      // --- 18. SÉRIES: MAIS BEM AVALIADAS ---
       {
         id: 'top_rated_series',
         title: 'Séries Mais Bem Avaliadas',
@@ -482,19 +497,6 @@ export class EditorialCuratorService {
           return searchService.isSeriesItem(item) && item.rating >= 8.0;
         },
         score: (item) => (item.rating / 10)
-      },
-
-      // --- 18. ANIMES: ANIMES DE SUCESSO (Shounen, Ação, Aventura) ---
-      {
-        id: 'anime_hits',
-        title: 'Animes de Sucesso',
-        subtitle: 'Batalhas lendárias, superação e grandes sagas da animação japonesa',
-        reasonType: 'top_recommendations',
-        minItems: 3,
-        targetCount: 36,
-        isChildAppropriate: true,
-        filter: (item) => isAnime(item) && (!item.genres || item.genres.some(g => /ação|acao|aventura|shounen|shonen/i.test(g))),
-        score: (item) => (item.rating / 10) + (item.isFeatured ? 0.3 : 0)
       },
 
       // --- 19. ANIMES: FANTASIA E OUTROS MUNDOS (Isekai / Magia) ---
@@ -573,7 +575,30 @@ export class EditorialCuratorService {
     const maxAllowedUsage = isSmallCatalog ? 5 : 2;
 
     // -------------------------------------------------------------------------
-    // 4. DISTRIBUIÇÃO EDITORIAL GLOBAL ENTRE FILEIRAS (Exclusividade Inteligente)
+    // 4. CARROSSÉIS DE EXCLUSIVOS DAS PLATAFORMAS DE STREAMING
+    // -------------------------------------------------------------------------
+    const platformRowMap = new Map<StreamingPlatformId, PersonalizedRow>();
+    const platformRows = streamingPlatformExclusivesService.getAllPlatformRows(eligibleCatalog, isChild);
+    for (const pRow of platformRows) {
+      if (pRow.id.startsWith('exclusive_')) {
+        const pid = pRow.id.replace('exclusive_', '') as StreamingPlatformId;
+        pRow.subtitle = undefined;
+        platformRowMap.set(pid, pRow);
+      }
+    }
+    const insertedPlatforms = new Set<StreamingPlatformId>();
+
+    const tryInsertPlatform = (platformId: StreamingPlatformId) => {
+      if (platformRowMap.has(platformId) && !insertedPlatforms.has(platformId)) {
+        rows.push(platformRowMap.get(platformId)!);
+        insertedPlatforms.add(platformId);
+      }
+    };
+
+    let editorialRowsAdded = 0;
+
+    // -------------------------------------------------------------------------
+    // 5. DISTRIBUIÇÃO EDITORIAL GLOBAL ENTRE FILEIRAS (Exclusividade Inteligente)
     // -------------------------------------------------------------------------
     for (const def of editorialDefinitions) {
       // Perfil Infantil: pula seções inapropriadas
@@ -676,12 +701,48 @@ export class EditorialCuratorService {
           reasonType: def.reasonType,
           items: selectedItems
         });
+        editorialRowsAdded++;
+
+        // Intercalação contextual dos carrosséis de exclusivos das plataformas
+        if (def.id === 'trending_zapitv') {
+          tryInsertPlatform('netflix');
+        } else if (def.id === 'recommended_for_you') {
+          tryInsertPlatform('prime');
+        } else if (def.id === 'critically_acclaimed') {
+          tryInsertPlatform('hbo');
+        } else if (def.id === 'hidden_gems') {
+          tryInsertPlatform('apple');
+        } else if (def.id === 'action_adventure_movies') {
+          tryInsertPlatform('paramount');
+        } else if (def.id === 'family_movies') {
+          tryInsertPlatform('disney');
+        } else if (def.id === 'drama_series') {
+          tryInsertPlatform('globoplay');
+        } else if (def.id === 'anime_hits') {
+          tryInsertPlatform('crunchyroll');
+        }
       }
 
-      // Limite saudável de fileiras na Home: entre 10 e 15 carrosséis para fluidez e variedade extrema
-      if (rows.length >= 15) {
+      // Limite saudável de fileiras editoriais na Home: até 15 carrosséis para variedade e fluidez
+      if (editorialRowsAdded >= 15) {
         break;
       }
+    }
+
+    // Garante que todas as plataformas de streaming com acervo comprovado (>= 3 itens)
+    // sejam incluídas mesmo se uma categoria editorial específica tiver sido suprimida
+    const remainingFallbackOrder: StreamingPlatformId[] = [
+      'netflix',
+      'disney',
+      'prime',
+      'hbo',
+      'apple',
+      'paramount',
+      'globoplay',
+      'crunchyroll'
+    ];
+    for (const pid of remainingFallbackOrder) {
+      tryInsertPlatform(pid);
     }
 
     this.sessionCache.set(cacheKey, {

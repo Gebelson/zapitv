@@ -4,6 +4,7 @@ import { storageService } from '../../core/storage/storageService';
 import { heroCarouselStore, HERO_CAROUSEL_STORAGE_KEY } from '../../core/catalog/heroCarouselStore';
 import { TvHeroBanner } from './TvHeroBanner';
 import { TvContentRow } from './TvContentRow';
+import { streamingPlatformExclusivesService } from '../../core/platforms/StreamingPlatformExclusivesService';
 import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvHomeViewProps {
@@ -96,16 +97,38 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
     }).slice(0, 15);
   }, [allContent]);
 
+  // Carrosséis de Exclusivos das Plataformas de Streaming para a Smart TV
+  const platformRows = useMemo(() => {
+    return {
+      netflix: streamingPlatformExclusivesService.getPlatformRow(allContent, 'netflix'),
+      prime: streamingPlatformExclusivesService.getPlatformRow(allContent, 'prime'),
+      hbo: streamingPlatformExclusivesService.getPlatformRow(allContent, 'hbo'),
+      apple: streamingPlatformExclusivesService.getPlatformRow(allContent, 'apple'),
+      disney: streamingPlatformExclusivesService.getPlatformRow(allContent, 'disney'),
+      paramount: streamingPlatformExclusivesService.getPlatformRow(allContent, 'paramount'),
+      globoplay: streamingPlatformExclusivesService.getPlatformRow(allContent, 'globoplay'),
+      crunchyroll: streamingPlatformExclusivesService.getPlatformRow(allContent, 'crunchyroll')
+    };
+  }, [allContent]);
+
   // Identificador da primeira fileira navegável
   const firstActiveRowId = useMemo(() => {
     if (continueWatchingItems.length > 0) return 'continue-watching';
     if (trendingItems.length > 0) return 'trending';
+    if (platformRows.netflix) return 'exclusive-netflix';
     if (popularMovies.length > 0) return 'popular-movies';
+    if (platformRows.prime) return 'exclusive-prime';
+    if (platformRows.hbo) return 'exclusive-hbo';
+    if (platformRows.apple) return 'exclusive-apple';
     if (popularSeries.length > 0) return 'popular-series';
+    if (platformRows.disney) return 'exclusive-disney';
+    if (platformRows.paramount) return 'exclusive-paramount';
+    if (platformRows.globoplay) return 'exclusive-globoplay';
     if (animeItems.length > 0) return 'popular-animes';
+    if (platformRows.crunchyroll) return 'exclusive-crunchyroll';
     if (featuredItems.length > 1) return 'featured-all';
     return '';
-  }, [continueWatchingItems, trendingItems, popularMovies, popularSeries, animeItems, featuredItems]);
+  }, [continueWatchingItems, trendingItems, platformRows, popularMovies, popularSeries, animeItems, featuredItems]);
 
   const isScrollingToHeroRef = useRef(false);
   const scrollTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -237,6 +260,17 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
           />
         )}
 
+        {/* Exclusivos Netflix */}
+        {platformRows.netflix && (
+          <TvContentRow
+            title={platformRows.netflix.title}
+            rowId="exclusive-netflix"
+            items={platformRows.netflix.items}
+            onItemClick={onSelectItem}
+            onRowUp={firstActiveRowId === 'exclusive-netflix' ? handleFirstRowUpPress : undefined}
+          />
+        )}
+
         {/* Filmes Populares */}
         {popularMovies.length > 0 && (
           <TvContentRow
@@ -245,6 +279,39 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={popularMovies}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'popular-movies' ? handleFirstRowUpPress : undefined}
+          />
+        )}
+
+        {/* Exclusivos Prime Video */}
+        {platformRows.prime && (
+          <TvContentRow
+            title={platformRows.prime.title}
+            rowId="exclusive-prime"
+            items={platformRows.prime.items}
+            onItemClick={onSelectItem}
+            onRowUp={firstActiveRowId === 'exclusive-prime' ? handleFirstRowUpPress : undefined}
+          />
+        )}
+
+        {/* Exclusivos HBO Max */}
+        {platformRows.hbo && (
+          <TvContentRow
+            title={platformRows.hbo.title}
+            rowId="exclusive-hbo"
+            items={platformRows.hbo.items}
+            onItemClick={onSelectItem}
+            onRowUp={firstActiveRowId === 'exclusive-hbo' ? handleFirstRowUpPress : undefined}
+          />
+        )}
+
+        {/* Exclusivos Apple TV+ */}
+        {platformRows.apple && (
+          <TvContentRow
+            title={platformRows.apple.title}
+            rowId="exclusive-apple"
+            items={platformRows.apple.items}
+            onItemClick={onSelectItem}
+            onRowUp={firstActiveRowId === 'exclusive-apple' ? handleFirstRowUpPress : undefined}
           />
         )}
 
@@ -259,6 +326,39 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
           />
         )}
 
+        {/* Exclusivos Disney+ */}
+        {platformRows.disney && (
+          <TvContentRow
+            title={platformRows.disney.title}
+            rowId="exclusive-disney"
+            items={platformRows.disney.items}
+            onItemClick={onSelectItem}
+            onRowUp={firstActiveRowId === 'exclusive-disney' ? handleFirstRowUpPress : undefined}
+          />
+        )}
+
+        {/* Exclusivos Paramount+ */}
+        {platformRows.paramount && (
+          <TvContentRow
+            title={platformRows.paramount.title}
+            rowId="exclusive-paramount"
+            items={platformRows.paramount.items}
+            onItemClick={onSelectItem}
+            onRowUp={firstActiveRowId === 'exclusive-paramount' ? handleFirstRowUpPress : undefined}
+          />
+        )}
+
+        {/* Exclusivos Globoplay */}
+        {platformRows.globoplay && (
+          <TvContentRow
+            title={platformRows.globoplay.title}
+            rowId="exclusive-globoplay"
+            items={platformRows.globoplay.items}
+            onItemClick={onSelectItem}
+            onRowUp={firstActiveRowId === 'exclusive-globoplay' ? handleFirstRowUpPress : undefined}
+          />
+        )}
+
         {/* Animes */}
         {animeItems.length > 0 && (
           <TvContentRow
@@ -267,6 +367,17 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={animeItems}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'popular-animes' ? handleFirstRowUpPress : undefined}
+          />
+        )}
+
+        {/* Exclusivos Crunchyroll */}
+        {platformRows.crunchyroll && (
+          <TvContentRow
+            title={platformRows.crunchyroll.title}
+            rowId="exclusive-crunchyroll"
+            items={platformRows.crunchyroll.items}
+            onItemClick={onSelectItem}
+            onRowUp={firstActiveRowId === 'exclusive-crunchyroll' ? handleFirstRowUpPress : undefined}
           />
         )}
 
