@@ -389,7 +389,7 @@ var init_verifiedCatalog = __esm({
 });
 
 // src/core/audio/audioPreferenceService.ts
-var DUAL_PATTERNS, DUBBED_PTBR_PATTERNS, PTBR_GENERAL_PATTERNS, SUBTITLED_ONLY_PATTERNS, FOREIGN_LANGUAGE_PATTERNS, AudioPreferenceService, audioPreferenceService;
+var DUAL_PATTERNS, EXPLICIT_DUBBED_PATTERNS, DUBBED_PTBR_PATTERNS, PTBR_GENERAL_PATTERNS, SUBTITLED_ONLY_PATTERNS, FOREIGN_LANGUAGE_PATTERNS, AudioPreferenceService, audioPreferenceService;
 var init_audioPreferenceService = __esm({
   "src/core/audio/audioPreferenceService.ts"() {
     DUAL_PATTERNS = [
@@ -400,17 +400,21 @@ var init_audioPreferenceService = __esm({
       /\bdual\s*latino\b/i
       // latino can be foreign if not PT, handled below
     ];
-    DUBBED_PTBR_PATTERNS = [
-      /\b(dublado|dublada|dublados|audio\s*pt|áudio\s*pt|audio\s*pt[-_]?br|áudio\s*pt[-_]?br|brazuca|nacional)\b/i,
+    EXPLICIT_DUBBED_PATTERNS = [
+      /\b(dublado|dublada|dublados|dublagem|dublagem\s*brasileira)\b/i,
       /\[dublado\]/i,
       /\[dub\]/i,
-      /\b(fhd[-_]?dublado|hd[-_]?dublado|web[-_]?dl[-_]?dublado)\b/i,
-      /🇧🇷\s*dublado/i,
-      /🇧🇷.*?(dublado|dual|áudio|audio)/i,
-      /\b(dublagem\s*brasileira)\b/i,
+      /\b(fhd[-_]?dublado|hd[-_]?dublado|web[-_]?dl[-_]?dublado|pt[-_]?br\s*dub|fhd[-_]?dub|hd[-_]?dub)\b/i,
+      /\b(audio|áudio)\s*(?:pt[-_]?br|portugu[eê]s|nacional|brasil|brasileiro)\b/i,
+      /\b(?:pt[-_]?br|portugu[eê]s)\s*(?:audio|áudio)\b/i,
+      /\b(brazuca|nacional)\b/i,
+      /🇧🇷\s*(?:dublado|dual|áudio|audio|dub\b)/i,
+      /🇧🇷.*?(?:dublado|dual|áudio|audio)/i
+    ];
+    DUBBED_PTBR_PATTERNS = [
+      ...EXPLICIT_DUBBED_PATTERNS,
       /🌎\s*portugu[eê]s/i,
-      /🌎\s*pt[-_]?br/i,
-      /\b(portugu[eê]s|pt[-_]?br)\b/i
+      /🌎\s*pt[-_]?br/i
     ];
     PTBR_GENERAL_PATTERNS = [
       /\b(pt[-_]?br|portugu[eê]s[-_]?br|portugu[eê]s)\b/i,
@@ -443,8 +447,10 @@ var init_audioPreferenceService = __esm({
       analyzeAudio(stream) {
         const combinedText = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""}`.toLowerCase();
         const isDualAudio = DUAL_PATTERNS.some((p) => p.test(combinedText));
+        const hasExplicitDubbed = EXPLICIT_DUBBED_PATTERNS.some((p) => p.test(combinedText));
         const hasDubbedPattern = DUBBED_PTBR_PATTERNS.some((p) => p.test(combinedText));
         const hasPtBrGeneral = PTBR_GENERAL_PATTERNS.some((p) => p.test(combinedText));
+        const hasSubtitledOnlyPattern = SUBTITLED_ONLY_PATTERNS.some((p) => p.test(combinedText));
         const hasExplicitBrazilianAudio = hasPtBrGeneral || /\b(audio|áudio)\s*pt(?:[-_]?br)?\b|\bdublagem\s*brasileira\b|\bbrazuca\b/i.test(combinedText);
         const isExplicitSpanishAudio = /\b(latino|espa[nñ]ol|espanhol|castellano)\b/i.test(combinedText) && !hasExplicitBrazilianAudio;
         if (isExplicitSpanishAudio) {
@@ -458,8 +464,8 @@ var init_audioPreferenceService = __esm({
             reason: "\xC1udio espanhol indicado explicitamente pela fonte"
           };
         }
-        const isExplicitlySubtitledOnly = SUBTITLED_ONLY_PATTERNS.some((p) => p.test(combinedText)) && !hasDubbedPattern && !isDualAudio;
-        const explicitlyBrazilian = hasDubbedPattern || hasPtBrGeneral || stream.isDubbed === true || stream.isPtBr === true || /\b(pt[-_]?br|pob|por[-_]?br|brazilian)\b/i.test(combinedText);
+        const isExplicitlySubtitledOnly = hasSubtitledOnlyPattern && !hasExplicitDubbed && !isDualAudio;
+        const explicitlyBrazilian = hasExplicitDubbed || !hasSubtitledOnlyPattern && (hasDubbedPattern || hasPtBrGeneral || stream.isDubbed === true || stream.isPtBr === true || /\b(pt[-_]?br|pob|por[-_]?br|brazilian)\b/i.test(combinedText));
         if (isDualAudio && explicitlyBrazilian && !isExplicitlySubtitledOnly) {
           return {
             tier: "dual_audio",
@@ -471,9 +477,9 @@ var init_audioPreferenceService = __esm({
             reason: "Dual \xC1udio com faixa PT-BR detectada"
           };
         }
-        const isForeignOnly = /\b(latino|espa[nñ]ol|espanhol|castellano)\b/i.test(combinedText) && !hasDubbedPattern && !hasPtBrGeneral && !stream.isDubbed && !stream.isPtBr;
+        const isForeignOnly = /\b(latino|espa[nñ]ol|espanhol|castellano)\b/i.test(combinedText) && !hasExplicitDubbed && !hasPtBrGeneral && !stream.isDubbed && !stream.isPtBr;
         const isPtPtOnly = /\b(pt[-_]?pt|portugu[eê]s[-_]?pt)\b/i.test(combinedText) && !/\b(pt[-_]?br|dublado|brazuca)\b/i.test(combinedText) && !/🇧🇷/.test(combinedText);
-        if (!isExplicitlySubtitledOnly && !isForeignOnly && !isPtPtOnly && (hasDubbedPattern || explicitlyBrazilian || stream.isDubbed === true || stream.isPtBr === true)) {
+        if (!isExplicitlySubtitledOnly && !isForeignOnly && !isPtPtOnly && (hasExplicitDubbed || !hasSubtitledOnlyPattern && (hasDubbedPattern || explicitlyBrazilian || stream.isDubbed === true))) {
           return {
             tier: "dubbed_ptbr",
             isPtBr: true,

@@ -2465,6 +2465,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
     // Se as fontes no idioma específico esgotarem, tenta silenciosamente outras fontes válidas da MESMA obra
     let nextCandidate = remaining[0];
+    let isLanguageFallback = false;
     if (!nextCandidate) {
       // REGRA FUNDAMENTAL: O fallback entre fontes deve ser silencioso até que uma fonte funcione ou todas falhem.
       // NUNCA disparar aviso de dublagem antes de confirmar que a próxima fonte é reproduzível!
@@ -2474,6 +2475,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           sourceConfidenceEngine.evaluate(s, canonicalIdentity).isMatch);
       if (anyRemaining.length > 0) {
         nextCandidate = anyRemaining[0];
+        isLanguageFallback = true;
       }
     }
 
@@ -2507,8 +2509,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         isInitialTimeAppliedRef.current = false;
       }
 
-      // Se a fonte falhar durante uma tentativa de troca de áudio, reverte o áudio ativo
-      if (previousActiveAudioIdRef.current) {
+      // Se o fallback mudou de idioma (ex: PT-BR esgotou e caiu para Japonês):
+      if (isLanguageFallback) {
+        const candidateLang = audioSelectionManager.inspectStreamAudioLanguage(nextCandidate.s, originalLanguage);
+        const resolvedAudioId = candidateLang !== 'unknown' ? `stream-${candidateLang}` : 'stream-default';
+        setActiveAudioId(resolvedAudioId);
+        previousActiveAudioIdRef.current = null;
+      } else if (previousActiveAudioIdRef.current) {
+        // Se a fonte falhar durante uma tentativa de troca de áudio dentro do mesmo idioma, reverte o áudio ativo
         setActiveAudioId(previousActiveAudioIdRef.current);
         previousActiveAudioIdRef.current = null;
       }
@@ -2521,6 +2529,34 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         isSwitchingStreamRef.current = false;
       }, 50);
     } else {
+      // Se estávamos tentando comutar de áudio e a fonte de destino falhou,
+      // mas tínhamos uma fonte anterior que funcionava (ex: Japonês original):
+      const prevIdx = previousStreamIndexRef.current;
+      if (prevIdx !== undefined && prevIdx !== selectedStreamIndex && streams[prevIdx]) {
+        const prevStream = streams[prevIdx];
+        if (sourceConfidenceEngine.evaluate(prevStream, canonicalIdentity).isMatch) {
+          triedIndicesRef.current.delete(prevIdx);
+          const prevLang = audioSelectionManager.inspectStreamAudioLanguage(prevStream, originalLanguage);
+          const prevAudioId = prevLang !== 'unknown' ? `stream-${prevLang}` : 'stream-default';
+          setActiveAudioId(prevAudioId);
+          previousActiveAudioIdRef.current = null;
+          setIsSwitchingAudio(false);
+          setIsLoading(true);
+          setHasError(false);
+
+          if (positionBeforeCleanup > 0) {
+            targetResumeTimeRef.current = positionBeforeCleanup;
+            isInitialTimeAppliedRef.current = false;
+          }
+
+          setTimeout(() => {
+            if (!isMountedRef.current) return;
+            setSelectedStreamIndex(prevIdx);
+            isSwitchingStreamRef.current = false;
+          }, 50);
+          return;
+        }
+      }
       if (loadingTraceId) mediaLoadingTracker.recordEvent(loadingTraceId, 'PLAYBACK_FAILED',
         'ZapiPlayer', 'FAILED', undefined, classifyPlaybackError(reason), reason);
       if (videoRef.current && !videoRef.current.paused) {
@@ -3182,6 +3218,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         // Confirma que a nova fonte carregou e desliga transição de áudio
         setIsSwitchingAudio(false);
         previousStreamIndexRef.current = selectedStreamIndex;
+        // Sincroniza activeAudioId com a fonte que está EFETIVAMENTE tocando
+        if (currentStream && !hlsRef.current) {
+          const originalLang = audioSelectionManager.detectOriginalLanguage(itemRef.current);
+          const actualLang = audioSelectionManager.inspectStreamAudioLanguage(currentStream, originalLang);
+          const confirmedId = actualLang !== 'unknown' ? `stream-${actualLang}` : 'stream-default';
+          setActiveAudioId(confirmedId);
+        }
         // Sincronização dinâmica: se a fonte em reprodução for PT-BR
         if (currentStream && (currentStream.isDubbed || currentStream.isPtBr || classifyStream(currentStream).isDubbed || classifyStream(currentStream).isPtBr)) {
           setHasDynamicallyConfirmedPtBr(true);
@@ -3942,25 +3985,48 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }
 
     // SITUAÇÃO B: Troca de fonte separada (arquivo de vídeo diferente)
-    if (opt.kind === 'separate-source' && opt.streamIndex !== undefined && opt.streamIndex !== selectedStreamIndex) {
-      setIsSwitchingAudio(true);
-      previousStreamIndexRef.current = selectedStreamIndex;
-      previousActiveAudioIdRef.current = activeAudioId;
-
-      // 1. Salvar progresso narrativo atual com máxima precisão
-      const lastTime = (videoRef.current && videoRef.current.currentTime > 0)
-        ? videoRef.current.currentTime
-        : (latestProgressRef.current.currentTime || currentTime);
-
-      if (lastTime > 0) {
-        targetResumeTimeRef.current = lastTime;
-        isInitialTimeAppliedRef.current = false;
+    if (opt.kind === 'separate-source') {
+      // 1. Se a opção clicada já está confirmada e tocando no player:
+      if (opt.isCurrent && (opt.streamIndex === selectedStreamIndex || opt.candidateStreamIndices?.includes(selectedStreamIndex))) {
+        // Já está tocando o áudio correspondente. Não interromper a reprodução!
+        return;
       }
 
-      // 2. Comutar stream index e definir o ID da opção solicitada
-      setActiveAudioId(opt.id);
-      setSelectedStreamIndex(opt.streamIndex);
-      return;
+      // 2. Localiza o melhor candidato disponível para este idioma:
+      const candidates = opt.candidateStreamIndices && opt.candidateStreamIndices.length > 0
+        ? opt.candidateStreamIndices
+        : (opt.streamIndex !== undefined ? [opt.streamIndex] : []);
+
+      // Procura primeiro um candidato que ainda não falhou
+      let targetIndex = candidates.find(idx => !triedIndicesRef.current.has(idx));
+
+      // Se todos os candidatos já foram marcados como tentados (ex: falha temporária anterior ou usuário insistiu),
+      // limpa os candidatos de triedIndicesRef para dar uma nova tentativa legítima
+      if (targetIndex === undefined && candidates.length > 0) {
+        candidates.forEach(idx => triedIndicesRef.current.delete(idx));
+        targetIndex = candidates[0];
+      }
+
+      if (targetIndex !== undefined && targetIndex !== selectedStreamIndex) {
+        setIsSwitchingAudio(true);
+        previousStreamIndexRef.current = selectedStreamIndex;
+        previousActiveAudioIdRef.current = activeAudioId;
+
+        // 1. Salvar progresso narrativo atual com máxima precisão
+        const lastTime = (videoRef.current && videoRef.current.currentTime > 0)
+          ? videoRef.current.currentTime
+          : (latestProgressRef.current.currentTime || currentTime);
+
+        if (lastTime > 0) {
+          targetResumeTimeRef.current = lastTime;
+          isInitialTimeAppliedRef.current = false;
+        }
+
+        // 2. Comutar stream index e definir o ID da opção solicitada
+        setActiveAudioId(opt.id);
+        setSelectedStreamIndex(targetIndex);
+        return;
+      }
     }
 
     // Requisito 9: Ativa legendas em idioma original APENAS se o usuário não tiver escolhido "Sem legenda"

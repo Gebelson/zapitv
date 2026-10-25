@@ -13,6 +13,7 @@ export interface AudioOption {
   isCurrent: boolean;              // Indica se esta é a faixa EFETIVAMENTE ativa no player
   hlsTrackIndex?: number;          // Se kind === 'hls-rendition'
   streamIndex?: number;            // Se kind === 'separate-source'
+  candidateStreamIndices?: number[]; // Lista completa de fontes alternativas para este idioma
   confidence: number;              // 0 a 1
   note?: string;
 }
@@ -175,7 +176,7 @@ export class AudioSelectionManager {
     const combined = `${name} ${title} ${desc}`.toLowerCase();
 
     const analysis = audioPreferenceService.analyzeAudio(stream);
-    if (analysis.isPtBr || analysis.language === 'pt-BR') {
+    if (analysis.isPtBr || analysis.language === 'pt-BR' || analysis.language === 'dual') {
       return 'pt-BR';
     }
     if (analysis.language === 'ja' || analysis.language === 'en' ||
@@ -186,11 +187,11 @@ export class AudioSelectionManager {
     // 2. Tags explícitas de dublagem ou áudio PT-BR
     const isSubtitledOnly = /\b(legendado|legendada|softsub|hardsub|sub\b|leg\b)\b/i.test(combined) && !/dublado|dual|áudio|audio/i.test(combined);
     if (
-      (!isSubtitledOnly && (/🇧🇷/i.test(combined) || /🌎\s*portugu[eê]s/i.test(combined) || /\b(portugu[eê]s|pt[-_]?br)\b/i.test(combined))) ||
-      /\b(dublado|dublada|dublados|audio\s*pt[-_]?br|áudio\s*pt[-_]?br|pt[-_]?br\s*dub|fhd[-_]?dub|hd[-_]?dub)\b/i.test(combined) ||
-      /\[dublado\]|\[dub\]/i.test(combined) ||
-      stream.isDubbed === true ||
-      (stream.isPtBr === true && !isSubtitledOnly)
+      !isSubtitledOnly && (
+        /\b(dublado|dublada|dublados|audio\s*pt[-_]?br|áudio\s*pt[-_]?br|pt[-_]?br\s*dub|fhd[-_]?dub|hd[-_]?dub)\b/i.test(combined) ||
+        /\[dublado\]|\[dub\]/i.test(combined) ||
+        stream.isDubbed === true
+      )
     ) {
       return 'pt-BR';
     }
@@ -221,19 +222,20 @@ export class AudioSelectionManager {
 
     // 6. Se o stream indicar Dual Audio sem dizer o segundo idioma:
     if (/\b(dual[-_]?audio|dual[-_]?áudio|multi[-_]?audio)\b/i.test(combined)) {
-      // Se tiver menção a PT-BR ou dublado, o áudio prioritário é PT-BR
       if (/pt[-_]?br|por|dub/i.test(combined)) {
         return 'pt-BR';
       }
     }
 
-    // 7. Se for expressamente legendado ('legendado', 'softsub', 'sub') ou indicar áudio original:
-    if (/\b(legendado|softsub|hardsub|sub\b|leg\b|original)\b/i.test(combined)) {
-      return 'unknown';
+    // 7. Se for expressamente legendado ou análise de áudio indicou original:
+    if (isSubtitledOnly || analysis.language === 'original' || /\b(legendado|softsub|hardsub|sub\b|leg\b|original)\b/i.test(combined)) {
+      return originalLang !== 'unknown' ? originalLang : 'other';
     }
 
-    // 8. Se nada for conclusivo mas for PT-BR declarado no objeto
-    // Flags fornecidas pelo addon não substituem evidência da faixa reproduzida.
+    // 8. Se originalLang for conhecido e não houver contradição
+    if (originalLang && originalLang !== 'unknown') {
+      return originalLang;
+    }
 
     return 'unknown';
   }
@@ -302,28 +304,46 @@ export class AudioSelectionManager {
     });
 
     // Mapeia idiomas comprovados presentes nas fontes web-ready
-    const foundLanguages = new Map<string, { streamIndex: number; stream: StremioStream; isOriginal: boolean }>();
+    // Suporta múltiplos streams alternativos por idioma para fallback e seleção
+    const foundLanguages = new Map<string, {
+      primaryStreamIndex: number;
+      streamIndices: number[];
+      streams: StremioStream[];
+      isOriginal: boolean;
+    }>();
 
     for (const itemStream of webReadyStreamsWithIndices) {
       const detectedLang = this.inspectStreamAudioLanguage(itemStream.stream, originalLang);
-      if (detectedLang !== 'unknown' && !foundLanguages.has(detectedLang)) {
-        foundLanguages.set(detectedLang, {
-          streamIndex: itemStream.index,
-          stream: itemStream.stream,
-          isOriginal: detectedLang === originalLang
-        });
+      if (detectedLang !== 'unknown') {
+        const existing = foundLanguages.get(detectedLang);
+        if (!existing) {
+          foundLanguages.set(detectedLang, {
+            primaryStreamIndex: itemStream.index,
+            streamIndices: [itemStream.index],
+            streams: [itemStream.stream],
+            isOriginal: detectedLang === originalLang
+          });
+        } else {
+          existing.streamIndices.push(itemStream.index);
+          existing.streams.push(itemStream.stream);
+        }
       }
     }
 
     // Se o stream atual não foi mapeado (ex: metadados genéricos), preserva sua existência como áudio atual
     const currentStream = streams && streams[currentStreamIndex];
-    if (currentStream && !Array.from(foundLanguages.values()).some(f => f.streamIndex === currentStreamIndex)) {
+    if (currentStream && !Array.from(foundLanguages.values()).some(f => f.streamIndices.includes(currentStreamIndex))) {
       const curLang = this.inspectStreamAudioLanguage(currentStream, originalLang);
-      const fallbackLang = curLang !== 'unknown' ? curLang : 'other';
-      if (!foundLanguages.has(fallbackLang)) {
+      const fallbackLang = curLang !== 'unknown' ? curLang : (originalLang !== 'unknown' ? originalLang : 'other');
+      const existing = foundLanguages.get(fallbackLang);
+      if (existing) {
+        existing.streamIndices.push(currentStreamIndex);
+        existing.streams.push(currentStream);
+      } else {
         foundLanguages.set(fallbackLang, {
-          streamIndex: currentStreamIndex,
-          stream: currentStream,
+          primaryStreamIndex: currentStreamIndex,
+          streamIndices: [currentStreamIndex],
+          streams: [currentStream],
           isOriginal: fallbackLang === originalLang
         });
       }
@@ -333,10 +353,19 @@ export class AudioSelectionManager {
     foundLanguages.forEach((data, langCode) => {
       const display = this.getLanguageDisplay(langCode);
       const optId = `stream-${langCode}`;
-      
-      const isCurrent = activeAudioId
-        ? activeAudioId.toLowerCase() === optId.toLowerCase()
-        : currentStreamIndex === data.streamIndex;
+
+      // A opção é 'isCurrent' estritamente se o stream atual (currentStreamIndex)
+      // pertencer à lista de fontes deste idioma!
+      // Se activeAudioId estiver definido e for de rendition HLS, respeita-o;
+      // para separate-source, NUNCA marcar PT-BR como isCurrent se a fonte atual for de outro idioma!
+      const isCurrent = data.streamIndices.includes(currentStreamIndex);
+
+      // O streamIndex a ser disparado se o usuário clicar:
+      // Se currentStreamIndex já for deste idioma, usa ele.
+      // Se não, usa o primeiro candidato deste idioma.
+      const targetStreamIndex = data.streamIndices.includes(currentStreamIndex)
+        ? currentStreamIndex
+        : data.primaryStreamIndex;
 
       optionsMap.set(optId, {
         id: optId,
@@ -346,7 +375,8 @@ export class AudioSelectionManager {
         badge: data.isOriginal ? 'Original' : 'Dublado',
         kind: 'separate-source',
         isCurrent,
-        streamIndex: data.streamIndex,
+        streamIndex: targetStreamIndex,
+        candidateStreamIndices: [...data.streamIndices],
         confidence: 0.95
       });
     });
@@ -363,6 +393,7 @@ export class AudioSelectionManager {
         kind: 'separate-source',
         isCurrent: true,
         streamIndex: currentStreamIndex,
+        candidateStreamIndices: [currentStreamIndex],
         confidence: 0
       });
     }
@@ -372,7 +403,7 @@ export class AudioSelectionManager {
     // Se nenhuma opção estiver marcada como current, e não havia activeAudioId explícito, usa currentStreamIndex
     const hasCurrent = list.some(o => o.isCurrent);
     if (!hasCurrent && list.length > 0) {
-      const matchCurrent = list.find(o => o.streamIndex === currentStreamIndex);
+      const matchCurrent = list.find(o => o.candidateStreamIndices?.includes(currentStreamIndex) || o.streamIndex === currentStreamIndex);
       if (matchCurrent) {
         matchCurrent.isCurrent = true;
       } else if (!activeAudioId) {
