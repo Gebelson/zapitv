@@ -241,18 +241,22 @@ export const MobileSearchView: React.FC<MobileSearchViewProps> = ({
 
       {/* Grid de Produções Encontradas */}
       {displayItems.length > 0 && (
-        <div className="flex-1 animate-in fade-in">
+        <div className="flex-1 w-full animate-in fade-in">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-3 px-1">
             <span>Resultados ({displayItems.length})</span>
             {isLoadingRemote && <span className="text-[#007df7] text-[10px] animate-pulse">Buscando mais...</span>}
           </div>
 
-          <div className="grid grid-cols-2 xs:grid-cols-3 gap-3">
+          <div
+            className="w-full grid grid-cols-2 gap-3"
+            style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
+          >
             {displayItems.map((item, idx) => (
               <MobileCard
                 key={`search-res-${item.id}-${idx}`}
                 item={item}
                 onItemClick={onSelectContent}
+                variant="grid"
               />
             ))}
           </div>

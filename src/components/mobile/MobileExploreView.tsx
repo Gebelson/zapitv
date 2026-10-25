@@ -66,7 +66,7 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
   }, [allContent, selectedCategory, selectedGenre]);
 
   return (
-    <div className="pt-16 pb-28 px-4 max-w-lg mx-auto select-none" data-testid="mobile-explore-view">
+    <div className="pt-16 pb-28 px-4 w-full max-w-lg mx-auto select-none" data-testid="mobile-explore-view">
       {/* Título da Seção */}
       <div className="mb-3">
         <h2
@@ -165,17 +165,21 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
         </div>
       ) : (
         /* Grid de Resultados do Catálogo */
-        <div>
+        <div className="w-full">
           <div className="flex items-center justify-between text-xs text-slate-400 mb-3 px-1">
             <span>{filteredItems.length} títulos encontrados</span>
           </div>
 
-          <div className="grid grid-cols-2 xs:grid-cols-3 gap-3">
+          <div
+            className="w-full grid grid-cols-2 gap-3"
+            style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
+          >
             {filteredItems.map(item => (
               <MobileCard
                 key={`explore-grid-${item.id}`}
                 item={item}
                 onItemClick={onSelectContent}
+                variant="grid"
               />
             ))}
           </div>

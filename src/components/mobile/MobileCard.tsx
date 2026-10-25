@@ -10,13 +10,17 @@ interface MobileCardProps {
   onItemClick: (item: ContentItem) => void;
   showProgress?: boolean;
   rankNumber?: number;
+  variant?: 'carousel' | 'grid';
+  className?: string;
 }
 
 export const MobileCard: React.FC<MobileCardProps> = memo(({
   item,
   onItemClick,
   showProgress = true,
-  rankNumber
+  rankNumber,
+  variant = 'grid',
+  className = ''
 }) => {
   const [imgSrc, setImgSrc] = useState<string>(() => {
     return posterRecoveryService.getCachedPoster(item) || item.image || item.backdrop || '';
@@ -36,6 +40,10 @@ export const MobileCard: React.FC<MobileCardProps> = memo(({
   const isAnime = item.type === ContentType.ANIME || item.genres?.includes('Anime');
   const typeBadge = isAnime ? 'Anime' : item.type === ContentType.SERIES ? 'Série' : 'Filme';
 
+  const sizeClasses = variant === 'carousel'
+    ? 'shrink-0 w-[122px] xs:w-[132px]'
+    : 'w-full min-w-0 max-w-full';
+
   return (
     <div
       role="button"
@@ -48,7 +56,7 @@ export const MobileCard: React.FC<MobileCardProps> = memo(({
         }
       }}
       aria-label={`${item.title} (${item.year})`}
-      className="group relative flex flex-col shrink-0 w-[122px] xs:w-[132px] select-none cursor-pointer active:scale-95 transition-transform duration-150 focus:outline-none"
+      className={`group relative flex flex-col select-none cursor-pointer active:scale-95 transition-transform duration-150 focus:outline-none ${sizeClasses} ${className}`}
     >
       {/* Pôster com proporção 2:3 */}
       <div className="relative w-full aspect-[2/3] rounded-xl overflow-hidden bg-slate-900 border border-white/10 shadow-md">
@@ -94,7 +102,7 @@ export const MobileCard: React.FC<MobileCardProps> = memo(({
       </div>
 
       {/* Rótulo inferior com título e metadados */}
-      <div className="mt-1.5 px-0.5 flex flex-col">
+      <div className="mt-1.5 px-0.5 flex flex-col w-full min-w-0">
         <h4 className="text-xs font-semibold text-slate-100 line-clamp-1 leading-snug group-hover:text-[#007df7] transition-colors">
           {item.title}
         </h4>

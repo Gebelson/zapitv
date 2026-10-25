@@ -482,9 +482,10 @@ async function runStreamingPlatformExclusivesSuite() {
   if (failed > 0) {
     process.exit(1);
   }
+  process.exit(0);
 }
 
-runStreamingPlatformExclusivesSuite().catch(err => {
+runStreamingPlatformExclusivesSuite().then(() => process.exit(0)).catch(err => {
   console.error('Erro fatal na execução da suíte:', err);
   process.exit(1);
 });

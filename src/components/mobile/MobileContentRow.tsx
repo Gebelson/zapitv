@@ -57,6 +57,7 @@ export const MobileContentRow: React.FC<MobileContentRowProps> = ({
             item={item}
             onItemClick={onItemClick}
             showProgress={showProgress}
+            variant="carousel"
           />
         ))}
       </div>
