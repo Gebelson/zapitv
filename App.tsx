@@ -1756,6 +1756,22 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       rootEl.style.backgroundColor = bgColor;
     }
 
+    // Sincroniza dinamicamente as meta tags theme-color e apple-mobile-web-app-status-bar-style com o tema ativo
+    const metaThemeColors = document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]');
+    if (metaThemeColors.length > 0) {
+      metaThemeColors.forEach(meta => meta.setAttribute('content', bgColor));
+    } else {
+      const meta = document.createElement('meta');
+      meta.name = 'theme-color';
+      meta.content = bgColor;
+      document.head.appendChild(meta);
+    }
+
+    const metaAppleStatus = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (metaAppleStatus) {
+      metaAppleStatus.setAttribute('content', isDarkMode ? 'black-translucent' : 'default');
+    }
+
     // Gerencia classes temáticas preservando tv-mode e demais classes existentes no body
     if (isDarkMode) {
       htmlEl.classList.add('dark');

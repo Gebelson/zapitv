@@ -160,7 +160,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
     <div
       ref={containerRef}
       data-testid="mobile-layout-container"
-      className="min-h-screen bg-[#07090E] text-slate-100 flex flex-col relative select-none"
+      className={`min-h-screen ${isDarkMode ? 'bg-[#05070a] text-slate-100' : 'bg-[#F8F9FC] text-gray-900'} flex flex-col relative select-none`}
     >
       {/* 1. Mobile Header (visível na Home e páginas gerais) */}
       <MobileHeader

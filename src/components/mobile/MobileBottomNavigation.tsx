@@ -42,7 +42,7 @@ export const MobileBottomNavigation: React.FC<MobileBottomNavigationProps> = ({
     <nav
       data-testid="mobile-bottom-nav"
       aria-label="Navegação móvel principal"
-      className="fixed bottom-0 left-0 right-0 z-[120] bg-[#07090E]/95 backdrop-blur-xl border-t border-white/10 select-none pb-[env(safe-area-inset-bottom,0px)]"
+      className="fixed bottom-0 left-0 right-0 z-[120] bg-[#05070a]/95 backdrop-blur-xl border-t border-white/10 select-none pb-[env(safe-area-inset-bottom,0px)]"
     >
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
         {navItems.map((item) => {

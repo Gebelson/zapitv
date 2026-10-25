@@ -5,7 +5,7 @@
   "display": "standalone",
   "orientation": "any",
   "background_color": "#05070a",
-  "theme_color": "#007df7",
+  "theme_color": "#05070a",
   "description": "Plataforma de streaming personalizada com Stremio Core, catálogo TMDB em português brasileiro e fontes dubladas.",
   "icons": [
     {

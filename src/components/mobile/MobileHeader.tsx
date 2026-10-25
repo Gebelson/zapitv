@@ -55,8 +55,12 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
         data-testid="mobile-header"
         className={`fixed top-0 left-0 right-0 z-[110] transition-colors duration-300 select-none pt-[env(safe-area-inset-top,0px)] ${
           isScrolled
-            ? 'bg-[#07090E]/95 backdrop-blur-xl border-b border-white/10 shadow-lg'
-            : 'bg-gradient-to-b from-black/80 via-black/40 to-transparent'
+            ? (isDarkMode
+                ? 'bg-[#05070a]/95 backdrop-blur-xl border-b border-white/10 shadow-lg'
+                : 'bg-[#F8F9FC]/95 backdrop-blur-xl border-b border-black/10 shadow-sm text-gray-900')
+            : (isDarkMode
+                ? 'bg-gradient-to-b from-[#05070a]/90 via-[#05070a]/40 to-transparent'
+                : 'bg-gradient-to-b from-[#F8F9FC]/90 via-[#F8F9FC]/40 to-transparent text-gray-900')
         }`}
       >
         <div className="h-14 px-4 flex items-center justify-between max-w-lg mx-auto">
