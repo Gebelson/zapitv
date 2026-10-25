@@ -337,45 +337,62 @@ export class EpisodeAvailabilityService {
     availableSeasons: number[],
     nextSeasonEpisodes?: EpisodeItem[]
   ): { season: number; episode: number; title: string } | null {
-    if (!currentSeasonEpisodes || currentSeasonEpisodes.length === 0) return null;
+    const curSeasonNum = Number(currentSeason || 1);
+    const curEpNum = Number(currentEpisode || 1);
+    const getEpNum = (ep: any): number => Number(ep?.number ?? ep?.episode ?? 0);
 
-    // 1. Procura o próximo episódio dentro da temporada atual
-    const sortedCurrent = [...currentSeasonEpisodes].sort((a, b) => a.number - b.number);
-    const currentIndex = sortedCurrent.findIndex(e => e.number === currentEpisode);
+    // 1. Procura o próximo episódio dentro da temporada atual se episódios foram fornecidos
+    if (Array.isArray(currentSeasonEpisodes) && currentSeasonEpisodes.length > 0) {
+      const sortedCurrent = [...currentSeasonEpisodes]
+        .filter(e => getEpNum(e) > 0)
+        .sort((a, b) => getEpNum(a) - getEpNum(b));
 
-    if (currentIndex !== -1 && currentIndex + 1 < sortedCurrent.length) {
-      const nextEp = sortedCurrent[currentIndex + 1];
-      return {
-        season: currentSeason,
-        episode: nextEp.number,
-        title: nextEp.title
-      };
-    } else if (currentIndex === -1) {
-      // Se o episódio atual não estiver na lista (ex: estava indisponível), procura o primeiro com número maior
-      const nextEp = sortedCurrent.find(e => e.number > currentEpisode);
-      if (nextEp) {
+      const currentIndex = sortedCurrent.findIndex(e => getEpNum(e) === curEpNum);
+
+      if (currentIndex !== -1 && currentIndex + 1 < sortedCurrent.length) {
+        const nextEp = sortedCurrent[currentIndex + 1];
+        const nextEpNum = getEpNum(nextEp);
         return {
-          season: currentSeason,
-          episode: nextEp.number,
-          title: nextEp.title
+          season: curSeasonNum,
+          episode: nextEpNum,
+          title: nextEp.title || `Episódio ${nextEpNum}`
         };
+      } else if (currentIndex === -1) {
+        // Se o episódio atual não estiver na lista (ex: estava indisponível ou filtrado), procura o primeiro com número maior
+        const nextEp = sortedCurrent.find(e => getEpNum(e) > curEpNum);
+        if (nextEp) {
+          const nextEpNum = getEpNum(nextEp);
+          return {
+            season: curSeasonNum,
+            episode: nextEpNum,
+            title: nextEp.title || `Episódio ${nextEpNum}`
+          };
+        }
       }
     }
 
-    // 2. Se a temporada atual terminou, procura a próxima temporada válida
-    const sortedSeasons = [...availableSeasons].sort((a, b) => a - b);
-    const nextSeason = sortedSeasons.find(s => s > currentSeason);
+    // 2. Se a temporada atual terminou (ou não há mais episódios nela), procura a próxima temporada válida
+    const sortedSeasons = [...(availableSeasons || [])]
+      .map(Number)
+      .filter(s => s > 0)
+      .sort((a, b) => a - b);
+    const nextSeason = sortedSeasons.find(s => s > curSeasonNum);
 
     if (nextSeason !== undefined) {
       // Se os episódios da próxima temporada foram fornecidos
-      if (nextSeasonEpisodes && nextSeasonEpisodes.length > 0) {
-        const sortedNext = [...nextSeasonEpisodes].sort((a, b) => a.number - b.number);
-        const firstEp = sortedNext[0];
-        return {
-          season: nextSeason,
-          episode: firstEp.number,
-          title: firstEp.title
-        };
+      if (Array.isArray(nextSeasonEpisodes) && nextSeasonEpisodes.length > 0) {
+        const sortedNext = [...nextSeasonEpisodes]
+          .filter(e => getEpNum(e) > 0)
+          .sort((a, b) => getEpNum(a) - getEpNum(b));
+        if (sortedNext.length > 0) {
+          const firstEp = sortedNext[0];
+          const firstEpNum = getEpNum(firstEp);
+          return {
+            season: nextSeason,
+            episode: firstEpNum,
+            title: firstEp.title || `Temporada ${nextSeason} • Episódio ${firstEpNum}`
+          };
+        }
       }
 
       // Se a próxima temporada é conhecida como disponível, aponta para o primeiro episódio

@@ -194,6 +194,10 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const [currentSeason, setCurrentSeason] = useState<number>(() => initialSeason || initialContinuity.season || 1);
   const [totalSeasons, setTotalSeasons] = useState(initialItem.seasonsCount || 1);
   const [availableSeasons, setAvailableSeasons] = useState<number[]>(() => {
+    if (initialItem.episodes && initialItem.episodes.length > 0) {
+      const sSet = new Set(initialItem.episodes.map((e: any) => Number(e.season ?? 1)).filter((s: number) => s > 0));
+      if (sSet.size > 0) return Array.from(sSet).sort((a: number, b: number) => a - b);
+    }
     return Array.from({ length: Math.max(1, initialItem.seasonsCount || 1) }, (_, i) => i + 1);
   });
   const [isPlaying, setIsPlaying] = useState(false);
@@ -265,7 +269,14 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     title: string;
     description: string;
     image: string;
-  }[]>([]);
+  }[]>(() => {
+    if (initialItem.episodes && initialItem.episodes.length > 0) {
+      const season = initialSeason || initialContinuity.season || 1;
+      const filtered = initialItem.episodes.filter((e: any) => Number(e.season ?? 1) === season);
+      return episodeAvailabilityService.filterAiredEpisodes(filtered as any[]);
+    }
+    return [];
+  });
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
 
   // Parâmetros do player (filme ou série/EP)
@@ -1055,15 +1066,34 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
 
   const nextEpisodeInfo = useMemo(() => {
     if (!hasEpisodes) return null;
-    const curSeason = currentEpisodeParams?.season ?? currentSeason ?? 1;
-    const curEpisode = currentEpisodeParams?.episode ?? 1;
+    const curSeason = Number(currentEpisodeParams?.season ?? currentSeason ?? 1);
+    const curEpisode = Number(currentEpisodeParams?.episode ?? 1);
+
+    // Fallback: se episodes ainda estiver vazio (ex: carregando TMDB), utiliza item.episodes se existir
+    const rawCurrentEps = (episodes && episodes.length > 0)
+      ? episodes
+      : (item.episodes && item.episodes.length > 0
+          ? item.episodes.filter((e: any) => Number(e.season ?? 1) === curSeason)
+          : []);
+
+    // Próxima temporada em item.episodes se disponível
+    let nextSeasonEps: any[] | undefined = undefined;
+    if (item.episodes && item.episodes.length > 0) {
+      const sortedSeasons = [...availableSeasons].map(Number).sort((a, b) => a - b);
+      const nextSeason = sortedSeasons.find(s => s > curSeason);
+      if (nextSeason !== undefined) {
+        nextSeasonEps = item.episodes.filter((e: any) => Number(e.season ?? 1) === nextSeason);
+      }
+    }
+
     return episodeAvailabilityService.getNextAvailableEpisode(
       curSeason,
       curEpisode,
-      episodes,
-      availableSeasons
+      rawCurrentEps as any[],
+      availableSeasons,
+      nextSeasonEps
     );
-  }, [hasEpisodes, currentEpisodeParams, currentSeason, episodes, availableSeasons]);
+  }, [hasEpisodes, currentEpisodeParams, currentSeason, episodes, availableSeasons, item.episodes]);
 
   const hasNextEpisode = Boolean(nextEpisodeInfo);
 

@@ -1148,6 +1148,20 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
           }
         }
 
+        // Se o botão contextual de próximo episódio estiver focado, aciona o próximo episódio
+        const isNextContextualFocused =
+          current === 'tv-player-next-contextual' ||
+          document.activeElement?.getAttribute('data-focus-key') === 'tv-player-next-contextual' ||
+          document.activeElement?.id === 'zapi-tv-next-episode-button' ||
+          document.querySelector('[data-focus-key="tv-player-next-contextual"][data-tv-focused="true"]') !== null;
+        if (isNextContextualFocused) {
+          const nextBtn = document.querySelector<HTMLElement>('[data-focus-key="tv-player-next-contextual"]');
+          if (nextBtn) {
+            nextBtn.click();
+            return true;
+          }
+        }
+
         if (scrubSessionRef.current?.active) {
           commitScrubSession();
           return true;
@@ -1295,6 +1309,21 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
         }
       }
 
+      // Se o botão contextual de próximo episódio estiver focado, aciona o próximo episódio
+      const isNextContextualFocused =
+        current === 'tv-player-next-contextual' ||
+        document.activeElement?.getAttribute('data-focus-key') === 'tv-player-next-contextual' ||
+        document.activeElement?.id === 'zapi-tv-next-episode-button' ||
+        document.querySelector('[data-focus-key="tv-player-next-contextual"][data-tv-focused="true"]') !== null;
+      if (isNextContextualFocused) {
+        const nextBtn = document.querySelector<HTMLElement>('[data-focus-key="tv-player-next-contextual"]');
+        if (nextBtn) {
+          nextBtn.click();
+          props.onInteraction();
+          return true;
+        }
+      }
+
       const element = Array.from(document.querySelectorAll<HTMLElement>('[data-focus-key]')).find(
         el => el.dataset.focusKey === current
       );
@@ -1387,7 +1416,7 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
 
     // Primeira abertura geral sem foco definido: define foco inicial em Play/Pause
     const id = requestAnimationFrame(() => {
-      if (getCurrentFocusKey() === 'tv-skip-button') return;
+      if (getCurrentFocusKey() === 'tv-skip-button' || getCurrentFocusKey() === 'tv-player-next-contextual') return;
       if (isClosingMenuRef.current) return;
       setFocus('tv-player-play');
     });

@@ -103,6 +103,19 @@ export const ZapiSkipButton: React.FC<ZapiSkipButtonProps> = ({
   // Integração com sistema de navegação espacial do Modo Smart TV
   const { ref: tvFocusRef, focused: isTvFocused } = useTvFocusable({
     focusKey: 'tv-skip-button',
+    onArrowPress: (direction) => {
+      // Se o botão de Próximo Episódio estiver visível abaixo, move o foco para ele com D-pad DOWN
+      if (direction === 'down') {
+        const nextBtn = document.querySelector('[data-focus-key="tv-player-next-contextual"]');
+        if (nextBtn) {
+          try {
+            setFocus('tv-player-next-contextual');
+            return false;
+          } catch {}
+        }
+      }
+      return true;
+    },
     onEnterPress: () => {
       triggerSkip();
     }

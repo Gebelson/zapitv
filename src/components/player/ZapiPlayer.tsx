@@ -23,6 +23,7 @@ import { videoAdBlocker } from '../../core/security/videoAdBlocker';
 import { streamQuarantineService } from '../../core/security/streamQuarantineService';
 import { ZapiLoader } from '../common/ZapiLoader';
 import { ZapiSkipButton } from './ZapiSkipButton';
+import { TvNextEpisodeButton } from './TvNextEpisodeButton';
 import { ZapiStreamDiagnosticsModal } from '../dev/ZapiStreamDiagnosticsModal';
 import { playbackSessionService, NavigationType } from '../../core/session/playbackSessionService';
 import { canonicalIdentityService } from '../../core/identity/canonicalIdentity';
@@ -156,7 +157,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   onUpdatePlaybackPosition
 }) => {
   useEffect(() => uiSoundService.beginPlayback(), []);
-  const isTvPlayback = typeof window !== 'undefined' && window.location.pathname.startsWith('/tv');
+  const isTvPlayback = (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv')) || tvModeService.isTvMode();
   const [selectedStreamIndex, setSelectedStreamIndex] = useState(0);
   const currentStream = streams[selectedStreamIndex] || streams[0];
   const sourceEvidenceRef = useRef<{
@@ -890,6 +891,42 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     setShowAutoPlayCountdown(false);
     setIsAutoPlayCancelled(true);
   }, []);
+
+  // Detecção contextual do botão flutuante "Próximo Episódio" no Modo Smart TV
+  const showTvNextEpisodeButton = useMemo(() => {
+    if (!isTvPlayback) return false;
+    const isSeriesOrAnime = (item.type === ContentType.SERIES || item.type === ContentType.ANIME) &&
+      item.mediaFormat !== 'movie' && (item.type as any) !== 'movie' && (item.type as any) !== 'FILME';
+    if (!isSeriesOrAnime) return false;
+    if (!nextEpisodeInfo || !onNextEpisode) return false;
+    if (isPlayingIntro || showNonDubbedPrompt || allSourcesFailed) return false;
+
+    // 1. Créditos finais identificados pelo skipService ('ed')
+    const hasCreditsInterval = skipIntervals.some(i => i.type === 'ed');
+    const isCreditsTime = activeSkipInterval?.type === 'ed' ||
+      (hasCreditsInterval && skipIntervals.some(i => i.type === 'ed' && currentTime >= (i.startTime - 2)));
+
+    // 2. Critério baseado no tempo restante (últimos 90 segundos) caso não haja marcação de créditos
+    const isDurationReliable = duration > 0 && isFinite(duration) && duration >= 120;
+    const remainingSeconds = isDurationReliable ? duration - currentTime : 999;
+    const isNearEnd = isDurationReliable && remainingSeconds <= 90 && currentTime > 30;
+
+    return isCreditsTime || isNearEnd || showAutoPlayCountdown;
+  }, [
+    isTvPlayback,
+    item.type,
+    item.mediaFormat,
+    nextEpisodeInfo,
+    onNextEpisode,
+    isPlayingIntro,
+    showNonDubbedPrompt,
+    allSourcesFailed,
+    skipIntervals,
+    activeSkipInterval,
+    currentTime,
+    duration,
+    showAutoPlayCountdown
+  ]);
 
   const handleToggleAutoPlay = useCallback(() => {
     const nextVal = !autoPlayEnabled;
@@ -3533,6 +3570,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         setShowFeedbackModal(false);
         return true;
       }
+      if (showAutoPlayCountdown) {
+        handleCancelAutoPlay();
+        return true;
+      }
       if (showAudioMenu || showQualityMenu || showSubtitlesMenu || showStyleEditor || showDevDiagnostics || showManualSkipModal) {
         setShowAudioMenu(false);
         setShowQualityMenu(false);
@@ -3554,7 +3595,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       return true;
     });
   }, [
-    showFeedbackModal, showAudioMenu, showQualityMenu, showSubtitlesMenu,
+    showFeedbackModal, showAutoPlayCountdown, handleCancelAutoPlay,
+    showAudioMenu, showQualityMenu, showSubtitlesMenu,
     showStyleEditor, showDevDiagnostics, showManualSkipModal, showNonDubbedPrompt,
     showControls, handleRejectNonDubbed, handlePlayerClose
   ]);
@@ -5968,7 +6010,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         />
       )}
 
-      {/* Camada Dedicada de Ações Contextuais da Smart TV (Pular Abertura / Pular Créditos / Pular Intro) */}
+      {/* Camada Dedicada de Ações Contextuais da Smart TV (Pular Abertura / Pular Créditos / Pular Intro / Próximo Episódio) */}
       {isTvPlayback && !showNonDubbedPrompt && !allSourcesFailed && (
         <div className="fixed inset-0 z-[85] pointer-events-none select-none overflow-hidden">
           {activeSkipInterval && !isPlayingIntro && (
@@ -5977,7 +6019,27 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
               interval={activeSkipInterval}
               currentTime={currentTime}
               onSkip={handleExecuteSkip}
-              className={showAutoPlayCountdown ? '!bottom-[260px] sm:!bottom-[280px]' : ''}
+              className={showTvNextEpisodeButton ? '!bottom-[280px] sm:!bottom-[300px]' : (showAutoPlayCountdown ? '!bottom-[260px] sm:!bottom-[280px]' : '')}
+            />
+          )}
+
+          {showTvNextEpisodeButton && nextEpisodeInfo && onNextEpisode && (
+            <TvNextEpisodeButton
+              key={`tv_next_ep_${nextEpisodeInfo.season}_${nextEpisodeInfo.episode}`}
+              nextEpisodeInfo={nextEpisodeInfo}
+              onNextEpisode={() => {
+                if (isBroadcastGuest) {
+                  watchPartyService.requestHostPlaybackAction('next_episode');
+                } else {
+                  handleWatchNextNow();
+                }
+              }}
+              autoPlayEnabled={autoPlayEnabled}
+              isAutoPlayCountdownActive={showAutoPlayCountdown}
+              countdownSeconds={countdownSeconds}
+              onCancelAutoPlay={handleCancelAutoPlay}
+              isLoadingStreams={isLoadingStreams}
+              isSkipCreditsVisible={Boolean(activeSkipInterval && activeSkipInterval.type === 'ed')}
             />
           )}
 
