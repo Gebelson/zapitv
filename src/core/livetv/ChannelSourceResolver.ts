@@ -18,15 +18,22 @@ export interface ResolvedSourceResult {
   sources: LiveStreamSource[];
   isFallback: boolean;
   activeSourceIndex: number;
+  hasEligibleSource?: boolean;
+  allSourcesFailed?: boolean;
+}
+
+export interface SourceFailureRecord {
+  lastFailureTime: number;
+  failureCount: number;
+  reason?: string;
+  isPermanent?: boolean;
 }
 
 export class ChannelSourceResolver {
   private static instance: ChannelSourceResolver;
 
-  // Mapa de URLs com falha temporária por canal (canalId -> Map de url para timestamp da falha)
-  private failedSourcesPerChannel = new Map<string, Map<string, number>>();
-  // Falhas expiram após 3 minutos (180s) para permitir auto-recuperação
-  private readonly FAILURE_EXPIRATION_MS = 3 * 60 * 1000;
+  // Mapa de URLs com registro de falhas por canal (canalId -> Map de url para SourceFailureRecord)
+  private failedSourcesPerChannel = new Map<string, Map<string, SourceFailureRecord>>();
 
   public static getInstance(): ChannelSourceResolver {
     if (!ChannelSourceResolver.instance) {
@@ -151,21 +158,39 @@ export class ChannelSourceResolver {
   }
 
   /**
+   * Calcula o período de resfriamento (cooldown) antes de reconsiderar uma fonte que falhou.
+   * - Falhas transitórias: 3 min (1ª falha), 6 min (2ª falha), 12 min (3+ falhas)
+   * - Falhas permanentes (ex: 404, 410, parked): 30 min
+   */
+  public getCooldownDuration(record?: SourceFailureRecord): number {
+    if (!record) return 180_000;
+    if (record.isPermanent) return 1_800_000;
+    if (record.failureCount >= 3) return 720_000;
+    if (record.failureCount === 2) return 360_000;
+    return 180_000;
+  }
+
+  /**
    * Retorna conjunto de URLs com falhas ativas (não expiradas) para o canal
    */
-  private getActiveFailedUrls(channelId: string): Set<string> {
+  public getActiveFailedUrls(channelId: string): Set<string> {
     const map = this.failedSourcesPerChannel.get(channelId);
     if (!map) return new Set();
 
     const now = Date.now();
     const active = new Set<string>();
 
-    for (const [url, timestamp] of map.entries()) {
-      if (now - timestamp < this.FAILURE_EXPIRATION_MS) {
+    for (const [url, record] of map.entries()) {
+      const cooldown = this.getCooldownDuration(record);
+      if (now - record.lastFailureTime < cooldown) {
         active.add(url);
       } else {
         map.delete(url); // Expira falha antiga
       }
+    }
+
+    if (map.size === 0) {
+      this.failedSourcesPerChannel.delete(channelId);
     }
 
     return active;
@@ -180,43 +205,51 @@ export class ChannelSourceResolver {
     const totalExcluded = new Set([...excludeUrls, ...Array.from(activeFailed)]);
 
     // Procura primeira fonte válida que não esteja na lista de falhas ativas
-    let chosenIndex = allSources.findIndex(s => !totalExcluded.has(s.url));
+    const chosenIndex = allSources.findIndex(s => !totalExcluded.has(s.url));
 
-    // Se todas as fontes falharam temporariamente, limpa as falhas expiradas para permitir reconexão
-    if (chosenIndex === -1 && allSources.length > 0) {
-      this.clearFailedSources(channel.id);
-      chosenIndex = 0;
+    if (chosenIndex === -1) {
+      // Se todas as fontes falharam temporariamente, NÃO limpa falhas automaticamente para evitar looping
+      const fallbackSource = allSources[0];
+      return {
+        primaryUrl: fallbackSource?.url || channel.streamUrl || '',
+        quality: fallbackSource?.quality || channel.quality || '720p',
+        format: fallbackSource?.format || 'hls',
+        sources: allSources,
+        isFallback: false,
+        activeSourceIndex: -1,
+        hasEligibleSource: false,
+        allSourcesFailed: true
+      };
     }
 
-    const chosen = allSources[chosenIndex] || {
-      id: `${channel.id}-default`,
-      url: channel.streamUrl,
-      quality: channel.quality || '720p',
-      provider: 'Padrão',
-      format: 'hls' as const,
-      resolutionHeight: 720
-    };
-
+    const chosen = allSources[chosenIndex];
     return {
       primaryUrl: chosen.url,
       quality: chosen.quality,
       format: chosen.format || 'hls',
       sources: allSources,
       isFallback: chosenIndex > 0 || Boolean(chosen.isBackup),
-      activeSourceIndex: Math.max(0, chosenIndex)
+      activeSourceIndex: chosenIndex,
+      hasEligibleSource: true,
+      allSourcesFailed: false
     };
   }
 
   /**
    * Obtém a próxima fonte disponível após uma falha de reprodução, prevenindo loops infinitos
    */
-  public getNextSource(channel: LiveChannel, currentFailedUrl: string): LiveStreamSource | null {
-    this.markSourceFailed(channel.id, currentFailedUrl);
+  public getNextSource(
+    channel: LiveChannel,
+    currentFailedUrl: string,
+    reason?: string,
+    isPermanent = false
+  ): LiveStreamSource | null {
+    this.markSourceFailed(channel.id, currentFailedUrl, reason, isPermanent);
 
     const allSources = this.getRankedSources(channel);
     const activeFailed = this.getActiveFailedUrls(channel.id);
 
-    // Filtra fontes que ainda não falharam recentemente
+    // Filtra fontes que ainda não falharam recentemente e que não sejam a URL atual
     const candidates = allSources.filter(s => s.url !== currentFailedUrl && !activeFailed.has(s.url));
 
     if (candidates.length > 0) {
@@ -227,16 +260,44 @@ export class ChannelSourceResolver {
   }
 
   /**
-   * Marca uma URL como falha temporária com timestamp de expiração
+   * Marca uma URL como falha temporária ou permanente com timestamp de expiração
    */
-  public markSourceFailed(channelId: string, url: string): void {
+  public markSourceFailed(channelId: string, url: string, reason?: string, isPermanent = false): void {
     if (!url) return;
     let map = this.failedSourcesPerChannel.get(channelId);
     if (!map) {
-      map = new Map<string, number>();
+      map = new Map<string, SourceFailureRecord>();
       this.failedSourcesPerChannel.set(channelId, map);
     }
-    map.set(url, Date.now());
+    const existing = map.get(url);
+    const failureCount = (existing?.failureCount || 0) + 1;
+    map.set(url, {
+      lastFailureTime: Date.now(),
+      failureCount,
+      reason: reason || existing?.reason,
+      isPermanent: isPermanent || existing?.isPermanent || false
+    });
+  }
+
+  /**
+   * Marca uma URL como bem-sucedida, limpando seu registro de falhas anteriores
+   */
+  public markSourceSuccess(channelId: string, url: string): void {
+    if (!channelId || !url) return;
+    const map = this.failedSourcesPerChannel.get(channelId);
+    if (map) {
+      map.delete(url);
+      if (map.size === 0) {
+        this.failedSourcesPerChannel.delete(channelId);
+      }
+    }
+  }
+
+  /**
+   * Retorna o registro de falha de uma fonte específica
+   */
+  public getSourceFailureRecord(channelId: string, url: string): SourceFailureRecord | undefined {
+    return this.failedSourcesPerChannel.get(channelId)?.get(url);
   }
 
   /**

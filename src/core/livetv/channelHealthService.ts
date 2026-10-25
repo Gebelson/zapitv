@@ -68,10 +68,13 @@ export class ChannelHealthService {
    */
   public confirmPlayback(channel: LiveChannel, activeUrl: string, timeToFirstFrameMs?: number): void {
     if (channel.requiresExternalAccess) {
+      channel.status = 'EXTERNAL_ACCESS';
       liveTvProviderRegistry.updateChannelStatus(channel.id, 'EXTERNAL_ACCESS');
       return;
     }
+    channel.status = 'AVAILABLE';
     liveStreamValidator.recordPlaybackSuccess(activeUrl, timeToFirstFrameMs);
+    channelSourceResolver.markSourceSuccess(channel.id, activeUrl);
     liveTvProviderRegistry.updateChannelStatus(channel.id, 'AVAILABLE');
   }
 
@@ -101,13 +104,14 @@ export class ChannelHealthService {
     channel: LiveChannel,
     failedUrl: string,
     reason = 'Erro na transmissão',
-    isNetwork = false
+    isNetwork = false,
+    isPermanent = false
   ): LiveStreamSource | null {
     // 1. Registra no validador de saúde
     liveStreamValidator.recordPlaybackFailure(failedUrl, reason, isNetwork);
 
     // 2. Registra no resolvedor de fontes e busca próximo backup
-    const nextSource = channelSourceResolver.getNextSource(channel, failedUrl);
+    const nextSource = channelSourceResolver.getNextSource(channel, failedUrl, reason, isPermanent);
 
     // 3. Atualiza o status do canal no catálogo
     const newStatus: ChannelHealthStatus = nextSource ? 'UNSTABLE' : 'UNAVAILABLE';
@@ -120,8 +124,13 @@ export class ChannelHealthService {
   /**
    * Alias de compatibilidade com chamadas legadas
    */
-  public reportPlaybackFailure(channel: LiveChannel, failedUrl: string, isNetwork = false): LiveStreamSource | null {
-    return this.handlePlaybackFailure(channel, failedUrl, 'Instabilidade de conexão', isNetwork);
+  public reportPlaybackFailure(
+    channel: LiveChannel,
+    failedUrl: string,
+    isNetwork = false,
+    isPermanent = false
+  ): LiveStreamSource | null {
+    return this.handlePlaybackFailure(channel, failedUrl, 'Instabilidade de conexão', isNetwork, isPermanent);
   }
 
   /**
