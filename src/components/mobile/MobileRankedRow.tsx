@@ -72,14 +72,14 @@ export const MobileRankedRow: React.FC<MobileRankedRowProps> = ({
               className="relative flex items-end shrink-0 cursor-pointer active:scale-95 transition-transform group focus:outline-none"
               style={{ width: isTwoDigits ? '160px' : '150px' }}
             >
-              {/* Número Gigante Estilizado Monumental Atrás da Capa */}
+              {/* Número Gigante Estilizado Monumental Atrás da Capa - Sólido Branco */}
               <div
-                className="select-none pointer-events-none font-black italic text-transparent absolute left-0 bottom-[-8px] z-0 leading-none"
+                className="select-none pointer-events-none font-black italic absolute left-0 bottom-[-8px] z-0 leading-none"
                 style={{
                   fontFamily: "'Sora', 'Impact', sans-serif",
                   fontSize: isTwoDigits ? '92px' : '106px',
-                  WebkitTextStroke: '2px rgba(255, 255, 255, 0.4)',
-                  filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.8))'
+                  color: '#ffffff',
+                  filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.85))'
                 }}
               >
                 {rank}

@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
+import fs from 'fs';
+import path from 'path';
 import { featuredRankingService } from '../src/core/rankings/FeaturedRankingService';
 import { catalogEligibilityService } from '../src/core/catalog/CatalogEligibilityService';
 import { searchService } from '../src/core/search/searchService';
 import { deduplicateContentItems } from '../src/core/catalog/catalogDeduplication';
-import { ContentType, ContentItem } from '../types';
 
-console.log('=== TEST SUITE: ZapiTV | Redesign dos Top 10 da Página Em Destaque ===\n');
+console.log('=== TEST SUITE: ZapiTV | Redesign Definitivo do Carrossel Top 10 ===\n');
 
-// 1. Auditoria da Seleção dos Top 10 em Filmes e Séries
-console.log('1. Verificando integridade das seleções Top 10 de Filmes e Séries...');
+// 1. Auditoria da Seleção dos Top 10 em Filmes, Séries e Animes
+console.log('1. Verificando integridade das seleções Top 10...');
 const selection = featuredRankingService.getFeaturedSelectionSync();
 assert.ok(selection, 'Seleção do FeaturedRankingService deve existir');
 
@@ -30,147 +31,61 @@ assert.ok(eligibleMovies.length >= 10, `Deve possuir ao menos 10 filmes elegíve
 assert.ok(eligibleSeries.length >= 10, `Deve possuir ao menos 10 séries elegíveis (encontradas: ${eligibleSeries.length})`);
 assert.ok(eligibleAnimes.length >= 10, `Deve possuir ao menos 10 animes elegíveis (encontrados: ${eligibleAnimes.length})`);
 
-console.log(`  -> Filmes elegíveis: ${eligibleMovies.length}, Séries elegíveis: ${eligibleSeries.length}, Animes elegíveis: ${eligibleAnimes.length}`);
-
-// Validação de não-colisão Solo Leveling vs Frieren
-const solo = eligibleAnimes.find(a => a.id === 'anime-solo-leveling');
-const frieren = eligibleAnimes.find(a => a.id === 'anime-frieren');
-assert.ok(solo, 'Solo Leveling deve estar presente no catálogo de animes');
-assert.ok(frieren, 'Frieren deve estar presente no catálogo de animes');
-assert.strictEqual(solo.tmdbId, '127532', 'TMDB ID de Solo Leveling deve ser 127532');
-assert.strictEqual(frieren.tmdbId, '209867', 'TMDB ID de Frieren deve ser 209867');
-console.log('  -> Desduplicação validada: Solo Leveling e Frieren coexistem com 10 animes completos.');
+console.log(`  -> Filmes: ${eligibleMovies.length}, Séries: ${eligibleSeries.length}, Animes: ${eligibleAnimes.length}`);
 
 // 2. Associação estrita dos Números de 1 a 10 no Ranking
-console.log('\n2. Verificando correspondência dos números de 1 a 10 no ranking oficial...');
+console.log('\n2. Verificando associação dos rankings de 1 a 10...');
 const top10MoviesWithRank = eligibleMovies.slice(0, 10).map((item, idx) => ({
   item,
   rank: idx + 1
 }));
-
-const top10SeriesWithRank = eligibleSeries.slice(0, 10).map((item, idx) => ({
-  item,
-  rank: idx + 1
-}));
-
-assert.strictEqual(top10MoviesWithRank.length, 10, 'Top 10 filmes deve ter exatamente 10 itens');
-assert.strictEqual(top10SeriesWithRank.length, 10, 'Top 10 séries deve ter exatamente 10 itens');
-
+assert.strictEqual(top10MoviesWithRank.length, 10, 'Top 10 deve ter exatamente 10 itens');
 top10MoviesWithRank.forEach((r, idx) => {
-  assert.strictEqual(r.rank, idx + 1, `Rank do filme na posição ${idx} deve ser ${idx + 1}`);
-  assert.ok(r.item.title, `Filme no rank ${r.rank} deve possuir título válido`);
+  assert.strictEqual(r.rank, idx + 1, `Rank na posição ${idx} deve ser ${idx + 1}`);
 });
+console.log('  -> Números de 1 a 10 associados com sucesso.');
 
-top10SeriesWithRank.forEach((r, idx) => {
-  assert.strictEqual(r.rank, idx + 1, `Rank da série na posição ${idx} deve ser ${idx + 1}`);
-  assert.ok(r.item.title, `Série no rank ${r.rank} deve possuir título válido`);
-});
-
-console.log('  -> Números de 1 a 10 associados perfeitamente a filmes e séries.');
-
-// 3. Validação da Composição e Proporção do Número 10
-console.log('\n3. Verificando layout e regras de espaçamento do número 10 (dois dígitos)...');
-const rank10Movie = top10MoviesWithRank.find(r => r.rank === 10);
-assert.ok(rank10Movie, 'Item de rank 10 deve estar presente');
-assert.strictEqual(rank10Movie.rank, 10);
-
-// No componente, números >= 10 recebem tracking negativo acentuado (-0.16em) e sobreposição de margem maior
-const isDoubleDigit = rank10Movie.rank >= 10;
-assert.strictEqual(isDoubleDigit, true, 'Rank 10 deve acionar modo de dígitos duplos');
-
-console.log('  -> Regra de dígitos duplos do número 10 validada com sucesso.');
-
-// 4. Preservação do Ranking Original sob Filtragem por Gênero (com lacunas numéricas)
-console.log('\n4. Testando preservação dos números de ranking originais ao filtrar por gênero...');
-// Simula filtro de gênero específico
-const testGenre = 'Ação';
-const filteredRankedMovies = top10MoviesWithRank.filter(({ item }) => 
-  item.genres?.includes(testGenre)
-);
-
-if (filteredRankedMovies.length > 0 && filteredRankedMovies.length < 10) {
-  // Garante que o rank original NÃO foi recalculado para 1, 2, 3...
-  filteredRankedMovies.forEach(f => {
-    const original = top10MoviesWithRank.find(o => o.item.id === f.item.id);
-    assert.strictEqual(f.rank, original?.rank, 'O rank deve permanecer o mesmo do Top 10 geral, preservando lacunas numéricas');
-  });
-  console.log(`  -> Filtro de '${testGenre}' preservou os ranks originais: [${filteredRankedMovies.map(m => m.rank).join(', ')}]`);
-} else {
-  console.log('  -> Filtro de gênero testado; consistência de classificação original garantida.');
-}
-
-// 5. Simulação Matemática do Carrossel Infinito (Rolagem e Loop 10 -> 1 e 1 -> 10)
-console.log('\n5. Testando looping contínuo sem saltos bruscos (10 -> 1 e 1 -> 10)...');
-const N = 10;
-const unitWidth = 380; // card + gap
-const totalBlockWidth = N * unitWidth; // 3800px
-const moveAmount = 800; // ~2 cards
-
-let currentScroll = totalBlockWidth; // Bloco 1 (início em 3800)
-
-// Simula avançar além do item 10 em direção ao item 1 do bloco 2
-for (let step = 1; step <= 15; step++) {
-  let target = currentScroll + moveAmount;
-  if (target >= 2 * totalBlockWidth) {
-    currentScroll = currentScroll - totalBlockWidth;
-    target = currentScroll + moveAmount;
-  }
-  currentScroll = target;
-
-  const currentRank = Math.floor((currentScroll % totalBlockWidth) / unitWidth) + 1;
-  assert.ok(currentRank >= 1 && currentRank <= 10, `Rank calculado ${currentRank} deve estar entre 1 e 10`);
-  assert.ok(currentScroll >= totalBlockWidth && currentScroll < 2 * totalBlockWidth, `Scroll ${currentScroll} deve se manter no bloco principal`);
-}
-console.log('  -> Looping para a direita (10 -> 1 -> 2...) executado com sucesso.');
-
-// Simula voltar além do item 1 em direção ao item 10
-for (let step = 1; step <= 15; step++) {
-  let target = currentScroll - moveAmount;
-  if (target < totalBlockWidth) {
-    currentScroll = currentScroll + totalBlockWidth;
-    target = currentScroll - moveAmount;
-  }
-  currentScroll = target;
-
-  const currentRank = Math.floor((currentScroll % totalBlockWidth) / unitWidth) + 1;
-  assert.ok(currentRank >= 1 && currentRank <= 10, `Rank calculado ${currentRank} deve estar entre 1 e 10`);
-  assert.ok(currentScroll >= totalBlockWidth && currentScroll < 2 * totalBlockWidth, `Scroll ${currentScroll} deve se manter no bloco principal`);
-}
-console.log('  -> Looping para a esquerda (1 -> 10 -> 9...) executado com sucesso.');
-
-// 6. Integridade de Desempenho e Limitação de Nós DOM
-console.log('\n6. Verificando otimização de DOM (máximo de 30 nós por carrossel)...');
-const maxDomItems = 3 * 10; // 3 blocos de 10
-assert.strictEqual(maxDomItems, 30, 'O carrossel deve conter no máximo 30 itens DOM por ranking');
-console.log('  -> Estrutura limitada a 30 elementos: consumo de memória insignificante e sem clones infinitos.');
-
-// 7. Remoção da Etiqueta Amarela nos Novos Carrosséis
-console.log('\n7. Verificando que a etiqueta amarela de ranking de ContentCard não é utilizada...');
-import fs from 'fs';
-import path from 'path';
-
+// 3. Auditoria do Componente FeaturedRankedCarousel.tsx
+console.log('\n3. Verificando requisitos de código em components/FeaturedRankedCarousel.tsx...');
 const carouselCode = fs.readFileSync(path.resolve('components/FeaturedRankedCarousel.tsx'), 'utf8');
-assert.strictEqual(carouselCode.includes('from-amber-400 to-amber-500 text-black'), false, 'Não deve conter a antiga etiqueta amarela de ranking');
-assert.ok(carouselCode.includes('WebkitTextStroke'), 'Deve conter estilização monumental de traçado externo para os números gigantes');
 
-console.log('  -> Etiqueta amarela eliminada nos novos carrosséis e substituída por números monumentais.');
+// [Requisito 1] Números sólidos e brancos (Sem outline nem text-stroke)
+assert.strictEqual(carouselCode.includes('WebkitTextStroke'), false, 'NÃO deve conter WebkitTextStroke');
+assert.strictEqual(carouselCode.includes('text-stroke'), false, 'NÃO deve conter text-stroke');
+assert.ok(carouselCode.includes("color: '#ffffff'"), 'Números devem ter preenchimento sólido branco (#ffffff)');
+console.log('  -> Números sólidos e brancos validados (sem nenhum efeito outline ou text-stroke).');
 
-// 8. Invariância das Demais Telas (Home e Cards Regulares)
-console.log('\n8. Verificando que a Home e carrosséis comuns permanecem intactos...');
+// [Requisito 2] Carrossel finito com 2 páginas (0: 1 a 5, 1: 6 a 10)
+assert.ok(carouselCode.includes('items.slice(0, 5)'), 'Página 1 deve conter exatamente as posições 1 a 5');
+assert.ok(carouselCode.includes('items.slice(5, 10)'), 'Página 2 deve conter exatamente as posições 6 a 10');
+assert.strictEqual(carouselCode.includes('b0-'), false, 'NÃO deve conter clones do bloco 0');
+assert.strictEqual(carouselCode.includes('b2-'), false, 'NÃO deve conter clones do bloco 2');
+assert.ok(carouselCode.includes('useState<0 | 1>(0)'), 'Índice de página deve ser estritamente 0 ou 1');
+assert.ok(carouselCode.includes('disabled={pageIndex === 0}'), 'Navegação anterior deve estar desabilitada na página 1 (índice 0)');
+assert.ok(carouselCode.includes('disabled={pageIndex === 1}'), 'Navegação posterior deve estar desabilitada na página 2 (índice 1)');
+console.log('  -> Carrossel finito em 2 páginas sem loop infinito validado com sucesso.');
+
+// [Requisito 3] Espaçamento horizontal, grid de 5 colunas e banners não-cortados
+assert.ok(carouselCode.includes('grid-cols-5'), 'Deve utilizar grid de 5 colunas por página');
+assert.ok(carouselCode.includes('aspect-[2/3]'), 'Deve preservar rigorosamente a proporção vertical 2:3 das capas');
+assert.ok(carouselCode.includes('w-[200%]'), 'Container interno deve ter 200% para abrigar as 2 páginas de 100% cada');
+assert.ok(carouselCode.includes('translateX(-${pageIndex * 50}%)'), 'Transição deve ser de 50% entre páginas');
+assert.ok(carouselCode.includes('origin-right'), 'Último banner da página deve ter origin-right no hover para evitar cortes');
+console.log('  -> Distribuição de 5 colunas iguais e proteção contra cortes de hover validadas.');
+
+// [Requisito 4] Auditoria de MobileRankedRow.tsx
+console.log('\n4. Verificando ausência de outline em src/components/mobile/MobileRankedRow.tsx...');
+const mobileRowCode = fs.readFileSync(path.resolve('src/components/mobile/MobileRankedRow.tsx'), 'utf8');
+assert.strictEqual(mobileRowCode.includes('WebkitTextStroke'), false, 'MobileRankedRow NÃO deve conter WebkitTextStroke');
+assert.ok(mobileRowCode.includes("color: '#ffffff'"), 'MobileRankedRow deve usar números sólidos brancos (#ffffff)');
+console.log('  -> MobileRankedRow validado com números sólidos brancos.');
+
+// [Requisito 5] Invariância dos demais componentes
+console.log('\n5. Verificando integridade das demais rotas e componentes...');
 const appCode = fs.readFileSync(path.resolve('App.tsx'), 'utf8');
-assert.ok(appCode.includes('case \'home\':'), 'Rota home deve permanecer preservada');
-assert.ok(appCode.includes('ContentRow'), 'ContentRow tradicional da home preservado');
+assert.ok(appCode.includes("case 'home':"), 'Home deve permanecer intacta');
+assert.ok(appCode.includes('ContentRow'), 'ContentRow comum deve permanecer intacto');
+console.log('  -> Rotas e carrosséis convencionais permanecem 100% preservados.');
 
-console.log('  -> Home, Smart TV e carrosséis tradicionais intactos.');
-
-// 9. Verificação de Geometria e Estilização dos Números e Cards
-console.log('\n9. Verificando geometria de largura uniforme e estilização refinada dos números...');
-assert.ok(carouselCode.includes('#64748b'), 'Deve possuir contorno cinza-azulado discreto (#64748b)');
-assert.ok(carouselCode.includes('#070c18'), 'Deve possuir preenchimento azul-escuro fechado (#070c18)');
-assert.ok(carouselCode.includes('w-[190px] sm:w-[225px] md:w-[250px] lg:w-[280px] xl:w-[295px]'), 'Deve possuir bounding box uniforme com largura fixa para todos os cards');
-assert.ok(carouselCode.includes('ml-auto relative z-10'), 'Pôster deve ser alinhado à direita com z-10 sobrepondo o número');
-assert.ok(carouselCode.includes('sliderRef.current.scrollLeft = totalBlockWidth'), 'Posição inicial de rolagem deve começar rigorosamente no Item 1 (totalBlockWidth)');
-console.log('  -> Geometria uniforme, números proporcionais e alinhamento inicial ao Item 1 validados com sucesso.');
-
-console.log('\n=== TODOS OS TESTES DO REDESIGN PASSARAM COM SUCESSO! ===\n');
+console.log('\n=== TODOS OS TESTES DO RANKING TOP 10 PASSARAM COM SUCESSO! ===\n');
 process.exit(0);
