@@ -118,25 +118,21 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   // Hierarquia do botão Voltar do Android
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
-      // 1. Se houver modal aberto (detalhes ou diagnóstico), fecha o modal
+      // Se houver modal aberto (detalhes ou diagnóstico), fecha o modal sem trocar de rota
       if (hasOpenModal && onCloseModal) {
         e.preventDefault();
         onCloseModal();
-        return;
-      }
-
-      // 2. Se estiver em uma sub-aba que não seja Home, volta para Home
-      if (activeTab !== 'home') {
-        navigate('/', { replace: true });
       }
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [hasOpenModal, onCloseModal, activeTab, navigate]);
+  }, [hasOpenModal, onCloseModal]);
 
   const handleSelectTab = (tab: MobileTab) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (activeTab === tab) return;
+
     switch (tab) {
       case 'home': navigate('/'); break;
       case 'explore': navigate('/explorar'); break;

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Home, Compass, Search, Tv, UserRound } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 
 export type MobileTab = 'home' | 'explore' | 'search' | 'programas' | 'my-zapitv';
@@ -16,9 +15,6 @@ export const MobileBottomNavigation: React.FC<MobileBottomNavigationProps> = ({
   onSelectTab,
   unreadNotificationsCount = 0
 }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-
   const navItems: Array<{
     id: MobileTab;
     label: string;
@@ -35,7 +31,6 @@ export const MobileBottomNavigation: React.FC<MobileBottomNavigationProps> = ({
   const handleTabClick = (item: typeof navItems[0]) => {
     uiSoundService.play('click');
     onSelectTab(item.id);
-    navigate(item.path);
   };
 
   return (

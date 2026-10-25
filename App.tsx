@@ -2916,13 +2916,19 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           </ViewWrapper>
         );
       case 'explore':
-        navigate('/filmes', { replace: true });
+        if (!isMobileViewport) {
+          navigate('/filmes', { replace: true });
+        }
         return null;
       case 'search':
-        navigate('/', { replace: true });
+        if (!isMobileViewport) {
+          navigate('/', { replace: true });
+        }
         return null;
       case 'my-zapitv':
-        navigate('/perfil', { replace: true });
+        if (!isMobileViewport) {
+          navigate('/perfil', { replace: true });
+        }
         return null;
       case 'notfound':
       default:
@@ -2930,8 +2936,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
   };
 
-  const viewContent = useMemo(() => isWatchRoute ? null : renderContent(), [
-    isWatchRoute, currentView, submittedSearchQuery, liveSearchActors, activeActorId, isDarkMode, favorites, myList, selectedGenre,
+  const viewContent = useMemo(() => {
+    if (isWatchRoute || isMobileViewport) return null;
+    return renderContent();
+  }, [
+    isWatchRoute, isMobileViewport, currentView, submittedSearchQuery, liveSearchActors, activeActorId, isDarkMode, favorites, myList, selectedGenre,
     currentUser, activeProfile, users, content, sectionTitles, customSections,
     filteredContent, visibleGridCount, trendingItems, popularMovies, popularSeries, animeItems,
     topRatedItems, featuredSelection, continueWatchingList, isLoadingMore,
