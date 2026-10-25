@@ -5,7 +5,7 @@
   "month": 10,
   "isCurrentMonth": true,
   "statusLabel": "Outubro de 2026 · Parcial",
-  "lastUpdatedAt": 1792905456529,
+  "lastUpdatedAt": 1792926592866,
   "nextScheduledUpdate": 1793005200000,
   "nextScheduledUpdateFormatted": "Segunda-feira, 26/10/2026 às 06:00 (BRT)",
   "movies": [
@@ -57,7 +57,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456528
+      "updatedAt": 1792926592865
     },
     {
       "position": 2,
@@ -107,7 +107,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456528
+      "updatedAt": 1792926592865
     },
     {
       "position": 3,
@@ -156,7 +156,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456528
+      "updatedAt": 1792926592865
     },
     {
       "position": 4,
@@ -205,7 +205,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456528
+      "updatedAt": 1792926592865
     },
     {
       "position": 5,
@@ -256,7 +256,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456528
+      "updatedAt": 1792926592865
     },
     {
       "position": 6,
@@ -306,7 +306,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456528
+      "updatedAt": 1792926592865
     },
     {
       "position": 7,
@@ -355,7 +355,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456528
+      "updatedAt": 1792926592865
     },
     {
       "position": 8,
@@ -405,7 +405,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456528
+      "updatedAt": 1792926592865
     },
     {
       "position": 9,
@@ -455,7 +455,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456528
+      "updatedAt": 1792926592865
     },
     {
       "position": 10,
@@ -505,7 +505,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456528
+      "updatedAt": 1792926592865
     }
   ],
   "series": [
@@ -567,7 +567,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     },
     {
       "position": 2,
@@ -634,7 +634,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     },
     {
       "position": 3,
@@ -701,7 +701,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     },
     {
       "position": 4,
@@ -761,7 +761,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     },
     {
       "position": 5,
@@ -821,7 +821,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     },
     {
       "position": 6,
@@ -882,7 +882,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     },
     {
       "position": 7,
@@ -942,7 +942,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     },
     {
       "position": 8,
@@ -1003,7 +1003,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     },
     {
       "position": 9,
@@ -1063,7 +1063,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     },
     {
       "position": 10,
@@ -1123,7 +1123,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     }
   ],
   "animes": [
@@ -1134,8 +1134,8 @@
       "title": "Solo Leveling",
       "originalTitle": "Ore dake Level Up na Ken",
       "year": 2024,
-      "poster": "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/gJL5iqPyZzgvI1Vb9k4PqB6fF6C.jpg",
+      "poster": "https://image.tmdb.org/t/p/w500/eCD7WS9h4lCT8N4Xavc9u8R1IGk.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/xMNH87maNLt9n2bMDYeI6db5VFm.jpg",
       "rating": 8.7,
       "item": {
         "id": "anime-solo-leveling",
@@ -1146,8 +1146,8 @@
         "mediaFormat": "series",
         "rating": 8.7,
         "year": 2024,
-        "image": "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/gJL5iqPyZzgvI1Vb9k4PqB6fF6C.jpg",
+        "image": "https://image.tmdb.org/t/p/w500/eCD7WS9h4lCT8N4Xavc9u8R1IGk.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/xMNH87maNLt9n2bMDYeI6db5VFm.jpg",
         "description": "Em um mundo onde caçadores despertam habilidades sobrenaturais, Sung Jin-woo, o caçador mais fraco da humanidade, recebe uma chance única de subir de nível sem limites.",
         "genres": [
           "Anime",
@@ -1168,7 +1168,7 @@
             "number": 1,
             "title": "Estou Acostumado",
             "description": "Sung Jin-woo lidera um grupo de expedição rumo a uma dungeon dupla com consequências fatais.",
-            "image": "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg"
+            "image": "https://image.tmdb.org/t/p/w500/eCD7WS9h4lCT8N4Xavc9u8R1IGk.jpg"
           }
         ],
         "imdbId": "anilist-151807",
@@ -1190,7 +1190,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     },
     {
       "position": 2,
@@ -1199,8 +1199,8 @@
       "title": "Jujutsu Kaisen",
       "originalTitle": "Jujutsu Kaisen",
       "year": 2020,
-      "poster": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/gmECX1Dv3y54wQ8o3t300gJ8uVp.jpg",
+      "poster": "https://image.tmdb.org/t/p/w500/8R1mMSC1gX1cg5ed7ns49JOEqw3.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/qpin8cASXEVtwhzNsprHYFiOAGk.jpg",
       "rating": 8.6,
       "item": {
         "id": "anime-jujutsu-kaisen",
@@ -1211,8 +1211,8 @@
         "mediaFormat": "series",
         "rating": 8.6,
         "year": 2020,
-        "image": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/gmECX1Dv3y54wQ8o3t300gJ8uVp.jpg",
+        "image": "https://image.tmdb.org/t/p/w500/8R1mMSC1gX1cg5ed7ns49JOEqw3.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/qpin8cASXEVtwhzNsprHYFiOAGk.jpg",
         "description": "Yuji Itadori engole um dedo amaldiçoado de Ryomen Sukuna e ingressa na Escola de Feitiçaria de Tóquio para expurgar maldições ameaçadoras.",
         "genres": [
           "Anime",
@@ -1233,7 +1233,7 @@
             "number": 1,
             "title": "Ryomen Sukuna",
             "description": "Yuji Itadori quebra o selo de um talismã amaldiçoado para salvar seus colegas de escola.",
-            "image": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg"
+            "image": "https://image.tmdb.org/t/p/w500/8R1mMSC1gX1cg5ed7ns49JOEqw3.jpg"
           }
         ],
         "overview": "A boy fights... for \"the right death.\"\n\n\n\nHardship, regret, shame: the negative feelings that humans feel become Curses that lurk in our everyday lives. The Curses run rampant throughout the world, capable of leading people to terrible misfortune and even death. What's more, the Curses can only be exorcised by another Curse.\n\n\n\nItadori Yuji is a boy with tremendous physical strength, though he lives a completely ordinary high school life. One day, to save a friend who has been attacked by Curses, he eats the finger of the Double-Faced Specter, taking the Curse into his own soul. From then on, he shares one body with the Double-Faced Specter. Guided by the most powerful of sorcerers, Gojou Satoru, Itadori is admitted to the Tokyo Metropolitan Technical High School of Sorcery, an organization that fights the Curses... and thus begins the heroic tale of a boy who became a Curse to exorcise a Curse, a life from which he could never turn back.\n\n\n\n(Source: Crunchyroll)\n\n\n\nNote: The first episode received an early web premiere on September 19th, 2020. The regular TV broadcast started on October 3rd, 2020.",
@@ -1256,7 +1256,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     },
     {
       "position": 3,
@@ -1322,7 +1322,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     },
     {
       "position": 4,
@@ -1331,8 +1331,8 @@
       "title": "Dandadan",
       "originalTitle": "Dan Da Dan",
       "year": 2024,
-      "poster": "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/1vKxVp97TqCjO1w9wE0K3G8kU9V.jpg",
+      "poster": "https://image.tmdb.org/t/p/w500/vtQug1eOyeU2VXIpNoDF1lTlcH4.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/uNTrRKIOyKYISthoeizghtXPEOK.jpg",
       "rating": 8.5,
       "item": {
         "id": "anime-dandadan",
@@ -1343,8 +1343,8 @@
         "mediaFormat": "series",
         "rating": 8.5,
         "year": 2024,
-        "image": "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/1vKxVp97TqCjO1w9wE0K3G8kU9V.jpg",
+        "image": "https://image.tmdb.org/t/p/w500/vtQug1eOyeU2VXIpNoDF1lTlcH4.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/uNTrRKIOyKYISthoeizghtXPEOK.jpg",
         "description": "Momo Ayase e Okarun desafiam suas crenças em fantasmas e alienígenas, desencadeando confrontos hilários e insanos no Japão.",
         "genres": [
           "Anime",
@@ -1365,7 +1365,7 @@
             "number": 1,
             "title": "Isso é o Amor Começando?",
             "description": "Momo e Okarun apostam para ver quem encontra alienígenas ou espíritos primeiro.",
-            "image": "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg"
+            "image": "https://image.tmdb.org/t/p/w500/vtQug1eOyeU2VXIpNoDF1lTlcH4.jpg"
           }
         ],
         "imdbId": "anilist-171018",
@@ -1387,7 +1387,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592865
     },
     {
       "position": 5,
@@ -1396,8 +1396,8 @@
       "title": "Bleach: Thousand-Year Blood War",
       "originalTitle": "Bleach: Sennen Kessen-hen",
       "year": 2022,
-      "poster": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/9pkbtK1kLhR1wzZg27v8O9eU4hV.jpg",
+      "poster": "https://image.tmdb.org/t/p/w500/iigTJJskR1PcjjXqxdyJwVB3BoU.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/z8IPicmEKXUO4I2UDdMEqw7RqOE.jpg",
       "rating": 8.9,
       "item": {
         "id": "anime-bleach-tybw",
@@ -1408,8 +1408,8 @@
         "mediaFormat": "series",
         "rating": 8.9,
         "year": 2022,
-        "image": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/9pkbtK1kLhR1wzZg27v8O9eU4hV.jpg",
+        "image": "https://image.tmdb.org/t/p/w500/iigTJJskR1PcjjXqxdyJwVB3BoU.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/z8IPicmEKXUO4I2UDdMEqw7RqOE.jpg",
         "description": "A guerra milenar entre os Shinigamis da Soul Society e o exército Quincy liderado por Yhwach chega ao seu clímax destrutivo.",
         "genres": [
           "Anime",
@@ -1430,7 +1430,7 @@
             "number": 1,
             "title": "Guerra de Sangue",
             "description": "A Soul Society é surpreendida por um ataque coordenado do Wandenreich.",
-            "image": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg"
+            "image": "https://image.tmdb.org/t/p/w500/iigTJJskR1PcjjXqxdyJwVB3BoU.jpg"
           }
         ],
         "imdbId": "anilist-114446",
@@ -1452,7 +1452,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592866
     },
     {
       "position": 6,
@@ -1517,7 +1517,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592866
     },
     {
       "position": 7,
@@ -1526,8 +1526,8 @@
       "title": "Chainsaw Man",
       "originalTitle": "Chainsaw Man",
       "year": 2022,
-      "poster": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/vI3a3n07Jq9g6iK2k69uP8wV7hX.jpg",
+      "poster": "https://image.tmdb.org/t/p/w500/mIz0eKhzHuSPeRSePCyoCt9bKVp.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/5DUMPBSnHOZsbBv81GFXZXvDpo6.jpg",
       "rating": 8.5,
       "item": {
         "id": "anime-chainsaw-man",
@@ -1538,8 +1538,8 @@
         "mediaFormat": "series",
         "rating": 8.5,
         "year": 2022,
-        "image": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/vI3a3n07Jq9g6iK2k69uP8wV7hX.jpg",
+        "image": "https://image.tmdb.org/t/p/w500/mIz0eKhzHuSPeRSePCyoCt9bKVp.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/5DUMPBSnHOZsbBv81GFXZXvDpo6.jpg",
         "description": "Denji renasce como um híbrido motosserra após se fundir com seu cachorro demônio Pochita e entra para a Segurança Pública.",
         "genres": [
           "Anime",
@@ -1560,7 +1560,7 @@
             "number": 1,
             "title": "Cachorro e Motosserra",
             "description": "Denji trabalha caçando demônios para pagar as dívidas deixadas por seu falecido pai.",
-            "image": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg"
+            "image": "https://image.tmdb.org/t/p/w500/mIz0eKhzHuSPeRSePCyoCt9bKVp.jpg"
           }
         ],
         "overview": "Denji is a teenage boy living with a Chainsaw Devil named Pochita. Due to the debt his father left behind, he has been living a rock-bottom life while repaying his debt by harvesting devil corpses with Pochita.\n\n\nOne day, Denji is betrayed and killed. As his consciousness fades, he makes a contract with Pochita and gets revived as \"Chainsaw Man\" — a man with a devil's heart.\n\n\n\n(Source: Crunchyroll)",
@@ -1583,7 +1583,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592866
     },
     {
       "position": 8,
@@ -1592,8 +1592,8 @@
       "title": "Attack on Titan",
       "originalTitle": "Shingeki no Kyojin",
       "year": 2013,
-      "poster": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/hP9cKk97kFh7g1w9w7h5g1kL2.jpg",
+      "poster": "https://image.tmdb.org/t/p/w500/8aMqmB5xSblsZc7bLMEhE28yHa2.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/rqbCbjB19amtOtFQbb3K2lgm2zv.jpg",
       "rating": 9,
       "item": {
         "id": "anime-attack-on-titan",
@@ -1604,8 +1604,8 @@
         "mediaFormat": "series",
         "rating": 9,
         "year": 2013,
-        "image": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/hP9cKk97kFh7g1w9w7h5g1kL2.jpg",
+        "image": "https://image.tmdb.org/t/p/w500/8aMqmB5xSblsZc7bLMEhE28yHa2.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/rqbCbjB19amtOtFQbb3K2lgm2zv.jpg",
         "description": "Eren Yeager e a Tropa de Exploração lutam desesperadamente pela sobrevivência humana contra gigantes devoradores de homens.",
         "genres": [
           "Anime",
@@ -1626,7 +1626,7 @@
             "number": 1,
             "title": "Para Você, Daqui a 2.000 Anos",
             "description": "A Muralha Maria é rompida pelo Titã Colossal e o caos engole a cidade de Shiganshina.",
-            "image": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg"
+            "image": "https://image.tmdb.org/t/p/w500/8aMqmB5xSblsZc7bLMEhE28yHa2.jpg"
           }
         ],
         "overview": "Several hundred years ago, humans were nearly exterminated by titans. Titans are typically several stories tall, seem to have no intelligence, devour human beings and, worst of all, seem to do it for the pleasure rather than as a food source. A small percentage of humanity survived by walling themselves in a city protected by extremely high walls, even taller than the biggest of titans.\n\n\r\nFlash forward to the present and the city has not seen a titan in over 100 years. Teenage boy Eren and his foster sister Mikasa witness something horrific as the city walls are destroyed by a colossal titan that appears out of thin air. As the smaller titans flood the city, the two kids watch in horror as their mother is eaten alive. Eren vows that he will murder every single titan and take revenge for all of mankind.\n\n\r\n(Source: MangaHelpers)",
@@ -1649,7 +1649,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592866
     },
     {
       "position": 9,
@@ -1715,7 +1715,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592866
     },
     {
       "position": 10,
@@ -1780,7 +1780,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792905456529
+      "updatedAt": 1792926592866
     }
   ],
   "totalCandidatesEvaluated": {

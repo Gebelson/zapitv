@@ -161,7 +161,7 @@ const RankedCard = memo<{
             color: '#ffffff',
             fontSize: isDoubleDigit ? 'clamp(4.2rem, 48cqw, 9.4rem)' : 'clamp(5.0rem, 58cqw, 11rem)',
             filter: isHovered
-              ? 'drop-shadow(0 10px 24px rgba(0, 125, 247, 0.45)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.9))'
+              ? 'drop-shadow(0 4px 16px rgba(0, 125, 247, 0.4)) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.85))'
               : 'drop-shadow(0 4px 14px rgba(0, 0, 0, 0.85))',
             letterSpacing: isDoubleDigit ? '-0.16em' : '-0.04em',
             transition: 'all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)',
@@ -174,23 +174,64 @@ const RankedCard = memo<{
 
       {/* 
         ========================================================================
-        BANNER / PÔSTER DA OBRA
+        WRAPPER DO BANNER / PÔSTER DA OBRA
         - Alinhado à direita (ml-auto) para expor a porção visível do número à esquerda
         - Proporção rígida vertical 2:3 (aspect-[2/3]), sem esticar ou achatar
-        - z-10 sobrepondo o número monumental
-        - Efeito hover cinematográfico com brilho e borda azul ZapiTV
+        - z-10 sobrepondo o número monumental, eleva para z-20 no hover
+        - Controla a escala no hover/foco de forma unificada
         ========================================================================
       */}
       <div
-        className={`ml-auto relative z-10 w-[70%] aspect-[2/3] rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 ${hoverOriginClass} ${
-          isDarkMode ? 'bg-slate-900 border border-white/10' : 'bg-slate-200 border border-black/10'
-        } ${
-          isHovered
-            ? 'scale-[1.03] border-[#007df7]/80 shadow-[0_15px_35px_rgba(0,125,247,0.35)] z-20'
-            : 'border-white/10 shadow-black/80'
-        } group-focus-visible/ranked:scale-[1.03] group-focus-visible/ranked:border-[#007df7] group-focus-visible/ranked:ring-2 group-focus-visible/ranked:ring-[#007df7]/50`}
+        className={`ml-auto relative w-[70%] aspect-[2/3] transition-transform duration-300 ${hoverOriginClass} ${
+          isHovered ? 'scale-[1.03] z-20' : 'z-10'
+        } group-focus-visible/ranked:scale-[1.03]`}
       >
-        {/* Imagem de Capa */}
+        {/* 
+          ========================================================================
+          CAMADA INDEPENDENTE DE GLOW / SOMBRA EXTERNA
+          - Renderizada independentemente atrás da capa (z-0)
+          - Dissipação suave, concêntrica e homogênea no hover, sem deslocamento vertical
+            assimétrico que crie uma massa retangular artificial abaixo da capa
+          - Sombra cinematográfica profunda em repouso (shadow-2xl shadow-black/80)
+          ========================================================================
+        */}
+        <div
+          className={`absolute inset-0 rounded-xl sm:rounded-2xl pointer-events-none transition-all duration-300 ${
+            isHovered
+              ? 'shadow-[0_0_24px_rgba(0,125,247,0.4),0_4px_16px_rgba(0,125,247,0.25)]'
+              : 'shadow-2xl shadow-black/80'
+          }`}
+          aria-hidden="true"
+        />
+
+        {/* 
+          ========================================================================
+          CAMADA DA CAPA (RECORTE RIGOROSO E ISOLAMENTO)
+          - Recorta rigorosamente a imagem, gradientes, overlays e conteúdos internos
+            conforme o border-radius (rounded-xl sm:rounded-2xl)
+          - Contenção total via WebkitMaskImage, transform translateZ(0), contain paint e isolation isolate:
+            impede que qualquer pixel de imagem com scale, gradiente ou background vaze para fora
+          - Borda azul ZapiTV com transição de cor suave no hover
+          ========================================================================
+        */}
+        <div
+          className={`relative z-10 w-full h-full rounded-xl sm:rounded-2xl overflow-hidden border transition-colors duration-300 ${
+            isDarkMode ? 'bg-slate-900' : 'bg-slate-200'
+          } ${
+            isHovered
+              ? 'border-[#007df7]/80'
+              : isDarkMode
+                ? 'border-white/10'
+                : 'border-black/10'
+          } group-focus-visible/ranked:border-[#007df7] group-focus-visible/ranked:ring-2 group-focus-visible/ranked:ring-[#007df7]/50`}
+          style={{
+            transform: 'translateZ(0)',
+            WebkitMaskImage: '-webkit-radial-gradient(white, black)',
+            isolation: 'isolate',
+            contain: 'paint'
+          }}
+        >
+          {/* Imagem de Capa */}
         {!hasImageError && imgSrc ? (
           <img
             src={imgSrc}
@@ -307,6 +348,7 @@ const RankedCard = memo<{
         </div>
       </div>
     </div>
+  </div>
   );
 });
 
