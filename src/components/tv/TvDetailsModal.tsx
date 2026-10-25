@@ -9,6 +9,7 @@ import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { uiSoundService } from '../../core/audio/uiSoundService';
+import { useExpandableSynopsis } from '../common/useExpandableSynopsis';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvDetailsModalProps {
@@ -324,15 +325,71 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
     onClose();
   }, [onClose]);
 
+  const synopsisText = item.description || item.overview || 'Sinopse completa disponível no catálogo do ZapiTV.';
+  const {
+    isExpanded: isSynopsisExpanded,
+    canExpand: canExpandSynopsis,
+    toggleSynopsis,
+    textRef: synopsisTextRef,
+    measureRef: synopsisMeasureRef
+  } = useExpandableSynopsis({
+    text: synopsisText,
+    contentId: item.id,
+    maxLines: 3
+  });
+
+  const handleToggleSynopsis = useCallback(() => {
+    toggleSynopsis();
+    setTimeout(() => {
+      setFocus('tv-details-synopsis-toggle');
+    }, 16);
+  }, [toggleSynopsis]);
+
+  const { ref: synopsisToggleRef, focused: isSynopsisToggleFocused } = useTvFocusable({
+    focusKey: 'tv-details-synopsis-toggle',
+    focusable: canExpandSynopsis,
+    enterSound: 'toggle',
+    onEnterPress: handleToggleSynopsis,
+    onArrowPress: direction => {
+      if (direction === 'down') {
+        if (!catalogEligibilityService.isCatalogVisibleNow(item)) {
+          setFocus('tv-details-list');
+        } else {
+          setFocus('tv-details-play');
+        }
+        return false;
+      }
+      if (direction === 'up') {
+        setFocus('tv-details-back');
+        return false;
+      }
+      return true;
+    }
+  });
+
   // Botões de Ação
   const { ref: backRef, focused: isBackFocused } = useTvFocusable({
     focusKey: 'tv-details-back',
-    onEnterPress: handleClose
+    onEnterPress: handleClose,
+    onArrowPress: direction => {
+      if (direction === 'down' && canExpandSynopsis) {
+        setFocus('tv-details-synopsis-toggle');
+        return false;
+      }
+      return true;
+    }
   });
 
   const { ref: playRef, focused: isPlayFocused } = useTvFocusable({
     focusKey: 'tv-details-play',
-    onArrowPress: direction => { if (direction === 'down') { focusBelowActions(); return false; } return true; },
+    onArrowPress: direction => {
+      if (direction === 'down') { focusBelowActions(); return false; }
+      if (direction === 'up' && canExpandSynopsis) {
+        setFocus('tv-details-synopsis-toggle');
+        return false;
+      }
+      return true;
+    },
     onEnterPress: () => {
       uiSoundService.play('watch');
       onPlay(item, isEpisodic ? currentSeason : undefined, isEpisodic ? 1 : undefined);
@@ -345,7 +402,14 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
       uiSoundService.play(isInList ? 'listRemove' : 'listAdd');
       onToggleList(item.id);
     },
-    onArrowPress: direction => { if (direction === 'down') { focusBelowActions(); return false; } return true; }
+    onArrowPress: direction => {
+      if (direction === 'down') { focusBelowActions(); return false; }
+      if (direction === 'up' && canExpandSynopsis) {
+        setFocus('tv-details-synopsis-toggle');
+        return false;
+      }
+      return true;
+    }
   });
 
   const { ref: favRef, focused: isFavFocused } = useTvFocusable({
@@ -354,7 +418,14 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
       uiSoundService.play('toggle');
       onToggleFavorite(item.id);
     },
-    onArrowPress: direction => { if (direction === 'down') { focusBelowActions(); return false; } return true; }
+    onArrowPress: direction => {
+      if (direction === 'down') { focusBelowActions(); return false; }
+      if (direction === 'up' && canExpandSynopsis) {
+        setFocus('tv-details-synopsis-toggle');
+        return false;
+      }
+      return true;
+    }
   });
 
   useEffect(() => {
@@ -581,9 +652,45 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
             </h1>
 
             {/* Sinopse */}
-            <p className="text-xs sm:text-sm md:text-base text-gray-300/90 leading-relaxed line-clamp-3 mb-6 max-w-xl">
-              {item.description || item.overview || 'Sinopse completa disponível no catálogo do ZapiTV.'}
-            </p>
+            <div className="relative mb-6 max-w-xl">
+              <div className={isSynopsisExpanded ? "max-h-[160px] overflow-y-auto no-scrollbar pr-2 transition-all duration-300" : ""}>
+                <p 
+                  ref={synopsisTextRef}
+                  className={`text-xs sm:text-sm md:text-base text-gray-300/90 leading-relaxed ${
+                    isSynopsisExpanded ? 'line-clamp-none' : 'line-clamp-3'
+                  }`}
+                >
+                  {synopsisText}
+                </p>
+              </div>
+
+              {/* Elemento de medição oculto com line-clamp-3 */}
+              <p
+                ref={synopsisMeasureRef}
+                aria-hidden="true"
+                className="absolute top-0 left-0 w-full pointer-events-none opacity-0 select-none -z-50 text-xs sm:text-sm md:text-base leading-relaxed line-clamp-3"
+              >
+                {synopsisText}
+              </p>
+
+              {canExpandSynopsis && (
+                <button
+                  ref={synopsisToggleRef}
+                  type="button"
+                  data-focus-key="tv-details-synopsis-toggle"
+                  data-tv-focused={isSynopsisToggleFocused ? "true" : undefined}
+                  onClick={handleToggleSynopsis}
+                  aria-expanded={isSynopsisExpanded}
+                  className={`mt-2 py-1 px-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 outline-none select-none flex items-center gap-1.5 ${
+                    isSynopsisToggleFocused
+                      ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-400 scale-105 shadow-[0_0_16px_rgba(0,229,255,0.4)] ring-1 ring-cyan-300'
+                      : 'text-cyan-400 hover:text-cyan-300 border border-transparent'
+                  }`}
+                >
+                  {isSynopsisExpanded ? 'Ver menos' : 'Ver mais'}
+                </button>
+              )}
+            </div>
 
             {/* Linha de Ações */}
             <div className="flex items-center gap-4">

@@ -29,6 +29,8 @@ import { tvNavigationManager } from '../src/core/tv/tvNavigationManager';
 import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { mobileFullscreenService } from '../src/core/mobile/mobileFullscreenService';
 import { getWatchRoute, getContentRoute, parseWatchRoute } from '../src/core/routes/navigationRoutes';
+import { useIsMobileViewport } from '../src/core/mobile/mobileViewportService';
+import { useExpandableSynopsis } from '../src/components/common/useExpandableSynopsis';
 
 const DetailModalTvButton: React.FC<{
   focusKey: string;
@@ -208,6 +210,19 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showWatchPartyModal, setShowWatchPartyModal] = useState(false);
   const isScheduledUnavailable = !catalogEligibilityService.isCatalogVisibleNow(item);
+  const isMobile = useIsMobileViewport(768);
+  const synopsisText = item.description || "Assista agora no ZapiTV com streaming em alta definição.";
+  const {
+    isExpanded: isSynopsisExpanded,
+    canExpand: canExpandSynopsis,
+    toggleSynopsis,
+    textRef: synopsisTextRef,
+    measureRef: synopsisMeasureRef
+  } = useExpandableSynopsis({
+    text: synopsisText,
+    contentId: item.id,
+    maxLines: isMobile ? 3 : 4
+  });
   const [, setModalEligibilityVersion] = useState(0);
   useEffect(() => {
     return catalogEligibilityService.subscribe(() => {
@@ -1385,9 +1400,33 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                     </span>
                   )}
                 </div>
-                <p className="text-gray-300 text-xs sm:text-sm md:text-base leading-relaxed mb-4 sm:mb-6 font-medium">
-                  {item.description || "Assista agora no ZapiTV com streaming em alta definição."}
-                </p>
+                <div className="relative mb-4 sm:mb-6">
+                  <p 
+                    ref={synopsisTextRef}
+                    className={`text-gray-300 text-xs sm:text-sm md:text-base leading-relaxed font-medium transition-all duration-200 ${
+                      isSynopsisExpanded ? 'line-clamp-none' : 'line-clamp-3 md:line-clamp-4'
+                    }`}
+                  >
+                    {synopsisText}
+                  </p>
+                  <p
+                    ref={synopsisMeasureRef}
+                    aria-hidden="true"
+                    className="absolute top-0 left-0 w-full pointer-events-none opacity-0 select-none -z-50 text-gray-300 text-xs sm:text-sm md:text-base leading-relaxed font-medium line-clamp-3 md:line-clamp-4"
+                  >
+                    {synopsisText}
+                  </p>
+                  {canExpandSynopsis && (
+                    <button
+                      type="button"
+                      onClick={toggleSynopsis}
+                      aria-expanded={isSynopsisExpanded}
+                      className="mt-2 text-xs sm:text-sm font-semibold text-[#007df7] hover:text-[#389aff] focus:text-[#389aff] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#007df7]/60 rounded transition-colors duration-150 inline-flex items-center cursor-pointer select-none"
+                    >
+                      {isSynopsisExpanded ? 'Ver menos' : 'Ver mais'}
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="text-xs md:text-sm space-y-3 sm:space-y-4">
                 {item.director && (<div><span className="text-gray-500 font-bold">Direção: </span><span className="text-gray-300">{item.director}</span></div>)}
