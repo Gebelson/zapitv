@@ -552,7 +552,17 @@ class ProviderRegistryService {
 
     const targetTitle = (id.title || catalogItem?.title || openItem?.title || '').trim();
     const originalTitle = (id.originalTitle || catalogItem?.originalTitle || openItem?.originalTitle || '').trim();
-    const alternateTitles: string[] = (id as any).alternateTitles || [];
+    const alternateTitles: string[] = (id as any).alternateTitles ? [...(id as any).alternateTitles] : [];
+    const candidateIds = [rawTargetId, imdbStr, tmdbNum ? `tmdb-${tmdbNum}` : '', tmdbNum].filter(Boolean);
+    for (const cid of candidateIds) {
+      if (!alternateTitles.includes(cid)) alternateTitles.push(cid);
+    }
+    if (id.year && !alternateTitles.includes(String(id.year))) {
+      alternateTitles.push(String(id.year));
+    }
+    if (id.year && targetTitle && !alternateTitles.includes(`${targetTitle} ${id.year}`)) {
+      alternateTitles.push(`${targetTitle} ${id.year}`);
+    }
 
     // 0. Extração imediata de fontes locais (0ms) sem aguardar requisições de rede
     if (openItem) {

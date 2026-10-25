@@ -5,7 +5,7 @@
   "month": 10,
   "isCurrentMonth": true,
   "statusLabel": "Outubro de 2026 · Parcial",
-  "lastUpdatedAt": 1792943534501,
+  "lastUpdatedAt": 1792945461740,
   "nextScheduledUpdate": 1793005200000,
   "nextScheduledUpdateFormatted": "Segunda-feira, 26/10/2026 às 06:00 (BRT)",
   "movies": [
@@ -57,7 +57,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534500
+      "updatedAt": 1792945461739
     },
     {
       "position": 2,
@@ -107,7 +107,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534500
+      "updatedAt": 1792945461739
     },
     {
       "position": 3,
@@ -156,7 +156,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534500
+      "updatedAt": 1792945461739
     },
     {
       "position": 4,
@@ -205,61 +205,10 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534500
+      "updatedAt": 1792945461739
     },
     {
       "position": 5,
-      "canonicalId": "movie:imdb:tt13000574",
-      "mediaType": "movie",
-      "title": "Resident Evil",
-      "originalTitle": "Resident Evil",
-      "year": 2026,
-      "poster": "https://image.tmdb.org/t/p/w500/gQ76UL64RQe3oHwiwHwODTC23g4.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/3icyRAqgakNcQn6aDVz9libFmBA.jpg",
-      "rating": 7.6,
-      "item": {
-        "id": "movie-resident-evil-2026",
-        "title": "Resident Evil",
-        "originalTitle": "Resident Evil",
-        "type": "FILME",
-        "rating": 7.6,
-        "year": 2026,
-        "image": "https://image.tmdb.org/t/p/w500/gQ76UL64RQe3oHwiwHwODTC23g4.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/3icyRAqgakNcQn6aDVz9libFmBA.jpg",
-        "description": "Nova adaptação cinematográfica da icônica franquia de terror e sobrevivência da Capcom com fidelidade máxima à atmosfera sombria.",
-        "genres": [
-          "Ação",
-          "Terror",
-          "Ficção Científica"
-        ],
-        "tmdbId": "1423191",
-        "imdbId": "tt13000574",
-        "isFeatured": true,
-        "availabilityStatus": "verified",
-        "audioStatus": "pt-br-dubbed",
-        "canonicalId": "movie:imdb:tt13000574",
-        "imdbRank": 7,
-        "displayRank": 5,
-        "heroTags": [
-          {
-            "id": "rank-5",
-            "text": "#5 Em Destaque (Outubro de 2026)",
-            "color": "#007df7",
-            "style": "solid"
-          }
-        ]
-      },
-      "calculatedScore": 188,
-      "source": "imdb-moviemeter",
-      "originalPosition": 7,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
-      "isPartial": true,
-      "validationStatus": "verified",
-      "updatedAt": 1792943534500
-    },
-    {
-      "position": 6,
       "canonicalId": "movie:imdb:tt0100935",
       "mediaType": "movie",
       "title": "Coração Selvagem",
@@ -289,11 +238,11 @@
         "audioStatus": "pt-br-dubbed",
         "canonicalId": "movie:imdb:tt0100935",
         "imdbRank": 9,
-        "displayRank": 6,
+        "displayRank": 5,
         "heroTags": [
           {
-            "id": "rank-6",
-            "text": "#6 Em Destaque (Outubro de 2026)",
+            "id": "rank-5",
+            "text": "#5 Em Destaque (Outubro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
@@ -306,10 +255,10 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534500
+      "updatedAt": 1792945461739
     },
     {
-      "position": 7,
+      "position": 6,
       "canonicalId": "movie:imdb:tt11464826",
       "mediaType": "movie",
       "title": "O Outro Lado das Redes",
@@ -338,11 +287,11 @@
         "audioStatus": "pt-br-dubbed",
         "canonicalId": "movie:imdb:tt11464826",
         "imdbRank": 10,
-        "displayRank": 7,
+        "displayRank": 6,
         "heroTags": [
           {
-            "id": "rank-7",
-            "text": "#7 Em Destaque (Outubro de 2026)",
+            "id": "rank-6",
+            "text": "#6 Em Destaque (Outubro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
@@ -355,10 +304,10 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534500
+      "updatedAt": 1792945461739
     },
     {
-      "position": 8,
+      "position": 7,
       "canonicalId": "movie:imdb:tt1392796",
       "mediaType": "movie",
       "title": "Unabomber",
@@ -388,11 +337,11 @@
         "audioStatus": "pt-br-dubbed",
         "canonicalId": "movie:imdb:tt1392796",
         "imdbRank": 11,
-        "displayRank": 8,
+        "displayRank": 7,
         "heroTags": [
           {
-            "id": "rank-8",
-            "text": "#8 Em Destaque (Outubro de 2026)",
+            "id": "rank-7",
+            "text": "#7 Em Destaque (Outubro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
@@ -405,10 +354,10 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534500
+      "updatedAt": 1792945461739
     },
     {
-      "position": 9,
+      "position": 8,
       "canonicalId": "movie:imdb:tt11576182",
       "mediaType": "movie",
       "title": "Dia D",
@@ -438,11 +387,11 @@
         "audioStatus": "pt-br-dubbed",
         "canonicalId": "movie:imdb:tt11576182",
         "imdbRank": 12,
-        "displayRank": 9,
+        "displayRank": 8,
         "heroTags": [
           {
-            "id": "rank-9",
-            "text": "#9 Em Destaque (Outubro de 2026)",
+            "id": "rank-8",
+            "text": "#8 Em Destaque (Outubro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
@@ -455,10 +404,10 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534500
+      "updatedAt": 1792945461739
     },
     {
-      "position": 10,
+      "position": 9,
       "canonicalId": "movie:imdb:tt0074991",
       "mediaType": "movie",
       "title": "Obsessão",
@@ -488,11 +437,11 @@
         "audioStatus": "pt-br-dubbed",
         "canonicalId": "movie:imdb:tt0074991",
         "imdbRank": 14,
-        "displayRank": 10,
+        "displayRank": 9,
         "heroTags": [
           {
-            "id": "rank-10",
-            "text": "#10 Em Destaque (Outubro de 2026)",
+            "id": "rank-9",
+            "text": "#9 Em Destaque (Outubro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
@@ -505,7 +454,62 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461739
+    },
+    {
+      "position": 10,
+      "canonicalId": "movie:imdb:tt11897478",
+      "mediaType": "movie",
+      "title": "Prisioneiro",
+      "originalTitle": "Prisoner",
+      "year": 2026,
+      "poster": "https://images.metahub.space/poster/medium/tt11897478/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt11897478/img",
+      "rating": 7.3,
+      "item": {
+        "id": "movie-prisioneiro-2026",
+        "title": "Prisioneiro",
+        "originalTitle": "Prisoner",
+        "type": "FILME",
+        "rating": 7.3,
+        "year": 2026,
+        "image": "https://images.metahub.space/poster/medium/tt11897478/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt11897478/img",
+        "description": "Um homem aprisionado injustamente em um complexo de segurança máxima descobre uma conspiração de alto nível.",
+        "genres": [
+          "Ação",
+          "Suspense"
+        ],
+        "imdbId": "tt11897478",
+        "isFeatured": true,
+        "availabilityStatus": "verified",
+        "audioStatus": "pt-br-dubbed",
+        "canonicalId": "movie:imdb:tt11897478",
+        "director": "Thomas M. Wright",
+        "cast": [
+          "Joel Edgerton",
+          "Sean Harris",
+          "Jada Alberts"
+        ],
+        "imdbRank": 15,
+        "displayRank": 10,
+        "heroTags": [
+          {
+            "id": "rank-10",
+            "text": "#10 Em Destaque (Outubro de 2026)",
+            "color": "#007df7",
+            "style": "solid"
+          }
+        ]
+      },
+      "calculatedScore": 86,
+      "source": "imdb-moviemeter",
+      "originalPosition": 15,
+      "monthKey": "2026-10",
+      "monthLabel": "Outubro de 2026",
+      "isPartial": true,
+      "validationStatus": "verified",
+      "updatedAt": 1792945461739
     }
   ],
   "series": [
@@ -567,7 +571,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461739
     },
     {
       "position": 2,
@@ -634,7 +638,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 3,
@@ -701,7 +705,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 4,
@@ -761,7 +765,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 5,
@@ -821,7 +825,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 6,
@@ -882,7 +886,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 7,
@@ -942,7 +946,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 8,
@@ -1003,7 +1007,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 9,
@@ -1063,7 +1067,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 10,
@@ -1123,7 +1127,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     }
   ],
   "animes": [
@@ -1190,7 +1194,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 2,
@@ -1256,7 +1260,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 3,
@@ -1322,7 +1326,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 4,
@@ -1387,7 +1391,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 5,
@@ -1452,7 +1456,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 6,
@@ -1517,7 +1521,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 7,
@@ -1583,7 +1587,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 8,
@@ -1649,7 +1653,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 9,
@@ -1715,7 +1719,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     },
     {
       "position": 10,
@@ -1780,7 +1784,7 @@
       "monthLabel": "Outubro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1792943534501
+      "updatedAt": 1792945461740
     }
   ],
   "totalCandidatesEvaluated": {
@@ -1871,26 +1875,6 @@
         "score": 190
       },
       {
-        "imdbId": "tt13000574",
-        "title": "Resident Evil",
-        "imdbTitle": "Resident Evil",
-        "canonicalTitle": "Resident Evil",
-        "year": 2026,
-        "mediaType": "movie",
-        "imdbRank": 7,
-        "displayRank": 5,
-        "rankPosition": 7,
-        "finalPosition": 5,
-        "status": "APPROVED",
-        "isIncluded": true,
-        "canonicalId": "movie-resident-evil-2026",
-        "availabilityStatus": "verified",
-        "hasAudioPtBr": true,
-        "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1,
-        "score": 188
-      },
-      {
         "imdbId": "tt0100935",
         "title": "Coração Selvagem",
         "imdbTitle": "Coração Selvagem",
@@ -1898,9 +1882,9 @@
         "year": 1990,
         "mediaType": "movie",
         "imdbRank": 9,
-        "displayRank": 6,
+        "displayRank": 5,
         "rankPosition": 9,
-        "finalPosition": 6,
+        "finalPosition": 5,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-wild-at-heart-1990",
@@ -1918,9 +1902,9 @@
         "year": 2020,
         "mediaType": "movie",
         "imdbRank": 10,
-        "displayRank": 7,
+        "displayRank": 6,
         "rankPosition": 10,
-        "finalPosition": 7,
+        "finalPosition": 6,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-social-dilemma-2020",
@@ -1938,9 +1922,9 @@
         "year": 2026,
         "mediaType": "movie",
         "imdbRank": 11,
-        "displayRank": 8,
+        "displayRank": 7,
         "rankPosition": 11,
-        "finalPosition": 8,
+        "finalPosition": 7,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-unabomber-2026",
@@ -1958,9 +1942,9 @@
         "year": 2026,
         "mediaType": "movie",
         "imdbRank": 12,
-        "displayRank": 9,
+        "displayRank": 8,
         "rankPosition": 12,
-        "finalPosition": 9,
+        "finalPosition": 8,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-dia-d-2026",
@@ -1978,9 +1962,9 @@
         "year": 1976,
         "mediaType": "movie",
         "imdbRank": 14,
-        "displayRank": 10,
+        "displayRank": 9,
         "rankPosition": 14,
-        "finalPosition": 10,
+        "finalPosition": 9,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-obsession-1976",
@@ -1989,6 +1973,26 @@
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
         "score": 174
+      },
+      {
+        "imdbId": "tt11897478",
+        "title": "Prisioneiro",
+        "imdbTitle": "Prisioneiro",
+        "canonicalTitle": "Prisioneiro",
+        "year": 2026,
+        "mediaType": "movie",
+        "imdbRank": 15,
+        "displayRank": 10,
+        "rankPosition": 15,
+        "finalPosition": 10,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "movie-prisioneiro-2026",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 86
       }
     ],
     "rejectedMovies": [
@@ -2019,6 +2023,19 @@
         "score": 194
       },
       {
+        "imdbId": "tt13000574",
+        "title": "Resident Evil",
+        "canonicalTitle": "Resident Evil",
+        "year": 2026,
+        "mediaType": "movie",
+        "rankPosition": 7,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "movie-resident-evil-2026",
+        "rejectionReason": "Indisponível temporariamente no catálogo. Primeira reavaliação programada para 20/11/2026 às 00:00 (Horário de Brasília), sujeita à confirmação de disponibilidade digital oficial no Brasil e fonte HD autorizada/reproduzível.",
+        "score": 188
+      },
+      {
         "imdbId": "tt20221436",
         "title": "Homem-Aranha: Um Novo Dia",
         "canonicalTitle": "Homem-Aranha: Um Novo Dia",
@@ -2041,7 +2058,7 @@
         "status": "REJECTED",
         "isIncluded": false,
         "canonicalId": "movie-a-odisseia-2026",
-        "rejectionReason": "Conteúdo temporariamente oculto no catálogo público até 20/11/2026 às 00h00 BRT",
+        "rejectionReason": "Indisponível temporariamente no catálogo. Retorno programado para 20/11/2026 às 00:00 (Horário de Brasília).",
         "score": 176
       }
     ],

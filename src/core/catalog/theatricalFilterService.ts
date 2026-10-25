@@ -73,6 +73,9 @@ class TheatricalFilterService {
       this.cache.delete('movie-a-odisseia-2026');
       this.cache.delete('tt33764258');
       this.cache.delete('1368337');
+      this.cache.delete('movie-resident-evil-2026');
+      this.cache.delete('tt13000574');
+      this.cache.delete('1423191');
     }
     this.saveToStorage();
   }

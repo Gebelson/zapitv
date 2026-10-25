@@ -270,10 +270,10 @@ export class SourceConfidenceEngine {
       }
     }
 
-    // Caso específico Resident Evil: animação 3D substituindo filme live-action
+    // Caso específico Resident Evil: animação 3D substituindo filme live-action ou desvio de obra
     if (/resident evil/i.test(identity.title) && !/vendetta|damnation|degeneration|infinite darkness|death island/i.test(identity.title)) {
-      if (/vendetta|damnation|degeneration|infinite darkness|death island/i.test(combined)) {
-        reasons.push('Animação 3D de Resident Evil não pode substituir o filme live-action solicitado');
+      if (/vendetta|damnation|degeneration|infinite darkness|death island|kadokawa|marza|anime|animado|animation|animated/i.test(combined)) {
+        reasons.push('Animação 3D de Resident Evil (Kadokawa/Vendetta/etc.) não pode substituir o filme live-action solicitado');
         const evalResult: StreamConfidenceEvaluation = {
           stream,
           confidence: 'REJECTED',
@@ -283,6 +283,21 @@ export class SourceConfidenceEngine {
         };
         this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
         return evalResult;
+      }
+      const isTarget2026 = identity.year === 2026 || identity.imdbId === 'tt13000574' || identity.tmdbId === '1423191' || /2026/.test(identity.title);
+      if (isTarget2026) {
+        if (/welcome to raccoon city|raccoon city|apocalypse|extinction|afterlife|retribution|final chapter|netflix/i.test(combined)) {
+          reasons.push('Adaptação anterior de Resident Evil não corresponde à produção live-action de 2026');
+          const evalResult: StreamConfidenceEvaluation = {
+            stream,
+            confidence: 'REJECTED',
+            isMatch: false,
+            reasons,
+            canonicalTitle: identity.title
+          };
+          this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
+          return evalResult;
+        }
       }
     }
 

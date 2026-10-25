@@ -5,9 +5,9 @@
   "monthLabel": "Outubro de 2026",
   "monthlyStatusLabel": "Outubro de 2026 · Parcial",
   "isPartialMonth": true,
-  "referenceDate": "2026-10-24",
-  "lastUpdatedAt": 1792881519455,
-  "lastCheckedAt": 1792881519455,
+  "referenceDate": "2026-10-25",
+  "lastUpdatedAt": 1792945241471,
+  "lastCheckedAt": 1792945241471,
   "nextScheduledUpdate": 1793005200000,
   "nextScheduledUpdateFormatted": "Segunda-feira, 26/10/2026 às 06:00 (BRT)",
   "sourceReference": "IMDb MOVIEmeter & TVmeter (Mensal Consolidado) + AniList",
@@ -137,38 +137,6 @@
       ]
     },
     {
-      "id": "movie-resident-evil-2026",
-      "title": "Resident Evil",
-      "originalTitle": "Resident Evil",
-      "type": "FILME",
-      "rating": 7.6,
-      "year": 2026,
-      "image": "https://image.tmdb.org/t/p/w500/gQ76UL64RQe3oHwiwHwODTC23g4.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/3icyRAqgakNcQn6aDVz9libFmBA.jpg",
-      "description": "Nova adaptação cinematográfica da icônica franquia de terror e sobrevivência da Capcom com fidelidade máxima à atmosfera sombria.",
-      "genres": [
-        "Ação",
-        "Terror",
-        "Ficção Científica"
-      ],
-      "tmdbId": "1423191",
-      "imdbId": "tt13000574",
-      "isFeatured": true,
-      "availabilityStatus": "verified",
-      "audioStatus": "pt-br-dubbed",
-      "canonicalId": "movie:imdb:tt13000574",
-      "imdbRank": 7,
-      "displayRank": 5,
-      "heroTags": [
-        {
-          "id": "rank-5",
-          "text": "#5 Em Destaque (Outubro de 2026)",
-          "color": "#007df7",
-          "style": "solid"
-        }
-      ]
-    },
-    {
       "id": "movie-wild-at-heart-1990",
       "title": "Coração Selvagem",
       "originalTitle": "Wild at Heart",
@@ -189,11 +157,11 @@
       "audioStatus": "pt-br-dubbed",
       "canonicalId": "movie:imdb:tt0100935",
       "imdbRank": 9,
-      "displayRank": 6,
+      "displayRank": 5,
       "heroTags": [
         {
-          "id": "rank-6",
-          "text": "#6 Em Destaque (Outubro de 2026)",
+          "id": "rank-5",
+          "text": "#5 Em Destaque (Outubro de 2026)",
           "color": "#007df7",
           "style": "solid"
         }
@@ -219,11 +187,11 @@
       "audioStatus": "pt-br-dubbed",
       "canonicalId": "movie:imdb:tt11464826",
       "imdbRank": 10,
-      "displayRank": 7,
+      "displayRank": 6,
       "heroTags": [
         {
-          "id": "rank-7",
-          "text": "#7 Em Destaque (Outubro de 2026)",
+          "id": "rank-6",
+          "text": "#6 Em Destaque (Outubro de 2026)",
           "color": "#007df7",
           "style": "solid"
         }
@@ -250,11 +218,11 @@
       "audioStatus": "pt-br-dubbed",
       "canonicalId": "movie:imdb:tt1392796",
       "imdbRank": 11,
-      "displayRank": 8,
+      "displayRank": 7,
       "heroTags": [
         {
-          "id": "rank-8",
-          "text": "#8 Em Destaque (Outubro de 2026)",
+          "id": "rank-7",
+          "text": "#7 Em Destaque (Outubro de 2026)",
           "color": "#007df7",
           "style": "solid"
         }
@@ -281,11 +249,11 @@
       "audioStatus": "pt-br-dubbed",
       "canonicalId": "movie:imdb:tt11576182",
       "imdbRank": 12,
-      "displayRank": 9,
+      "displayRank": 8,
       "heroTags": [
         {
-          "id": "rank-9",
-          "text": "#9 Em Destaque (Outubro de 2026)",
+          "id": "rank-8",
+          "text": "#8 Em Destaque (Outubro de 2026)",
           "color": "#007df7",
           "style": "solid"
         }
@@ -312,6 +280,42 @@
       "audioStatus": "pt-br-dubbed",
       "canonicalId": "movie:imdb:tt0074991",
       "imdbRank": 14,
+      "displayRank": 9,
+      "heroTags": [
+        {
+          "id": "rank-9",
+          "text": "#9 Em Destaque (Outubro de 2026)",
+          "color": "#007df7",
+          "style": "solid"
+        }
+      ]
+    },
+    {
+      "id": "movie-prisioneiro-2026",
+      "title": "Prisioneiro",
+      "originalTitle": "Prisoner",
+      "type": "FILME",
+      "rating": 7.3,
+      "year": 2026,
+      "image": "https://images.metahub.space/poster/medium/tt11897478/img",
+      "backdrop": "https://images.metahub.space/background/medium/tt11897478/img",
+      "description": "Um homem aprisionado injustamente em um complexo de segurança máxima descobre uma conspiração de alto nível.",
+      "genres": [
+        "Ação",
+        "Suspense"
+      ],
+      "imdbId": "tt11897478",
+      "isFeatured": true,
+      "availabilityStatus": "verified",
+      "audioStatus": "pt-br-dubbed",
+      "canonicalId": "movie:imdb:tt11897478",
+      "director": "Thomas M. Wright",
+      "cast": [
+        "Joel Edgerton",
+        "Sean Harris",
+        "Jada Alberts"
+      ],
+      "imdbRank": 15,
       "displayRank": 10,
       "heroTags": [
         {
@@ -761,8 +765,8 @@
       "mediaFormat": "series",
       "rating": 8.7,
       "year": 2024,
-      "image": "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/gJL5iqPyZzgvI1Vb9k4PqB6fF6C.jpg",
+      "image": "https://image.tmdb.org/t/p/w500/eCD7WS9h4lCT8N4Xavc9u8R1IGk.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/xMNH87maNLt9n2bMDYeI6db5VFm.jpg",
       "description": "Em um mundo onde caçadores despertam habilidades sobrenaturais, Sung Jin-woo, o caçador mais fraco da humanidade, recebe uma chance única de subir de nível sem limites.",
       "genres": [
         "Anime",
@@ -783,7 +787,7 @@
           "number": 1,
           "title": "Estou Acostumado",
           "description": "Sung Jin-woo lidera um grupo de expedição rumo a uma dungeon dupla com consequências fatais.",
-          "image": "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg"
+          "image": "https://image.tmdb.org/t/p/w500/eCD7WS9h4lCT8N4Xavc9u8R1IGk.jpg"
         }
       ],
       "imdbId": "anilist-151807",
@@ -807,8 +811,8 @@
       "mediaFormat": "series",
       "rating": 8.6,
       "year": 2020,
-      "image": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/gmECX1Dv3y54wQ8o3t300gJ8uVp.jpg",
+      "image": "https://image.tmdb.org/t/p/w500/8R1mMSC1gX1cg5ed7ns49JOEqw3.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/qpin8cASXEVtwhzNsprHYFiOAGk.jpg",
       "description": "Yuji Itadori engole um dedo amaldiçoado de Ryomen Sukuna e ingressa na Escola de Feitiçaria de Tóquio para expurgar maldições ameaçadoras.",
       "genres": [
         "Anime",
@@ -829,7 +833,7 @@
           "number": 1,
           "title": "Ryomen Sukuna",
           "description": "Yuji Itadori quebra o selo de um talismã amaldiçoado para salvar seus colegas de escola.",
-          "image": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg"
+          "image": "https://image.tmdb.org/t/p/w500/8R1mMSC1gX1cg5ed7ns49JOEqw3.jpg"
         }
       ],
       "imdbId": "anilist-113415",
@@ -899,8 +903,8 @@
       "mediaFormat": "series",
       "rating": 8.5,
       "year": 2024,
-      "image": "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/1vKxVp97TqCjO1w9wE0K3G8kU9V.jpg",
+      "image": "https://image.tmdb.org/t/p/w500/vtQug1eOyeU2VXIpNoDF1lTlcH4.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/uNTrRKIOyKYISthoeizghtXPEOK.jpg",
       "description": "Momo Ayase e Okarun desafiam suas crenças em fantasmas e alienígenas, desencadeando confrontos hilários e insanos no Japão.",
       "genres": [
         "Anime",
@@ -921,7 +925,7 @@
           "number": 1,
           "title": "Isso é o Amor Começando?",
           "description": "Momo e Okarun apostam para ver quem encontra alienígenas ou espíritos primeiro.",
-          "image": "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg"
+          "image": "https://image.tmdb.org/t/p/w500/vtQug1eOyeU2VXIpNoDF1lTlcH4.jpg"
         }
       ],
       "imdbId": "anilist-171018",
@@ -945,8 +949,8 @@
       "mediaFormat": "series",
       "rating": 8.9,
       "year": 2022,
-      "image": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/9pkbtK1kLhR1wzZg27v8O9eU4hV.jpg",
+      "image": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx116674-p3zK4PUX2Aag.jpg",
+      "backdrop": "https://s4.anilist.co/file/anilistcdn/media/anime/banner/116674-l2YlIyJzvGSV.jpg",
       "description": "A guerra milenar entre os Shinigamis da Soul Society e o exército Quincy liderado por Yhwach chega ao seu clímax destrutivo.",
       "genres": [
         "Anime",
@@ -967,7 +971,7 @@
           "number": 1,
           "title": "Guerra de Sangue",
           "description": "A Soul Society é surpreendida por um ataque coordenado do Wandenreich.",
-          "image": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg"
+          "image": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx116674-p3zK4PUX2Aag.jpg"
         }
       ],
       "imdbId": "anilist-116674",
@@ -1037,8 +1041,8 @@
       "mediaFormat": "series",
       "rating": 8.5,
       "year": 2022,
-      "image": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/vI3a3n07Jq9g6iK2k69uP8wV7hX.jpg",
+      "image": "https://image.tmdb.org/t/p/w500/mIz0eKhzHuSPeRSePCyoCt9bKVp.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/5DUMPBSnHOZsbBv81GFXZXvDpo6.jpg",
       "description": "Denji renasce como um híbrido motosserra após se fundir com seu cachorro demônio Pochita e entra para a Segurança Pública.",
       "genres": [
         "Anime",
@@ -1059,7 +1063,7 @@
           "number": 1,
           "title": "Cachorro e Motosserra",
           "description": "Denji trabalha caçando demônios para pagar as dívidas deixadas por seu falecido pai.",
-          "image": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg"
+          "image": "https://image.tmdb.org/t/p/w500/mIz0eKhzHuSPeRSePCyoCt9bKVp.jpg"
         }
       ],
       "imdbId": "anilist-127230",
@@ -1083,8 +1087,8 @@
       "mediaFormat": "series",
       "rating": 9,
       "year": 2013,
-      "image": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg",
-      "backdrop": "https://image.tmdb.org/t/p/original/hP9cKk97kFh7g1w9w7h5g1kL2.jpg",
+      "image": "https://image.tmdb.org/t/p/w500/8aMqmB5xSblsZc7bLMEhE28yHa2.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/original/rqbCbjB19amtOtFQbb3K2lgm2zv.jpg",
       "description": "Eren Yeager e a Tropa de Exploração lutam desesperadamente pela sobrevivência humana contra gigantes devoradores de homens.",
       "genres": [
         "Anime",
@@ -1105,7 +1109,7 @@
           "number": 1,
           "title": "Para Você, Daqui a 2.000 Anos",
           "description": "A Muralha Maria é rompida pelo Titã Colossal e o caos engole a cidade de Shiganshina.",
-          "image": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg"
+          "image": "https://image.tmdb.org/t/p/w500/8aMqmB5xSblsZc7bLMEhE28yHa2.jpg"
         }
       ],
       "imdbId": "anilist-16498",
@@ -1220,7 +1224,7 @@
     "month": 10,
     "isCurrentMonth": true,
     "statusLabel": "Outubro de 2026 · Parcial",
-    "lastUpdatedAt": 1792881519455,
+    "lastUpdatedAt": 1792945241471,
     "nextScheduledUpdate": 1793005200000,
     "nextScheduledUpdateFormatted": "Segunda-feira, 26/10/2026 às 06:00 (BRT)",
     "movies": [
@@ -1272,7 +1276,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
         "position": 2,
@@ -1322,7 +1326,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
         "position": 3,
@@ -1371,7 +1375,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
         "position": 4,
@@ -1420,61 +1424,10 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
         "position": 5,
-        "canonicalId": "movie:imdb:tt13000574",
-        "mediaType": "movie",
-        "title": "Resident Evil",
-        "originalTitle": "Resident Evil",
-        "year": 2026,
-        "poster": "https://image.tmdb.org/t/p/w500/gQ76UL64RQe3oHwiwHwODTC23g4.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/3icyRAqgakNcQn6aDVz9libFmBA.jpg",
-        "rating": 7.6,
-        "item": {
-          "id": "movie-resident-evil-2026",
-          "title": "Resident Evil",
-          "originalTitle": "Resident Evil",
-          "type": "FILME",
-          "rating": 7.6,
-          "year": 2026,
-          "image": "https://image.tmdb.org/t/p/w500/gQ76UL64RQe3oHwiwHwODTC23g4.jpg",
-          "backdrop": "https://image.tmdb.org/t/p/original/3icyRAqgakNcQn6aDVz9libFmBA.jpg",
-          "description": "Nova adaptação cinematográfica da icônica franquia de terror e sobrevivência da Capcom com fidelidade máxima à atmosfera sombria.",
-          "genres": [
-            "Ação",
-            "Terror",
-            "Ficção Científica"
-          ],
-          "tmdbId": "1423191",
-          "imdbId": "tt13000574",
-          "isFeatured": true,
-          "availabilityStatus": "verified",
-          "audioStatus": "pt-br-dubbed",
-          "canonicalId": "movie:imdb:tt13000574",
-          "imdbRank": 7,
-          "displayRank": 5,
-          "heroTags": [
-            {
-              "id": "rank-5",
-              "text": "#5 Em Destaque (Outubro de 2026)",
-              "color": "#007df7",
-              "style": "solid"
-            }
-          ]
-        },
-        "calculatedScore": 188,
-        "source": "imdb-moviemeter",
-        "originalPosition": 7,
-        "monthKey": "2026-10",
-        "monthLabel": "Outubro de 2026",
-        "isPartial": true,
-        "validationStatus": "verified",
-        "updatedAt": 1792881519454
-      },
-      {
-        "position": 6,
         "canonicalId": "movie:imdb:tt0100935",
         "mediaType": "movie",
         "title": "Coração Selvagem",
@@ -1504,11 +1457,11 @@
           "audioStatus": "pt-br-dubbed",
           "canonicalId": "movie:imdb:tt0100935",
           "imdbRank": 9,
-          "displayRank": 6,
+          "displayRank": 5,
           "heroTags": [
             {
-              "id": "rank-6",
-              "text": "#6 Em Destaque (Outubro de 2026)",
+              "id": "rank-5",
+              "text": "#5 Em Destaque (Outubro de 2026)",
               "color": "#007df7",
               "style": "solid"
             }
@@ -1521,10 +1474,10 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
-        "position": 7,
+        "position": 6,
         "canonicalId": "movie:imdb:tt11464826",
         "mediaType": "movie",
         "title": "O Outro Lado das Redes",
@@ -1553,11 +1506,11 @@
           "audioStatus": "pt-br-dubbed",
           "canonicalId": "movie:imdb:tt11464826",
           "imdbRank": 10,
-          "displayRank": 7,
+          "displayRank": 6,
           "heroTags": [
             {
-              "id": "rank-7",
-              "text": "#7 Em Destaque (Outubro de 2026)",
+              "id": "rank-6",
+              "text": "#6 Em Destaque (Outubro de 2026)",
               "color": "#007df7",
               "style": "solid"
             }
@@ -1570,10 +1523,10 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
-        "position": 8,
+        "position": 7,
         "canonicalId": "movie:imdb:tt1392796",
         "mediaType": "movie",
         "title": "Unabomber",
@@ -1603,11 +1556,11 @@
           "audioStatus": "pt-br-dubbed",
           "canonicalId": "movie:imdb:tt1392796",
           "imdbRank": 11,
-          "displayRank": 8,
+          "displayRank": 7,
           "heroTags": [
             {
-              "id": "rank-8",
-              "text": "#8 Em Destaque (Outubro de 2026)",
+              "id": "rank-7",
+              "text": "#7 Em Destaque (Outubro de 2026)",
               "color": "#007df7",
               "style": "solid"
             }
@@ -1620,10 +1573,10 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
-        "position": 9,
+        "position": 8,
         "canonicalId": "movie:imdb:tt11576182",
         "mediaType": "movie",
         "title": "Dia D",
@@ -1653,11 +1606,11 @@
           "audioStatus": "pt-br-dubbed",
           "canonicalId": "movie:imdb:tt11576182",
           "imdbRank": 12,
-          "displayRank": 9,
+          "displayRank": 8,
           "heroTags": [
             {
-              "id": "rank-9",
-              "text": "#9 Em Destaque (Outubro de 2026)",
+              "id": "rank-8",
+              "text": "#8 Em Destaque (Outubro de 2026)",
               "color": "#007df7",
               "style": "solid"
             }
@@ -1670,10 +1623,10 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
-        "position": 10,
+        "position": 9,
         "canonicalId": "movie:imdb:tt0074991",
         "mediaType": "movie",
         "title": "Obsessão",
@@ -1703,11 +1656,11 @@
           "audioStatus": "pt-br-dubbed",
           "canonicalId": "movie:imdb:tt0074991",
           "imdbRank": 14,
-          "displayRank": 10,
+          "displayRank": 9,
           "heroTags": [
             {
-              "id": "rank-10",
-              "text": "#10 Em Destaque (Outubro de 2026)",
+              "id": "rank-9",
+              "text": "#9 Em Destaque (Outubro de 2026)",
               "color": "#007df7",
               "style": "solid"
             }
@@ -1720,7 +1673,62 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
+      },
+      {
+        "position": 10,
+        "canonicalId": "movie:imdb:tt11897478",
+        "mediaType": "movie",
+        "title": "Prisioneiro",
+        "originalTitle": "Prisoner",
+        "year": 2026,
+        "poster": "https://images.metahub.space/poster/medium/tt11897478/img",
+        "backdrop": "https://images.metahub.space/background/medium/tt11897478/img",
+        "rating": 7.3,
+        "item": {
+          "id": "movie-prisioneiro-2026",
+          "title": "Prisioneiro",
+          "originalTitle": "Prisoner",
+          "type": "FILME",
+          "rating": 7.3,
+          "year": 2026,
+          "image": "https://images.metahub.space/poster/medium/tt11897478/img",
+          "backdrop": "https://images.metahub.space/background/medium/tt11897478/img",
+          "description": "Um homem aprisionado injustamente em um complexo de segurança máxima descobre uma conspiração de alto nível.",
+          "genres": [
+            "Ação",
+            "Suspense"
+          ],
+          "imdbId": "tt11897478",
+          "isFeatured": true,
+          "availabilityStatus": "verified",
+          "audioStatus": "pt-br-dubbed",
+          "canonicalId": "movie:imdb:tt11897478",
+          "director": "Thomas M. Wright",
+          "cast": [
+            "Joel Edgerton",
+            "Sean Harris",
+            "Jada Alberts"
+          ],
+          "imdbRank": 15,
+          "displayRank": 10,
+          "heroTags": [
+            {
+              "id": "rank-10",
+              "text": "#10 Em Destaque (Outubro de 2026)",
+              "color": "#007df7",
+              "style": "solid"
+            }
+          ]
+        },
+        "calculatedScore": 86,
+        "source": "imdb-moviemeter",
+        "originalPosition": 15,
+        "monthKey": "2026-10",
+        "monthLabel": "Outubro de 2026",
+        "isPartial": true,
+        "validationStatus": "verified",
+        "updatedAt": 1792945241470
       }
     ],
     "series": [
@@ -1782,7 +1790,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
         "position": 2,
@@ -1849,7 +1857,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
         "position": 3,
@@ -1916,7 +1924,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
         "position": 4,
@@ -1976,7 +1984,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
         "position": 5,
@@ -2036,7 +2044,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
         "position": 6,
@@ -2097,7 +2105,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
         "position": 7,
@@ -2157,7 +2165,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
         "position": 8,
@@ -2218,7 +2226,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
         "position": 9,
@@ -2278,7 +2286,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241470
       },
       {
         "position": 10,
@@ -2338,7 +2346,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519454
+        "updatedAt": 1792945241471
       }
     ],
     "animes": [
@@ -2349,8 +2357,8 @@
         "title": "Solo Leveling",
         "originalTitle": "Ore dake Level Up na Ken",
         "year": 2024,
-        "poster": "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/gJL5iqPyZzgvI1Vb9k4PqB6fF6C.jpg",
+        "poster": "https://image.tmdb.org/t/p/w500/eCD7WS9h4lCT8N4Xavc9u8R1IGk.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/xMNH87maNLt9n2bMDYeI6db5VFm.jpg",
         "rating": 8.7,
         "item": {
           "id": "anime-solo-leveling",
@@ -2361,8 +2369,8 @@
           "mediaFormat": "series",
           "rating": 8.7,
           "year": 2024,
-          "image": "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg",
-          "backdrop": "https://image.tmdb.org/t/p/original/gJL5iqPyZzgvI1Vb9k4PqB6fF6C.jpg",
+          "image": "https://image.tmdb.org/t/p/w500/eCD7WS9h4lCT8N4Xavc9u8R1IGk.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/xMNH87maNLt9n2bMDYeI6db5VFm.jpg",
           "description": "Em um mundo onde caçadores despertam habilidades sobrenaturais, Sung Jin-woo, o caçador mais fraco da humanidade, recebe uma chance única de subir de nível sem limites.",
           "genres": [
             "Anime",
@@ -2383,7 +2391,7 @@
               "number": 1,
               "title": "Estou Acostumado",
               "description": "Sung Jin-woo lidera um grupo de expedição rumo a uma dungeon dupla com consequências fatais.",
-              "image": "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg"
+              "image": "https://image.tmdb.org/t/p/w500/eCD7WS9h4lCT8N4Xavc9u8R1IGk.jpg"
             }
           ],
           "imdbId": "anilist-151807",
@@ -2405,7 +2413,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519455
+        "updatedAt": 1792945241471
       },
       {
         "position": 2,
@@ -2414,8 +2422,8 @@
         "title": "Jujutsu Kaisen",
         "originalTitle": "Jujutsu Kaisen",
         "year": 2020,
-        "poster": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/gmECX1Dv3y54wQ8o3t300gJ8uVp.jpg",
+        "poster": "https://image.tmdb.org/t/p/w500/8R1mMSC1gX1cg5ed7ns49JOEqw3.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/qpin8cASXEVtwhzNsprHYFiOAGk.jpg",
         "rating": 8.6,
         "item": {
           "id": "anime-jujutsu-kaisen",
@@ -2426,8 +2434,8 @@
           "mediaFormat": "series",
           "rating": 8.6,
           "year": 2020,
-          "image": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg",
-          "backdrop": "https://image.tmdb.org/t/p/original/gmECX1Dv3y54wQ8o3t300gJ8uVp.jpg",
+          "image": "https://image.tmdb.org/t/p/w500/8R1mMSC1gX1cg5ed7ns49JOEqw3.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/qpin8cASXEVtwhzNsprHYFiOAGk.jpg",
           "description": "Yuji Itadori engole um dedo amaldiçoado de Ryomen Sukuna e ingressa na Escola de Feitiçaria de Tóquio para expurgar maldições ameaçadoras.",
           "genres": [
             "Anime",
@@ -2448,7 +2456,7 @@
               "number": 1,
               "title": "Ryomen Sukuna",
               "description": "Yuji Itadori quebra o selo de um talismã amaldiçoado para salvar seus colegas de escola.",
-              "image": "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg"
+              "image": "https://image.tmdb.org/t/p/w500/8R1mMSC1gX1cg5ed7ns49JOEqw3.jpg"
             }
           ],
           "imdbId": "anilist-113415",
@@ -2470,7 +2478,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519455
+        "updatedAt": 1792945241471
       },
       {
         "position": 3,
@@ -2535,7 +2543,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519455
+        "updatedAt": 1792945241471
       },
       {
         "position": 4,
@@ -2544,8 +2552,8 @@
         "title": "Dandadan",
         "originalTitle": "Dan Da Dan",
         "year": 2024,
-        "poster": "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/1vKxVp97TqCjO1w9wE0K3G8kU9V.jpg",
+        "poster": "https://image.tmdb.org/t/p/w500/vtQug1eOyeU2VXIpNoDF1lTlcH4.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/uNTrRKIOyKYISthoeizghtXPEOK.jpg",
         "rating": 8.5,
         "item": {
           "id": "anime-dandadan",
@@ -2556,8 +2564,8 @@
           "mediaFormat": "series",
           "rating": 8.5,
           "year": 2024,
-          "image": "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg",
-          "backdrop": "https://image.tmdb.org/t/p/original/1vKxVp97TqCjO1w9wE0K3G8kU9V.jpg",
+          "image": "https://image.tmdb.org/t/p/w500/vtQug1eOyeU2VXIpNoDF1lTlcH4.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/uNTrRKIOyKYISthoeizghtXPEOK.jpg",
           "description": "Momo Ayase e Okarun desafiam suas crenças em fantasmas e alienígenas, desencadeando confrontos hilários e insanos no Japão.",
           "genres": [
             "Anime",
@@ -2578,7 +2586,7 @@
               "number": 1,
               "title": "Isso é o Amor Começando?",
               "description": "Momo e Okarun apostam para ver quem encontra alienígenas ou espíritos primeiro.",
-              "image": "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg"
+              "image": "https://image.tmdb.org/t/p/w500/vtQug1eOyeU2VXIpNoDF1lTlcH4.jpg"
             }
           ],
           "imdbId": "anilist-171018",
@@ -2600,7 +2608,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519455
+        "updatedAt": 1792945241471
       },
       {
         "position": 5,
@@ -2609,8 +2617,8 @@
         "title": "Bleach: Thousand-Year Blood War",
         "originalTitle": "Bleach: Sennen Kessen-hen",
         "year": 2022,
-        "poster": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/9pkbtK1kLhR1wzZg27v8O9eU4hV.jpg",
+        "poster": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx116674-p3zK4PUX2Aag.jpg",
+        "backdrop": "https://s4.anilist.co/file/anilistcdn/media/anime/banner/116674-l2YlIyJzvGSV.jpg",
         "rating": 8.9,
         "item": {
           "id": "anime-bleach-tybw",
@@ -2621,8 +2629,8 @@
           "mediaFormat": "series",
           "rating": 8.9,
           "year": 2022,
-          "image": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg",
-          "backdrop": "https://image.tmdb.org/t/p/original/9pkbtK1kLhR1wzZg27v8O9eU4hV.jpg",
+          "image": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx116674-p3zK4PUX2Aag.jpg",
+          "backdrop": "https://s4.anilist.co/file/anilistcdn/media/anime/banner/116674-l2YlIyJzvGSV.jpg",
           "description": "A guerra milenar entre os Shinigamis da Soul Society e o exército Quincy liderado por Yhwach chega ao seu clímax destrutivo.",
           "genres": [
             "Anime",
@@ -2643,7 +2651,7 @@
               "number": 1,
               "title": "Guerra de Sangue",
               "description": "A Soul Society é surpreendida por um ataque coordenado do Wandenreich.",
-              "image": "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg"
+              "image": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx116674-p3zK4PUX2Aag.jpg"
             }
           ],
           "imdbId": "anilist-116674",
@@ -2665,7 +2673,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519455
+        "updatedAt": 1792945241471
       },
       {
         "position": 6,
@@ -2730,7 +2738,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519455
+        "updatedAt": 1792945241471
       },
       {
         "position": 7,
@@ -2739,8 +2747,8 @@
         "title": "Chainsaw Man",
         "originalTitle": "Chainsaw Man",
         "year": 2022,
-        "poster": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/vI3a3n07Jq9g6iK2k69uP8wV7hX.jpg",
+        "poster": "https://image.tmdb.org/t/p/w500/mIz0eKhzHuSPeRSePCyoCt9bKVp.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/5DUMPBSnHOZsbBv81GFXZXvDpo6.jpg",
         "rating": 8.5,
         "item": {
           "id": "anime-chainsaw-man",
@@ -2751,8 +2759,8 @@
           "mediaFormat": "series",
           "rating": 8.5,
           "year": 2022,
-          "image": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg",
-          "backdrop": "https://image.tmdb.org/t/p/original/vI3a3n07Jq9g6iK2k69uP8wV7hX.jpg",
+          "image": "https://image.tmdb.org/t/p/w500/mIz0eKhzHuSPeRSePCyoCt9bKVp.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/5DUMPBSnHOZsbBv81GFXZXvDpo6.jpg",
           "description": "Denji renasce como um híbrido motosserra após se fundir com seu cachorro demônio Pochita e entra para a Segurança Pública.",
           "genres": [
             "Anime",
@@ -2773,7 +2781,7 @@
               "number": 1,
               "title": "Cachorro e Motosserra",
               "description": "Denji trabalha caçando demônios para pagar as dívidas deixadas por seu falecido pai.",
-              "image": "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg"
+              "image": "https://image.tmdb.org/t/p/w500/mIz0eKhzHuSPeRSePCyoCt9bKVp.jpg"
             }
           ],
           "imdbId": "anilist-127230",
@@ -2795,7 +2803,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519455
+        "updatedAt": 1792945241471
       },
       {
         "position": 8,
@@ -2804,8 +2812,8 @@
         "title": "Attack on Titan",
         "originalTitle": "Shingeki no Kyojin",
         "year": 2013,
-        "poster": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg",
-        "backdrop": "https://image.tmdb.org/t/p/original/hP9cKk97kFh7g1w9w7h5g1kL2.jpg",
+        "poster": "https://image.tmdb.org/t/p/w500/8aMqmB5xSblsZc7bLMEhE28yHa2.jpg",
+        "backdrop": "https://image.tmdb.org/t/p/original/rqbCbjB19amtOtFQbb3K2lgm2zv.jpg",
         "rating": 9,
         "item": {
           "id": "anime-attack-on-titan",
@@ -2816,8 +2824,8 @@
           "mediaFormat": "series",
           "rating": 9,
           "year": 2013,
-          "image": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg",
-          "backdrop": "https://image.tmdb.org/t/p/original/hP9cKk97kFh7g1w9w7h5g1kL2.jpg",
+          "image": "https://image.tmdb.org/t/p/w500/8aMqmB5xSblsZc7bLMEhE28yHa2.jpg",
+          "backdrop": "https://image.tmdb.org/t/p/original/rqbCbjB19amtOtFQbb3K2lgm2zv.jpg",
           "description": "Eren Yeager e a Tropa de Exploração lutam desesperadamente pela sobrevivência humana contra gigantes devoradores de homens.",
           "genres": [
             "Anime",
@@ -2838,7 +2846,7 @@
               "number": 1,
               "title": "Para Você, Daqui a 2.000 Anos",
               "description": "A Muralha Maria é rompida pelo Titã Colossal e o caos engole a cidade de Shiganshina.",
-              "image": "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg"
+              "image": "https://image.tmdb.org/t/p/w500/8aMqmB5xSblsZc7bLMEhE28yHa2.jpg"
             }
           ],
           "imdbId": "anilist-16498",
@@ -2860,7 +2868,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519455
+        "updatedAt": 1792945241471
       },
       {
         "position": 9,
@@ -2925,7 +2933,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519455
+        "updatedAt": 1792945241471
       },
       {
         "position": 10,
@@ -2990,7 +2998,7 @@
         "monthLabel": "Outubro de 2026",
         "isPartial": true,
         "validationStatus": "verified",
-        "updatedAt": 1792881519455
+        "updatedAt": 1792945241471
       }
     ],
     "totalCandidatesEvaluated": {
@@ -3081,26 +3089,6 @@
           "score": 190
         },
         {
-          "imdbId": "tt13000574",
-          "title": "Resident Evil",
-          "imdbTitle": "Resident Evil",
-          "canonicalTitle": "Resident Evil",
-          "year": 2026,
-          "mediaType": "movie",
-          "imdbRank": 7,
-          "displayRank": 5,
-          "rankPosition": 7,
-          "finalPosition": 5,
-          "status": "APPROVED",
-          "isIncluded": true,
-          "canonicalId": "movie-resident-evil-2026",
-          "availabilityStatus": "verified",
-          "hasAudioPtBr": true,
-          "audioStatus": "pt-br-dubbed",
-          "verifiedSourcesCount": 1,
-          "score": 188
-        },
-        {
           "imdbId": "tt0100935",
           "title": "Coração Selvagem",
           "imdbTitle": "Coração Selvagem",
@@ -3108,9 +3096,9 @@
           "year": 1990,
           "mediaType": "movie",
           "imdbRank": 9,
-          "displayRank": 6,
+          "displayRank": 5,
           "rankPosition": 9,
-          "finalPosition": 6,
+          "finalPosition": 5,
           "status": "APPROVED",
           "isIncluded": true,
           "canonicalId": "movie-wild-at-heart-1990",
@@ -3128,9 +3116,9 @@
           "year": 2020,
           "mediaType": "movie",
           "imdbRank": 10,
-          "displayRank": 7,
+          "displayRank": 6,
           "rankPosition": 10,
-          "finalPosition": 7,
+          "finalPosition": 6,
           "status": "APPROVED",
           "isIncluded": true,
           "canonicalId": "movie-social-dilemma-2020",
@@ -3148,9 +3136,9 @@
           "year": 2026,
           "mediaType": "movie",
           "imdbRank": 11,
-          "displayRank": 8,
+          "displayRank": 7,
           "rankPosition": 11,
-          "finalPosition": 8,
+          "finalPosition": 7,
           "status": "APPROVED",
           "isIncluded": true,
           "canonicalId": "movie-unabomber-2026",
@@ -3168,9 +3156,9 @@
           "year": 2026,
           "mediaType": "movie",
           "imdbRank": 12,
-          "displayRank": 9,
+          "displayRank": 8,
           "rankPosition": 12,
-          "finalPosition": 9,
+          "finalPosition": 8,
           "status": "APPROVED",
           "isIncluded": true,
           "canonicalId": "movie-dia-d-2026",
@@ -3188,9 +3176,9 @@
           "year": 1976,
           "mediaType": "movie",
           "imdbRank": 14,
-          "displayRank": 10,
+          "displayRank": 9,
           "rankPosition": 14,
-          "finalPosition": 10,
+          "finalPosition": 9,
           "status": "APPROVED",
           "isIncluded": true,
           "canonicalId": "movie-obsession-1976",
@@ -3199,6 +3187,26 @@
           "audioStatus": "pt-br-dubbed",
           "verifiedSourcesCount": 1,
           "score": 174
+        },
+        {
+          "imdbId": "tt11897478",
+          "title": "Prisioneiro",
+          "imdbTitle": "Prisioneiro",
+          "canonicalTitle": "Prisioneiro",
+          "year": 2026,
+          "mediaType": "movie",
+          "imdbRank": 15,
+          "displayRank": 10,
+          "rankPosition": 15,
+          "finalPosition": 10,
+          "status": "APPROVED",
+          "isIncluded": true,
+          "canonicalId": "movie-prisioneiro-2026",
+          "availabilityStatus": "verified",
+          "hasAudioPtBr": true,
+          "audioStatus": "pt-br-dubbed",
+          "verifiedSourcesCount": 1,
+          "score": 86
         }
       ],
       "rejectedMovies": [
@@ -3229,6 +3237,19 @@
           "score": 194
         },
         {
+          "imdbId": "tt13000574",
+          "title": "Resident Evil",
+          "canonicalTitle": "Resident Evil",
+          "year": 2026,
+          "mediaType": "movie",
+          "rankPosition": 7,
+          "status": "REJECTED",
+          "isIncluded": false,
+          "canonicalId": "movie-resident-evil-2026",
+          "rejectionReason": "Indisponível temporariamente no catálogo. Primeira reavaliação programada para 20/11/2026 às 00:00 (Horário de Brasília), sujeita à confirmação de disponibilidade digital oficial no Brasil e fonte HD autorizada/reproduzível.",
+          "score": 188
+        },
+        {
           "imdbId": "tt20221436",
           "title": "Homem-Aranha: Um Novo Dia",
           "canonicalTitle": "Homem-Aranha: Um Novo Dia",
@@ -3251,7 +3272,7 @@
           "status": "REJECTED",
           "isIncluded": false,
           "canonicalId": "movie-a-odisseia-2026",
-          "rejectionReason": "Conteúdo temporariamente oculto no catálogo público até 20/11/2026 às 00h00 BRT",
+          "rejectionReason": "Indisponível temporariamente no catálogo. Retorno programado para 20/11/2026 às 00:00 (Horário de Brasília).",
           "score": 176
         }
       ],
@@ -3837,26 +3858,6 @@
         "score": 190
       },
       {
-        "imdbId": "tt13000574",
-        "title": "Resident Evil",
-        "imdbTitle": "Resident Evil",
-        "canonicalTitle": "Resident Evil",
-        "year": 2026,
-        "mediaType": "movie",
-        "imdbRank": 7,
-        "displayRank": 5,
-        "rankPosition": 7,
-        "finalPosition": 5,
-        "status": "APPROVED",
-        "isIncluded": true,
-        "canonicalId": "movie-resident-evil-2026",
-        "availabilityStatus": "verified",
-        "hasAudioPtBr": true,
-        "audioStatus": "pt-br-dubbed",
-        "verifiedSourcesCount": 1,
-        "score": 188
-      },
-      {
         "imdbId": "tt0100935",
         "title": "Coração Selvagem",
         "imdbTitle": "Coração Selvagem",
@@ -3864,9 +3865,9 @@
         "year": 1990,
         "mediaType": "movie",
         "imdbRank": 9,
-        "displayRank": 6,
+        "displayRank": 5,
         "rankPosition": 9,
-        "finalPosition": 6,
+        "finalPosition": 5,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-wild-at-heart-1990",
@@ -3884,9 +3885,9 @@
         "year": 2020,
         "mediaType": "movie",
         "imdbRank": 10,
-        "displayRank": 7,
+        "displayRank": 6,
         "rankPosition": 10,
-        "finalPosition": 7,
+        "finalPosition": 6,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-social-dilemma-2020",
@@ -3904,9 +3905,9 @@
         "year": 2026,
         "mediaType": "movie",
         "imdbRank": 11,
-        "displayRank": 8,
+        "displayRank": 7,
         "rankPosition": 11,
-        "finalPosition": 8,
+        "finalPosition": 7,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-unabomber-2026",
@@ -3924,9 +3925,9 @@
         "year": 2026,
         "mediaType": "movie",
         "imdbRank": 12,
-        "displayRank": 9,
+        "displayRank": 8,
         "rankPosition": 12,
-        "finalPosition": 9,
+        "finalPosition": 8,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-dia-d-2026",
@@ -3944,9 +3945,9 @@
         "year": 1976,
         "mediaType": "movie",
         "imdbRank": 14,
-        "displayRank": 10,
+        "displayRank": 9,
         "rankPosition": 14,
-        "finalPosition": 10,
+        "finalPosition": 9,
         "status": "APPROVED",
         "isIncluded": true,
         "canonicalId": "movie-obsession-1976",
@@ -3955,6 +3956,26 @@
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
         "score": 174
+      },
+      {
+        "imdbId": "tt11897478",
+        "title": "Prisioneiro",
+        "imdbTitle": "Prisioneiro",
+        "canonicalTitle": "Prisioneiro",
+        "year": 2026,
+        "mediaType": "movie",
+        "imdbRank": 15,
+        "displayRank": 10,
+        "rankPosition": 15,
+        "finalPosition": 10,
+        "status": "APPROVED",
+        "isIncluded": true,
+        "canonicalId": "movie-prisioneiro-2026",
+        "availabilityStatus": "verified",
+        "hasAudioPtBr": true,
+        "audioStatus": "pt-br-dubbed",
+        "verifiedSourcesCount": 1,
+        "score": 86
       }
     ],
     "rejectedMovies": [
@@ -3985,6 +4006,19 @@
         "score": 194
       },
       {
+        "imdbId": "tt13000574",
+        "title": "Resident Evil",
+        "canonicalTitle": "Resident Evil",
+        "year": 2026,
+        "mediaType": "movie",
+        "rankPosition": 7,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "movie-resident-evil-2026",
+        "rejectionReason": "Indisponível temporariamente no catálogo. Primeira reavaliação programada para 20/11/2026 às 00:00 (Horário de Brasília), sujeita à confirmação de disponibilidade digital oficial no Brasil e fonte HD autorizada/reproduzível.",
+        "score": 188
+      },
+      {
         "imdbId": "tt20221436",
         "title": "Homem-Aranha: Um Novo Dia",
         "canonicalTitle": "Homem-Aranha: Um Novo Dia",
@@ -4007,7 +4041,7 @@
         "status": "REJECTED",
         "isIncluded": false,
         "canonicalId": "movie-a-odisseia-2026",
-        "rejectionReason": "Conteúdo temporariamente oculto no catálogo público até 20/11/2026 às 00h00 BRT",
+        "rejectionReason": "Indisponível temporariamente no catálogo. Retorno programado para 20/11/2026 às 00:00 (Horário de Brasília).",
         "score": 176
       }
     ],

@@ -24,6 +24,55 @@ import { canonicalIdentityService } from '../identity/canonicalIdentity';
 import { adultContentService } from '../adult/AdultContentService';
 import { bannedContentRegistry } from './BannedContentRegistry';
 import { trustedTimeService } from '../time/trustedTimeService';
+import { CamBlockerEngine } from './CamBlockerEngine';
+
+export interface LockedReleaseConfig {
+  id: string;
+  aliases: string[];
+  imdbId?: string;
+  tmdbId?: string | number;
+  title: string;
+  originalTitle?: string;
+  year: number;
+  director?: string;
+  mediaType: ContentType;
+  reevaluationDate: string; // ISO 8601
+  requiresExplicitDigitalRelease: boolean;
+  requiresVerifiedHdSource: boolean;
+  noticeMessage?: string;
+}
+
+export const TEMPORARILY_LOCKED_RELEASES: LockedReleaseConfig[] = [
+  {
+    id: 'movie-a-odisseia-2026',
+    aliases: ['movie-a-odisseia-2026', 'tt33764258', 'tmdb-1368337', '1368337'],
+    imdbId: 'tt33764258',
+    tmdbId: '1368337',
+    title: 'A Odisseia',
+    originalTitle: 'The Odyssey',
+    year: 2026,
+    mediaType: ContentType.MOVIE,
+    reevaluationDate: '2026-11-20T00:00:00-03:00',
+    requiresExplicitDigitalRelease: false,
+    requiresVerifiedHdSource: false,
+    noticeMessage: 'Indisponível temporariamente no catálogo. Retorno programado para 20/11/2026 às 00:00 (Horário de Brasília).'
+  },
+  {
+    id: 'movie-resident-evil-2026',
+    aliases: ['movie-resident-evil-2026', 'tt13000574', 'tmdb-1423191', '1423191'],
+    imdbId: 'tt13000574',
+    tmdbId: '1423191',
+    title: 'Resident Evil',
+    originalTitle: 'Resident Evil',
+    year: 2026,
+    director: 'Zach Cregger',
+    mediaType: ContentType.MOVIE,
+    reevaluationDate: '2026-11-20T00:00:00-03:00',
+    requiresExplicitDigitalRelease: true,
+    requiresVerifiedHdSource: true,
+    noticeMessage: 'Indisponível temporariamente no catálogo. Primeira reavaliação programada para 20/11/2026 às 00:00 (Horário de Brasília), sujeita à confirmação de disponibilidade digital oficial no Brasil e fonte HD autorizada/reproduzível.'
+  }
+];
 
 export type ReleaseStatus = 
   | 'NOT_RELEASED'      // Ainda não lançado oficialmente (data futura)
@@ -139,7 +188,7 @@ class CatalogEligibilityService {
   public isTheOdyssey2026(item?: { id?: string; imdbId?: string; tmdbId?: string | number; type?: ContentType | string; year?: number | string; title?: string } | null): boolean {
     if (!item) return false;
 
-    const isMovie = item.type === ContentType.MOVIE || String(item.type || '').toUpperCase() === 'FILME' || String(item.type || '').toLowerCase() === 'movie';
+    const isMovie = !item.type || item.type === ContentType.MOVIE || String(item.type || '').toUpperCase() === 'FILME' || String(item.type || '').toLowerCase() === 'movie';
     const is2026 = Number(item.year) === 2026;
     if (!isMovie || !is2026) return false;
 
@@ -157,22 +206,117 @@ class CatalogEligibilityService {
   }
 
   /**
+   * Identifica canonicamente a obra cinematográfica live-action Resident Evil (2026), dirigida por Zach Cregger
+   */
+  public isResidentEvil2026(item?: { id?: string; imdbId?: string; tmdbId?: string | number; type?: ContentType | string; year?: number | string; title?: string; originalTitle?: string; director?: string } | null): boolean {
+    if (!item) return false;
+
+    const isMovie = !item.type || item.type === ContentType.MOVIE || String(item.type || '').toUpperCase() === 'FILME' || String(item.type || '').toLowerCase() === 'movie';
+    const is2026 = Number(item.year) === 2026;
+    if (!isMovie) return false;
+
+    const imdbId = (item.imdbId || '').trim().toLowerCase();
+    const tmdbId = String(item.tmdbId || '').trim();
+    const id = (item.id || '').trim().toLowerCase();
+
+    if (
+      imdbId === 'tt13000574' ||
+      tmdbId === '1423191' ||
+      id === 'movie-resident-evil-2026' ||
+      id === 'tt13000574' ||
+      id === 'tmdb-1423191'
+    ) {
+      return true;
+    }
+
+    if (item.director && /zach\s*cregger/i.test(item.director)) {
+      return true;
+    }
+
+    if (is2026) {
+      const titleNorm = (item.title || '').trim().toLowerCase();
+      const origNorm = (item.originalTitle || '').trim().toLowerCase();
+      if ((titleNorm === 'resident evil' || origNorm === 'resident evil') && !titleNorm.includes(':') && !origNorm.includes(':')) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Retorna a configuração de lançamento temporariamente bloqueado se houver correspondência
+   */
+  public getTemporarilyLockedRelease(item?: { id?: string; imdbId?: string; tmdbId?: string | number; type?: ContentType | string; year?: number | string; title?: string; originalTitle?: string; director?: string } | null): LockedReleaseConfig | null {
+    if (!item) return null;
+    if (this.isTheOdyssey2026(item)) {
+      return TEMPORARILY_LOCKED_RELEASES[0];
+    }
+    if (this.isResidentEvil2026(item)) {
+      return TEMPORARILY_LOCKED_RELEASES[1];
+    }
+    return null;
+  }
+
+  /**
+   * Retorna a mensagem amigável e institucional de bloqueio temporário se houver
+   */
+  public getLockedReleaseNotice(item?: ContentItem | null): string | null {
+    if (!item) return null;
+    const locked = this.getTemporarilyLockedRelease(item);
+    return locked?.noticeMessage || null;
+  }
+
+  /**
    * Retorna a data de agendamento de visibilidade pública se houver
    */
   public getCatalogVisibleFrom(item?: ContentItem | null): string | null {
     if (!item) return null;
     if (item.catalogVisibleFrom) return item.catalogVisibleFrom;
-    if (this.isTheOdyssey2026(item)) {
-      return '2026-11-20T00:00:00-03:00';
+    const locked = this.getTemporarilyLockedRelease(item);
+    if (locked) {
+      return locked.reevaluationDate;
     }
     return null;
   }
 
   /**
    * Verifica se a obra está liberada para exibição no catálogo com base no tempo confiável
+   * e nas regras estritas de disponibilidade digital e fontes HD
    */
   public isCatalogVisibleNow(item?: ContentItem | null, referenceTimeMs?: number): boolean {
     if (!item) return false;
+
+    const locked = this.getTemporarilyLockedRelease(item);
+    if (locked) {
+      const visibleFromEpoch = Date.parse(locked.reevaluationDate);
+      const now = referenceTimeMs !== undefined ? referenceTimeMs : trustedTimeService.getNow();
+      if (now < visibleFromEpoch) {
+        return false;
+      }
+      // Se a data já passou (ou é agora), mas a obra exige liberação digital oficial e fonte HD verificada
+      if (locked.requiresExplicitDigitalRelease || locked.requiresVerifiedHdSource) {
+        if (item.availabilityStatus === 'unavailable' || item.availabilityStatus === 'unreleased') {
+          return false;
+        }
+        const key = this.getCanonicalKey(item);
+        const record = this.records.get(key);
+        const hasVerifiedStreams = Boolean(item.verifiedStreams && item.verifiedStreams.length > 0);
+        const hasVerifiedRecord = Boolean(record && record.isPubliclyPlayable && record.playbackStatus === 'AVAILABLE' && record.validSourceCount > 0);
+        if (!hasVerifiedStreams && !hasVerifiedRecord) {
+          return false;
+        }
+        if (item.verifiedStreams && item.verifiedStreams.length > 0) {
+          const hasHdSource = item.verifiedStreams.some(s => {
+            const isCam = CamBlockerEngine.evaluateStream(s).isCam || theatricalFilterService.isCamRecording(`${s.name || ''} ${s.title || ''}`);
+            return !isCam;
+          });
+          if (!hasHdSource) return false;
+        }
+      }
+      return true;
+    }
+
     const visibleFrom = this.getCatalogVisibleFrom(item);
     if (!visibleFrom) return true;
 
@@ -571,8 +715,8 @@ class CatalogEligibilityService {
           // Validação rigorosa de cada fonte candidata
           const validStreams: any[] = [];
           for (const s of streams) {
-            // Séries e animes mantêm a política anterior; filmes podem usar CAM.
-            if (mediaType !== 'movie' && theatricalFilterService.isCamRecording(`${s.name} ${s.title}`)) {
+            // Rejeição incondicional de gravações de cinema (CAM, HDCAM, Telesync, TC) em TODAS as mídias
+            if (theatricalFilterService.isCamRecording(`${s.name} ${s.title}`) || CamBlockerEngine.evaluateStream(s, item).isCam) {
               rejectedSourceCount++;
               continue;
             }
@@ -719,7 +863,7 @@ class CatalogEligibilityService {
       );
 
       const validStreams = streams.filter(s => {
-        if (theatricalFilterService.isCamRecording(`${s.name} ${s.title}`)) return false;
+        if (theatricalFilterService.isCamRecording(`${s.name} ${s.title}`) || CamBlockerEngine.evaluateStream(s, item as any).isCam) return false;
         if (theatricalFilterService.isTrailerOrFakeSource(s).isFake) return false;
         return streamValidator.isContentMatchingTarget(
           `${s.name || ''} ${s.title || ''}`,
@@ -842,7 +986,10 @@ class CatalogEligibilityService {
   private autoUnlockTimer: any = null;
 
   public invalidateScheduledItemCaches(item?: ContentItem): void {
-    const keysToPurge = ['movie-a-odisseia-2026', 'tt33764258', 'tmdb-1368337'];
+    const keysToPurge = [
+      'movie-a-odisseia-2026', 'tt33764258', 'tmdb-1368337',
+      'movie-resident-evil-2026', 'tt13000574', 'tmdb-1423191', '1423191'
+    ];
     if (item?.id) keysToPurge.push(item.id.toLowerCase());
     if (item?.imdbId) keysToPurge.push(item.imdbId.toLowerCase());
     if (item?.tmdbId) keysToPurge.push(`tmdb-${item.tmdbId}`);

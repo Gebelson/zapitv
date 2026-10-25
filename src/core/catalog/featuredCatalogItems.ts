@@ -123,7 +123,7 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     audioStatus: 'pt-br-dubbed'
   },
 
-  // 7. RESIDENT EVIL (2026 - tt13000574) — Disponível
+  // 7. RESIDENT EVIL (2026 - tt13000574) — Indisponível / Bloqueio temporário (Zach Cregger)
   {
     id: 'movie-resident-evil-2026',
     title: 'Resident Evil',
@@ -131,14 +131,16 @@ export const FEATURED_CATALOG_ITEMS: ContentItem[] = [
     type: ContentType.MOVIE,
     rating: 7.6,
     year: 2026,
+    director: 'Zach Cregger',
     image: 'https://image.tmdb.org/t/p/w500/gQ76UL64RQe3oHwiwHwODTC23g4.jpg',
     backdrop: 'https://image.tmdb.org/t/p/original/3icyRAqgakNcQn6aDVz9libFmBA.jpg',
-    description: 'Nova adaptação cinematográfica da icônica franquia de terror e sobrevivência da Capcom com fidelidade máxima à atmosfera sombria.',
+    description: 'Nova adaptação cinematográfica da icônica franquia de terror e sobrevivência da Capcom com fidelidade máxima à atmosfera sombria, dirigida por Zach Cregger.',
     genres: ['Ação', 'Terror', 'Ficção Científica'],
     tmdbId: '1423191',
     imdbId: 'tt13000574',
-    isFeatured: true,
-    availabilityStatus: 'verified',
+    isFeatured: false,
+    availabilityStatus: 'unavailable',
+    catalogVisibleFrom: '2026-11-20T00:00:00-03:00',
     audioStatus: 'pt-br-dubbed'
   },
 

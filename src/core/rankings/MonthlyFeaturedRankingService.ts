@@ -495,15 +495,11 @@ export class MonthlyFeaturedRankingService {
         }
       }
 
-      // CASO 3: Ocultação Temporária Programada — A Odisseia (2026) até 20/11/2026 às 00:00 BRT
-      const isOdyssey2026 = (
-        (catalogItem.imdbId === 'tt33764258' || catalogItem.tmdbId === '1368337' || catalogItem.id.includes('odisseia')) &&
-        (catalogItem.year === 2026)
-      );
-      if (isOdyssey2026) {
-        const releaseTimeBRT = new Date('2026-11-20T00:00:00-03:00').getTime();
-        const nowTime = Date.now();
-        if (nowTime < releaseTimeBRT) {
+      // CASO 3: Ocultação Temporária Programada (A Odisseia 2026, Resident Evil 2026, etc.)
+      const lockedRelease = catalogEligibilityService.getTemporarilyLockedRelease(catalogItem);
+      if (lockedRelease) {
+        const isCurrentlyVisible = catalogEligibilityService.isCatalogVisibleNow(catalogItem);
+        if (!isCurrentlyVisible) {
           audit.push({
             imdbId: cand.imdbId,
             title: cand.title,
@@ -514,7 +510,7 @@ export class MonthlyFeaturedRankingService {
             status: 'REJECTED',
             isIncluded: false,
             canonicalId: catalogItem.id,
-            rejectionReason: 'Conteúdo temporariamente oculto no catálogo público até 20/11/2026 às 00h00 BRT',
+            rejectionReason: lockedRelease.noticeMessage || 'Conteúdo temporariamente oculto no catálogo público até 20/11/2026 às 00:00 (Horário de Brasília).',
             score: cand.cumulativeScore
           });
           continue;

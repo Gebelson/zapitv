@@ -436,6 +436,29 @@ class FeaturedRankingService {
         continue;
       }
 
+      // CASO 3.1: Bloqueio Temporário Programado (A Odisseia 2026, Resident Evil 2026, etc.)
+      const lockedRelease = catalogEligibilityService.getTemporarilyLockedRelease(catalogItem);
+      if (lockedRelease) {
+        if (!catalogEligibilityService.isCatalogVisibleNow(catalogItem)) {
+          audit.push({
+            imdbId: cand.imdbId,
+            title: cand.title,
+            imdbTitle: cand.title,
+            canonicalTitle: catalogItem.title,
+            year: cand.year,
+            mediaType: rankType,
+            imdbRank: rankPosition,
+            rankPosition,
+            status: 'REJECTED',
+            isIncluded: false,
+            canonicalId: catalogItem.id,
+            availabilityStatus: 'temporarily_locked',
+            rejectionReason: lockedRelease.noticeMessage || 'Conteúdo temporariamente oculto no catálogo público'
+          });
+          continue;
+        }
+      }
+
       // CASO 4: Obras cuja estreia ainda está no futuro
       if (rankType === 'movie') {
         const isTheatricallyAllowed = theatricalFilterService.isMovieAllowedSync(catalogItem);

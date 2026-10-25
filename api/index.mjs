@@ -3279,6 +3279,56 @@ var init_streamValidator = __esm({
           }
           return false;
         }
+      },
+      // 6. Resident Evil (2026 live-action por Zach Cregger / tt13000574 / 1423191)
+      // Rejeita terminantemente animações (Kadokawa / Marza / Vendetta / Degeneration / Damnation / Death Island / Infinite Darkness)
+      // e adaptações anteriores da franquia associadas erroneamente ao título de 2026.
+      {
+        targetPattern: /resident\s*evil|tt13000574|1423191|movie-resident-evil-2026/i,
+        rejectStream: (s, rawCandidates = []) => {
+          const text2 = `${s.name || ""} ${s.title || ""} ${s.description || ""} ${s.url || ""}`.toLowerCase();
+          const candText = (Array.isArray(rawCandidates) ? rawCandidates.join(" ") : String(rawCandidates || "")).toLowerCase();
+          const isTargetAnimation = /vendetta|damnation|degeneration|infinite darkness|death island/i.test(candText);
+          if (!isTargetAnimation) {
+            const animationTerms = [
+              "vendetta",
+              "kadokawa",
+              "marza",
+              "degeneration",
+              "damnation",
+              "death island",
+              "infinite darkness",
+              "anime",
+              "animado",
+              "animation",
+              "animated"
+            ];
+            if (animationTerms.some((term) => text2.includes(term))) {
+              return true;
+            }
+          }
+          const isTarget2026 = /tt13000574|1423191|movie-resident-evil-2026|2026|zach/i.test(candText);
+          if (isTarget2026) {
+            const otherAdaptations = [
+              "welcome to raccoon city",
+              "raccoon city",
+              "apocalypse",
+              "extinction",
+              "afterlife",
+              "retribution",
+              "final chapter",
+              "netflix"
+            ];
+            if (otherAdaptations.some((term) => text2.includes(term))) {
+              return true;
+            }
+            const yearMatches = text2.match(/\b(19\d{2}|20[0-2][0-4])\b/g);
+            if (yearMatches && yearMatches.length > 0) {
+              return true;
+            }
+          }
+          return false;
+        }
       }
     ];
     StreamValidator = class {
@@ -3538,7 +3588,7 @@ var init_streamValidator = __esm({
         }
         for (const rule of KNOWN_UPSTREAM_MISMATCHES) {
           if (rawCandidates.some((cand) => rule.targetPattern.test(cand))) {
-            if (rule.rejectStream(stream)) {
+            if (rule.rejectStream(stream, rawCandidates)) {
               console.warn(`[StreamValidator] Stream rejeitado por desvio conhecido para '[${rawCandidates.join(", ")}]': ${sTitle || sUrl}`);
               return false;
             }
@@ -5905,7 +5955,7 @@ var init_featuredCatalogItems = __esm({
         availabilityStatus: "verified",
         audioStatus: "pt-br-dubbed"
       },
-      // 7. RESIDENT EVIL (2026 - tt13000574) — Disponível
+      // 7. RESIDENT EVIL (2026 - tt13000574) — Indisponível / Bloqueio temporário (Zach Cregger)
       {
         id: "movie-resident-evil-2026",
         title: "Resident Evil",
@@ -5913,14 +5963,16 @@ var init_featuredCatalogItems = __esm({
         type: "FILME" /* MOVIE */,
         rating: 7.6,
         year: 2026,
+        director: "Zach Cregger",
         image: "https://image.tmdb.org/t/p/w500/gQ76UL64RQe3oHwiwHwODTC23g4.jpg",
         backdrop: "https://image.tmdb.org/t/p/original/3icyRAqgakNcQn6aDVz9libFmBA.jpg",
-        description: "Nova adapta\xE7\xE3o cinematogr\xE1fica da ic\xF4nica franquia de terror e sobreviv\xEAncia da Capcom com fidelidade m\xE1xima \xE0 atmosfera sombria.",
+        description: "Nova adapta\xE7\xE3o cinematogr\xE1fica da ic\xF4nica franquia de terror e sobreviv\xEAncia da Capcom com fidelidade m\xE1xima \xE0 atmosfera sombria, dirigida por Zach Cregger.",
         genres: ["A\xE7\xE3o", "Terror", "Fic\xE7\xE3o Cient\xEDfica"],
         tmdbId: "1423191",
         imdbId: "tt13000574",
-        isFeatured: true,
-        availabilityStatus: "verified",
+        isFeatured: false,
+        availabilityStatus: "unavailable",
+        catalogVisibleFrom: "2026-11-20T00:00:00-03:00",
         audioStatus: "pt-br-dubbed"
       },
       // 8. HOMEM-ARANHA: UM NOVO DIA (2026 - tt20221436) — Indisponível / Não lançado
@@ -11321,7 +11373,17 @@ var init_providerRegistry = __esm({
         }
         const targetTitle = (id.title || catalogItem?.title || openItem?.title || "").trim();
         const originalTitle = (id.originalTitle || catalogItem?.originalTitle || openItem?.originalTitle || "").trim();
-        const alternateTitles = id.alternateTitles || [];
+        const alternateTitles = id.alternateTitles ? [...id.alternateTitles] : [];
+        const candidateIds = [rawTargetId, imdbStr, tmdbNum ? `tmdb-${tmdbNum}` : "", tmdbNum].filter(Boolean);
+        for (const cid of candidateIds) {
+          if (!alternateTitles.includes(cid)) alternateTitles.push(cid);
+        }
+        if (id.year && !alternateTitles.includes(String(id.year))) {
+          alternateTitles.push(String(id.year));
+        }
+        if (id.year && targetTitle && !alternateTitles.includes(`${targetTitle} ${id.year}`)) {
+          alternateTitles.push(`${targetTitle} ${id.year}`);
+        }
         if (openItem) {
           if ((type === "series" || type === "anime") && openItem.episodes && openItem.episodes.length > 0) {
             const epNum = episode?.episode || 1;
@@ -12327,8 +12389,108 @@ var init_trustedTimeService = __esm({
   }
 });
 
+// src/core/catalog/CamBlockerEngine.ts
+var CamBlockerEngine;
+var init_CamBlockerEngine = __esm({
+  "src/core/catalog/CamBlockerEngine.ts"() {
+    init_theatricalFilterService();
+    CamBlockerEngine = class {
+      static {
+        // Padrões canônicos de gravações de sala de cinema
+        this.CAM_PATTERNS = [
+          /\bcam\b/i,
+          /\bhd-?cam\b/i,
+          /\bcam-?rip\b/i,
+          /\bcamrip\b/i,
+          /\btelesync\b/i,
+          /\btele-?sync\b/i,
+          /\bhd-?ts\b/i,
+          /\bhdts\b/i,
+          /\btele-?cine\b/i,
+          /\btelecine\b/i,
+          /\b\d+p\s*tc\b/i,
+          /\b\d+p\s*ts\b/i,
+          /\bdvdscr\b/i,
+          /\bscreener\b/i,
+          /\bdvd-?screener\b/i,
+          /\bcinema-?rip\b/i,
+          /\btheater-?rip\b/i,
+          /\btheatre-?rip\b/i,
+          /\bline-?audio\b/i,
+          /\bmic-?audio\b/i,
+          /\bdirect-?mic\b/i,
+          /\bworkprint\b/i,
+          /\bcinemax-?cam\b/i,
+          /\bc1nem4\b/i,
+          /\bhive-?cm8\b/i,
+          /\bcam-?latino\b/i,
+          /\bcam-?legendado\b/i,
+          /\bcam-?dublado\b/i,
+          /\bgravado-?no-?cinema\b/i,
+          /\bfilme-?de-?cinema\b/i,
+          /\bcinema\s*hd\b/i,
+          /\bqualidade\s*cinema\b/i
+        ];
+      }
+      /**
+       * Avalia uma fonte de vídeo contra evidências de gravação de cinema.
+       */
+      static evaluateStream(stream, targetItem) {
+        const sName = stream.name || "";
+        const sTitle = stream.title || "";
+        const sUrl = stream.url || "";
+        const combined = `${sName} ${sTitle} ${sUrl}`.toLowerCase();
+        const matchedSignatures = [];
+        for (const pattern of this.CAM_PATTERNS) {
+          if (pattern.test(combined)) {
+            matchedSignatures.push(pattern.source);
+          }
+        }
+        if (matchedSignatures.length > 0) {
+          return {
+            isCam: true,
+            confidence: "DEFINITIVE",
+            reason: `Rejeitado: assinatura de grava\xE7\xE3o de cinema detectada (${matchedSignatures[0]})`,
+            matchedSignatures
+          };
+        }
+        if (/\b(mic|line\s*in|audio\s*de\s*cinema|gravado\s*em\s*sala)\b/i.test(`${sTitle} ${sName}`)) {
+          return {
+            isCam: true,
+            confidence: "HIGH",
+            reason: "Rejeitado: \xE1udio de microfone de cinema detectado",
+            matchedSignatures: ["mic_audio"]
+          };
+        }
+        if (targetItem) {
+          const isRestricted = theatricalFilterService.isKnownUnreleasedOrTheatrical(targetItem) || !theatricalFilterService.isMovieAllowedSync(targetItem);
+          if (isRestricted) {
+            return {
+              isCam: true,
+              confidence: "DEFINITIVE",
+              reason: "Rejeitado: filme ainda n\xE3o lan\xE7ado",
+              matchedSignatures: ["unreleased_movie"]
+            };
+          }
+        }
+        return {
+          isCam: false,
+          confidence: "CLEAN",
+          matchedSignatures: []
+        };
+      }
+      /**
+       * Atalho booleano rápido para verificar se uma fonte é CAM.
+       */
+      static isCamStream(stream, targetItem) {
+        return this.evaluateStream(stream, targetItem).isCam;
+      }
+    };
+  }
+});
+
 // src/core/catalog/CatalogEligibilityService.ts
-var STORAGE_ELIGIBILITY_KEY, TTL_AVAILABLE_MS, TTL_UNAVAILABLE_MS, TTL_ERROR_MS, KNOWN_EXCLUDED_PATTERNS, CatalogEligibilityService, catalogEligibilityService;
+var TEMPORARILY_LOCKED_RELEASES, STORAGE_ELIGIBILITY_KEY, TTL_AVAILABLE_MS, TTL_UNAVAILABLE_MS, TTL_ERROR_MS, KNOWN_EXCLUDED_PATTERNS, CatalogEligibilityService, catalogEligibilityService;
 var init_CatalogEligibilityService = __esm({
   "src/core/catalog/CatalogEligibilityService.ts"() {
     init_types();
@@ -12340,6 +12502,38 @@ var init_CatalogEligibilityService = __esm({
     init_AdultContentService();
     init_BannedContentRegistry();
     init_trustedTimeService();
+    init_CamBlockerEngine();
+    TEMPORARILY_LOCKED_RELEASES = [
+      {
+        id: "movie-a-odisseia-2026",
+        aliases: ["movie-a-odisseia-2026", "tt33764258", "tmdb-1368337", "1368337"],
+        imdbId: "tt33764258",
+        tmdbId: "1368337",
+        title: "A Odisseia",
+        originalTitle: "The Odyssey",
+        year: 2026,
+        mediaType: "FILME" /* MOVIE */,
+        reevaluationDate: "2026-11-20T00:00:00-03:00",
+        requiresExplicitDigitalRelease: false,
+        requiresVerifiedHdSource: false,
+        noticeMessage: "Indispon\xEDvel temporariamente no cat\xE1logo. Retorno programado para 20/11/2026 \xE0s 00:00 (Hor\xE1rio de Bras\xEDlia)."
+      },
+      {
+        id: "movie-resident-evil-2026",
+        aliases: ["movie-resident-evil-2026", "tt13000574", "tmdb-1423191", "1423191"],
+        imdbId: "tt13000574",
+        tmdbId: "1423191",
+        title: "Resident Evil",
+        originalTitle: "Resident Evil",
+        year: 2026,
+        director: "Zach Cregger",
+        mediaType: "FILME" /* MOVIE */,
+        reevaluationDate: "2026-11-20T00:00:00-03:00",
+        requiresExplicitDigitalRelease: true,
+        requiresVerifiedHdSource: true,
+        noticeMessage: "Indispon\xEDvel temporariamente no cat\xE1logo. Primeira reavalia\xE7\xE3o programada para 20/11/2026 \xE0s 00:00 (Hor\xE1rio de Bras\xEDlia), sujeita \xE0 confirma\xE7\xE3o de disponibilidade digital oficial no Brasil e fonte HD autorizada/reproduz\xEDvel."
+      }
+    ];
     STORAGE_ELIGIBILITY_KEY = "zapitv_catalog_eligibility_v2";
     TTL_AVAILABLE_MS = 24 * 60 * 60 * 1e3;
     TTL_UNAVAILABLE_MS = 12 * 60 * 60 * 1e3;
@@ -12371,7 +12565,7 @@ var init_CatalogEligibilityService = __esm({
        */
       isTheOdyssey2026(item) {
         if (!item) return false;
-        const isMovie = item.type === "FILME" /* MOVIE */ || String(item.type || "").toUpperCase() === "FILME" || String(item.type || "").toLowerCase() === "movie";
+        const isMovie = !item.type || item.type === "FILME" /* MOVIE */ || String(item.type || "").toUpperCase() === "FILME" || String(item.type || "").toLowerCase() === "movie";
         const is2026 = Number(item.year) === 2026;
         if (!isMovie || !is2026) return false;
         const imdbId = (item.imdbId || "").trim().toLowerCase();
@@ -12380,21 +12574,98 @@ var init_CatalogEligibilityService = __esm({
         return imdbId === "tt33764258" || tmdbId === "1368337" || id === "movie-a-odisseia-2026" || id === "tt33764258" || id === "tmdb-1368337";
       }
       /**
+       * Identifica canonicamente a obra cinematográfica live-action Resident Evil (2026), dirigida por Zach Cregger
+       */
+      isResidentEvil2026(item) {
+        if (!item) return false;
+        const isMovie = !item.type || item.type === "FILME" /* MOVIE */ || String(item.type || "").toUpperCase() === "FILME" || String(item.type || "").toLowerCase() === "movie";
+        const is2026 = Number(item.year) === 2026;
+        if (!isMovie) return false;
+        const imdbId = (item.imdbId || "").trim().toLowerCase();
+        const tmdbId = String(item.tmdbId || "").trim();
+        const id = (item.id || "").trim().toLowerCase();
+        if (imdbId === "tt13000574" || tmdbId === "1423191" || id === "movie-resident-evil-2026" || id === "tt13000574" || id === "tmdb-1423191") {
+          return true;
+        }
+        if (item.director && /zach\s*cregger/i.test(item.director)) {
+          return true;
+        }
+        if (is2026) {
+          const titleNorm = (item.title || "").trim().toLowerCase();
+          const origNorm = (item.originalTitle || "").trim().toLowerCase();
+          if ((titleNorm === "resident evil" || origNorm === "resident evil") && !titleNorm.includes(":") && !origNorm.includes(":")) {
+            return true;
+          }
+        }
+        return false;
+      }
+      /**
+       * Retorna a configuração de lançamento temporariamente bloqueado se houver correspondência
+       */
+      getTemporarilyLockedRelease(item) {
+        if (!item) return null;
+        if (this.isTheOdyssey2026(item)) {
+          return TEMPORARILY_LOCKED_RELEASES[0];
+        }
+        if (this.isResidentEvil2026(item)) {
+          return TEMPORARILY_LOCKED_RELEASES[1];
+        }
+        return null;
+      }
+      /**
+       * Retorna a mensagem amigável e institucional de bloqueio temporário se houver
+       */
+      getLockedReleaseNotice(item) {
+        if (!item) return null;
+        const locked = this.getTemporarilyLockedRelease(item);
+        return locked?.noticeMessage || null;
+      }
+      /**
        * Retorna a data de agendamento de visibilidade pública se houver
        */
       getCatalogVisibleFrom(item) {
         if (!item) return null;
         if (item.catalogVisibleFrom) return item.catalogVisibleFrom;
-        if (this.isTheOdyssey2026(item)) {
-          return "2026-11-20T00:00:00-03:00";
+        const locked = this.getTemporarilyLockedRelease(item);
+        if (locked) {
+          return locked.reevaluationDate;
         }
         return null;
       }
       /**
        * Verifica se a obra está liberada para exibição no catálogo com base no tempo confiável
+       * e nas regras estritas de disponibilidade digital e fontes HD
        */
       isCatalogVisibleNow(item, referenceTimeMs) {
         if (!item) return false;
+        const locked = this.getTemporarilyLockedRelease(item);
+        if (locked) {
+          const visibleFromEpoch2 = Date.parse(locked.reevaluationDate);
+          const now2 = referenceTimeMs !== void 0 ? referenceTimeMs : trustedTimeService.getNow();
+          if (now2 < visibleFromEpoch2) {
+            return false;
+          }
+          if (locked.requiresExplicitDigitalRelease || locked.requiresVerifiedHdSource) {
+            if (item.availabilityStatus === "unavailable" || item.availabilityStatus === "unreleased") {
+              return false;
+            }
+            const key = this.getCanonicalKey(item);
+            const record = this.records.get(key);
+            const hasVerifiedStreams = Boolean(item.verifiedStreams && item.verifiedStreams.length > 0);
+            const hasVerifiedRecord = Boolean(record && record.isPubliclyPlayable && record.playbackStatus === "AVAILABLE" && record.validSourceCount > 0);
+            if (!hasVerifiedStreams && !hasVerifiedRecord) {
+              return false;
+            }
+            if (item.verifiedStreams && item.verifiedStreams.length > 0) {
+              const hasHdSource = item.verifiedStreams.some((s) => {
+                const isCam = CamBlockerEngine.evaluateStream(s).isCam || theatricalFilterService.isCamRecording(`${s.name || ""} ${s.title || ""}`);
+                return !isCam;
+              });
+              if (!hasHdSource) return false;
+            }
+          }
+          return true;
+        }
         const visibleFrom = this.getCatalogVisibleFrom(item);
         if (!visibleFrom) return true;
         const visibleFromEpoch = Date.parse(visibleFrom);
@@ -12714,7 +12985,7 @@ var init_CatalogEligibilityService = __esm({
               candidateSourceCount = streams.length;
               const validStreams = [];
               for (const s of streams) {
-                if (mediaType !== "movie" && theatricalFilterService.isCamRecording(`${s.name} ${s.title}`)) {
+                if (theatricalFilterService.isCamRecording(`${s.name} ${s.title}`) || CamBlockerEngine.evaluateStream(s, item).isCam) {
                   rejectedSourceCount++;
                   continue;
                 }
@@ -12837,7 +13108,7 @@ var init_CatalogEligibilityService = __esm({
             { season, episode: episodeNum }
           );
           const validStreams = streams.filter((s) => {
-            if (theatricalFilterService.isCamRecording(`${s.name} ${s.title}`)) return false;
+            if (theatricalFilterService.isCamRecording(`${s.name} ${s.title}`) || CamBlockerEngine.evaluateStream(s, item).isCam) return false;
             if (theatricalFilterService.isTrailerOrFakeSource(s).isFake) return false;
             return streamValidator.isContentMatchingTarget(
               `${s.name || ""} ${s.title || ""}`,
@@ -12947,7 +13218,15 @@ var init_CatalogEligibilityService = __esm({
         };
       }
       invalidateScheduledItemCaches(item) {
-        const keysToPurge = ["movie-a-odisseia-2026", "tt33764258", "tmdb-1368337"];
+        const keysToPurge = [
+          "movie-a-odisseia-2026",
+          "tt33764258",
+          "tmdb-1368337",
+          "movie-resident-evil-2026",
+          "tt13000574",
+          "tmdb-1423191",
+          "1423191"
+        ];
         if (item?.id) keysToPurge.push(item.id.toLowerCase());
         if (item?.imdbId) keysToPurge.push(item.imdbId.toLowerCase());
         if (item?.tmdbId) keysToPurge.push(`tmdb-${item.tmdbId}`);
@@ -13051,6 +13330,9 @@ var init_theatricalFilterService = __esm({
           this.cache.delete("movie-a-odisseia-2026");
           this.cache.delete("tt33764258");
           this.cache.delete("1368337");
+          this.cache.delete("movie-resident-evil-2026");
+          this.cache.delete("tt13000574");
+          this.cache.delete("1423191");
         }
         this.saveToStorage();
       }
@@ -16039,8 +16321,8 @@ var init_sourceConfidenceEngine = __esm({
           }
         }
         if (/resident evil/i.test(identity.title) && !/vendetta|damnation|degeneration|infinite darkness|death island/i.test(identity.title)) {
-          if (/vendetta|damnation|degeneration|infinite darkness|death island/i.test(combined)) {
-            reasons.push("Anima\xE7\xE3o 3D de Resident Evil n\xE3o pode substituir o filme live-action solicitado");
+          if (/vendetta|damnation|degeneration|infinite darkness|death island|kadokawa|marza|anime|animado|animation|animated/i.test(combined)) {
+            reasons.push("Anima\xE7\xE3o 3D de Resident Evil (Kadokawa/Vendetta/etc.) n\xE3o pode substituir o filme live-action solicitado");
             const evalResult2 = {
               stream,
               confidence: "REJECTED",
@@ -16050,6 +16332,21 @@ var init_sourceConfidenceEngine = __esm({
             };
             this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
             return evalResult2;
+          }
+          const isTarget2026 = identity.year === 2026 || identity.imdbId === "tt13000574" || identity.tmdbId === "1423191" || /2026/.test(identity.title);
+          if (isTarget2026) {
+            if (/welcome to raccoon city|raccoon city|apocalypse|extinction|afterlife|retribution|final chapter|netflix/i.test(combined)) {
+              reasons.push("Adapta\xE7\xE3o anterior de Resident Evil n\xE3o corresponde \xE0 produ\xE7\xE3o live-action de 2026");
+              const evalResult2 = {
+                stream,
+                confidence: "REJECTED",
+                isMatch: false,
+                reasons,
+                canonicalTitle: identity.title
+              };
+              this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
+              return evalResult2;
+            }
           }
         }
         const targetTokens = canonicalIdentityService.extractSignificantTokens(identity.title);
@@ -17326,106 +17623,6 @@ var init_searchService = __esm({
       }
     };
     searchService = SearchService.getInstance();
-  }
-});
-
-// src/core/catalog/CamBlockerEngine.ts
-var CamBlockerEngine;
-var init_CamBlockerEngine = __esm({
-  "src/core/catalog/CamBlockerEngine.ts"() {
-    init_theatricalFilterService();
-    CamBlockerEngine = class {
-      static {
-        // Padrões canônicos de gravações de sala de cinema
-        this.CAM_PATTERNS = [
-          /\bcam\b/i,
-          /\bhd-?cam\b/i,
-          /\bcam-?rip\b/i,
-          /\bcamrip\b/i,
-          /\btelesync\b/i,
-          /\btele-?sync\b/i,
-          /\bhd-?ts\b/i,
-          /\bhdts\b/i,
-          /\btele-?cine\b/i,
-          /\btelecine\b/i,
-          /\b\d+p\s*tc\b/i,
-          /\b\d+p\s*ts\b/i,
-          /\bdvdscr\b/i,
-          /\bscreener\b/i,
-          /\bdvd-?screener\b/i,
-          /\bcinema-?rip\b/i,
-          /\btheater-?rip\b/i,
-          /\btheatre-?rip\b/i,
-          /\bline-?audio\b/i,
-          /\bmic-?audio\b/i,
-          /\bdirect-?mic\b/i,
-          /\bworkprint\b/i,
-          /\bcinemax-?cam\b/i,
-          /\bc1nem4\b/i,
-          /\bhive-?cm8\b/i,
-          /\bcam-?latino\b/i,
-          /\bcam-?legendado\b/i,
-          /\bcam-?dublado\b/i,
-          /\bgravado-?no-?cinema\b/i,
-          /\bfilme-?de-?cinema\b/i,
-          /\bcinema\s*hd\b/i,
-          /\bqualidade\s*cinema\b/i
-        ];
-      }
-      /**
-       * Avalia uma fonte de vídeo contra evidências de gravação de cinema.
-       */
-      static evaluateStream(stream, targetItem) {
-        const sName = stream.name || "";
-        const sTitle = stream.title || "";
-        const sUrl = stream.url || "";
-        const combined = `${sName} ${sTitle} ${sUrl}`.toLowerCase();
-        const matchedSignatures = [];
-        for (const pattern of this.CAM_PATTERNS) {
-          if (pattern.test(combined)) {
-            matchedSignatures.push(pattern.source);
-          }
-        }
-        if (matchedSignatures.length > 0) {
-          return {
-            isCam: true,
-            confidence: "DEFINITIVE",
-            reason: `Rejeitado: assinatura de grava\xE7\xE3o de cinema detectada (${matchedSignatures[0]})`,
-            matchedSignatures
-          };
-        }
-        if (/\b(mic|line\s*in|audio\s*de\s*cinema|gravado\s*em\s*sala)\b/i.test(`${sTitle} ${sName}`)) {
-          return {
-            isCam: true,
-            confidence: "HIGH",
-            reason: "Rejeitado: \xE1udio de microfone de cinema detectado",
-            matchedSignatures: ["mic_audio"]
-          };
-        }
-        if (targetItem) {
-          const isRestricted = theatricalFilterService.isKnownUnreleasedOrTheatrical(targetItem) || !theatricalFilterService.isMovieAllowedSync(targetItem);
-          if (isRestricted) {
-            return {
-              isCam: true,
-              confidence: "DEFINITIVE",
-              reason: "Rejeitado: filme ainda n\xE3o lan\xE7ado",
-              matchedSignatures: ["unreleased_movie"]
-            };
-          }
-        }
-        return {
-          isCam: false,
-          confidence: "CLEAN",
-          matchedSignatures: []
-        };
-      }
-      /**
-       * Atalho booleano rápido para verificar se uma fonte é CAM.
-       */
-      static isCamStream(stream, targetItem) {
-        return this.evaluateStream(stream, targetItem).isCam;
-      }
-    };
   }
 });
 
@@ -20675,11 +20872,10 @@ var MonthlyFeaturedRankingService = class _MonthlyFeaturedRankingService {
           continue;
         }
       }
-      const isOdyssey2026 = (catalogItem.imdbId === "tt33764258" || catalogItem.tmdbId === "1368337" || catalogItem.id.includes("odisseia")) && catalogItem.year === 2026;
-      if (isOdyssey2026) {
-        const releaseTimeBRT = (/* @__PURE__ */ new Date("2026-11-20T00:00:00-03:00")).getTime();
-        const nowTime = Date.now();
-        if (nowTime < releaseTimeBRT) {
+      const lockedRelease = catalogEligibilityService.getTemporarilyLockedRelease(catalogItem);
+      if (lockedRelease) {
+        const isCurrentlyVisible = catalogEligibilityService.isCatalogVisibleNow(catalogItem);
+        if (!isCurrentlyVisible) {
           audit.push({
             imdbId: cand.imdbId,
             title: cand.title,
@@ -20690,7 +20886,7 @@ var MonthlyFeaturedRankingService = class _MonthlyFeaturedRankingService {
             status: "REJECTED",
             isIncluded: false,
             canonicalId: catalogItem.id,
-            rejectionReason: "Conte\xFAdo temporariamente oculto no cat\xE1logo p\xFAblico at\xE9 20/11/2026 \xE0s 00h00 BRT",
+            rejectionReason: lockedRelease.noticeMessage || "Conte\xFAdo temporariamente oculto no cat\xE1logo p\xFAblico at\xE9 20/11/2026 \xE0s 00:00 (Hor\xE1rio de Bras\xEDlia).",
             score: cand.cumulativeScore
           });
           continue;
@@ -21444,6 +21640,27 @@ var FeaturedRankingService = class _FeaturedRankingService {
           rejectionReason: "T\xEDtulo ainda n\xE3o lan\xE7ado comercialmente (data de estreia futura)"
         });
         continue;
+      }
+      const lockedRelease = catalogEligibilityService.getTemporarilyLockedRelease(catalogItem);
+      if (lockedRelease) {
+        if (!catalogEligibilityService.isCatalogVisibleNow(catalogItem)) {
+          audit.push({
+            imdbId: cand.imdbId,
+            title: cand.title,
+            imdbTitle: cand.title,
+            canonicalTitle: catalogItem.title,
+            year: cand.year,
+            mediaType: rankType,
+            imdbRank: rankPosition,
+            rankPosition,
+            status: "REJECTED",
+            isIncluded: false,
+            canonicalId: catalogItem.id,
+            availabilityStatus: "temporarily_locked",
+            rejectionReason: lockedRelease.noticeMessage || "Conte\xFAdo temporariamente oculto no cat\xE1logo p\xFAblico"
+          });
+          continue;
+        }
       }
       if (rankType === "movie") {
         const isTheatricallyAllowed = theatricalFilterService.isMovieAllowedSync(catalogItem);

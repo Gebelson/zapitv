@@ -1217,7 +1217,25 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       )}
       
       {playerOnly && !isPlaying && (
-        <div className="fixed inset-0 z-[500] bg-black flex items-center justify-center"><ZapiLoader size="lg" /></div>
+        <div className="fixed inset-0 z-[500] bg-black flex flex-col items-center justify-center p-6 text-center text-white">
+          {isScheduledUnavailable ? (
+            <div className="max-w-md p-6 rounded-2xl bg-[#0f1115] border border-amber-500/30 flex flex-col items-center gap-4 shadow-2xl">
+              <Clock className="w-12 h-12 text-amber-400 shrink-0" />
+              <h2 className="text-xl font-bold text-white">{item.title}</h2>
+              <p className="text-sm text-amber-200">
+                {catalogEligibilityService.getLockedReleaseNotice(item) || 'Este título está temporariamente indisponível no catálogo. Aguardando disponibilidade oficial em HD.'}
+              </p>
+              <button
+                onClick={handleClose}
+                className="mt-2 px-6 py-2.5 rounded-xl bg-[#007df7] hover:bg-[#0069d9] text-white font-semibold text-sm transition-all shadow-lg shadow-[#007df7]/25"
+              >
+                Voltar ao catálogo
+              </button>
+            </div>
+          ) : (
+            <ZapiLoader size="lg" />
+          )}
+        </div>
       )}
       {!isPlaying && !playerOnly && (
         <div key="modal-detail-stage" className="min-h-full w-full flex items-start justify-center py-3 sm:py-8 md:py-12 px-2 sm:px-4 md:px-6">
@@ -1283,7 +1301,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                   {isScheduledUnavailable ? (
                     <div className="flex items-center gap-2.5 px-4 sm:px-6 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs sm:text-sm font-semibold select-none shadow-lg">
                       <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 shrink-0" />
-                      <span>Indisponível temporariamente no catálogo. Retorno programado para 20/11/2026 às 00:00 (Horário de Brasília).</span>
+                      <span>{catalogEligibilityService.getLockedReleaseNotice(item) || 'Indisponível temporariamente no catálogo. Retorno programado para 20/11/2026 às 00:00 (Horário de Brasília).'}</span>
                     </div>
                   ) : (
                     <DetailModalTvButton 

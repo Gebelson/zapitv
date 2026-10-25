@@ -49,7 +49,7 @@ export const PARKING_SIGNATURES = [
 // Regras específicas de bloqueio para conteúdos trocados / corrompidos em provedores upstream
 export const KNOWN_UPSTREAM_MISMATCHES: Array<{
   targetPattern: RegExp;
-  rejectStream: (stream: StremioStream) => boolean;
+  rejectStream: (stream: StremioStream, rawCandidates?: string[]) => boolean;
 }> = [
   // 1. Doraemon: provedores upstream mapeiam erroneamente para Sparks of Tomorrow (/1684/), kurage.live proxy ou ER Plantão Médico ou Ultraman
   {
@@ -122,6 +122,62 @@ export const KNOWN_UPSTREAM_MISMATCHES: Array<{
       ) {
         return true;
       }
+      return false;
+    }
+  },
+  // 6. Resident Evil (2026 live-action por Zach Cregger / tt13000574 / 1423191)
+  // Rejeita terminantemente animações (Kadokawa / Marza / Vendetta / Degeneration / Damnation / Death Island / Infinite Darkness)
+  // e adaptações anteriores da franquia associadas erroneamente ao título de 2026.
+  {
+    targetPattern: /resident\s*evil|tt13000574|1423191|movie-resident-evil-2026/i,
+    rejectStream: (s, rawCandidates = []) => {
+      const text = `${s.name || ''} ${s.title || ''} ${s.description || ''} ${s.url || ''}`.toLowerCase();
+      const candText = (Array.isArray(rawCandidates) ? rawCandidates.join(' ') : String(rawCandidates || '')).toLowerCase();
+      const isTargetAnimation = /vendetta|damnation|degeneration|infinite darkness|death island/i.test(candText);
+
+      // Rejeita animações para produções live-action
+      if (!isTargetAnimation) {
+        const animationTerms = [
+          'vendetta',
+          'kadokawa',
+          'marza',
+          'degeneration',
+          'damnation',
+          'death island',
+          'infinite darkness',
+          'anime',
+          'animado',
+          'animation',
+          'animated'
+        ];
+        if (animationTerms.some(term => text.includes(term))) {
+          return true;
+        }
+      }
+
+      // Se a obra solicitada for especificamente o live-action de 2026 (Zach Cregger / tt13000574 / 1423191)
+      const isTarget2026 = /tt13000574|1423191|movie-resident-evil-2026|2026|zach/i.test(candText);
+      if (isTarget2026) {
+        const otherAdaptations = [
+          'welcome to raccoon city',
+          'raccoon city',
+          'apocalypse',
+          'extinction',
+          'afterlife',
+          'retribution',
+          'final chapter',
+          'netflix'
+        ];
+        if (otherAdaptations.some(term => text.includes(term))) {
+          return true;
+        }
+        // Rejeita anos anteriores a 2026 (1990-2024)
+        const yearMatches = text.match(/\b(19\d{2}|20[0-2][0-4])\b/g);
+        if (yearMatches && yearMatches.length > 0) {
+          return true;
+        }
+      }
+
       return false;
     }
   }
@@ -467,7 +523,7 @@ class StreamValidator {
     // 2. Aplica regras de bloqueio de desvios conhecidos (ex: Doraemon -> Sparks of Tomorrow)
     for (const rule of KNOWN_UPSTREAM_MISMATCHES) {
       if (rawCandidates.some(cand => rule.targetPattern.test(cand))) {
-        if (rule.rejectStream(stream)) {
+        if (rule.rejectStream(stream, rawCandidates)) {
           console.warn(`[StreamValidator] Stream rejeitado por desvio conhecido para '[${rawCandidates.join(', ')}]': ${sTitle || sUrl}`);
           return false;
         }
