@@ -6232,8 +6232,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 7.7,
         year: 2026,
-        image: "https://images.metahub.space/poster/medium/tt28289508/img",
-        backdrop: "https://images.metahub.space/background/medium/tt28289508/img",
+        image: "https://image.tmdb.org/t/p/w500/jM7bH9b9QT22PtkTyHzxbXx4lDI.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/jM7bH9b9QT22PtkTyHzxbXx4lDI.jpg",
         description: "Conflitos territoriais sangrentos entre fam\xEDlias rivais em uma cidade fronteiri\xE7a dominada pelo crime organizado.",
         genres: ["Crime", "Drama"],
         imdbId: "tt28289508",
@@ -7211,8 +7211,8 @@ var init_featuredCatalogItems = __esm({
         mediaFormat: "series",
         rating: 8.7,
         year: 2024,
-        image: "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/gJL5iqPyZzgvI1Vb9k4PqB6fF6C.jpg",
+        image: "https://image.tmdb.org/t/p/w500/eCD7WS9h4lCT8N4Xavc9u8R1IGk.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/xMNH87maNLt9n2bMDYeI6db5VFm.jpg",
         description: "Em um mundo onde ca\xE7adores despertam habilidades sobrenaturais, Sung Jin-woo, o ca\xE7ador mais fraco da humanidade, recebe uma chance \xFAnica de subir de n\xEDvel sem limites.",
         genres: ["Anime", "A\xE7\xE3o", "Aventura", "Fantasia"],
         aniListId: 151807,
@@ -7228,7 +7228,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Estou Acostumado",
             description: "Sung Jin-woo lidera um grupo de expedi\xE7\xE3o rumo a uma dungeon dupla com consequ\xEAncias fatais.",
-            image: "https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr0xtJuPxJ8BGdM.jpg"
+            image: "https://image.tmdb.org/t/p/w500/eCD7WS9h4lCT8N4Xavc9u8R1IGk.jpg"
           }
         ]
       },
@@ -7242,8 +7242,8 @@ var init_featuredCatalogItems = __esm({
         mediaFormat: "series",
         rating: 8.6,
         year: 2020,
-        image: "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/gmECX1Dv3y54wQ8o3t300gJ8uVp.jpg",
+        image: "https://image.tmdb.org/t/p/w500/8R1mMSC1gX1cg5ed7ns49JOEqw3.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/qpin8cASXEVtwhzNsprHYFiOAGk.jpg",
         description: "Yuji Itadori engole um dedo amaldi\xE7oado de Ryomen Sukuna e ingressa na Escola de Feiti\xE7aria de T\xF3quio para expurgar maldi\xE7\xF5es amea\xE7adoras.",
         genres: ["Anime", "A\xE7\xE3o", "Sobrenatural", "Fantasia"],
         aniListId: 113415,
@@ -7259,7 +7259,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Ryomen Sukuna",
             description: "Yuji Itadori quebra o selo de um talism\xE3 amaldi\xE7oado para salvar seus colegas de escola.",
-            image: "https://image.tmdb.org/t/p/w500/hD8pZc961t2F1oJ3w0z9Uf9w1hS.jpg"
+            image: "https://image.tmdb.org/t/p/w500/8R1mMSC1gX1cg5ed7ns49JOEqw3.jpg"
           }
         ]
       },
@@ -7304,8 +7304,8 @@ var init_featuredCatalogItems = __esm({
         mediaFormat: "series",
         rating: 8.5,
         year: 2024,
-        image: "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/1vKxVp97TqCjO1w9wE0K3G8kU9V.jpg",
+        image: "https://image.tmdb.org/t/p/w500/vtQug1eOyeU2VXIpNoDF1lTlcH4.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/uNTrRKIOyKYISthoeizghtXPEOK.jpg",
         description: "Momo Ayase e Okarun desafiam suas cren\xE7as em fantasmas e alien\xEDgenas, desencadeando confrontos hil\xE1rios e insanos no Jap\xE3o.",
         genres: ["Anime", "A\xE7\xE3o", "Com\xE9dia", "Sobrenatural"],
         aniListId: 171018,
@@ -7321,7 +7321,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Isso \xE9 o Amor Come\xE7ando?",
             description: "Momo e Okarun apostam para ver quem encontra alien\xEDgenas ou esp\xEDritos primeiro.",
-            image: "https://image.tmdb.org/t/p/w500/9bV1h2042Uv4Vz32wA8o4h8U1c0.jpg"
+            image: "https://image.tmdb.org/t/p/w500/vtQug1eOyeU2VXIpNoDF1lTlcH4.jpg"
           }
         ]
       },
@@ -7335,8 +7335,8 @@ var init_featuredCatalogItems = __esm({
         mediaFormat: "series",
         rating: 8.9,
         year: 2022,
-        image: "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/9pkbtK1kLhR1wzZg27v8O9eU4hV.jpg",
+        image: "https://image.tmdb.org/t/p/w500/iigTJJskR1PcjjXqxdyJwVB3BoU.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/z8IPicmEKXUO4I2UDdMEqw7RqOE.jpg",
         description: "A guerra milenar entre os Shinigamis da Soul Society e o ex\xE9rcito Quincy liderado por Yhwach chega ao seu cl\xEDmax destrutivo.",
         genres: ["Anime", "A\xE7\xE3o", "Aventura", "Sobrenatural"],
         aniListId: 114446,
@@ -7352,7 +7352,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Guerra de Sangue",
             description: "A Soul Society \xE9 surpreendida por um ataque coordenado do Wandenreich.",
-            image: "https://image.tmdb.org/t/p/w500/2Eewgp7o5AU1xCjrXY2euTrneU0.jpg"
+            image: "https://image.tmdb.org/t/p/w500/iigTJJskR1PcjjXqxdyJwVB3BoU.jpg"
           }
         ]
       },
@@ -7397,8 +7397,8 @@ var init_featuredCatalogItems = __esm({
         mediaFormat: "series",
         rating: 8.5,
         year: 2022,
-        image: "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/vI3a3n07Jq9g6iK2k69uP8wV7hX.jpg",
+        image: "https://image.tmdb.org/t/p/w500/mIz0eKhzHuSPeRSePCyoCt9bKVp.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/5DUMPBSnHOZsbBv81GFXZXvDpo6.jpg",
         description: "Denji renasce como um h\xEDbrido motosserra ap\xF3s se fundir com seu cachorro dem\xF4nio Pochita e entra para a Seguran\xE7a P\xFAblica.",
         genres: ["Anime", "A\xE7\xE3o", "Sobrenatural", "Horror"],
         aniListId: 127230,
@@ -7414,7 +7414,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Cachorro e Motosserra",
             description: "Denji trabalha ca\xE7ando dem\xF4nios para pagar as d\xEDvidas deixadas por seu falecido pai.",
-            image: "https://image.tmdb.org/t/p/w500/npdB6eFz4qt9CdISEgQiFiUbL9v.jpg"
+            image: "https://image.tmdb.org/t/p/w500/mIz0eKhzHuSPeRSePCyoCt9bKVp.jpg"
           }
         ]
       },
@@ -7428,8 +7428,8 @@ var init_featuredCatalogItems = __esm({
         mediaFormat: "series",
         rating: 9,
         year: 2013,
-        image: "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/hP9cKk97kFh7g1w9w7h5g1kL2.jpg",
+        image: "https://image.tmdb.org/t/p/w500/8aMqmB5xSblsZc7bLMEhE28yHa2.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/rqbCbjB19amtOtFQbb3K2lgm2zv.jpg",
         description: "Eren Yeager e a Tropa de Explora\xE7\xE3o lutam desesperadamente pela sobreviv\xEAncia humana contra gigantes devoradores de homens.",
         genres: ["Anime", "A\xE7\xE3o", "Drama", "Fantasia"],
         aniListId: 16498,
@@ -7445,7 +7445,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Para Voc\xEA, Daqui a 2.000 Anos",
             description: "A Muralha Maria \xE9 rompida pelo Tit\xE3 Colossal e o caos engole a cidade de Shiganshina.",
-            image: "https://image.tmdb.org/t/p/w500/8C9n4uK1n6bK7L5F9k9w7h5g1kL.jpg"
+            image: "https://image.tmdb.org/t/p/w500/8aMqmB5xSblsZc7bLMEhE28yHa2.jpg"
           }
         ]
       },
@@ -7552,8 +7552,8 @@ var init_featuredCatalogItems = __esm({
         mediaFormat: "series",
         rating: 8.2,
         year: 2022,
-        image: "https://image.tmdb.org/t/p/w500/i9pZkK9w8vK1m9x2eX2xK1v8a7Z3.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/9pZkK9w8vK1m9x2eX2xK1v8a7Z4.jpg",
+        image: "https://image.tmdb.org/t/p/w500/bnTXjwOwdUz8MKFyQCNf0hG4fdL.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/AjwoDj77HLlqcpwEGqsnvMXm5my.jpg",
         description: "Trezentos atacantes colegiais do Jap\xE3o s\xE3o confinados em uma pris\xE3o de treinamento de futebol para forjar o maior atacante ego\xEDsta do mundo.",
         genres: ["Anime", "Esporte", "A\xE7\xE3o", "Drama"],
         aniListId: 163148,
@@ -7569,7 +7569,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Sonho",
             description: "Yoichi Isagi recebe o convite misterioso da Uni\xE3o Japonesa de Futebol para o projeto Blue Lock.",
-            image: "https://image.tmdb.org/t/p/w500/i9pZkK9w8vK1m9x2eX2xK1v8a7Z3.jpg"
+            image: "https://image.tmdb.org/t/p/w500/bnTXjwOwdUz8MKFyQCNf0hG4fdL.jpg"
           }
         ]
       }

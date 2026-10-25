@@ -59,22 +59,28 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   disableScale = false,
   suppressFocusBorder = false
 }) => {
-  // Prioriza o poster vertical real em 2:3 com luminosidade e cores originais
+  // Prioriza o poster vertical verificado ou original com resolução calibrada
   const rawPoster = posterRecoveryService.getCachedPoster(item) || item.image || item.poster || item.backdrop || '';
   const targetPoster = tvPerformanceProfileService.getOptimizedPosterUrl(rawPoster);
+
   const [prevItemId, setPrevItemId] = useState(item.id);
   const [imgSrc, setImgSrc] = useState<string>(targetPoster);
   const [hasImageError, setHasImageError] = useState(!targetPoster);
+
   const cardContainerRef = useRef<HTMLDivElement>(null);
   const failedUrlsRef = useRef<Set<string>>(new Set());
   const currentItemIdRef = useRef(item.id);
   currentItemIdRef.current = item.id;
   const isMountedRef = useRef(true);
   const isRecoveringRef = useRef(false);
+  const generationRef = useRef(0);
+  const recoveryAttemptsRef = useRef(0);
 
   // Sincronização síncrona no render: elimina o atraso de 1 frame e evita piscadas na troca de itens dos slots
   if (prevItemId !== item.id) {
     setPrevItemId(item.id);
+    generationRef.current++;
+    recoveryAttemptsRef.current = 0;
     failedUrlsRef.current.clear();
     isRecoveringRef.current = false;
     setImgSrc(targetPoster);
@@ -103,12 +109,20 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
     if (isRecoveringRef.current) return;
     if (!item) return;
 
+    // Limite de segurança de tentativas por ciclo de vida do item para impedir loops
+    if (recoveryAttemptsRef.current >= 3) {
+      setHasImageError(true);
+      return;
+    }
+
     const activeId = item.id;
+    const activeGen = generationRef.current;
+    recoveryAttemptsRef.current++;
     isRecoveringRef.current = true;
 
     try {
       const recovered = await posterRecoveryService.recoverPoster(item);
-      if (!isMountedRef.current || currentItemIdRef.current !== activeId) {
+      if (!isMountedRef.current || currentItemIdRef.current !== activeId || generationRef.current !== activeGen) {
         return;
       }
 
@@ -120,7 +134,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
         setHasImageError(true);
       }
     } catch {
-      if (isMountedRef.current && currentItemIdRef.current === activeId) {
+      if (isMountedRef.current && currentItemIdRef.current === activeId && generationRef.current === activeGen) {
         setHasImageError(true);
       }
     } finally {
@@ -131,7 +145,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   // Monitora montagem e aciona recuperação automática se o item montar sem imagem ou com erro
   useEffect(() => {
     isMountedRef.current = true;
-    if (hasImageError && !isRecoveringRef.current) {
+    if (hasImageError && !isRecoveringRef.current && recoveryAttemptsRef.current === 0) {
       triggerRecovery();
     }
     return () => {
@@ -143,7 +157,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   useEffect(() => {
     const unsubscribe = posterRecoveryService.subscribe((recoveredItemId, newUrl) => {
       if (!isMountedRef.current || currentItemIdRef.current !== item.id) return;
-      if (recoveredItemId === item.id && newUrl) {
+      if (recoveredItemId === item.id && newUrl && !failedUrlsRef.current.has(newUrl)) {
         const opt = tvPerformanceProfileService.getOptimizedPosterUrl(newUrl);
         setImgSrc(opt);
         setHasImageError(false);
@@ -173,14 +187,15 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
 
     if (imgSrc) {
       failedUrlsRef.current.add(imgSrc);
+      posterRecoveryService.reportImageFailure(item, imgSrc);
     }
 
-    // Candidatos em ordem de preferência:
-    // 1. URL original do poster quando versão otimizada falhar
-    // 2. Poster em cache
-    // 3. Backdrop otimizado
-    // 4. Backdrop original
-    // 5. Backdrops ou imagens adicionais
+    // Candidatos em ordem de preferência estrita:
+    // 1. URL original do poster quando versão otimizada falhar (Requisito 5)
+    // 2. Poster em cache se disponível e diferente da URL falhada
+    // 3. Outras imagens existentes nos metadados
+    // 4. Backdrop otimizado
+    // 5. Backdrop original
     const cached = posterRecoveryService.getCachedPoster(item);
     const rawPosterUrl = item.image || item.poster || '';
     const optPosterUrl = tvPerformanceProfileService.getOptimizedPosterUrl(rawPosterUrl);
@@ -188,19 +203,20 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
     const optBackdrop = tvPerformanceProfileService.getOptimizedPosterUrl(rawBackdrop);
 
     const candidates = [
-      rawPosterUrl !== optPosterUrl ? rawPosterUrl : '',
+      (optPosterUrl && imgSrc === optPosterUrl && rawPosterUrl !== optPosterUrl) ? rawPosterUrl : '',
       cached ? tvPerformanceProfileService.getOptimizedPosterUrl(cached) : '',
       cached || '',
+      ...(Array.isArray(item.images) ? item.images : []),
       optBackdrop,
       rawBackdrop !== optBackdrop ? rawBackdrop : '',
-      ...(Array.isArray(item.backdrops) ? item.backdrops : []),
-      ...(Array.isArray(item.images) ? item.images : [])
-    ].filter((url): url is string => Boolean(url && typeof url === 'string' && url.startsWith('http')));
+      ...(Array.isArray(item.backdrops) ? item.backdrops : [])
+    ].filter((url): url is string => Boolean(url && typeof url === 'string' && url.startsWith('http') && !url.includes('broken_404')));
 
     const nextCandidate = candidates.find(url => url !== imgSrc && !failedUrlsRef.current.has(url));
 
     if (nextCandidate) {
       setImgSrc(nextCandidate);
+      setHasImageError(false);
     } else {
       setHasImageError(true);
       triggerRecovery();
