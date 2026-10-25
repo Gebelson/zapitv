@@ -3,7 +3,7 @@ import Hls, { type HlsConfig } from 'hls.js';
 import { 
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, 
   Settings, AlertCircle, RefreshCw, Radio, ChevronLeft, ChevronRight, X,
-  PictureInPicture2, ExternalLink, ShieldCheck
+  PictureInPicture2, ShieldCheck
 } from 'lucide-react';
 import { LiveChannel, LiveStreamSource } from '../../core/livetv/types';
 import { channelHealthService } from '../../core/livetv/channelHealthService';
@@ -92,8 +92,8 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   const playStartTimeRef = useRef<number>(0);
 
   const isTv = tvModeService.isTvMode() || (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv'));
-  const STARTUP_TIMEOUT_MS = isTv ? 12000 : 9000;
-  const MAX_STALL_TIMEOUT_S = isTv ? 18 : 15;
+  const STARTUP_TIMEOUT_MS = isTv ? 10000 : 7000;
+  const MAX_STALL_TIMEOUT_S = isTv ? 16 : 12;
 
   // Mantém referência do canal ativo para evitar conflitos assíncronos
   useEffect(() => {
@@ -310,21 +310,21 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
     video.volume = currentPrefs.volume;
 
     if (streamUrl.includes('.m3u8') && Hls.isSupported()) {
-      // Perfil de reprodução ESTÁVEL com parâmetros diferenciados (TV vs PC)
+      // Perfil de reprodução ESTÁVEL e ÁGIL (TTFF 2-3s) com parâmetros otimizados
       const hlsConfig: Partial<HlsConfig> = isTv
         ? {
             enableWorker: false, // Menor consumo de memória e overhead em navegadores de TV
             lowLatencyMode: false,
             backBufferLength: 10,
-            maxBufferLength: 20,
-            maxMaxBufferLength: 35,
-            liveSyncDurationCount: 4,
-            liveMaxLatencyDurationCount: 8,
-            manifestLoadingTimeOut: 10000,
+            maxBufferLength: 15,
+            maxMaxBufferLength: 30,
+            liveSyncDurationCount: 3,
+            liveMaxLatencyDurationCount: 6,
+            manifestLoadingTimeOut: 6000,
             manifestLoadingMaxRetry: 2,
-            levelLoadingTimeOut: 10000,
+            levelLoadingTimeOut: 6000,
             levelLoadingMaxRetry: 2,
-            fragLoadingTimeOut: 12000,
+            fragLoadingTimeOut: 8000,
             fragLoadingMaxRetry: 2,
             abrEwmaDefaultEstimate: 1500000,
             startLevel: -1
@@ -332,17 +332,17 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
         : {
             enableWorker: true,
             lowLatencyMode: false,
-            backBufferLength: 20,
-            maxBufferLength: 40,
-            maxMaxBufferLength: 80,
-            liveSyncDurationCount: 5,
-            liveMaxLatencyDurationCount: 10,
-            manifestLoadingTimeOut: 12000,
-            manifestLoadingMaxRetry: 3,
-            levelLoadingTimeOut: 12000,
-            levelLoadingMaxRetry: 3,
-            fragLoadingTimeOut: 15000,
-            fragLoadingMaxRetry: 3,
+            backBufferLength: 15,
+            maxBufferLength: 25,
+            maxMaxBufferLength: 50,
+            liveSyncDurationCount: 3,
+            liveMaxLatencyDurationCount: 6,
+            manifestLoadingTimeOut: 6000,
+            manifestLoadingMaxRetry: 2,
+            levelLoadingTimeOut: 6000,
+            levelLoadingMaxRetry: 2,
+            fragLoadingTimeOut: 8000,
+            fragLoadingMaxRetry: 2,
             abrEwmaDefaultEstimate: 2000000,
             startLevel: -1
           };
@@ -633,7 +633,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
     }
   };
 
-  // Se o canal requer acesso externo oficial (ex: SporTV, ESPN, Premiere, TV Globo ao vivo oficial)
+  // Se o canal não possui fonte incorporável autorizada (ex: canais estritamente pagos ou protegidos por DRM proprietário)
   if (channel.requiresExternalAccess) {
     return (
       <div
@@ -649,7 +649,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
         <div className="flex items-center gap-2 mb-2">
           <ShieldCheck className="w-4 h-4 text-emerald-400" />
           <span className="text-[11px] font-black uppercase tracking-widest text-emerald-400">
-            Transmissão Oficial Protegida
+            Grade Oficial
           </span>
         </div>
 
@@ -658,15 +658,12 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
           {channel.description || 'Este canal transmite sua grade linear sob direitos de transmissão na plataforma autorizada oficial.'}
         </p>
 
-        <a
-          href={channel.externalAccessUrl || '#'}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-[#007df7] to-[#005bb5] hover:from-[#0069d9] hover:to-[#004a99] text-white rounded-xl text-xs md:text-sm font-bold uppercase tracking-wider transition-all shadow-xl shadow-[#007df7]/30 hover:scale-105"
-        >
-          <span>Abrir no {channel.externalProviderName || 'Provedor Oficial'}</span>
-          <ExternalLink className="w-4 h-4" />
-        </a>
+        <div className="px-6 py-4 rounded-2xl bg-white/5 border border-white/10 max-w-md text-center shadow-lg backdrop-blur-sm">
+          <p className="text-white text-sm md:text-base font-bold mb-1.5">Transmissão indisponível no momento</p>
+          <p className="text-gray-400 text-xs leading-relaxed">
+            Este canal transmite sua grade linear exclusivamente em sua plataforma oficial credenciada ({channel.externalProviderName || 'Provedor Oficial'}).
+          </p>
+        </div>
 
         {onClose && (
           <button

@@ -268,6 +268,9 @@ export class LiveStreamValidator {
         let hasLivePlaylist = true;
 
         if (isHls) {
+          // Base URL para resolução relativa (considerando redirecionamentos 302/301)
+          const masterBaseUrl = response.url || fetchTarget || url;
+
           // Verifica se é uma playlist ao vivo contínua
           if (text.includes('#EXT-X-ENDLIST')) {
             hasLivePlaylist = false;
@@ -279,30 +282,43 @@ export class LiveStreamValidator {
             const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
             let variantUrl = '';
             for (let i = 0; i < lines.length; i++) {
-              if (lines[i].startsWith('#EXT-X-STREAM-INF') && i + 1 < lines.length) {
-                variantUrl = lines[i + 1];
-                break;
+              if (lines[i].startsWith('#EXT-X-STREAM-INF')) {
+                for (let j = i + 1; j < lines.length; j++) {
+                  if (!lines[j].startsWith('#')) {
+                    variantUrl = lines[j];
+                    break;
+                  }
+                }
+                if (variantUrl) break;
               }
             }
 
             if (variantUrl && !variantUrl.startsWith('#')) {
               try {
-                const resolvedVariant = new URL(variantUrl, url).href;
+                const resolvedVariant = new URL(variantUrl, masterBaseUrl).href;
                 const vRes = await fetch(resolvedVariant, {
                   method: 'GET',
                   headers: { 'Range': 'bytes=0-4096' },
                   signal: AbortSignal.timeout(3000)
                 });
                 if (vRes.ok || vRes.status === 206) {
+                  const variantBaseUrl = vRes.url || resolvedVariant;
                   const vText = await vRes.text();
                   if (vText.includes('#EXT-X-ENDLIST')) {
                     hasLivePlaylist = false;
                   }
-                  // Busca primeiro segmento
+                  // Busca primeiro segmento (suporta TS, fMP4/CMAF .m4s/.mp4, áudio .aac/.m4a)
                   const vLines = vText.split('\n').map(l => l.trim()).filter(Boolean);
-                  const segLine = vLines.find(l => !l.startsWith('#') && (l.includes('.ts') || l.includes('.m4s') || l.includes('.aac') || l.includes('http')));
+                  const segLine = vLines.find(l => !l.startsWith('#') && (
+                    l.includes('.ts') ||
+                    l.includes('.m4s') ||
+                    l.includes('.mp4') ||
+                    l.includes('.m4a') ||
+                    l.includes('.aac') ||
+                    l.includes('http')
+                  ));
                   if (segLine) {
-                    const resolvedSeg = new URL(segLine, resolvedVariant).href;
+                    const resolvedSeg = new URL(segLine, variantBaseUrl).href;
                     const segRes = await fetch(resolvedSeg, {
                       method: 'GET',
                       headers: { 'Range': 'bytes=0-1024' },
@@ -342,11 +358,20 @@ export class LiveStreamValidator {
             }
           } else {
             // Media Playlist direta
+            const masterBaseUrl = response.url || fetchTarget || url;
             const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-            const segLine = lines.find(l => !l.startsWith('#') && (l.includes('.ts') || l.includes('.m4s') || l.includes('.aac') || l.includes('http') || !l.includes('.m3u8')));
+            const segLine = lines.find(l => !l.startsWith('#') && (
+              l.includes('.ts') ||
+              l.includes('.m4s') ||
+              l.includes('.mp4') ||
+              l.includes('.m4a') ||
+              l.includes('.aac') ||
+              l.includes('http') ||
+              !l.includes('.m3u8')
+            ));
             if (segLine) {
               try {
-                const resolvedSeg = new URL(segLine, url).href;
+                const resolvedSeg = new URL(segLine, masterBaseUrl).href;
                 const segRes = await fetch(resolvedSeg, {
                   method: 'GET',
                   headers: { 'Range': 'bytes=0-1024' },

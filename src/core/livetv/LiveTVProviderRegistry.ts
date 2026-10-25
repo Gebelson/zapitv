@@ -332,7 +332,7 @@ export class LiveTVProviderRegistry {
   }
 
   public getAvailableCount(): number {
-    return this.getAllChannels().filter(c => c.status === 'AVAILABLE' || c.status === 'EXTERNAL_ACCESS').length;
+    return this.getAllChannels().filter(c => c.status === 'AVAILABLE').length;
   }
 
   public searchChannels(query: string): LiveChannel[] {

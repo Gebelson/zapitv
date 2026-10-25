@@ -109,16 +109,10 @@ const ProgramasView: React.FC<ProgramasViewProps> = ({ isDarkMode, initialMode }
     liveTvPreferences.setLastWatched(channel.id);
   };
 
-  // Assistir canal diretamente em tela cheia/player principal
+  // Assistir canal diretamente em tela cheia/player principal (100% interno na ZapiTV)
   const handleWatchChannel = (channel: LiveChannel) => {
     setActiveChannel(channel);
     liveTvPreferences.setLastWatched(channel.id);
-
-    if (channel.requiresExternalAccess && channel.externalAccessUrl) {
-      window.open(channel.externalAccessUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
     setFullscreenChannel(channel);
   };
 

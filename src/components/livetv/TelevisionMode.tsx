@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Tv, Play, Maximize, ChevronLeft, ChevronRight, Volume2, VolumeX, 
-  Heart, Calendar, Radio, Sparkles, SlidersHorizontal, ExternalLink, ShieldCheck,
+  Heart, Calendar, Radio, Sparkles, SlidersHorizontal, ShieldCheck,
   AlertCircle
 } from 'lucide-react';
 import { LiveChannel, CurrentEpgState } from '../../core/livetv/types';
@@ -74,13 +74,8 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
     setIsFav(next);
   };
 
-  // Assistir em Tela Cheia ou abrir Provedor Oficial
+  // Assistir em Tela Cheia (100% interno na ZapiTV)
   const handleWatchFullscreen = () => {
-    if (activeChannel.requiresExternalAccess && activeChannel.externalAccessUrl) {
-      window.open(activeChannel.externalAccessUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
     setIsMuted(false);
     liveTvPreferences.setIsMuted(false);
     setIsFullPlaybackActive(true);
@@ -178,19 +173,15 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
             <h3 className="text-2xl sm:text-3xl font-black text-white mb-3">
               {activeChannel.name}
             </h3>
-            <p className="text-gray-400 text-sm max-w-lg mb-6">
-              Este canal é transmitido legalmente com exclusividade via assinatura oficial ({activeChannel.externalProviderName || 'Provedor Oficial'}). O ZapiTV respeita direitos de transmissão e não distribui retransmissões não autorizadas.
+            <p className="text-gray-400 text-sm max-w-lg mb-6 leading-relaxed">
+              {activeChannel.description || 'Este canal transmite sua grade linear sob direitos de transmissão na plataforma autorizada oficial.'}
             </p>
-            {activeChannel.externalAccessUrl && (
-              <a
-                href={activeChannel.externalAccessUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-600 active:scale-95 text-black rounded-2xl text-xs sm:text-sm font-black uppercase tracking-wider transition-all shadow-xl shadow-amber-500/20"
-              >
-                <ExternalLink className="w-4 h-4" /> Acessar no Provedor Oficial ({activeChannel.externalProviderName})
-              </a>
-            )}
+            <div className="px-6 py-3.5 rounded-2xl bg-white/5 border border-white/10 max-w-lg text-center backdrop-blur-sm">
+              <p className="text-white text-sm font-bold mb-1">Transmissão indisponível no momento</p>
+              <p className="text-gray-400 text-xs leading-relaxed">
+                Este canal transmite sua grade linear exclusivamente em sua plataforma oficial credenciada.
+              </p>
+            </div>
           </div>
         ) : (
           <LiveTvPlayer
@@ -220,8 +211,8 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
                     {activeChannel.name}
                   </span>
                   {activeChannel.requiresExternalAccess ? (
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/90 text-black flex items-center gap-1 shadow-sm">
-                      <ShieldCheck className="w-2.5 h-2.5 text-black" /> Acesso Oficial
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-zinc-700/90 text-gray-300 flex items-center gap-1 shadow-sm border border-white/10">
+                      <ShieldCheck className="w-2.5 h-2.5 text-gray-300" /> Grade Oficial
                     </span>
                   ) : (
                     <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-red-600 text-white flex items-center gap-1 shadow-sm">
@@ -290,21 +281,12 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
                 <AlertCircle className="w-4 h-4" />
               </button>
 
-              {activeChannel.requiresExternalAccess ? (
-                <button
-                  onClick={handleWatchFullscreen}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-black rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-amber-500/30 cursor-pointer"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" /> Acessar Provedor Oficial
-                </button>
-              ) : (
-                <button
-                  onClick={handleWatchFullscreen}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-[#007df7] hover:bg-[#0069d9] active:scale-95 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-[#007df7]/30 cursor-pointer"
-                >
-                  <Play className="w-3.5 h-3.5 fill-current" /> Assistir em Tela Cheia
-                </button>
-              )}
+              <button
+                onClick={handleWatchFullscreen}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#007df7] hover:bg-[#0069d9] active:scale-95 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-[#007df7]/30 cursor-pointer"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" /> Assistir em Tela Cheia
+              </button>
             </div>
           </div>
         </div>
