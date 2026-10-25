@@ -2688,30 +2688,24 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           rank: idx + 1
         }));
 
-        // Preserva a classificação original dos títulos restantes mesmo com lacunas por gênero/busca
+        // Preserva os rankings completos com suas classificações originais de 1 a 10, sem dependência de filtro de gênero
         const displayMovies = top10MoviesWithRank
-          .filter(({ item }) => !selectedGenre || selectedGenre === 'Todos' || item.genres?.includes(selectedGenre))
           .filter(({ item }) => !submittedSearchQuery || item.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()));
 
         const displaySeries = top10SeriesWithRank
-          .filter(({ item }) => !selectedGenre || selectedGenre === 'Todos' || item.genres?.includes(selectedGenre))
           .filter(({ item }) => !submittedSearchQuery || item.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()));
 
         const displayAnimes = top10AnimesWithRank
-          .filter(({ item }) => !selectedGenre || selectedGenre === 'Todos' || item.genres?.includes(selectedGenre))
           .filter(({ item }) => !submittedSearchQuery || item.title.toLowerCase().includes(submittedSearchQuery.toLowerCase()));
 
         return (
           <ViewWrapper>
             <div className="px-3 sm:px-6 md:px-12 py-6 sm:py-8 pb-32 space-y-10 sm:space-y-14 md:space-y-18 max-w-[2560px] mx-auto">
               {/* Cabeçalho Principal da Página Em Destaque */}
-              <div className={`flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 md:gap-7 pb-4 border-b ${isDarkMode ? 'border-white/10' : 'border-black/10'}`}>
-                <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
-                  <h2 className={titleClass}>
-                    Em Destaque
-                  </h2>
-                  <GenreDropdown genres={availableGenres} selectedGenre={selectedGenre} onSelect={handleSelectGenre} isDarkMode={isDarkMode} />
-                </div>
+              <div className={`pb-4 border-b ${isDarkMode ? 'border-white/10' : 'border-black/10'}`}>
+                <h2 className={titleClass}>
+                  Em Destaque
+                </h2>
               </div>
 
               {/* SEÇÃO 1: TOP 10 FILMES DO MÊS (CARROSSEL HORIZONTAL RANKING) */}
