@@ -53,17 +53,34 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
     <>
       <header
         data-testid="mobile-header"
-        className={`fixed top-0 left-0 right-0 z-[110] transition-colors duration-300 select-none pt-[env(safe-area-inset-top,0px)] ${
-          isScrolled
-            ? (isDarkMode
-                ? 'bg-[#05070a]/95 backdrop-blur-xl border-b border-white/10 shadow-lg'
-                : 'bg-[#F8F9FC]/95 backdrop-blur-xl border-b border-black/10 shadow-sm text-gray-900')
-            : (isDarkMode
-                ? 'bg-gradient-to-b from-[#05070a]/90 via-[#05070a]/40 to-transparent'
-                : 'bg-gradient-to-b from-[#F8F9FC]/90 via-[#F8F9FC]/40 to-transparent text-gray-900')
-        }`}
+        className="fixed top-0 left-0 right-0 z-[110] select-none pt-[env(safe-area-inset-top,0px)] pointer-events-none"
       >
-        <div className="h-14 px-4 flex items-center justify-between max-w-lg mx-auto">
+        {/* Camada 1: Blur Progressivo com Máscara Gradual */}
+        <div
+          className="absolute inset-x-0 top-0 bottom-[-20px] pointer-events-none transition-opacity duration-500 backdrop-blur-md md:backdrop-blur-lg"
+          style={{
+            maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 45%, rgba(0,0,0,0.3) 75%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 45%, rgba(0,0,0,0.3) 75%, transparent 100%)',
+            opacity: isScrolled ? 1 : 0.75
+          }}
+        />
+
+        {/* Camada 2: Degradê Cinematográfico Contínuo partindo de #05070a (Sem borda, sem corte abrupto) */}
+        <div
+          className="absolute inset-x-0 top-0 bottom-[-24px] pointer-events-none transition-all duration-500"
+          style={{
+            background: isScrolled
+              ? (isDarkMode
+                  ? 'linear-gradient(to bottom, rgba(5, 7, 10, 0.96) 0%, rgba(5, 7, 10, 0.82) 45%, rgba(5, 7, 10, 0.35) 75%, transparent 100%)'
+                  : 'linear-gradient(to bottom, rgba(248, 249, 252, 0.96) 0%, rgba(248, 249, 252, 0.82) 45%, rgba(248, 249, 252, 0.35) 75%, transparent 100%)')
+              : (isDarkMode
+                  ? 'linear-gradient(to bottom, rgba(5, 7, 10, 0.85) 0%, rgba(5, 7, 10, 0.5) 45%, rgba(5, 7, 10, 0.15) 75%, transparent 100%)'
+                  : 'linear-gradient(to bottom, rgba(248, 249, 252, 0.85) 0%, rgba(248, 249, 252, 0.5) 45%, rgba(248, 249, 252, 0.15) 75%, transparent 100%)')
+          }}
+        />
+
+        {/* Conteúdo Interativo do Header */}
+        <div className="relative z-10 h-14 px-4 flex items-center justify-between max-w-lg mx-auto pointer-events-auto">
           {/* Logo ZapiTV */}
           <div
             role="button"

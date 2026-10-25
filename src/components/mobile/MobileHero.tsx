@@ -87,7 +87,7 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      className="relative w-full h-[54vh] min-h-[380px] max-h-[500px] overflow-hidden select-none bg-[#07090E]"
+      className="relative w-full h-[58vh] min-h-[420px] max-h-[560px] overflow-hidden select-none bg-[#05070a]"
     >
       {/* Imagem de Fundo com Enquadramento Otimizado para Mobile */}
       <div className="absolute inset-0">
@@ -104,8 +104,8 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
         />
 
         {/* Gradientes cinematográficos para legibilidade mobile */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#07090E] via-[#07090E]/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-transparent opacity-70" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#05070a] via-[#05070a]/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#05070a]/80 via-transparent to-transparent opacity-80" />
       </div>
 
       {/* Conteúdo sobreposto */}

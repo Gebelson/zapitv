@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Film, Tv, Flame, Sparkles, Layers } from 'lucide-react';
+import { Flame } from 'lucide-react';
 import { ContentItem } from '../../../types';
 import { MobileHero } from './MobileHero';
 import { MobileContentRow } from './MobileContentRow';
@@ -7,7 +7,6 @@ import { MobileRankedRow } from './MobileRankedRow';
 import { storageService, WatchProgress } from '../../core/storage/storageService';
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication';
-import { uiSoundService } from '../../core/audio/uiSoundService';
 
 interface MobileHomeViewProps {
   heroItems: ContentItem[];
@@ -20,7 +19,7 @@ interface MobileHomeViewProps {
   onSelectContent: (item: ContentItem) => void;
   onPlayClick?: (item: ContentItem) => void;
   onToggleList: (e: React.MouseEvent, id: string) => void;
-  onSelectCategoryFilter: (category: 'all' | 'movies' | 'series' | 'animes' | 'featured') => void;
+  onSelectCategoryFilter?: (category: 'all' | 'movies' | 'series' | 'animes' | 'featured') => void;
 }
 
 export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
@@ -74,18 +73,6 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
     };
   }, []);
 
-  const quickFilterChips: Array<{
-    id: 'all' | 'movies' | 'series' | 'animes' | 'featured';
-    label: string;
-    icon: React.ComponentType<{ className?: string }>;
-  }> = [
-    { id: 'all', label: 'Todos', icon: Layers },
-    { id: 'movies', label: 'Filmes', icon: Film },
-    { id: 'series', label: 'Séries', icon: Tv },
-    { id: 'animes', label: 'Animes', icon: Sparkles },
-    { id: 'featured', label: 'Em Destaque', icon: Flame }
-  ];
-
   // Top 10 Filmes do Mês para o carrossel de ranking na Home
   const top10Movies = (featuredSelection?.featuredMovies || trendingItems.slice(0, 10))
     .slice(0, 10)
@@ -93,25 +80,7 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
 
   return (
     <div className="pb-28">
-      {/* 2. Filtros rápidos de categoria no topo (Abaixo do header) */}
-      <div className="pt-16 pb-2 px-4 flex items-center gap-2 overflow-x-auto no-scrollbar select-none z-20 relative">
-        {quickFilterChips.map(chip => (
-          <button
-            key={chip.id}
-            type="button"
-            onClick={() => {
-              uiSoundService.play('click');
-              onSelectCategoryFilter(chip.id);
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 active:bg-[#007df7] active:text-white border border-white/10 text-slate-200 text-xs font-semibold shrink-0 transition-all cursor-pointer backdrop-blur-md"
-          >
-            <chip.icon className="w-3.5 h-3.5 text-[#007df7]" />
-            <span>{chip.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* 3. Banner Principal Mobile */}
+      {/* 1. Banner Principal Mobile (Começa no topo absoluto da viewport sob o header) */}
       <MobileHero
         featuredItems={heroItems}
         myList={myList}
@@ -120,7 +89,7 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
         onToggleList={onToggleList}
       />
 
-      {/* 4. Continuar Assistindo (quando houver histórico) */}
+      {/* 2. Continuar Assistindo (quando houver histórico) */}
       {continueWatchingItems.length > 0 && (
         <MobileContentRow
           title="Continuar Assistindo"

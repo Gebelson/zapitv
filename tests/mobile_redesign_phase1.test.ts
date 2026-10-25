@@ -105,11 +105,10 @@ assert.strictEqual(searchResults[0].title, 'Duna: Parte 2', 'Primeiro resultado 
 assert(duration < 10, `Busca local instantânea levou ${duration.toFixed(2)}ms (< 10ms)`);
 console.log(`  -> Busca instantânea respondeu em ${duration.toFixed(3)}ms.`);
 
-// Teste 6: Estrutura da Home Mobile e Ordem dos Elementos
+// Teste 6: Estrutura da Home Mobile e Ordem dos Elementos (Banner Cinematográfico Integrado no Topo)
 console.log('\n6. Verificando ordem dos elementos na Home Mobile...');
 const homeSectionsOrder = [
   'header',
-  'category_chips',
   'hero_banner',
   'continue_watching',
   'trending',
@@ -117,13 +116,12 @@ const homeSectionsOrder = [
   'recommended'
 ];
 assert.strictEqual(homeSectionsOrder[0], 'header', 'Header deve ser o 1º elemento');
-assert.strictEqual(homeSectionsOrder[1], 'category_chips', 'Filtros rápidos devem ser o 2º elemento');
-assert.strictEqual(homeSectionsOrder[2], 'hero_banner', 'Banner deve ser o 3º elemento');
-assert.strictEqual(homeSectionsOrder[3], 'continue_watching', 'Continuar assistindo deve ser o 4º elemento');
-assert.strictEqual(homeSectionsOrder[4], 'trending', 'Em Alta deve ser o 5º elemento');
-assert.strictEqual(homeSectionsOrder[5], 'top_10', 'Top 10 do Mês deve ser o 6º elemento');
-assert.strictEqual(homeSectionsOrder[6], 'recommended', 'Recomendados deve ser o 7º elemento');
-console.log('  -> Ordem estrita da Home validada com sucesso.');
+assert.strictEqual(homeSectionsOrder[1], 'hero_banner', 'Banner cinematográfico deve começar no topo sob o header');
+assert.strictEqual(homeSectionsOrder[2], 'continue_watching', 'Continuar assistindo deve ser o 3º elemento');
+assert.strictEqual(homeSectionsOrder[3], 'trending', 'Em Alta deve ser o 4º elemento');
+assert.strictEqual(homeSectionsOrder[4], 'top_10', 'Top 10 do Mês deve ser o 5º elemento');
+assert.strictEqual(homeSectionsOrder[5], 'recommended', 'Recomendados deve ser o 6º elemento');
+console.log('  -> Ordem cinematográfica da Home validada com sucesso.');
 
 // Teste 7: Banner Mobile (MobileHero)
 console.log('\n7. Verificando proporções e ações do Banner Mobile...');
