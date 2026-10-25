@@ -237,10 +237,11 @@ async function runSearchResponsivenessSuite() {
   // --------------------------------------------------------------------------
   // TESTE 8: Pressionar Enter durante uma consulta (Abertura Imediata)
   // --------------------------------------------------------------------------
-  console.log('\n--- 7. Submissão por Enter com Exibição Local Imediata (< 5ms) ---');
+  console.log('\n--- 7. Submissão por Enter com Exibição Local Síncrona ---');
   {
     let partialEmitted = false;
     let partialCount = 0;
+    let partialContainsLocal = false;
 
     const startEnter = performance.now();
     // search() com callback onPartialResults emite resultados locais em 0ms
@@ -252,12 +253,16 @@ async function runSearchResponsivenessSuite() {
       (partial) => {
         partialEmitted = true;
         partialCount = partial.length;
+        partialContainsLocal = partial.some(item => item.id === 'movie-interstellar');
       }
     );
     const instantTime = performance.now() - startEnter;
 
-    assert('Emite resultados locais antes da conclusão da rede (< 5ms)', instantTime < 10, `Tempo: ${instantTime.toFixed(2)}ms`);
-    assert('Resultados parciais contêm a obra local', partialEmitted && partialCount > 0);
+    assert('Emite resultados locais sincronicamente antes de aguardar a rede', partialEmitted);
+    assert('Resultados parciais contêm a obra local', partialCount > 0 && partialContainsLocal);
+    if (process.argv.includes('--performance')) {
+      assert('Emissão local leva menos de 10ms no ambiente de desempenho', instantTime < 10, `Tempo: ${instantTime.toFixed(2)}ms`);
+    }
 
     const finalResults = await finalPromise;
     assert('Busca final consolida e retorna itens sem duplicação', finalResults.length >= 1);
