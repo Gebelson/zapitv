@@ -42,6 +42,8 @@ export interface ContentItem {
   poster?: string;
   logo?: string;
   releaseDate?: string;
+  backdrops?: string[];
+  images?: string[];
   
   // Novos metadados detalhados
   director?: string; // Para séries, funciona como "Criador"

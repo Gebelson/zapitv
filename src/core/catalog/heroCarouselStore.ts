@@ -8,6 +8,31 @@ export const EVENT_HERO_CAROUSEL_UPDATED = 'zapitv_hero_carousel_updated';
 export const MAX_HERO_DISPLAY_COUNT = 6;
 
 /**
+ * Valida se uma URL candidata de imagem para banner possui formato legítimo.
+ */
+export function isValidHeroImageUrl(url: any): boolean {
+  if (typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  const lower = trimmed.toLowerCase();
+  if (lower === 'null' || lower === 'undefined' || lower === '""' || lower === "''") return false;
+  return trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/');
+}
+
+/**
+ * Verifica se uma obra possui ao menos uma URL candidata válida de imagem para exibição no carrossel.
+ */
+export function hasValidHeroImageCandidate(item: ContentItem | null | undefined): boolean {
+  if (!item) return false;
+  if (isValidHeroImageUrl(item.poster)) return true;
+  if (isValidHeroImageUrl(item.image)) return true;
+  if (isValidHeroImageUrl(item.backdrop)) return true;
+  if (Array.isArray(item.backdrops) && item.backdrops.some(isValidHeroImageUrl)) return true;
+  if (Array.isArray(item.images) && item.images.some(isValidHeroImageUrl)) return true;
+  return false;
+}
+
+/**
  * Banners de Destaque Padrão Oficiais do ZapiTV
  * Inclui "Verdade Oculta" e as maiores obras em alta com metadados e backdrops oficiais em alta resolução.
  */
@@ -261,9 +286,9 @@ class HeroCarouselStore {
     const seenIds = new Set<string>();
     const result: ContentItem[] = [];
 
-    // 1. Prioriza os itens configurados manualmente na ordem definida pelo usuário
+    // 1. Prioriza os itens configurados manualmente na ordem definida pelo usuário com imagem candidata válida
     for (const item of sanitized) {
-      if (item && item.id && !seenIds.has(item.id)) {
+      if (item && item.id && !seenIds.has(item.id) && hasValidHeroImageCandidate(item)) {
         seenIds.add(item.id);
         result.push(item);
       }
@@ -276,7 +301,7 @@ class HeroCarouselStore {
       const sanitizedSeeds = theatricalFilterService.filterAllowedMoviesSync(eligibleSeeds);
 
       for (const seed of sanitizedSeeds) {
-        if (seed && seed.id && !seenIds.has(seed.id)) {
+        if (seed && seed.id && !seenIds.has(seed.id) && hasValidHeroImageCandidate(seed)) {
           seenIds.add(seed.id);
           result.push(seed);
         }

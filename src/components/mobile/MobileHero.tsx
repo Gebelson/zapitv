@@ -4,6 +4,7 @@ import { ContentItem } from '../../../types';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { heroCarouselStore, MAX_HERO_DISPLAY_COUNT } from '../../core/catalog/heroCarouselStore';
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
+import { heroImageService, ZAPITV_HERO_FALLBACK_IMAGE } from '../../core/catalog/heroImageService';
 
 interface MobileHeroProps {
   featuredItems: ContentItem[];
@@ -21,6 +22,7 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
   onToggleList
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [failedItemIds, setFailedItemIds] = useState<Set<string>>(new Set());
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -29,8 +31,77 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
     return heroCarouselStore.getDisplayItems(featuredItems, MAX_HERO_DISPLAY_COUNT);
   }, [featuredItems]);
 
-  const total = displayItems.length;
+  // Filtra itens cujas imagens falharam completamente em todas as fontes
+  const activeItems = useMemo(() => {
+    const valid = displayItems.filter(item => item && !failedItemIds.has(item.id));
+    return valid.length > 0 ? valid : displayItems;
+  }, [displayItems, failedItemIds]);
 
+  const total = activeItems.length;
+  const currentItem = activeItems[currentIndex % Math.max(1, total)] || activeItems[0];
+
+  // Imagem exibida atualmente com suporte a transição de camada dupla
+  const [currentDisplayImage, setCurrentDisplayImage] = useState<string>(() => {
+    if (!currentItem) return ZAPITV_HERO_FALLBACK_IMAGE;
+    return currentItem.poster || currentItem.image || currentItem.backdrop || ZAPITV_HERO_FALLBACK_IMAGE;
+  });
+  const [prevImage, setPrevImage] = useState<string | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Carregamento, validação e recuperação inteligente de imagem para o slide atual
+  useEffect(() => {
+    if (!currentItem) return;
+
+    const controller = new AbortController();
+    let isMounted = true;
+
+    const loadSlideImage = async () => {
+      try {
+        const result = await heroImageService.resolveHeroImageForItem(currentItem, controller.signal);
+        if (!isMounted || controller.signal.aborted) return;
+
+        // Se falhou completamente em todas as fontes e retornou o fallback institucional,
+        // e há outros itens válidos no carrossel, ignora este item da rotação
+        if (result.isFallback && activeItems.length > 1) {
+          setFailedItemIds(prev => new Set(prev).add(currentItem.id));
+          return;
+        }
+
+        if (result.url !== currentDisplayImage) {
+          setPrevImage(currentDisplayImage);
+          setIsTransitioning(true);
+          setCurrentDisplayImage(result.url);
+
+          setTimeout(() => {
+            if (isMounted) {
+              setPrevImage(null);
+              setIsTransitioning(false);
+            }
+          }, 500);
+        }
+
+        // Pré-carrega o próximo slide antecipadamente
+        if (total > 1) {
+          const nextIndex = (currentIndex + 1) % total;
+          const nextItem = activeItems[nextIndex];
+          if (nextItem && nextItem.id !== currentItem.id) {
+            heroImageService.preloadHeroItem(nextItem);
+          }
+        }
+      } catch {
+        // Ignora cancelamentos
+      }
+    };
+
+    loadSlideImage();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [currentItem?.id, currentIndex, total, activeItems.length]);
+
+  // Rotação automática suave
   useEffect(() => {
     if (total <= 1) return;
     autoPlayTimerRef.current = setInterval(() => {
@@ -42,7 +113,6 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
     };
   }, [total]);
 
-  const currentItem = displayItems[currentIndex] || displayItems[0];
   const isInList = currentItem ? myList.includes(currentItem.id) : false;
 
   const isPlayable = currentItem
@@ -77,9 +147,6 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
 
   if (!currentItem) return null;
 
-  // Usa pôster vertical de preferência no smartphone, com fallback de backdrop
-  const bgImage = currentItem.poster || currentItem.image || currentItem.backdrop;
-
   return (
     <section
       data-testid="mobile-hero"
@@ -91,21 +158,40 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
     >
       {/* Imagem de Fundo com Enquadramento Otimizado para Mobile */}
       <div className="absolute inset-0">
+        {/* Camada do slide anterior preservada durante transição para eliminar flash preto */}
+        {prevImage && (
+          <img
+            src={prevImage}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover object-top filter brightness-[0.9]"
+          />
+        )}
+
+        {/* Camada ativa do slide atual com transição suave */}
         <img
-          key={`hero-bg-${currentItem.id}`}
-          src={bgImage}
+          key={`hero-bg-${currentItem.id}-${currentDisplayImage}`}
+          src={currentDisplayImage}
           alt={currentItem.title}
-          className="w-full h-full object-cover object-top filter brightness-[0.9] transition-opacity duration-500"
-          onError={(e) => {
-            if (currentItem.backdrop && (e.target as HTMLImageElement).src !== currentItem.backdrop) {
-              (e.target as HTMLImageElement).src = currentItem.backdrop;
+          className={`w-full h-full object-cover object-top filter brightness-[0.9] transition-opacity duration-500 ${
+            isTransitioning ? 'opacity-90' : 'opacity-100'
+          }`}
+          onError={() => {
+            // Em caso de erro em tempo de execução, registra a falha e tenta o próximo candidato
+            heroImageService.markUrlFailed(currentDisplayImage);
+            const candidates = heroImageService.getCandidateUrls(currentItem);
+            const nextCand = candidates.find(u => u !== currentDisplayImage && !heroImageService.isUrlFailed(u));
+            if (nextCand) {
+              setCurrentDisplayImage(nextCand);
+            } else if (currentDisplayImage !== ZAPITV_HERO_FALLBACK_IMAGE) {
+              setCurrentDisplayImage(ZAPITV_HERO_FALLBACK_IMAGE);
             }
           }}
         />
 
         {/* Gradientes cinematográficos para legibilidade mobile */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#05070a] via-[#05070a]/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#05070a]/80 via-transparent to-transparent opacity-80" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#05070a] via-[#05070a]/60 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#05070a]/80 via-transparent to-transparent opacity-80 pointer-events-none" />
       </div>
 
       {/* Conteúdo sobreposto */}
@@ -210,7 +296,7 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
         {/* Indicadores de slides (dots) */}
         {total > 1 && (
           <div className="flex items-center justify-center gap-1.5 mt-3">
-            {displayItems.map((_, idx) => (
+            {activeItems.map((_, idx) => (
               <button
                 key={idx}
                 type="button"
@@ -220,7 +306,7 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
                 }}
                 aria-label={`Ir para destaque ${idx + 1}`}
                 className={`transition-all duration-300 rounded-full h-1 ${
-                  idx === currentIndex
+                  idx === (currentIndex % total)
                     ? 'w-5 bg-[#007df7]'
                     : 'w-1.5 bg-white/30'
                 }`}
