@@ -1656,8 +1656,8 @@ export const FEATURED_ANIME_ITEMS: ContentItem[] = [
     mediaFormat: 'series',
     rating: 9.1,
     year: 2023,
-    image: 'https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBPd.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/original/4HodYYKEIsGOdinkGi2Ucz6X9i0.jpg',
+    image: 'https://image.tmdb.org/t/p/w500/qykTIEJQF8cunKD0CKOqab15wns.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/rBOnrVlck7BIlGeWVlzYiZeg4l2.jpg',
     description: 'Após derrotar o Rei Demônio, a maga elfa Frieren embarca em uma peregrinação contemplativa sobre o tempo e a brevidade da vida humana.',
     genres: ['Anime', 'Aventura', 'Drama', 'Fantasia'],
     aniListId: 154587,
@@ -1673,7 +1673,7 @@ export const FEATURED_ANIME_ITEMS: ContentItem[] = [
         number: 1,
         title: 'O Fim da Jornada',
         description: 'Frieren e o grupo dos heróis celebram o retorno triunfal após dez anos de campanha.',
-        image: 'https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBPd.jpg'
+        image: 'https://image.tmdb.org/t/p/w500/7SfqQVmW125ugsktoRVTnRXpAkd.jpg'
       }
     ]
   },

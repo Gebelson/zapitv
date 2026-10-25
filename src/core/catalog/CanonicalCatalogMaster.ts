@@ -18,6 +18,7 @@ import { normalizeCatalogText } from './catalogDeduplication';
 import { theatricalFilterService } from './theatricalFilterService';
 import { catalogEligibilityService } from './CatalogEligibilityService';
 import { adultContentService } from '../adult/AdultContentService';
+import { isCorruptedPosterUrl } from './PosterRecoveryService';
 import { FEATURED_CATALOG_ITEMS } from './featuredCatalogItems';
 import { filmesData } from '../../../constants';
 
@@ -253,12 +254,26 @@ export class CanonicalCatalogMaster {
       if ((!merged.cast || merged.cast.length === 0) && item.cast) merged.cast = item.cast;
       if ((!merged.genres || merged.genres.length === 0) && item.genres) merged.genres = item.genres;
       if (!merged.overview && item.overview) merged.overview = item.overview;
-      if (!merged.backdrop && item.backdrop) merged.backdrop = item.backdrop;
-      if (!merged.image && item.image) merged.image = item.image;
+      if ((!merged.backdrop || isCorruptedPosterUrl(merged.backdrop)) && item.backdrop && !isCorruptedPosterUrl(item.backdrop)) {
+        merged.backdrop = item.backdrop;
+      }
+      if ((!merged.image || isCorruptedPosterUrl(merged.image)) && item.image && !isCorruptedPosterUrl(item.image)) {
+        merged.image = item.image;
+      }
+      if (isCorruptedPosterUrl(merged.image)) merged.image = '';
+      if (isCorruptedPosterUrl(merged.backdrop)) merged.backdrop = '';
 
       // Preservação de episódios e temporadas
       if ((!merged.episodes || merged.episodes.length === 0) && item.episodes && item.episodes.length > 0) {
         merged.episodes = item.episodes;
+      }
+      if (Array.isArray(merged.episodes)) {
+        merged.episodes.forEach(ep => {
+          if (ep.image && isCorruptedPosterUrl(ep.image)) {
+            const freshEp = item.episodes?.find(e => e.id === ep.id || e.number === ep.number);
+            ep.image = (freshEp && !isCorruptedPosterUrl(freshEp.image)) ? freshEp.image : '';
+          }
+        });
       }
       if (!merged.seasonsCount && item.seasonsCount) {
         merged.seasonsCount = item.seasonsCount;
@@ -273,6 +288,14 @@ export class CanonicalCatalogMaster {
     }
 
     // Novo registro mestre
+    if (item.image && isCorruptedPosterUrl(item.image)) item.image = '';
+    if (item.backdrop && isCorruptedPosterUrl(item.backdrop)) item.backdrop = '';
+    if (Array.isArray(item.episodes)) {
+      item.episodes.forEach(ep => {
+        if (ep.image && isCorruptedPosterUrl(ep.image)) ep.image = '';
+      });
+    }
+
     const newEntry: MasterCatalogEntry = {
       canonicalId,
       item,

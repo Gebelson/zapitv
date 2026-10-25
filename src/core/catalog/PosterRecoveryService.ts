@@ -12,7 +12,9 @@ export const CORRUPTED_POSTER_FRAGMENTS = [
   'iigTJJskR1PcjjXqxdyJwVB3BoU', // Death Note poster associado indevidamente
   'z8IPicmEKXUO4I2UDdMEqw7RqOE', // Death Note backdrop associado indevidamente
   'bnTXjwOwdUz8MKFyQCNf0hG4fdL', // The Glory / A Lição poster associado indevidamente
-  'AjwoDj77HLlqcpwEGqsnvMXm5my'  // The Glory / A Lição backdrop associado indevidamente
+  'AjwoDj77HLlqcpwEGqsnvMXm5my', // The Glory / A Lição backdrop associado indevidamente
+  'dqZENchTd7lp5zht7BdlqM7RBPd', // Spider-Man poster associado indevidamente a Frieren
+  '4HodYYKEIsGOdinkGi2Ucz6X9i0'  // Spider-Man backdrop associado indevidamente a Frieren
 ];
 
 export function isCorruptedPosterUrl(url: string | null | undefined): boolean {
@@ -233,7 +235,12 @@ export class PosterRecoveryService {
   public sanitizeKnownCorruptedImages(): void {
     const keysToDelete: string[] = [];
     this.memoryCache.forEach((entry, key) => {
-      if (isCorruptedPosterUrl(entry.url) || key.includes('13916') || key.includes('136283')) {
+      if (
+        isCorruptedPosterUrl(entry.url) ||
+        key.includes('13916') ||
+        key.includes('136283') ||
+        (key.includes('frieren') && isCorruptedPosterUrl(entry.url))
+      ) {
         keysToDelete.push(key);
       }
     });
@@ -287,6 +294,10 @@ export class PosterRecoveryService {
             return null;
           }
         } else if (entry.url && entry.url.startsWith('http')) {
+          if (isCorruptedPosterUrl(entry.url)) {
+            this.memoryCache.delete(key);
+            continue;
+          }
           return entry.url;
         }
       }
@@ -303,6 +314,10 @@ export class PosterRecoveryService {
     for (const key of keys) {
       const entry = this.memoryCache.get(key);
       if (entry && entry.status === 'verified' && entry.url && entry.url.startsWith('http')) {
+        if (isCorruptedPosterUrl(entry.url)) {
+          this.memoryCache.delete(key);
+          continue;
+        }
         return entry.url;
       }
     }

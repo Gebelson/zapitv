@@ -7374,8 +7374,8 @@ var init_featuredCatalogItems = __esm({
         mediaFormat: "series",
         rating: 9.1,
         year: 2023,
-        image: "https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBPd.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/4HodYYKEIsGOdinkGi2Ucz6X9i0.jpg",
+        image: "https://image.tmdb.org/t/p/w500/qykTIEJQF8cunKD0CKOqab15wns.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/rBOnrVlck7BIlGeWVlzYiZeg4l2.jpg",
         description: "Ap\xF3s derrotar o Rei Dem\xF4nio, a maga elfa Frieren embarca em uma peregrina\xE7\xE3o contemplativa sobre o tempo e a brevidade da vida humana.",
         genres: ["Anime", "Aventura", "Drama", "Fantasia"],
         aniListId: 154587,
@@ -7391,7 +7391,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "O Fim da Jornada",
             description: "Frieren e o grupo dos her\xF3is celebram o retorno triunfal ap\xF3s dez anos de campanha.",
-            image: "https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBPd.jpg"
+            image: "https://image.tmdb.org/t/p/w500/7SfqQVmW125ugsktoRVTnRXpAkd.jpg"
           }
         ]
       },
@@ -14015,6 +14015,1240 @@ var init_catalogDeduplication = __esm({
   }
 });
 
+// src/core/tv/tvPerformanceService.ts
+var TvPerformanceService, tvPerformanceService;
+var init_tvPerformanceService = __esm({
+  "src/core/tv/tvPerformanceService.ts"() {
+    TvPerformanceService = class _TvPerformanceService {
+      constructor() {
+        this.isTv = false;
+        this.rafId = null;
+        this.lastFrameTime = 0;
+        this.frameTimes = [];
+        this.jankCount = 0;
+        this.droppedFrames = 0;
+        this.fps = 60;
+        this.avgFrameTimeMs = 16.6;
+        this.inputLatencies = [];
+        this.lastInputLatencyMs = 0;
+        this.lastEventLatencyMs = 0;
+        this.lastVisualLatencyMs = 0;
+        this.lastDomCheckTime = 0;
+        this.cachedDomNodeCount = 0;
+        this.cachedNavigableCount = 0;
+        this.cachedGpuLayerCount = 0;
+        this.currentHardwareProfile = "balanced";
+        this.activeImageDecodes = 0;
+        this.isSamplingActive = false;
+        this.samplingSubscribers = /* @__PURE__ */ new Set();
+        this.detectHardwareProfile();
+      }
+      static getInstance() {
+        if (!_TvPerformanceService.instance) {
+          _TvPerformanceService.instance = new _TvPerformanceService();
+        }
+        return _TvPerformanceService.instance;
+      }
+      /**
+       * Identifica o perfil de hardware seguro da Smart TV
+       */
+      detectHardwareProfile() {
+        if (typeof window === "undefined") {
+          this.currentHardwareProfile = "balanced";
+          return "balanced";
+        }
+        const ua = (navigator.userAgent || "").toLowerCase();
+        const nav = navigator;
+        const isSamsungTv = /tizen|maple|samsung.*(?:tv|smarttv)|mediastationx|media\s*station\s*x/i.test(ua);
+        const hwConcurrency = nav.hardwareConcurrency || 4;
+        const deviceMemory = nav.deviceMemory || 4;
+        if (isSamsungTv) {
+          if (deviceMemory <= 2 || hwConcurrency <= 2) {
+            this.currentHardwareProfile = "eco";
+          } else {
+            this.currentHardwareProfile = "balanced";
+          }
+        } else if (hwConcurrency >= 8 && deviceMemory >= 8) {
+          this.currentHardwareProfile = "high";
+        } else {
+          this.currentHardwareProfile = "balanced";
+        }
+        return this.currentHardwareProfile;
+      }
+      getHardwareProfile() {
+        return this.currentHardwareProfile;
+      }
+      setHardwareProfile(profile) {
+        this.currentHardwareProfile = profile;
+        this.notifySubscribers();
+      }
+      /**
+       * Inicia amostragem leve de frames sem consumir CPU
+       */
+      startFrameSampling() {
+        if (this.isSamplingActive || typeof window === "undefined") return;
+        this.isSamplingActive = true;
+        this.lastFrameTime = performance.now();
+        this.frameTimes = [];
+        const sample = (now) => {
+          if (!this.isSamplingActive) return;
+          const delta = now - this.lastFrameTime;
+          this.lastFrameTime = now;
+          if (delta > 0 && delta < 500) {
+            this.frameTimes.push(delta);
+            if (this.frameTimes.length > 60) {
+              this.frameTimes.shift();
+            }
+            if (delta > 33.3) {
+              this.jankCount++;
+              const dropped = Math.max(1, Math.round(delta / 16.67) - 1);
+              this.droppedFrames += dropped;
+            }
+            const sum = this.frameTimes.reduce((acc, t) => acc + t, 0);
+            this.avgFrameTimeMs = sum / this.frameTimes.length;
+            this.fps = Math.min(60, Math.round(1e3 / Math.max(1, this.avgFrameTimeMs)));
+          }
+          this.rafId = requestAnimationFrame(sample);
+        };
+        this.rafId = requestAnimationFrame(sample);
+      }
+      stopFrameSampling() {
+        this.isSamplingActive = false;
+        if (this.rafId !== null) {
+          cancelAnimationFrame(this.rafId);
+          this.rafId = null;
+        }
+      }
+      /**
+       * Registra a latência do comando físico:
+       * - eventDurationOrStart: tempo do handler de evento síncrono (ou timestamp de início)
+       * - visualDuration: tempo total percebido até a pintura do primeiro frame (requestAnimationFrame)
+       */
+      recordInputLatency(eventDurationOrStart, visualDuration) {
+        let eventMs = 0;
+        let visualMs = 0;
+        if (visualDuration !== void 0) {
+          eventMs = Math.max(0, eventDurationOrStart);
+          visualMs = Math.max(0, visualDuration);
+        } else {
+          eventMs = Math.max(0, performance.now() - eventDurationOrStart);
+          visualMs = eventMs;
+        }
+        this.lastEventLatencyMs = Number(eventMs.toFixed(1));
+        this.lastVisualLatencyMs = Number(visualMs.toFixed(1));
+        this.lastInputLatencyMs = Number(visualMs.toFixed(1));
+        this.inputLatencies.push(visualMs);
+        if (this.inputLatencies.length > 50) {
+          this.inputLatencies.shift();
+        }
+      }
+      recordImageDecodeStart() {
+        this.activeImageDecodes++;
+      }
+      recordImageDecodeEnd() {
+        this.activeImageDecodes = Math.max(0, this.activeImageDecodes - 1);
+      }
+      /**
+       * Obtém métricas consolidadas em tempo real
+       */
+      getMetrics() {
+        const now = performance.now();
+        if (typeof document !== "undefined" && now - this.lastDomCheckTime > 2e3) {
+          this.lastDomCheckTime = now;
+          const tvRoot = document.querySelector("[data-tv-app-root]") || document.body;
+          this.cachedDomNodeCount = tvRoot ? tvRoot.querySelectorAll("*").length : 0;
+          this.cachedNavigableCount = document.querySelectorAll("[data-focus-key]").length;
+          this.cachedGpuLayerCount = document.querySelectorAll(".will-change-transform, .transform-gpu").length;
+        }
+        const avgInput = this.inputLatencies.length > 0 ? this.inputLatencies.reduce((a, b) => a + b, 0) / this.inputLatencies.length : 0;
+        return {
+          fps: this.fps,
+          avgFrameTimeMs: Number(this.avgFrameTimeMs.toFixed(1)),
+          droppedFrames: this.droppedFrames,
+          jankCount: this.jankCount,
+          lastEventLatencyMs: this.lastEventLatencyMs,
+          lastVisualLatencyMs: this.lastVisualLatencyMs,
+          lastInputLatencyMs: Number(this.lastInputLatencyMs.toFixed(1)),
+          avgInputLatencyMs: Number(avgInput.toFixed(1)),
+          domNodeCount: this.cachedDomNodeCount,
+          navigableFocusableCount: this.cachedNavigableCount,
+          activeImageDecodes: this.activeImageDecodes,
+          gpuLayerHintCount: this.cachedGpuLayerCount,
+          hardwareProfile: this.currentHardwareProfile
+        };
+      }
+      subscribe(callback) {
+        this.samplingSubscribers.add(callback);
+        return () => {
+          this.samplingSubscribers.delete(callback);
+        };
+      }
+      notifySubscribers() {
+        this.samplingSubscribers.forEach((cb) => cb());
+      }
+      resetStats() {
+        this.frameTimes = [];
+        this.jankCount = 0;
+        this.droppedFrames = 0;
+        this.inputLatencies = [];
+        this.lastInputLatencyMs = 0;
+      }
+    };
+    tvPerformanceService = TvPerformanceService.getInstance();
+  }
+});
+
+// src/core/tv/tvPerformanceProfileService.ts
+var PROFILES, TvPerformanceProfileService, tvPerformanceProfileService;
+var init_tvPerformanceProfileService = __esm({
+  "src/core/tv/tvPerformanceProfileService.ts"() {
+    init_tvPerformanceService();
+    PROFILES = {
+      high: {
+        name: "high",
+        bufferSlotsLeft: 2,
+        bufferSlotsRight: 6,
+        enableDynamicWillChange: true,
+        skipUnfocusedBlurGlow: true,
+        renderOffscreenRows: true,
+        maxDistantRowRenderDistance: 4,
+        optimizeImageResolution: true
+      },
+      balanced: {
+        name: "balanced",
+        bufferSlotsLeft: 1,
+        bufferSlotsRight: 5,
+        enableDynamicWillChange: true,
+        skipUnfocusedBlurGlow: true,
+        renderOffscreenRows: false,
+        maxDistantRowRenderDistance: 3,
+        optimizeImageResolution: true
+      },
+      eco: {
+        name: "eco",
+        bufferSlotsLeft: 1,
+        bufferSlotsRight: 4,
+        enableDynamicWillChange: true,
+        skipUnfocusedBlurGlow: true,
+        renderOffscreenRows: false,
+        maxDistantRowRenderDistance: 2,
+        optimizeImageResolution: true
+      }
+    };
+    TvPerformanceProfileService = class _TvPerformanceProfileService {
+      constructor() {
+      }
+      static getInstance() {
+        if (!_TvPerformanceProfileService.instance) {
+          _TvPerformanceProfileService.instance = new _TvPerformanceProfileService();
+        }
+        return _TvPerformanceProfileService.instance;
+      }
+      getActiveConfig() {
+        const profile = tvPerformanceService.getHardwareProfile();
+        return PROFILES[profile] || PROFILES.balanced;
+      }
+      /**
+       * Converte URLs do TMDB para dimensões ideais de pôster de Smart TV (260px em tela 1080p -> w342 / w500)
+       * Previne decodificar imagens originais 4K/2K para cards de 260px na GPU da TV.
+       */
+      getOptimizedPosterUrl(rawUrl) {
+        if (!rawUrl) return "";
+        if (rawUrl.includes("image.tmdb.org/t/p/original/")) {
+          return rawUrl.replace("image.tmdb.org/t/p/original/", "image.tmdb.org/t/p/w500/");
+        }
+        return rawUrl;
+      }
+    };
+    tvPerformanceProfileService = TvPerformanceProfileService.getInstance();
+  }
+});
+
+// src/core/tv/tvImagePreloaderService.ts
+var TvImagePreloaderService, tvImagePreloaderService;
+var init_tvImagePreloaderService = __esm({
+  "src/core/tv/tvImagePreloaderService.ts"() {
+    init_LruCache();
+    TvImagePreloaderService = class _TvImagePreloaderService {
+      constructor() {
+        // Limite estrito de imagens decodificadas na memória (80 imagens @ w500 ~ 15-20MB de VRAM)
+        this.MAX_DECODED_ENTRIES = 80;
+        // Concorrência máxima calibrada para o processador de TV Samsung Tizen / WebKit
+        this.MAX_CONCURRENT_WORKERS = 3;
+        // Timeout de 6 segundos por imagem para evitar prender a fila em conexões instáveis
+        this.LOAD_TIMEOUT_MS = 6e3;
+        // Cache LRU de imagens decodificadas prontas para pintura instantânea
+        this.readyCache = new LruCache(80);
+        // Cache de URLs com erro (TTL de 60 segundos) para evitar loops de requisições 404
+        this.failedCache = new LruCache(100, 6e4);
+        // Deduplicação de requisições em voo: uma mesma URL é baixada apenas uma única vez
+        this.inFlight = /* @__PURE__ */ new Map();
+        // Fila de prioridade de pré-carregamento
+        this.queue = [];
+        this.activeWorkers = 0;
+        // Métricas de diagnóstico e observabilidade
+        this.metrics = {
+          totalRequested: 0,
+          cacheHits: 0,
+          cacheMisses: 0,
+          inFlightDeduplicated: 0,
+          completedDecodes: 0,
+          failedLoads: 0,
+          currentQueueSize: 0,
+          activeWorkers: 0,
+          readyCacheSize: 0
+        };
+      }
+      static getInstance() {
+        if (!_TvImagePreloaderService.instance) {
+          _TvImagePreloaderService.instance = new _TvImagePreloaderService();
+        }
+        return _TvImagePreloaderService.instance;
+      }
+      /**
+       * Verifica se a imagem já foi baixada e decodificada na memória da TV
+       */
+      isReady(url) {
+        if (!url) return false;
+        return this.readyCache.has(url);
+      }
+      /**
+       * Verifica se a imagem falhou recentemente (404/rede)
+       */
+      hasFailed(url) {
+        if (!url) return false;
+        return this.failedCache.has(url);
+      }
+      /**
+       * Adiciona uma URL para pré-carregamento e decodificação com prioridade
+       */
+      preload(url, priority = 2) {
+        if (!url || typeof url !== "string" || !url.startsWith("http")) {
+          return Promise.resolve(false);
+        }
+        this.metrics.totalRequested++;
+        if (this.readyCache.has(url)) {
+          this.metrics.cacheHits++;
+          return Promise.resolve(true);
+        }
+        if (this.failedCache.has(url)) {
+          return Promise.resolve(false);
+        }
+        this.metrics.cacheMisses++;
+        if (this.inFlight.has(url)) {
+          this.metrics.inFlightDeduplicated++;
+          return this.inFlight.get(url);
+        }
+        const promise = new Promise((resolve) => {
+          this.enqueueTask({
+            url,
+            priority,
+            resolve,
+            timestamp: Date.now()
+          });
+        }).finally(() => {
+          this.inFlight.delete(url);
+        });
+        this.inFlight.set(url, promise);
+        this.processQueue();
+        return promise;
+      }
+      /**
+       * Insere a tarefa na fila respeitando a ordem de prioridade (1 antes de 2 antes de 3)
+       */
+      enqueueTask(task) {
+        const existingIndex = this.queue.findIndex((t) => t.url === task.url);
+        if (existingIndex !== -1) {
+          if (task.priority < this.queue[existingIndex].priority) {
+            this.queue[existingIndex].priority = task.priority;
+            this.sortQueue();
+          }
+          return;
+        }
+        this.queue.push(task);
+        this.sortQueue();
+        this.metrics.currentQueueSize = this.queue.length;
+      }
+      sortQueue() {
+        this.queue.sort((a, b) => {
+          if (a.priority !== b.priority) {
+            return a.priority - b.priority;
+          }
+          return a.timestamp - b.timestamp;
+        });
+      }
+      /**
+       * Drena a fila respeitando o limite máximo de concorrência
+       */
+      processQueue() {
+        if (this.activeWorkers >= this.MAX_CONCURRENT_WORKERS || this.queue.length === 0) {
+          this.metrics.activeWorkers = this.activeWorkers;
+          this.metrics.currentQueueSize = this.queue.length;
+          return;
+        }
+        const task = this.queue.shift();
+        if (!task) return;
+        this.activeWorkers++;
+        this.metrics.activeWorkers = this.activeWorkers;
+        this.metrics.currentQueueSize = this.queue.length;
+        this.executeLoad(task.url).then((success) => {
+          task.resolve(success);
+        }).catch(() => {
+          task.resolve(false);
+        }).finally(() => {
+          this.activeWorkers--;
+          this.metrics.activeWorkers = this.activeWorkers;
+          this.metrics.readyCacheSize = this.readyCache.size;
+          this.processQueue();
+        });
+      }
+      /**
+       * Executa o download e a decodificação da imagem por aceleração gráfica
+       */
+      executeLoad(url) {
+        if (typeof window === "undefined" && typeof Image === "undefined") {
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              if (url.includes("404") || url.includes("broken") || url.includes("invalid")) {
+                this.failedCache.set(url, true);
+                this.metrics.failedLoads++;
+                resolve(false);
+              } else {
+                this.readyCache.set(url, true);
+                this.metrics.completedDecodes++;
+                resolve(true);
+              }
+            }, 15);
+          });
+        }
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.referrerPolicy = "no-referrer";
+          let settled = false;
+          const finalize = (success) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            if (success) {
+              this.readyCache.set(url, true);
+              this.metrics.completedDecodes++;
+            } else {
+              this.failedCache.set(url, true);
+              this.metrics.failedLoads++;
+            }
+            resolve(success);
+          };
+          const timer = setTimeout(() => {
+            finalize(false);
+          }, this.LOAD_TIMEOUT_MS);
+          img.onload = async () => {
+            if ("decode" in img && typeof img.decode === "function") {
+              try {
+                await img.decode();
+                finalize(true);
+              } catch {
+                finalize(true);
+              }
+            } else {
+              finalize(true);
+            }
+          };
+          img.onerror = () => {
+            finalize(false);
+          };
+          img.src = url;
+        });
+      }
+      /**
+       * Retorna o snapshot atual das métricas de desempenho
+       */
+      getMetrics() {
+        return {
+          ...this.metrics,
+          readyCacheSize: this.readyCache.size,
+          activeWorkers: this.activeWorkers,
+          currentQueueSize: this.queue.length
+        };
+      }
+      /**
+       * Limpa todo o cache (para testes ou reinicialização)
+       */
+      clear() {
+        this.readyCache.clear();
+        this.failedCache.clear();
+        this.inFlight.clear();
+        this.queue = [];
+        this.activeWorkers = 0;
+      }
+    };
+    tvImagePreloaderService = TvImagePreloaderService.getInstance();
+  }
+});
+
+// src/core/catalog/PosterRecoveryService.ts
+function isCorruptedPosterUrl(url) {
+  if (!url || typeof url !== "string") return false;
+  return CORRUPTED_POSTER_FRAGMENTS.some((frag) => url.includes(frag));
+}
+function logRecoveryDiagnostic(diag) {
+  const isDev = typeof process !== "undefined" && process.env?.NODE_ENV !== "production" || typeof import.meta !== "undefined" && import.meta.env?.DEV || typeof window !== "undefined" && window.__ZAPITV_DEV__;
+  if (isDev) {
+    if (diag.finalResult === "SUCCESS") {
+      console.info(
+        `[PosterRecoveryService][DIAGNOSTIC] \u2705 Capa recuperada com sucesso: "${diag.title}" (${diag.id}) | Fonte: ${diag.recoveredSource} | URL: ${diag.recoveredUrl}`
+      );
+    } else {
+      console.warn(
+        `[PosterRecoveryService][DIAGNOSTIC] \u274C Falha na recupera\xE7\xE3o de capa: "${diag.title}" (${diag.id}) | Causa: [${diag.diagnosticCause || "UNKNOWN"}] ${diag.failureReason || "Todas as fontes esgotadas"} | Tentativas: ${diag.attempts.join(", ")}`
+      );
+    }
+  }
+}
+var POSTER_CACHE_KEY_V3, POSTER_CACHE_KEY_V2, NO_IMAGE_SENTINEL, CORRUPTED_POSTER_FRAGMENTS, NEGATIVE_TTL_MS, VERIFIED_TTL_MS, PosterRecoveryService, posterRecoveryService;
+var init_PosterRecoveryService = __esm({
+  "src/core/catalog/PosterRecoveryService.ts"() {
+    init_types();
+    init_tmdbClient();
+    init_LruCache();
+    init_tvPerformanceProfileService();
+    init_tvImagePreloaderService();
+    POSTER_CACHE_KEY_V3 = "zapitv_poster_recovery_cache_v3";
+    POSTER_CACHE_KEY_V2 = "zapitv_poster_recovery_cache_v2";
+    NO_IMAGE_SENTINEL = "__NO_IMAGE__";
+    CORRUPTED_POSTER_FRAGMENTS = [
+      "iigTJJskR1PcjjXqxdyJwVB3BoU",
+      // Death Note poster associado indevidamente
+      "z8IPicmEKXUO4I2UDdMEqw7RqOE",
+      // Death Note backdrop associado indevidamente
+      "bnTXjwOwdUz8MKFyQCNf0hG4fdL",
+      // The Glory / A Lição poster associado indevidamente
+      "AjwoDj77HLlqcpwEGqsnvMXm5my",
+      // The Glory / A Lição backdrop associado indevidamente
+      "dqZENchTd7lp5zht7BdlqM7RBPd",
+      // Spider-Man poster associado indevidamente a Frieren
+      "4HodYYKEIsGOdinkGi2Ucz6X9i0"
+      // Spider-Man backdrop associado indevidamente a Frieren
+    ];
+    NEGATIVE_TTL_MS = 3 * 60 * 1e3;
+    VERIFIED_TTL_MS = 30 * 24 * 60 * 60 * 1e3;
+    PosterRecoveryService = class _PosterRecoveryService {
+      constructor() {
+        this.memoryCache = new LruCache(500);
+        this.inFlight = /* @__PURE__ */ new Map();
+        this.queue = [];
+        this.activeWorkers = 0;
+        this.MAX_CONCURRENT_RECOVERIES = 3;
+        this.listeners = /* @__PURE__ */ new Set();
+        this.saveTimer = null;
+        this.loadStorageCache();
+      }
+      static getInstance() {
+        if (!_PosterRecoveryService.instance) {
+          _PosterRecoveryService.instance = new _PosterRecoveryService();
+        }
+        return _PosterRecoveryService.instance;
+      }
+      /**
+       * Registra um listener para atualizações de capas no cache
+       */
+      subscribe(callback) {
+        this.listeners.add(callback);
+        return () => this.listeners.delete(callback);
+      }
+      notify(itemId, url) {
+        this.listeners.forEach((cb) => {
+          try {
+            cb(itemId, url);
+          } catch (err) {
+            console.error("[PosterRecoveryService] Erro no listener:", err);
+          }
+        });
+        if (typeof window !== "undefined") {
+          try {
+            window.dispatchEvent(new CustomEvent("zapitv_poster_recovered", { detail: { itemId, url } }));
+          } catch {
+          }
+        }
+      }
+      loadStorageCache() {
+        if (typeof window === "undefined") return;
+        try {
+          try {
+            window.sessionStorage.removeItem("zapitv_poster_recovery_cache_v1");
+            window.localStorage.removeItem("zapitv_poster_recovery_cache_v1");
+          } catch {
+          }
+          const storedV3 = window.localStorage.getItem(POSTER_CACHE_KEY_V3) || window.sessionStorage.getItem(POSTER_CACHE_KEY_V3);
+          if (storedV3) {
+            const parsed = JSON.parse(storedV3);
+            if (typeof parsed === "object" && parsed !== null) {
+              const now = Date.now();
+              Object.entries(parsed).forEach(([k, entry]) => {
+                if (entry && typeof entry === "object") {
+                  if (entry.status === "negative") {
+                    if (now - (entry.timestamp || 0) < NEGATIVE_TTL_MS) {
+                      this.memoryCache.set(k, entry);
+                    }
+                  } else if (typeof entry.url === "string" && entry.url.startsWith("http")) {
+                    if (!entry.url.includes("undefined") && !entry.url.includes("broken_404") && !isCorruptedPosterUrl(entry.url)) {
+                      if (!k.includes("13916") && !k.includes("136283")) {
+                        this.memoryCache.set(k, {
+                          url: entry.url,
+                          status: entry.status || "stored",
+                          timestamp: entry.timestamp || now,
+                          source: entry.source
+                        });
+                      }
+                    }
+                  }
+                } else if (typeof entry === "string" && entry.startsWith("http")) {
+                  if (!isCorruptedPosterUrl(entry) && !k.includes("13916") && !k.includes("136283")) {
+                    this.memoryCache.set(k, {
+                      url: entry,
+                      status: "stored",
+                      timestamp: now
+                    });
+                  }
+                }
+              });
+            }
+          }
+          const storedV2 = window.localStorage.getItem(POSTER_CACHE_KEY_V2) || window.sessionStorage.getItem(POSTER_CACHE_KEY_V2);
+          if (storedV2) {
+            const parsedV2 = JSON.parse(storedV2);
+            if (typeof parsedV2 === "object" && parsedV2 !== null) {
+              const now = Date.now();
+              Object.entries(parsedV2).forEach(([k, v]) => {
+                if (v === NO_IMAGE_SENTINEL || v === "__NO_IMAGE__") return;
+                if (typeof v === "string" && v.startsWith("http")) {
+                  if (v.includes("undefined") || v.includes("broken_404") || isCorruptedPosterUrl(v) || k.includes("13916") || k.includes("136283") || v.includes("metahub.space") && v.includes("tt31828574")) return;
+                  if (!this.memoryCache.has(k)) {
+                    this.memoryCache.set(k, {
+                      url: v,
+                      status: "stored",
+                      timestamp: now
+                    });
+                  }
+                }
+              });
+            }
+            try {
+              window.localStorage.removeItem(POSTER_CACHE_KEY_V2);
+            } catch {
+            }
+            try {
+              window.sessionStorage.removeItem(POSTER_CACHE_KEY_V2);
+            } catch {
+            }
+          }
+          this.sanitizeKnownCorruptedImages();
+        } catch {
+        }
+      }
+      saveStorageCache() {
+        if (typeof window === "undefined") return;
+        if (this.saveTimer) return;
+        this.saveTimer = setTimeout(() => {
+          this.saveTimer = null;
+          try {
+            const obj = {};
+            this.memoryCache.forEach((entry, k) => {
+              if (entry.status !== "negative") {
+                obj[k] = entry;
+              }
+            });
+            const serialized = JSON.stringify(obj);
+            try {
+              window.localStorage.setItem(POSTER_CACHE_KEY_V3, serialized);
+            } catch {
+            }
+            try {
+              window.sessionStorage.setItem(POSTER_CACHE_KEY_V3, serialized);
+            } catch {
+            }
+          } catch {
+          }
+        }, 300);
+      }
+      /**
+       * Saneia o cache em memória e storage descartando associações incorretas conhecidas
+       */
+      sanitizeKnownCorruptedImages() {
+        const keysToDelete = [];
+        this.memoryCache.forEach((entry, key) => {
+          if (isCorruptedPosterUrl(entry.url) || key.includes("13916") || key.includes("136283") || key.includes("frieren") && isCorruptedPosterUrl(entry.url)) {
+            keysToDelete.push(key);
+          }
+        });
+        keysToDelete.forEach((k) => this.memoryCache.delete(k));
+        if (keysToDelete.length > 0) {
+          this.saveStorageCache();
+        }
+      }
+      getCacheKeys(item) {
+        const keys = [];
+        if (item.imdbId && /^tt\d+$/i.test(item.imdbId.trim())) {
+          keys.push(`imdb:${item.imdbId.trim().toLowerCase()}`);
+        }
+        if (item.tmdbId) {
+          keys.push(`tmdb:${item.type || "all"}:${item.tmdbId}`);
+        }
+        if (item.id) {
+          keys.push(`id:${item.id.toLowerCase()}`);
+        }
+        if (item.aniListId) {
+          keys.push(`anilist:${item.aniListId}`);
+        }
+        if (item.canonicalId) {
+          keys.push(`canonical:${item.canonicalId.toLowerCase()}`);
+        }
+        const cleanTitle = (item.title || item.originalTitle || "").trim().toLowerCase();
+        if (cleanTitle) {
+          keys.push(`title:${item.type || "all"}:${cleanTitle}:${item.year || 0}`);
+        }
+        return keys;
+      }
+      /**
+       * Retorna a URL em cache se disponível e válida.
+       * Não considera uma entrada negativa expirada.
+       */
+      getCachedPoster(item) {
+        if (!item) return null;
+        const keys = this.getCacheKeys(item);
+        const now = Date.now();
+        for (const key of keys) {
+          const entry = this.memoryCache.get(key);
+          if (entry) {
+            if (entry.status === "negative") {
+              if (now - entry.timestamp > NEGATIVE_TTL_MS) {
+                this.memoryCache.delete(key);
+              } else {
+                return null;
+              }
+            } else if (entry.url && entry.url.startsWith("http")) {
+              if (isCorruptedPosterUrl(entry.url)) {
+                this.memoryCache.delete(key);
+                continue;
+              }
+              return entry.url;
+            }
+          }
+        }
+        return null;
+      }
+      /**
+       * Retorna exclusivamente uma URL que foi testada e confirmada funcional
+       */
+      getVerifiedPoster(item) {
+        if (!item) return null;
+        const keys = this.getCacheKeys(item);
+        for (const key of keys) {
+          const entry = this.memoryCache.get(key);
+          if (entry && entry.status === "verified" && entry.url && entry.url.startsWith("http")) {
+            if (isCorruptedPosterUrl(entry.url)) {
+              this.memoryCache.delete(key);
+              continue;
+            }
+            return entry.url;
+          }
+        }
+        return null;
+      }
+      /**
+       * Verifica se houve uma recuperação concluída com sucesso ou sentinela negativa válida recente.
+       * Não bloqueia se a tentativa anterior expirou ou se continha apenas dado não verificado.
+       */
+      hasAttemptedRecovery(item) {
+        if (!item) return false;
+        const keys = this.getCacheKeys(item);
+        const now = Date.now();
+        for (const key of keys) {
+          const entry = this.memoryCache.get(key);
+          if (entry) {
+            if (entry.status === "negative") {
+              if (now - entry.timestamp > NEGATIVE_TTL_MS) {
+                this.memoryCache.delete(key);
+                return false;
+              }
+              return true;
+            }
+            if (entry.status === "verified") {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+      /**
+       * Registra a falha de uma URL específica reportada pelo componente TvCard16x9.
+       * Invalida a entrada no cache imediatamente para que uma nova fonte seja consultada.
+       */
+      reportImageFailure(item, failedUrl) {
+        if (!item || !failedUrl) return;
+        const keys = this.getCacheKeys(item);
+        let mutated = false;
+        const optFailed = tvPerformanceProfileService.getOptimizedPosterUrl(failedUrl);
+        keys.forEach((k) => {
+          const entry = this.memoryCache.get(k);
+          if (entry && (entry.url === failedUrl || entry.url === optFailed || tvPerformanceProfileService.getOptimizedPosterUrl(entry.url) === failedUrl)) {
+            this.memoryCache.delete(k);
+            mutated = true;
+          }
+        });
+        if (mutated) {
+          this.saveStorageCache();
+        }
+      }
+      /**
+       * Invalida explicitamente as entradas de um item no cache
+       */
+      invalidateCachedPoster(item, failedUrl) {
+        if (!item) return;
+        const keys = this.getCacheKeys(item);
+        keys.forEach((k) => {
+          if (failedUrl) {
+            const entry = this.memoryCache.get(k);
+            if (entry && (entry.url === failedUrl || tvPerformanceProfileService.getOptimizedPosterUrl(entry.url) === failedUrl)) {
+              this.memoryCache.delete(k);
+            }
+          } else {
+            this.memoryCache.delete(k);
+          }
+        });
+        this.saveStorageCache();
+      }
+      /**
+       * Salva o poster no cache identificando se é verificado ou apenas armazenado
+       */
+      setCachedPoster(item, url, status = "verified", source) {
+        if (!item || !url) return;
+        const keys = this.getCacheKeys(item);
+        const entry = {
+          url,
+          status,
+          timestamp: Date.now(),
+          source
+        };
+        keys.forEach((k) => this.memoryCache.set(k, entry));
+        this.saveStorageCache();
+        const opt = tvPerformanceProfileService.getOptimizedPosterUrl(url);
+        if (opt) {
+          tvImagePreloaderService.preload(opt, 1);
+        }
+        this.notify(item.id, url);
+      }
+      /**
+       * Indica se a capa já está decodificada e pronta na memória GPU/RAM
+       */
+      isPosterReady(item) {
+        const raw = this.getCachedPoster(item) || item?.image || item?.poster || item?.backdrop || "";
+        if (!raw) return false;
+        const opt = tvPerformanceProfileService.getOptimizedPosterUrl(raw);
+        return tvImagePreloaderService.isReady(opt);
+      }
+      /**
+       * Pré-carrega a capa da obra de forma coordenada
+       */
+      preloadItemPoster(item, priority = 2) {
+        const raw = this.getCachedPoster(item) || item?.image || item?.poster || item?.backdrop || "";
+        if (!raw) return Promise.resolve(false);
+        const opt = tvPerformanceProfileService.getOptimizedPosterUrl(raw);
+        return tvImagePreloaderService.preload(opt, priority);
+      }
+      /**
+       * Registra sentinela negativa temporária (TTL de 3 minutos em memória, sem persistência permanente)
+       */
+      markNoImageAvailable(item) {
+        if (!item) return;
+        const keys = this.getCacheKeys(item);
+        const entry = {
+          url: "",
+          status: "negative",
+          timestamp: Date.now()
+        };
+        keys.forEach((k) => this.memoryCache.set(k, entry));
+      }
+      /**
+       * Valida se uma URL candidata carrega com sucesso
+       */
+      async validateImageUrl(url, timeoutMs = 4500) {
+        if (!url || typeof url !== "string" || !url.startsWith("http")) return false;
+        if (typeof window === "undefined" || typeof Image === "undefined") {
+          try {
+            const res = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(timeoutMs) });
+            return res.ok;
+          } catch {
+            return false;
+          }
+        }
+        const opt = tvPerformanceProfileService.getOptimizedPosterUrl(url);
+        if (tvImagePreloaderService.isReady(opt) || tvImagePreloaderService.isReady(url)) {
+          return true;
+        }
+        try {
+          const preloadPromise = tvImagePreloaderService.preload(opt, 1);
+          const timeoutPromise = new Promise((resolve) => {
+            setTimeout(() => resolve(false), timeoutMs);
+          });
+          const ok = await Promise.race([preloadPromise, timeoutPromise]);
+          if (ok) return true;
+          if (opt !== url) {
+            return await tvImagePreloaderService.preload(url, 1);
+          }
+          return false;
+        } catch {
+          return false;
+        }
+      }
+      /**
+       * Consulta a API oficial do AniList (GraphQL) por ID numérico
+       */
+      async queryAniListById(id) {
+        if (!id || id <= 0) return null;
+        const query = `
+      query ($id: Int) {
+        Media (id: $id, type: ANIME) {
+          coverImage { extraLarge large medium }
+          bannerImage
+        }
+      }
+    `;
+        try {
+          const res = await fetch("https://graphql.anilist.co", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ query, variables: { id } }),
+            signal: AbortSignal.timeout(5e3)
+          });
+          if (!res.ok) return null;
+          const data = await res.json();
+          const media2 = data?.data?.Media;
+          const cover = media2?.coverImage?.extraLarge || media2?.coverImage?.large || media2?.coverImage?.medium;
+          if (cover && typeof cover === "string" && cover.startsWith("http")) {
+            return cover;
+          }
+          if (media2?.bannerImage && typeof media2.bannerImage === "string" && media2.bannerImage.startsWith("http")) {
+            return media2.bannerImage;
+          }
+        } catch {
+        }
+        return null;
+      }
+      /**
+       * Consulta a API oficial do AniList (GraphQL) por título para animes
+       */
+      async queryAniList(title) {
+        if (!title || title.trim().length < 2) return null;
+        const cleanSearch = title.replace(/\s*\([^)]*\)/g, "").trim();
+        const query = `
+      query ($search: String) {
+        Media (search: $search, type: ANIME) {
+          coverImage { extraLarge large medium }
+          bannerImage
+        }
+      }
+    `;
+        try {
+          const res = await fetch("https://graphql.anilist.co", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify({ query, variables: { search: cleanSearch } }),
+            signal: AbortSignal.timeout(5e3)
+          });
+          if (!res.ok) return null;
+          const data = await res.json();
+          const media2 = data?.data?.Media;
+          const cover = media2?.coverImage?.extraLarge || media2?.coverImage?.large || media2?.coverImage?.medium;
+          if (cover && typeof cover === "string" && cover.startsWith("http")) {
+            return cover;
+          }
+          if (media2?.bannerImage && typeof media2.bannerImage === "string" && media2.bannerImage.startsWith("http")) {
+            return media2.bannerImage;
+          }
+        } catch {
+        }
+        return null;
+      }
+      /**
+       * Recupera a capa oficial correta de uma obra cujo pôster falhou ou está ausente.
+       * Não associa imagens de outras obras: valida estritamente tipo de mídia e ano.
+       * Utiliza fila com controle de concorrência limitada (máx 3 simultâneas) para não sobrecarregar Smart TVs.
+       */
+      recoverPoster(item, options) {
+        if (!item) return Promise.resolve(null);
+        if (!options?.forceRefresh && this.hasAttemptedRecovery(item)) {
+          const verified = this.getVerifiedPoster(item);
+          if (verified) return Promise.resolve(verified);
+          const cached = this.getCachedPoster(item);
+          if (cached) return Promise.resolve(cached);
+        }
+        const primaryKey2 = item.imdbId || item.id || item.title;
+        if (this.inFlight.has(primaryKey2)) {
+          return this.inFlight.get(primaryKey2);
+        }
+        const task = new Promise((resolve) => {
+          this.queue.push({
+            item,
+            forceRefresh: options?.forceRefresh,
+            resolve
+          });
+          this.processQueue();
+        }).finally(() => {
+          this.inFlight.delete(primaryKey2);
+        });
+        this.inFlight.set(primaryKey2, task);
+        return task;
+      }
+      processQueue() {
+        if (this.activeWorkers >= this.MAX_CONCURRENT_RECOVERIES || this.queue.length === 0) {
+          return;
+        }
+        const next = this.queue.shift();
+        if (!next) return;
+        this.activeWorkers++;
+        this.executeRecovery(next.item).then((url) => next.resolve(url)).catch(() => next.resolve(null)).finally(() => {
+          this.activeWorkers--;
+          this.processQueue();
+        });
+      }
+      /**
+       * Executa a estratégia de recuperação em 7 etapas estritas conforme especificação:
+       * 1. Pôster conhecido e previamente validado.
+       * 2. URL original do conteúdo.
+       * 3. Variação otimizada do pôster.
+       * 4. Outra imagem existente nos metadados.
+       * 5. Recuperação pelo TMDB utilizando identificadores confiáveis (ID, IMDb, Busca).
+       * 6. Recuperação pelo AniList, especialmente para animes.
+       * 7. Backdrop oficial como alternativa final.
+       */
+      async executeRecovery(item) {
+        const isMovie = item.type === "FILME" /* MOVIE */ || item.mediaFormat === "movie";
+        const isAnime = item.type === "ANIME" /* ANIME */ || item.genres?.includes("Anime");
+        const diag = {
+          id: item.id,
+          title: item.title,
+          originalUrl: item.image || item.poster || "",
+          attempts: [],
+          recoveredSource: null,
+          recoveredUrl: null,
+          finalResult: "FAILED"
+        };
+        try {
+          const verified = this.getVerifiedPoster(item);
+          if (verified && !verified.includes("broken_404")) {
+            diag.attempts.push(`cached_verified:${verified}`);
+            if (await this.validateImageUrl(verified)) {
+              diag.recoveredSource = "cached_verified";
+              diag.recoveredUrl = verified;
+              diag.finalResult = "SUCCESS";
+              logRecoveryDiagnostic(diag);
+              return verified;
+            } else {
+              diag.diagnosticCause = "INVALID_CACHE";
+            }
+          }
+          const rawPoster = item.image || item.poster;
+          if (rawPoster && rawPoster.startsWith("http") && !rawPoster.includes("broken_404") && !isCorruptedPosterUrl(rawPoster)) {
+            diag.attempts.push(`original_poster:${rawPoster}`);
+            if (await this.validateImageUrl(rawPoster)) {
+              this.setCachedPoster(item, rawPoster, "verified", "original_poster");
+              diag.recoveredSource = "original_poster";
+              diag.recoveredUrl = rawPoster;
+              diag.finalResult = "SUCCESS";
+              logRecoveryDiagnostic(diag);
+              return rawPoster;
+            }
+          }
+          if (rawPoster && rawPoster.startsWith("http") && !rawPoster.includes("broken_404") && !isCorruptedPosterUrl(rawPoster)) {
+            const optPoster = tvPerformanceProfileService.getOptimizedPosterUrl(rawPoster);
+            if (optPoster && optPoster !== rawPoster && !isCorruptedPosterUrl(optPoster)) {
+              diag.attempts.push(`optimized_poster:${optPoster}`);
+              if (await this.validateImageUrl(optPoster)) {
+                this.setCachedPoster(item, optPoster, "verified", "optimized_poster");
+                diag.recoveredSource = "optimized_poster";
+                diag.recoveredUrl = optPoster;
+                diag.finalResult = "SUCCESS";
+                logRecoveryDiagnostic(diag);
+                return optPoster;
+              }
+            }
+          }
+          const metaCandidates = [
+            ...Array.isArray(item.images) ? item.images : [],
+            ...Array.isArray(item.backdrops) ? item.backdrops : []
+          ].filter((u) => Boolean(u && typeof u === "string" && u.startsWith("http") && !u.includes("broken_404") && !isCorruptedPosterUrl(u)));
+          for (const metaImg of metaCandidates) {
+            diag.attempts.push(`metadata_candidate:${metaImg}`);
+            if (await this.validateImageUrl(metaImg)) {
+              this.setCachedPoster(item, metaImg, "verified", "metadata_candidate");
+              diag.recoveredSource = "metadata_candidate";
+              diag.recoveredUrl = metaImg;
+              diag.finalResult = "SUCCESS";
+              logRecoveryDiagnostic(diag);
+              return metaImg;
+            }
+          }
+          if (isAnime) {
+            let targetAniListId = item.aniListId;
+            if (!targetAniListId && item.canonicalId && item.canonicalId.includes("anilist:")) {
+              const match = item.canonicalId.match(/anilist:(\d+)/i);
+              if (match) targetAniListId = parseInt(match[1], 10);
+            }
+            if (targetAniListId) {
+              diag.attempts.push(`anilist_id:${targetAniListId}`);
+              const anilistCover = await this.queryAniListById(targetAniListId);
+              if (anilistCover && !isCorruptedPosterUrl(anilistCover) && await this.validateImageUrl(anilistCover)) {
+                this.setCachedPoster(item, anilistCover, "verified", "anilist_id");
+                diag.recoveredSource = "anilist_id";
+                diag.recoveredUrl = anilistCover;
+                diag.finalResult = "SUCCESS";
+                logRecoveryDiagnostic(diag);
+                return anilistCover;
+              }
+            }
+            const animeTitle = item.originalTitle || item.title;
+            diag.attempts.push(`anilist_title:${animeTitle}`);
+            const anilistCoverByTitle = await this.queryAniList(animeTitle);
+            if (anilistCoverByTitle && !isCorruptedPosterUrl(anilistCoverByTitle) && await this.validateImageUrl(anilistCoverByTitle)) {
+              this.setCachedPoster(item, anilistCoverByTitle, "verified", "anilist_title");
+              diag.recoveredSource = "anilist_title";
+              diag.recoveredUrl = anilistCoverByTitle;
+              diag.finalResult = "SUCCESS";
+              logRecoveryDiagnostic(diag);
+              return anilistCoverByTitle;
+            }
+          }
+          if (item.tmdbId && /^\d+$/.test(String(item.tmdbId).trim())) {
+            diag.attempts.push(`tmdb_id:${item.tmdbId}`);
+            try {
+              const data = await tmdbService.getDetails(String(item.tmdbId), isMovie ? "FILME" /* MOVIE */ : "S\xC9RIE" /* SERIES */);
+              const detailItem = data?.item;
+              if (detailItem && sameCatalogWork(detailItem, item)) {
+                if (detailItem.image && detailItem.image.startsWith("http") && detailItem.image !== rawPoster && !isCorruptedPosterUrl(detailItem.image)) {
+                  if (await this.validateImageUrl(detailItem.image)) {
+                    this.setCachedPoster(item, detailItem.image, "verified", "tmdb_id_details");
+                    diag.recoveredSource = "tmdb_id_details";
+                    diag.recoveredUrl = detailItem.image;
+                    diag.finalResult = "SUCCESS";
+                    logRecoveryDiagnostic(diag);
+                    return detailItem.image;
+                  }
+                }
+                const images = await tmdbService.getImages(item.tmdbId, isMovie);
+                for (const poster of images.posters) {
+                  if (poster && poster.startsWith("http") && poster !== rawPoster && !isCorruptedPosterUrl(poster) && await this.validateImageUrl(poster)) {
+                    this.setCachedPoster(item, poster, "verified", "tmdb_id_images");
+                    diag.recoveredSource = "tmdb_id_images";
+                    diag.recoveredUrl = poster;
+                    diag.finalResult = "SUCCESS";
+                    logRecoveryDiagnostic(diag);
+                    return poster;
+                  }
+                }
+              }
+            } catch {
+            }
+          }
+          if (item.imdbId && /^tt\d+$/i.test(item.imdbId.trim())) {
+            diag.attempts.push(`tmdb_imdb:${item.imdbId.trim()}`);
+            try {
+              const tmdbItem = await tmdbService.findByImdb(item.imdbId.trim());
+              if (tmdbItem && sameCatalogWork(tmdbItem, item)) {
+                if (tmdbItem.image && tmdbItem.image.startsWith("http") && tmdbItem.image !== rawPoster && !isCorruptedPosterUrl(tmdbItem.image)) {
+                  if (await this.validateImageUrl(tmdbItem.image)) {
+                    this.setCachedPoster(item, tmdbItem.image, "verified", "tmdb_imdb_find");
+                    diag.recoveredSource = "tmdb_imdb_find";
+                    diag.recoveredUrl = tmdbItem.image;
+                    diag.finalResult = "SUCCESS";
+                    logRecoveryDiagnostic(diag);
+                    return tmdbItem.image;
+                  }
+                }
+                if (tmdbItem.tmdbId) {
+                  const images = await tmdbService.getImages(tmdbItem.tmdbId, isMovie);
+                  for (const poster of images.posters) {
+                    if (poster && poster.startsWith("http") && poster !== rawPoster && !isCorruptedPosterUrl(poster) && await this.validateImageUrl(poster)) {
+                      this.setCachedPoster(item, poster, "verified", "tmdb_imdb_images");
+                      diag.recoveredSource = "tmdb_imdb_images";
+                      diag.recoveredUrl = poster;
+                      diag.finalResult = "SUCCESS";
+                      logRecoveryDiagnostic(diag);
+                      return poster;
+                    }
+                  }
+                }
+              }
+            } catch {
+            }
+          }
+          const searchTitle = item.originalTitle || item.title;
+          if (searchTitle && searchTitle.trim().length >= 2) {
+            diag.attempts.push(`tmdb_search:${searchTitle.trim()}`);
+            try {
+              const candidates = await tmdbService.searchMulti(searchTitle.trim());
+              const match = candidates.find((cand) => sameCatalogWork(cand, item) && !isCorruptedPosterUrl(cand.image) && !isCorruptedPosterUrl(cand.backdrop) && (cand.image && cand.image.startsWith("http") || cand.backdrop && cand.backdrop.startsWith("http")));
+              if (match) {
+                const resolved = match.image && match.image.startsWith("http") && match.image !== rawPoster ? match.image : match.backdrop;
+                if (resolved && !isCorruptedPosterUrl(resolved) && await this.validateImageUrl(resolved)) {
+                  this.setCachedPoster(item, resolved, "verified", "tmdb_search_match");
+                  diag.recoveredSource = "tmdb_search_match";
+                  diag.recoveredUrl = resolved;
+                  diag.finalResult = "SUCCESS";
+                  logRecoveryDiagnostic(diag);
+                  return resolved;
+                }
+              }
+            } catch {
+            }
+          }
+          if (item.imdbId && /^tt\d+$/i.test(item.imdbId.trim())) {
+            diag.attempts.push(`cinemeta_imdb:${item.imdbId.trim()}`);
+            const cinemetaType = isMovie ? "movie" : "series";
+            try {
+              const meta = await tmdbService.getCinemetaMeta(cinemetaType, item.imdbId.trim(), 4e3);
+              const candidatePoster = meta?.poster || meta?.background;
+              if (candidatePoster && candidatePoster.startsWith("http") && !candidatePoster.includes("undefined")) {
+                if (await this.validateImageUrl(candidatePoster)) {
+                  this.setCachedPoster(item, candidatePoster, "verified", "cinemeta");
+                  diag.recoveredSource = "cinemeta";
+                  diag.recoveredUrl = candidatePoster;
+                  diag.finalResult = "SUCCESS";
+                  logRecoveryDiagnostic(diag);
+                  return candidatePoster;
+                }
+              }
+            } catch {
+            }
+          }
+          const rawBackdrop = item.backdrop;
+          if (rawBackdrop && rawBackdrop.startsWith("http") && !rawBackdrop.includes("broken_404")) {
+            diag.attempts.push(`backdrop_fallback:${rawBackdrop}`);
+            if (await this.validateImageUrl(rawBackdrop)) {
+              this.setCachedPoster(item, rawBackdrop, "verified", "backdrop_fallback");
+              diag.recoveredSource = "backdrop_fallback";
+              diag.recoveredUrl = rawBackdrop;
+              diag.finalResult = "SUCCESS";
+              logRecoveryDiagnostic(diag);
+              return rawBackdrop;
+            }
+          }
+        } catch (err) {
+          diag.failureReason = err?.message || String(err);
+          diag.diagnosticCause = "NETWORK_ERROR";
+          console.warn(`[PosterRecoveryService] Erro na recupera\xE7\xE3o de imagem para ${item.title}:`, err);
+        }
+        diag.finalResult = "FAILED";
+        diag.failureReason = "Todas as estrat\xE9gias (TMDB, AniList, Cinemeta, Backdrop) esgotadas";
+        diag.diagnosticCause = diag.diagnosticCause || "NO_MATCH_TMDB_ANILIST";
+        logRecoveryDiagnostic(diag);
+        this.markNoImageAvailable(item);
+        return null;
+      }
+    };
+    posterRecoveryService = PosterRecoveryService.getInstance();
+  }
+});
+
 // src/core/catalog/CanonicalCatalogMaster.ts
 var CanonicalCatalogMaster, canonicalCatalogMaster;
 var init_CanonicalCatalogMaster = __esm({
@@ -14024,6 +15258,7 @@ var init_CanonicalCatalogMaster = __esm({
     init_catalogDeduplication();
     init_theatricalFilterService();
     init_CatalogEligibilityService();
+    init_PosterRecoveryService();
     init_featuredCatalogItems();
     init_constants();
     CanonicalCatalogMaster = class _CanonicalCatalogMaster {
@@ -14176,10 +15411,24 @@ var init_CanonicalCatalogMaster = __esm({
           if ((!merged.cast || merged.cast.length === 0) && item.cast) merged.cast = item.cast;
           if ((!merged.genres || merged.genres.length === 0) && item.genres) merged.genres = item.genres;
           if (!merged.overview && item.overview) merged.overview = item.overview;
-          if (!merged.backdrop && item.backdrop) merged.backdrop = item.backdrop;
-          if (!merged.image && item.image) merged.image = item.image;
+          if ((!merged.backdrop || isCorruptedPosterUrl(merged.backdrop)) && item.backdrop && !isCorruptedPosterUrl(item.backdrop)) {
+            merged.backdrop = item.backdrop;
+          }
+          if ((!merged.image || isCorruptedPosterUrl(merged.image)) && item.image && !isCorruptedPosterUrl(item.image)) {
+            merged.image = item.image;
+          }
+          if (isCorruptedPosterUrl(merged.image)) merged.image = "";
+          if (isCorruptedPosterUrl(merged.backdrop)) merged.backdrop = "";
           if ((!merged.episodes || merged.episodes.length === 0) && item.episodes && item.episodes.length > 0) {
             merged.episodes = item.episodes;
+          }
+          if (Array.isArray(merged.episodes)) {
+            merged.episodes.forEach((ep) => {
+              if (ep.image && isCorruptedPosterUrl(ep.image)) {
+                const freshEp = item.episodes?.find((e) => e.id === ep.id || e.number === ep.number);
+                ep.image = freshEp && !isCorruptedPosterUrl(freshEp.image) ? freshEp.image : "";
+              }
+            });
           }
           if (!merged.seasonsCount && item.seasonsCount) {
             merged.seasonsCount = item.seasonsCount;
@@ -14189,6 +15438,13 @@ var init_CanonicalCatalogMaster = __esm({
           existingEntry.unreleased = isTheatricalOrFuture;
           this.indexItem(canonicalId, merged);
           return merged;
+        }
+        if (item.image && isCorruptedPosterUrl(item.image)) item.image = "";
+        if (item.backdrop && isCorruptedPosterUrl(item.backdrop)) item.backdrop = "";
+        if (Array.isArray(item.episodes)) {
+          item.episodes.forEach((ep) => {
+            if (ep.image && isCorruptedPosterUrl(ep.image)) ep.image = "";
+          });
         }
         const newEntry = {
           canonicalId,
@@ -19057,6 +20313,7 @@ init_verifiedCatalog();
 init_constants();
 init_searchService();
 init_aniListClient();
+init_PosterRecoveryService();
 var STORAGE_KEY_MONTHLY_RANKINGS = "zapitv_monthly_featured_rankings_v1";
 var EVENT_MONTHLY_RANKING_UPDATED = "zapitv_monthly_ranking_updated";
 var MonthlyFeaturedRankingService = class _MonthlyFeaturedRankingService {
@@ -19764,6 +21021,7 @@ var MonthlyFeaturedRankingService = class _MonthlyFeaturedRankingService {
     if (this.storageAdapter) {
       const data = this.storageAdapter.load();
       if (data) {
+        this.sanitizeSnapshot(data);
         this.cachedMonthlySnapshot = data;
         return;
       }
@@ -19772,12 +21030,41 @@ var MonthlyFeaturedRankingService = class _MonthlyFeaturedRankingService {
       try {
         const raw = localStorage.getItem(STORAGE_KEY_MONTHLY_RANKINGS);
         if (raw) {
-          this.cachedMonthlySnapshot = JSON.parse(raw);
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            this.sanitizeSnapshot(parsed);
+            this.cachedMonthlySnapshot = parsed;
+          }
         }
       } catch (e) {
         console.warn("[MonthlyFeaturedRankingService] Falha ao ler cache do localStorage:", e);
       }
     }
+  }
+  sanitizeSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== "object") return;
+    const cleanList = (list) => {
+      if (!Array.isArray(list)) return;
+      list.forEach((ranked) => {
+        if (!ranked) return;
+        const it = ranked.item || ranked;
+        if (it && (it.id === "anime-frieren" || isCorruptedPosterUrl(it.image) || isCorruptedPosterUrl(ranked.poster))) {
+          const fresh = FEATURED_CATALOG_ITEMS.find((f) => f.id === (it.id || "anime-frieren"));
+          if (fresh) {
+            if (ranked.poster && isCorruptedPosterUrl(ranked.poster)) ranked.poster = fresh.image || "";
+            if (ranked.backdrop && isCorruptedPosterUrl(ranked.backdrop)) ranked.backdrop = fresh.backdrop || "";
+            if (ranked.item) {
+              ranked.item.image = fresh.image || "";
+              ranked.item.backdrop = fresh.backdrop || "";
+              ranked.item.episodes = fresh.episodes;
+            }
+          }
+        }
+      });
+    };
+    cleanList(snapshot.movies);
+    cleanList(snapshot.series);
+    cleanList(snapshot.animes);
   }
   saveToStorage(snapshot) {
     if (this.storageAdapter) {
@@ -19819,7 +21106,9 @@ var monthlyFeaturedRankingService = MonthlyFeaturedRankingService.getInstance();
 init_theatricalFilterService();
 init_CatalogEligibilityService();
 init_MediaAvailabilityIndex();
+init_featuredCatalogItems();
 init_searchService();
+init_PosterRecoveryService();
 var STORAGE_KEY_FEATURED_SELECTION = "zapitv_featured_ranking_selection_v4";
 var EVENT_FEATURED_RANKING_UPDATED = "zapitv_featured_ranking_updated";
 var FeaturedRankingService = class _FeaturedRankingService {
@@ -20432,10 +21721,31 @@ var FeaturedRankingService = class _FeaturedRankingService {
   async refreshFeaturedSelection(customCatalog) {
     return this.runWeeklyScheduledUpdate({ force: true, customCatalog });
   }
+  sanitizeSelection(data) {
+    if (!data || typeof data !== "object") return;
+    const cleanList = (list) => {
+      if (!Array.isArray(list)) return;
+      list.forEach((item) => {
+        if (!item) return;
+        if (item.id === "anime-frieren" || isCorruptedPosterUrl(item.image) || isCorruptedPosterUrl(item.backdrop)) {
+          const fresh = FEATURED_CATALOG_ITEMS.find((f) => f.id === (item.id || "anime-frieren"));
+          if (fresh) {
+            item.image = fresh.image || "";
+            item.backdrop = fresh.backdrop || "";
+            item.episodes = fresh.episodes;
+          }
+        }
+      });
+    };
+    cleanList(data.featuredMovies);
+    cleanList(data.featuredSeries);
+    cleanList(data.featuredAnimes);
+  }
   loadFromStorage() {
     if (this.storageAdapter) {
       const data = this.storageAdapter.load();
       if (data) {
+        this.sanitizeSelection(data);
         this.cachedSelection = data;
         return;
       }
@@ -20456,6 +21766,7 @@ var FeaturedRankingService = class _FeaturedRankingService {
             (a) => a.id === "anime-solo-leveling" && a.tmdbId === "209867"
           );
           if (!hasOutdatedSeries && !hasInvalidAnimeCollision) {
+            this.sanitizeSelection(parsed);
             this.cachedSelection = parsed;
             return;
           }

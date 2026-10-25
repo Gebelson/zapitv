@@ -38,6 +38,7 @@ import { VERIFIED_OPEN_ITEMS } from '../catalog/verifiedCatalog';
 import { filmesData } from '../../../constants';
 import { searchService } from '../search/searchService';
 import { aniListClient } from '../anilist/aniListClient';
+import { isCorruptedPosterUrl } from '../catalog/PosterRecoveryService';
 
 export const STORAGE_KEY_MONTHLY_RANKINGS = 'zapitv_monthly_featured_rankings_v1';
 export const EVENT_MONTHLY_RANKING_UPDATED = 'zapitv_monthly_ranking_updated';
@@ -912,6 +913,7 @@ export class MonthlyFeaturedRankingService {
     if (this.storageAdapter) {
       const data = this.storageAdapter.load();
       if (data) {
+        this.sanitizeSnapshot(data);
         this.cachedMonthlySnapshot = data;
         return;
       }
@@ -921,12 +923,42 @@ export class MonthlyFeaturedRankingService {
       try {
         const raw = localStorage.getItem(STORAGE_KEY_MONTHLY_RANKINGS);
         if (raw) {
-          this.cachedMonthlySnapshot = JSON.parse(raw);
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            this.sanitizeSnapshot(parsed);
+            this.cachedMonthlySnapshot = parsed;
+          }
         }
       } catch (e) {
         console.warn('[MonthlyFeaturedRankingService] Falha ao ler cache do localStorage:', e);
       }
     }
+  }
+
+  private sanitizeSnapshot(snapshot: MonthlyRankingSnapshot): void {
+    if (!snapshot || typeof snapshot !== 'object') return;
+    const cleanList = (list: any[]) => {
+      if (!Array.isArray(list)) return;
+      list.forEach((ranked: MonthlyRankedItem) => {
+        if (!ranked) return;
+        const it = ranked.item || (ranked as any);
+        if (it && (it.id === 'anime-frieren' || isCorruptedPosterUrl(it.image) || isCorruptedPosterUrl(ranked.poster))) {
+          const fresh = FEATURED_CATALOG_ITEMS.find(f => f.id === (it.id || 'anime-frieren'));
+          if (fresh) {
+            if (ranked.poster && isCorruptedPosterUrl(ranked.poster)) ranked.poster = fresh.image || '';
+            if (ranked.backdrop && isCorruptedPosterUrl(ranked.backdrop)) ranked.backdrop = fresh.backdrop || '';
+            if (ranked.item) {
+              ranked.item.image = fresh.image || '';
+              ranked.item.backdrop = fresh.backdrop || '';
+              ranked.item.episodes = fresh.episodes;
+            }
+          }
+        }
+      });
+    };
+    cleanList(snapshot.movies);
+    cleanList(snapshot.series);
+    cleanList(snapshot.animes);
   }
 
   private saveToStorage(snapshot: MonthlyRankingSnapshot): void {

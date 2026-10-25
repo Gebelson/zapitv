@@ -2,6 +2,8 @@ import { ContentItem, ContentType, HeroTag } from '../../../types';
 import { theatricalFilterService } from './theatricalFilterService';
 import { catalogEligibilityService } from './CatalogEligibilityService';
 import { deduplicateContentItems } from './catalogDeduplication';
+import { isCorruptedPosterUrl } from './PosterRecoveryService';
+import { FEATURED_CATALOG_ITEMS } from './featuredCatalogItems';
 
 export const HERO_CAROUSEL_STORAGE_KEY = 'zapitv_hero_carousel_v1';
 export const EVENT_HERO_CAROUSEL_UPDATED = 'zapitv_hero_carousel_updated';
@@ -16,6 +18,7 @@ export function isValidHeroImageUrl(url: any): boolean {
   if (!trimmed) return false;
   const lower = trimmed.toLowerCase();
   if (lower === 'null' || lower === 'undefined' || lower === '""' || lower === "''") return false;
+  if (isCorruptedPosterUrl(trimmed)) return false;
   return trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/');
 }
 
@@ -226,7 +229,15 @@ class HeroCarouselStore {
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            const sanitized = theatricalFilterService.filterAllowedMoviesSync(parsed);
+            const sanitized = theatricalFilterService.filterAllowedMoviesSync(parsed).map((it: ContentItem) => {
+              if (it && (it.id === 'anime-frieren' || isCorruptedPosterUrl(it.image) || isCorruptedPosterUrl(it.backdrop))) {
+                const fresh = FEATURED_CATALOG_ITEMS.find(f => f.id === it.id);
+                if (fresh) {
+                  return { ...it, image: fresh.image, backdrop: fresh.backdrop, episodes: fresh.episodes };
+                }
+              }
+              return it;
+            });
             if (sanitized.length > 0) {
               this.cachedItems = sanitized;
               return sanitized;

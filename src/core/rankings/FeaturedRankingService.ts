@@ -30,6 +30,7 @@ import { VERIFIED_OPEN_ITEMS } from '../catalog/verifiedCatalog';
 import { FEATURED_CATALOG_ITEMS } from '../catalog/featuredCatalogItems';
 import { searchService } from '../search/searchService';
 import { filmesData } from '../../../constants';
+import { isCorruptedPosterUrl } from '../catalog/PosterRecoveryService';
 
 export const STORAGE_KEY_FEATURED_SELECTION = 'zapitv_featured_ranking_selection_v4';
 export const EVENT_FEATURED_RANKING_UPDATED = 'zapitv_featured_ranking_updated';
@@ -771,10 +772,32 @@ class FeaturedRankingService {
     return this.runWeeklyScheduledUpdate({ force: true, customCatalog });
   }
 
+  private sanitizeSelection(data: FeaturedSelectionResult): void {
+    if (!data || typeof data !== 'object') return;
+    const cleanList = (list: any[]) => {
+      if (!Array.isArray(list)) return;
+      list.forEach((item: any) => {
+        if (!item) return;
+        if (item.id === 'anime-frieren' || isCorruptedPosterUrl(item.image) || isCorruptedPosterUrl(item.backdrop)) {
+          const fresh = FEATURED_CATALOG_ITEMS.find(f => f.id === (item.id || 'anime-frieren'));
+          if (fresh) {
+            item.image = fresh.image || '';
+            item.backdrop = fresh.backdrop || '';
+            item.episodes = fresh.episodes;
+          }
+        }
+      });
+    };
+    cleanList(data.featuredMovies);
+    cleanList(data.featuredSeries);
+    cleanList(data.featuredAnimes);
+  }
+
   private loadFromStorage(): void {
     if (this.storageAdapter) {
       const data = this.storageAdapter.load();
       if (data) {
+        this.sanitizeSelection(data);
         this.cachedSelection = data;
         return;
       }
@@ -806,6 +829,7 @@ class FeaturedRankingService {
             a.id === 'anime-solo-leveling' && a.tmdbId === '209867'
           );
           if (!hasOutdatedSeries && !hasInvalidAnimeCollision) {
+            this.sanitizeSelection(parsed);
             this.cachedSelection = parsed;
             return;
           }
