@@ -26,9 +26,9 @@ const ProgramasView: React.FC<ProgramasViewProps> = ({ isDarkMode, initialMode }
     return base;
   });
   const [searchQuery, setSearchQuery] = useState('');
-  const [allChannels, setAllChannels] = useState<LiveChannel[]>(() => channelRegistry.getAllChannels());
+  const [allChannels, setAllChannels] = useState<LiveChannel[]>(() => channelRegistry.getVerifiedChannels());
   const [activeChannel, setActiveChannel] = useState<LiveChannel>(() => {
-    const all = channelRegistry.getAllChannels();
+    const all = channelRegistry.getVerifiedChannels();
     const last = all.find(c => c.id === preferences.lastWatchedChannelId);
     return last || all[0];
   });
@@ -40,13 +40,14 @@ const ProgramasView: React.FC<ProgramasViewProps> = ({ isDarkMode, initialMode }
     return unsub;
   }, []);
 
-  // Escuta alterações de canais do agregador de provedores
+  // Escuta alterações de canais do agregador de provedores (restringindo estritamente aos verificados)
   useEffect(() => {
-    const unsub = liveTvProviderRegistry.subscribe((updated) => {
-      setAllChannels(updated);
+    const unsub = liveTvProviderRegistry.subscribe(() => {
+      const verified = channelRegistry.getVerifiedChannels();
+      setAllChannels(verified);
       setActiveChannel(prev => {
-        const found = updated.find(c => c.id === prev?.id);
-        return found || prev || updated[0];
+        const found = verified.find(c => c.id === prev?.id);
+        return found || verified[0];
       });
     });
     // Inicializa carregamento assíncrono dos provedores
@@ -71,9 +72,9 @@ const ProgramasView: React.FC<ProgramasViewProps> = ({ isDarkMode, initialMode }
     };
   }, [fullscreenChannel]);
 
-  // Contagem dinâmica real de canais disponíveis
+  // Contagem dinâmica real de canais disponíveis (estritamente canais verificados e funcionais)
   const availableCount = useMemo(() => {
-    return allChannels.filter(c => c.status === 'AVAILABLE' || c.status === 'EXTERNAL_ACCESS').length;
+    return allChannels.length;
   }, [allChannels]);
 
   // Filtra canais por categoria selecionada e busca

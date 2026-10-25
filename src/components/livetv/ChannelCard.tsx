@@ -84,7 +84,7 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
             <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-zinc-700/90 text-gray-300 flex items-center gap-1 shadow-md border border-white/10">
               <ShieldCheck className="w-3 h-3 text-gray-300" /> Grade Oficial
             </span>
-          ) : channel.status === 'AVAILABLE' ? (
+          ) : channel.status === 'AVAILABLE' || channel.status === 'VERIFIED' ? (
             <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-red-600/90 text-white flex items-center gap-1 shadow-md">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" /> AO VIVO
             </span>
@@ -139,10 +139,12 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
 
       {/* Barra de Progresso do Programa Atual */}
       <div className="w-full h-1 bg-white/10 overflow-hidden">
-        <div
-          className="h-full bg-[#007df7] transition-all duration-1000 ease-linear shadow-[0_0_6px_rgba(0,125,247,0.8)]"
-          style={{ width: `${epg.progressPercent}%` }}
-        />
+        {epg.hasVerifiedSchedule && (
+          <div
+            className="h-full bg-[#007df7] transition-all duration-1000 ease-linear shadow-[0_0_6px_rgba(0,125,247,0.8)]"
+            style={{ width: `${epg.progressPercent}%` }}
+          />
+        )}
       </div>
 
       {/* Detalhes do Canal & Programação EPG */}
@@ -165,7 +167,9 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
           <span className="line-clamp-1">
             {channel.requiresExternalAccess && channel.externalProviderName
               ? `Disponível em: ${channel.externalProviderName}`
-              : epg.currentProgram.title}
+              : epg.hasVerifiedSchedule
+                ? epg.currentProgram.title
+                : 'Programação não disponível'}
           </span>
         </div>
 
@@ -174,7 +178,7 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
           {epg.hasVerifiedSchedule ? (
             <span>{epg.formattedStartTime} - {epg.formattedEndTime}</span>
           ) : (
-            <span>Grade em atualização</span>
+            <span className="text-gray-500">Programação não disponível</span>
           )}
           {epg.nextProgram && !channel.requiresExternalAccess && epg.hasVerifiedSchedule && (
             <span className="truncate max-w-[110px] text-gray-500">

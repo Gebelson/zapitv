@@ -6,6 +6,7 @@ import {
   PictureInPicture2, ShieldCheck
 } from 'lucide-react';
 import { LiveChannel, LiveStreamSource } from '../../core/livetv/types';
+import { liveTvProviderRegistry } from '../../core/livetv/LiveTVProviderRegistry';
 import { channelHealthService } from '../../core/livetv/channelHealthService';
 import { channelSourceResolver } from '../../core/livetv/ChannelSourceResolver';
 import { liveTvPreferences } from '../../core/livetv/liveTvPreferences';
@@ -236,13 +237,32 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
         channelId: channel.id,
         tentativas: attemptedUrlsThisSessionRef.current.size
       });
+      liveTvProviderRegistry.updateChannelStatus(channel.id, 'UNAVAILABLE');
       setPlaybackStatus('unavailable');
-      setHasError(true);
-      setErrorMessage(reason || 'Esta transmissão está temporariamente indisponível.');
       setIsLoading(false);
       setIsPlaying(false);
+
+      if (onNextChannel) {
+        setFallbackNotice('Transmissão instável. Avançando automaticamente...');
+        setTimeout(() => {
+          if (activeChannelIdRef.current === channel.id) {
+            onNextChannel();
+          }
+        }, 2200);
+      } else if (onClose) {
+        setHasError(true);
+        setErrorMessage(reason || 'Esta transmissão está temporariamente indisponível.');
+        setTimeout(() => {
+          if (activeChannelIdRef.current === channel.id) {
+            onClose();
+          }
+        }, 3500);
+      } else {
+        setHasError(true);
+        setErrorMessage(reason || 'Esta transmissão está temporariamente indisponível.');
+      }
     }
-  }, [channel]);
+  }, [channel, onNextChannel, onClose]);
 
   // Função interna para iniciar a reprodução de uma URL específica
   const playStreamUrl = useCallback((rawTargetUrl: string) => {
@@ -551,9 +571,11 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
 
     if (channel.requiresExternalAccess) {
       cleanupPlayer();
-      setIsLoading(false);
-      setHasError(false);
-      setPlaybackStatus('playing');
+      if (onNextChannel) {
+        onNextChannel();
+      } else if (onClose) {
+        onClose();
+      }
       return;
     }
 
@@ -566,11 +588,18 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       setErrorMessage('Todas as fontes deste canal estão temporariamente indisponíveis.');
       setIsLoading(false);
       setIsPlaying(false);
+      if (onNextChannel) {
+        setTimeout(() => {
+          if (activeChannelIdRef.current === channel.id) {
+            onNextChannel();
+          }
+        }, 2200);
+      }
       return;
     }
 
     playStreamUrl(resolved.primaryUrl);
-  }, [channel, playStreamUrl, cleanupPlayer]);
+  }, [channel, onNextChannel, onClose, playStreamUrl, cleanupPlayer]);
 
   // Reinicia player quando o canal selecionado mudar
   useEffect(() => {
@@ -633,47 +662,22 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
     }
   };
 
-  // Se o canal não possui fonte incorporável autorizada (ex: canais estritamente pagos ou protegidos por DRM proprietário)
+  // Salvaguarda: se o canal exigir acesso externo, não exibe tela estática e aciona transição segura
   if (channel.requiresExternalAccess) {
+    if (onNextChannel) {
+      setTimeout(() => onNextChannel(), 50);
+    } else if (onClose) {
+      setTimeout(() => onClose(), 50);
+    }
     return (
       <div
         ref={containerRef}
-        className={`relative w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden font-sans ${
+        className={`relative w-full h-full bg-black flex items-center justify-center select-none overflow-hidden font-sans ${
           isFullscreen ? 'fixed inset-0 z-[5000]' : 'rounded-2xl border border-white/10'
         }`}
       >
-        <div className="w-20 h-20 rounded-2xl bg-white/10 p-3 mb-5 border border-white/15 backdrop-blur-md shadow-2xl flex items-center justify-center">
-          <img src={channel.logo} alt={channel.name} className="w-full h-full object-contain" />
-        </div>
-
-        <div className="flex items-center gap-2 mb-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-emerald-400">
-            Grade Oficial
-          </span>
-        </div>
-
-        <h3 className="text-white text-xl md:text-2xl font-black mb-2">{channel.name}</h3>
-        <p className="text-gray-400 text-xs md:text-sm max-w-md mb-6 leading-relaxed">
-          {channel.description || 'Este canal transmite sua grade linear sob direitos de transmissão na plataforma autorizada oficial.'}
-        </p>
-
-        <div className="px-6 py-4 rounded-2xl bg-white/5 border border-white/10 max-w-md text-center shadow-lg backdrop-blur-sm">
-          <p className="text-white text-sm md:text-base font-bold mb-1.5">Transmissão indisponível no momento</p>
-          <p className="text-gray-400 text-xs leading-relaxed">
-            Este canal transmite sua grade linear exclusivamente em sua plataforma oficial credenciada ({channel.externalProviderName || 'Provedor Oficial'}).
-          </p>
-        </div>
-
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10"
-            title="Fechar"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
+        <span className="sr-only">Transmissão indisponível no momento</span>
+        <ZapiLoader size="md" />
       </div>
     );
   }

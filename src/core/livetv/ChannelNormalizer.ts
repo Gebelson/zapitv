@@ -1,5 +1,6 @@
 import { LiveChannel, LiveChannelCategory, LiveStreamSource, RawChannelInput, ChannelHealthStatus } from './types';
 import { liveStreamValidator } from './LiveStreamValidator';
+import { VERIFIED_STREAMS_SNAPSHOT } from './verifiedStreamsSnapshot';
 
 export class ChannelNormalizer {
   private static instance: ChannelNormalizer;
@@ -134,9 +135,9 @@ export class ChannelNormalizer {
         } else if (sources.length === 0) {
           initialStatus = 'UNAVAILABLE';
         } else {
-          // Consulta cache de saúde prévio se houver
+          // Consulta cache de saúde prévio se houver ou validação pelo snapshot canônico
           const cached = sources[0]?.url ? liveStreamValidator.getCachedStatus(sources[0].url) : null;
-          initialStatus = cached || 'CHECKING';
+          initialStatus = cached || (VERIFIED_STREAMS_SNAPSHOT[canonicalId] ? 'AVAILABLE' : 'UNVERIFIED');
         }
 
         const newChannel: LiveChannel = {

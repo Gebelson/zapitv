@@ -3,6 +3,7 @@ import { OfficialChannelProvider } from './OfficialChannelProvider';
 import { M3UProviderAdapter } from './M3UProviderAdapter';
 import { StremioLiveTVAdapter } from './StremioLiveTVAdapter';
 import { channelNormalizer } from './ChannelNormalizer';
+import { liveStreamValidator } from './LiveStreamValidator';
 
 interface ChannelOverride {
   customStreamUrl?: string;
@@ -291,7 +292,7 @@ export class LiveTVProviderRegistry {
         if (prev.streamUrl === ch.streamUrl) {
           ch.status = prev.status;
         } else {
-          ch.status = 'CHECKING';
+          ch.status = 'UNVERIFIED';
         }
       }
     }
@@ -320,8 +321,18 @@ export class LiveTVProviderRegistry {
     );
   }
 
+  public getVerifiedChannels(): LiveChannel[] {
+    return this.channels.filter(c => 
+      c.isEnabled !== false && 
+      !c.requiresExternalAccess && 
+      (c.status === 'VERIFIED' || c.status === 'AVAILABLE') &&
+      Boolean(c.streamUrl) &&
+      !liveStreamValidator.isParkedDomain(c.streamUrl)
+    );
+  }
+
   public getChannelsByCategory(category: LiveChannelCategory, favoriteIds: string[] = []): LiveChannel[] {
-    const visible = this.getAllChannels();
+    const visible = this.getVerifiedChannels();
     if (category === 'todos') {
       return visible;
     }
@@ -332,12 +343,12 @@ export class LiveTVProviderRegistry {
   }
 
   public getAvailableCount(): number {
-    return this.getAllChannels().filter(c => c.status === 'AVAILABLE').length;
+    return this.getVerifiedChannels().length;
   }
 
   public searchChannels(query: string): LiveChannel[] {
     const q = query.toLowerCase().trim();
-    const visible = this.getAllChannels();
+    const visible = this.getVerifiedChannels();
     if (!q) return visible;
 
     return visible.filter(c => 

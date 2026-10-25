@@ -20,6 +20,7 @@ import { authenticateAdmin } from "./src/server/database/firebaseAuth.ts";
 import { watchPartyRouter } from "./src/server/watchparty/routes.ts";
 import { publicHttpGet } from "./src/server/security/publicHttp.ts";
 import { normalizeProxyRange } from "./src/server/proxyRange.ts";
+import { epgSyncService } from "./src/server/livetv/epgSyncService.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -619,6 +620,41 @@ function createApp() {
       timestamp: new Date().toISOString(),
       uptime: process.uptime()
     });
+  });
+
+  // =========================================================================
+  // Rotas de Guia Eletrônico de Programação (EPG Real de Canais ao Vivo)
+  // =========================================================================
+  app.get("/api/livetv/epg", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=60");
+    const schedules = epgSyncService.getAllSchedules();
+    res.json(schedules);
+  });
+
+  app.get("/api/livetv/epg/:channelId", (req, res) => {
+    const { channelId } = req.params;
+    const dateStr = typeof req.query.date === 'string' ? req.query.date : undefined;
+    const schedule = epgSyncService.getChannelSchedule(channelId, dateStr);
+    const availableDates = epgSyncService.getChannelAvailableDates(channelId);
+    res.setHeader("Cache-Control", "public, max-age=60");
+    res.json({
+      channelId,
+      availableDates,
+      date: dateStr || epgSyncService.formatBrasiliaDate(new Date()),
+      schedule
+    });
+  });
+
+  app.get("/api/livetv/epg-sources", (_req, res) => {
+    res.json({
+      sources: epgSyncService.getSources(),
+      status: epgSyncService.getSourcesStatus()
+    });
+  });
+
+  app.post("/api/livetv/epg/sync", async (_req, res) => {
+    const result = await epgSyncService.syncAllSources(true);
+    res.json(result);
   });
 
   // CORS Proxy for Stremio Addons and media streams

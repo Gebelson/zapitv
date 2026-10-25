@@ -45,12 +45,13 @@ export class ChannelHealthService {
 
     for (const url of testUrls) {
       const status = await liveStreamValidator.validateStreamUrl(url, timeoutMs);
-      if (status === 'AVAILABLE') {
+      if (status === 'AVAILABLE' || status === 'VERIFIED') {
         foundAvailable = true;
         // Se a fonte funcional for um backup, promove ela para stream principal
         if (url !== channel.streamUrl) {
           channel.streamUrl = url;
         }
+        channel.status = 'AVAILABLE';
         liveTvProviderRegistry.updateChannelStatus(channel.id, 'AVAILABLE');
         return 'AVAILABLE';
       } else if (status === 'UNSTABLE') {
@@ -59,6 +60,7 @@ export class ChannelHealthService {
     }
 
     const finalStatus: ChannelHealthStatus = anyUnstable ? 'UNSTABLE' : 'UNAVAILABLE';
+    channel.status = finalStatus;
     liveTvProviderRegistry.updateChannelStatus(channel.id, finalStatus);
     return finalStatus;
   }

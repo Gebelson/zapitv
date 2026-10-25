@@ -1,4 +1,4 @@
-import { LiveChannel, LiveChannelCategory, ChannelHealthStatus } from './types';
+import { LiveChannel, LiveChannelCategory, ChannelHealthStatus, isChannelVerified } from './types';
 import { liveTvProviderRegistry, LiveTVProviderRegistry } from './LiveTVProviderRegistry';
 
 export const CATEGORY_DEFINITIONS: Array<{ id: LiveChannelCategory; label: string }> = [
@@ -30,6 +30,10 @@ export class ChannelRegistry {
     return liveTvProviderRegistry.getAllChannels();
   }
 
+  public getVerifiedChannels(): LiveChannel[] {
+    return liveTvProviderRegistry.getVerifiedChannels();
+  }
+
   public getChannelById(id: string): LiveChannel | undefined {
     return liveTvProviderRegistry.getChannelById(id);
   }
@@ -39,7 +43,7 @@ export class ChannelRegistry {
   }
 
   public getVerifiedAvailableChannels(): LiveChannel[] {
-    return liveTvProviderRegistry.getAllChannels().filter(c => c.status === 'AVAILABLE' || c.status === 'EXTERNAL_ACCESS');
+    return liveTvProviderRegistry.getVerifiedChannels();
   }
 
   public getAvailableCount(): number {
@@ -56,5 +60,5 @@ export class ChannelRegistry {
 }
 
 export const channelRegistry = ChannelRegistry.getInstance();
-export const VERIFIED_CHANNELS: LiveChannel[] = liveTvProviderRegistry.getAllChannels();
+export const VERIFIED_CHANNELS: LiveChannel[] = liveTvProviderRegistry.getVerifiedChannels();
 export { liveTvProviderRegistry, LiveTVProviderRegistry };

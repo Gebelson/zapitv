@@ -1,4 +1,5 @@
 import { ChannelHealthStatus } from './types';
+import { VERIFIED_STREAMS_SNAPSHOT } from './verifiedStreamsSnapshot';
 
 export interface StreamHealthMetrics {
   status: ChannelHealthStatus;
@@ -66,16 +67,67 @@ class ConcurrencyLimiter {
 
 export class LiveStreamValidator {
   private static instance: LiveStreamValidator;
+  private static readonly STORAGE_KEY = 'zapitv_live_health_metrics_v2';
   private metricsMap = new Map<string, StreamHealthMetrics>();
-  private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos de cache
+  private readonly CACHE_TTL_MS = 3 * 60 * 60 * 1000; // 3 horas de validade (expiração periódica controlada)
   private pendingChecks = new Map<string, Promise<ChannelHealthStatus>>();
   private limiter = new ConcurrencyLimiter(3);
+
+  private constructor() {
+    this.loadPersistedCache();
+    this.seedFromSnapshot();
+  }
 
   public static getInstance(): LiveStreamValidator {
     if (!LiveStreamValidator.instance) {
       LiveStreamValidator.instance = new LiveStreamValidator();
     }
     return LiveStreamValidator.instance;
+  }
+
+  private loadPersistedCache(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(LiveStreamValidator.STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const now = Date.now();
+          for (const item of parsed) {
+            if (item && item.testedUrl && (now - item.timestamp) < this.CACHE_TTL_MS) {
+              this.metricsMap.set(item.testedUrl, item);
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  private seedFromSnapshot(): void {
+    const now = Date.now();
+    for (const seed of Object.values(VERIFIED_STREAMS_SNAPSHOT)) {
+      if (!this.metricsMap.has(seed.streamUrl)) {
+        this.metricsMap.set(seed.streamUrl, {
+          status: 'AVAILABLE',
+          testedUrl: seed.streamUrl,
+          timestamp: now,
+          latencyMs: seed.latencyMs,
+          hasLivePlaylist: true,
+          segmentAccessible: true,
+          lastSuccess: now,
+          failureCount: 0,
+          stallCount: 0
+        });
+      }
+    }
+  }
+
+  private persistCache(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const entries = Array.from(this.metricsMap.values()).slice(0, 100);
+      localStorage.setItem(LiveStreamValidator.STORAGE_KEY, JSON.stringify(entries));
+    } catch {}
   }
 
   /**
@@ -524,11 +576,17 @@ export class LiveStreamValidator {
       testedUrl: url,
       timestamp: Date.now()
     });
+    this.persistCache();
   }
 
   public clearCache(): void {
     this.metricsMap.clear();
     this.pendingChecks.clear();
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(LiveStreamValidator.STORAGE_KEY);
+      } catch {}
+    }
   }
 }
 

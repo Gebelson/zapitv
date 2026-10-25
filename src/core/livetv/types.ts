@@ -23,6 +23,12 @@ export interface EpgProgram {
   category?: string;
   rating?: string;
   isFallback?: boolean;
+  isLive?: boolean;
+  competition?: string;
+  teams?: string;
+  startUtcMs?: number;
+  endUtcMs?: number;
+  durationMinutes?: number;
 }
 
 export interface CurrentEpgState {
@@ -37,7 +43,9 @@ export interface CurrentEpgState {
 }
 
 export type ChannelHealthStatus = 
+  | 'VERIFIED'
   | 'AVAILABLE' 
+  | 'UNVERIFIED'
   | 'CHECKING' 
   | 'UNSTABLE'
   | 'UNAVAILABLE' 
@@ -46,6 +54,12 @@ export type ChannelHealthStatus =
   | 'EXPIRED' 
   | 'RESTRICTED'
   | 'INCONCLUSIVE';
+
+export function isChannelVerified(channel: LiveChannel | { status?: ChannelHealthStatus; requiresExternalAccess?: boolean; streamUrl?: string; isEnabled?: boolean } | null | undefined): boolean {
+  if (!channel || channel.isEnabled === false || channel.requiresExternalAccess) return false;
+  const status = channel.status;
+  return (status === 'VERIFIED' || status === 'AVAILABLE') && Boolean(channel.streamUrl);
+}
 
 export type ChannelAccessType = 'internal' | 'external' | 'restricted';
 

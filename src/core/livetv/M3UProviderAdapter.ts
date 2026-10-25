@@ -8,6 +8,7 @@ export class M3UProviderAdapter {
   private enabled: boolean;
   private lastSync: number = 0;
   private cachedChannels: RawChannelInput[] = [];
+  private tvgUrl: string | null = null;
 
   public static readonly DEFAULT_BR_M3U = 'https://iptv-org.github.io/iptv/countries/br.m3u';
 
@@ -56,12 +57,24 @@ export class M3UProviderAdapter {
     return this.cachedChannels.length;
   }
 
+  public getTvgUrl(): string | null {
+    return this.tvgUrl;
+  }
+
   /**
    * Converte o conteúdo bruto de uma lista M3U/M3U8 em RawChannelInput[]
    */
   public parseM3UContent(content: string): RawChannelInput[] {
     const lines = content.split(/\r?\n/);
     const channels: RawChannelInput[] = [];
+
+    // Extrai URL EPG declarada no cabeçalho #EXTM3U (url-tvg ou x-tvg-url)
+    if (lines[0] && lines[0].startsWith('#EXTM3U')) {
+      const tvgMatch = lines[0].match(/(?:url-tvg|x-tvg-url)="([^"]+)"/i);
+      if (tvgMatch) {
+        this.tvgUrl = tvgMatch[1].trim();
+      }
+    }
 
     let currentMeta: Partial<RawChannelInput> | null = null;
 

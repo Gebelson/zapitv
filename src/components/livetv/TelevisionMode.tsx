@@ -32,8 +32,18 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
   const [isFav, setIsFav] = useState(() => liveTvPreferences.isFavorite(activeChannel.id));
   const [isFullPlaybackActive, setIsFullPlaybackActive] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(true);
 
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
+  const overlayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerOverlay = useCallback(() => {
+    setShowOverlay(true);
+    if (overlayTimeoutRef.current) clearTimeout(overlayTimeoutRef.current);
+    overlayTimeoutRef.current = setTimeout(() => {
+      setShowOverlay(false);
+    }, 4500);
+  }, []);
 
   // Índice atual para zapear
   const currentIndex = channels.findIndex(c => c.id === activeChannel.id);
@@ -44,7 +54,8 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
     setEpg(epgService.getCurrentEpgState(activeChannel));
     setIsFav(liveTvPreferences.isFavorite(activeChannel.id));
     liveTvPreferences.setLastWatched(activeChannel.id);
-  }, [activeChannel.id]);
+    triggerOverlay();
+  }, [activeChannel.id, triggerOverlay]);
 
   // Atualiza progresso da barra a cada 20 segundos
   useEffect(() => {
@@ -157,48 +168,26 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
       {/* Main 16:9 Preview Player Area */}
       <div 
         ref={previewContainerRef}
+        onMouseMove={triggerOverlay}
+        onClick={triggerOverlay}
         className="relative aspect-video w-full max-w-6xl mx-auto bg-black rounded-3xl overflow-hidden shadow-2xl border border-white/15"
       >
-        {activeChannel.requiresExternalAccess ? (
-          <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-gradient-to-b from-[#0c101a] via-[#080b12] to-black text-center">
-            <div className="w-20 h-20 rounded-3xl bg-white/10 p-3 border border-white/20 flex items-center justify-center mb-6 shadow-2xl">
-              <img src={activeChannel.logo} alt={activeChannel.name} className="w-full h-full object-contain" />
-            </div>
-            <div className="flex items-center gap-2 mb-2">
-              <ShieldCheck className="w-5 h-5 text-amber-400" />
-              <span className="text-amber-400 text-xs font-black uppercase tracking-wider">
-                Transmissão Linear Oficial Exclusiva
-              </span>
-            </div>
-            <h3 className="text-2xl sm:text-3xl font-black text-white mb-3">
-              {activeChannel.name}
-            </h3>
-            <p className="text-gray-400 text-sm max-w-lg mb-6 leading-relaxed">
-              {activeChannel.description || 'Este canal transmite sua grade linear sob direitos de transmissão na plataforma autorizada oficial.'}
-            </p>
-            <div className="px-6 py-3.5 rounded-2xl bg-white/5 border border-white/10 max-w-lg text-center backdrop-blur-sm">
-              <p className="text-white text-sm font-bold mb-1">Transmissão indisponível no momento</p>
-              <p className="text-gray-400 text-xs leading-relaxed">
-                Este canal transmite sua grade linear exclusivamente em sua plataforma oficial credenciada.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <LiveTvPlayer
-            key={activeChannel.id}
-            channel={activeChannel}
-            autoPlay={true}
-            initialMuted={isMuted}
-            isInteractive={true}
-            onNextChannel={handleNextChannel}
-            onPrevChannel={handlePrevChannel}
-            channelIndexInfo={{ current: safeIndex + 1, total: channels.length }}
-          />
-        )}
+        <LiveTvPlayer
+          key={activeChannel.id}
+          channel={activeChannel}
+          autoPlay={true}
+          initialMuted={isMuted}
+          isInteractive={true}
+          onNextChannel={handleNextChannel}
+          onPrevChannel={handlePrevChannel}
+          channelIndexInfo={{ current: safeIndex + 1, total: channels.length }}
+        />
 
-        {/* Floating Channel & EPG Overlay Bar sobreposto na parte inferior */}
-        <div className="absolute bottom-16 inset-x-4 sm:inset-x-8 z-35 pointer-events-none">
-          <div className="p-4 sm:p-5 rounded-2xl bg-[#0f121a]/85 backdrop-blur-xl border border-white/15 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 pointer-events-auto">
+        {/* Floating Channel & EPG Overlay Bar sobreposto na parte inferior com auto-hide */}
+        <div className={`absolute bottom-16 inset-x-4 sm:inset-x-8 z-35 transition-all duration-300 ${
+          showOverlay ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'
+        }`}>
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#0f121a]/85 backdrop-blur-xl border border-white/15 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
             {/* Lado Esquerdo: Identificação & Programa Atual */}
             <div className="flex items-start gap-4 max-w-xl">
               <div className="w-12 h-12 rounded-xl bg-white/10 p-2 border border-white/15 flex items-center justify-center shrink-0">
@@ -258,8 +247,17 @@ export const TelevisionMode: React.FC<TelevisionModeProps> = ({
               </div>
             </div>
 
-            {/* Lado Direito: Botão Assistir & Favorito */}
+            {/* Lado Direito: Botão Assistir, Guia & Favorito */}
             <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center">
+              <button
+                onClick={() => setIsEpgModalOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-xl text-xs font-bold transition-all border border-white/10 cursor-pointer"
+                title="Ver programação completa do canal"
+              >
+                <Calendar className="w-3.5 h-3.5 text-[#007df7]" />
+                <span className="hidden sm:inline">Guia</span>
+              </button>
+
               <button
                 onClick={handleToggleFav}
                 className={`p-2.5 rounded-xl border transition-all ${
