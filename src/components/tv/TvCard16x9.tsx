@@ -67,11 +67,16 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   const [hasImageError, setHasImageError] = useState(!targetPoster);
   const cardContainerRef = useRef<HTMLDivElement>(null);
   const failedUrlsRef = useRef<Set<string>>(new Set());
+  const currentItemIdRef = useRef(item.id);
+  currentItemIdRef.current = item.id;
+  const isMountedRef = useRef(true);
+  const isRecoveringRef = useRef(false);
 
   // Sincronização síncrona no render: elimina o atraso de 1 frame e evita piscadas na troca de itens dos slots
   if (prevItemId !== item.id) {
     setPrevItemId(item.id);
     failedUrlsRef.current.clear();
+    isRecoveringRef.current = false;
     setImgSrc(targetPoster);
     setHasImageError(!targetPoster);
   }
@@ -93,14 +98,70 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
     return () => window.removeEventListener('zapitv_progress_updated', handleProgress);
   }, [item, showProgress]);
 
+  // Função central de acionamento de recuperação de imagem com posterRecoveryService
+  const triggerRecovery = useCallback(async () => {
+    if (isRecoveringRef.current) return;
+    if (!item) return;
+
+    const activeId = item.id;
+    isRecoveringRef.current = true;
+
+    try {
+      const recovered = await posterRecoveryService.recoverPoster(item);
+      if (!isMountedRef.current || currentItemIdRef.current !== activeId) {
+        return;
+      }
+
+      if (recovered && !failedUrlsRef.current.has(recovered)) {
+        const opt = tvPerformanceProfileService.getOptimizedPosterUrl(recovered);
+        setImgSrc(opt);
+        setHasImageError(false);
+      } else {
+        setHasImageError(true);
+      }
+    } catch {
+      if (isMountedRef.current && currentItemIdRef.current === activeId) {
+        setHasImageError(true);
+      }
+    } finally {
+      isRecoveringRef.current = false;
+    }
+  }, [item]);
+
+  // Monitora montagem e aciona recuperação automática se o item montar sem imagem ou com erro
+  useEffect(() => {
+    isMountedRef.current = true;
+    if (hasImageError && !isRecoveringRef.current) {
+      triggerRecovery();
+    }
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [hasImageError, item.id, triggerRecovery]);
+
+  // Atualiza imagem quando o cache global de recuperação recebe uma nova URL para este item
+  useEffect(() => {
+    const unsubscribe = posterRecoveryService.subscribe((recoveredItemId, newUrl) => {
+      if (!isMountedRef.current || currentItemIdRef.current !== item.id) return;
+      if (recoveredItemId === item.id && newUrl) {
+        const opt = tvPerformanceProfileService.getOptimizedPosterUrl(newUrl);
+        setImgSrc(opt);
+        setHasImageError(false);
+      }
+    });
+    return unsubscribe;
+  }, [item.id]);
+
   // Atualiza imagem quando o item muda preservando rigorosamente a URL otimizada sem loops
   useEffect(() => {
     const raw = posterRecoveryService.getCachedPoster(item) || item.image || item.poster || item.backdrop || '';
     const optimized = tvPerformanceProfileService.getOptimizedPosterUrl(raw);
     if (optimized && optimized !== imgSrc) {
-      failedUrlsRef.current.clear();
-      setImgSrc(optimized);
-      setHasImageError(false);
+      if (!failedUrlsRef.current.has(optimized)) {
+        failedUrlsRef.current.clear();
+        setImgSrc(optimized);
+        setHasImageError(false);
+      }
     }
   }, [item.id, item.image, item.poster, item.backdrop]);
 
@@ -115,19 +176,34 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
     }
 
     // Candidatos em ordem de preferência:
-    // 1. URL original do poster
-    // 2. Backdrop otimizado
-    // 3. Backdrop original
+    // 1. URL original do poster quando versão otimizada falhar
+    // 2. Poster em cache
+    // 3. Backdrop otimizado
+    // 4. Backdrop original
+    // 5. Backdrops ou imagens adicionais
+    const cached = posterRecoveryService.getCachedPoster(item);
+    const rawPosterUrl = item.image || item.poster || '';
+    const optPosterUrl = tvPerformanceProfileService.getOptimizedPosterUrl(rawPosterUrl);
     const rawBackdrop = item.backdrop || '';
     const optBackdrop = tvPerformanceProfileService.getOptimizedPosterUrl(rawBackdrop);
 
-    const candidates = [rawPoster, optBackdrop, rawBackdrop].filter((url): url is string => Boolean(url));
+    const candidates = [
+      rawPosterUrl !== optPosterUrl ? rawPosterUrl : '',
+      cached ? tvPerformanceProfileService.getOptimizedPosterUrl(cached) : '',
+      cached || '',
+      optBackdrop,
+      rawBackdrop !== optBackdrop ? rawBackdrop : '',
+      ...(Array.isArray(item.backdrops) ? item.backdrops : []),
+      ...(Array.isArray(item.images) ? item.images : [])
+    ].filter((url): url is string => Boolean(url && typeof url === 'string' && url.startsWith('http')));
+
     const nextCandidate = candidates.find(url => url !== imgSrc && !failedUrlsRef.current.has(url));
 
     if (nextCandidate) {
       setImgSrc(nextCandidate);
     } else {
       setHasImageError(true);
+      triggerRecovery();
     }
   };
 
@@ -283,6 +359,9 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
 }, (prev, next) => {
   return (
     prev.item.id === next.item.id &&
+    prev.item.image === next.item.image &&
+    prev.item.poster === next.item.poster &&
+    prev.item.backdrop === next.item.backdrop &&
     prev.isFocused === next.isFocused &&
     prev.showProgress === next.showProgress &&
     prev.priority === next.priority &&

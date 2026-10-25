@@ -212,9 +212,15 @@ export class TvImagePreloaderService {
     if (typeof window === 'undefined' && typeof Image === 'undefined') {
       return new Promise<boolean>((resolve) => {
         setTimeout(() => {
-          this.readyCache.set(url, true);
-          this.metrics.completedDecodes++;
-          resolve(true);
+          if (url.includes('404') || url.includes('broken') || url.includes('invalid')) {
+            this.failedCache.set(url, true);
+            this.metrics.failedLoads++;
+            resolve(false);
+          } else {
+            this.readyCache.set(url, true);
+            this.metrics.completedDecodes++;
+            resolve(true);
+          }
         }, 15);
       });
     }
