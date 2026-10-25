@@ -84,6 +84,32 @@ const RankedCard = memo<{
       ? 'origin-right'
       : 'origin-center';
 
+  // Posicionamento horizontal proporcional dos números em relação à capa
+  // Aproxima visualmente o número 1 da capa e mantém todos os números de 1 a 10
+  // parcialmente atrás do pôster (z-0 sob z-10) com proporções equilibradas e sem invadir cards vizinhos.
+  const numberLeftOffset = useMemo(() => {
+    switch (rank) {
+      case 1:
+        return '14%'; // Otimizado para o dígito estreito '1', eliminando o espaço vazio e inserindo-o parcialmente sob a capa
+      case 2:
+      case 3:
+      case 7:
+        return '6%'; // Dígitos de largura intermediária
+      case 5:
+        return '5%';
+      case 8:
+        return '4%';
+      case 4:
+      case 6:
+      case 9:
+        return '3%'; // Dígitos mais largos
+      case 10:
+        return '0%'; // Dois dígitos ('10'): fixado à esquerda para abrigar '1' e '0' confortavelmente sem colisão
+      default:
+        return '4%';
+    }
+  }, [rank]);
+
   return (
     <div
       className="relative flex items-end w-full select-none group/ranked cursor-pointer focus:outline-none"
@@ -109,14 +135,16 @@ const RankedCard = memo<{
         NÚMERO DO RANKING
         - Preenchimento sólido branco puro (#ffffff), tipografia pesada e monumental
         - Removido completamente qualquer traçado externo ou contorno
-        - Posicionado à esquerda da capa, parcialmente atrás dela (z-0)
-        - Para o número 10 (dois dígitos): kerning ajustado (-0.16em) e proporção equilibrada
+        - Posicionamento proporcional à esquerda e parcialmente atrás da capa (z-0)
+        - Número 1 aproximado da capa, eliminando a distância visual excessiva
+        - Para o número 10 (dois dígitos): kerning ajustado (-0.16em) e proporção equilibrada sem sobrepor vizinho
         - Drop shadow para contraste cristalino sobre qualquer fundo
         ========================================================================
       */}
       <div 
-        className="absolute left-0 bottom-[-2px] sm:bottom-[-4px] md:bottom-[-6px] z-0 flex items-end select-none pointer-events-none"
+        className="absolute bottom-[-2px] sm:bottom-[-4px] md:bottom-[-6px] z-0 flex items-end select-none pointer-events-none"
         style={{
+          left: numberLeftOffset,
           width: isDoubleDigit ? '54%' : '44%',
           justifyContent: 'flex-start'
         }}
@@ -438,9 +466,13 @@ export const FeaturedRankedCarousel: React.FC<FeaturedRankedCarouselProps> = ({
         )}
       </div>
 
-      {/* Trilha Finitas de Duas Páginas com Transição Suave e Espaçamento Perfeito */}
+      {/* Trilha Finitas de Duas Páginas com Transição Suave, Espaçamento Perfeito e Dissipação Natural do Glow */}
       <div 
-        className="relative w-full overflow-hidden py-6 -my-6 px-1 -mx-1 focus:outline-none"
+        className="relative w-full overflow-hidden pt-3 pb-12 sm:pb-14 px-2 sm:px-3 focus:outline-none"
+        style={{
+          overflowX: 'clip',
+          overflowY: 'visible'
+        }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onKeyDown={handleKeyDown}

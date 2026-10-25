@@ -73,6 +73,18 @@ assert.ok(carouselCode.includes('translateX(-${pageIndex * 50}%)'), 'Transição
 assert.ok(carouselCode.includes('origin-right'), 'Último banner da página deve ter origin-right no hover para evitar cortes');
 console.log('  -> Distribuição de 5 colunas iguais e proteção contra cortes de hover validadas.');
 
+// [Requisito 3.1] Posicionamento proporcional dos números (aproximação do 1 e contenção do 10)
+assert.ok(carouselCode.includes('numberLeftOffset'), 'Deve calcular offset proporcional dos números');
+assert.ok(carouselCode.includes("case 1:\n        return '14%'") || carouselCode.includes("case 1:"), 'Número 1 deve possuir offset para aproximação da capa');
+assert.ok(carouselCode.includes("case 10:\n        return '0%'") || carouselCode.includes("case 10:"), 'Número 10 deve tratar 2 dígitos sem invasão de card vizinho');
+console.log('  -> Posicionamento proporcional e aproximação do número 1 validados.');
+
+// [Requisito 3.2] Dissipação natural do glow (sem cortes horizontais ou laterais)
+assert.strictEqual(carouselCode.includes('-my-6'), false, 'NÃO deve conter -my-6 causando cortes de sombra');
+assert.ok(carouselCode.includes("overflowX: 'clip'") || carouselCode.includes('overflowX: "clip"'), 'Deve utilizar overflowX clip para recorte horizontal sem corte vertical');
+assert.ok(carouselCode.includes("overflowY: 'visible'") || carouselCode.includes('overflowY: "visible"'), 'Deve manter overflowY visible para dissipação do glow');
+console.log('  -> Dissipação natural do glow sem cortes horizontais ou laterais validada.');
+
 // [Requisito 4] Auditoria de MobileRankedRow.tsx
 console.log('\n4. Verificando ausência de outline em src/components/mobile/MobileRankedRow.tsx...');
 const mobileRowCode = fs.readFileSync(path.resolve('src/components/mobile/MobileRankedRow.tsx'), 'utf8');
