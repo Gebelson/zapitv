@@ -5,6 +5,7 @@ import { storageService, PlaybackContinuityInfo } from '../../core/storage/stora
 import { posterRecoveryService } from '../../core/catalog/PosterRecoveryService';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvPerformanceProfileService } from '../../core/tv/tvPerformanceProfileService';
+import { tvPerformanceService } from '../../core/tv/tvPerformanceService';
 
 interface TvCardProps {
   item: ContentItem;
@@ -272,14 +273,15 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
           : 'hover:scale-102 z-10 transform-gpu'
       } ${className}`}
     >
-      {/* GLOW AMBIENTE DAS CAPAS (Samsung The Frame / Tizen / Media Station X) */}
+      {/* GLOW AMBIENTE DAS CAPAS (Samsung The Frame / Tizen / Media Station X / Fire TV) */}
       {/* Iluminação suave e atmosférica que acompanha as cores originais da capa, posicionada estritamente ATRÁS do card */}
       {isTvFocused && !suppressFocusBorder && (
         <div 
           className="absolute -inset-3 sm:-inset-4 rounded-3xl pointer-events-none transition-all duration-300 transform-gpu opacity-35 scale-100"
           style={{
             background: ambientGlowStyle,
-            filter: 'blur(20px)',
+            filter: (tvPerformanceService.isFireTv() || tvPerformanceProfileService.getActiveConfig().name === 'eco') ? 'none' : 'blur(20px)',
+            boxShadow: (tvPerformanceService.isFireTv() || tvPerformanceProfileService.getActiveConfig().name === 'eco') ? '0 0 20px rgba(0, 125, 247, 0.4)' : undefined,
             zIndex: 0
           }}
           aria-hidden="true"

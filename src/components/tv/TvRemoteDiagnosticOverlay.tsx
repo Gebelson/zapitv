@@ -30,6 +30,7 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
     Escape: 0,
     Backspace: 0,
     TizenBack_10009: 0,
+    FireTvBack_4: 0,
   });
 
   const [currentActiveElement, setCurrentActiveElement] = useState<string>('none');
@@ -105,6 +106,8 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
       let testCategory = '';
       if (keyCode === 10009 || key === 'GoBack' || key === 'Return') {
         testCategory = 'TizenBack_10009';
+      } else if (keyCode === 4 || key === 'Back' || key === 'BrowserBack') {
+        testCategory = 'FireTvBack_4';
       } else if (key === 'ArrowUp' || keyCode === 38) {
         testCategory = 'ArrowUp';
       } else if (key === 'ArrowDown' || keyCode === 40) {
@@ -113,7 +116,7 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
         testCategory = 'ArrowLeft';
       } else if (key === 'ArrowRight' || keyCode === 39) {
         testCategory = 'ArrowRight';
-      } else if (key === 'Enter' || keyCode === 13) {
+      } else if (key === 'Enter' || keyCode === 13 || keyCode === 66) {
         testCategory = 'Enter';
       } else if (key === 'Escape' || keyCode === 27) {
         testCategory = 'Escape';
@@ -236,8 +239,10 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Versão / Build:</span>
-                <span className="text-gray-300 font-medium">04e663d (v2.0-tv)</span>
+                <span className="text-gray-400">Dispositivo:</span>
+                <span className="text-amber-300 font-bold truncate max-w-[190px]">
+                  {perfMetrics?.deviceFamily ? `${perfMetrics.deviceFamily} (${perfMetrics.deviceModel || 'padrão'})` : 'Geral'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Componentes Focáveis:</span>
@@ -325,9 +330,9 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
               )}
             </div>
 
-            {/* Dica técnica MSX */}
+            {/* Dica técnica MSX / Fire TV */}
             <div className="text-[9px] text-gray-400 border-t border-white/10 pt-1 leading-tight">
-              Tizen Back = 10009. Teclas são capturadas com prioridade em capture-phase.
+              Tizen Back = 10009 · Fire TV Back = 4 / Back · Enter = 13 / 66.
             </div>
           </>
         )}

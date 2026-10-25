@@ -50,7 +50,7 @@ class TvNavigationManager {
         up: [38, 'ArrowUp'],
         right: [39, 'ArrowRight'],
         down: [40, 'ArrowDown'],
-        enter: [13, 10, 'Enter', 'Select', 65385]
+        enter: [13, 10, 'Enter', 'Select', 'Ok', 'OK', 65385, 66]
       });
 
       // Captura global do botão VOLTAR / BACK (Tizen 10009, Escape, Backspace)
@@ -95,7 +95,10 @@ class TvNavigationManager {
     const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
     const isBackKey =
       e.keyCode === 10009 ||
+      e.keyCode === 4 ||
+      e.key === 'Back' ||
       e.key === 'GoBack' ||
+      e.key === 'BrowserBack' ||
       e.key === 'Return' ||
       e.key === 'Escape' ||
       (e.key === 'Backspace' && !isInput);

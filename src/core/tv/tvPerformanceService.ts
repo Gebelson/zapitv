@@ -26,6 +26,8 @@ export interface TvPerformanceMetrics {
   activeImageDecodes: number;
   gpuLayerHintCount: number;
   hardwareProfile: 'high' | 'balanced' | 'eco';
+  deviceFamily?: 'firetv' | 'samsung' | 'msx' | 'generic';
+  deviceModel?: string;
 }
 
 class TvPerformanceService {
@@ -66,19 +68,85 @@ class TvPerformanceService {
   }
 
   /**
+   * Detecta se o ambiente de execução é um dispositivo Amazon Fire TV
+   */
+  public isFireTv(customUa?: string): boolean {
+    if (typeof window === 'undefined' && !customUa) return false;
+    const ua = (customUa || (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '').toLowerCase();
+
+    // Identificadores confiáveis de User-Agent do ecossistema Amazon Fire OS:
+    // 1. Identificadores de hardware oficiais Fire TV (AFTT, AFTM, AFTMM, AFTKA, AFTKM, AFTA, AFTEU, etc.)
+    // 2. Navegador oficial Silk (Silk/, Silk-Accelerated, AmazonWebAppPlatform)
+    // 3. Menções explícitas a FireTV, Fire OS, ou Media Station X rodando sobre Fire OS
+    const isAftModel = /\b(aft[a-z0-9]+)\b/i.test(ua);
+    const isSilkBrowser = /silk\/|silk-accelerated|amazonwebappplatform/i.test(ua);
+    const isFireTvBrand = /firetv|fire\s*tv|fireos/i.test(ua);
+    const isAmazonAndroid = /amazon/i.test(ua) && (/android/i.test(ua) || /tv/i.test(ua));
+    const isMsxOnFireTv = /mediastationx|media\s*station\s*x/i.test(ua) && (/aft/i.test(ua) || /amazon/i.test(ua) || /fire/i.test(ua));
+
+    return isAftModel || isSilkBrowser || isFireTvBrand || isAmazonAndroid || isMsxOnFireTv;
+  }
+
+  /**
+   * Retorna a família do dispositivo detectado
+   */
+  public getDeviceFamily(customUa?: string): 'firetv' | 'samsung' | 'msx' | 'generic' {
+    const ua = (customUa || (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '').toLowerCase();
+    if (this.isFireTv(ua)) return 'firetv';
+    if (/tizen|maple|samsung.*(?:tv|smarttv)/i.test(ua)) return 'samsung';
+    if (/mediastationx|media\s*station\s*x/i.test(ua)) return 'msx';
+    return 'generic';
+  }
+
+  /**
+   * Retorna o modelo amigável ou identificador de dispositivo
+   */
+  public getDeviceModel(customUa?: string): string {
+    const ua = (customUa || (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '').toLowerCase();
+    if (this.isFireTv(ua)) {
+      if (/\baftkm\b/i.test(ua)) return 'Amazon Fire TV Stick 4K Max (Gen 2)';
+      if (/\baftka\b/i.test(ua)) return 'Amazon Fire TV Stick 4K Max';
+      if (/\baftga\b/i.test(ua)) return 'Amazon Fire TV Stick 4K (Gen 2)';
+      if (/\baftmm\b/i.test(ua)) return 'Amazon Fire TV Stick 4K';
+      if (/\baftss\b/i.test(ua)) return 'Amazon Fire TV Stick Lite';
+      if (/\baftt\b/i.test(ua)) return 'Amazon Fire TV Stick (Gen 2/3)';
+      if (/\baftm\b/i.test(ua)) return 'Amazon Fire TV Stick (Gen 1)';
+      if (/\bafteu\b/i.test(ua)) return 'Amazon Fire TV Cube (Gen 3)';
+      if (/\bafta\b|\baftr\b/i.test(ua)) return 'Amazon Fire TV Cube';
+      if (/\bafts\b/i.test(ua)) return 'Amazon Fire TV';
+      if (/silk/i.test(ua)) return 'Amazon Fire TV (Silk Browser)';
+      if (/mediastationx|media\s*station\s*x/i.test(ua)) return 'Fire OS (Media Station X)';
+      return 'Amazon Fire TV';
+    }
+    if (/tizen/i.test(ua)) return 'Samsung Tizen TV';
+    if (/mediastationx|media\s*station\s*x/i.test(ua)) return 'Media Station X';
+    if (/webos/i.test(ua)) return 'LG webOS TV';
+    return 'Dispositivo Padrão';
+  }
+
+  /**
    * Identifica o perfil de hardware seguro da Smart TV
    */
-  public detectHardwareProfile(): 'high' | 'balanced' | 'eco' {
-    if (typeof window === 'undefined') {
+  public detectHardwareProfile(customUa?: string): 'high' | 'balanced' | 'eco' {
+    if (typeof window === 'undefined' && !customUa) {
       this.currentHardwareProfile = 'balanced';
       return 'balanced';
     }
 
-    const ua = (navigator.userAgent || '').toLowerCase();
-    const nav = navigator as any;
+    const ua = (customUa || (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '').toLowerCase();
+    const nav = (typeof navigator !== 'undefined' ? navigator : {}) as any;
+    const isFireTv = this.isFireTv(ua);
     const isSamsungTv = /tizen|maple|samsung.*(?:tv|smarttv)|mediastationx|media\s*station\s*x/i.test(ua);
     const hwConcurrency = nav.hardwareConcurrency || 4;
     const deviceMemory = nav.deviceMemory || 4;
+
+    // Dispositivos Fire TV: perfil conservador econômico por padrão para garantir fluidez imediata
+    // e prevenir travamentos do compositor gráfico na GPU limitada de sticks HDMI
+    if (isFireTv) {
+      const isHighEndFireTv = /\b(afteu|aftkm)\b/i.test(ua) && hwConcurrency >= 4 && deviceMemory >= 2;
+      this.currentHardwareProfile = isHighEndFireTv ? 'balanced' : 'eco';
+      return this.currentHardwareProfile;
+    }
 
     // Smart TVs como Samsung The Frame / Tizen ou MSX possuem restrições de VRAM na GPU
     if (isSamsungTv) {
@@ -217,7 +285,9 @@ class TvPerformanceService {
       navigableFocusableCount: this.cachedNavigableCount,
       activeImageDecodes: this.activeImageDecodes,
       gpuLayerHintCount: this.cachedGpuLayerCount,
-      hardwareProfile: this.currentHardwareProfile
+      hardwareProfile: this.currentHardwareProfile,
+      deviceFamily: this.getDeviceFamily(),
+      deviceModel: this.getDeviceModel()
     };
   }
 

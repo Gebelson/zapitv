@@ -145,8 +145,8 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
     if (requestedMode === 'original' || requestedMode === 'gradients' || requestedMode === 'full') {
       return { bannerMode: requestedMode, isDiagnostic: true };
     }
-    const isSamsungTv = /Tizen|Maple|Samsung.*(?:TV|SmartTV)|Media\s*Station\s*X|MediaStationX/i.test(navigator.userAgent);
-    return { bannerMode: isSamsungTv ? 'gradients' as const : 'full' as const, isDiagnostic: false };
+    const isTvEnvironment = /Tizen|Maple|Samsung.*(?:TV|SmartTV)|Media\s*Station\s*X|MediaStationX|Amazon|Silk|FireTV|Fire\s*OS|AFT[A-Z0-9]+/i.test(navigator.userAgent);
+    return { bannerMode: isTvEnvironment ? 'gradients' as const : 'full' as const, isDiagnostic: false };
   }, []);
 
   // Estados do carrossel cinematográfico

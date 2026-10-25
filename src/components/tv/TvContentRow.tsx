@@ -5,6 +5,7 @@ import { TvCard16x9, getCardAmbientGlow } from './TvCard16x9';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { tvPerformanceProfileService } from '../../core/tv/tvPerformanceProfileService';
+import { tvPerformanceService } from '../../core/tv/tvPerformanceService';
 import { tvScrollService } from '../../core/tv/tvScrollService';
 import { posterRecoveryService } from '../../core/catalog/PosterRecoveryService';
 
@@ -448,9 +449,10 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
             >
               <div className="relative w-full aspect-[2/3]">
                 <div 
-                  className="absolute -inset-4 sm:-inset-5 rounded-3xl opacity-35 filter blur-xl transform-gpu pointer-events-none"
+                  className={`absolute -inset-4 sm:-inset-5 rounded-3xl opacity-35 ${(tvPerformanceService.isFireTv() || tvPerformanceProfileService.getActiveConfig().name === 'eco') ? '' : 'filter blur-xl'} transform-gpu pointer-events-none`}
                   style={{
                     background: getCardAmbientGlow(currentItem),
+                    boxShadow: (tvPerformanceService.isFireTv() || tvPerformanceProfileService.getActiveConfig().name === 'eco') ? '0 0 25px rgba(0, 125, 247, 0.45)' : undefined
                   }}
                 />
               </div>

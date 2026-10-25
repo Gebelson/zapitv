@@ -10558,13 +10558,14 @@ var init_PlaybackOptimizerService = __esm({
         const ua = (nav.userAgent || "").toLowerCase();
         const hwConcurrency = nav.hardwareConcurrency || 4;
         const deviceMemory = nav.deviceMemory || 4;
-        const isSmartTv = typeof window !== "undefined" && window.location.pathname.startsWith("/tv") || /smart-tv|smarttv|tizen|webos|viera|bravia|netcast|crkey|aft|googletv|mediastationx/i.test(ua);
+        const isSmartTv = typeof window !== "undefined" && window.location.pathname.startsWith("/tv") || /smart-tv|smarttv|tizen|webos|viera|bravia|netcast|crkey|aft|firetv|fire\s*tv|fireos|silk|amazonwebappplatform|googletv|mediastationx/i.test(ua);
+        const isFireTv = /amazon|silk|firetv|fire\s*os|aft[a-z0-9]+/i.test(ua);
         const isMobile = !isSmartTv && /mobile|android|iphone|ipod/i.test(ua);
         const winScreen = typeof window !== "undefined" ? window.screen : null;
         const isTablet = !isSmartTv && (/ipad/i.test(ua) || isMobile && winScreen && Math.min(winScreen.width, winScreen.height) >= 600);
         const isDesktop = !isSmartTv && !isMobile && !isTablet;
         const deviceType = isSmartTv ? "smart-tv" : isMobile ? "mobile" : isTablet ? "tablet" : "desktop";
-        const isLowEnd = hwConcurrency <= 2 || deviceMemory <= 2;
+        const isLowEnd = hwConcurrency <= 2 || deviceMemory <= 2 || isFireTv;
         const screenWidth = typeof window !== "undefined" ? window.screen?.width || 1920 : 1920;
         const screenHeight = typeof window !== "undefined" ? window.screen?.height || 1080 : 1080;
         const maxDimension = Math.max(screenWidth, screenHeight);
@@ -10604,9 +10605,10 @@ var init_PlaybackOptimizerService = __esm({
         let maxMaxBufferLength = 60;
         let maxBufferSize = 30 * 1024 * 1024;
         if (dev.deviceType === "smart-tv") {
-          maxBufferLength = dev.isLowEnd ? 24 : 30;
-          maxMaxBufferLength = dev.isLowEnd ? 40 : 60;
-          maxBufferSize = (dev.isLowEnd ? 24 : 30) * 1024 * 1024;
+          const isFireTvDevice2 = typeof navigator !== "undefined" && /amazon|silk|firetv|fire\s*os|aft[a-z0-9]+/i.test(navigator.userAgent || "");
+          maxBufferLength = isFireTvDevice2 ? 20 : dev.isLowEnd ? 24 : 30;
+          maxMaxBufferLength = isFireTvDevice2 ? 35 : dev.isLowEnd ? 40 : 60;
+          maxBufferSize = (isFireTvDevice2 ? 20 : dev.isLowEnd ? 24 : 30) * 1024 * 1024;
         } else if (net.isSlowConnection || dev.isLowEnd) {
           maxBufferLength = 15;
           maxMaxBufferLength = 30;
@@ -10616,11 +10618,12 @@ var init_PlaybackOptimizerService = __esm({
           maxMaxBufferLength = 90;
           maxBufferSize = 60 * 1024 * 1024;
         }
+        const isFireTvDevice = typeof navigator !== "undefined" && /amazon|silk|firetv|fire\s*os|aft[a-z0-9]+/i.test(navigator.userAgent || "");
         return {
           enableWorker: true,
           lowLatencyMode: false,
           // Desativa baixa latência em VoD para garantir buffer contínuo sem micro-travas
-          backBufferLength: dev.isLowEnd || dev.deviceType === "smart-tv" ? 30 : 60,
+          backBufferLength: isFireTvDevice ? 15 : dev.isLowEnd || dev.deviceType === "smart-tv" ? 25 : 60,
           maxBufferLength,
           maxMaxBufferLength,
           maxBufferSize,
@@ -10911,6 +10914,245 @@ var init_PlaybackOptimizerService = __esm({
   }
 });
 
+// src/core/tv/tvPerformanceService.ts
+var TvPerformanceService, tvPerformanceService;
+var init_tvPerformanceService = __esm({
+  "src/core/tv/tvPerformanceService.ts"() {
+    TvPerformanceService = class _TvPerformanceService {
+      constructor() {
+        this.isTv = false;
+        this.rafId = null;
+        this.lastFrameTime = 0;
+        this.frameTimes = [];
+        this.jankCount = 0;
+        this.droppedFrames = 0;
+        this.fps = 60;
+        this.avgFrameTimeMs = 16.6;
+        this.inputLatencies = [];
+        this.lastInputLatencyMs = 0;
+        this.lastEventLatencyMs = 0;
+        this.lastVisualLatencyMs = 0;
+        this.lastDomCheckTime = 0;
+        this.cachedDomNodeCount = 0;
+        this.cachedNavigableCount = 0;
+        this.cachedGpuLayerCount = 0;
+        this.currentHardwareProfile = "balanced";
+        this.activeImageDecodes = 0;
+        this.isSamplingActive = false;
+        this.samplingSubscribers = /* @__PURE__ */ new Set();
+        this.detectHardwareProfile();
+      }
+      static getInstance() {
+        if (!_TvPerformanceService.instance) {
+          _TvPerformanceService.instance = new _TvPerformanceService();
+        }
+        return _TvPerformanceService.instance;
+      }
+      /**
+       * Detecta se o ambiente de execução é um dispositivo Amazon Fire TV
+       */
+      isFireTv(customUa) {
+        if (typeof window === "undefined" && !customUa) return false;
+        const ua = (customUa || (typeof navigator !== "undefined" ? navigator.userAgent : "") || "").toLowerCase();
+        const isAftModel = /\b(aft[a-z0-9]+)\b/i.test(ua);
+        const isSilkBrowser = /silk\/|silk-accelerated|amazonwebappplatform/i.test(ua);
+        const isFireTvBrand = /firetv|fire\s*tv|fireos/i.test(ua);
+        const isAmazonAndroid = /amazon/i.test(ua) && (/android/i.test(ua) || /tv/i.test(ua));
+        const isMsxOnFireTv = /mediastationx|media\s*station\s*x/i.test(ua) && (/aft/i.test(ua) || /amazon/i.test(ua) || /fire/i.test(ua));
+        return isAftModel || isSilkBrowser || isFireTvBrand || isAmazonAndroid || isMsxOnFireTv;
+      }
+      /**
+       * Retorna a família do dispositivo detectado
+       */
+      getDeviceFamily(customUa) {
+        const ua = (customUa || (typeof navigator !== "undefined" ? navigator.userAgent : "") || "").toLowerCase();
+        if (this.isFireTv(ua)) return "firetv";
+        if (/tizen|maple|samsung.*(?:tv|smarttv)/i.test(ua)) return "samsung";
+        if (/mediastationx|media\s*station\s*x/i.test(ua)) return "msx";
+        return "generic";
+      }
+      /**
+       * Retorna o modelo amigável ou identificador de dispositivo
+       */
+      getDeviceModel(customUa) {
+        const ua = (customUa || (typeof navigator !== "undefined" ? navigator.userAgent : "") || "").toLowerCase();
+        if (this.isFireTv(ua)) {
+          if (/\baftkm\b/i.test(ua)) return "Amazon Fire TV Stick 4K Max (Gen 2)";
+          if (/\baftka\b/i.test(ua)) return "Amazon Fire TV Stick 4K Max";
+          if (/\baftga\b/i.test(ua)) return "Amazon Fire TV Stick 4K (Gen 2)";
+          if (/\baftmm\b/i.test(ua)) return "Amazon Fire TV Stick 4K";
+          if (/\baftss\b/i.test(ua)) return "Amazon Fire TV Stick Lite";
+          if (/\baftt\b/i.test(ua)) return "Amazon Fire TV Stick (Gen 2/3)";
+          if (/\baftm\b/i.test(ua)) return "Amazon Fire TV Stick (Gen 1)";
+          if (/\bafteu\b/i.test(ua)) return "Amazon Fire TV Cube (Gen 3)";
+          if (/\bafta\b|\baftr\b/i.test(ua)) return "Amazon Fire TV Cube";
+          if (/\bafts\b/i.test(ua)) return "Amazon Fire TV";
+          if (/silk/i.test(ua)) return "Amazon Fire TV (Silk Browser)";
+          if (/mediastationx|media\s*station\s*x/i.test(ua)) return "Fire OS (Media Station X)";
+          return "Amazon Fire TV";
+        }
+        if (/tizen/i.test(ua)) return "Samsung Tizen TV";
+        if (/mediastationx|media\s*station\s*x/i.test(ua)) return "Media Station X";
+        if (/webos/i.test(ua)) return "LG webOS TV";
+        return "Dispositivo Padr\xE3o";
+      }
+      /**
+       * Identifica o perfil de hardware seguro da Smart TV
+       */
+      detectHardwareProfile(customUa) {
+        if (typeof window === "undefined" && !customUa) {
+          this.currentHardwareProfile = "balanced";
+          return "balanced";
+        }
+        const ua = (customUa || (typeof navigator !== "undefined" ? navigator.userAgent : "") || "").toLowerCase();
+        const nav = typeof navigator !== "undefined" ? navigator : {};
+        const isFireTv = this.isFireTv(ua);
+        const isSamsungTv = /tizen|maple|samsung.*(?:tv|smarttv)|mediastationx|media\s*station\s*x/i.test(ua);
+        const hwConcurrency = nav.hardwareConcurrency || 4;
+        const deviceMemory = nav.deviceMemory || 4;
+        if (isFireTv) {
+          const isHighEndFireTv = /\b(afteu|aftkm)\b/i.test(ua) && hwConcurrency >= 4 && deviceMemory >= 2;
+          this.currentHardwareProfile = isHighEndFireTv ? "balanced" : "eco";
+          return this.currentHardwareProfile;
+        }
+        if (isSamsungTv) {
+          if (deviceMemory <= 2 || hwConcurrency <= 2) {
+            this.currentHardwareProfile = "eco";
+          } else {
+            this.currentHardwareProfile = "balanced";
+          }
+        } else if (hwConcurrency >= 8 && deviceMemory >= 8) {
+          this.currentHardwareProfile = "high";
+        } else {
+          this.currentHardwareProfile = "balanced";
+        }
+        return this.currentHardwareProfile;
+      }
+      getHardwareProfile() {
+        return this.currentHardwareProfile;
+      }
+      setHardwareProfile(profile) {
+        this.currentHardwareProfile = profile;
+        this.notifySubscribers();
+      }
+      /**
+       * Inicia amostragem leve de frames sem consumir CPU
+       */
+      startFrameSampling() {
+        if (this.isSamplingActive || typeof window === "undefined") return;
+        this.isSamplingActive = true;
+        this.lastFrameTime = performance.now();
+        this.frameTimes = [];
+        const sample = (now) => {
+          if (!this.isSamplingActive) return;
+          const delta = now - this.lastFrameTime;
+          this.lastFrameTime = now;
+          if (delta > 0 && delta < 500) {
+            this.frameTimes.push(delta);
+            if (this.frameTimes.length > 60) {
+              this.frameTimes.shift();
+            }
+            if (delta > 33.3) {
+              this.jankCount++;
+              const dropped = Math.max(1, Math.round(delta / 16.67) - 1);
+              this.droppedFrames += dropped;
+            }
+            const sum = this.frameTimes.reduce((acc, t) => acc + t, 0);
+            this.avgFrameTimeMs = sum / this.frameTimes.length;
+            this.fps = Math.min(60, Math.round(1e3 / Math.max(1, this.avgFrameTimeMs)));
+          }
+          this.rafId = requestAnimationFrame(sample);
+        };
+        this.rafId = requestAnimationFrame(sample);
+      }
+      stopFrameSampling() {
+        this.isSamplingActive = false;
+        if (this.rafId !== null) {
+          cancelAnimationFrame(this.rafId);
+          this.rafId = null;
+        }
+      }
+      /**
+       * Registra a latência do comando físico:
+       * - eventDurationOrStart: tempo do handler de evento síncrono (ou timestamp de início)
+       * - visualDuration: tempo total percebido até a pintura do primeiro frame (requestAnimationFrame)
+       */
+      recordInputLatency(eventDurationOrStart, visualDuration) {
+        let eventMs = 0;
+        let visualMs = 0;
+        if (visualDuration !== void 0) {
+          eventMs = Math.max(0, eventDurationOrStart);
+          visualMs = Math.max(0, visualDuration);
+        } else {
+          eventMs = Math.max(0, performance.now() - eventDurationOrStart);
+          visualMs = eventMs;
+        }
+        this.lastEventLatencyMs = Number(eventMs.toFixed(1));
+        this.lastVisualLatencyMs = Number(visualMs.toFixed(1));
+        this.lastInputLatencyMs = Number(visualMs.toFixed(1));
+        this.inputLatencies.push(visualMs);
+        if (this.inputLatencies.length > 50) {
+          this.inputLatencies.shift();
+        }
+      }
+      recordImageDecodeStart() {
+        this.activeImageDecodes++;
+      }
+      recordImageDecodeEnd() {
+        this.activeImageDecodes = Math.max(0, this.activeImageDecodes - 1);
+      }
+      /**
+       * Obtém métricas consolidadas em tempo real
+       */
+      getMetrics() {
+        const now = performance.now();
+        if (typeof document !== "undefined" && now - this.lastDomCheckTime > 2e3) {
+          this.lastDomCheckTime = now;
+          const tvRoot = document.querySelector("[data-tv-app-root]") || document.body;
+          this.cachedDomNodeCount = tvRoot ? tvRoot.querySelectorAll("*").length : 0;
+          this.cachedNavigableCount = document.querySelectorAll("[data-focus-key]").length;
+          this.cachedGpuLayerCount = document.querySelectorAll(".will-change-transform, .transform-gpu").length;
+        }
+        const avgInput = this.inputLatencies.length > 0 ? this.inputLatencies.reduce((a, b) => a + b, 0) / this.inputLatencies.length : 0;
+        return {
+          fps: this.fps,
+          avgFrameTimeMs: Number(this.avgFrameTimeMs.toFixed(1)),
+          droppedFrames: this.droppedFrames,
+          jankCount: this.jankCount,
+          lastEventLatencyMs: this.lastEventLatencyMs,
+          lastVisualLatencyMs: this.lastVisualLatencyMs,
+          lastInputLatencyMs: Number(this.lastInputLatencyMs.toFixed(1)),
+          avgInputLatencyMs: Number(avgInput.toFixed(1)),
+          domNodeCount: this.cachedDomNodeCount,
+          navigableFocusableCount: this.cachedNavigableCount,
+          activeImageDecodes: this.activeImageDecodes,
+          gpuLayerHintCount: this.cachedGpuLayerCount,
+          hardwareProfile: this.currentHardwareProfile,
+          deviceFamily: this.getDeviceFamily(),
+          deviceModel: this.getDeviceModel()
+        };
+      }
+      subscribe(callback) {
+        this.samplingSubscribers.add(callback);
+        return () => {
+          this.samplingSubscribers.delete(callback);
+        };
+      }
+      notifySubscribers() {
+        this.samplingSubscribers.forEach((cb) => cb());
+      }
+      resetStats() {
+        this.frameTimes = [];
+        this.jankCount = 0;
+        this.droppedFrames = 0;
+        this.inputLatencies = [];
+        this.lastInputLatencyMs = 0;
+      }
+    };
+    tvPerformanceService = TvPerformanceService.getInstance();
+  }
+});
+
 // src/core/providers/sourceReadiness.ts
 function isSourcePlayableHere(stream) {
   if (!stream.url) return false;
@@ -11015,6 +11257,7 @@ var init_providerRegistry = __esm({
     init_constants();
     init_BannedContentRegistry();
     init_PlaybackOptimizerService();
+    init_tvPerformanceService();
     init_LruCache();
     init_sourceMemory();
     localEngineCache = { active: false, lastCheck: 0 };
@@ -11158,6 +11401,7 @@ var init_providerRegistry = __esm({
         // 15s de expiração rápida para cache negativo
         this.pending = /* @__PURE__ */ new Map();
         this.progressiveListeners = /* @__PURE__ */ new Map();
+        this.providerResultListeners = /* @__PURE__ */ new Map();
         this.inFlightConsumers = /* @__PURE__ */ new Map();
         this.cacheGeneration = 0;
         this.CACHE_TTL_MS = 15 * 60 * 1e3;
@@ -11299,13 +11543,30 @@ var init_providerRegistry = __esm({
        * Resolve todos os fluxos de reprodução para um item (filme ou série).
        */
       resolveStreams(type, id, episode, options) {
-        const cacheKey = JSON.stringify(["v7_canonical_identity", type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
+        const rawTargetId = id.id || "";
+        const cleanId = rawTargetId.replace(/^tmdb-?/i, "");
+        const tmdbStr = id.tmdbId ? String(id.tmdbId).replace(/^tmdb-?/i, "") : /^\d+$/.test(cleanId) ? cleanId : "";
+        const imdbStr = id.imdbId ? String(id.imdbId) : rawTargetId.startsWith("tt") ? rawTargetId : "";
+        const cleanTitle = (id.title || "").trim().toLowerCase();
+        const cacheKey = JSON.stringify(["v8_canonical_identity", type, rawTargetId, tmdbStr, imdbStr, cleanTitle, id.year, episode?.season, episode?.episode]);
         const releaseListener = () => {
           const callback = options?.onProgressiveStreams;
-          if (!callback) return;
-          const listeners = this.progressiveListeners.get(cacheKey);
-          listeners?.delete(callback);
-          if (listeners?.size === 0) this.progressiveListeners.delete(cacheKey);
+          if (callback) {
+            const listeners = this.progressiveListeners.get(cacheKey);
+            listeners?.delete(callback);
+            if (listeners?.size === 0) this.progressiveListeners.delete(cacheKey);
+          }
+          const providerCb = options?.onProviderResult;
+          if (providerCb) {
+            const pListeners = this.providerResultListeners.get(cacheKey);
+            pListeners?.delete(providerCb);
+            if (pListeners?.size === 0) this.providerResultListeners.delete(cacheKey);
+          }
+          const consumers2 = this.inFlightConsumers.get(cacheKey);
+          if (consumers2 && options?.signal) {
+            consumers2.delete(options.signal);
+            if (consumers2.size === 0) this.inFlightConsumers.delete(cacheKey);
+          }
           options?.signal?.removeEventListener("abort", releaseListener);
         };
         if (options?.onProgressiveStreams) {
@@ -11313,7 +11574,15 @@ var init_providerRegistry = __esm({
             this.progressiveListeners.set(cacheKey, /* @__PURE__ */ new Set());
           }
           this.progressiveListeners.get(cacheKey).add(options.onProgressiveStreams);
-          options.signal?.addEventListener("abort", releaseListener, { once: true });
+        }
+        if (options?.onProviderResult) {
+          if (!this.providerResultListeners.has(cacheKey)) {
+            this.providerResultListeners.set(cacheKey, /* @__PURE__ */ new Set());
+          }
+          this.providerResultListeners.get(cacheKey).add(options.onProviderResult);
+        }
+        if (options?.signal) {
+          options.signal.addEventListener("abort", releaseListener, { once: true });
         }
         if (options?.forceRefresh || options?.bypassNegativeCache) {
           this.negativeCache.delete(cacheKey);
@@ -11323,6 +11592,19 @@ var init_providerRegistry = __esm({
             const age = Date.now() - cached.timestamp;
             if (age < this.CACHE_TTL_MS) {
               options?.onProgressiveStreams?.(cached.streams);
+              if (options?.onProviderResult) {
+                const providers = this.getEligibleProviders();
+                for (const p of providers) {
+                  options.onProviderResult({
+                    providerId: p.id,
+                    providerName: p.name,
+                    durationMs: 0,
+                    success: true,
+                    streamCount: cached.streams.filter((s) => s.providerId === p.id).length,
+                    isTimeout: false
+                  });
+                }
+              }
               if (age >= this.STALE_TTL_MS && !this.pending.has(cacheKey)) {
                 const bgRequest = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration).catch(() => []).finally(() => {
                   if (this.pending.get(cacheKey) === bgRequest) {
@@ -11663,7 +11945,8 @@ var init_providerRegistry = __esm({
             let providerSuccess = false;
             let providerStreamCount = 0;
             let providerError;
-            const addonTimeout = addon.id.includes("froststream") ? 7e3 : 4500;
+            const isFireTv = tvPerformanceService.isFireTv();
+            const addonTimeout = addon.id.includes("froststream") ? isFireTv ? 8500 : 7e3 : isFireTv ? 6500 : 4500;
             try {
               const client = new StremioClient(addon.url);
               let primaryQueryId = stremioId;
@@ -11864,7 +12147,7 @@ var init_providerRegistry = __esm({
                 streamCount: providerStreamCount,
                 error: providerError
               });
-              options?.onProviderResult?.({
+              const attemptDetail = {
                 providerId: addon.id,
                 providerName: addon.name,
                 durationMs: duration,
@@ -11872,7 +12155,19 @@ var init_providerRegistry = __esm({
                 streamCount: providerStreamCount,
                 isTimeout,
                 error: providerError
-              });
+              };
+              options?.onProviderResult?.(attemptDetail);
+              const prListeners = this.providerResultListeners.get(effectiveCacheKey);
+              if (prListeners && prListeners.size > 0) {
+                for (const cb of prListeners) {
+                  if (cb !== options?.onProviderResult) {
+                    try {
+                      cb(attemptDetail);
+                    } catch {
+                    }
+                  }
+                }
+              }
             }
             return [];
           };
@@ -11907,7 +12202,7 @@ var init_providerRegistry = __esm({
                   const hasFrostStreamFinished = !sortedAddons.some((a) => a.id.includes("froststream")) || collectedFromAddons.some((s) => s.providerId?.includes("froststream"));
                   const culprits = cleanInterim.filter((s) => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
                   const hasWebReadyPtBr = culprits.length > 0;
-                  if (cleanInterim.length >= 2 && hasWebReadyPtBr && hasFrostStreamFinished) {
+                  if ((cleanInterim.length >= 1 && hasWebReadyPtBr || cleanInterim.length >= 2) && hasFrostStreamFinished) {
                     stopSpawning = true;
                   }
                 }
@@ -11941,9 +12236,9 @@ var init_providerRegistry = __esm({
                   const hasFrostStreamFinished = !sortedAddons.some((a) => a.id.includes("froststream")) || collectedFromAddons.some((s) => s.providerId?.includes("froststream"));
                   const culprits = cleanInterim.filter((s) => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
                   const hasWebReadyPtBr = culprits.length > 0;
-                  if (cleanInterim.length >= 2 && hasWebReadyPtBr && hasFrostStreamFinished) {
+                  if ((cleanInterim.length >= 1 && hasWebReadyPtBr || cleanInterim.length >= 2) && hasFrostStreamFinished) {
                     if (interval) clearInterval(interval);
-                    timer = setTimeout(resolve, 350);
+                    timer = setTimeout(resolve, 250);
                   }
                 }
               }, 60);
@@ -12064,6 +12359,8 @@ var init_providerRegistry = __esm({
         this.cache.clear();
         this.negativeCache.clear();
         this.pending.clear();
+        this.progressiveListeners.clear();
+        this.providerResultListeners.clear();
         sourceSelectionService.clearRankingCache();
       }
     };
@@ -14324,189 +14621,6 @@ var init_catalogDeduplication = __esm({
   }
 });
 
-// src/core/tv/tvPerformanceService.ts
-var TvPerformanceService, tvPerformanceService;
-var init_tvPerformanceService = __esm({
-  "src/core/tv/tvPerformanceService.ts"() {
-    TvPerformanceService = class _TvPerformanceService {
-      constructor() {
-        this.isTv = false;
-        this.rafId = null;
-        this.lastFrameTime = 0;
-        this.frameTimes = [];
-        this.jankCount = 0;
-        this.droppedFrames = 0;
-        this.fps = 60;
-        this.avgFrameTimeMs = 16.6;
-        this.inputLatencies = [];
-        this.lastInputLatencyMs = 0;
-        this.lastEventLatencyMs = 0;
-        this.lastVisualLatencyMs = 0;
-        this.lastDomCheckTime = 0;
-        this.cachedDomNodeCount = 0;
-        this.cachedNavigableCount = 0;
-        this.cachedGpuLayerCount = 0;
-        this.currentHardwareProfile = "balanced";
-        this.activeImageDecodes = 0;
-        this.isSamplingActive = false;
-        this.samplingSubscribers = /* @__PURE__ */ new Set();
-        this.detectHardwareProfile();
-      }
-      static getInstance() {
-        if (!_TvPerformanceService.instance) {
-          _TvPerformanceService.instance = new _TvPerformanceService();
-        }
-        return _TvPerformanceService.instance;
-      }
-      /**
-       * Identifica o perfil de hardware seguro da Smart TV
-       */
-      detectHardwareProfile() {
-        if (typeof window === "undefined") {
-          this.currentHardwareProfile = "balanced";
-          return "balanced";
-        }
-        const ua = (navigator.userAgent || "").toLowerCase();
-        const nav = navigator;
-        const isSamsungTv = /tizen|maple|samsung.*(?:tv|smarttv)|mediastationx|media\s*station\s*x/i.test(ua);
-        const hwConcurrency = nav.hardwareConcurrency || 4;
-        const deviceMemory = nav.deviceMemory || 4;
-        if (isSamsungTv) {
-          if (deviceMemory <= 2 || hwConcurrency <= 2) {
-            this.currentHardwareProfile = "eco";
-          } else {
-            this.currentHardwareProfile = "balanced";
-          }
-        } else if (hwConcurrency >= 8 && deviceMemory >= 8) {
-          this.currentHardwareProfile = "high";
-        } else {
-          this.currentHardwareProfile = "balanced";
-        }
-        return this.currentHardwareProfile;
-      }
-      getHardwareProfile() {
-        return this.currentHardwareProfile;
-      }
-      setHardwareProfile(profile) {
-        this.currentHardwareProfile = profile;
-        this.notifySubscribers();
-      }
-      /**
-       * Inicia amostragem leve de frames sem consumir CPU
-       */
-      startFrameSampling() {
-        if (this.isSamplingActive || typeof window === "undefined") return;
-        this.isSamplingActive = true;
-        this.lastFrameTime = performance.now();
-        this.frameTimes = [];
-        const sample = (now) => {
-          if (!this.isSamplingActive) return;
-          const delta = now - this.lastFrameTime;
-          this.lastFrameTime = now;
-          if (delta > 0 && delta < 500) {
-            this.frameTimes.push(delta);
-            if (this.frameTimes.length > 60) {
-              this.frameTimes.shift();
-            }
-            if (delta > 33.3) {
-              this.jankCount++;
-              const dropped = Math.max(1, Math.round(delta / 16.67) - 1);
-              this.droppedFrames += dropped;
-            }
-            const sum = this.frameTimes.reduce((acc, t) => acc + t, 0);
-            this.avgFrameTimeMs = sum / this.frameTimes.length;
-            this.fps = Math.min(60, Math.round(1e3 / Math.max(1, this.avgFrameTimeMs)));
-          }
-          this.rafId = requestAnimationFrame(sample);
-        };
-        this.rafId = requestAnimationFrame(sample);
-      }
-      stopFrameSampling() {
-        this.isSamplingActive = false;
-        if (this.rafId !== null) {
-          cancelAnimationFrame(this.rafId);
-          this.rafId = null;
-        }
-      }
-      /**
-       * Registra a latência do comando físico:
-       * - eventDurationOrStart: tempo do handler de evento síncrono (ou timestamp de início)
-       * - visualDuration: tempo total percebido até a pintura do primeiro frame (requestAnimationFrame)
-       */
-      recordInputLatency(eventDurationOrStart, visualDuration) {
-        let eventMs = 0;
-        let visualMs = 0;
-        if (visualDuration !== void 0) {
-          eventMs = Math.max(0, eventDurationOrStart);
-          visualMs = Math.max(0, visualDuration);
-        } else {
-          eventMs = Math.max(0, performance.now() - eventDurationOrStart);
-          visualMs = eventMs;
-        }
-        this.lastEventLatencyMs = Number(eventMs.toFixed(1));
-        this.lastVisualLatencyMs = Number(visualMs.toFixed(1));
-        this.lastInputLatencyMs = Number(visualMs.toFixed(1));
-        this.inputLatencies.push(visualMs);
-        if (this.inputLatencies.length > 50) {
-          this.inputLatencies.shift();
-        }
-      }
-      recordImageDecodeStart() {
-        this.activeImageDecodes++;
-      }
-      recordImageDecodeEnd() {
-        this.activeImageDecodes = Math.max(0, this.activeImageDecodes - 1);
-      }
-      /**
-       * Obtém métricas consolidadas em tempo real
-       */
-      getMetrics() {
-        const now = performance.now();
-        if (typeof document !== "undefined" && now - this.lastDomCheckTime > 2e3) {
-          this.lastDomCheckTime = now;
-          const tvRoot = document.querySelector("[data-tv-app-root]") || document.body;
-          this.cachedDomNodeCount = tvRoot ? tvRoot.querySelectorAll("*").length : 0;
-          this.cachedNavigableCount = document.querySelectorAll("[data-focus-key]").length;
-          this.cachedGpuLayerCount = document.querySelectorAll(".will-change-transform, .transform-gpu").length;
-        }
-        const avgInput = this.inputLatencies.length > 0 ? this.inputLatencies.reduce((a, b) => a + b, 0) / this.inputLatencies.length : 0;
-        return {
-          fps: this.fps,
-          avgFrameTimeMs: Number(this.avgFrameTimeMs.toFixed(1)),
-          droppedFrames: this.droppedFrames,
-          jankCount: this.jankCount,
-          lastEventLatencyMs: this.lastEventLatencyMs,
-          lastVisualLatencyMs: this.lastVisualLatencyMs,
-          lastInputLatencyMs: Number(this.lastInputLatencyMs.toFixed(1)),
-          avgInputLatencyMs: Number(avgInput.toFixed(1)),
-          domNodeCount: this.cachedDomNodeCount,
-          navigableFocusableCount: this.cachedNavigableCount,
-          activeImageDecodes: this.activeImageDecodes,
-          gpuLayerHintCount: this.cachedGpuLayerCount,
-          hardwareProfile: this.currentHardwareProfile
-        };
-      }
-      subscribe(callback) {
-        this.samplingSubscribers.add(callback);
-        return () => {
-          this.samplingSubscribers.delete(callback);
-        };
-      }
-      notifySubscribers() {
-        this.samplingSubscribers.forEach((cb) => cb());
-      }
-      resetStats() {
-        this.frameTimes = [];
-        this.jankCount = 0;
-        this.droppedFrames = 0;
-        this.inputLatencies = [];
-        this.lastInputLatencyMs = 0;
-      }
-    };
-    tvPerformanceService = TvPerformanceService.getInstance();
-  }
-});
-
 // src/core/tv/tvPerformanceProfileService.ts
 var PROFILES, TvPerformanceProfileService, tvPerformanceProfileService;
 var init_tvPerformanceProfileService = __esm({
@@ -14578,6 +14692,7 @@ var TvImagePreloaderService, tvImagePreloaderService;
 var init_tvImagePreloaderService = __esm({
   "src/core/tv/tvImagePreloaderService.ts"() {
     init_LruCache();
+    init_tvPerformanceService();
     TvImagePreloaderService = class _TvImagePreloaderService {
       constructor() {
         // Limite estrito de imagens decodificadas na memória (80 imagens @ w500 ~ 15-20MB de VRAM)
@@ -14687,10 +14802,19 @@ var init_tvImagePreloaderService = __esm({
         });
       }
       /**
+       * Obtém a concorrência máxima adaptativa de acordo com o hardware da TV
+       */
+      getMaxConcurrentWorkers() {
+        if (tvPerformanceService.isFireTv() || tvPerformanceService.getHardwareProfile() === "eco") {
+          return 2;
+        }
+        return this.MAX_CONCURRENT_WORKERS;
+      }
+      /**
        * Drena a fila respeitando o limite máximo de concorrência
        */
       processQueue() {
-        if (this.activeWorkers >= this.MAX_CONCURRENT_WORKERS || this.queue.length === 0) {
+        if (this.activeWorkers >= this.getMaxConcurrentWorkers() || this.queue.length === 0) {
           this.metrics.activeWorkers = this.activeWorkers;
           this.metrics.currentQueueSize = this.queue.length;
           return;

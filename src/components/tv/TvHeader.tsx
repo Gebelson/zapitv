@@ -4,6 +4,7 @@ import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { TvProfileMenu } from './TvProfileMenu';
 import { uiSoundService } from '../../core/audio/uiSoundService';
+import { tvPerformanceService } from '../../core/tv/tvPerformanceService';
 import { ZapiAnimatedLogo } from '../common/ZapiAnimatedLogo';
 
 export type TvTab = 'home' | 'movies' | 'series' | 'animes' | 'featured';
@@ -101,6 +102,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
 }) => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const isFireTvOrEco = tvPerformanceService.isFireTv() || tvPerformanceService.getHardwareProfile() === 'eco';
   const logoVideoRef = useRef<HTMLVideoElement>(null);
 
   // Estado e refs para o traço indicador único deslizante entre os links do header
@@ -271,18 +273,20 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
           aria-hidden="true"
           className="absolute z-0 inset-x-0 top-0 h-[140px] sm:h-[160px] pointer-events-none select-none overflow-hidden"
         >
-          {/* Desfoque Real Progressivo via backdrop-filter e máscara gradual */}
-          <div
-            className={`tv-header-blur absolute inset-0 pointer-events-none transform-gpu transition-opacity duration-500 ease-in-out ${
-              isScrolled ? 'opacity-100' : 'opacity-70'
-            }`}
-            style={{
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-              maskImage: 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.92) 35%, rgba(0,0,0,0.45) 68%, transparent 100%)',
-              WebkitMaskImage: 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.92) 35%, rgba(0,0,0,0.45) 68%, transparent 100%)'
-            }}
-          />
+          {/* Desfoque Real Progressivo via backdrop-filter e máscara gradual (desativado em Fire TV / perfis eco para evitar repaints) */}
+          {!isFireTvOrEco && (
+            <div
+              className={`tv-header-blur absolute inset-0 pointer-events-none transform-gpu transition-opacity duration-500 ease-in-out ${
+                isScrolled ? 'opacity-100' : 'opacity-70'
+              }`}
+              style={{
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                maskImage: 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.92) 35%, rgba(0,0,0,0.45) 68%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.92) 35%, rgba(0,0,0,0.45) 68%, transparent 100%)'
+              }}
+            />
+          )}
 
           {/* Degradê Escuro Cinematográfico (Garante contraste e legibilidade sem faixa sólida) */}
           <div

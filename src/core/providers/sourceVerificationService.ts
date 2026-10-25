@@ -172,6 +172,7 @@ class SourceVerificationService {
     };
 
     let phase1Streams: StremioStream[] = [];
+    const collectedProgressivePlayable: StremioStream[] = [];
     const canonicalIdentity = canonicalIdentityService.buildIdentity(item, episode);
 
     // Validação estrita de compatibilidade técnica e correspondência canônica de identidade
@@ -192,8 +193,13 @@ class SourceVerificationService {
             if (options?.signal?.aborted) return;
             const playable = progressive?.filter(isPlayableAndCanonicallyVerified) || [];
             if (playable.length > 0) {
-              diagnostic.approvedStreamsCount = playable.length;
-              options?.onProgressiveStreams?.(playable);
+              for (const p of playable) {
+                if (!collectedProgressivePlayable.some(c => c.url === p.url)) {
+                  collectedProgressivePlayable.push(p);
+                }
+              }
+              diagnostic.approvedStreamsCount = collectedProgressivePlayable.length;
+              options?.onProgressiveStreams?.(collectedProgressivePlayable);
               // Notifica imediatamente AVAILABLE para preparar o vídeo sem aguardar os demais provedores.
               options?.onStateChange?.('AVAILABLE');
             }
@@ -208,7 +214,8 @@ class SourceVerificationService {
     }
 
     diagnostic.phase1DurationMs = Date.now() - phase1Start;
-    const phase1Playable = phase1Streams.filter(isPlayableAndCanonicallyVerified);
+    const phase1Candidates = phase1Streams.length > 0 ? phase1Streams : collectedProgressivePlayable;
+    const phase1Playable = phase1Candidates.filter(isPlayableAndCanonicallyVerified);
     diagnostic.approvedStreamsCount = phase1Playable.length;
 
     // Se a primeira verificação encontrou fontes válidas, FINALIZA IMEDIATAMENTE (Requisito 3 e 9)
@@ -326,8 +333,13 @@ class SourceVerificationService {
             if (options?.signal?.aborted) return;
             const playable = progressive?.filter(isPlayableAndCanonicallyVerified) || [];
             if (playable.length > 0) {
-              diagnostic.approvedStreamsCount = playable.length;
-              options?.onProgressiveStreams?.(playable);
+              for (const p of playable) {
+                if (!collectedProgressivePlayable.some(c => c.url === p.url)) {
+                  collectedProgressivePlayable.push(p);
+                }
+              }
+              diagnostic.approvedStreamsCount = collectedProgressivePlayable.length;
+              options?.onProgressiveStreams?.(collectedProgressivePlayable);
               options?.onStateChange?.('AVAILABLE');
             }
           },
@@ -345,7 +357,8 @@ class SourceVerificationService {
     diagnostic.totalDurationMs = Date.now() - overallStart;
 
     // Se encontrou fontes em qualquer fase que atendam à validação canônica, retorna AVAILABLE
-    const finalStreams = phase2Streams.filter(isPlayableAndCanonicallyVerified);
+    const finalCandidates = phase2Streams.length > 0 ? phase2Streams : collectedProgressivePlayable;
+    const finalStreams = finalCandidates.filter(isPlayableAndCanonicallyVerified);
     if (finalStreams.length > 0) {
       diagnostic.approvedStreamsCount = finalStreams.length;
       diagnostic.finalState = 'AVAILABLE';
@@ -360,7 +373,7 @@ class SourceVerificationService {
 
     // Coleta fontes candidatas de ambas as fases verificando estritamente a identidade canônica
     // REGRA MANDATÓRIA: Nenhum fallback pode contornar a validação canônica de identidade
-    const candidatePool = [...phase2Streams, ...phase1Streams];
+    const candidatePool = [...phase2Streams, ...phase1Streams, ...collectedProgressivePlayable];
     const webReadyCandidates: StremioStream[] = [];
     const seenCandidateKeys = new Set<string>();
 

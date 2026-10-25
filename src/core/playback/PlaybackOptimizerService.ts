@@ -225,14 +225,15 @@ export class PlaybackOptimizerService {
     const deviceMemory = nav.deviceMemory || 4;
 
     const isSmartTv = (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv')) ||
-      /smart-tv|smarttv|tizen|webos|viera|bravia|netcast|crkey|aft|googletv|mediastationx/i.test(ua);
+      /smart-tv|smarttv|tizen|webos|viera|bravia|netcast|crkey|aft|firetv|fire\s*tv|fireos|silk|amazonwebappplatform|googletv|mediastationx/i.test(ua);
+    const isFireTv = /amazon|silk|firetv|fire\s*os|aft[a-z0-9]+/i.test(ua);
     const isMobile = !isSmartTv && /mobile|android|iphone|ipod/i.test(ua);
     const winScreen = typeof window !== 'undefined' ? window.screen : null;
     const isTablet = !isSmartTv && (/ipad/i.test(ua) || (isMobile && winScreen && Math.min(winScreen.width, winScreen.height) >= 600));
     const isDesktop = !isSmartTv && !isMobile && !isTablet;
 
     const deviceType: DeviceProfile['deviceType'] = isSmartTv ? 'smart-tv' : (isMobile ? 'mobile' : (isTablet ? 'tablet' : 'desktop'));
-    const isLowEnd = hwConcurrency <= 2 || deviceMemory <= 2;
+    const isLowEnd = hwConcurrency <= 2 || deviceMemory <= 2 || isFireTv;
 
     const screenWidth = typeof window !== 'undefined' ? (window.screen?.width || 1920) : 1920;
     const screenHeight = typeof window !== 'undefined' ? (window.screen?.height || 1080) : 1080;
@@ -281,10 +282,10 @@ export class PlaybackOptimizerService {
     let maxBufferSize = 30 * 1024 * 1024; // 30 MB
 
     if (dev.deviceType === 'smart-tv') {
-      // Low core count alone does not mean a high-bitrate TV can survive on 15 MB.
-      maxBufferLength = dev.isLowEnd ? 24 : 30;
-      maxMaxBufferLength = dev.isLowEnd ? 40 : 60;
-      maxBufferSize = (dev.isLowEnd ? 24 : 30) * 1024 * 1024;
+      const isFireTvDevice = typeof navigator !== 'undefined' && /amazon|silk|firetv|fire\s*os|aft[a-z0-9]+/i.test(navigator.userAgent || '');
+      maxBufferLength = isFireTvDevice ? 20 : (dev.isLowEnd ? 24 : 30);
+      maxMaxBufferLength = isFireTvDevice ? 35 : (dev.isLowEnd ? 40 : 60);
+      maxBufferSize = (isFireTvDevice ? 20 : (dev.isLowEnd ? 24 : 30)) * 1024 * 1024;
     } else if (net.isSlowConnection || dev.isLowEnd) {
       maxBufferLength = 15;
       maxMaxBufferLength = 30;
@@ -296,10 +297,12 @@ export class PlaybackOptimizerService {
       maxBufferSize = 60 * 1024 * 1024; // 60 MB
     }
 
+    const isFireTvDevice = typeof navigator !== 'undefined' && /amazon|silk|firetv|fire\s*os|aft[a-z0-9]+/i.test(navigator.userAgent || '');
+
     return {
       enableWorker: true,
       lowLatencyMode: false, // Desativa baixa latência em VoD para garantir buffer contínuo sem micro-travas
-      backBufferLength: dev.isLowEnd || dev.deviceType === 'smart-tv' ? 30 : 60,
+      backBufferLength: isFireTvDevice ? 15 : (dev.isLowEnd || dev.deviceType === 'smart-tv' ? 25 : 60),
       maxBufferLength,
       maxMaxBufferLength,
       maxBufferSize,

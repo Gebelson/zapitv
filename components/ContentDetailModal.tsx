@@ -1010,6 +1010,13 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
         mediaLoadingTracker.transition(traceId, 'BUFFERING', {
           streamCount: streams.length,
         });
+      } else if (verificationResult.state === 'INCONCLUSIVE' && !isAutoRetry) {
+        // Recuperação automática limitada para instabilidades transitórias / cold start de provedores no Fire TV
+        console.log('[ContentDetailModal] Verificação inconclusiva transitória na 1ª tentativa. Realizando auto-recuperação automática imediata...');
+        await new Promise(r => setTimeout(r, 350));
+        if (currentRequestId === playbackRequestIdRef.current && !playbackAbort.signal.aborted) {
+          return startPlayback(season, episode, navType, true);
+        }
       } else {
         setVerificationState(verificationResult.state);
         setResolvedStreams([]);

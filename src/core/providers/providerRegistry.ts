@@ -16,6 +16,7 @@ import { ContentItem } from '../../../types';
 import { filmesData } from '../../../constants';
 import { bannedContentRegistry } from '../catalog/BannedContentRegistry';
 import { playbackOptimizerService } from '../playback/PlaybackOptimizerService';
+import { tvPerformanceService } from '../tv/tvPerformanceService';
 import { LruCache } from '../cache/LruCache';
 import { getRememberedSources, prioritizeRememberedSources } from './sourceMemory';
 
@@ -245,6 +246,7 @@ class ProviderRegistryService {
   private negativeCache = new LruCache<string, { timestamp: number; reason: string; inconclusive: boolean }>(100, 15 * 1000); // 15s de expiração rápida para cache negativo
   private pending = new Map<string, Promise<StremioStream[]>>();
   private progressiveListeners = new Map<string, Set<(streams: StremioStream[]) => void>>();
+  private providerResultListeners = new Map<string, Set<(detail: any) => void>>();
   private inFlightConsumers = new Map<string, Set<AbortSignal | null>>();
   private cacheGeneration = 0;
   private readonly CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutos de retenção em cache
@@ -412,24 +414,51 @@ class ProviderRegistryService {
     episode?: { season: number; episode: number },
     options?: ResolveStreamsOptions
   ): Promise<StremioStream[]> {
-    const cacheKey = JSON.stringify(['v7_canonical_identity', type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
+    const rawTargetId = id.id || '';
+    const cleanId = rawTargetId.replace(/^tmdb-?/i, '');
+    const tmdbStr = id.tmdbId ? String(id.tmdbId).replace(/^tmdb-?/i, '') : (/^\d+$/.test(cleanId) ? cleanId : '');
+    const imdbStr = id.imdbId ? String(id.imdbId) : (rawTargetId.startsWith('tt') ? rawTargetId : '');
+    const cleanTitle = (id.title || '').trim().toLowerCase();
+    const cacheKey = JSON.stringify(['v8_canonical_identity', type, rawTargetId, tmdbStr, imdbStr, cleanTitle, id.year, episode?.season, episode?.episode]);
 
-    // 1. Registro de listener progressivo para este cacheKey
+    // 1. Registro de listeners (progressivo e telemetria de provedores) para este cacheKey
     const releaseListener = () => {
       const callback = options?.onProgressiveStreams;
-      if (!callback) return;
-      const listeners = this.progressiveListeners.get(cacheKey);
-      listeners?.delete(callback);
-      if (listeners?.size === 0) this.progressiveListeners.delete(cacheKey);
+      if (callback) {
+        const listeners = this.progressiveListeners.get(cacheKey);
+        listeners?.delete(callback);
+        if (listeners?.size === 0) this.progressiveListeners.delete(cacheKey);
+      }
+      const providerCb = options?.onProviderResult;
+      if (providerCb) {
+        const pListeners = this.providerResultListeners.get(cacheKey);
+        pListeners?.delete(providerCb);
+        if (pListeners?.size === 0) this.providerResultListeners.delete(cacheKey);
+      }
+      const consumers = this.inFlightConsumers.get(cacheKey);
+      if (consumers && options?.signal) {
+        consumers.delete(options.signal);
+        if (consumers.size === 0) this.inFlightConsumers.delete(cacheKey);
+      }
       options?.signal?.removeEventListener('abort', releaseListener);
     };
+
     if (options?.onProgressiveStreams) {
       if (!this.progressiveListeners.has(cacheKey)) {
         this.progressiveListeners.set(cacheKey, new Set());
       }
       this.progressiveListeners.get(cacheKey)!.add(options.onProgressiveStreams);
+    }
 
-      options.signal?.addEventListener('abort', releaseListener, { once: true });
+    if (options?.onProviderResult) {
+      if (!this.providerResultListeners.has(cacheKey)) {
+        this.providerResultListeners.set(cacheKey, new Set());
+      }
+      this.providerResultListeners.get(cacheKey)!.add(options.onProviderResult);
+    }
+
+    if (options?.signal) {
+      options.signal.addEventListener('abort', releaseListener, { once: true });
     }
 
     // 2. Cache inteligente com separação estrita de positivo vs negativo (Requisito 7)
@@ -442,6 +471,19 @@ class ProviderRegistryService {
         const age = Date.now() - cached.timestamp;
         if (age < this.CACHE_TTL_MS) {
           options?.onProgressiveStreams?.(cached.streams);
+          if (options?.onProviderResult) {
+            const providers = this.getEligibleProviders();
+            for (const p of providers) {
+              options.onProviderResult({
+                providerId: p.id,
+                providerName: p.name,
+                durationMs: 0,
+                success: true,
+                streamCount: cached.streams.filter(s => s.providerId === p.id).length,
+                isTimeout: false
+              });
+            }
+          }
           // Se estiver na janela stale, dispara revalidação em segundo plano sem bloquear
           if (age >= this.STALE_TTL_MS && !this.pending.has(cacheKey)) {
             const bgRequest = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration)
@@ -848,8 +890,11 @@ class ProviderRegistryService {
         let providerSuccess = false;
         let providerStreamCount = 0;
         let providerError: string | undefined;
-        // Timeout individual ágil por add-on (otimizado para evitar acúmulo de espera)
-        const addonTimeout = addon.id.includes('froststream') ? 7000 : 4500;
+        // Timeout adaptativo: no Fire TV / cold start, estende para permitir negociação SSL e parsing sem corte precoce
+        const isFireTv = tvPerformanceService.isFireTv();
+        const addonTimeout = addon.id.includes('froststream')
+          ? (isFireTv ? 8500 : 7000)
+          : (isFireTv ? 6500 : 4500);
 
         try {
           const client = new StremioClient(addon.url);
@@ -1077,7 +1122,7 @@ class ProviderRegistryService {
             streamCount: providerStreamCount,
             error: providerError
           });
-          options?.onProviderResult?.({
+          const attemptDetail = {
             providerId: addon.id,
             providerName: addon.name,
             durationMs: duration,
@@ -1085,7 +1130,16 @@ class ProviderRegistryService {
             streamCount: providerStreamCount,
             isTimeout,
             error: providerError
-          });
+          };
+          options?.onProviderResult?.(attemptDetail);
+          const prListeners = this.providerResultListeners.get(effectiveCacheKey);
+          if (prListeners && prListeners.size > 0) {
+            for (const cb of prListeners) {
+              if (cb !== options?.onProviderResult) {
+                try { cb(attemptDetail); } catch {}
+              }
+            }
+          }
         }
         return [];
       };
@@ -1127,7 +1181,7 @@ class ProviderRegistryService {
               const hasFrostStreamFinished = !sortedAddons.some(a => a.id.includes('froststream')) || collectedFromAddons.some(s => s.providerId?.includes('froststream'));
               const culprits = cleanInterim.filter(s => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
               const hasWebReadyPtBr = culprits.length > 0;
-              if (cleanInterim.length >= 2 && hasWebReadyPtBr && hasFrostStreamFinished) {
+              if (((cleanInterim.length >= 1 && hasWebReadyPtBr) || cleanInterim.length >= 2) && hasFrostStreamFinished) {
                 stopSpawning = true;
               }
             }
@@ -1166,9 +1220,9 @@ class ProviderRegistryService {
               const hasFrostStreamFinished = !sortedAddons.some(a => a.id.includes('froststream')) || collectedFromAddons.some(s => s.providerId?.includes('froststream'));
               const culprits = cleanInterim.filter(s => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
               const hasWebReadyPtBr = culprits.length > 0;
-              if (cleanInterim.length >= 2 && hasWebReadyPtBr && hasFrostStreamFinished) {
+              if (((cleanInterim.length >= 1 && hasWebReadyPtBr) || cleanInterim.length >= 2) && hasFrostStreamFinished) {
                 if (interval) clearInterval(interval);
-                timer = setTimeout(resolve, 350);
+                timer = setTimeout(resolve, 250);
               }
             }
           }, 60);
@@ -1321,6 +1375,8 @@ class ProviderRegistryService {
     this.cache.clear();
     this.negativeCache.clear();
     this.pending.clear();
+    this.progressiveListeners.clear();
+    this.providerResultListeners.clear();
     sourceSelectionService.clearRankingCache();
   }
 }

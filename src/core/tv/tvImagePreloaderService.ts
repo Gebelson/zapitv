@@ -17,6 +17,7 @@
  */
 
 import { LruCache } from '../cache/LruCache';
+import { tvPerformanceService } from './tvPerformanceService';
 
 export interface PreloadMetrics {
   totalRequested: number;
@@ -173,10 +174,20 @@ export class TvImagePreloaderService {
   }
 
   /**
+   * Obtém a concorrência máxima adaptativa de acordo com o hardware da TV
+   */
+  private getMaxConcurrentWorkers(): number {
+    if (tvPerformanceService.isFireTv() || tvPerformanceService.getHardwareProfile() === 'eco') {
+      return 2;
+    }
+    return this.MAX_CONCURRENT_WORKERS;
+  }
+
+  /**
    * Drena a fila respeitando o limite máximo de concorrência
    */
   private processQueue(): void {
-    if (this.activeWorkers >= this.MAX_CONCURRENT_WORKERS || this.queue.length === 0) {
+    if (this.activeWorkers >= this.getMaxConcurrentWorkers() || this.queue.length === 0) {
       this.metrics.activeWorkers = this.activeWorkers;
       this.metrics.currentQueueSize = this.queue.length;
       return;
