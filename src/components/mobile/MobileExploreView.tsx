@@ -166,10 +166,6 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
       ) : (
         /* Grid de Resultados do Catálogo */
         <div className="w-full">
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-3 px-1">
-            <span>{filteredItems.length} títulos encontrados</span>
-          </div>
-
           <div
             className="w-full grid grid-cols-2 gap-3"
             style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}

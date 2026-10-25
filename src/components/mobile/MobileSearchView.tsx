@@ -206,7 +206,7 @@ export const MobileSearchView: React.FC<MobileSearchViewProps> = ({
         <div className="mb-6 animate-in fade-in">
           <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-[#007df7] mb-3">
             <UserIcon className="w-3.5 h-3.5" />
-            <span>Artistas ({actors.length})</span>
+            <span>Artistas</span>
           </div>
           <div className="flex gap-3 overflow-x-auto no-scrollbar py-1">
             {actors.map(actor => (
@@ -242,10 +242,11 @@ export const MobileSearchView: React.FC<MobileSearchViewProps> = ({
       {/* Grid de Produções Encontradas */}
       {displayItems.length > 0 && (
         <div className="flex-1 w-full animate-in fade-in">
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-3 px-1">
-            <span>Resultados ({displayItems.length})</span>
-            {isLoadingRemote && <span className="text-[#007df7] text-[10px] animate-pulse">Buscando mais...</span>}
-          </div>
+          {isLoadingRemote && (
+            <div className="flex justify-end text-xs text-slate-400 mb-2 px-1">
+              <span className="text-[#007df7] text-[10px] animate-pulse">Buscando mais...</span>
+            </div>
+          )}
 
           <div
             className="w-full grid grid-cols-2 gap-3"
