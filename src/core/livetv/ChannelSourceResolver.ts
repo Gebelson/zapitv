@@ -209,11 +209,11 @@ export class ChannelSourceResolver {
 
     if (chosenIndex === -1) {
       // Se todas as fontes falharam temporariamente, NÃO limpa falhas automaticamente para evitar looping
-      const fallbackSource = allSources[0];
+      // e NÃO retorna uma URL já falhada como primaryUrl
       return {
-        primaryUrl: fallbackSource?.url || channel.streamUrl || '',
-        quality: fallbackSource?.quality || channel.quality || '720p',
-        format: fallbackSource?.format || 'hls',
+        primaryUrl: '',
+        quality: channel.quality || '720p',
+        format: 'hls',
         sources: allSources,
         isFallback: false,
         activeSourceIndex: -1,

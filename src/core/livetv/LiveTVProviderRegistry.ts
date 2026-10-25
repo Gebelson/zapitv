@@ -122,7 +122,11 @@ export class LiveTVProviderRegistry {
       const override = this.channelOverrides.get(channel.id);
       if (override) {
         if (override.customStreamUrl) {
-          channel.streamUrl = override.customStreamUrl;
+          if (channel.streamUrl !== override.customStreamUrl) {
+            channel.streamUrl = override.customStreamUrl;
+            // Invalida status de disponibilidade prévio se a URL foi alterada
+            channel.status = 'CHECKING';
+          }
           if (!channel.sources) channel.sources = [];
           if (!channel.sources.some(s => s.url === override.customStreamUrl)) {
             channel.sources.unshift({
@@ -185,7 +189,11 @@ export class LiveTVProviderRegistry {
 
     const ch = this.channels.find(c => c.id === channelId);
     if (ch) {
-      ch.streamUrl = newUrl;
+      if (ch.streamUrl !== newUrl) {
+        ch.streamUrl = newUrl;
+        // Invalida status antigo (não transferir AVAILABLE automaticamente para nova URL)
+        ch.status = 'CHECKING';
+      }
       this.notify();
     }
   }
@@ -275,11 +283,16 @@ export class LiveTVProviderRegistry {
     // Normalizar e deduplicar em uma única lista canônica
     const unified = channelNormalizer.normalizeAndDeduplicate(rawList);
 
-    // Atualiza canais internos mantendo status prévios se existirem
-    const prevMap = new Map(this.channels.map(c => [c.id, c.status]));
+    // Atualiza canais internos mantendo status prévios apenas se a URL principal for a mesma
+    const prevMap = new Map(this.channels.map(c => [c.id, { status: c.status, streamUrl: c.streamUrl }]));
     for (const ch of unified) {
-      if (prevMap.has(ch.id)) {
-        ch.status = prevMap.get(ch.id)!;
+      const prev = prevMap.get(ch.id);
+      if (prev) {
+        if (prev.streamUrl === ch.streamUrl) {
+          ch.status = prev.status;
+        } else {
+          ch.status = 'CHECKING';
+        }
       }
     }
 

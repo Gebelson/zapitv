@@ -180,11 +180,42 @@ export class ChannelNormalizer {
           existing.description = raw.description;
         }
 
-        // Adicionar novo stream caso seja uma URL distinta
-        if (streamSource && !existing.sources?.some(s => s.url === streamSource.url)) {
-          existing.sources = existing.sources || [];
-          existing.sources.push(streamSource);
+        // Mescla fontes adicionais do novo registro sem remover backups válidos
+        existing.sources = existing.sources || [];
+        const candidateSources: LiveStreamSource[] = [];
+        if (streamSource) candidateSources.push(streamSource);
+        if (raw.sources && Array.isArray(raw.sources)) {
+          for (const s of raw.sources) {
+            if (s.url && !candidateSources.some(c => c.url === s.url)) candidateSources.push(s);
+          }
+        }
+        if (raw.backupStreamUrls && Array.isArray(raw.backupStreamUrls)) {
+          for (let i = 0; i < raw.backupStreamUrls.length; i++) {
+            const bUrl = raw.backupStreamUrls[i];
+            if (bUrl && !candidateSources.some(c => c.url === bUrl)) {
+              candidateSources.push({
+                id: `${canonicalId}-backup-m-${i}`,
+                url: bUrl,
+                quality: '720p',
+                provider: raw.provider || 'Backup',
+                format: bUrl.includes('.mpd') ? 'dash' : 'hls',
+                isOfficial: false,
+                isBackup: true,
+                resolutionHeight: 720
+              });
+            }
+          }
+        }
 
+        let sourcesAdded = false;
+        for (const candidate of candidateSources) {
+          if (candidate.url && !existing.sources.some(s => s.url === candidate.url)) {
+            existing.sources.push(candidate);
+            sourcesAdded = true;
+          }
+        }
+
+        if (sourcesAdded) {
           // Ordenação: 1º isOfficial, 2º maior resolução
           existing.sources.sort((a, b) => {
             if (a.isOfficial && !b.isOfficial) return -1;
@@ -193,7 +224,7 @@ export class ChannelNormalizer {
           });
 
           // Atualizar stream principal e backups
-          if (!existing.streamUrl) {
+          if (!existing.streamUrl && existing.sources.length > 0) {
             existing.streamUrl = existing.sources[0].url;
             existing.quality = existing.sources[0].quality;
           }

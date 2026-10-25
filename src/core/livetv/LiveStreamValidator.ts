@@ -169,12 +169,16 @@ export class LiveStreamValidator {
           ? `/api/proxy?url=${encodeURIComponent(url)}`
           : url;
 
+        const reqHeaders: Record<string, string> = {
+          'Range': 'bytes=0-8192'
+        };
+        if (typeof window === 'undefined') {
+          reqHeaders['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ZapiTV-LiveCore/2.0';
+        }
+
         const response = await fetch(fetchTarget, {
           method: 'GET',
-          headers: {
-            'Range': 'bytes=0-8192',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ZapiTV-LiveCore/2.0'
-          },
+          headers: reqHeaders,
           signal: controller.signal
         });
 
@@ -260,7 +264,7 @@ export class LiveStreamValidator {
         }
 
         // ETAPA C: VALIDAÇÃO DE SEGMENTOS E PLAYLIST
-        let segmentAccessible = true;
+        let segmentAccessible: boolean | 'inconclusive' = true;
         let hasLivePlaylist = true;
 
         if (isHls) {
@@ -269,8 +273,9 @@ export class LiveStreamValidator {
             hasLivePlaylist = false;
           }
 
-          // Se for Master Playlist, tenta resolver primeira variante e validar seu primeiro segmento
-          if (text.includes('#EXT-X-STREAM-INF')) {
+          const isMaster = text.includes('#EXT-X-STREAM-INF');
+
+          if (isMaster) {
             const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
             let variantUrl = '';
             for (let i = 0; i < lines.length; i++) {
@@ -303,18 +308,72 @@ export class LiveStreamValidator {
                       headers: { 'Range': 'bytes=0-1024' },
                       signal: AbortSignal.timeout(3000)
                     });
-                    segmentAccessible = segRes.ok || segRes.status === 206;
+                    if (segRes.ok || segRes.status === 206) {
+                      segmentAccessible = true;
+                    } else if (segRes.status === 401 || segRes.status === 403) {
+                      this.updateMetrics(url, {
+                        status: 'RESTRICTED',
+                        httpStatus: segRes.status,
+                        lastFailureReason: `HTTP ${segRes.status} Acesso restrito aos segmentos de mídia`
+                      });
+                      return 'RESTRICTED';
+                    } else {
+                      segmentAccessible = false;
+                    }
+                  } else {
+                    segmentAccessible = 'inconclusive';
                   }
+                } else if (vRes.status === 401 || vRes.status === 403) {
+                  this.updateMetrics(url, {
+                    status: 'RESTRICTED',
+                    httpStatus: vRes.status,
+                    lastFailureReason: `HTTP ${vRes.status} Acesso restrito à playlist variante`
+                  });
+                  return 'RESTRICTED';
+                } else {
+                  segmentAccessible = false;
                 }
               } catch {
-                // Erro não fatal no sub-teste de segmento
-                segmentAccessible = true;
+                // Erro real ao carregar variante ou segmentos: não assumir true
+                segmentAccessible = false;
               }
+            } else {
+              segmentAccessible = 'inconclusive';
+            }
+          } else {
+            // Media Playlist direta
+            const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+            const segLine = lines.find(l => !l.startsWith('#') && (l.includes('.ts') || l.includes('.m4s') || l.includes('.aac') || l.includes('http') || !l.includes('.m3u8')));
+            if (segLine) {
+              try {
+                const resolvedSeg = new URL(segLine, url).href;
+                const segRes = await fetch(resolvedSeg, {
+                  method: 'GET',
+                  headers: { 'Range': 'bytes=0-1024' },
+                  signal: AbortSignal.timeout(3000)
+                });
+                if (segRes.ok || segRes.status === 206) {
+                  segmentAccessible = true;
+                } else if (segRes.status === 401 || segRes.status === 403) {
+                  this.updateMetrics(url, {
+                    status: 'RESTRICTED',
+                    httpStatus: segRes.status,
+                    lastFailureReason: `HTTP ${segRes.status} Acesso restrito aos segmentos de mídia`
+                  });
+                  return 'RESTRICTED';
+                } else {
+                  segmentAccessible = false;
+                }
+              } catch {
+                segmentAccessible = false;
+              }
+            } else {
+              segmentAccessible = 'inconclusive';
             }
           }
         }
 
-        if (!segmentAccessible) {
+        if (segmentAccessible === false) {
           this.updateMetrics(url, {
             status: 'UNSTABLE',
             httpStatus,
@@ -322,9 +381,21 @@ export class LiveStreamValidator {
             latencyMs,
             hasLivePlaylist,
             segmentAccessible: false,
-            lastFailureReason: 'Segmentos de mídia inacessíveis'
+            lastFailureReason: 'Segmentos de mídia inacessíveis ou falha de entrega'
           });
           return 'UNSTABLE';
+        }
+
+        if (segmentAccessible === 'inconclusive') {
+          this.updateMetrics(url, {
+            status: 'INCONCLUSIVE',
+            httpStatus,
+            contentType,
+            latencyMs,
+            hasLivePlaylist,
+            lastFailureReason: 'Verificação de segmentos inconclusiva no manifesto'
+          });
+          return 'INCONCLUSIVE';
         }
 
         // ETAPA D & E: SUCESSO DE VALIDAÇÃO

@@ -13,7 +13,7 @@ import { tvModeService } from '../../core/tv/tvModeService';
 import { ZapiLoader } from '../common/ZapiLoader';
 import { pipService } from '../../core/pip/pipService';
 
-export type LiveTvPlaybackStatus = 'loading' | 'recovering' | 'playing' | 'unavailable';
+export type LiveTvPlaybackStatus = 'loading' | 'recovering' | 'playing' | 'waiting_interaction' | 'unavailable';
 
 interface LiveTvPlayerProps {
   channel: LiveChannel;
@@ -281,12 +281,18 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
     });
 
     // Startup Watchdog Independente:
-    // Impede spinner infinito se o manifesto não carregar ou se os segmentos não iniciarem
+    // Impede spinner infinito se o manifesto não carregar ou se os segmentos não iniciarem,
+    // mas respeita bloqueios de autoplay e pausas voluntárias do usuário.
     startupWatchdogTimeoutRef.current = setTimeout(() => {
       if (playbackGenerationRef.current !== currentGeneration || activeChannelIdRef.current !== channel.id) return;
 
       const v = videoRef.current;
-      const hasStarted = v && !v.paused && v.currentTime > 0.05 && v.readyState >= 3;
+      if (!v) return;
+
+      // Se o player está aguardando interação do usuário pelo navegador, não mata a fonte
+      if (v.paused && !autoPlay) return;
+
+      const hasStarted = !v.paused && v.currentTime > 0.05 && v.readyState >= 2;
       if (!hasStarted) {
         logLiveTvDiag('Startup Watchdog Timeout atingido', {
           channelId: channel.id,
@@ -348,7 +354,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
 
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         if (playbackGenerationRef.current !== currentGeneration || activeChannelIdRef.current !== channel.id) return;
-        setIsLoading(false);
+        // Não marcar isLoading(false) aqui — aguardar sinal real de vídeo/áudio reproduzível
         const heights = data.levels.map(l => `${l.height}p`).filter(Boolean);
         const unique = Array.from(new Set(heights));
         setAvailableQualities(['Auto', ...unique]);
@@ -356,20 +362,27 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
         if (autoPlay) {
           video.play().then(() => {
             if (playbackGenerationRef.current !== currentGeneration) return;
-            setIsPlaying(true);
+            // O evento onPlaying fará a confirmação definitiva
           }).catch(() => {
             if (playbackGenerationRef.current !== currentGeneration) return;
-            // Em navegadores com autoplay restrito, inicia mudo
+            // Em navegadores com autoplay restrito, tenta com mudo
             video.muted = true;
             setIsMuted(true);
             video.play().then(() => {
               if (playbackGenerationRef.current !== currentGeneration) return;
-              setIsPlaying(true);
             }).catch(() => {
               if (playbackGenerationRef.current !== currentGeneration) return;
+              // Autoplay bloqueado pelo navegador exigindo interação do usuário
+              // NÃO marcar como falha nem deixar o watchdog matar a fonte
+              setIsLoading(false);
               setIsPlaying(false);
+              setPlaybackStatus('waiting_interaction');
             });
           });
+        } else {
+          setIsLoading(false);
+          setIsPlaying(false);
+          setPlaybackStatus('waiting_interaction');
         }
       });
 
@@ -429,17 +442,25 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       video.src = streamUrl;
       video.onloadedmetadata = () => {
         if (playbackGenerationRef.current !== currentGeneration || activeChannelIdRef.current !== channel.id) return;
-        setIsLoading(false);
+        // Não marcar isLoading(false) imediatamente — aguardar frames reais
         if (autoPlay) {
           video.play().then(() => {
             if (playbackGenerationRef.current !== currentGeneration) return;
-            setIsPlaying(true);
           }).catch(() => {
             if (playbackGenerationRef.current !== currentGeneration) return;
             video.muted = true;
             setIsMuted(true);
-            video.play().catch(() => {});
+            video.play().catch(() => {
+              if (playbackGenerationRef.current !== currentGeneration) return;
+              setIsLoading(false);
+              setIsPlaying(false);
+              setPlaybackStatus('waiting_interaction');
+            });
           });
+        } else {
+          setIsLoading(false);
+          setIsPlaying(false);
+          setPlaybackStatus('waiting_interaction');
         }
       };
       video.onerror = () => {
@@ -539,7 +560,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
     const resolved = channelSourceResolver.resolveBestSource(channel);
     setIsUsingFallback(resolved.isFallback);
 
-    if (resolved.allSourcesFailed && !resolved.primaryUrl) {
+    if (resolved.allSourcesFailed || !resolved.hasEligibleSource || !resolved.primaryUrl) {
       setPlaybackStatus('unavailable');
       setHasError(true);
       setErrorMessage('Todas as fontes deste canal estão temporariamente indisponíveis.');
@@ -675,6 +696,12 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
         className="w-full h-full object-contain bg-black cursor-pointer"
         playsInline
         onClick={togglePlay}
+        onLoadedData={() => {
+          if (activeChannelIdRef.current !== channel.id) return;
+          if (videoRef.current && (videoRef.current.videoWidth > 0 || videoRef.current.readyState >= 2)) {
+            setIsLoading(false);
+          }
+        }}
         onPlaying={() => {
           // Cancela startup watchdog imediatamente com o início real do playback
           if (startupWatchdogTimeoutRef.current) {
@@ -706,6 +733,20 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       {fallbackNotice && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-amber-500/90 text-black text-xs font-bold rounded-full shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-top-2">
           {fallbackNotice}
+        </div>
+      )}
+
+      {/* Tela de Aguardando Interação do Usuário (Autoplay Bloqueado) */}
+      {playbackStatus === 'waiting_interaction' && !hasError && (
+        <div 
+          onClick={togglePlay}
+          className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm cursor-pointer animate-in fade-in"
+        >
+          <div className="w-16 h-16 rounded-full bg-[#007df7] flex items-center justify-center text-white shadow-xl shadow-[#007df7]/40 hover:scale-110 active:scale-95 transition-all">
+            <Play className="w-8 h-8 fill-current ml-1" />
+          </div>
+          <span className="text-white text-sm font-bold mt-4">Clique para reproduzir transmissão ao vivo</span>
+          <span className="text-slate-400 text-xs mt-1">Interação necessária pelo navegador</span>
         </div>
       )}
 

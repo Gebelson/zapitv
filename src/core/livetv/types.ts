@@ -44,7 +44,8 @@ export type ChannelHealthStatus =
   | 'EXTERNAL_ACCESS'
   | 'ERROR' 
   | 'EXPIRED' 
-  | 'RESTRICTED';
+  | 'RESTRICTED'
+  | 'INCONCLUSIVE';
 
 export type ChannelAccessType = 'internal' | 'external' | 'restricted';
 
