@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Film, Tv, Sparkles, Radio, ChevronDown, X, Check } from 'lucide-react';
+import { ChevronDown, X, Check } from 'lucide-react';
 import { ContentItem } from '../../../types';
 import { MobileCard } from './MobileCard';
 import { searchService } from '../../core/search/searchService';
@@ -54,10 +54,10 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
 
   // Lista dos 4 quadros fixos de navegação (Grid 2x2)
   const exploreCards = [
-    { id: 'movies' as const, label: 'Filmes', icon: Film, subtitle: 'Longas e produções' },
-    { id: 'series' as const, label: 'Séries', icon: Tv, subtitle: 'Temporadas completas' },
-    { id: 'animes' as const, label: 'Animes', icon: Sparkles, subtitle: 'Animações japonesas' },
-    { id: 'live' as const, label: 'TV ao vivo', icon: Radio, subtitle: 'Canais e programas' }
+    { id: 'movies' as const, label: 'Filmes' },
+    { id: 'series' as const, label: 'Séries' },
+    { id: 'animes' as const, label: 'Animes' },
+    { id: 'live' as const, label: 'TV ao vivo' }
   ];
 
   // Gêneros disponíveis calculados dinamicamente com base nos itens da categoria atual
@@ -214,7 +214,7 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
         </h1>
       </div>
 
-      {/* 2. Quatro Quadros Fixos de Navegação (Grade 2x2 sem rolagem horizontal) */}
+      {/* 2. Quatro Quadros Fixos de Navegação (Grade 2x2 Minimalista) */}
       <div
         data-testid="explore-categories-grid"
         className="grid grid-cols-2 gap-3 mb-4 w-full"
@@ -222,7 +222,6 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
       >
         {exploreCards.map(card => {
           const isSelected = selectedCategory === card.id;
-          const Icon = card.icon;
 
           return (
             <button
@@ -230,32 +229,18 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
               type="button"
               data-testid={`explore-category-${card.id}`}
               onClick={() => handleSelectCategory(card.id)}
-              className={`relative flex flex-col justify-between p-3.5 rounded-2xl transition-all cursor-pointer select-none text-left min-h-[82px] overflow-hidden ${
+              className={`flex items-center justify-center p-3 sm:p-3.5 rounded-2xl transition-all duration-200 cursor-pointer select-none text-center min-h-[52px] ${
                 isSelected
-                  ? 'bg-gradient-to-br from-[#007df7]/25 to-[#007df7]/10 border-2 border-[#007df7] shadow-[0_0_24px_rgba(0,125,247,0.3)] text-white'
+                  ? 'bg-gradient-to-br from-[#007df7]/20 to-[#007df7]/10 border-2 border-[#007df7] shadow-[0_0_20px_rgba(0,125,247,0.25)] text-white'
                   : 'bg-[#07090E]/90 border border-white/10 hover:border-white/20 text-slate-300 active:scale-[0.98]'
               }`}
             >
-              <div className="flex items-center justify-between w-full mb-2">
-                <div
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
-                    isSelected ? 'bg-[#007df7] text-white shadow-md shadow-[#007df7]/40' : 'bg-white/5 text-slate-300'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                </div>
-                {isSelected && (
-                  <span className="w-2 h-2 rounded-full bg-[#007df7] shadow-[0_0_8px_#007df7]" />
-                )}
-              </div>
-              <div>
-                <span className="text-sm font-bold tracking-tight text-white block">
-                  {card.label}
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium block leading-tight mt-0.5">
-                  {card.subtitle}
-                </span>
-              </div>
+              <span
+                className="text-sm sm:text-base font-bold tracking-tight"
+                style={{ fontFamily: "'Sora', sans-serif" }}
+              >
+                {card.label}
+              </span>
             </button>
           );
         })}
