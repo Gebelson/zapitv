@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { User, Profile, ContentItem, SiteNotification, AppView } from '../../../types';
 import { MobileHeader } from './MobileHeader';
@@ -115,6 +115,38 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Posicionamento instantâneo no topo antes da pintura ao navegar entre páginas/abas no mobile
+  // Evita qualquer animação de rolagem da página anterior e elimina flashes ou saltos visuais
+  useLayoutEffect(() => {
+    // Desativa qualquer transição animada de scroll durante a mudança de rota
+    const htmlEl = typeof document !== 'undefined' ? document.documentElement : null;
+    const prevScrollBehavior = htmlEl ? htmlEl.style.scrollBehavior : '';
+    if (htmlEl) {
+      htmlEl.style.scrollBehavior = 'auto';
+    }
+
+    // Posiciona imediatamente no topo (sem animação, sem flashes, sem atrasos)
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+    if (document.body) {
+      document.body.scrollTop = 0;
+    }
+    if (htmlEl) {
+      htmlEl.scrollTop = 0;
+    }
+    if (containerRef.current) {
+      containerRef.current.scrollTop = 0;
+    }
+
+    setScrollY(0);
+
+    // Restaura o estilo de scrollBehavior anterior
+    if (htmlEl) {
+      htmlEl.style.scrollBehavior = prevScrollBehavior;
+    }
+  }, [location.pathname, location.search]);
+
   // Hierarquia do botão Voltar do Android
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
@@ -140,7 +172,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   const handleSelectTab = (tab: MobileTab) => {
     setIsGenreMenuOpen(false);
     document.body.style.overflow = '';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
     if (activeTab === tab) return;
 
     switch (tab) {
