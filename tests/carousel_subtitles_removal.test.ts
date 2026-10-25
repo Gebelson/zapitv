@@ -49,7 +49,7 @@ assert.strictEqual(
   'MobileContentRow.tsx NÃO deve conter classes de subtítulo'
 );
 assert.ok(
-  mobileContentRowCode.includes('<h3\n          className="text-base sm:text-lg font-black text-white tracking-tight"'),
+  /<h3\s+className="text-base sm:text-lg font-black text-white tracking-tight"\s+style=\{\{ fontFamily: "'Sora', sans-serif" \}\}/.test(mobileContentRowCode),
   'MobileContentRow.tsx deve preservar o título com tipografia Sora'
 );
 console.log('  -> MobileContentRow.tsx limpo de subtítulos.');

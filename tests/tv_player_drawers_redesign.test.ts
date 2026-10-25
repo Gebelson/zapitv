@@ -96,11 +96,11 @@ console.log('✓ Componentes modulares, submenu de estilos e helpers implementad
 // -----------------------------------------------------------------------------
 console.log('\n[Teste 2] Verificação da hierarquia do botão Voltar (Submenu -> Menu Anterior -> Controles)...');
 assert.ok(
-  controlsSource.includes("if (menu === 'subtitle_styles') {\n      returnFromSubtitleStyles();\n      return true;\n    }"),
+  /if \(menu === 'subtitle_styles'\) \{\s*returnFromSubtitleStyles\(\);\s*return true;\s*\}/.test(controlsSource),
   'Ao pressionar Voltar em subtitle_styles deve retornar ao menu anterior'
 );
 assert.ok(
-  controlsSource.includes("if (menu) {\n      closeMenu();\n      return true;\n    }"),
+  /if \(menu\) \{\s*closeMenu\(\);\s*return true;\s*\}/.test(controlsSource),
   'Ao pressionar Voltar em qualquer menu lateral aberto deve fechar o menu e restaurar foco'
 );
 console.log('✓ Hierarquia do botão Voltar respeita navegação multinível da TV.');

@@ -76,9 +76,10 @@ testAssert(
 );
 
 testAssert(
-  'Grid do catálogo inicia diretamente após os filtros de gênero/categoria',
-  exploreCode.includes('/* Grid de Resultados do Catálogo */\n        <div className="w-full">\n          <div\n            className="w-full grid grid-cols-2 gap-3"') ||
-  exploreCode.includes('/* Grid de Resultados do Catálogo */\r\n        <div className="w-full">\r\n          <div\r\n            className="w-full grid grid-cols-2 gap-3"')
+  'Grid do catálogo permanece após os filtros de gênero/categoria e renderiza os títulos filtrados',
+  exploreCode.includes('data-testid="explore-genre-bar"') &&
+  exploreCode.indexOf('data-testid="explore-content-grid"') > exploreCode.indexOf('data-testid="explore-genre-bar"') &&
+  /data-testid="explore-content-grid"[\s\S]*?className="w-full grid grid-cols-2 gap-3"[\s\S]*?\{filteredItems\.map\(/.test(exploreCode)
 );
 
 testAssert(
