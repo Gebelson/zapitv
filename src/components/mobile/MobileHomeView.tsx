@@ -99,7 +99,7 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
         />
       )}
 
-      {/* 5. Em Alta (Trending) */}
+      {/* 3. Em Alta (Trending) */}
       {trendingItems.length > 0 && (
         <MobileContentRow
           title="Em Alta Agora"
@@ -108,7 +108,7 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
         />
       )}
 
-      {/* 6. Top 10 do Mês (com números gigantes) */}
+      {/* 4. Top 10 do Mês (com números gigantes) */}
       {top10Movies.length > 0 && (
         <MobileRankedRow
           title="Top 10 do Mês"
@@ -118,7 +118,7 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
         />
       )}
 
-      {/* 7. Recomendados para Você & 8. Demais Carrosséis Relevantes */}
+      {/* 5. Recomendados para Você e Demais Carrosséis Personalizados (Sem subtítulos) */}
       {personalizedRows.map(row => (
         <MobileContentRow
           key={`mobile-rec-${row.id}`}
