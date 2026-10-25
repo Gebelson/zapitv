@@ -63,17 +63,22 @@ console.log('\n2. Verificando MobileViewportService e isolamento estrito...');
 assert.strictEqual(typeof mobileViewportService.isSmartphone, 'function', 'isSmartphone deve ser função');
 console.log('  -> MobileViewportService implementado e isolado.');
 
-// Teste 3: Barra de Navegação Inferior (5 abas principais)
+// Teste 3: Barra de Navegação Inferior (5 abas principais na ordem minimalista)
 console.log('\n3. Verificando as 5 abas da Barra de Navegação Inferior...');
 const expectedTabs = [
   { id: 'home', label: 'Início', path: '/' },
   { id: 'explore', label: 'Explorar', path: '/explorar' },
-  { id: 'search', label: 'Buscar', path: '/buscar' },
+  { id: 'my-zapitv', label: 'Minha Zapi', path: '/minha-zapitv' },
   { id: 'programas', label: 'Programas', path: '/programas' },
-  { id: 'my-zapitv', label: 'Minha Zapi', path: '/minha-zapitv' }
+  { id: 'search', label: 'Buscar', path: '/buscar' }
 ];
 assert.strictEqual(expectedTabs.length, 5, 'Devem existir rigorosamente 5 abas');
-console.log('  -> 5 abas validadas: Início, Explorar, Buscar, Programas, Minha Zapi.');
+assert.strictEqual(expectedTabs[0].id, 'home', '1ª aba deve ser Início');
+assert.strictEqual(expectedTabs[1].id, 'explore', '2ª aba deve ser Explorar');
+assert.strictEqual(expectedTabs[2].id, 'my-zapitv', '3ª aba deve ser Minha Zapi');
+assert.strictEqual(expectedTabs[3].id, 'programas', '4ª aba deve ser Programas');
+assert.strictEqual(expectedTabs[4].id, 'search', '5ª aba deve ser Buscar');
+console.log('  -> 5 abas validadas na ordem: Início, Explorar, Minha Zapi, Programas, Buscar.');
 
 // Teste 4: Filtros da aba Explorar
 console.log('\n4. Verificando filtros e categorização da aba Explorar...');
