@@ -74,12 +74,13 @@ async function runTvCarouselHorizontalTransitionsTests() {
   );
   console.log('✓ Teste 5: Sincronização de capas instantânea sem piscadas ou atraso de 1 frame OK');
 
-  // Teste 6: Janela circular de slots visíveis para catálogos pequenos
+  // Teste 6: Carrossel finito para 1-6 itens e circular infinito para >= 7 itens
   assert(
-    contentRowCode.includes('count === 2) return [-1, 0, 1]'),
-    'getVisibleSlots deve fornecer slot -1 e slot 1 mesmo para catálogo de 2 itens, prevenindo buracos visuais'
+    contentRowCode.includes('count === 2) return [0, 1]') &&
+    contentRowCode.includes('count === 7) return [-1, 0, 1, 2, 3, 4, 5, 6]'),
+    'getVisibleSlots deve fornecer carrossel finito para 1 a 6 itens e infinito para >= 7 itens'
   );
-  console.log('✓ Teste 6: Suporte a catálogos pequenos com slots de entrada e saída bidirecionais OK');
+  console.log('✓ Teste 6: Regra estrita de carrossel finito (1-6) e infinito (>=7) OK');
 
   // Teste 7: Tecla Enter protegida para abrir o item correto mesmo durante a animação
   assert(

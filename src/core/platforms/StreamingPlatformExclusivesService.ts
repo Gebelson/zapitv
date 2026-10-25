@@ -35,9 +35,10 @@ export class StreamingPlatformExclusivesService {
   private imdbIndex = new Map<string, PlatformMetadataEntry>();
   private titleYearIndex = new Map<string, PlatformMetadataEntry>();
 
-  // Cache de fileiras geradas com TTL de 15 minutos
+  // Cache de fileiras geradas com TTL de 15 minutos e controle de revisão
   private rowsCache = new Map<string, { timestamp: number; rows: PersonalizedRow[] }>();
   private readonly CACHE_TTL_MS = 15 * 60 * 1000;
+  private cacheRevision = 0;
 
   private constructor() {
     this.buildIndices();
@@ -51,7 +52,32 @@ export class StreamingPlatformExclusivesService {
   }
 
   public invalidateCache(): void {
+    this.cacheRevision++;
     this.rowsCache.clear();
+  }
+
+  /**
+   * Calcula fingerprint determinístico profundo do catálogo
+   * Não depende apenas do tamanho ou das pontas da lista
+   */
+  private computeCatalogFingerprint(catalog: ContentItem[], isChild: boolean): string {
+    if (!catalog || catalog.length === 0) {
+      return `empty_${isChild ? 'child' : 'adult'}_rev${this.cacheRevision}`;
+    }
+
+    let hash = 0x811c9dc5;
+    const len = catalog.length;
+    for (let i = 0; i < len; i++) {
+      const item = catalog[i];
+      if (!item) continue;
+      const str = `${item.id}:${item.availabilityStatus || ''}:${item.rating || 0};`;
+      for (let j = 0; j < str.length; j++) {
+        hash ^= str.charCodeAt(j);
+        hash = (hash * 0x01000193) >>> 0;
+      }
+    }
+
+    return `rev${this.cacheRevision}_${len}_${isChild ? 'child' : 'adult'}_${hash.toString(16)}`;
   }
 
   private buildIndices(): void {
@@ -73,6 +99,33 @@ export class StreamingPlatformExclusivesService {
   }
 
   /**
+   * Valida compatibilidade estrita entre o item do catálogo e a entrada de metadados
+   * Impede falsos positivos causados por títulos idênticos em anos ou formatos diferentes
+   */
+  private isEntryCompatible(entry: PlatformMetadataEntry, item: ContentItem): boolean {
+    if (!entry || !item) return false;
+
+    // Se ambos possuem ano registrado, exige proximidade (máximo 1 ano de diferença para janelas internacionais)
+    if (entry.year && item.year) {
+      if (Math.abs(entry.year - item.year) > 1) {
+        return false;
+      }
+    }
+
+    // Compatibilidade de tipo de mídia
+    if (entry.mediaType) {
+      if (entry.mediaType === 'movie' && item.type === ContentType.SERIES) return false;
+      if (entry.mediaType === 'series' && item.type === ContentType.MOVIE) return false;
+      if (entry.mediaType === 'anime' && item.type !== ContentType.ANIME) {
+        const hasAnimeGenre = item.genres?.some(g => /anime/i.test(g));
+        if (!hasAnimeGenre) return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
    * Identifica metadados de exclusividade de um conteúdo do catálogo
    */
   public getExclusivityMetadata(item: ContentItem): PlatformMetadataEntry | null {
@@ -90,15 +143,19 @@ export class StreamingPlatformExclusivesService {
       if (match) return match;
     }
 
-    // 3. Correspondência por Título Normalizado + Ano
+    // 3. Correspondência por Título Normalizado + Ano (estrito)
     const normTitle = normalizeCatalogText(item.title);
     if (normTitle) {
       if (item.year) {
         const matchYear = this.titleYearIndex.get(`${normTitle}_${item.year}`);
-        if (matchYear) return matchYear;
+        if (matchYear && this.isEntryCompatible(matchYear, item)) return matchYear;
+        const matchPrev = this.titleYearIndex.get(`${normTitle}_${item.year - 1}`);
+        if (matchPrev && this.isEntryCompatible(matchPrev, item)) return matchPrev;
+        const matchNext = this.titleYearIndex.get(`${normTitle}_${item.year + 1}`);
+        if (matchNext && this.isEntryCompatible(matchNext, item)) return matchNext;
       }
       const matchTitle = this.titleYearIndex.get(normTitle);
-      if (matchTitle) return matchTitle;
+      if (matchTitle && this.isEntryCompatible(matchTitle, item)) return matchTitle;
     }
 
     // 4. Verificação de originalTitle se disponível
@@ -107,10 +164,14 @@ export class StreamingPlatformExclusivesService {
       if (normOrig) {
         if (item.year) {
           const matchYear = this.titleYearIndex.get(`${normOrig}_${item.year}`);
-          if (matchYear) return matchYear;
+          if (matchYear && this.isEntryCompatible(matchYear, item)) return matchYear;
+          const matchPrev = this.titleYearIndex.get(`${normOrig}_${item.year - 1}`);
+          if (matchPrev && this.isEntryCompatible(matchPrev, item)) return matchPrev;
+          const matchNext = this.titleYearIndex.get(`${normOrig}_${item.year + 1}`);
+          if (matchNext && this.isEntryCompatible(matchNext, item)) return matchNext;
         }
         const matchOrig = this.titleYearIndex.get(normOrig);
-        if (matchOrig) return matchOrig;
+        if (matchOrig && this.isEntryCompatible(matchOrig, item)) return matchOrig;
       }
     }
 
@@ -205,7 +266,7 @@ export class StreamingPlatformExclusivesService {
    * Retorna todas as fileiras de exclusivos disponíveis para o catálogo
    */
   public getAllPlatformRows(catalog: ContentItem[], isChild: boolean = false): PersonalizedRow[] {
-    const fingerprint = `${catalog.length}_${isChild ? 'child' : 'adult'}_${catalog[0]?.id || ''}_${catalog[catalog.length - 1]?.id || ''}`;
+    const fingerprint = this.computeCatalogFingerprint(catalog, isChild);
     const cached = this.rowsCache.get(fingerprint);
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
       return cached.rows;

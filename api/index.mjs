@@ -6674,6 +6674,530 @@ var init_featuredCatalogItems = __esm({
             image: "https://images.metahub.space/poster/medium/tt7587890/img"
           }
         ]
+      },
+      // =========================================================================
+      // EXPANSÃO DO CATÁLOGO CANÔNICO — OBRAS DE SUCESSO DE STREAMING
+      // =========================================================================
+      // 1. TULSA KING (Paramount+ - 2022 - tt16358384)
+      {
+        id: "series-tulsa-king",
+        title: "Tulsa King",
+        originalTitle: "Tulsa King",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8,
+        year: 2022,
+        image: "https://image.tmdb.org/t/p/w500/fwLoHQw2iW3oFqP3yJ3y751i9cE.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/9faGSFi5jam6pDWGNd0ip80ioXA.jpg",
+        description: 'Dwight "The General" Manfredi, um l\xEDder da m\xE1fia de Nova York, \xE9 libertado ap\xF3s 25 anos na pris\xE3o e exilado por seu chefe para abrir opera\xE7\xF5es em Tulsa, Oklahoma.',
+        genres: ["Crime", "Drama"],
+        imdbId: "tt16358384",
+        tmdbId: "153312",
+        seasonsCount: 2,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "tk-s1e1",
+            number: 1,
+            title: "Para o Oeste, Velho",
+            description: "Dwight chega em Tulsa ap\xF3s 25 anos de pris\xE3o e rapidamente monta sua nova equipe local.",
+            image: "https://image.tmdb.org/t/p/w500/fwLoHQw2iW3oFqP3yJ3y751i9cE.jpg"
+          }
+        ]
+      },
+      // 2. DIVERTIDA MENTE 2 (Disney+ - 2024 - tt22022452)
+      {
+        id: "movie-divertida-mente-2",
+        title: "Divertida Mente 2",
+        originalTitle: "Inside Out 2",
+        type: "FILME" /* MOVIE */,
+        rating: 7.7,
+        year: 2024,
+        image: "https://image.tmdb.org/t/p/w500/9h2rAuvmsmQk9m36Bsm5D154P2q.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/p5ozvmdgsmbWe0H8wf4tIcAOFhm.jpg",
+        description: "Riley agora \xE9 uma adolescente e sua central de controle passa por uma reforma para dar espa\xE7o a emo\xE7\xF5es inesperadas: Ansiedade, Inveja, T\xE9dio e Vergonha.",
+        genres: ["Anima\xE7\xE3o", "Fam\xEDlia", "Aventura", "Com\xE9dia"],
+        imdbId: "tt22022452",
+        tmdbId: "1022789",
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed"
+      },
+      // 3. YELLOWSTONE (Paramount+ - 2018 - tt4236770)
+      {
+        id: "series-yellowstone",
+        title: "Yellowstone",
+        originalTitle: "Yellowstone",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.7,
+        year: 2018,
+        image: "https://image.tmdb.org/t/p/w500/peNC0eyc3TQJa6x4TdKIIIRiz09.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/9xxLWtn8vKfZgnapG1T5k2n1A1x.jpg",
+        description: "John Dutton lidera sua fam\xEDlia em uma luta incans\xE1vel para defender seu vasto rancho em Montana contra especuladores imobili\xE1rios, reservas ind\xEDgenas e o primeiro parque nacional dos EUA.",
+        genres: ["Drama", "Faroeste"],
+        imdbId: "tt4236770",
+        tmdbId: "73586",
+        seasonsCount: 5,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "ys-s1e1",
+            number: 1,
+            title: "Primeiro Dia de Ca\xE7a",
+            description: "John Dutton defende os limites de seu rancho contra opositores.",
+            image: "https://image.tmdb.org/t/p/w500/peNC0eyc3TQJa6x4TdKIIIRiz09.jpg"
+          }
+        ]
+      },
+      // 4. HALO (Paramount+ - 2022 - tt2934286)
+      {
+        id: "series-halo",
+        title: "Halo",
+        originalTitle: "Halo",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 7.3,
+        year: 2022,
+        image: "https://image.tmdb.org/t/p/w500/nJUHX3DPIPC4RjDGL0xUCzNAl5e.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/1qpUk27LVI9UoK2GU0987Lz9m17.jpg",
+        description: "No s\xE9culo XXVI, a humanidade enfrenta a maior amea\xE7a \xE0 sua sobreviv\xEAncia: a alian\xE7a alien\xEDgena conhecida como Covenant. O supersoldado Master Chief lidera a resist\xEAncia.",
+        genres: ["A\xE7\xE3o", "Aventura", "Fic\xE7\xE3o Cient\xEDfica"],
+        imdbId: "tt2934286",
+        tmdbId: "52814",
+        seasonsCount: 2,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "halo-s1e1",
+            number: 1,
+            title: "Contato",
+            description: "Em Madrigal, Master Chief e os Spartans salvam colonos rebeldes de um ataque Covenant.",
+            image: "https://image.tmdb.org/t/p/w500/nJUHX3DPIPC4RjDGL0xUCzNAl5e.jpg"
+          }
+        ]
+      },
+      // 5. THE MANDALORIAN (Disney+ - 2019 - tt8111088)
+      {
+        id: "series-the-mandalorian",
+        title: "The Mandalorian",
+        originalTitle: "The Mandalorian",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.6,
+        year: 2019,
+        image: "https://image.tmdb.org/t/p/w500/eU1i6eHXlzMOlEq0ku1R07Y9W7r.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/o7Qi2v4uWQ8scZ1VR7G951478p8.jpg",
+        description: "Ap\xF3s a queda do Imp\xE9rio Gal\xE1ctico, um ca\xE7ador de recompensas solit\xE1rio navega pelos confins da gal\xE1xia, protegendo uma misteriosa crian\xE7a com poderes da For\xE7a.",
+        genres: ["Fic\xE7\xE3o Cient\xEDfica", "A\xE7\xE3o", "Aventura"],
+        imdbId: "tt8111088",
+        tmdbId: "82856",
+        seasonsCount: 3,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "mando-s1e1",
+            number: 1,
+            title: "Cap\xEDtulo 1: O Mandaloriano",
+            description: "Um ca\xE7ador de recompensas aceita um contrato clandestino com grande pagamento.",
+            image: "https://image.tmdb.org/t/p/w500/eU1i6eHXlzMOlEq0ku1R07Y9W7r.jpg"
+          }
+        ]
+      },
+      // 6. LOKI (Disney+ - 2021 - tt9140554)
+      {
+        id: "series-loki",
+        title: "Loki",
+        originalTitle: "Loki",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.2,
+        year: 2021,
+        image: "https://image.tmdb.org/t/p/w500/voHUmlvjysv923Zq98bYFqE4x9a.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/k47JEUTQsSMN539ygmgWIt3IR7W.jpg",
+        description: "Ap\xF3s roubar o Tesseract, o Deus da Trapa\xE7a \xE9 capturado pela Autoridade de Vari\xE2ncia Temporal (AVT) e precisa consertar a linha do tempo do multiverso.",
+        genres: ["Fic\xE7\xE3o Cient\xEDfica", "A\xE7\xE3o", "Aventura"],
+        imdbId: "tt9140554",
+        tmdbId: "84958",
+        seasonsCount: 2,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "loki-s1e1",
+            number: 1,
+            title: "Glorioso Prop\xF3sito",
+            description: "Loki \xE9 julgado na AVT ap\xF3s fugir com o Tesseract.",
+            image: "https://image.tmdb.org/t/p/w500/voHUmlvjysv923Zq98bYFqE4x9a.jpg"
+          }
+        ]
+      },
+      // 7. RUPTURA (Apple TV+ - 2022 - tt11280740)
+      {
+        id: "series-ruptura",
+        title: "Ruptura",
+        originalTitle: "Severance",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.7,
+        year: 2022,
+        image: "https://image.tmdb.org/t/p/w500/p4T5Wz9EaD010bW328Z7p4YjO38.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/9i3A33K34j4o9Z10bW328Z7p4Yj.jpg",
+        description: "Mark lidera uma equipe na Lumon Industries cujos funcion\xE1rios passaram por um procedimento cir\xFArgico que separa suas mem\xF3rias profissionais de suas vidas pessoais.",
+        genres: ["Drama", "Mist\xE9rio", "Fic\xE7\xE3o Cient\xEDfica"],
+        imdbId: "tt11280740",
+        tmdbId: "95396",
+        seasonsCount: 2,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "sev-s1e1",
+            number: 1,
+            title: "Boas Not\xEDcias Sobre o Inferno",
+            description: "Mark Scout lidera a equipe de refinamento de macrodados ap\xF3s a promo\xE7\xE3o inesperada.",
+            image: "https://image.tmdb.org/t/p/w500/p4T5Wz9EaD010bW328Z7p4YjO38.jpg"
+          }
+        ]
+      },
+      // 8. THE BOYS (Prime Video - 2019 - tt1190634)
+      {
+        id: "series-the-boys",
+        title: "The Boys",
+        originalTitle: "The Boys",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.7,
+        year: 2019,
+        image: "https://image.tmdb.org/t/p/w500/7Ns6tO3aYjUvXQ4w4J7s8E7Yj.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/n6bUvigpRFqSwmPp1m2U5vFzQvH.jpg",
+        description: "Um grupo de vigilantes liderado por Billy Bruto combate super-her\xF3is corruptos que abusam de seus poderes e trabalham para uma megacorpora\xE7\xE3o bilion\xE1ria.",
+        genres: ["A\xE7\xE3o", "Com\xE9dia", "Fic\xE7\xE3o Cient\xEDfica"],
+        imdbId: "tt1190634",
+        tmdbId: "76479",
+        seasonsCount: 4,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "boys-s1e1",
+            number: 1,
+            title: "O Nome do Jogo",
+            description: "Hughie sofre uma perda tr\xE1gica e \xE9 recrutado por Billy Bruto.",
+            image: "https://image.tmdb.org/t/p/w500/7Ns6tO3aYjUvXQ4w4J7s8E7Yj.jpg"
+          }
+        ]
+      },
+      // 9. FALLOUT (Prime Video - 2024 - tt12637874)
+      {
+        id: "series-fallout",
+        title: "Fallout",
+        originalTitle: "Fallout",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.4,
+        year: 2024,
+        image: "https://image.tmdb.org/t/p/w500/AnsSKR9LuK0T9bEmJfpRG9UmvHQ.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/mo0A4bK1K1100bW328Z7p4YjO38.jpg",
+        description: "Duzentos anos ap\xF3s o apocalipse nuclear, uma habitante pac\xEDfica de um luxuoso abrigo subterr\xE2neo \xE9 for\xE7ada a subir \xE0 superf\xEDcie e descobre um deserto bizarro e violento.",
+        genres: ["Fic\xE7\xE3o Cient\xEDfica", "A\xE7\xE3o", "Aventura"],
+        imdbId: "tt12637874",
+        tmdbId: "106379",
+        seasonsCount: 1,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "fallout-s1e1",
+            number: 1,
+            title: "O Fim",
+            description: "Lucy deixa o Ref\xFAgio 33 para resgatar seu pai sequestrado.",
+            image: "https://image.tmdb.org/t/p/w500/AnsSKR9LuK0T9bEmJfpRG9UmvHQ.jpg"
+          }
+        ]
+      },
+      // 10. INVENCÍVEL (Prime Video - 2021 - tt6741278)
+      {
+        id: "series-invencivel",
+        title: "Invenc\xEDvel",
+        originalTitle: "Invincible",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.7,
+        year: 2021,
+        image: "https://image.tmdb.org/t/p/w500/yDWJYRAwMNKbWvt8G8q9bEmJfpR.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/6VmF0cE4Xw8bYFqE4x9a10bW328.jpg",
+        description: "Mark Grayson \xE9 um adolescente comum, exceto pelo fato de seu pai ser o super-her\xF3i mais poderoso do planeta. Ao completar 17 anos, seus poderes come\xE7am a despertar.",
+        genres: ["Anima\xE7\xE3o", "A\xE7\xE3o", "Fic\xE7\xE3o Cient\xEDfica", "Drama"],
+        imdbId: "tt6741278",
+        tmdbId: "95557",
+        seasonsCount: 2,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "inv-s1e1",
+            number: 1,
+            title: "J\xE1 Era Hora",
+            description: "Mark desenvolve superpoderes e come\xE7a o treinamento com Omni-Man.",
+            image: "https://image.tmdb.org/t/p/w500/yDWJYRAwMNKbWvt8G8q9bEmJfpR.jpg"
+          }
+        ]
+      },
+      // 11. A CASA DO DRAGÃO (HBO Max - 2022 - tt11198330)
+      {
+        id: "series-house-of-the-dragon",
+        title: "A Casa do Drag\xE3o",
+        originalTitle: "House of the Dragon",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.4,
+        year: 2022,
+        image: "https://image.tmdb.org/t/p/w500/1X4h40fcB4WWUmIBK0auT4zRBAV.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/etjA2mmpvK7S3b3bYFqE4x9a10b.jpg",
+        description: "Cerca de 200 anos antes dos eventos de Game of Thrones, a dinastia Targaryen se encontra no auge de seu poder antes de uma sangrenta guerra civil pela sucess\xE3o do Trono de Ferro.",
+        genres: ["Drama", "A\xE7\xE3o", "Fantasia"],
+        imdbId: "tt11198330",
+        tmdbId: "94997",
+        seasonsCount: 2,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "hotd-s1e1",
+            number: 1,
+            title: "Os Herdeiros do Drag\xE3o",
+            description: "O rei Viserys convoca um torneio para celebrar o nascimento de seu segundo filho.",
+            image: "https://image.tmdb.org/t/p/w500/1X4h40fcB4WWUmIBK0auT4zRBAV.jpg"
+          }
+        ]
+      },
+      // 12. THE LAST OF US (HBO Max - 2023 - tt3581920)
+      {
+        id: "series-the-last-of-us",
+        title: "The Last of Us",
+        originalTitle: "The Last of Us",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.8,
+        year: 2023,
+        image: "https://image.tmdb.org/t/p/w500/uKvVjHNqB5VmOrdxqAt2V7J9Gmx.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/9J2mmpvK7S3b3bYFqE4x9a10b32.jpg",
+        description: "Vinte anos ap\xF3s uma infec\xE7\xE3o f\xFAngica destruir a civiliza\xE7\xE3o, Joel \xE9 contratado para contrabandear Ellie, uma jovem de 14 anos imune ao fungo, para fora de uma zona de quarentena opressiva.",
+        genres: ["Drama", "Fic\xE7\xE3o Cient\xEDfica", "A\xE7\xE3o", "Aventura"],
+        imdbId: "tt3581920",
+        tmdbId: "100088",
+        seasonsCount: 1,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "tlou-s1e1",
+            number: 1,
+            title: "Quando Voc\xEA Estiver Perdido na Escurid\xE3o",
+            description: "Joel e Tess recebem a miss\xE3o de escoltar Ellie em dire\xE7\xE3o ao Oeste.",
+            image: "https://image.tmdb.org/t/p/w500/uKvVjHNqB5VmOrdxqAt2V7J9Gmx.jpg"
+          }
+        ]
+      },
+      // 13. SUCCESSION (HBO Max - 2018 - tt7660850)
+      {
+        id: "series-succession",
+        title: "Succession",
+        originalTitle: "Succession",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.9,
+        year: 2018,
+        image: "https://image.tmdb.org/t/p/w500/7DVk0X2qB8w8bYFqE4x9a10bW32.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/c4J2mmpvK7S3b3bYFqE4x9a10b32.jpg",
+        description: "A fam\xEDlia Roy \xE9 conhecida por controlar a Waystar RoyCo, um dos maiores conglomerados de m\xEDdia do mundo. Quando o patriarca decide se afastar, os quatro filhos disputam o controle da empresa.",
+        genres: ["Drama"],
+        imdbId: "tt7660850",
+        tmdbId: "76331",
+        seasonsCount: 4,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "succ-s1e1",
+            number: 1,
+            title: "Celebra\xE7\xE3o",
+            description: "No anivers\xE1rio de 80 anos de Logan Roy, ele surpreende seus filhos com um an\xFAncio sobre o futuro da empresa.",
+            image: "https://image.tmdb.org/t/p/w500/7DVk0X2qB8w8bYFqE4x9a10bW32.jpg"
+          }
+        ]
+      },
+      // 14. STRANGER THINGS (Netflix - 2016 - tt4574334)
+      {
+        id: "series-stranger-things",
+        title: "Stranger Things",
+        originalTitle: "Stranger Things",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.7,
+        year: 2016,
+        image: "https://image.tmdb.org/t/p/w500/49WJfeN0moxb9IPfGn8AIqMGskD.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/56v2mJjLLKElGQvscfG10b328Z7.jpg",
+        description: "Em 1983, em uma pequena cidade de Indiana, o desaparecimento repentino de um garoto leva seus amigos e familiares a desvendarem mist\xE9rios sobrenaturais e experimentos secretos.",
+        genres: ["Fic\xE7\xE3o Cient\xEDfica", "Terror", "Drama", "Mist\xE9rio"],
+        imdbId: "tt4574334",
+        tmdbId: "66732",
+        seasonsCount: 4,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "st-s1e1",
+            number: 1,
+            title: "Cap\xEDtulo Um: O Desaparecimento de Will Byers",
+            description: "Voltando para casa de bicicleta, Will v\xEA algo aterrorizante. Uma garota misteriosa surge na lanchonete local.",
+            image: "https://image.tmdb.org/t/p/w500/49WJfeN0moxb9IPfGn8AIqMGskD.jpg"
+          }
+        ]
+      },
+      // 15. WANDINHA (Netflix - 2022 - tt13443470)
+      {
+        id: "series-wandinha",
+        title: "Wandinha",
+        originalTitle: "Wednesday",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.1,
+        year: 2022,
+        image: "https://image.tmdb.org/t/p/w500/9PFonBhy4cQy7Jz20ZyZuZu37ao.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/iHSwvRVsRyxpX7FE7GbviaDvgGZ.jpg",
+        description: "Wandinha Addams ingressa na Academia Nunca Mais, onde tenta dominar suas habilidades ps\xEDquicas emergentes, investigar uma onda de assassinatos e solucionar um mist\xE9rio familiar.",
+        genres: ["Com\xE9dia", "Mist\xE9rio", "Fantasia"],
+        imdbId: "tt13443470",
+        tmdbId: "119051",
+        seasonsCount: 1,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "wed-s1e1",
+            number: 1,
+            title: "Wandinha \xC9 S\xF3 Problema",
+            description: "Ap\xF3s ser expulsa da escola regular, Wandinha \xE9 enviada para a Academia Nunca Mais.",
+            image: "https://image.tmdb.org/t/p/w500/9PFonBhy4cQy7Jz20ZyZuZu37ao.jpg"
+          }
+        ]
+      },
+      // 16. ROUND 6 (Netflix - 2021 - tt10919420)
+      {
+        id: "series-round-6",
+        title: "Round 6",
+        originalTitle: "Squid Game",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8,
+        year: 2021,
+        image: "https://image.tmdb.org/t/p/w500/dDlG1v7n0D28eNl8w8bYFqE4x9a.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/oaGvjJZmpvK7S3b3bYFqE4x9a10.jpg",
+        description: "Centenas de jogadores endividados aceitam um convite estranho para competir em jogos infantis tradicionais, onde o pr\xEAmio \xE9 uma fortuna bilion\xE1ria e a penalidade \xE9 fatal.",
+        genres: ["A\xE7\xE3o", "Suspense", "Drama"],
+        imdbId: "tt10919420",
+        tmdbId: "93405",
+        seasonsCount: 2,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "sq-s1e1",
+            number: 1,
+            title: "Batatinha Frita 1, 2, 3",
+            description: "Gi-hun aceita o misterioso cart\xE3o de visita e acorda em um dormit\xF3rio com centenas de outros jogadores.",
+            image: "https://image.tmdb.org/t/p/w500/dDlG1v7n0D28eNl8w8bYFqE4x9a.jpg"
+          }
+        ]
+      },
+      // 17. OS OUTROS (Globoplay - 2023 - tmdb: 224673)
+      {
+        id: "series-os-outros",
+        title: "Os Outros",
+        originalTitle: "Os Outros",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.4,
+        year: 2023,
+        image: "https://image.tmdb.org/t/p/w500/kK9w8vK1m9x2eX2xK1v8a7Z4.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/vK1m9x2eX2xK1v8a7Z4kK9w8vK1.jpg",
+        description: "Dois casais vizinhos entram em conflito em um condom\xEDnio fechado na Barra da Tijuca ap\xF3s uma briga entre seus filhos adolescentes, desencadeando consequ\xEAncias imprevis\xEDveis.",
+        genres: ["Drama", "Suspense"],
+        tmdbId: "224673",
+        seasonsCount: 2,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "oo-s1e1",
+            number: 1,
+            title: "Epis\xF3dio 1",
+            description: "Uma briga na quadra de esportes do condom\xEDnio Barra Diamond desencadeia uma rivalidade destrutiva entre fam\xEDlias vizinhas.",
+            image: "https://image.tmdb.org/t/p/w500/kK9w8vK1m9x2eX2xK1v8a7Z4.jpg"
+          }
+        ]
+      },
+      // 18. SOB PRESSÃO (Globoplay - 2017 - tt7631376)
+      {
+        id: "series-sob-pressao",
+        title: "Sob Press\xE3o",
+        originalTitle: "Sob Press\xE3o",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.6,
+        year: 2017,
+        image: "https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq2.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/FuXrg3G8fep5Mm79vTfgq23r4LY.jpg",
+        description: "Em um hospital p\xFAblico no sub\xFArbio do Rio de Janeiro, uma equipe m\xE9dica liderada pelos doutores Evandro e Carolina enfrenta dilemas \xE9ticos e a escassez cr\xF4nica de recursos para salvar vidas.",
+        genres: ["Drama"],
+        imdbId: "tt7631376",
+        tmdbId: "74601",
+        seasonsCount: 5,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "sp-s1e1",
+            number: 1,
+            title: "Epis\xF3dio 1",
+            description: "Dr. Evandro e Dra. Carolina precisam realizar cirurgias simult\xE2neas de extrema urg\xEAncia sem equipamentos essenciais.",
+            image: "https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq2.jpg"
+          }
+        ]
+      },
+      // 19. JUSTIÇA (Globoplay - 2016 - tt6007424)
+      {
+        id: "series-justica",
+        title: "Justi\xE7a",
+        originalTitle: "Justi\xE7a",
+        type: "S\xC9RIE" /* SERIES */,
+        rating: 8.3,
+        year: 2016,
+        image: "https://image.tmdb.org/t/p/w500/fL6K0z0wYV8x1q9eX2xK1v8a7Z2.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/YV8x1q9eX2xK1v8a7Z2fL6K0z0w.jpg",
+        description: "Quatro hist\xF3rias independentes mas interligadas no Recife exploram o limite \xE9tico entre lei, vingan\xE7a pessoal e o conceito de justi\xE7a ap\xF3s sete anos de pris\xE3o dos protagonistas.",
+        genres: ["Drama", "Crime"],
+        imdbId: "tt6007424",
+        tmdbId: "67915",
+        seasonsCount: 2,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "jus-s1e1",
+            number: 1,
+            title: "Elisa e Vicente",
+            description: "Vicente \xE9 preso ap\xF3s assassinar a noiva Isabela em um acesso de ci\xFAmes; a m\xE3e de Isabela jura vingan\xE7a.",
+            image: "https://image.tmdb.org/t/p/w500/fL6K0z0wYV8x1q9eX2xK1v8a7Z2.jpg"
+          }
+        ]
       }
     ];
     FEATURED_ANIME_ITEMS = [

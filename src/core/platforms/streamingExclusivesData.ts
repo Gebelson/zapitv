@@ -178,6 +178,216 @@ export const VERIFIED_STREAMING_EXCLUSIVES: PlatformMetadataEntry[] = [
     verifiedOriginal: true,
     notes: 'Série Original Netflix / Sucesso Global'
   },
+  {
+    imdbId: 'tt14641788',
+    title: 'Enola Holmes 2',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Filme Original Netflix / Millie Bobby Brown'
+  },
+  {
+    imdbId: 'tt1016150',
+    title: 'Nada de Novo no Front',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Filme Vencedor do Oscar Original Netflix'
+  },
+  {
+    imdbId: 'tt5181830',
+    title: 'Wendell & Wild',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Filme de Animação Stop-Motion Original Netflix'
+  },
+  {
+    imdbId: 'tt4595186',
+    title: 'Uma Garota de Muita Sorte',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Filme Dramático Original Netflix'
+  },
+  {
+    imdbId: 'tt22091698',
+    title: 'Esposa de Aluguel',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Comédia Romântica Nacional Original Netflix'
+  },
+  {
+    imdbId: 'tt16027944',
+    title: 'Depois do Universo',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Drama Romântico Nacional Original Netflix'
+  },
+  {
+    imdbId: 'tt12683756',
+    title: 'Jaula',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Suspense Psicológico Espanhol Original Netflix'
+  },
+  {
+    imdbId: 'tt18082758',
+    title: 'Hackers no Controle',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Thriller Holandês Original Netflix'
+  },
+  {
+    imdbId: 'tt14270848',
+    title: 'Roubando Mussolini',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Filme Italiano de Comédia e Ação Original Netflix'
+  },
+  {
+    imdbId: 'tt21837726',
+    title: 'O Time da Redenção',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Documentário Esportivo Original Netflix'
+  },
+  {
+    imdbId: 'tt15374214',
+    title: 'O Cavaleiro do Rei',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Drama Histórico Original Netflix'
+  },
+  {
+    imdbId: 'tt15128068',
+    title: 'Monica, O My Darling',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Comédia de Humor Negro Original Netflix'
+  },
+  {
+    imdbId: 'tt11897478',
+    title: 'O Desconhecido',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Suspense Policial Australiano Original Netflix'
+  },
+  {
+    imdbId: 'tt15463032',
+    title: 'Amor em Verona',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Comédia Romântica Original Netflix'
+  },
+  {
+    imdbId: 'tt29368988',
+    title: 'Acampamento com a Mamãe',
+    year: 2024,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Comédia Familiar Original Netflix'
+  },
+  {
+    imdbId: 'tt32084246',
+    title: 'Virgem Maria',
+    year: 2024,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Drama Bíblico Original Netflix'
+  },
+  {
+    imdbId: 'tt18224682',
+    title: 'Roubo Cibernético: Bilhões em Bitcoins',
+    year: 2024,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Documentário Investigativo Original Netflix'
+  },
+  {
+    imdbId: 'tt22437050',
+    title: 'Vento Selvagem',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Filme Sul-Africano Original Netflix'
+  },
+  {
+    tmdbId: 258165,
+    imdbId: 'tt21097264',
+    title: 'A Leste do Éden',
+    year: 2026,
+    mediaType: 'series',
+    originalPlatform: 'netflix',
+    currentExclusivePlatform: 'netflix',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Minissérie Original Netflix'
+  },
 
   // =========================================================================
   // 2. DISNEY+
@@ -205,6 +415,18 @@ export const VERIFIED_STREAMING_EXCLUSIVES: PlatformMetadataEntry[] = [
     brazilExclusive: true,
     verifiedOriginal: false,
     notes: 'Anime com distribuição exclusiva de streaming no Brasil via Disney+'
+  },
+  {
+    tmdbId: 13916,
+    imdbId: 'tt0434665',
+    title: 'Bleach: Thousand-Year Blood War',
+    year: 2022,
+    mediaType: 'anime',
+    originalPlatform: 'crunchyroll',
+    currentExclusivePlatform: 'disney',
+    brazilExclusive: true,
+    verifiedOriginal: false,
+    notes: 'Anime com distribuição exclusiva de streaming no Brasil via Disney+ (ID canônico alternativo)'
   },
   {
     imdbId: 'tt1844624',
@@ -288,6 +510,28 @@ export const VERIFIED_STREAMING_EXCLUSIVES: PlatformMetadataEntry[] = [
     brazilExclusive: true,
     verifiedOriginal: true,
     notes: 'Filme Animado Original Disney'
+  },
+  {
+    imdbId: 'tt1777606',
+    title: 'Rosalina',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'disney',
+    currentExclusivePlatform: 'disney',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Comédia Romântica 20th Century Studios / Disney+ / Star+'
+  },
+  {
+    imdbId: 'tt15791034',
+    title: 'Noites Brutais',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'disney',
+    currentExclusivePlatform: 'disney',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Terror e Suspense 20th Century Studios / Disney+ / Star+'
   },
 
   // =========================================================================
@@ -373,6 +617,28 @@ export const VERIFIED_STREAMING_EXCLUSIVES: PlatformMetadataEntry[] = [
     brazilExclusive: true,
     verifiedOriginal: true,
     notes: 'Série Original Amazon Prime Video / Kilter Films'
+  },
+  {
+    imdbId: 'tt15301048',
+    title: 'Argentina 1985',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'prime',
+    currentExclusivePlatform: 'prime',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Filme Original Amazon Studios indicado ao Oscar'
+  },
+  {
+    imdbId: 'tt15713012',
+    title: 'Overdose',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'prime',
+    currentExclusivePlatform: 'prime',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Filme Policial Francês Original Amazon Prime Video'
   },
 
   // =========================================================================
@@ -469,6 +735,28 @@ export const VERIFIED_STREAMING_EXCLUSIVES: PlatformMetadataEntry[] = [
     brazilExclusive: true,
     verifiedOriginal: true,
     notes: 'Série Aclamada Original HBO'
+  },
+  {
+    imdbId: 'tt10731256',
+    title: 'Não Se Preocupe, Querida',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'hbo',
+    currentExclusivePlatform: 'hbo',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Filme Warner Bros / Max Original'
+  },
+  {
+    imdbId: 'tt6443346',
+    title: 'Adão Negro',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'hbo',
+    currentExclusivePlatform: 'hbo',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Filme DC / Warner Bros / Max'
   },
 
   // =========================================================================
@@ -624,6 +912,17 @@ export const VERIFIED_STREAMING_EXCLUSIVES: PlatformMetadataEntry[] = [
     brazilExclusive: true,
     verifiedOriginal: true,
     notes: 'Série Original Paramount+ / 343 Industries'
+  },
+  {
+    imdbId: 'tt15038118',
+    title: 'A Grande Aventura de Blue na Cidade',
+    year: 2022,
+    mediaType: 'movie',
+    originalPlatform: 'paramount',
+    currentExclusivePlatform: 'paramount',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Filme Infantil Musical Original Paramount+ / Nickelodeon'
   },
 
   // =========================================================================
@@ -843,5 +1142,16 @@ export const VERIFIED_STREAMING_EXCLUSIVES: PlatformMetadataEntry[] = [
     brazilExclusive: true,
     verifiedOriginal: true,
     notes: 'Catálogo Completo Oficial Crunchyroll'
+  },
+  {
+    tmdbId: 37854,
+    title: 'One Piece',
+    year: 1999,
+    mediaType: 'anime',
+    originalPlatform: 'crunchyroll',
+    currentExclusivePlatform: 'crunchyroll',
+    brazilExclusive: true,
+    verifiedOriginal: true,
+    notes: 'Transmissão Oficial e Simulcast Crunchyroll'
   }
 ];

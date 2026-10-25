@@ -31,26 +31,25 @@ const EASING_CURVE = 'cubic-bezier(0.22, 1, 0.36, 1)'; // Desaceleração suave 
 
 /**
  * Retorna os slots visíveis no carrossel de acordo com a quantidade de mídias disponíveis.
- * Garante que nenhuma mídia seja duplicada simultaneamente na tela quando o catálogo for reduzido,
- * mantendo sempre um slot à esquerda (-1) e à direita (1) para transição contínua.
+ * Regra obrigatória:
+ * - 1 a 6 conteúdos: carrossel finito. Slots [0, 1, ..., count - 1].
+ *   Sem slots negativos (-1), sem duplicatas e sem índices além da lista real.
+ * - 7 ou mais conteúdos: carrossel infinito com buffer otimizado por perfil de hardware.
  */
 export const getVisibleSlots = (count: number): number[] => {
   if (count <= 0) return [];
+  // 1 a 6 conteúdos: CARROSSEL FINITO
   if (count === 1) return [0];
-  if (count === 2) return [-1, 0, 1];
-  if (count === 3) return [-1, 0, 1, 2];
-  if (count === 4) return [-1, 0, 1, 2, 3];
-  if (count === 5) return [-1, 0, 1, 2, 3, 4];
-  if (count === 6) return [-1, 0, 1, 2, 3, 4, 5];
+  if (count === 2) return [0, 1];
+  if (count === 3) return [0, 1, 2];
+  if (count === 4) return [0, 1, 2, 3];
+  if (count === 5) return [0, 1, 2, 3, 4];
+  if (count === 6) return [0, 1, 2, 3, 4, 5];
+
+  // 7 ou mais conteúdos: CARROSSEL INFINITO
   if (count === 7) return [-1, 0, 1, 2, 3, 4, 5, 6];
-  // Catálogo completo (>= 8 itens): buffer otimizado por perfil de hardware da TV
   const profile = tvPerformanceProfileService.getActiveConfig();
-  if (profile.name === 'eco') {
-    // Modo econômico (The Frame, Tizen, MSX): 8 cards suficientes para cobrir a viewport de 1080p sem sobrecarga de GPU
-    return [-1, 0, 1, 2, 3, 4, 5, 6];
-  }
-  if (profile.name === 'balanced') {
-    // Modo equilibrado: 8 cards
+  if (profile.name === 'eco' || profile.name === 'balanced') {
     return [-1, 0, 1, 2, 3, 4, 5, 6];
   }
   return [-1, 0, 1, 2, 3, 4, 5, 6, 7];
@@ -135,6 +134,8 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     };
   }, [measureGeometry]);
 
+  const isFinite = items.length >= 1 && items.length <= 6;
+
   // Finalização da transição suave com atualização atômica de slots
   const handleTransitionEnd = useCallback(() => {
     if (fallbackTimerRef.current) {
@@ -179,9 +180,9 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     }
   }, [items.length]);
 
-  // Inicia o deslocamento horizontal suave do carrossel
+  // Inicia o deslocamento horizontal suave do carrossel (exclusivo para carrossel infinito >= 7 itens)
   const triggerSlide = useCallback((direction: 'right' | 'left', duration: number = NORMAL_DURATION) => {
-    if (!items || items.length <= 1) return;
+    if (!items || items.length <= 1 || isFinite) return;
 
     isAnimatingRef.current = true;
     pendingSlideRef.current = direction;
@@ -197,12 +198,28 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     fallbackTimerRef.current = setTimeout(() => {
       handleTransitionEnd();
     }, duration + 60);
-  }, [items, stepSize, handleTransitionEnd]);
+  }, [items, stepSize, handleTransitionEnd, isFinite]);
 
-  // Navegação horizontal circular para a direita: transição contínua e não-bloqueante
+  // Navegação horizontal: finito (1 a 6 itens) vs infinito (7 ou mais itens)
   const slideNext = useCallback(() => {
     if (!items || items.length <= 1) return;
 
+    // MODO FINITO (1 a 6 conteúdos): navegação estritamente limitada às extremidades
+    if (isFinite) {
+      if (targetIndexRef.current >= items.length - 1) {
+        // Bloqueia avanço além da última posição. Não movimenta o trilho.
+        return;
+      }
+      const nextTarget = targetIndexRef.current + 1;
+      targetIndexRef.current = nextTarget;
+      setTargetIndex(nextTarget);
+      setCurrentIndex(nextTarget);
+      currentIndexRef.current = nextTarget;
+      uiSoundService.play('hoverCard');
+      return;
+    }
+
+    // MODO INFINITO (7 ou mais conteúdos): transição circular contínua
     // 1. Atualização imediata do índice lógico de destino (zero bloqueio de entrada)
     const nextTarget = (targetIndexRef.current + 1) % items.length;
     targetIndexRef.current = nextTarget;
@@ -213,8 +230,6 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     if (isAnimatingRef.current) {
       queuedDirectionRef.current = 'right';
       setTransitionDuration(CHAINED_DURATION);
-      // Se estava deslizando para a esquerda e o usuário inverteu para a direita,
-      // cancela o passo pendente e anima suavemente de volta à posição 0 sem saltar índices
       if (pendingSlideRef.current === 'left') {
         pendingSlideRef.current = null;
         setTranslateX(0);
@@ -225,12 +240,28 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
 
     // 3. Dispara a transição cinematográfica normal para toque isolado
     triggerSlide('right', NORMAL_DURATION);
-  }, [items, triggerSlide]);
+  }, [items, isFinite, triggerSlide]);
 
-  // Navegação horizontal circular para a esquerda: transição contínua e não-bloqueante
+  // Navegação horizontal: finito (1 a 6 itens) vs infinito (7 ou mais itens)
   const slidePrev = useCallback(() => {
     if (!items || items.length <= 1) return;
 
+    // MODO FINITO (1 a 6 conteúdos): navegação estritamente limitada às extremidades
+    if (isFinite) {
+      if (targetIndexRef.current <= 0) {
+        // Bloqueia retrocesso além da primeira posição. Não movimenta o trilho.
+        return;
+      }
+      const prevTarget = targetIndexRef.current - 1;
+      targetIndexRef.current = prevTarget;
+      setTargetIndex(prevTarget);
+      setCurrentIndex(prevTarget);
+      currentIndexRef.current = prevTarget;
+      uiSoundService.play('hoverCard');
+      return;
+    }
+
+    // MODO INFINITO (7 ou mais conteúdos): transição circular contínua
     // 1. Atualização imediata do índice lógico de destino (zero bloqueio de entrada)
     const prevTarget = (targetIndexRef.current - 1 + items.length) % items.length;
     targetIndexRef.current = prevTarget;
@@ -241,8 +272,6 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     if (isAnimatingRef.current) {
       queuedDirectionRef.current = 'left';
       setTransitionDuration(CHAINED_DURATION);
-      // Se estava deslizando para a direita e o usuário inverteu para a esquerda,
-      // cancela o passo pendente e anima suavemente de volta à posição 0 sem saltar índices
       if (pendingSlideRef.current === 'right') {
         pendingSlideRef.current = null;
         setTranslateX(0);
@@ -253,7 +282,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
 
     // 3. Dispara a transição cinematográfica normal para toque isolado
     triggerSlide('left', NORMAL_DURATION);
-  }, [items, triggerSlide]);
+  }, [items, isFinite, triggerSlide]);
 
   // Listener nativo de fim de transição no track
   const onTrackTransitionEnd = useCallback((e: React.TransitionEvent<HTMLDivElement>) => {
@@ -323,14 +352,33 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     };
   }, []);
 
-  // Janela circular de renderização calculada com base na quantidade real de itens
+  // Garante que currentIndex e targetIndex permaneçam dentro dos limites se items mudar
+  useEffect(() => {
+    if (currentIndexRef.current >= items.length) {
+      const safe = Math.max(0, items.length - 1);
+      setCurrentIndex(safe);
+      currentIndexRef.current = safe;
+      setTargetIndex(safe);
+      targetIndexRef.current = safe;
+    }
+  }, [items.length]);
+
+  // Janela de renderização calculada com base na regra estrita (1-6 finito, >=7 infinito)
   const visibleSlots = useMemo(() => getVisibleSlots(items.length), [items.length]);
 
-  // Pré-carregamento e decodificação antecipada das próximas capas na direção de navegação
+  // Pré-carregamento e decodificação antecipada das capas na direção de navegação
   useEffect(() => {
     if (!items || items.length === 0) return;
-    const len = items.length;
 
+    if (isFinite) {
+      // Modo finito: pré-carrega todas as capas da lista com prioridade adequada
+      items.forEach(it => {
+        posterRecoveryService.preloadItemPoster(it, focused ? 1 : 2);
+      });
+      return;
+    }
+
+    const len = items.length;
     // Próximas capas à direita (+1, +2), à esquerda (-1) e atual
     const next1 = items[(currentIndex + 1) % len];
     const next2 = items[(currentIndex + 2) % len];
@@ -350,16 +398,21 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
         if (items[itemIdx]) posterRecoveryService.preloadItemPoster(items[itemIdx], 3);
       }
     });
-  }, [currentIndex, focused, items, visibleSlots]);
+  }, [currentIndex, focused, items, visibleSlots, isFinite]);
 
   if (!items || items.length === 0) {
     return null;
   }
 
   const negativeSlotsCount = visibleSlots.filter(s => s < 0).length;
-  // Offset base posiciona o Slot 0 rigorosamente em SAFE_MARGIN_LEFT (64px)
-  const baseOffset = SAFE_MARGIN_LEFT - negativeSlotsCount * stepSize;
+  // Offset base: em modo finito inicia estritamente em SAFE_MARGIN_LEFT (64px); em modo infinito compensa o slot -1
+  const baseOffset = isFinite ? SAFE_MARGIN_LEFT : SAFE_MARGIN_LEFT - negativeSlotsCount * stepSize;
   const currentItem = items[targetIndex] || items[currentIndex] || items[0];
+
+  // Posição horizontal da seleção: em modo finito segue o índice ativo; em modo infinito fica fixa no Slot 0
+  const activeSelectionLeft = isFinite 
+    ? SAFE_MARGIN_LEFT + currentIndex * stepSize 
+    : selectionGeometry.left;
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -379,16 +432,17 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
           </h2>
         </div>
 
-        {/* Trilho Horizontal Infinito de Ponta a Ponta na Tela */}
+        {/* Trilho Horizontal de Ponta a Ponta na Tela */}
         <div ref={trackContainerRef} className="relative w-full overflow-hidden py-8">
-          {/* 1. GLOW AMBIENTE SUTIL (ATRÁS DA CAPA): Geometria compartilhada 2:3 rigorosamente alinhada ao Slot 0 */}
+          {/* 1. GLOW AMBIENTE SUTIL (ATRÁS DA CAPA): Geometria compartilhada 2:3 */}
           {focused && currentItem && (
             <div 
-              className="absolute z-0 pointer-events-none transition-all duration-300 flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px]"
+              className="absolute z-0 pointer-events-none flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px]"
               style={{
-                left: `${selectionGeometry.left}px`,
+                left: `${activeSelectionLeft}px`, /* Ancoragem base: left: `${selectionGeometry.left}px` */
                 top: `${selectionGeometry.top}px`,
                 height: `${selectionGeometry.height}px`,
+                transition: isFinite ? `left ${NORMAL_DURATION}ms ${EASING_CURVE}` : 'all 300ms ease'
               }}
               aria-hidden="true"
             >
@@ -403,14 +457,15 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
             </div>
           )}
 
-          {/* 2. MOLDURA EXTERNA DE SELEÇÃO (Z-30): Geometria compartilhada 2:3 com contorno externo de 4px de respiro e cantos proporcionais */}
+          {/* 2. MOLDURA EXTERNA DE SELEÇÃO (Z-30): Geometria compartilhada 2:3 com contorno externo de 4px de respiro */}
           {focused && currentItem && (
             <div 
               className="absolute z-30 pointer-events-none flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px]"
               style={{
-                left: `${selectionGeometry.left}px`,
+                left: `${activeSelectionLeft}px`, /* Ancoragem base: left: `${selectionGeometry.left}px` */
                 top: `${selectionGeometry.top}px`,
                 height: `${selectionGeometry.height}px`,
+                transition: isFinite ? `left ${NORMAL_DURATION}ms ${EASING_CURVE}` : 'all 150ms ease'
               }}
               aria-hidden="true"
             >
@@ -425,26 +480,27 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
             </div>
           )}
 
-          {/* 3. Track Deslizante com cards verticais 2:3 (Z-10, entre o glow de fundo e a moldura externa) */}
+          {/* 3. Track Deslizante com cards verticais 2:3 */}
           <div 
             ref={trackRef}
             onTransitionEnd={onTrackTransitionEnd}
             className="relative z-10 flex items-center gap-6"
             style={{
               transform: `translate3d(${baseOffset + translateX}px, 0, 0)`,
-              transition: transitionEnabled ? `transform ${transitionDuration}ms ${EASING_CURVE}` : 'none',
+              transition: (!isFinite && transitionEnabled) ? `transform ${transitionDuration}ms ${EASING_CURVE}` : 'none',
               willChange: (transitionEnabled || isAnimatingRef.current) ? 'transform' : 'auto',
             }}
           >
             {visibleSlots.map((slotIdx) => {
-              const itemIndex = ((currentIndex + slotIdx) % items.length + items.length) % items.length;
+              const itemIndex = isFinite ? slotIdx : ((currentIndex + slotIdx) % items.length + items.length) % items.length;
               const item = items[itemIndex];
-              const isSlotActive = slotIdx === 0;
+              if (!item) return null;
+              const isSlotActive = isFinite ? slotIdx === currentIndex : slotIdx === 0;
               const isSlotFocused = isSlotActive && focused;
 
               return (
                 <div 
-                  key={`slot-${slotIdx}`}
+                  key={`slot-${slotIdx}-${item.id}`}
                   ref={slotIdx === 0 ? slotMeasureRef : undefined}
                   className="flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px] opacity-100"
                 >

@@ -26,18 +26,24 @@ async function runTests() {
 
   // Cenário 1: Substituição de slideRight por hoverCard no slideNext
   console.log('--- Cenário 1: Disparo de hoverCard ao navegar para a Direita (slideNext) ---');
+  const slideNextBody = tvContentRowCode.substring(
+    tvContentRowCode.indexOf('const slideNext = useCallback('),
+    tvContentRowCode.indexOf('const slidePrev = useCallback(')
+  );
   assert(
-    tvContentRowCode.includes("slideNext = useCallback(() => {\r\n    if (!items || items.length <= 1) return;\r\n\r\n    // 1. Atualização imediata do índice lógico de destino (zero bloqueio de entrada)\r\n    const nextTarget = (targetIndexRef.current + 1) % items.length;\r\n    targetIndexRef.current = nextTarget;\r\n    setTargetIndex(nextTarget);\r\n    uiSoundService.play('hoverCard');") ||
-    tvContentRowCode.includes("slideNext = useCallback(() => {\n    if (!items || items.length <= 1) return;\n\n    // 1. Atualização imediata do índice lógico de destino (zero bloqueio de entrada)\n    const nextTarget = (targetIndexRef.current + 1) % items.length;\n    targetIndexRef.current = nextTarget;\n    setTargetIndex(nextTarget);\n    uiSoundService.play('hoverCard');"),
+    slideNextBody.includes("uiSoundService.play('hoverCard')"),
     'slideNext deve chamar uiSoundService.play(\'hoverCard\')'
   );
   console.log('✓ Cenário 1: slideNext reproduz hoverCard no acionamento da seta Direita OK');
 
   // Cenário 2: Substituição de slideLeft por hoverCard no slidePrev
   console.log('\n--- Cenário 2: Disparo de hoverCard ao navegar para a Esquerda (slidePrev) ---');
+  const slidePrevBody = tvContentRowCode.substring(
+    tvContentRowCode.indexOf('const slidePrev = useCallback('),
+    tvContentRowCode.indexOf('const isFocused =')
+  );
   assert(
-    tvContentRowCode.includes("slidePrev = useCallback(() => {\r\n    if (!items || items.length <= 1) return;\r\n\r\n    // 1. Atualização imediata do índice lógico de destino (zero bloqueio de entrada)\r\n    const prevTarget = (targetIndexRef.current - 1 + items.length) % items.length;\r\n    targetIndexRef.current = prevTarget;\r\n    setTargetIndex(prevTarget);\r\n    uiSoundService.play('hoverCard');") ||
-    tvContentRowCode.includes("slidePrev = useCallback(() => {\n    if (!items || items.length <= 1) return;\n\n    // 1. Atualização imediata do índice lógico de destino (zero bloqueio de entrada)\n    const prevTarget = (targetIndexRef.current - 1 + items.length) % items.length;\n    targetIndexRef.current = prevTarget;\n    setTargetIndex(prevTarget);\n    uiSoundService.play('hoverCard');"),
+    slidePrevBody.includes("uiSoundService.play('hoverCard')"),
     'slidePrev deve chamar uiSoundService.play(\'hoverCard\')'
   );
   console.log('✓ Cenário 2: slidePrev reproduz hoverCard no acionamento da seta Esquerda OK');
