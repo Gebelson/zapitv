@@ -92,9 +92,10 @@ const TvVirtualKey: React.FC<TvVirtualKeyProps> = ({
       data-focus-key={focusKey}
       data-tv-focused={focused ? "true" : undefined}
       onClick={() => onPress(char)}
+      style={{ ...style, minHeight: style?.height }}
       className={`select-none rounded-xl font-bold flex items-center justify-center transition-all duration-150 outline-none cursor-pointer ${
         focused
-          ? 'border-2 border-cyan-400 bg-cyan-500/35 text-white shadow-[0_0_18px_rgba(0,229,255,0.7)] scale-110 z-20'
+          ? 'border-2 border-cyan-400 bg-cyan-500/35 text-white shadow-[0_0_18px_rgba(0,229,255,0.7)] scale-105 z-20'
           : 'border border-white/10 bg-white/5 text-gray-200 hover:bg-white/15 hover:text-white'
       } ${className}`}
     >
@@ -592,26 +593,26 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
               {/* Linha de Utilidades: Espaço (3 cols), Apagar (2 cols), Limpar (1 col) */}
               <TvVirtualKey
                 char=" "
-                displayLabel={<span className="text-[9.5px] sm:text-xs uppercase tracking-wider font-semibold">␣ Espaço</span>}
+                displayLabel={<span className="flex items-center justify-center gap-1 uppercase tracking-wider font-bold">␣ Espaço</span>}
                 onPress={handleVirtualKeyPress}
                 focusKey="tv-key-space"
-                style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${viewport.keyboardFontSize}px` }}
+                style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${Math.round(viewport.keyboardFontSize * 0.9)}px` }}
                 className="col-span-3"
               />
               <TvVirtualKey
                 char="BACKSPACE"
-                displayLabel={<span className="text-[9.5px] sm:text-xs uppercase tracking-wider font-semibold">⌫ Apagar</span>}
+                displayLabel={<span className="flex items-center justify-center gap-1 uppercase tracking-wider font-bold">⌫ Apagar</span>}
                 onPress={handleVirtualKeyPress}
                 focusKey="tv-key-backspace"
-                style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${viewport.keyboardFontSize}px` }}
+                style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${Math.round(viewport.keyboardFontSize * 0.9)}px` }}
                 className="col-span-2"
               />
               <TvVirtualKey
                 char="CLEAR"
-                displayLabel={<span className="text-[9.5px] sm:text-xs uppercase tracking-wider font-semibold">Limpar</span>}
+                displayLabel={<span className="flex items-center justify-center uppercase tracking-wider font-bold">Limpar</span>}
                 onPress={handleVirtualKeyPress}
                 focusKey="tv-key-clear"
-                style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${viewport.keyboardFontSize}px` }}
+                style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${Math.round(viewport.keyboardFontSize * 0.9)}px` }}
                 className="col-span-1"
                 onArrowRightFromEdge={handleJumpToResults}
               />

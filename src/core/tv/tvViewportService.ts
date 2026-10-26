@@ -7,7 +7,12 @@
  * 
  * NÃO força artificialmente uma resolução fixa nem aplica transform: scale() / zoom global,
  * fornecendo em vez disso tokens e medidas responsivas calculadas para cada viewport.
+ * 
+ * Isola rigorosamente otimizações específicas do ecossistema Amazon Fire TV das demais Smart TVs
+ * (Samsung Tizen, LG webOS, Media Station X e navegadores de TV).
  */
+
+import { tvPerformanceService } from './tvPerformanceService';
 
 export type TvScaleCategory = 'compact' | 'standard' | 'expanded';
 
@@ -20,6 +25,8 @@ export interface TvViewportMetrics {
   visualViewportWidth: number;
   visualViewportHeight: number;
   scaleCategory: TvScaleCategory;
+  isFireTv: boolean;
+  deviceFamily: 'firetv' | 'samsung' | 'msx' | 'generic';
   // Tokens de layout calculados proporcionalmente
   headerHeight: number;
   safeMarginX: number;
@@ -65,10 +72,18 @@ class TvViewportService {
   }
 
   /**
-   * Calcula as métricas reais do viewport CSS do ambiente atual
+   * Calcula as métricas reais do viewport CSS do ambiente atual,
+   * diferenciando regras universais de layout das otimizações exclusivas de Fire TV.
    */
-  public computeMetrics(): TvViewportMetrics {
+  public computeMetrics(customUa?: string): TvViewportMetrics {
+    const ua = (customUa || (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '').toLowerCase();
+    const isExplicitNonFireTv = /tizen|maple|samsung.*(?:tv|smarttv)|webos|lg\s*browser/i.test(ua) || 
+      (/mediastationx|media\s*station\s*x/i.test(ua) && !(/aft|amazon|fire/i.test(ua)));
+
     if (typeof window === 'undefined') {
+      const isFireTv = !isExplicitNonFireTv && tvPerformanceService.isFireTv(customUa);
+      const deviceFamily = isFireTv ? 'firetv' : tvPerformanceService.getDeviceFamily(customUa);
+
       return {
         width: 1920,
         height: 1080,
@@ -78,6 +93,8 @@ class TvViewportService {
         visualViewportWidth: 1920,
         visualViewportHeight: 1080,
         scaleCategory: 'expanded',
+        isFireTv,
+        deviceFamily,
         headerHeight: 92,
         safeMarginX: 64,
         logoIconSize: 48,
@@ -94,9 +111,9 @@ class TvViewportService {
         cardWidth: 265,
         cardGap: 20,
         rowTitleSize: 24,
-        searchSidebarWidth: 380,
-        keyboardKeyHeight: 44,
-        keyboardFontSize: 16,
+        searchSidebarWidth: isFireTv ? 380 : 380,
+        keyboardKeyHeight: isFireTv ? 44 : 46,
+        keyboardFontSize: isFireTv ? 16 : 17,
         loaderSize: 120,
         hudMaxW: 'max-w-5xl'
       };
@@ -111,8 +128,16 @@ class TvViewportService {
     const visualViewportWidth = visualVp ? Math.round(visualVp.width) : width;
     const visualViewportHeight = visualVp ? Math.round(visualVp.height) : height;
 
+    // Detecção segura e isolada da família do dispositivo
+    const isFireTv = !isExplicitNonFireTv && (
+      tvPerformanceService.isFireTv(customUa) || 
+      // Fallback para mock/ambiente de teste do Fire TV Stick (960x540 DPR 2.0) sem UA explícito de outra plataforma
+      ((!ua || ua.includes('node')) && width <= 960 && height <= 540 && dpr >= 1.8)
+    );
+    const deviceFamily = isFireTv ? 'firetv' : tvPerformanceService.getDeviceFamily(customUa);
+
     // Categorização de escala da Smart TV:
-    // - compact: Fire TV Stick (geralmente 960x540 CSS px) ou telas com largura <= 1080px ou altura <= 600px
+    // - compact: Fire TV Stick ou telas com largura <= 1080px ou altura <= 600px
     // - standard: 720p nativo (1280x720 CSS px) ou telas intermediárias (1081px a 1500px)
     // - expanded: 1080p nativo (1920x1080 CSS px), 4K ou telas amplas (> 1500px)
     let scaleCategory: TvScaleCategory = 'expanded';
@@ -141,9 +166,9 @@ class TvViewportService {
     let cardWidth = 265;
     let cardGap = 20;
     let rowTitleSize = 24;
-    let searchSidebarWidth = 380;
-    let keyboardKeyHeight = 44;
-    let keyboardFontSize = 16;
+    let searchSidebarWidth = isFireTv ? 380 : 380;
+    let keyboardKeyHeight = isFireTv ? 44 : 46;
+    let keyboardFontSize = isFireTv ? 16 : 17;
     let loaderSize = 120;
     let hudMaxW = 'max-w-5xl';
 
@@ -165,11 +190,20 @@ class TvViewportService {
       cardWidth = 132;
       cardGap = 12;
       rowTitleSize = 16;
-      searchSidebarWidth = 260;
-      keyboardKeyHeight = 30;
-      keyboardFontSize = 11;
       loaderSize = 76;
       hudMaxW = 'max-w-3xl';
+
+      // Dimensionamento do teclado e coluna lateral isolado por família de dispositivo:
+      if (isFireTv) {
+        searchSidebarWidth = 260;
+        keyboardKeyHeight = 30;
+        keyboardFontSize = 11;
+      } else {
+        // Smart TVs normais (Samsung Tizen, MSX, etc.): altura confortável, sem achatamento
+        searchSidebarWidth = 300;
+        keyboardKeyHeight = 38;
+        keyboardFontSize = 14;
+      }
     } else if (scaleCategory === 'standard') {
       headerHeight = 76;
       safeMarginX = 48;
@@ -188,11 +222,20 @@ class TvViewportService {
       cardWidth = 175;
       cardGap = 16;
       rowTitleSize = 20;
-      searchSidebarWidth = 330;
-      keyboardKeyHeight = 36;
-      keyboardFontSize = 14;
       loaderSize = 96;
       hudMaxW = 'max-w-4xl';
+
+      // Dimensionamento do teclado e coluna lateral isolado por família de dispositivo:
+      if (isFireTv) {
+        searchSidebarWidth = 330;
+        keyboardKeyHeight = 36;
+        keyboardFontSize = 14;
+      } else {
+        // Smart TVs normais (Samsung Tizen, MSX, etc.): dimensões confortáveis e proporcionais
+        searchSidebarWidth = 340;
+        keyboardKeyHeight = 42;
+        keyboardFontSize = 15;
+      }
     }
 
     return {
@@ -204,6 +247,8 @@ class TvViewportService {
       visualViewportWidth,
       visualViewportHeight,
       scaleCategory,
+      isFireTv,
+      deviceFamily,
       headerHeight,
       safeMarginX,
       logoIconSize,
@@ -268,6 +313,7 @@ class TvViewportService {
     root.style.setProperty('--tv-safe-margin-x', `${this.currentMetrics.safeMarginX}px`);
     root.style.setProperty('--tv-card-width', `${this.currentMetrics.cardWidth}px`);
     root.style.setProperty('--tv-card-gap', `${this.currentMetrics.cardGap}px`);
+    root.style.setProperty('--tv-keyboard-key-height', `${this.currentMetrics.keyboardKeyHeight}px`);
   }
 
   public getMetrics(): TvViewportMetrics {
