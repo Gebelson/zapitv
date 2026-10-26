@@ -124,18 +124,49 @@ async function run() {
     console.log(`  📸 Screenshot salvo: ${carouselsPath}`);
 
     const carouselMetrics = await fireTvPage.evaluate(() => {
-      const firstRow = document.querySelector('section[id^="row-"]');
-      const rowTitle = firstRow?.querySelector('h2');
-      const firstCard = firstRow?.querySelector('[data-card-poster="true"]');
+      const rows = Array.from(document.querySelectorAll('section[id^="row-"]'));
+      const rowSummaries = rows.map(r => {
+        const cards = Array.from(r.querySelectorAll('[data-card-poster="true"]'));
+        const title = r.querySelector('h2')?.textContent || '';
+        return { id: r.id, title, renderedCards: cards.length };
+      });
+
+      // Pega a fileira que tenha mais de 6 conteúdos (modo infinito com 6,5 capas)
+      const targetRow = rows.find(r => r.querySelectorAll('[data-card-poster="true"]').length > 6) || rows[0];
+      const rowTitle = targetRow?.querySelector('h2');
+      const cards = Array.from(targetRow?.querySelectorAll('[data-card-poster="true"]') || []);
+      const firstCard = cards[0];
       const cardRect = firstCard?.getBoundingClientRect();
+
+      // Medição dos cards visíveis dentro da largura da janela (960px)
+      const visibleCardsInfo = cards.map((c, i) => {
+        const r = c.getBoundingClientRect();
+        const visibleLeft = Math.max(0, r.left);
+        const visibleRight = Math.min(960, r.right);
+        const visibleW = Math.max(0, visibleRight - visibleLeft);
+        return {
+          index: i,
+          left: Math.round(r.left),
+          right: Math.round(r.right),
+          width: Math.round(r.width),
+          visibleWidth: Math.round(visibleW),
+          visiblePercent: Math.round((visibleW / r.width) * 100)
+        };
+      }).filter(c => c.visibleWidth > 0);
+
       return {
+        rowSummaries,
+        inspectedRow: targetRow?.id,
         rowTitleFontSize: rowTitle ? window.getComputedStyle(rowTitle).fontSize : '0px',
         cardWidth: cardRect ? Math.round(cardRect.width) : 0,
         cardHeight: cardRect ? Math.round(cardRect.height) : 0,
-        aspectRatio: cardRect ? (cardRect.height / cardRect.width).toFixed(2) : '0'
+        aspectRatio: cardRect ? (cardRect.height / cardRect.width).toFixed(2) : '0',
+        totalRenderedCards: cards.length,
+        visibleCardsCount: visibleCardsInfo.length,
+        cardsOnScreen: visibleCardsInfo
       };
     });
-    console.log('  🎬 Métrica dos Carrosséis:', carouselMetrics);
+    console.log('  🎬 Métrica dos Carrosséis (6,5 capas):', JSON.stringify(carouselMetrics, null, 2));
 
     // 1.5 Página de Busca
     await fireTvPage.evaluate(() => {
@@ -152,13 +183,24 @@ async function run() {
       const sidebarRect = sidebar?.getBoundingClientRect();
       const keyA = document.querySelector('button[data-focus-key="tv-key-a"]');
       const keyARect = keyA?.getBoundingClientRect();
+      const grid = document.querySelector('.w-full.h-screen [data-card-poster="true"]')?.parentElement?.parentElement;
+      const gridComputed = grid ? window.getComputedStyle(grid) : null;
+      const searchCards = Array.from(document.querySelectorAll('.w-full.h-screen [data-card-poster="true"]'));
+      const firstRowCards = searchCards.slice(0, 6).map(c => {
+        const r = c.getBoundingClientRect();
+        return { width: Math.round(r.width), height: Math.round(r.height), top: Math.round(r.top) };
+      });
+
       return {
         sidebarWidth: sidebarRect ? Math.round(sidebarRect.width) : 0,
         keyAHeight: keyARect ? Math.round(keyARect.height) : 0,
-        keyAFontSize: keyA ? window.getComputedStyle(keyA).fontSize : '0px'
+        keyAFontSize: keyA ? window.getComputedStyle(keyA).fontSize : '0px',
+        gridColumns: gridComputed?.gridTemplateColumns || '',
+        cardsInFirstRow: firstRowCards.length,
+        firstRowCards
       };
     });
-    console.log('  🔍 Métrica da Busca:', searchMetrics);
+    console.log('  🔍 Métrica da Busca (6 colunas):', JSON.stringify(searchMetrics, null, 2));
 
     await fireTvContext.close();
 

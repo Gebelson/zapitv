@@ -35,7 +35,9 @@ const EASING_CURVE = 'cubic-bezier(0.22, 1, 0.36, 1)'; // Desaceleração suave 
  * Regra obrigatória:
  * - 1 a 6 conteúdos: carrossel finito. Slots [0, 1, ..., count - 1].
  *   Sem slots negativos (-1), sem duplicatas e sem índices além da lista real.
- * - 7 ou mais conteúdos: carrossel infinito com buffer otimizado por resolução e perfil de hardware.
+ * - 7 ou mais conteúdos: carrossel infinito apresentando 6 capas completas (slots 0 a 5)
+ *   e metade da 7ª capa visível na extremidade direita (slot 6), com buffer de transição
+ *   à esquerda (-1) e buffer de prefetch à direita (7).
  */
 export const getVisibleSlots = (count: number): number[] => {
   if (count <= 0) return [];
@@ -47,15 +49,10 @@ export const getVisibleSlots = (count: number): number[] => {
   if (count === 5) return [0, 1, 2, 3, 4];
   if (count === 6) return [0, 1, 2, 3, 4, 5];
 
-  // 7 ou mais conteúdos: CARROSSEL INFINITO
-  const metrics = tvViewportService.getMetrics();
-  const isCompactOrEco = metrics.scaleCategory === 'compact' || tvPerformanceService.isFireTv() || tvPerformanceProfileService.getActiveConfig().name === 'eco';
-  if (isCompactOrEco) {
-    return [-1, 0, 1, 2, 3, 4];
-  }
-  if (metrics.scaleCategory === 'standard' || tvPerformanceProfileService.getActiveConfig().name === 'balanced') {
-    return [-1, 0, 1, 2, 3, 4, 5];
-  }
+  // 7 conteúdos: CARROSSEL INFINITO sem duplicatas (6 capas completas + 7ª capa pela metade)
+  if (count === 7) return [-1, 0, 1, 2, 3, 4, 5, 6];
+
+  // 8 ou mais conteúdos: CARROSSEL INFINITO com buffer de prefetch à direita
   return [-1, 0, 1, 2, 3, 4, 5, 6, 7];
 };
 

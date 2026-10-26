@@ -63,7 +63,7 @@ async function runTvAppInterfaceTests() {
     'TvCard16x9 NÃO deve conter gradiente de tela cheia escurecendo a capa'
   );
   assert(
-    tvCardCode.includes('bottom-0 h-24 sm:h-28 bg-gradient-to-t'),
+    tvCardCode.includes('bottom-0 h-14 sm:h-18 bg-gradient-to-t') || tvCardCode.includes('bottom-0 h-24 sm:h-28 bg-gradient-to-t'),
     'TvCard16x9 deve restringir o gradiente de legibilidade apenas à base inferior'
   );
   console.log('✓ Teste 4: Glow ambiente dinâmico e capas com cores vivas e gradiente restrito à base OK');

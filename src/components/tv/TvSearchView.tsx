@@ -522,40 +522,49 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
         {/* ========================================================= */}
         {/* COLUNA ESQUERDA: Voltar, Input, Teclado Virtual, Sugestões */}
         {/* ========================================================= */}
-        <div style={{ width: `${viewport.searchSidebarWidth}px` }} className={`flex-shrink-0 h-full flex flex-col border-r border-white/10 bg-[#070b13]/95 backdrop-blur-xl overflow-y-auto z-20 shadow-2xl ${viewport.scaleCategory === 'compact' ? 'p-3.5 sm:p-4' : 'p-6 sm:p-7'}`}>
-          {/* Botão Voltar */}
-          <div className="mb-4">
+        <div 
+          style={{ width: `${viewport.searchSidebarWidth}px` }} 
+          className={`flex-shrink-0 h-full flex flex-col border-r border-white/10 bg-[#070b13]/95 backdrop-blur-xl overflow-y-auto z-20 shadow-2xl ${
+            viewport.scaleCategory === 'compact' ? 'p-3' : viewport.scaleCategory === 'standard' ? 'p-4 sm:p-5' : 'p-6 sm:p-7'
+          }`}
+        >
+          {/* Botão Voltar da Tela de Busca */}
+          <div className={viewport.scaleCategory === 'compact' ? 'mb-2.5' : 'mb-4'}>
             <button
               ref={backRef as any}
               type="button"
               data-focus-key="tv-search-back"
               data-tv-focused={isBackFocused ? "true" : undefined}
               onClick={onClose}
-              className={`w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl font-bold text-base tracking-wide transition-all duration-150 outline-none cursor-pointer ${
+              className={`w-full flex items-center justify-center gap-2 rounded-xl font-bold tracking-wide transition-all duration-150 outline-none cursor-pointer ${
+                viewport.scaleCategory === 'compact' ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-base'
+              } ${
                 isBackFocused
                   ? 'border-2 border-cyan-400 bg-cyan-500/30 text-white shadow-[0_0_20px_rgba(0,229,255,0.6)] scale-102 font-extrabold'
                   : 'border border-white/15 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white'
               }`}
             >
-              <ArrowLeft className={viewport.scaleCategory === 'compact' ? "w-4 h-4 text-cyan-400" : "w-5 h-5 text-cyan-400"} />
+              <ArrowLeft className={viewport.scaleCategory === 'compact' ? "w-3.5 h-3.5 text-cyan-400" : "w-5 h-5 text-cyan-400"} />
               <span>Voltar</span>
             </button>
           </div>
 
           {/* Campo de Busca Visual com Texto Digitado */}
-          <div className="mb-5">
+          <div className={viewport.scaleCategory === 'compact' ? 'mb-3' : 'mb-5'}>
             <div
               ref={inputFocusRef}
               data-focus-key="tv-search-input"
               data-tv-focused={isInputFocused ? "true" : undefined}
-              className={`flex items-center gap-3 bg-[#0d1422] px-4 py-3 rounded-xl border transition-all duration-200 ${
+              className={`flex items-center gap-2.5 bg-[#0d1422] rounded-xl border transition-all duration-200 ${
+                viewport.scaleCategory === 'compact' ? 'px-3 py-2' : 'px-4 py-3'
+              } ${
                 isInputFocused
                   ? 'border-2 border-cyan-400 shadow-[0_0_20px_rgba(0,229,255,0.45)] scale-101'
                   : 'border border-white/15'
               }`}
             >
-              <Search className={`w-5 h-5 flex-shrink-0 ${isInputFocused ? 'text-cyan-400' : 'text-gray-400'}`} />
-              <div className="flex-1 text-white font-semibold text-base truncate flex items-center min-h-[24px]">
+              <Search className={`${viewport.scaleCategory === 'compact' ? 'w-4 h-4' : 'w-5 h-5'} flex-shrink-0 ${isInputFocused ? 'text-cyan-400' : 'text-gray-400'}`} />
+              <div className={`flex-1 text-white font-semibold truncate flex items-center ${viewport.scaleCategory === 'compact' ? 'text-xs min-h-[20px]' : 'text-base min-h-[24px]'}`}>
                 {query ? (
                   <>
                     <span className="tracking-wide">{query}</span>
@@ -578,12 +587,12 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
           </div>
 
           {/* Teclado Virtual Integrado */}
-          <div className={viewport.scaleCategory === 'compact' ? 'mb-4' : 'mb-6'}>
-            <div className={`grid grid-cols-6 w-full ${viewport.scaleCategory === 'compact' ? 'gap-1.5' : 'gap-2'}`}>
+          <div className={viewport.scaleCategory === 'compact' ? 'mb-3' : 'mb-6'}>
+            <div className={`grid grid-cols-6 w-full ${viewport.scaleCategory === 'compact' ? 'gap-1' : 'gap-2'}`}>
               {/* Linha de Utilidades: Espaço (3 cols), Apagar (2 cols), Limpar (1 col) */}
               <TvVirtualKey
                 char=" "
-                displayLabel={<span className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold">␣ Espaço</span>}
+                displayLabel={<span className="text-[9.5px] sm:text-xs uppercase tracking-wider font-semibold">␣ Espaço</span>}
                 onPress={handleVirtualKeyPress}
                 focusKey="tv-key-space"
                 style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${viewport.keyboardFontSize}px` }}
@@ -591,7 +600,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
               />
               <TvVirtualKey
                 char="BACKSPACE"
-                displayLabel={<span className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold">⌫ Apagar</span>}
+                displayLabel={<span className="text-[9.5px] sm:text-xs uppercase tracking-wider font-semibold">⌫ Apagar</span>}
                 onPress={handleVirtualKeyPress}
                 focusKey="tv-key-backspace"
                 style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${viewport.keyboardFontSize}px` }}
@@ -599,7 +608,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
               />
               <TvVirtualKey
                 char="CLEAR"
-                displayLabel={<span className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold">Limpar</span>}
+                displayLabel={<span className="text-[9.5px] sm:text-xs uppercase tracking-wider font-semibold">Limpar</span>}
                 onPress={handleVirtualKeyPress}
                 focusKey="tv-key-clear"
                 style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${viewport.keyboardFontSize}px` }}
@@ -656,7 +665,9 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
         {/* ========================================================= */}
         <div 
           ref={resultsContainerRef}
-          className="flex-1 h-full flex flex-col p-6 sm:p-8 lg:p-10 overflow-y-auto"
+          className={`flex-1 h-full flex flex-col overflow-y-auto ${
+            viewport.scaleCategory === 'compact' ? 'p-3.5 sm:p-4' : viewport.scaleCategory === 'standard' ? 'p-5 sm:p-6' : 'p-8 lg:p-10'
+          }`}
         >
           {/* Cabeçalho da Direita: Termo Pesquisado e Abas de Categoria */}
           <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 ${viewport.scaleCategory === 'compact' ? 'mb-4 pb-3' : 'mb-8 pb-5'}`}>
@@ -686,6 +697,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                   id={cat.id}
                   label={cat.label}
                   isActive={selectedCategory === cat.id}
+                  scaleCategory={viewport.scaleCategory}
                   onSelect={(id) => {
                     uiSoundService.play('toggle');
                     setSelectedCategory(id);
@@ -699,7 +711,13 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
           {/* Grade de Resultados Verticais 2:3 */}
           {searchResults.length > 0 ? (
             <>
-              <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 ${viewport.scaleCategory === 'compact' ? 'gap-3 sm:gap-4' : 'gap-6'}`}>
+              <div 
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+                  gap: viewport.scaleCategory === 'compact' ? '10px' : viewport.scaleCategory === 'standard' ? '14px' : '18px'
+                }}
+              >
                 {searchResults.slice(0, visibleCount).map((item, idx) => (
                   <TvCard16x9
                     key={`search-${item.id}-${idx}`}

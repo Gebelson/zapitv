@@ -342,7 +342,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
               uiSoundService.play('navigate');
               onSelectTab('home');
             }}
-            className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0 cursor-pointer group/logo outline-none focus:outline-none pointer-events-auto"
+            className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer group/logo outline-none focus:outline-none pointer-events-auto"
           >
             <div 
               className="flex items-center justify-center relative flex-shrink-0"
@@ -360,7 +360,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
             <img
               src="/zapitv-text.png"
               alt="ZapiTV"
-              className="w-auto object-contain select-none ml-1 drop-shadow-lg"
+              className="w-auto object-contain select-none ml-0 drop-shadow-lg"
               style={{
                 height: `${viewport.logoTextHeight}px`,
                 transform: 'translateY(2px)'

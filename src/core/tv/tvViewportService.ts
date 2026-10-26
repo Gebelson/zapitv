@@ -40,6 +40,8 @@ export interface TvViewportMetrics {
   searchSidebarWidth: number;
   keyboardKeyHeight: number;
   keyboardFontSize: number;
+  loaderSize: number;
+  hudMaxW: string;
 }
 
 class TvViewportService {
@@ -89,12 +91,14 @@ class TvViewportService {
         heroDotsBottom: 48,
         heroDotsWidth: 32,
         heroDotsHeight: 8,
-        cardWidth: 260,
-        cardGap: 24,
-        rowTitleSize: 26,
-        searchSidebarWidth: 400,
-        keyboardKeyHeight: 46,
-        keyboardFontSize: 17
+        cardWidth: 265,
+        cardGap: 20,
+        rowTitleSize: 24,
+        searchSidebarWidth: 380,
+        keyboardKeyHeight: 44,
+        keyboardFontSize: 16,
+        loaderSize: 120,
+        hudMaxW: 'max-w-5xl'
       };
     }
 
@@ -134,12 +138,14 @@ class TvViewportService {
     let heroDotsBottom = 48;
     let heroDotsWidth = 32;
     let heroDotsHeight = 8;
-    let cardWidth = 260;
-    let cardGap = 24;
-    let rowTitleSize = 26;
-    let searchSidebarWidth = 400;
-    let keyboardKeyHeight = 46;
-    let keyboardFontSize = 17;
+    let cardWidth = 265;
+    let cardGap = 20;
+    let rowTitleSize = 24;
+    let searchSidebarWidth = 380;
+    let keyboardKeyHeight = 44;
+    let keyboardFontSize = 16;
+    let loaderSize = 120;
+    let hudMaxW = 'max-w-5xl';
 
     if (scaleCategory === 'compact') {
       headerHeight = 60;
@@ -155,12 +161,15 @@ class TvViewportService {
       heroDotsBottom = 20;
       heroDotsWidth = 18;
       heroDotsHeight = 4;
-      cardWidth = 165;
-      cardGap = 14;
-      rowTitleSize = 18;
-      searchSidebarWidth = 275;
-      keyboardKeyHeight = 32;
-      keyboardFontSize = 12;
+      // Proporção precisa para 6,5 capas na tela de 960x540 (6 completas + 48.5% da 7ª capa visível)
+      cardWidth = 132;
+      cardGap = 12;
+      rowTitleSize = 16;
+      searchSidebarWidth = 260;
+      keyboardKeyHeight = 30;
+      keyboardFontSize = 11;
+      loaderSize = 76;
+      hudMaxW = 'max-w-3xl';
     } else if (scaleCategory === 'standard') {
       headerHeight = 76;
       safeMarginX = 48;
@@ -175,12 +184,15 @@ class TvViewportService {
       heroDotsBottom = 34;
       heroDotsWidth = 24;
       heroDotsHeight = 6;
-      cardWidth = 215;
-      cardGap = 18;
-      rowTitleSize = 22;
-      searchSidebarWidth = 340;
-      keyboardKeyHeight = 38;
-      keyboardFontSize = 15;
+      // Proporção precisa para 6,5 capas na tela de 1280x720 (6 completas + 49% da 7ª capa visível)
+      cardWidth = 175;
+      cardGap = 16;
+      rowTitleSize = 20;
+      searchSidebarWidth = 330;
+      keyboardKeyHeight = 36;
+      keyboardFontSize = 14;
+      loaderSize = 96;
+      hudMaxW = 'max-w-4xl';
     }
 
     return {
@@ -210,7 +222,9 @@ class TvViewportService {
       rowTitleSize,
       searchSidebarWidth,
       keyboardKeyHeight,
-      keyboardFontSize
+      keyboardFontSize,
+      loaderSize,
+      hudMaxW
     };
   }
 

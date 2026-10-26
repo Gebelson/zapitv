@@ -2,6 +2,7 @@ import React from 'react';
 import { Radio, Calendar, Trophy, Clock, Volume2, ShieldCheck } from 'lucide-react';
 import { LiveChannel, CurrentEpgState } from '../../../core/livetv/types';
 import { channelNumberingService } from '../../../core/livetv/channelNumberingService';
+import { useTvViewport } from '../../../core/tv/tvViewportService';
 
 interface TvLiveChannelOverlayProps {
   channel: LiveChannel;
@@ -18,6 +19,7 @@ export const TvLiveChannelOverlay: React.FC<TvLiveChannelOverlayProps> = ({
 }) => {
   const formattedNumber = channelNumberingService.getFormattedNumber(channel);
   const prog = epg.currentProgram;
+  const viewport = useTvViewport();
 
   return (
     <div
@@ -28,17 +30,17 @@ export const TvLiveChannelOverlay: React.FC<TvLiveChannelOverlayProps> = ({
           : 'opacity-0 translate-y-6'
       }`}
     >
-      <div className="relative bg-[#070b14]/92 backdrop-blur-2xl border border-white/15 rounded-3xl p-5 sm:p-6 shadow-2xl shadow-black/80 flex flex-col gap-3 max-w-5xl mx-auto overflow-hidden">
+      <div className={`relative bg-[#070b14]/92 backdrop-blur-2xl border border-white/15 shadow-2xl shadow-black/80 flex flex-col mx-auto overflow-hidden ${viewport.hudMaxW} ${viewport.scaleCategory === 'compact' ? 'p-3.5 gap-2 rounded-2xl' : 'p-5 sm:p-6 gap-3 rounded-3xl'}`}>
         {/* Linha superior: Número, Logo, Nome do canal, Categoria e Qualidade */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             {/* Número do Canal Estilo SKY / Claro */}
-            <div className="flex items-center justify-center px-3.5 py-1.5 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 font-black font-mono text-xl sm:text-2xl tracking-widest drop-shadow-[0_0_10px_rgba(0,229,255,0.6)] shrink-0">
+            <div className={`flex items-center justify-center bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 font-black font-mono tracking-widest drop-shadow-[0_0_10px_rgba(0,229,255,0.6)] shrink-0 ${viewport.scaleCategory === 'compact' ? 'px-2.5 py-1 text-base rounded-xl' : 'px-3.5 py-1.5 text-xl sm:text-2xl rounded-2xl'}`}>
               {formattedNumber}
             </div>
 
             {/* Logo da Emissora */}
-            <div className="w-14 h-14 rounded-2xl bg-black/40 border border-white/10 p-2 flex items-center justify-center shrink-0 shadow-inner">
+            <div className={`bg-black/40 border border-white/10 flex items-center justify-center shrink-0 shadow-inner ${viewport.scaleCategory === 'compact' ? 'w-10 h-10 p-1 rounded-xl' : 'w-14 h-14 p-2 rounded-2xl'}`}>
               <img
                 src={channel.logo}
                 alt={channel.name}
@@ -55,7 +57,7 @@ export const TvLiveChannelOverlay: React.FC<TvLiveChannelOverlayProps> = ({
             {/* Nome e Badges */}
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-2.5 flex-wrap">
-                <h2 className="text-white font-black text-lg sm:text-xl truncate tracking-wide drop-shadow">
+                <h2 className={`text-white font-black truncate tracking-wide drop-shadow ${viewport.scaleCategory === 'compact' ? 'text-sm sm:text-base' : 'text-lg sm:text-xl'}`}>
                   {channel.name}
                 </h2>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/10 text-gray-300 border border-white/10">
@@ -92,7 +94,7 @@ export const TvLiveChannelOverlay: React.FC<TvLiveChannelOverlayProps> = ({
               <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-red-600 text-white flex items-center gap-1 shadow-sm shrink-0">
                 <Radio className="w-2.5 h-2.5 animate-pulse" /> NO AR
               </span>
-              <h3 className="text-white font-bold text-sm sm:text-base truncate drop-shadow">
+              <h3 className={`text-white font-bold truncate drop-shadow ${viewport.scaleCategory === 'compact' ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'}`}>
                 {epg.hasVerifiedSchedule ? prog.title : 'Programação não disponível'}
               </h3>
               {prog.competition && (
@@ -121,7 +123,7 @@ export const TvLiveChannelOverlay: React.FC<TvLiveChannelOverlayProps> = ({
 
           {/* Barra de Progresso Real */}
           {epg.hasVerifiedSchedule && (
-            <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mt-1">
+            <div className={`w-full bg-white/10 rounded-full overflow-hidden mt-1 ${viewport.scaleCategory === 'compact' ? 'h-1' : 'h-1.5'}`}>
               <div
                 className="h-full bg-gradient-to-r from-[#007df7] to-cyan-400 transition-all duration-1000 ease-linear shadow-[0_0_8px_rgba(0,229,255,0.7)]"
                 style={{ width: `${epg.progressPercent}%` }}

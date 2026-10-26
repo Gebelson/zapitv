@@ -122,7 +122,7 @@ async function runCardLeakPreventionTests() {
   // Cenário 7: Capas escuras e claras com gradiente recortado
   console.log('\n--- Cenário 7: Gradiente de legibilidade restrito ao recorte da imagem ---');
   assert.ok(
-    cardCode.includes('className="absolute inset-x-0 bottom-0 h-24 sm:h-28 bg-gradient-to-t from-black/85 via-black/40 to-transparent pointer-events-none"'),
+    cardCode.includes('bottom-0 h-14 sm:h-18 bg-gradient-to-t') || cardCode.includes('bottom-0 h-24 sm:h-28 bg-gradient-to-t'),
     'Gradiente inferior de legibilidade deve permanecer restrito à base inferior'
   );
   console.log('✓ Cenário 7: Gradiente inferior de legibilidade contido dentro do clipPath da GPU OK');

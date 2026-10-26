@@ -563,7 +563,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
         >
           {/* Metadados: Ano, Classificação, Gêneros, Nota */}
           <div className={`flex flex-wrap items-center font-bold text-gray-300 drop-shadow ${
-            viewport.scaleCategory === 'compact' ? 'gap-1.5 mb-1.5 text-[11px]' : 'gap-3 mb-3 text-sm'
+            viewport.scaleCategory === 'compact' ? 'gap-1 mb-1 text-[10px]' : 'gap-3 mb-3 text-sm'
           }`}>
             {currentItem.rating ? (
               <span className="flex items-center gap-1 text-amber-400 bg-black/60 px-1.5 py-0.5 rounded border border-amber-400/30">
@@ -588,7 +588,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
           <h1 
             style={{
               fontSize: viewport.scaleCategory === 'compact'
-                ? 'clamp(1.2rem, 2.5vw, 1.65rem)'
+                ? 'clamp(1.1rem, 2.2vw, 1.45rem)'
                 : viewport.scaleCategory === 'standard'
                 ? 'clamp(1.8rem, 3.5vw, 2.4rem)'
                 : 'clamp(2.5rem, 4.5vw, 3.75rem)'

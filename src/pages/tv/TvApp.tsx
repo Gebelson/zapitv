@@ -28,6 +28,7 @@ import { TvRemoteDiagnosticOverlay } from '../../components/tv/TvRemoteDiagnosti
 import { TvScreensaver } from '../../components/tv/TvScreensaver';
 import { TvWatchError } from '../../components/tv/TvWatchError';
 import { ZapiLoader } from '../../components/common/ZapiLoader';
+import { useTvViewport } from '../../core/tv/tvViewportService';
 import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 
@@ -77,6 +78,7 @@ export const TvApp: React.FC<TvAppProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const viewport = useTvViewport();
 
   // Inicializa navegação espacial e define o foco inicial no botão Assistir do Hero
   useEffect(() => {
@@ -241,7 +243,7 @@ export const TvApp: React.FC<TvAppProps> = ({
   // Pilha de navegação Voltar da TV (prioridade 10 - Root)
   useEffect(() => {
     return tvNavigationManager.registerBackHandler('tv-app-root', 10, () => {
-      // Se estiver em uma tela especial (busca, minha lista, etc.), fecha a visão e restaura o foco no link da aba ativa
+      // 1. Se estiver em uma tela especial (busca, minha lista, etc.), fecha a visão e restaura o foco no link da aba ativa
       if (specialView !== null) {
         setSpecialView(null);
         const targetFocus = tabFocusKeys[currentTab] || 'tv-nav-home';
@@ -253,8 +255,15 @@ export const TvApp: React.FC<TvAppProps> = ({
         return true;
       }
 
-      // Nas páginas principais (Início, Filmes, Séries, Animes, Em Destaque),
-      // o botão Voltar devolve o foco diretamente ao link da página atual, sem alterar a página.
+      // 2. Se estiver na aba Ao Vivo (featured), revela o header imediatamente e foca no canal / aba Ao Vivo
+      if (currentTab === 'featured') {
+        handleRevealLiveHeader();
+        return true;
+      }
+
+      // 3. Nas páginas principais de catálogo (Início, Filmes, Séries, Animes),
+      // o botão Voltar devolve o foco diretamente ao link da página atual no header,
+      // sem alterar a página (não troca automaticamente para Início).
       const targetFocus = tabFocusKeys[currentTab] || 'tv-nav-home';
       try {
         setFocus(targetFocus);
@@ -267,7 +276,7 @@ export const TvApp: React.FC<TvAppProps> = ({
       }
       return true;
     });
-  }, [specialView, currentTab]);
+  }, [specialView, currentTab, handleRevealLiveHeader]);
 
   // Catálogo completo unificado e elegível para a busca e detalhes da Smart TV
   const fullTvCatalog = useMemo(() => {
@@ -497,7 +506,7 @@ export const TvApp: React.FC<TvAppProps> = ({
         <div className="fixed inset-0 z-[5000] bg-black overflow-hidden select-none">
           <Suspense fallback={
             <div className="fixed inset-0 z-[5000] bg-black flex items-center justify-center">
-              <ZapiLoader size="xl" />
+              <ZapiLoader size={viewport.loaderSize || 76} />
             </div>
           }>
             <ContentDetailModal
@@ -518,7 +527,7 @@ export const TvApp: React.FC<TvAppProps> = ({
         </div>
       ) : isTvWatchRoute ? (
         <div className="fixed inset-0 flex items-center justify-center bg-black text-white">
-          {tvWatchNotFound ? <TvWatchError onBack={handleLeaveWatchError} /> : <ZapiLoader size="xl" />}
+          {tvWatchNotFound ? <TvWatchError onBack={handleLeaveWatchError} /> : <ZapiLoader size={viewport.loaderSize || 76} />}
         </div>
       ) : (
         <>
@@ -559,7 +568,12 @@ export const TvApp: React.FC<TvAppProps> = ({
                 onSelectItem={handleOpenDetailModal}
                 onClose={() => {
                   setSpecialView(null);
-                  setTimeout(() => setFocus('tv-nav-search'), 50);
+                  const targetFocus = tabFocusKeys[currentTab] || 'tv-nav-home';
+                  setTimeout(() => {
+                    try {
+                      setFocus(targetFocus);
+                    } catch {}
+                  }, 50);
                 }}
               />
             ) : specialView === 'mylist' ? (

@@ -80,10 +80,11 @@ async function runTestSuite() {
   assert.strictEqual(metricsCompact.logoTextHeight, 18, 'Logo text height em compact deve ser 18px');
   assert.strictEqual(metricsCompact.navFontSize, 14, 'Nav font size em compact deve ser 14px');
   assert.strictEqual(metricsCompact.navGap, 10, 'Nav gap em compact deve ser 10px');
-  assert.strictEqual(metricsCompact.cardWidth, 165, 'Card width em compact deve ser 165px');
-  assert.strictEqual(metricsCompact.cardGap, 14, 'Card gap em compact deve ser 14px');
-  assert.strictEqual(metricsCompact.searchSidebarWidth, 275, 'Search sidebar width em compact deve ser 275px');
-  assert.strictEqual(metricsCompact.keyboardKeyHeight, 32, 'Keyboard key height em compact deve ser 32px');
+  assert.strictEqual(metricsCompact.cardWidth, 132, 'Card width em compact deve ser 132px');
+  assert.strictEqual(metricsCompact.cardGap, 12, 'Card gap em compact deve ser 12px');
+  assert.strictEqual(metricsCompact.searchSidebarWidth, 260, 'Search sidebar width em compact deve ser 260px');
+  assert.strictEqual(metricsCompact.keyboardKeyHeight, 30, 'Keyboard key height em compact deve ser 30px');
+  assert.strictEqual(metricsCompact.loaderSize, 76, 'Loader size em compact deve ser 76px');
   console.log('  ✅ Viewport Compact (960x540 / Fire TV Stick) validado com sucesso.');
 
   // 1.2 Resolução Standard 1280x720 (720p)
@@ -95,8 +96,8 @@ async function runTestSuite() {
   assert.strictEqual(metricsStandard.logoIconSize, 42, 'Logo icon size em standard deve ser 42px');
   assert.strictEqual(metricsStandard.navFontSize, 17, 'Nav font size em standard deve ser 17px');
   assert.strictEqual(metricsStandard.navGap, 18, 'Nav gap em standard deve ser 18px');
-  assert.strictEqual(metricsStandard.cardWidth, 215, 'Card width em standard deve ser 215px');
-  assert.strictEqual(metricsStandard.cardGap, 18, 'Card gap em standard deve ser 18px');
+  assert.strictEqual(metricsStandard.cardWidth, 175, 'Card width em standard deve ser 175px');
+  assert.strictEqual(metricsStandard.cardGap, 16, 'Card gap em standard deve ser 16px');
   console.log('  ✅ Viewport Standard (1280x720 / 720p) validado com sucesso.');
 
   // 1.3 Resolução Expanded 1920x1080 (Full HD)
@@ -108,8 +109,8 @@ async function runTestSuite() {
   assert.strictEqual(metricsExpanded.logoIconSize, 48, 'Logo icon size em expanded deve ser 48px');
   assert.strictEqual(metricsExpanded.navFontSize, 21, 'Nav font size em expanded deve ser 21px');
   assert.strictEqual(metricsExpanded.navGap, 28, 'Nav gap em expanded deve ser 28px');
-  assert.strictEqual(metricsExpanded.cardWidth, 260, 'Card width em expanded deve ser 260px');
-  assert.strictEqual(metricsExpanded.cardGap, 24, 'Card gap em expanded deve ser 24px');
+  assert.strictEqual(metricsExpanded.cardWidth, 265, 'Card width em expanded deve ser 265px');
+  assert.strictEqual(metricsExpanded.cardGap, 20, 'Card gap em expanded deve ser 20px');
   console.log('  ✅ Viewport Expanded (1920x1080 / 1080p) validado com sucesso.');
 
   // =========================================================================
@@ -261,7 +262,7 @@ async function runTestSuite() {
   console.log(`  Altura estimada do conteúdo do banner em compact: ~${estimatedHeroContentHeight}px (${occupancyPercentage.toFixed(1)}% do espaço)`);
 
   assert.ok(occupancyPercentage < 45, 'O conteúdo do banner deve ocupar menos de 45% do espaço vertical útil em 960x540');
-  assert.ok(tvHeroBannerContent.includes('clamp(1.2rem, 2.5vw, 1.65rem)'), 'Banner deve usar tipografia fluida com clamp compacto proporcional');
+  assert.ok(tvHeroBannerContent.includes('clamp(1.1rem, 2.2vw, 1.45rem)'), 'Banner deve usar tipografia fluida com clamp compacto proporcional');
   assert.ok(tvHeroBannerContent.includes('scaleCategory={viewport.scaleCategory}'), 'TvHeroButton deve receber scaleCategory dinâmico');
   assert.ok(tvHeroBannerContent.includes('viewport.heroDotsBottom'), 'Dots de paginação devem utilizar heroDotsBottom dinâmico');
   assert.ok(!tvHeroBannerContent.includes('bottom-16 sm:bottom-20'), 'Dots de paginação NÃO devem usar bottom-16 sm:bottom-20 fixos');

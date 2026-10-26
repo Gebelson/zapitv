@@ -19,6 +19,7 @@ class TvNavigationManager {
   private isInitialized: boolean = false;
   private lastFocusedKeyBeforeModal: string | null = null;
   private lastUserNavTime: number = -Infinity;
+  private lastBackTriggerTime: number = -Infinity;
   private activityHandler: ((event: KeyboardEvent) => boolean) | null = null;
   private commandHandler: ((event: KeyboardEvent) => boolean) | null = null;
 
@@ -55,8 +56,15 @@ class TvNavigationManager {
         enter: [13, 10, 'Enter', 'Select', 'Ok', 'OK', 65385, 66]
       });
 
-      // Captura global do botão VOLTAR / BACK (Tizen 10009, Escape, Backspace)
+      // Captura global do botão VOLTAR / BACK (Fire TV 4, Tizen 10009, webOS 461, Escape 27)
       window.addEventListener('keydown', this.handleGlobalKeyDown, { capture: true });
+      window.addEventListener('keyup', this.handleGlobalKeyUp, { capture: true });
+      window.addEventListener('popstate', this.handlePopState);
+
+      // Previne que o histórico do navegador Silk/Android feche abruptamente a WebView
+      try {
+        window.history.pushState({ tvApp: true }, '', window.location.href);
+      } catch {}
 
       // Registro defensivo de teclas de TV no Samsung Tizen (CH+, CH- e Teclado Numérico)
       try {
@@ -111,6 +119,8 @@ class TvNavigationManager {
     const isBackKey =
       e.keyCode === 10009 ||
       e.keyCode === 4 ||
+      e.keyCode === 461 ||
+      e.keyCode === 27 ||
       e.key === 'Back' ||
       e.key === 'GoBack' ||
       e.key === 'BrowserBack' ||
@@ -119,6 +129,14 @@ class TvNavigationManager {
       (e.key === 'Backspace' && !isInput);
 
     if (isBackKey) {
+      const now = performance.now();
+      if (now - this.lastBackTriggerTime < 250) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+      this.lastBackTriggerTime = now;
+
       const handled = this.dispatchBack();
       if (handled) {
         e.preventDefault();
@@ -130,6 +148,49 @@ class TvNavigationManager {
     if (this.commandHandler?.(e)) {
       e.preventDefault();
       e.stopImmediatePropagation();
+    }
+  };
+
+  /**
+   * Captura keyup para evitar processamento residual e duplicatas no Silk Browser
+   */
+  private handleGlobalKeyUp = (e: KeyboardEvent): void => {
+    if (!tvModeService.isTvMode()) return;
+    const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    const isBackKey =
+      e.keyCode === 10009 ||
+      e.keyCode === 4 ||
+      e.keyCode === 461 ||
+      e.keyCode === 27 ||
+      e.key === 'Back' ||
+      e.key === 'GoBack' ||
+      e.key === 'BrowserBack' ||
+      e.key === 'Return' ||
+      e.key === 'Escape' ||
+      (e.key === 'Backspace' && !isInput);
+
+    if (isBackKey) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  };
+
+  /**
+   * Captura botão voltar nativo do navegador/WebView (Silk/Android popstate)
+   */
+  private handlePopState = (_e: PopStateEvent): void => {
+    if (!tvModeService.isTvMode()) return;
+    const now = performance.now();
+    if (now - this.lastBackTriggerTime < 250) {
+      return;
+    }
+    this.lastBackTriggerTime = now;
+
+    const handled = this.dispatchBack();
+    if (handled) {
+      try {
+        window.history.pushState({ tvApp: true }, '', window.location.href);
+      } catch {}
     }
   };
 

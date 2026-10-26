@@ -1,7 +1,7 @@
 import React, { useId } from 'react';
 
 export interface ZapiLoaderProps {
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | number;
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'tv' | number;
   className?: string;
   showText?: boolean;
   text?: string;
@@ -37,6 +37,9 @@ export const ZapiLoader: React.FC<ZapiLoaderProps> = ({
         break;
       case 'xl':
         width = 220;
+        break;
+      case 'tv':
+        width = 76;
         break;
     }
   }
