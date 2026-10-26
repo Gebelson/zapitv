@@ -168,24 +168,32 @@ const ProgramasView: React.FC<ProgramasViewProps> = ({ isDarkMode, initialMode }
               isInteractive={true}
               onClose={() => setFullscreenChannel(null)}
               onNextChannel={() => {
-                const idx = allChannels.findIndex(c => c.id === fullscreenChannel.id);
-                if (idx !== -1) {
-                  const nextCh = allChannels[(idx + 1) % allChannels.length];
-                  setFullscreenChannel(nextCh);
-                  setActiveChannel(nextCh);
+                const verified = channelRegistry.getVerifiedChannels();
+                if (verified.length === 0) {
+                  setFullscreenChannel(null);
+                  return;
                 }
+                const idx = verified.findIndex(c => c.id === fullscreenChannel.id);
+                const nextIdx = idx !== -1 ? (idx + 1) % verified.length : 0;
+                const nextCh = verified[nextIdx];
+                setFullscreenChannel(nextCh);
+                setActiveChannel(nextCh);
               }}
               onPrevChannel={() => {
-                const idx = allChannels.findIndex(c => c.id === fullscreenChannel.id);
-                if (idx !== -1) {
-                  const prevCh = allChannels[(idx - 1 + allChannels.length) % allChannels.length];
-                  setFullscreenChannel(prevCh);
-                  setActiveChannel(prevCh);
+                const verified = channelRegistry.getVerifiedChannels();
+                if (verified.length === 0) {
+                  setFullscreenChannel(null);
+                  return;
                 }
+                const idx = verified.findIndex(c => c.id === fullscreenChannel.id);
+                const prevIdx = idx !== -1 ? (idx - 1 + verified.length) % verified.length : 0;
+                const prevCh = verified[prevIdx];
+                setFullscreenChannel(prevCh);
+                setActiveChannel(prevCh);
               }}
               channelIndexInfo={{
-                current: allChannels.findIndex(c => c.id === fullscreenChannel.id) + 1,
-                total: allChannels.length
+                current: Math.max(1, channelRegistry.getVerifiedChannels().findIndex(c => c.id === fullscreenChannel.id) + 1),
+                total: channelRegistry.getVerifiedChannels().length
               }}
             />
           </div>

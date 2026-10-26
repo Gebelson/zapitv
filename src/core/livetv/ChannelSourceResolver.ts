@@ -58,7 +58,7 @@ export class ChannelSourceResolver {
     const metrics = liveStreamValidator.getMetrics(source.url);
     const cachedStatus = metrics?.status || liveStreamValidator.getCachedStatus(source.url);
 
-    if (cachedStatus === 'AVAILABLE') {
+    if (cachedStatus === 'AVAILABLE' || cachedStatus === 'VERIFIED') {
       score += 300;
     } else if (cachedStatus === 'CHECKING' || !cachedStatus) {
       score += 100;

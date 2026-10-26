@@ -112,6 +112,18 @@ export class EPGAggregator {
       return [{ dateStr: todayStr, label: 'Hoje', offset: 0 }];
     }
 
+    // Se tiver apenas hoje disponível, projeta amanhã para navegação contínua no guia de TV
+    if (availableDateStrings.length === 1) {
+      try {
+        const [y, m, d] = availableDateStrings[0].split('-').map(Number);
+        const nextDt = new Date(Date.UTC(y, m - 1, d + 1));
+        const nextStr = nextDt.toISOString().split('T')[0];
+        if (!availableDateStrings.includes(nextStr)) {
+          availableDateStrings.push(nextStr);
+        }
+      } catch {}
+    }
+
     const todayIndex = availableDateStrings.indexOf(todayStr);
 
     return availableDateStrings.map((dStr) => {
@@ -165,7 +177,11 @@ export class EPGAggregator {
       targetDate = fallbackDates[fallbackDates.length - 1];
     }
 
-    const list = entry.dates[targetDate];
+    let list = entry.dates[targetDate];
+    if ((!list || list.length === 0) && availableDates.length > 0) {
+      list = entry.dates[availableDates[0]];
+    }
+
     if (!list || list.length === 0) {
       return [this.createUnavailableFallback(channel)];
     }

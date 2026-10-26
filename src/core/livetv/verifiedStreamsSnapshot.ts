@@ -380,14 +380,6 @@ export const VERIFIED_STREAMS_SNAPSHOT: Record<string, VerifiedStreamSeed> = {
     latencyMs: 500,
     lastVerifiedAt: Date.now()
   },
-  'tv-brasil-central': {
-    channelId: 'tv-brasil-central',
-    name: 'TV Brasil Central (Goiás)',
-    streamUrl: 'https://tbc.zoeweb.tv/tbc/tbc/chunklist.m3u8',
-    quality: '720p',
-    latencyMs: 500,
-    lastVerifiedAt: Date.now()
-  },
   'conecta-mais-tv': {
     channelId: 'conecta-mais-tv',
     name: 'Conecta Mais TV',

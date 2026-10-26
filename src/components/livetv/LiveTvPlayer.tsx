@@ -285,10 +285,28 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
     attemptedUrlsThisSessionRef.current.add(rawTargetUrl);
 
     if (!streamUrl) {
+      liveTvProviderRegistry.updateChannelStatus(channel.id, 'UNAVAILABLE');
       setPlaybackStatus('unavailable');
-      setHasError(true);
-      setErrorMessage('Endereço de transmissão não configurado.');
       setIsLoading(false);
+      setIsPlaying(false);
+      if (onNextChannel) {
+        setFallbackNotice('Transmissão indisponível. Avançando para o próximo canal verificado...');
+        setTimeout(() => {
+          if (activeChannelIdRef.current === channel.id) {
+            onNextChannel();
+          }
+        }, 1800);
+      } else if (onClose) {
+        setFallbackNotice('Transmissão indisponível. Retornando à grade de canais...');
+        setTimeout(() => {
+          if (activeChannelIdRef.current === channel.id) {
+            onClose();
+          }
+        }, 1800);
+      } else {
+        setHasError(true);
+        setErrorMessage('Endereço de transmissão não configurado.');
+      }
       return;
     }
 
