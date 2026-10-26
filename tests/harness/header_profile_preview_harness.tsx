@@ -2,11 +2,20 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { TvHeader } from '../../src/components/tv/TvHeader';
 import { tvNavigationManager } from '../../src/core/tv/tvNavigationManager';
+import { tvModeService } from '../../src/core/tv/tvModeService';
 import '../../index.css';
+
+const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+const mockDeviceFamily = params.get('deviceFamily');
+if (typeof window !== 'undefined') {
+  tvModeService.setTvMode(true);
+  if (mockDeviceFamily) {
+    (window as any).__MOCK_DEVICE_FAMILY__ = mockDeviceFamily;
+  }
+}
 
 const HeaderProfilePreviewApp: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<'home' | 'movies' | 'series' | 'animes' | 'featured'>('home');
-  const params = new URLSearchParams(window.location.search);
   const bannerType = params.get('banner') || 'dark';
 
   useEffect(() => {

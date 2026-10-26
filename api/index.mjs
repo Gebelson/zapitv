@@ -11106,6 +11106,14 @@ var init_tvPerformanceService = __esm({
        * Detecta se o ambiente de execução é um dispositivo Amazon Fire TV
        */
       isFireTv(customUa) {
+        if (!customUa && typeof window !== "undefined") {
+          if (window.__MOCK_DEVICE_FAMILY__ === "firetv" || window.__MOCK_FIRE_TV__ === true) {
+            return true;
+          }
+          if (window.__MOCK_DEVICE_FAMILY__ && window.__MOCK_DEVICE_FAMILY__ !== "firetv") {
+            return false;
+          }
+        }
         if (typeof window === "undefined" && !customUa) return false;
         const ua = (customUa || (typeof navigator !== "undefined" ? navigator.userAgent : "") || "").toLowerCase();
         const isAftModel = /\b(aft[a-z0-9]+)\b/i.test(ua);
@@ -11119,6 +11127,9 @@ var init_tvPerformanceService = __esm({
        * Retorna a família do dispositivo detectado
        */
       getDeviceFamily(customUa) {
+        if (!customUa && typeof window !== "undefined" && window.__MOCK_DEVICE_FAMILY__) {
+          return window.__MOCK_DEVICE_FAMILY__;
+        }
         const ua = (customUa || (typeof navigator !== "undefined" ? navigator.userAgent : "") || "").toLowerCase();
         if (this.isFireTv(ua)) return "firetv";
         if (/tizen|maple|samsung.*(?:tv|smarttv)/i.test(ua)) return "samsung";
