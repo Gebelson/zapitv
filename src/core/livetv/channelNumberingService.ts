@@ -38,6 +38,7 @@ export const DEFAULT_CANONICAL_CHANNEL_NUMBERS: Record<string, number> = {
   'star-trek-br': 32,
   'comedy-central-pluto': 33,
   'adrenalina-pura': 34,
+  'mais-um-tv': 35,
 
   // Animes & Geek (040 - 049)
   'naruto-dublado': 40,
@@ -54,17 +55,21 @@ export const DEFAULT_CANONICAL_CHANNEL_NUMBERS: Record<string, number> = {
   'icarly-br': 54,
   'kenan-and-kel': 55,
   'desenhos-classicos': 56,
+  'box-kids-tv': 57,
 
   // Música & Entretenimento (060 - 069)
   'mtv-biggest-pop': 60,
   'mtv-classic-br': 61,
   'mtv-pluto-tv': 62,
 
-  // Culinária & Documentários (070 - 079)
+  // Culinária & Documentários & Cultura (070 - 079)
   'tastemade-brasil': 70,
   'masterchef-brasil': 71,
   'smithsonian-channel': 72,
   'pluto-tv-natureza': 73,
+  'arte-1': 74,
+  'agro-canal': 75,
+  'agro-mais': 76,
 
   // Canais Institucionais / Regionais (080 - 099)
   'tv-senado': 80,

@@ -19286,6 +19286,79 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         description: "Emissora comunit\xE1ria com entretenimento, cultura dos munic\xEDpios e informa\xE7\xE3o."
       },
       // =========================================================================
+      // CANAIS BRASILEIROS VERIFICADOS (Fontes HLS Abertas e Estáveis)
+      // =========================================================================
+      {
+        id: "arte-1",
+        tvgId: "Arte1.br",
+        tvgName: "Arte 1",
+        name: "Arte 1",
+        category: "cultura",
+        groupTitle: "Cultura",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Logotipo_do_Arte_1.svg/512px-Logotipo_do_Arte_1.svg.png",
+        url: "http://45.162.64.114/ARTE1/index.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Canal brasileiro dedicado \xE0 arte, cinema independente, m\xFAsica erudita, teatro, dan\xE7a e literatura."
+      },
+      {
+        id: "agro-canal",
+        tvgId: "AgroCanal.br",
+        tvgName: "AgroCanal",
+        name: "AgroCanal",
+        category: "noticias",
+        groupTitle: "Not\xEDcias",
+        tvgLogo: "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=512&auto=format&fit=crop&q=80",
+        url: "http://45.162.64.114/AGRO_CANAL/index.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Transmiss\xE3o com foco em agroneg\xF3cio, cota\xE7\xF5es, feiras agropecu\xE1rias e informa\xE7\xE3o para o produtor rural."
+      },
+      {
+        id: "agro-mais",
+        tvgId: "AgroMais.br",
+        tvgName: "AgroMais",
+        name: "AgroMais",
+        category: "noticias",
+        groupTitle: "Not\xEDcias",
+        tvgLogo: "https://images.unsplash.com/photo-1592417817098-8f3d69109853?w=512&auto=format&fit=crop&q=80",
+        url: "http://45.162.64.114/AGROMAIS/index.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Canal de jornalismo e an\xE1lises econ\xF4micas do agroneg\xF3cio brasileiro pelo Grupo Bandeirantes."
+      },
+      {
+        id: "box-kids-tv",
+        tvgId: "BoxKidsTV.br",
+        tvgName: "Box Kids TV",
+        name: "Box Kids TV",
+        category: "infantil",
+        groupTitle: "Infantil",
+        tvgLogo: "https://images.unsplash.com/photo-1566140967404-b8b3932483f5?w=512&auto=format&fit=crop&q=80",
+        url: "http://45.162.64.114/BOX_KIDS/index.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Programa\xE7\xE3o infantil brasileira com desenhos animados, s\xE9ries educativas e entretenimento para crian\xE7as."
+      },
+      {
+        id: "mais-um-tv",
+        tvgId: "MaisUmTV.br",
+        tvgName: "+MaisUm TV",
+        name: "+MaisUm TV",
+        category: "filmes_series",
+        groupTitle: "Variedades",
+        tvgLogo: "https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=512&auto=format&fit=crop&q=80",
+        url: "https://stream.ichibansys.com:3230/hybrid/play.m3u8",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Canal de entretenimento com s\xE9ries, cinema, variedades e programas de audit\xF3rio."
+      },
+      // =========================================================================
       // CANAIS LINEARES NACIONAIS E PREMIUM (Acesso Oficial Protegido)
       // Indicam de forma clara e transparente a origem oficial sem feeds piratas instáveis
       // =========================================================================

@@ -5,6 +5,45 @@ import { VERIFIED_STREAMS_SNAPSHOT } from './verifiedStreamsSnapshot';
 export class ChannelNormalizer {
   private static instance: ChannelNormalizer;
 
+  private static readonly CANONICAL_ALIASES: Record<string, string> = {
+    'arte-1': 'arte-1',
+    'arte1': 'arte-1',
+    'canal-arte-1': 'arte-1',
+    'agrocanal': 'agro-canal',
+    'agro-canal': 'agro-canal',
+    'agro-canal-hd': 'agro-canal',
+    'agromais': 'agro-mais',
+    'agro-mais': 'agro-mais',
+    'agromais-noticias': 'agro-mais',
+    'agro-mais-noticias': 'agro-mais',
+    'box-kids-tv': 'box-kids-tv',
+    'boxkids': 'box-kids-tv',
+    'box-kids': 'box-kids-tv',
+    'maisumtv': 'mais-um-tv',
+    'maisum-tv': 'mais-um-tv',
+    'mais-um-tv': 'mais-um-tv',
+    'mais-um': 'mais-um-tv',
+    'pluto-tv-cine-sucessos': 'pluto-tv-cine-sucessos',
+    'tv-brasil': 'tv-brasil',
+    'tvbrasil': 'tv-brasil',
+    'tv-cultura': 'tv-cultura',
+    'tvcultura': 'tv-cultura',
+    'rede-brasil': 'rede-brasil',
+    'redebrasil': 'rede-brasil',
+    'rbtv': 'rede-brasil',
+    'sbt-interior': 'sbt-interior',
+    'sbt': 'sbt-interior',
+    'sbt-hd': 'sbt-interior',
+    'cnn-brasil': 'cnn-brasil',
+    'cnnbrasil': 'cnn-brasil',
+    'jovem-pan-news': 'jovem-pan-news',
+    'jp-news': 'jovem-pan-news',
+    'record-news': 'record-news',
+    'recordnews': 'record-news',
+    'band-news': 'band-news',
+    'bandnews': 'band-news'
+  };
+
   public static getInstance(): ChannelNormalizer {
     if (!ChannelNormalizer.instance) {
       ChannelNormalizer.instance = new ChannelNormalizer();
@@ -55,6 +94,7 @@ export class ChannelNormalizer {
       .replace(/\s*\[.*?\]/g, '')
       .replace(/\s*\(Brazil\)/gi, '')
       .replace(/\s*\(Brasil\)/gi, '')
+      .replace(/\s*\b(hd|full\s*hd|fhd|sd|4k)\b/gi, '')
       .trim();
 
     if (clean !== 'tv brasil' && clean !== 'brasil' && clean.endsWith(' brasil')) {
@@ -63,9 +103,11 @@ export class ChannelNormalizer {
       clean = clean.replace(/\s+brazil$/i, '').trim();
     }
 
-    return clean
+    const slug = clean
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
+
+    return ChannelNormalizer.CANONICAL_ALIASES[slug] || slug;
   }
 
   /**
@@ -164,12 +206,18 @@ export class ChannelNormalizer {
           status: initialStatus,
           isEnabled: true,
           country: raw.country || 'BR',
-          region: raw.region
+          region: raw.region,
+          isTemporaryEvent: Boolean(raw.isTemporaryEvent),
+          eventExpiry: raw.eventExpiry
         };
         channelMap.set(canonicalId, newChannel);
       } else {
         // Canal já existe: mesclar fontes preservando dados canônicos
         const existing = channelMap.get(canonicalId)!;
+        if (raw.isTemporaryEvent) {
+          existing.isTemporaryEvent = true;
+          existing.eventExpiry = raw.eventExpiry;
+        }
 
         // Se o novo registro tiver logo oficial e o atual for genérico
         if (raw.tvgLogo && (raw.tvgLogo.includes('wikimedia') || !existing.logo)) {

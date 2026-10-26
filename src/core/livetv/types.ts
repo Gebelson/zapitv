@@ -106,6 +106,8 @@ export interface LiveChannel {
   region?: string;
   broadcaster?: string;
   isEnabled?: boolean;
+  isTemporaryEvent?: boolean;
+  eventExpiry?: number;
 }
 
 export interface RawChannelInput {
@@ -128,6 +130,8 @@ export interface RawChannelInput {
   region?: string;
   sources?: LiveStreamSource[];
   backupStreamUrls?: string[];
+  isTemporaryEvent?: boolean;
+  eventExpiry?: number;
 }
 
 export interface LiveTvPreferencesState {

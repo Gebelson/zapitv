@@ -182,6 +182,29 @@ export class LiveTVProviderRegistry {
     }
   }
 
+  public addStremioAdapter(name: string, url: string): StremioLiveTVAdapter {
+    const adapter = new StremioLiveTVAdapter(url);
+    this.stremioAdapters.push(adapter);
+    this.persistProviders();
+    this.refreshCatalog().catch(() => {});
+    return adapter;
+  }
+
+  public removeStremioAdapter(id: string): void {
+    this.stremioAdapters = this.stremioAdapters.filter(a => a.getId() !== id);
+    this.persistProviders();
+    this.refreshCatalog().catch(() => {});
+  }
+
+  public toggleStremioAdapter(id: string, enabled: boolean): void {
+    const adapter = this.stremioAdapters.find(a => a.getId() !== id);
+    if (adapter) {
+      adapter.setEnabled(enabled);
+      this.persistProviders();
+      this.refreshCatalog().catch(() => {});
+    }
+  }
+
   public updateChannelStreamUrl(channelId: string, newUrl: string): void {
     const existing = this.channelOverrides.get(channelId) || {};
     existing.customStreamUrl = newUrl;
@@ -257,27 +280,31 @@ export class LiveTVProviderRegistry {
     const official = OfficialChannelProvider.getOfficialChannels();
     rawList.push(...official);
 
-    // 2. Provedores M3U externos
-    for (const m3u of this.m3uAdapters) {
-      if (m3u.isEnabled()) {
+    // 2. Busca paralela e não-bloqueante de adaptadores M3U e Stremio
+    const m3uTasks = this.m3uAdapters
+      .filter(m => m.isEnabled())
+      .map(async m => {
         try {
-          const m3uChannels = await m3u.fetchAndParse();
-          if (m3uChannels.length > 0) {
-            rawList.push(...m3uChannels);
-          }
-        } catch {}
-      }
-    }
+          return await m.fetchAndParse();
+        } catch {
+          return [];
+        }
+      });
 
-    // 3. Provedores Stremio Live Addon
-    for (const stremio of this.stremioAdapters) {
-      if (stremio.isEnabled()) {
+    const stremioTasks = this.stremioAdapters
+      .filter(s => s.isEnabled())
+      .map(async s => {
         try {
-          const stremioChannels = await stremio.fetchCatalogChannels();
-          if (stremioChannels.length > 0) {
-            rawList.push(...stremioChannels);
-          }
-        } catch {}
+          return await s.fetchCatalogChannels();
+        } catch {
+          return [];
+        }
+      });
+
+    const providerResults = await Promise.allSettled([...m3uTasks, ...stremioTasks]);
+    for (const res of providerResults) {
+      if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+        rawList.push(...res.value);
       }
     }
 
@@ -325,6 +352,21 @@ export class LiveTVProviderRegistry {
     return this.channels.filter(c => 
       c.isEnabled !== false && 
       !c.requiresExternalAccess && 
+      !c.isTemporaryEvent &&
+      (c.status === 'VERIFIED' || c.status === 'AVAILABLE') &&
+      Boolean(c.streamUrl) &&
+      !liveStreamValidator.isParkedDomain(c.streamUrl)
+    );
+  }
+
+  public getPermanentLinearChannels(): LiveChannel[] {
+    return this.getVerifiedChannels().filter(c => !c.isTemporaryEvent);
+  }
+
+  public getTemporarySportsEvents(): LiveChannel[] {
+    return this.channels.filter(c => 
+      c.isEnabled !== false && 
+      Boolean(c.isTemporaryEvent) &&
       (c.status === 'VERIFIED' || c.status === 'AVAILABLE') &&
       Boolean(c.streamUrl) &&
       !liveStreamValidator.isParkedDomain(c.streamUrl)

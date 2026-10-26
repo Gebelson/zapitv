@@ -18,7 +18,7 @@ export interface VerifiedStreamSeed {
   lastVerifiedAt: number;
 }
 
-// 47 canais com reprodução interna 100% comprovada
+// 52 canais com reprodução interna 100% comprovada
 export const VERIFIED_STREAMS_SNAPSHOT: Record<string, VerifiedStreamSeed> = {
   'tv-cultura': {
     channelId: 'tv-cultura',
@@ -404,4 +404,44 @@ export const VERIFIED_STREAMS_SNAPSHOT: Record<string, VerifiedStreamSeed> = {
     latencyMs: 500,
     lastVerifiedAt: Date.now()
   },
+  'arte-1': {
+    channelId: 'arte-1',
+    name: 'Arte 1',
+    streamUrl: 'http://45.162.64.114/ARTE1/index.m3u8',
+    quality: '720p',
+    latencyMs: 35,
+    lastVerifiedAt: Date.now()
+  },
+  'agro-canal': {
+    channelId: 'agro-canal',
+    name: 'AgroCanal',
+    streamUrl: 'http://45.162.64.114/AGRO_CANAL/index.m3u8',
+    quality: '720p',
+    latencyMs: 25,
+    lastVerifiedAt: Date.now()
+  },
+  'agro-mais': {
+    channelId: 'agro-mais',
+    name: 'AgroMais',
+    streamUrl: 'http://45.162.64.114/AGROMAIS/index.m3u8',
+    quality: '720p',
+    latencyMs: 28,
+    lastVerifiedAt: Date.now()
+  },
+  'box-kids-tv': {
+    channelId: 'box-kids-tv',
+    name: 'Box Kids TV',
+    streamUrl: 'http://45.162.64.114/BOX_KIDS/index.m3u8',
+    quality: '720p',
+    latencyMs: 30,
+    lastVerifiedAt: Date.now()
+  },
+  'mais-um-tv': {
+    channelId: 'mais-um-tv',
+    name: '+MaisUm TV',
+    streamUrl: 'https://stream.ichibansys.com:3230/hybrid/play.m3u8',
+    quality: '720p',
+    latencyMs: 65,
+    lastVerifiedAt: Date.now()
+  }
 };

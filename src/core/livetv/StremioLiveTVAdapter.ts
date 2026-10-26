@@ -133,21 +133,36 @@ export class StremioLiveTVAdapter {
           const data = await resp.json();
           const metas: StremioMetaPreview[] = data.metas || [];
 
-          for (const meta of metas) {
-            // Tenta resolver a URL de stream imediatamente para não poluir o catálogo com canais sem stream
-            const resolvedStreamUrl = await this.resolveStream(meta.type || catalog.type, meta.id);
-            if (resolvedStreamUrl) {
-              channels.push({
-                id: meta.id,
-                tvgId: meta.id,
-                name: meta.name,
-                tvgLogo: meta.logo || meta.poster,
-                description: meta.description,
-                groupTitle: meta.genres?.[0] || catalog.name,
-                url: resolvedStreamUrl,
-                provider: manifest.name || 'Stremio Live Addon',
-                isOfficial: false
-              });
+          // Processamento paralelo controlado em lotes de 5 requisições simultâneas
+          const BATCH_SIZE = 5;
+          for (let i = 0; i < metas.length; i += BATCH_SIZE) {
+            const batch = metas.slice(i, i + BATCH_SIZE);
+            const results = await Promise.allSettled(
+              batch.map(async (meta) => {
+                const resolvedStreamUrl = await this.resolveStream(meta.type || catalog.type, meta.id);
+                if (!resolvedStreamUrl) return null;
+
+                const isTemporary = this.isTemporarySportsEvent(meta.name, catalog.name);
+
+                return {
+                  id: meta.id,
+                  tvgId: meta.id,
+                  name: meta.name,
+                  tvgLogo: meta.logo || meta.poster,
+                  description: meta.description,
+                  groupTitle: meta.genres?.[0] || catalog.name,
+                  url: resolvedStreamUrl,
+                  provider: manifest.name || 'Stremio Live Addon',
+                  isOfficial: false,
+                  isTemporaryEvent: isTemporary
+                } as RawChannelInput;
+              })
+            );
+
+            for (const r of results) {
+              if (r.status === 'fulfilled' && r.value) {
+                channels.push(r.value);
+              }
             }
           }
         }
@@ -157,6 +172,33 @@ export class StremioLiveTVAdapter {
     this.channelCount = channels.length;
     this.lastSync = Date.now();
     return channels;
+  }
+
+  /**
+   * Distingue eventos esportivos temporários/jogos de canais lineares permanentes 24/7
+   */
+  public isTemporarySportsEvent(title: string, catalogName?: string): boolean {
+    const t = title.toLowerCase();
+    const c = (catalogName || '').toLowerCase();
+
+    // Padrões de confronto direto (ex: "Flamengo x Palmeiras", "Arsenal vs Chelsea", "UFC 308")
+    const matchPatterns = [
+      /\s+x\s+/,
+      /\s+vs\.?\s+/,
+      /\b(ufc|combate|fight|f1|formula\s+1|motogp)\b/i,
+      /\b(rodada|quartas|semifinal|final|jogo)\b/i,
+      /\b\d{1,2}:\d{2}\b/ // Título com horário embutido
+    ];
+
+    if (matchPatterns.some(p => p.test(t))) {
+      return true;
+    }
+
+    if (c.includes('event') || c.includes('sports live') || c.includes('jogos') || c.includes('matches')) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
