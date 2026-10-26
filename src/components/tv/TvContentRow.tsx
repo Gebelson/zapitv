@@ -8,6 +8,7 @@ import { tvPerformanceProfileService } from '../../core/tv/tvPerformanceProfileS
 import { tvPerformanceService } from '../../core/tv/tvPerformanceService';
 import { tvScrollService } from '../../core/tv/tvScrollService';
 import { posterRecoveryService } from '../../core/catalog/PosterRecoveryService';
+import { useTvViewport, tvViewportService } from '../../core/tv/tvViewportService';
 
 interface TvContentRowProps {
   title: string;
@@ -20,10 +21,9 @@ interface TvContentRowProps {
   onRowDown?: () => void;
 }
 
-// Margem segura da interface (55-65px na resolução de referência 1920x1080)
-// 64px alinha com precisão milimétrica com o título da seção (sm:px-16 = 4rem = 64px)
-const SAFE_MARGIN_LEFT = 64;
-const CARD_GAP = 24; // gap-6 = 24px
+// Margem segura da interface padrão (substituída dinamicamente por tvViewportService)
+const DEFAULT_SAFE_MARGIN_LEFT = 64;
+const DEFAULT_CARD_GAP = 24;
 
 // Constantes de transição cinematográfica fluida (estilo Netflix)
 const NORMAL_DURATION = 320; // Duração cinematográfica suave para toques individuais (300-350ms)
@@ -35,7 +35,7 @@ const EASING_CURVE = 'cubic-bezier(0.22, 1, 0.36, 1)'; // Desaceleração suave 
  * Regra obrigatória:
  * - 1 a 6 conteúdos: carrossel finito. Slots [0, 1, ..., count - 1].
  *   Sem slots negativos (-1), sem duplicatas e sem índices além da lista real.
- * - 7 ou mais conteúdos: carrossel infinito com buffer otimizado por perfil de hardware.
+ * - 7 ou mais conteúdos: carrossel infinito com buffer otimizado por resolução e perfil de hardware.
  */
 export const getVisibleSlots = (count: number): number[] => {
   if (count <= 0) return [];
@@ -48,10 +48,13 @@ export const getVisibleSlots = (count: number): number[] => {
   if (count === 6) return [0, 1, 2, 3, 4, 5];
 
   // 7 ou mais conteúdos: CARROSSEL INFINITO
-  if (count === 7) return [-1, 0, 1, 2, 3, 4, 5, 6];
-  const profile = tvPerformanceProfileService.getActiveConfig();
-  if (profile.name === 'eco' || profile.name === 'balanced') {
-    return [-1, 0, 1, 2, 3, 4, 5, 6];
+  const metrics = tvViewportService.getMetrics();
+  const isCompactOrEco = metrics.scaleCategory === 'compact' || tvPerformanceService.isFireTv() || tvPerformanceProfileService.getActiveConfig().name === 'eco';
+  if (isCompactOrEco) {
+    return [-1, 0, 1, 2, 3, 4];
+  }
+  if (metrics.scaleCategory === 'standard' || tvPerformanceProfileService.getActiveConfig().name === 'balanced') {
+    return [-1, 0, 1, 2, 3, 4, 5];
   }
   return [-1, 0, 1, 2, 3, 4, 5, 6, 7];
 };
@@ -66,11 +69,12 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   onRowUp,
   onRowDown
 }) => {
+  const viewport = useTvViewport();
   const containerRef = useRef<HTMLDivElement>(null);
   const trackContainerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  // Índice do item ativo fixado na primeira posição visível (Slot 0 em SAFE_MARGIN_LEFT)
+  // Índice do item ativo fixado na primeira posição visível (Slot 0 em safeMarginX)
   const [currentIndex, setCurrentIndex] = useState(0);
   const [targetIndex, setTargetIndex] = useState(0);
   const [translateX, setTranslateX] = useState(0);
@@ -88,13 +92,13 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
 
   // Medição precisa da largura do card + gap (step) e geometria da seleção
   const slotMeasureRef = useRef<HTMLDivElement>(null);
-  const [cardWidth, setCardWidth] = useState(275);
-  const [stepSize, setStepSize] = useState(299);
+  const [cardWidth, setCardWidth] = useState(viewport.cardWidth);
+  const [stepSize, setStepSize] = useState(viewport.cardWidth + viewport.cardGap);
   const [selectionGeometry, setSelectionGeometry] = useState({
     top: 32, // fallback para py-8 (32px / 2rem)
-    left: SAFE_MARGIN_LEFT,
-    width: 275,
-    height: 413,
+    left: viewport.safeMarginX,
+    width: viewport.cardWidth,
+    height: Math.round(viewport.cardWidth * 1.5),
   });
 
   const measureGeometry = useCallback(() => {
@@ -103,19 +107,19 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
       const containerRect = trackContainerRef.current.getBoundingClientRect();
       const w = Math.round(slotRect.width);
       const h = Math.round(slotRect.height);
-      if (w > 100) {
+      if (w > 80) {
         const topOffset = Math.round(slotRect.top - containerRect.top);
         setCardWidth(w);
-        setStepSize(w + CARD_GAP);
+        setStepSize(w + viewport.cardGap);
         setSelectionGeometry({
           top: topOffset,
-          left: SAFE_MARGIN_LEFT,
+          left: viewport.safeMarginX,
           width: w,
-          height: h > 100 ? h : Math.round(w * 1.5)
+          height: h > 80 ? h : Math.round(w * 1.5)
         });
       }
     }
-  }, []);
+  }, [viewport.cardGap, viewport.safeMarginX]);
 
   useEffect(() => {
     measureGeometry();
@@ -406,13 +410,13 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   }
 
   const negativeSlotsCount = visibleSlots.filter(s => s < 0).length;
-  // Offset base: em modo finito inicia estritamente em SAFE_MARGIN_LEFT (64px); em modo infinito compensa o slot -1
-  const baseOffset = isFinite ? SAFE_MARGIN_LEFT : SAFE_MARGIN_LEFT - negativeSlotsCount * stepSize;
+  // Offset base: em modo finito inicia estritamente em safeMarginX; em modo infinito compensa o slot -1
+  const baseOffset = isFinite ? viewport.safeMarginX : viewport.safeMarginX - negativeSlotsCount * stepSize;
   const currentItem = items[targetIndex] || items[currentIndex] || items[0];
 
   // Posição horizontal da seleção: em modo finito segue o índice ativo; em modo infinito fica fixa no Slot 0
   const activeSelectionLeft = isFinite 
-    ? SAFE_MARGIN_LEFT + currentIndex * stepSize 
+    ? viewport.safeMarginX + currentIndex * stepSize 
     : selectionGeometry.left;
 
   return (
@@ -423,12 +427,18 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
         data-row-id={rowId}
         data-focus-key={focusKey}
         data-tv-focused={focused ? "true" : undefined}
-        className="w-full mb-10 sm:mb-12 select-none overflow-hidden focus:outline-none"
+        className="w-full mb-8 sm:mb-10 lg:mb-12 select-none overflow-hidden focus:outline-none"
         aria-label={title}
       >
-        {/* Título da Fileira (Alinhado com a margem segura de 64px, sem contadores) */}
-        <div className="px-14 sm:px-16 mb-2">
-          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wide drop-shadow-md">
+        {/* Título da Fileira (Alinhado com safeMarginX, sem contadores) */}
+        <div 
+          className="mb-2"
+          style={{
+            paddingLeft: `${viewport.safeMarginX}px`,
+            paddingRight: `${viewport.safeMarginX}px`
+          }}
+        >
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-wide drop-shadow-md">
             {title}
           </h2>
         </div>
@@ -438,10 +448,11 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
           {/* 1. GLOW AMBIENTE SUTIL (ATRÁS DA CAPA): Geometria compartilhada 2:3 */}
           {focused && currentItem && (
             <div 
-              className="absolute z-0 pointer-events-none flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px]"
+              className="absolute z-0 pointer-events-none flex-none"
               style={{
                 left: `${activeSelectionLeft}px`, /* Ancoragem base: left: `${selectionGeometry.left}px` */
                 top: `${selectionGeometry.top}px`,
+                width: `${cardWidth}px`,
                 height: `${selectionGeometry.height}px`,
                 transition: isFinite ? `left ${NORMAL_DURATION}ms ${EASING_CURVE}` : 'all 300ms ease'
               }}
@@ -462,10 +473,11 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
           {/* 2. MOLDURA EXTERNA DE SELEÇÃO (Z-30): Geometria compartilhada 2:3 com contorno externo de 4px de respiro */}
           {focused && currentItem && (
             <div 
-              className="absolute z-30 pointer-events-none flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px]"
+              className="absolute z-30 pointer-events-none flex-none"
               style={{
                 left: `${activeSelectionLeft}px`, /* Ancoragem base: left: `${selectionGeometry.left}px` */
                 top: `${selectionGeometry.top}px`,
+                width: `${cardWidth}px`,
                 height: `${selectionGeometry.height}px`,
                 transition: isFinite ? `left ${NORMAL_DURATION}ms ${EASING_CURVE}` : 'all 150ms ease'
               }}
@@ -486,8 +498,9 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
           <div 
             ref={trackRef}
             onTransitionEnd={onTrackTransitionEnd}
-            className="relative z-10 flex items-center gap-6"
+            className="relative z-10 flex items-center"
             style={{
+              gap: `${viewport.cardGap}px`,
               transform: `translate3d(${baseOffset + translateX}px, 0, 0)`,
               transition: (!isFinite && transitionEnabled) ? `transform ${transitionDuration}ms ${EASING_CURVE}` : 'none',
               willChange: (transitionEnabled || isAnimatingRef.current) ? 'transform' : 'auto',
@@ -504,7 +517,8 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
                 <div 
                   key={`slot-${slotIdx}-${item.id}`}
                   ref={slotIdx === 0 ? slotMeasureRef : undefined}
-                  className="flex-none w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px] opacity-100"
+                  style={{ width: `${viewport.cardWidth}px` }}
+                  className="flex-none opacity-100"
                 >
                   <TvCard16x9
                     item={item}

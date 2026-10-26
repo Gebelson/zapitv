@@ -236,7 +236,7 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
       )}
 
       {/* Fileiras de Conteúdos: Exclusivamente abaixo da primeira viewport (Sem margem negativa) */}
-      <div className="relative z-10 pt-8 sm:pt-12 pb-28 space-y-6 sm:space-y-10">
+      <div className="relative z-10 pt-4 sm:pt-8 lg:pt-12 pb-24 sm:pb-28 space-y-4 sm:space-y-6 lg:space-y-10">
         {/* Continuar Assistindo (Se houver progresso real) */}
         {hasContinue && (
           <TvContentRow

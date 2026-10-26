@@ -11159,7 +11159,7 @@ var init_tvPerformanceService = __esm({
           return "balanced";
         }
         const ua = (customUa || (typeof navigator !== "undefined" ? navigator.userAgent : "") || "").toLowerCase();
-        const nav = typeof navigator !== "undefined" ? navigator : {};
+        const nav = !customUa && typeof navigator !== "undefined" ? navigator : {};
         const isFireTv = this.isFireTv(ua);
         const isSamsungTv = /tizen|maple|samsung.*(?:tv|smarttv)|mediastationx|media\s*station\s*x/i.test(ua);
         const hwConcurrency = nav.hardwareConcurrency || 4;

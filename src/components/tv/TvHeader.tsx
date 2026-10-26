@@ -5,6 +5,7 @@ import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spat
 import { TvProfileMenu } from './TvProfileMenu';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { tvPerformanceService } from '../../core/tv/tvPerformanceService';
+import { useTvViewport, TvScaleCategory } from '../../core/tv/tvViewportService';
 import { ZapiAnimatedLogo } from '../common/ZapiAnimatedLogo';
 
 export type TvTab = 'home' | 'movies' | 'series' | 'animes' | 'featured';
@@ -25,10 +26,12 @@ const TvNavTabButton: React.FC<{
   focusKey: string;
   label: string;
   isActive: boolean;
+  fontSize?: number;
+  scaleCategory?: TvScaleCategory;
   onClick: () => void;
   onFocusTab: (key: string, el: HTMLElement | null) => void;
   onBlurTab: (key: string) => void;
-}> = ({ focusKey, label, isActive, onClick, onFocusTab, onBlurTab }) => {
+}> = ({ focusKey, label, isActive, fontSize, scaleCategory = 'expanded', onClick, onFocusTab, onBlurTab }) => {
   const { ref, focused } = useTvFocusable({
     focusKey,
     onEnterPress: onClick,
@@ -68,6 +71,12 @@ const TvNavTabButton: React.FC<{
     }
   }, [focused, focusKey, onFocusTab, onBlurTab]);
 
+  const paddingClass = scaleCategory === 'compact'
+    ? 'py-1.5 px-2'
+    : scaleCategory === 'standard'
+    ? 'py-2 px-2.5'
+    : 'py-2 px-3';
+
   return (
     <button
       ref={ref}
@@ -76,7 +85,8 @@ const TvNavTabButton: React.FC<{
       data-tv-focused={focused ? "true" : undefined}
       data-tv-active={isActive ? "true" : undefined}
       onClick={onClick}
-      className={`relative py-2 px-2 text-[20px] lg:text-[23px] font-medium tracking-wide transition-all duration-150 outline-none select-none cursor-pointer whitespace-nowrap inline-flex items-center justify-center ${
+      style={{ fontSize: fontSize ? `${fontSize}px` : undefined }}
+      className={`relative ${paddingClass} font-medium tracking-wide transition-all duration-150 outline-none select-none cursor-pointer whitespace-nowrap flex-shrink-0 inline-flex items-center justify-center ${
         focused
           ? 'text-cyan-300 scale-105 drop-shadow-[0_0_14px_rgba(0,229,255,0.7)]'
           : isActive
@@ -106,6 +116,12 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
   const [isScrolled, setIsScrolled] = useState(false);
   const isFireTvOrEco = tvPerformanceService.isFireTv() || tvPerformanceService.getHardwareProfile() === 'eco';
   const logoVideoRef = useRef<HTMLVideoElement>(null);
+  const viewport = useTvViewport();
+
+  const indicatorWidth = viewport.scaleCategory === 'compact' ? 24 : viewport.scaleCategory === 'standard' ? 28 : 32;
+  const actionBtnSize = viewport.scaleCategory === 'compact' ? 42 : viewport.scaleCategory === 'standard' ? 48 : 56;
+  const searchIconSize = viewport.scaleCategory === 'compact' ? 20 : viewport.scaleCategory === 'standard' ? 24 : 28;
+  const avatarIconSize = viewport.scaleCategory === 'compact' ? 18 : viewport.scaleCategory === 'standard' ? 22 : 24;
 
   // Estado e refs para o traço indicador único deslizante entre os links do header
   const [indicatorVisible, setIndicatorVisible] = useState(false);
@@ -131,7 +147,8 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     } else {
       centerX = buttonEl.offsetLeft + (buttonEl.offsetWidth || 80) / 2;
     }
-    const targetX = Math.round(centerX - 16);
+    const currentIndicatorW = viewport.scaleCategory === 'compact' ? 24 : viewport.scaleCategory === 'standard' ? 28 : 32;
+    const targetX = Math.round(centerX - currentIndicatorW / 2);
 
     if (!animate || !isIndicatorVisibleRef.current) {
       // Primeira aparição vinda de outra área: posiciona diretamente sob o link sem cruzar o header
@@ -149,7 +166,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
       setIndicatorVisible(true);
       isIndicatorVisibleRef.current = true;
     }
-  }, []);
+  }, [viewport.scaleCategory]);
 
   const handleTabFocus = useCallback((key: string, buttonEl: HTMLElement | null) => {
     if (blurTimerRef.current) {
@@ -214,7 +231,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     saveLastFocusedChild: true
   });
 
-  // Botão de Busca Ampliado (Área 56px, Ícone 28px)
+  // Botão de Busca
   const { ref: searchRef, focused: searchFocused } = useTvFocusable({
     focusKey: 'tv-nav-search',
     onEnterPress: onOpenSearch,
@@ -239,7 +256,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     }
   });
 
-  // Botão de Perfil Ampliado (Área 56px, Avatar 48px)
+  // Botão de Perfil
   const { ref: profileRef, focused: profileFocused } = useTvFocusable({
     focusKey: 'tv-nav-profile',
     onEnterPress: () => setIsProfileMenuOpen(prev => !prev),
@@ -269,14 +286,20 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
       <header
         ref={noriginRef as any}
         data-testid="tv-header"
-        className={`fixed top-0 inset-x-0 z-[120] h-24 sm:h-[100px] px-14 sm:px-16 flex items-center justify-between select-none border-none shadow-none bg-transparent transition-all duration-300 transform-gpu ${
+        style={{
+          height: `${viewport.headerHeight}px`,
+          paddingLeft: `${viewport.safeMarginX}px`,
+          paddingRight: `${viewport.safeMarginX}px`,
+        }}
+        className={`fixed top-0 inset-x-0 z-[120] flex items-center justify-between select-none border-none shadow-none bg-transparent transition-all duration-300 transform-gpu ${
           hidden ? 'opacity-0 -translate-y-full pointer-events-none invisible' : 'opacity-100 translate-y-0 pointer-events-none'
         }`}
       >
         {/* Camada de fundo flutuante com Desfoque Real e Degradê Escuro Cinematográfico */}
         <div
           aria-hidden="true"
-          className="absolute z-0 inset-x-0 top-0 h-[140px] sm:h-[160px] pointer-events-none select-none overflow-hidden"
+          className="absolute z-0 inset-x-0 top-0 pointer-events-none select-none overflow-hidden"
+          style={{ height: `${viewport.headerHeight + 50}px` }}
         >
           {/* Desfoque Real Progressivo via backdrop-filter e máscara gradual (desativado em Fire TV / perfis eco para evitar repaints) */}
           {!isFireTvOrEco && (
@@ -303,169 +326,204 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
             }}
           />
         </div>
-        {/* Esquerda: Logotipo Oficial ZapiTV Ampliado (Largura proporcional ~190-210px) */}
-        <div 
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            uiSoundService.play('navigate');
-            onSelectTab('home');
-          }}
-          className="relative z-10 flex items-center gap-3.5 cursor-pointer group/logo outline-none focus:outline-none pointer-events-auto"
-        >
-          <div className="w-12 h-12 sm:w-[50px] sm:h-[50px] flex items-center justify-center relative flex-shrink-0">
-            <ZapiAnimatedLogo
-              videoSrc="/zapi-icon.webm"
-              className="w-full h-full object-contain pointer-events-none"
-              alt="ZapiTV"
-            />
-          </div>
-          <img
-            src="/zapitv-text.png"
-            alt="ZapiTV"
-            className="h-[28px] sm:h-[32px] w-auto object-contain select-none ml-1 hidden sm:block drop-shadow-lg"
-            style={{ transform: 'translateY(3px)' }}
-            draggable={false}
-          />
-        </div>
 
-        {/* Centro: Navegação Flutuante Livre (SEM RETÂNGULO EXTERNO, CENTRALIZADA NA LARGURA TOTAL) */}
-        <nav
-          ref={navRef}
-          className="absolute z-10 left-1/2 -translate-x-1/2 flex items-center gap-6 sm:gap-8 lg:gap-10 pointer-events-auto"
-        >
-          {/* Único traço indicador deslizante suave entre os links do header aproximado a 5px do texto (top-[calc(100%+5px)]) */}
-          <div
-            aria-hidden="true"
-            data-testid="tv-nav-indicator"
-            className={`absolute left-0 bottom-0 h-[3px] w-8 bg-cyan-400 rounded-full shadow-[0_0_10px_#00e5ff] pointer-events-none will-change-transform ${
-              indicatorVisible ? 'opacity-100' : 'opacity-0'
-            }`}
-            style={{
-              transform: `translate3d(${indicatorX}px, 0, 0)`,
-              transition: hasTransition
-                ? 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease-out'
-                : 'opacity 200ms ease-out',
-            }}
-          />
-          <TvNavTabButton
-            focusKey="tv-nav-home"
-            label="Início"
-            isActive={currentTab === 'home'}
-            onFocusTab={handleTabFocus}
-            onBlurTab={handleTabBlur}
+        {/* Container Flex de 3 Regiões Não-Sobreponíveis */}
+        <div className="relative z-10 flex items-center justify-between w-full h-full">
+          {/* 1. Região Esquerda: Logotipo Oficial ZapiTV (flex-shrink-0) */}
+          <div 
+            role="button"
+            tabIndex={0}
             onClick={() => {
               uiSoundService.play('navigate');
               onSelectTab('home');
             }}
-          />
-          <TvNavTabButton
-            focusKey="tv-nav-movies"
-            label="Filmes"
-            isActive={currentTab === 'movies'}
-            onFocusTab={handleTabFocus}
-            onBlurTab={handleTabBlur}
-            onClick={() => {
-              uiSoundService.play('navigate');
-              onSelectTab('movies');
-            }}
-          />
-          <TvNavTabButton
-            focusKey="tv-nav-series"
-            label="Séries"
-            isActive={currentTab === 'series'}
-            onFocusTab={handleTabFocus}
-            onBlurTab={handleTabBlur}
-            onClick={() => {
-              uiSoundService.play('navigate');
-              onSelectTab('series');
-            }}
-          />
-          <TvNavTabButton
-            focusKey="tv-nav-animes"
-            label="Animes"
-            isActive={currentTab === 'animes'}
-            onFocusTab={handleTabFocus}
-            onBlurTab={handleTabBlur}
-            onClick={() => {
-              uiSoundService.play('navigate');
-              onSelectTab('animes');
-            }}
-          />
-          <TvNavTabButton
-            focusKey="tv-nav-featured"
-            label="Ao Vivo"
-            isActive={currentTab === 'featured'}
-            onFocusTab={handleTabFocus}
-            onBlurTab={handleTabBlur}
-            onClick={() => {
-              uiSoundService.play('navigate');
-              onSelectTab('featured');
-            }}
-          />
-        </nav>
-
-        {/* Direita: Busca e Perfil Ampliados (Áreas 56px, Ícones 28px) */}
-        <div className="relative z-10 flex items-center gap-4 sm:gap-5 pointer-events-auto ml-auto">
-          {/* Botão de Busca */}
-          <button
-            ref={searchRef}
-            type="button"
-            data-focus-key="tv-nav-search"
-            data-tv-focused={searchFocused ? "true" : undefined}
-            onClick={() => {
-              uiSoundService.play('click');
-              onOpenSearch();
-            }}
-            aria-label="Buscar títulos"
-            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 outline-none ${
-              searchFocused
-                ? 'bg-cyan-500/25 text-cyan-300 border-2 border-cyan-400 scale-105 shadow-[0_0_20px_rgba(0,229,255,0.6)]'
-                : 'text-gray-200 hover:text-white bg-white/10 hover:bg-white/15 border border-white/20'
-            }`}
+            className="flex items-center gap-2.5 sm:gap-3 flex-shrink-0 cursor-pointer group/logo outline-none focus:outline-none pointer-events-auto"
           >
-            <Search className="w-7 h-7" />
-          </button>
-
-          {/* Botão de Perfil e Dropdown Encapsulado */}
-          <div className="relative">
-            <button
-              ref={profileRef}
-              type="button"
-              data-focus-key="tv-nav-profile"
-              data-tv-focused={profileFocused ? "true" : undefined}
-              onClick={() => {
-                uiSoundService.play('confirm');
-                setIsProfileMenuOpen(prev => !prev);
+            <div 
+              className="flex items-center justify-center relative flex-shrink-0"
+              style={{
+                width: viewport.scaleCategory === 'compact' ? 38 : viewport.scaleCategory === 'standard' ? 44 : 50,
+                height: viewport.scaleCategory === 'compact' ? 38 : viewport.scaleCategory === 'standard' ? 44 : 50
               }}
-              aria-label="Menu do perfil"
-              className={`w-14 h-14 rounded-full p-1 flex items-center justify-center transition-all duration-200 outline-none ${
-                profileFocused
-                  ? 'border-2 border-cyan-400 scale-105 shadow-[0_0_20px_rgba(0,229,255,0.6)]'
-                  : 'border-2 border-white/20 hover:border-white/40'
+            >
+              <ZapiAnimatedLogo
+                videoSrc="/zapi-icon.webm"
+                className="w-full h-full object-contain pointer-events-none"
+                alt="ZapiTV"
+              />
+            </div>
+            {viewport.scaleCategory !== 'compact' && (
+              <img
+                src="/zapitv-text.png"
+                alt="ZapiTV"
+                className="h-[24px] lg:h-[30px] w-auto object-contain select-none ml-1 hidden sm:block drop-shadow-lg"
+                style={{ transform: 'translateY(2px)' }}
+                draggable={false}
+              />
+            )}
+          </div>
+
+          {/* 2. Região Central: Navegação Flutuante Flexível (flex-1 flex items-center justify-center min-w-0) */}
+          <nav
+            ref={navRef}
+            className="flex-1 flex items-center justify-center min-w-0 relative pointer-events-auto px-2"
+            style={{ gap: `${viewport.navGap}px` }}
+          >
+            {/* Único traço indicador deslizante suave entre os links do header */}
+            <div
+              aria-hidden="true"
+              data-testid="tv-nav-indicator"
+              className={`absolute bottom-0 h-[3px] bg-cyan-400 rounded-full shadow-[0_0_10px_#00e5ff] pointer-events-none will-change-transform ${
+                indicatorVisible ? 'opacity-100' : 'opacity-0'
+              }`}
+              style={{
+                width: `${indicatorWidth}px`,
+                transform: `translate3d(${indicatorX}px, 0, 0)`,
+                transition: hasTransition
+                  ? 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease-out'
+                  : 'opacity 200ms ease-out',
+              }}
+            />
+            <TvNavTabButton
+              focusKey="tv-nav-home"
+              label="Início"
+              fontSize={viewport.navFontSize}
+              scaleCategory={viewport.scaleCategory}
+              isActive={currentTab === 'home'}
+              onFocusTab={handleTabFocus}
+              onBlurTab={handleTabBlur}
+              onClick={() => {
+                uiSoundService.play('navigate');
+                onSelectTab('home');
+              }}
+            />
+            <TvNavTabButton
+              focusKey="tv-nav-movies"
+              label="Filmes"
+              fontSize={viewport.navFontSize}
+              scaleCategory={viewport.scaleCategory}
+              isActive={currentTab === 'movies'}
+              onFocusTab={handleTabFocus}
+              onBlurTab={handleTabBlur}
+              onClick={() => {
+                uiSoundService.play('navigate');
+                onSelectTab('movies');
+              }}
+            />
+            <TvNavTabButton
+              focusKey="tv-nav-series"
+              label="Séries"
+              fontSize={viewport.navFontSize}
+              scaleCategory={viewport.scaleCategory}
+              isActive={currentTab === 'series'}
+              onFocusTab={handleTabFocus}
+              onBlurTab={handleTabBlur}
+              onClick={() => {
+                uiSoundService.play('navigate');
+                onSelectTab('series');
+              }}
+            />
+            <TvNavTabButton
+              focusKey="tv-nav-animes"
+              label="Animes"
+              fontSize={viewport.navFontSize}
+              scaleCategory={viewport.scaleCategory}
+              isActive={currentTab === 'animes'}
+              onFocusTab={handleTabFocus}
+              onBlurTab={handleTabBlur}
+              onClick={() => {
+                uiSoundService.play('navigate');
+                onSelectTab('animes');
+              }}
+            />
+            <TvNavTabButton
+              focusKey="tv-nav-featured"
+              label="Ao Vivo"
+              fontSize={viewport.navFontSize}
+              scaleCategory={viewport.scaleCategory}
+              isActive={currentTab === 'featured'}
+              onFocusTab={handleTabFocus}
+              onBlurTab={handleTabBlur}
+              onClick={() => {
+                uiSoundService.play('navigate');
+                onSelectTab('featured');
+              }}
+            />
+          </nav>
+
+          {/* 3. Região Direita: Busca e Perfil (flex-shrink-0 ml-auto) */}
+          <div 
+            className="flex items-center flex-shrink-0 ml-auto pointer-events-auto"
+            style={{ gap: viewport.scaleCategory === 'compact' ? '12px' : '16px' }}
+          >
+            {/* Botão de Busca */}
+            <button
+              ref={searchRef}
+              type="button"
+              data-focus-key="tv-nav-search"
+              data-tv-focused={searchFocused ? "true" : undefined}
+              onClick={() => {
+                uiSoundService.play('click');
+                onOpenSearch();
+              }}
+              aria-label="Buscar títulos"
+              style={{
+                width: actionBtnSize,
+                height: actionBtnSize
+              }}
+              className={`rounded-full flex items-center justify-center transition-all duration-200 outline-none ${
+                searchFocused
+                  ? 'bg-cyan-500/25 text-cyan-300 border-2 border-cyan-400 scale-105 shadow-[0_0_20px_rgba(0,229,255,0.6)]'
+                  : 'text-gray-200 hover:text-white bg-white/10 hover:bg-white/15 border border-white/20'
               }`}
             >
-              <div className="w-full h-full rounded-full overflow-hidden bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={userName} className="w-full h-full object-cover" />
-                ) : (
-                  <UserIcon className="w-6 h-6 text-white" />
-                )}
-              </div>
+              <Search style={{ width: searchIconSize, height: searchIconSize }} />
             </button>
 
-            {/* Menu Dropdown do Perfil (Minha Lista fica exclusivamente aqui) */}
-            <TvProfileMenu
-              isOpen={isProfileMenuOpen}
-              onClose={() => setIsProfileMenuOpen(false)}
-              onNavigate={(target) => {
-                setIsProfileMenuOpen(false);
-                onNavigateProfileMenu(target);
-              }}
-              userName={userName}
-              avatarUrl={avatarUrl}
-              accountPlan={accountPlan}
-            />
+            {/* Botão de Perfil e Dropdown Encapsulado */}
+            <div className="relative">
+              <button
+                ref={profileRef}
+                type="button"
+                data-focus-key="tv-nav-profile"
+                data-tv-focused={profileFocused ? "true" : undefined}
+                onClick={() => {
+                  uiSoundService.play('confirm');
+                  setIsProfileMenuOpen(prev => !prev);
+                }}
+                aria-label="Menu do perfil"
+                style={{
+                  width: actionBtnSize,
+                  height: actionBtnSize
+                }}
+                className={`rounded-full p-1 flex items-center justify-center transition-all duration-200 outline-none ${
+                  profileFocused
+                    ? 'border-2 border-cyan-400 scale-105 shadow-[0_0_20px_rgba(0,229,255,0.6)]'
+                    : 'border-2 border-white/20 hover:border-white/40'
+                }`}
+              >
+                <div className="w-full h-full rounded-full overflow-hidden bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={userName} className="w-full h-full object-cover" />
+                  ) : (
+                    <UserIcon style={{ width: avatarIconSize, height: avatarIconSize }} className="text-white" />
+                  )}
+                </div>
+              </button>
+
+              {/* Menu Dropdown do Perfil (Minha Lista fica exclusivamente aqui) */}
+              <TvProfileMenu
+                isOpen={isProfileMenuOpen}
+                onClose={() => setIsProfileMenuOpen(false)}
+                onNavigate={(target) => {
+                  setIsProfileMenuOpen(false);
+                  onNavigateProfileMenu(target);
+                }}
+                userName={userName}
+                avatarUrl={avatarUrl}
+                accountPlan={accountPlan}
+              />
+            </div>
           </div>
         </div>
       </header>

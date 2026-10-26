@@ -3,6 +3,7 @@ import { tvModeService } from '../../core/tv/tvModeService';
 import { getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
 import { playbackOptimizerService } from '../../core/playback/PlaybackOptimizerService';
 import { tvPerformanceService, TvPerformanceMetrics } from '../../core/tv/tvPerformanceService';
+import { useTvViewport } from '../../core/tv/tvViewportService';
 
 interface KeyRecord {
   id: string;
@@ -18,6 +19,7 @@ interface KeyRecord {
 }
 
 export const TvRemoteDiagnosticOverlay: React.FC = () => {
+  const tvVp = useTvViewport();
   const [isVisible, setIsVisible] = useState<boolean>(() => tvModeService.isDiagMode());
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
   const [keyLogs, setKeyLogs] = useState<KeyRecord[]>([]);
@@ -247,6 +249,32 @@ export const TvRemoteDiagnosticOverlay: React.FC = () => {
               <div className="flex justify-between">
                 <span className="text-gray-400">Componentes Focáveis:</span>
                 <span className="text-cyan-400 font-bold">{navigableCount} elementos</span>
+              </div>
+            </div>
+
+            {/* Resolução, Viewport e Escala TV */}
+            <div className="bg-black/50 border border-cyan-500/40 rounded-lg p-2 space-y-1 text-[10px]">
+              <div className="flex justify-between items-center">
+                <span className="text-cyan-400 font-bold uppercase tracking-wider">Viewport & Escala:</span>
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                  tvVp.scaleCategory === 'compact' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' :
+                  tvVp.scaleCategory === 'standard' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40' :
+                  'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                }`}>
+                  {tvVp.scaleCategory}
+                </span>
+              </div>
+              <div className="flex justify-between text-gray-300">
+                <span className="text-gray-400">CSS Viewport:</span>
+                <span className="font-bold text-white">{tvVp.width} × {tvVp.height} (DPR {tvVp.dpr})</span>
+              </div>
+              <div className="flex justify-between text-gray-300">
+                <span className="text-gray-400">Tela / Visual VP:</span>
+                <span className="font-bold text-gray-200">{tvVp.screenWidth}×{tvVp.screenHeight} · vis {tvVp.visualViewportWidth}×{tvVp.visualViewportHeight}</span>
+              </div>
+              <div className="flex justify-between text-gray-300">
+                <span className="text-gray-400">Tokens TV:</span>
+                <span className="font-mono text-cyan-300 text-[9px]">Hdr {tvVp.headerHeight}px · Marg {tvVp.safeMarginX}px · Card {tvVp.cardWidth}px</span>
               </div>
             </div>
 
