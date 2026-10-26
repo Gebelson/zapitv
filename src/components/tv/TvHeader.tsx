@@ -72,9 +72,9 @@ const TvNavTabButton: React.FC<{
   }, [focused, focusKey, onFocusTab, onBlurTab]);
 
   const paddingClass = scaleCategory === 'compact'
-    ? 'py-1.5 px-2'
+    ? 'py-1 px-2'
     : scaleCategory === 'standard'
-    ? 'py-2 px-2.5'
+    ? 'py-1.5 px-2.5'
     : 'py-2 px-3';
 
   return (
@@ -119,13 +119,15 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
   const viewport = useTvViewport();
 
   const indicatorWidth = viewport.scaleCategory === 'compact' ? 24 : viewport.scaleCategory === 'standard' ? 28 : 32;
-  const actionBtnSize = viewport.scaleCategory === 'compact' ? 42 : viewport.scaleCategory === 'standard' ? 48 : 56;
-  const searchIconSize = viewport.scaleCategory === 'compact' ? 20 : viewport.scaleCategory === 'standard' ? 24 : 28;
-  const avatarIconSize = viewport.scaleCategory === 'compact' ? 18 : viewport.scaleCategory === 'standard' ? 22 : 24;
+  const indicatorBottom = viewport.scaleCategory === 'compact' ? 10 : viewport.scaleCategory === 'standard' ? 16 : 22;
+  const actionBtnSize = viewport.actionBtnSize;
+  const searchIconSize = viewport.actionIconSize;
+  const avatarIconSize = Math.round(viewport.actionIconSize * 0.9);
 
   // Estado e refs para o traço indicador único deslizante entre os links do header
   const [indicatorVisible, setIndicatorVisible] = useState(false);
   const [indicatorX, setIndicatorX] = useState(0);
+  const [indicatorTop, setIndicatorTop] = useState(42);
   const [hasTransition, setHasTransition] = useState(false);
 
   const navRef = useRef<HTMLElement | null>(null);
@@ -142,13 +144,18 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     const buttonRect = buttonEl.getBoundingClientRect();
 
     let centerX = 0;
+    let computedTop = 42;
     if (navRect.width > 0 && buttonRect.width > 0) {
       centerX = (buttonRect.left + buttonRect.width / 2) - navRect.left;
+      computedTop = Math.round(buttonRect.bottom - navRect.top + 3);
     } else {
       centerX = buttonEl.offsetLeft + (buttonEl.offsetWidth || 80) / 2;
+      computedTop = Math.round(buttonEl.offsetTop + buttonEl.offsetHeight + 3);
     }
     const currentIndicatorW = viewport.scaleCategory === 'compact' ? 24 : viewport.scaleCategory === 'standard' ? 28 : 32;
     const targetX = Math.round(centerX - currentIndicatorW / 2);
+
+    setIndicatorTop(computedTop);
 
     if (!animate || !isIndicatorVisibleRef.current) {
       // Primeira aparição vinda de outra área: posiciona diretamente sob o link sem cruzar o header
@@ -301,20 +308,18 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
           className="absolute z-0 inset-x-0 top-0 pointer-events-none select-none overflow-hidden"
           style={{ height: `${viewport.headerHeight + 50}px` }}
         >
-          {/* Desfoque Real Progressivo via backdrop-filter e máscara gradual (desativado em Fire TV / perfis eco para evitar repaints) */}
-          {!isFireTvOrEco && (
-            <div
-              className={`tv-header-blur absolute inset-0 pointer-events-none transform-gpu transition-opacity duration-500 ease-in-out ${
-                isScrolled ? 'opacity-100' : 'opacity-70'
-              }`}
-              style={{
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-                maskImage: 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.92) 35%, rgba(0,0,0,0.45) 68%, transparent 100%)',
-                WebkitMaskImage: 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.92) 35%, rgba(0,0,0,0.45) 68%, transparent 100%)'
-              }}
-            />
-          )}
+          {/* Desfoque Real Progressivo via backdrop-filter e máscara gradual */}
+          <div
+            className={`tv-header-blur absolute inset-0 pointer-events-none transform-gpu transition-opacity duration-500 ease-in-out ${
+              isScrolled ? 'opacity-100' : 'opacity-70'
+            }`}
+            style={{
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              maskImage: 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.92) 35%, rgba(0,0,0,0.45) 68%, transparent 100%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.92) 35%, rgba(0,0,0,0.45) 68%, transparent 100%)'
+            }}
+          />
 
           {/* Degradê Escuro Cinematográfico (Garante contraste e legibilidade sem faixa sólida) */}
           <div
@@ -337,13 +342,13 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
               uiSoundService.play('navigate');
               onSelectTab('home');
             }}
-            className="flex items-center gap-2.5 sm:gap-3 flex-shrink-0 cursor-pointer group/logo outline-none focus:outline-none pointer-events-auto"
+            className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0 cursor-pointer group/logo outline-none focus:outline-none pointer-events-auto"
           >
             <div 
               className="flex items-center justify-center relative flex-shrink-0"
               style={{
-                width: viewport.scaleCategory === 'compact' ? 38 : viewport.scaleCategory === 'standard' ? 44 : 50,
-                height: viewport.scaleCategory === 'compact' ? 38 : viewport.scaleCategory === 'standard' ? 44 : 50
+                width: `${viewport.logoIconSize}px`,
+                height: `${viewport.logoIconSize}px`
               }}
             >
               <ZapiAnimatedLogo
@@ -352,15 +357,16 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
                 alt="ZapiTV"
               />
             </div>
-            {viewport.scaleCategory !== 'compact' && (
-              <img
-                src="/zapitv-text.png"
-                alt="ZapiTV"
-                className="h-[24px] lg:h-[30px] w-auto object-contain select-none ml-1 hidden sm:block drop-shadow-lg"
-                style={{ transform: 'translateY(2px)' }}
-                draggable={false}
-              />
-            )}
+            <img
+              src="/zapitv-text.png"
+              alt="ZapiTV"
+              className="w-auto object-contain select-none ml-1 drop-shadow-lg"
+              style={{
+                height: `${viewport.logoTextHeight}px`,
+                transform: 'translateY(2px)'
+              }}
+              draggable={false}
+            />
           </div>
 
           {/* 2. Região Central: Navegação Flutuante Flexível (flex-1 flex items-center justify-center min-w-0) */}
@@ -373,11 +379,12 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
             <div
               aria-hidden="true"
               data-testid="tv-nav-indicator"
-              className={`absolute bottom-0 h-[3px] bg-cyan-400 rounded-full shadow-[0_0_10px_#00e5ff] pointer-events-none will-change-transform ${
+              className={`absolute left-0 h-[3px] bg-cyan-400 rounded-full shadow-[0_0_10px_#00e5ff] pointer-events-none will-change-transform ${
                 indicatorVisible ? 'opacity-100' : 'opacity-0'
               }`}
               style={{
                 width: `${indicatorWidth}px`,
+                top: `${indicatorTop}px`,
                 transform: `translate3d(${indicatorX}px, 0, 0)`,
                 transition: hasTransition
                   ? 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease-out'

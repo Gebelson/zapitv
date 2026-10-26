@@ -45,6 +45,8 @@ class TvNavigationManager {
         domNodeFocusOptions: { preventScroll: true }
       });
 
+      (window as any).__setTvFocus = (key: string) => setFocus(key);
+
       setKeyMap({
         left: [37, 'ArrowLeft'],
         up: [38, 'ArrowUp'],

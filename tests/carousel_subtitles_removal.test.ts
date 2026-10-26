@@ -165,7 +165,7 @@ assert.strictEqual(
   'TvContentRow.tsx NÃO deve conter referências a subtitle'
 );
 assert.ok(
-  tvRowCode.includes('<h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-wide drop-shadow-md">') &&
+  tvRowCode.includes('className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-wide drop-shadow-md"') &&
   /<h2[^>]*>\s*\{title\}\s*<\/h2>/.test(tvRowCode),
   'TvContentRow.tsx deve exibir apenas o título h2 da fileira'
 );

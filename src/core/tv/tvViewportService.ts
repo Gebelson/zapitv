@@ -20,15 +20,26 @@ export interface TvViewportMetrics {
   visualViewportWidth: number;
   visualViewportHeight: number;
   scaleCategory: TvScaleCategory;
-  // Tokens de layout calculados
+  // Tokens de layout calculados proporcionalmente
   headerHeight: number;
   safeMarginX: number;
+  logoIconSize: number;
+  logoTextHeight: number;
   navFontSize: number;
   navGap: number;
+  actionBtnSize: number;
+  actionIconSize: number;
   heroTitleSize: number;
   heroBtnHeight: number;
+  heroDotsBottom: number;
+  heroDotsWidth: number;
+  heroDotsHeight: number;
   cardWidth: number;
   cardGap: number;
+  rowTitleSize: number;
+  searchSidebarWidth: number;
+  keyboardKeyHeight: number;
+  keyboardFontSize: number;
 }
 
 class TvViewportService {
@@ -65,14 +76,25 @@ class TvViewportService {
         visualViewportWidth: 1920,
         visualViewportHeight: 1080,
         scaleCategory: 'expanded',
-        headerHeight: 96,
+        headerHeight: 92,
         safeMarginX: 64,
+        logoIconSize: 48,
+        logoTextHeight: 28,
         navFontSize: 21,
-        navGap: 32,
-        heroTitleSize: 56,
-        heroBtnHeight: 58,
-        cardWidth: 275,
-        cardGap: 24
+        navGap: 28,
+        actionBtnSize: 52,
+        actionIconSize: 26,
+        heroTitleSize: 48,
+        heroBtnHeight: 54,
+        heroDotsBottom: 48,
+        heroDotsWidth: 32,
+        heroDotsHeight: 8,
+        cardWidth: 260,
+        cardGap: 24,
+        rowTitleSize: 26,
+        searchSidebarWidth: 400,
+        keyboardKeyHeight: 46,
+        keyboardFontSize: 17
       };
     }
 
@@ -99,33 +121,66 @@ class TvViewportService {
     }
 
     // Parâmetros de design fluidos e proporcionais a cada categoria
-    let headerHeight = 96;
+    let headerHeight = 92;
     let safeMarginX = 64;
+    let logoIconSize = 48;
+    let logoTextHeight = 28;
     let navFontSize = 21;
-    let navGap = 32;
-    let heroTitleSize = 56;
-    let heroBtnHeight = 58;
-    let cardWidth = 275;
+    let navGap = 28;
+    let actionBtnSize = 52;
+    let actionIconSize = 26;
+    let heroTitleSize = 48;
+    let heroBtnHeight = 54;
+    let heroDotsBottom = 48;
+    let heroDotsWidth = 32;
+    let heroDotsHeight = 8;
+    let cardWidth = 260;
     let cardGap = 24;
+    let rowTitleSize = 26;
+    let searchSidebarWidth = 400;
+    let keyboardKeyHeight = 46;
+    let keyboardFontSize = 17;
 
     if (scaleCategory === 'compact') {
-      headerHeight = 64;
-      safeMarginX = 36;
-      navFontSize = 15;
-      navGap = 14;
-      heroTitleSize = 32;
-      heroBtnHeight = 44;
-      cardWidth = 205;
-      cardGap = 16;
+      headerHeight = 60;
+      safeMarginX = 32;
+      logoIconSize = 34;
+      logoTextHeight = 18;
+      navFontSize = 14;
+      navGap = 10;
+      actionBtnSize = 38;
+      actionIconSize = 18;
+      heroTitleSize = 24;
+      heroBtnHeight = 36;
+      heroDotsBottom = 20;
+      heroDotsWidth = 18;
+      heroDotsHeight = 4;
+      cardWidth = 165;
+      cardGap = 14;
+      rowTitleSize = 18;
+      searchSidebarWidth = 275;
+      keyboardKeyHeight = 32;
+      keyboardFontSize = 12;
     } else if (scaleCategory === 'standard') {
-      headerHeight = 80;
+      headerHeight = 76;
       safeMarginX = 48;
-      navFontSize = 18;
-      navGap = 22;
-      heroTitleSize = 44;
-      heroBtnHeight = 50;
-      cardWidth = 240;
-      cardGap = 20;
+      logoIconSize = 42;
+      logoTextHeight = 22;
+      navFontSize = 17;
+      navGap = 18;
+      actionBtnSize = 44;
+      actionIconSize = 22;
+      heroTitleSize = 36;
+      heroBtnHeight = 46;
+      heroDotsBottom = 34;
+      heroDotsWidth = 24;
+      heroDotsHeight = 6;
+      cardWidth = 215;
+      cardGap = 18;
+      rowTitleSize = 22;
+      searchSidebarWidth = 340;
+      keyboardKeyHeight = 38;
+      keyboardFontSize = 15;
     }
 
     return {
@@ -139,12 +194,23 @@ class TvViewportService {
       scaleCategory,
       headerHeight,
       safeMarginX,
+      logoIconSize,
+      logoTextHeight,
       navFontSize,
       navGap,
+      actionBtnSize,
+      actionIconSize,
       heroTitleSize,
       heroBtnHeight,
+      heroDotsBottom,
+      heroDotsWidth,
+      heroDotsHeight,
       cardWidth,
-      cardGap
+      cardGap,
+      rowTitleSize,
+      searchSidebarWidth,
+      keyboardKeyHeight,
+      keyboardFontSize
     };
   }
 

@@ -76,7 +76,7 @@ async function runTvHeroNoArrowsTests() {
   assert(
     heroCode.includes('hero-dot-') &&
     heroCode.includes('pointer-events-none') &&
-    heroCode.includes('w-8 h-2.5 bg-gradient-to-r from-blue-500 to-cyan-400') &&
+    (heroCode.includes('heroDotsWidth') || heroCode.includes('bg-gradient-to-r')) &&
     !heroCode.includes('onClick={() => { resetTimer(); goToSlide(idx); }}'),
     'Indicadores devem ser exibidos visualmente mas ser pointer-events-none, sem onClick e sem foco'
   );

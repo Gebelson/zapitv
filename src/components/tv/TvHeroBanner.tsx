@@ -66,12 +66,12 @@ const TvHeroButton: React.FC<{
   if (scaleCategory === 'compact') {
     if (isPrimary) {
       btnStyle = focused
-        ? 'px-5 py-2.5 rounded-xl font-bold text-sm border-0 overflow-hidden bg-gradient-to-r from-blue-500 via-blue-400 to-cyan-300 text-white scale-105 shadow-[0_0_20px_rgba(0,229,255,0.75)]'
-        : 'px-5 py-2.5 rounded-xl font-bold text-sm border-0 overflow-hidden bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 text-white shadow-lg shadow-cyan-500/25 hover:scale-102';
+        ? 'px-4 py-2 rounded-lg font-bold text-xs border-0 overflow-hidden bg-gradient-to-r from-blue-500 via-blue-400 to-cyan-300 text-white scale-105 shadow-[0_0_16px_rgba(0,229,255,0.7)]'
+        : 'px-4 py-2 rounded-lg font-bold text-xs border-0 overflow-hidden bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-400 text-white shadow-md shadow-cyan-500/25 hover:scale-102';
     } else {
       btnStyle = focused
-        ? 'px-4 py-2.5 rounded-xl font-bold text-sm bg-white/25 text-white scale-105 border-2 border-white shadow-[0_0_16px_rgba(255,255,255,0.5)]'
-        : 'px-4 py-2.5 rounded-xl font-bold text-sm bg-white/10 hover:bg-white/15 text-gray-200 border border-white/20 hover:scale-102';
+        ? 'px-3.5 py-2 rounded-lg font-bold text-xs bg-white/25 text-white scale-105 border-2 border-white shadow-[0_0_14px_rgba(255,255,255,0.5)]'
+        : 'px-3.5 py-2 rounded-lg font-bold text-xs bg-white/10 hover:bg-white/15 text-gray-200 border border-white/20 hover:scale-102';
     }
   } else if (scaleCategory === 'standard') {
     if (isPrimary) {
@@ -526,20 +526,24 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
         {/* Indicadores de Paginação Discretos e Estilizados (Apenas Exibição Visual, Sem Seleção Manual) */}
         {slides.length > 1 && (
           <div 
-            className={`absolute z-30 flex items-center gap-2 select-none pointer-events-none ${
-              viewport.scaleCategory === 'compact' ? 'bottom-16 sm:bottom-20' : 'bottom-24 sm:bottom-28'
-            }`}
-            style={{ right: `${viewport.safeMarginX}px` }}
+            className="absolute z-30 flex items-center select-none pointer-events-none"
+            style={{
+              right: `${viewport.safeMarginX}px`,
+              bottom: `${viewport.heroDotsBottom}px`,
+              gap: viewport.scaleCategory === 'compact' ? '6px' : '8px'
+            }}
             aria-hidden="true"
           >
             {slides.map((slide, idx) => (
               <div
                 key={`hero-dot-${slide.id}-${idx}`}
-                className={`transition-all duration-300 rounded-full p-0 ${
-                  idx === currentIndex
-                    ? 'w-8 h-2.5 bg-gradient-to-r from-blue-500 to-cyan-400 shadow-[0_0_12px_#00e5ff]'
-                    : 'w-2.5 h-2.5 bg-white/30'
-                }`}
+                className="transition-all duration-300 rounded-full p-0"
+                style={{
+                  width: idx === currentIndex ? `${viewport.heroDotsWidth}px` : `${viewport.heroDotsHeight}px`,
+                  height: `${viewport.heroDotsHeight}px`,
+                  background: idx === currentIndex ? 'linear-gradient(to right, #3b82f6, #22d3ee)' : 'rgba(255, 255, 255, 0.35)',
+                  boxShadow: idx === currentIndex ? '0 0 10px #00e5ff' : 'none'
+                }}
               />
             ))}
           </div>
@@ -551,19 +555,19 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
           style={{
             paddingLeft: `${viewport.safeMarginX}px`,
             paddingRight: `${viewport.safeMarginX}px`,
-            paddingBottom: viewport.scaleCategory === 'compact' ? '28px' : viewport.scaleCategory === 'standard' ? '44px' : '64px',
-            maxWidth: viewport.scaleCategory === 'compact' ? '540px' : viewport.scaleCategory === 'standard' ? '680px' : '820px',
+            paddingBottom: viewport.scaleCategory === 'compact' ? '20px' : viewport.scaleCategory === 'standard' ? '36px' : '56px',
+            maxWidth: viewport.scaleCategory === 'compact' ? '480px' : viewport.scaleCategory === 'standard' ? '640px' : '800px',
             opacity: textOpacity,
             transform: textOpacity === 1 ? 'translate3d(0, 0, 0)' : 'translate3d(0, 8px, 0)'
           }}
         >
           {/* Metadados: Ano, Classificação, Gêneros, Nota */}
           <div className={`flex flex-wrap items-center font-bold text-gray-300 drop-shadow ${
-            viewport.scaleCategory === 'compact' ? 'gap-2 mb-2 text-xs' : 'gap-3 mb-3 text-sm'
+            viewport.scaleCategory === 'compact' ? 'gap-1.5 mb-1.5 text-[11px]' : 'gap-3 mb-3 text-sm'
           }`}>
             {currentItem.rating ? (
-              <span className="flex items-center gap-1.5 text-amber-400 bg-black/60 px-2 py-0.5 rounded-lg border border-amber-400/30">
-                <Star className="w-3.5 h-3.5 fill-amber-400" />
+              <span className="flex items-center gap-1 text-amber-400 bg-black/60 px-1.5 py-0.5 rounded border border-amber-400/30">
+                <Star className={viewport.scaleCategory === 'compact' ? "w-3 h-3 fill-amber-400" : "w-3.5 h-3.5 fill-amber-400"} />
                 {currentItem.rating.toFixed(1)}
               </span>
             ) : null}
@@ -571,7 +575,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
             {currentItem.year ? <span>{currentItem.year}</span> : null}
 
             {currentItem.ageRating && (
-              <span className="px-1.5 py-0.5 rounded-md bg-white/15 border border-white/20 text-[11px] text-white">
+              <span className="px-1.5 py-0.5 rounded bg-white/15 border border-white/20 text-[10px] text-white">
                 {currentItem.ageRating}
               </span>
             )}
@@ -584,13 +588,13 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
           <h1 
             style={{
               fontSize: viewport.scaleCategory === 'compact'
-                ? 'clamp(1.5rem, 3.2vw, 2rem)'
+                ? 'clamp(1.2rem, 2.5vw, 1.65rem)'
                 : viewport.scaleCategory === 'standard'
-                ? 'clamp(2rem, 3.8vw, 2.75rem)'
+                ? 'clamp(1.8rem, 3.5vw, 2.4rem)'
                 : 'clamp(2.5rem, 4.5vw, 3.75rem)'
             }}
             className={`font-black text-white tracking-tight leading-tight line-clamp-2 drop-shadow-2xl ${
-              viewport.scaleCategory === 'compact' ? 'mb-2' : viewport.scaleCategory === 'standard' ? 'mb-3' : 'mb-4'
+              viewport.scaleCategory === 'compact' ? 'mb-1.5' : viewport.scaleCategory === 'standard' ? 'mb-2.5' : 'mb-4'
             }`}
           >
             {currentItem.title}
@@ -600,17 +604,17 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
           <p 
             className={`text-gray-300/95 leading-relaxed drop-shadow ${
               viewport.scaleCategory === 'compact'
-                ? 'text-xs sm:text-sm line-clamp-2 mb-4 max-w-md'
+                ? 'text-xs line-clamp-2 mb-3 max-w-md'
                 : viewport.scaleCategory === 'standard'
-                ? 'text-sm sm:text-base line-clamp-3 mb-6 max-w-lg'
+                ? 'text-sm line-clamp-3 mb-5 max-w-lg'
                 : 'text-base sm:text-lg line-clamp-3 mb-8 max-w-xl'
             }`}
           >
             {currentItem.description || currentItem.overview || 'Acompanhe esta incrível produção agora no ZapiTV com a máxima qualidade e sem interrupções.'}
           </p>
 
-          {/* Botões Grandes de Ação Proporcionais ao Viewport */}
-          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+          {/* Botões de Ação Proporcionais ao Viewport */}
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
             <TvHeroButton
               focusKey="tv-hero-play"
               onClick={() => {
@@ -619,7 +623,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
               }}
               isPrimary
               scaleCategory={viewport.scaleCategory}
-              icon={<Play className={viewport.scaleCategory === 'compact' ? "w-4 h-4 fill-white" : viewport.scaleCategory === 'standard' ? "w-5 h-5 fill-white" : "w-6 h-6 fill-white"} />}
+              icon={<Play className={viewport.scaleCategory === 'compact' ? "w-3.5 h-3.5 fill-white" : viewport.scaleCategory === 'standard' ? "w-4 h-4 fill-white" : "w-5 h-5 fill-white"} />}
               label={hasProgress ? "Continuar" : "Assistir"}
               onDownPress={onDownPress}
               upFocusKey={upFocusKey}
@@ -633,7 +637,7 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
               }}
               isPrimary={false}
               scaleCategory={viewport.scaleCategory}
-              icon={<Info className={viewport.scaleCategory === 'compact' ? "w-4 h-4" : viewport.scaleCategory === 'standard' ? "w-5 h-5" : "w-6 h-6"} />}
+              icon={<Info className={viewport.scaleCategory === 'compact' ? "w-3.5 h-3.5" : viewport.scaleCategory === 'standard' ? "w-4 h-4" : "w-5 h-5"} />}
               label="Mais detalhes"
               onDownPress={onDownPress}
               upFocusKey={upFocusKey}

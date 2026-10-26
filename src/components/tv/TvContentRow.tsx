@@ -95,7 +95,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   const [cardWidth, setCardWidth] = useState(viewport.cardWidth);
   const [stepSize, setStepSize] = useState(viewport.cardWidth + viewport.cardGap);
   const [selectionGeometry, setSelectionGeometry] = useState({
-    top: 32, // fallback para py-8 (32px / 2rem)
+    top: viewport.scaleCategory === 'compact' ? 20 : 32,
     left: viewport.safeMarginX,
     width: viewport.cardWidth,
     height: Math.round(viewport.cardWidth * 1.5),
@@ -427,24 +427,27 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
         data-row-id={rowId}
         data-focus-key={focusKey}
         data-tv-focused={focused ? "true" : undefined}
-        className="w-full mb-8 sm:mb-10 lg:mb-12 select-none overflow-hidden focus:outline-none"
+        className="w-full mb-6 sm:mb-8 lg:mb-12 select-none overflow-hidden focus:outline-none"
         aria-label={title}
       >
         {/* Título da Fileira (Alinhado com safeMarginX, sem contadores) */}
         <div 
-          className="mb-2"
+          className="mb-1.5 sm:mb-2"
           style={{
             paddingLeft: `${viewport.safeMarginX}px`,
             paddingRight: `${viewport.safeMarginX}px`
           }}
         >
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-wide drop-shadow-md">
+          <h2 
+            style={{ fontSize: `${viewport.rowTitleSize}px` }}
+            className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-wide drop-shadow-md"
+          >
             {title}
           </h2>
         </div>
 
         {/* Trilho Horizontal de Ponta a Ponta na Tela */}
-        <div ref={trackContainerRef} className="relative w-full overflow-hidden py-8">
+        <div ref={trackContainerRef} className={`relative w-full overflow-hidden ${viewport.scaleCategory === 'compact' ? 'py-5' : 'py-8'}`}>
           {/* 1. GLOW AMBIENTE SUTIL (ATRÁS DA CAPA): Geometria compartilhada 2:3 */}
           {focused && currentItem && (
             <div 

@@ -6,6 +6,7 @@ import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { searchService, SearchCategory } from '../../core/search/searchService';
 import { uiSoundService } from '../../core/audio/uiSoundService';
+import { useTvViewport } from '../../core/tv/tvViewportService';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvSearchViewProps {
@@ -59,6 +60,7 @@ interface TvVirtualKeyProps {
   onPress: (char: string) => void;
   className?: string;
   focusKey: string;
+  style?: React.CSSProperties;
   onArrowRightFromEdge?: () => void;
 }
 
@@ -68,6 +70,7 @@ const TvVirtualKey: React.FC<TvVirtualKeyProps> = ({
   onPress,
   className = '',
   focusKey,
+  style,
   onArrowRightFromEdge
 }) => {
   const { ref, focused } = useTvFocusable({
@@ -107,6 +110,7 @@ interface TvFilterTabProps {
   id: SearchCategory;
   label: string;
   isActive: boolean;
+  scaleCategory?: string;
   onSelect: (id: SearchCategory) => void;
   onArrowLeftEdge?: () => void;
 }
@@ -115,6 +119,7 @@ const TvFilterTab: React.FC<TvFilterTabProps> = ({
   id,
   label,
   isActive,
+  scaleCategory,
   onSelect,
   onArrowLeftEdge
 }) => {
@@ -138,7 +143,7 @@ const TvFilterTab: React.FC<TvFilterTabProps> = ({
       data-tv-focused={focused ? "true" : undefined}
       data-tv-active={isActive ? "true" : undefined}
       onClick={() => onSelect(id)}
-      className={`px-5 py-2 rounded-xl text-base font-bold transition-all duration-150 outline-none cursor-pointer ${
+      className={`${scaleCategory === 'compact' ? 'px-3 py-1.5 text-xs rounded-lg' : 'px-5 py-2 text-base rounded-xl'} font-bold transition-all duration-150 outline-none cursor-pointer ${
         focused
           ? 'border-2 border-cyan-400 bg-cyan-500/35 text-white shadow-[0_0_20px_rgba(0,229,255,0.7)] scale-105 z-20'
           : isActive
@@ -206,6 +211,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
   onSelectItem,
   onClose
 }) => {
+  const viewport = useTvViewport();
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<SearchCategory>('all');
   const resultsContainerRef = useRef<HTMLDivElement>(null);
@@ -516,7 +522,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
         {/* ========================================================= */}
         {/* COLUNA ESQUERDA: Voltar, Input, Teclado Virtual, Sugestões */}
         {/* ========================================================= */}
-        <div className="w-[360px] sm:w-[380px] lg:w-[420px] flex-shrink-0 h-full flex flex-col border-r border-white/10 bg-[#070b13]/95 backdrop-blur-xl p-6 sm:p-7 overflow-y-auto z-20 shadow-2xl">
+        <div style={{ width: `${viewport.searchSidebarWidth}px` }} className={`flex-shrink-0 h-full flex flex-col border-r border-white/10 bg-[#070b13]/95 backdrop-blur-xl overflow-y-auto z-20 shadow-2xl ${viewport.scaleCategory === 'compact' ? 'p-3.5 sm:p-4' : 'p-6 sm:p-7'}`}>
           {/* Botão Voltar */}
           <div className="mb-4">
             <button
@@ -531,7 +537,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                   : 'border border-white/15 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white'
               }`}
             >
-              <ArrowLeft className="w-5 h-5 text-cyan-400" />
+              <ArrowLeft className={viewport.scaleCategory === 'compact' ? "w-4 h-4 text-cyan-400" : "w-5 h-5 text-cyan-400"} />
               <span>Voltar</span>
             </button>
           </div>
@@ -572,29 +578,32 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
           </div>
 
           {/* Teclado Virtual Integrado */}
-          <div className="mb-6">
-            <div className="grid grid-cols-6 gap-2 w-full">
+          <div className={viewport.scaleCategory === 'compact' ? 'mb-4' : 'mb-6'}>
+            <div className={`grid grid-cols-6 w-full ${viewport.scaleCategory === 'compact' ? 'gap-1.5' : 'gap-2'}`}>
               {/* Linha de Utilidades: Espaço (3 cols), Apagar (2 cols), Limpar (1 col) */}
               <TvVirtualKey
                 char=" "
-                displayLabel={<span className="text-xs uppercase tracking-wider font-semibold">␣ Espaço</span>}
+                displayLabel={<span className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold">␣ Espaço</span>}
                 onPress={handleVirtualKeyPress}
                 focusKey="tv-key-space"
-                className="col-span-3 h-10 sm:h-11"
+                style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${viewport.keyboardFontSize}px` }}
+                className="col-span-3"
               />
               <TvVirtualKey
                 char="BACKSPACE"
-                displayLabel={<span className="text-xs uppercase tracking-wider font-semibold">⌫ Apagar</span>}
+                displayLabel={<span className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold">⌫ Apagar</span>}
                 onPress={handleVirtualKeyPress}
                 focusKey="tv-key-backspace"
-                className="col-span-2 h-10 sm:h-11"
+                style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${viewport.keyboardFontSize}px` }}
+                className="col-span-2"
               />
               <TvVirtualKey
                 char="CLEAR"
-                displayLabel={<span className="text-xs uppercase tracking-wider font-semibold">Limpar</span>}
+                displayLabel={<span className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold">Limpar</span>}
                 onPress={handleVirtualKeyPress}
                 focusKey="tv-key-clear"
-                className="col-span-1 h-10 sm:h-11"
+                style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${viewport.keyboardFontSize}px` }}
+                className="col-span-1"
                 onArrowRightFromEdge={handleJumpToResults}
               />
 
@@ -608,7 +617,8 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                       char={k}
                       onPress={handleVirtualKeyPress}
                       focusKey={`tv-key-${k}`}
-                      className="h-10 sm:h-11 text-base sm:text-lg uppercase"
+                      style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${viewport.keyboardFontSize}px` }}
+                      className="uppercase font-bold"
                       onArrowRightFromEdge={isRightEdge ? handleJumpToResults : undefined}
                     />
                   );
@@ -618,7 +628,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
           </div>
 
           {/* Lista de Sugestões logo abaixo do teclado */}
-          <div className="mt-auto pt-3 border-t border-white/10">
+          <div className={`mt-auto border-t border-white/10 ${viewport.scaleCategory === 'compact' ? 'pt-2' : 'pt-3'}`}>
             <div className="flex items-center gap-1.5 mb-2.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
               <span>{query ? 'Sugestões Relacionadas' : 'Categorias & Temas Populares'}</span>
@@ -649,9 +659,9 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
           className="flex-1 h-full flex flex-col p-6 sm:p-8 lg:p-10 overflow-y-auto"
         >
           {/* Cabeçalho da Direita: Termo Pesquisado e Abas de Categoria */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-5 border-b border-white/10">
+          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 ${viewport.scaleCategory === 'compact' ? 'mb-4 pb-3' : 'mb-8 pb-5'}`}>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
+              <h1 className={`font-extrabold tracking-tight text-white flex items-center gap-2.5 ${viewport.scaleCategory === 'compact' ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl'}`}>
                 {query.trim() ? (
                   <>
                     <span>Resultados para</span>
@@ -663,7 +673,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                   <span>Títulos em Alta e Recomendados</span>
                 )}
               </h1>
-              <p className="text-sm text-gray-400 mt-1">
+              <p className={`text-gray-400 mt-0.5 ${viewport.scaleCategory === 'compact' ? 'text-xs' : 'text-sm'}`}>
                 {searchResults.length} {searchResults.length === 1 ? 'título disponível' : 'títulos disponíveis'}
               </p>
             </div>
@@ -689,7 +699,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
           {/* Grade de Resultados Verticais 2:3 */}
           {searchResults.length > 0 ? (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+              <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 ${viewport.scaleCategory === 'compact' ? 'gap-3 sm:gap-4' : 'gap-6'}`}>
                 {searchResults.slice(0, visibleCount).map((item, idx) => (
                   <TvCard16x9
                     key={`search-${item.id}-${idx}`}
