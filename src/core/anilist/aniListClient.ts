@@ -127,14 +127,22 @@ export class AniListClient {
       .trim();
 
     const episodeCount = media.episodes || (isMovie ? 1 : 12);
+    const releaseYear = media.seasonYear || media.startDate?.year || new Date().getFullYear();
+    const formattedDate = media.startDate?.year
+      ? `${media.startDate.year}-${String(media.startDate.month || 1).padStart(2, '0')}-${String(media.startDate.day || 1).padStart(2, '0')}`
+      : `${releaseYear}-01-01`;
+
     const episodes = isMovie ? undefined : Array.from({ length: Math.min(episodeCount, 1500) }, (_, idx) => {
       const epNum = idx + 1;
       return {
-        id: `ep-${epNum}`,
+        id: `ep-${media.id}-${epNum}`,
         number: epNum,
+        season: 1,
         title: `Episódio ${epNum}`,
         description: `Episódio ${epNum} de ${mainTitle}`,
-        image: poster
+        image: poster,
+        airDate: formattedDate,
+        releaseDate: formattedDate
       };
     });
 
@@ -184,6 +192,8 @@ export class AniListClient {
             seasonYear
             startDate {
               year
+              month
+              day
             }
             coverImage {
               extraLarge
@@ -230,6 +240,8 @@ export class AniListClient {
             seasonYear
             startDate {
               year
+              month
+              day
             }
             coverImage {
               extraLarge

@@ -247,6 +247,8 @@ export function sameCatalogWork(a: ContentItem, b: ContentItem): boolean {
 
 class TMDBClientService {
   private imdbCache = new Map<string, string>();
+  private seasonEpisodesCache = new Map<string, { eps: any[]; timestamp: number }>();
+  private inFlightSeasonEpisodes = new Map<string, Promise<any[]>>();
 
   private async request(endpoint: string, timeoutMs = 8000, signal?: AbortSignal): Promise<any> {
     const url = `${TMDB_BASE_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}api_key=${TMDB_API_KEY}&language=pt-BR`;
@@ -986,22 +988,77 @@ class TMDBClientService {
     airDate?: string;
     releaseDate?: string;
   }[]> {
-    try {
-      const data = await this.request(`/tv/${tvId}/season/${seasonNumber}`);
-      return (data.episodes || []).map((ep: any) => ({
-        id: `ep-${tvId}-${seasonNumber}-${ep.episode_number}`,
-        number: ep.episode_number,
-        title: ep.name || `Episódio ${ep.episode_number}`,
-        description: ep.overview || 'Sinopse oficial deste episódio não informada.',
-        image: ep.still_path ? `${TMDB_IMAGE_BASE}${ep.still_path}` : '',
-        stillPath: ep.still_path,
-        airDate: ep.air_date,
-        releaseDate: ep.air_date
-      }));
-    } catch (err) {
-      console.warn(`Erro ao carregar episódios da T${seasonNumber}:`, err);
-      return [];
+    const cleanId = String(tvId).trim().replace(/^tmdb-?/i, '');
+    const cacheKey = `${cleanId}_s${seasonNumber}`;
+
+    // 1. Consulta em cache (TTL de 24 horas para episódios já lançados)
+    const cached = this.seasonEpisodesCache.get(cacheKey);
+    const now = Date.now();
+    if (cached && (now - cached.timestamp < 24 * 60 * 60 * 1000) && cached.eps.length > 0) {
+      return cached.eps;
     }
+
+    // 2. Reutilização de requisição em andamento
+    if (this.inFlightSeasonEpisodes.has(cacheKey)) {
+      return this.inFlightSeasonEpisodes.get(cacheKey)!;
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const data = await this.request(`/tv/${cleanId}/season/${seasonNumber}`, 9000);
+        const mapped = (data.episodes || []).map((ep: any) => ({
+          id: `ep-${cleanId}-${seasonNumber}-${ep.episode_number}`,
+          number: ep.episode_number,
+          title: ep.name || `Episódio ${ep.episode_number}`,
+          description: ep.overview || 'Sinopse oficial deste episódio não informada.',
+          image: ep.still_path ? `${TMDB_IMAGE_BASE}${ep.still_path}` : '',
+          stillPath: ep.still_path,
+          airDate: ep.air_date,
+          releaseDate: ep.air_date
+        }));
+
+        if (mapped.length > 0) {
+          this.seasonEpisodesCache.set(cacheKey, { eps: mapped, timestamp: Date.now() });
+          return mapped;
+        }
+        return [];
+      } catch (err) {
+        console.warn(`Erro ao carregar episódios da T${seasonNumber} (TMDB ID ${cleanId}):`, err);
+        // Se houver cache prévio (mesmo antigo), preserva para não deixar o usuário sem episódios
+        if (cached && cached.eps.length > 0) {
+          return cached.eps;
+        }
+        // Fallback: tenta recuperar via Cinemeta se houver IMDb ID associado
+        try {
+          const imdbId = await this.getImdbId(cleanId, 'series');
+          if (imdbId) {
+            const cineMeta = await this.getCinemetaMeta('series', imdbId);
+            if (cineMeta?.videos) {
+              const filtered = cineMeta.videos.filter(v => v.season === seasonNumber);
+              if (filtered.length > 0) {
+                const cineMapped = filtered.map(v => ({
+                  id: v.id || `${imdbId}:${v.season}:${v.number}`,
+                  number: v.number,
+                  title: v.name || v.title || `Episódio ${v.number}`,
+                  description: v.overview || v.description || 'Sinopse oficial via catálogo Stremio Cinemeta.',
+                  image: v.thumbnail || '',
+                  airDate: v.released,
+                  releaseDate: v.released
+                }));
+                this.seasonEpisodesCache.set(cacheKey, { eps: cineMapped, timestamp: Date.now() });
+                return cineMapped;
+              }
+            }
+          }
+        } catch {}
+        return [];
+      } finally {
+        this.inFlightSeasonEpisodes.delete(cacheKey);
+      }
+    })();
+
+    this.inFlightSeasonEpisodes.set(cacheKey, fetchPromise);
+    return fetchPromise;
   }
 
   public async getSeasonEpisodesByImdb(imdbId: string, seasonNumber: number): Promise<{

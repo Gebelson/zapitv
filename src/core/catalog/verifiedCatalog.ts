@@ -363,6 +363,41 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     ]
   },
 
+  // ANIME VERIFICADO - DR. STONE (CANÔNICO)
+  {
+    id: 'anime-dr-stone-verified',
+    canonicalId: 'anime:anilist:105333',
+    title: 'Dr. Stone',
+    originalTitle: 'Dr.STONE',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 8.6,
+    year: 2019,
+    image: 'https://image.tmdb.org/t/p/w500/xEbnuDJXA0MYVV1zjizGWgOhSPE.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/lN13BPAEnc5iXmoxxBQHOZ1ScfZ.jpg',
+    description: 'Milhares de anos após um fenômeno misterioso transformar toda a humanidade em pedra, o jovem gênio da ciência Senku Ishigami desperta determinado a reconstruir a civilização do zero através da ciência.',
+    genres: ['Anime', 'Ficção Científica', 'Aventura', 'Comédia', 'Ação'],
+    aniListId: 105333,
+    tmdbId: '86031',
+    imdbId: 'tt9679542',
+    malId: 38691,
+    seasonsCount: 3,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'dr-stone-s1e1',
+        number: 1,
+        season: 1,
+        title: 'Stone World',
+        description: 'Tudo começa quando um clarão misterioso petrifica a humanidade inteira. Milênios depois, o gênio Senku desperta em um mundo de pedra.',
+        image: 'https://image.tmdb.org/t/p/w500/tsySP3maZBXg1XnPK0BcOwYfozS.jpg',
+        airDate: '2019-07-05',
+        releaseDate: '2019-07-05'
+      }
+    ]
+  },
+
   // 13. FILME EM CARTAZ - HOPE: O PRIMEIRO IMPACTO (2026)
   // Obra em produção/cartaz nos cinemas. Fontes de torrent fraudulentas contendo trotes/vídeos adultos foram isoladas em quarentena permanente.
   {

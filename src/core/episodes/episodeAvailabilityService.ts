@@ -50,59 +50,123 @@ export class EpisodeAvailabilityService {
 
   /**
    * Valida rigorosamente se o episódio já estreou oficialmente na data/horário oficial.
-   * Oculta completamente episódios futuros ou sem data confirmada de lançamento.
+   * Distingue entre:
+   * 1. Estreia confirmada no passado -> true
+   * 2. Estreia futura confirmada -> false
+   * 3. Data ausente/desconhecida com evidência confiável de existência em temporada lançada -> true
+   * 4. Placeholder ou episódio fictício sem evidência -> false
    */
-  public isEpisodeOfficiallyAired(airDate?: string | null, releaseDate?: string | null): boolean {
-    const raw = airDate || releaseDate;
-    if (!raw || typeof raw !== 'string' || !raw.trim()) {
-      // Sem data de lançamento oficial = ainda não estreou / não confirmado
+  public isEpisodeOfficiallyAired(
+    airDate?: string | null,
+    releaseDateOrContext?: string | null | {
+      hasOfficialEvidence?: boolean;
+      seriesYear?: number;
+      isAfterFutureEpisode?: boolean;
+      episodeTitle?: string;
+    },
+    context?: {
+      hasOfficialEvidence?: boolean;
+      seriesYear?: number;
+      isAfterFutureEpisode?: boolean;
+      episodeTitle?: string;
+    }
+  ): boolean {
+    let effReleaseDate: string | null | undefined = undefined;
+    let effContext = context;
+
+    if (typeof releaseDateOrContext === 'string') {
+      effReleaseDate = releaseDateOrContext;
+    } else if (typeof releaseDateOrContext === 'object' && releaseDateOrContext !== null) {
+      effContext = releaseDateOrContext;
+    }
+
+    const raw = airDate || effReleaseDate;
+    const now = new Date();
+    const todayYear = now.getFullYear();
+    const todayMonth = now.getMonth();
+    const todayDay = now.getDate();
+    const todayNumber = todayYear * 10000 + (todayMonth + 1) * 100 + todayDay;
+
+    // Se possui data informada:
+    if (raw && typeof raw === 'string' && raw.trim()) {
+      const trimmed = raw.trim();
+
+      // Se possui timestamp completo ISO com horário (ex: 2026-10-15T20:00:00Z)
+      if (trimmed.includes('T')) {
+        const releaseTime = new Date(trimmed).getTime();
+        if (!isNaN(releaseTime)) {
+          return releaseTime <= now.getTime();
+        }
+      }
+
+      // Se é formato de data apenas (YYYY-MM-DD)
+      const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        const year = parseInt(match[1], 10);
+        const month = parseInt(match[2], 10) - 1;
+        const day = parseInt(match[3], 10);
+        const epNumber = year * 10000 + (month + 1) * 100 + day;
+
+        // Se a data do episódio for superior a hoje, é comprovadamente futuro
+        if (epNumber > todayNumber) {
+          return false;
+        }
+        return true;
+      }
+
+      // Fallback para outros formatos de string de data
+      const parsed = new Date(trimmed).getTime();
+      if (!isNaN(parsed)) {
+        return parsed <= now.getTime();
+      }
+    }
+
+    // Se NÃO possui data cadastrada:
+    // 1. Se sucede um episódio com estreia futura na mesma temporada, é futuro
+    if (effContext?.isAfterFutureEpisode) {
       return false;
     }
 
-    const trimmed = raw.trim();
-    const now = new Date();
-
-    // Se possui timestamp completo ISO com horário (ex: 2026-10-15T20:00:00Z)
-    if (trimmed.includes('T')) {
-      const releaseTime = new Date(trimmed).getTime();
-      if (!isNaN(releaseTime)) {
-        return releaseTime <= now.getTime();
-      }
+    // 2. Se o título ou descrição sugerem episódio futuro/placeholder
+    if (effContext?.episodeTitle && /futuro|in[eé]dito|tba|tbd|a anunciar|placeholder|fict[ií]cio/i.test(effContext.episodeTitle)) {
+      return false;
     }
 
-    // Se é formato de data apenas (YYYY-MM-DD)
-    const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (match) {
-      const year = parseInt(match[1], 10);
-      const month = parseInt(match[2], 10) - 1; // 0-indexed no JS
-      const day = parseInt(match[3], 10);
+    // 3. Se a série/temporada possui ano futuro comprovado
+    if (effContext?.seriesYear && effContext.seriesYear > todayYear) {
+      return false;
+    }
 
-      const todayYear = now.getFullYear();
-      const todayMonth = now.getMonth();
-      const todayDay = now.getDate();
-
-      const epNumber = year * 10000 + (month + 1) * 100 + day;
-      const todayNumber = todayYear * 10000 + (todayMonth + 1) * 100 + todayDay;
-
-      // Se a data do episódio for estritamente superior a hoje, é futuro
-      if (epNumber > todayNumber) {
-        return false;
-      }
+    // 4. Se possui evidência de existência oficial (ID oficial, título com conteúdo, sinopse ou still)
+    if (effContext?.hasOfficialEvidence) {
       return true;
     }
 
-    // Fallback para outros formatos de string de data
-    const parsed = new Date(trimmed).getTime();
-    if (isNaN(parsed)) return false;
-    return parsed <= now.getTime();
+    // Chamada sem data e sem qualquer contexto ou evidência
+    return false;
   }
 
   /**
    * Filtra uma lista de episódios brutos preservando rigorosamente a numeração original,
    * removendo episódios que ainda não estrearam e placeholders fictícios.
+   * Não oculta episódios reais lançados apenas pela ausência de data individual em metadados.
    */
-  public filterAiredEpisodes<T extends { number: number; airDate?: string; releaseDate?: string; title?: string }>(episodes: T[]): T[] {
+  public filterAiredEpisodes<T extends {
+    number: number;
+    airDate?: string;
+    releaseDate?: string;
+    title?: string;
+    id?: string;
+    image?: string;
+    stillPath?: string;
+    description?: string;
+  }>(
+    episodes: T[],
+    seasonContext?: { seriesYear?: number; totalEpisodesCount?: number; isCompletedSeries?: boolean }
+  ): T[] {
     if (!Array.isArray(episodes) || episodes.length === 0) return [];
+
+    let hasSeenFutureEpisode = false;
 
     return episodes.filter(ep => {
       // 1. Rejeita números de episódio inválidos ou fictícios
@@ -110,13 +174,33 @@ export class EpisodeAvailabilityService {
         return false;
       }
 
-      // 2. Valida data oficial de estreia
-      const isAired = this.isEpisodeOfficiallyAired(ep.airDate, ep.releaseDate);
-      if (!isAired) {
-        return false;
+      // 2. Verifica se a data cadastrada é explicitamente no futuro
+      const rawDate = ep.airDate || ep.releaseDate;
+      if (rawDate && typeof rawDate === 'string' && rawDate.trim()) {
+        const isAired = this.isEpisodeOfficiallyAired(ep.airDate, ep.releaseDate);
+        if (!isAired) {
+          hasSeenFutureEpisode = true;
+          return false;
+        }
+        return true;
       }
 
-      return true;
+      // 3. Caso sem data explícita: analisa evidências de existência oficial
+      const hasTitle = Boolean(ep.title && ep.title.trim().length > 0 && !/futuro|in[eé]dito|tba|tbd|a anunciar|placeholder|fict[ií]cio/i.test(ep.title));
+      const hasImage = Boolean((ep.stillPath && ep.stillPath.length > 0) || (ep.image && ep.image.startsWith('http')));
+      const hasId = Boolean(ep.id && !ep.id.includes('placeholder'));
+      const isPastOrCurrentSeason = Boolean(seasonContext?.seriesYear && seasonContext.seriesYear <= new Date().getFullYear());
+
+      const hasOfficialEvidence = (hasTitle && (hasImage || hasId)) || isPastOrCurrentSeason;
+
+      const isAired = this.isEpisodeOfficiallyAired(ep.airDate, ep.releaseDate, {
+        hasOfficialEvidence,
+        seriesYear: seasonContext?.seriesYear,
+        isAfterFutureEpisode: hasSeenFutureEpisode,
+        episodeTitle: ep.title
+      });
+
+      return isAired;
     });
   }
 

@@ -367,6 +367,40 @@ var init_verifiedCatalog = __esm({
           }
         ]
       },
+      // ANIME VERIFICADO - DR. STONE (CANÔNICO)
+      {
+        id: "anime-dr-stone-verified",
+        canonicalId: "anime:anilist:105333",
+        title: "Dr. Stone",
+        originalTitle: "Dr.STONE",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 8.6,
+        year: 2019,
+        image: "https://image.tmdb.org/t/p/w500/xEbnuDJXA0MYVV1zjizGWgOhSPE.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/lN13BPAEnc5iXmoxxBQHOZ1ScfZ.jpg",
+        description: "Milhares de anos ap\xF3s um fen\xF4meno misterioso transformar toda a humanidade em pedra, o jovem g\xEAnio da ci\xEAncia Senku Ishigami desperta determinado a reconstruir a civiliza\xE7\xE3o do zero atrav\xE9s da ci\xEAncia.",
+        genres: ["Anime", "Fic\xE7\xE3o Cient\xEDfica", "Aventura", "Com\xE9dia", "A\xE7\xE3o"],
+        aniListId: 105333,
+        tmdbId: "86031",
+        imdbId: "tt9679542",
+        malId: 38691,
+        seasonsCount: 3,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "dr-stone-s1e1",
+            number: 1,
+            season: 1,
+            title: "Stone World",
+            description: "Tudo come\xE7a quando um clar\xE3o misterioso petrifica a humanidade inteira. Mil\xEAnios depois, o g\xEAnio Senku desperta em um mundo de pedra.",
+            image: "https://image.tmdb.org/t/p/w500/tsySP3maZBXg1XnPK0BcOwYfozS.jpg",
+            airDate: "2019-07-05",
+            releaseDate: "2019-07-05"
+          }
+        ]
+      },
       // 13. FILME EM CARTAZ - HOPE: O PRIMEIRO IMPACTO (2026)
       // Obra em produção/cartaz nos cinemas. Fontes de torrent fraudulentas contendo trotes/vídeos adultos foram isoladas em quarentena permanente.
       {
@@ -1186,6 +1220,8 @@ var init_tmdbClient = __esm({
     TMDBClientService = class {
       constructor() {
         this.imdbCache = /* @__PURE__ */ new Map();
+        this.seasonEpisodesCache = /* @__PURE__ */ new Map();
+        this.inFlightSeasonEpisodes = /* @__PURE__ */ new Map();
       }
       async request(endpoint, timeoutMs = 8e3, signal) {
         const url = `${TMDB_BASE_URL}${endpoint}${endpoint.includes("?") ? "&" : "?"}api_key=${TMDB_API_KEY}&language=pt-BR`;
@@ -1785,22 +1821,69 @@ var init_tmdbClient = __esm({
         };
       }
       async getSeasonEpisodes(tvId, seasonNumber) {
-        try {
-          const data = await this.request(`/tv/${tvId}/season/${seasonNumber}`);
-          return (data.episodes || []).map((ep) => ({
-            id: `ep-${tvId}-${seasonNumber}-${ep.episode_number}`,
-            number: ep.episode_number,
-            title: ep.name || `Epis\xF3dio ${ep.episode_number}`,
-            description: ep.overview || "Sinopse oficial deste epis\xF3dio n\xE3o informada.",
-            image: ep.still_path ? `${TMDB_IMAGE_BASE}${ep.still_path}` : "",
-            stillPath: ep.still_path,
-            airDate: ep.air_date,
-            releaseDate: ep.air_date
-          }));
-        } catch (err) {
-          console.warn(`Erro ao carregar epis\xF3dios da T${seasonNumber}:`, err);
-          return [];
+        const cleanId = String(tvId).trim().replace(/^tmdb-?/i, "");
+        const cacheKey = `${cleanId}_s${seasonNumber}`;
+        const cached = this.seasonEpisodesCache.get(cacheKey);
+        const now = Date.now();
+        if (cached && now - cached.timestamp < 24 * 60 * 60 * 1e3 && cached.eps.length > 0) {
+          return cached.eps;
         }
+        if (this.inFlightSeasonEpisodes.has(cacheKey)) {
+          return this.inFlightSeasonEpisodes.get(cacheKey);
+        }
+        const fetchPromise = (async () => {
+          try {
+            const data = await this.request(`/tv/${cleanId}/season/${seasonNumber}`, 9e3);
+            const mapped = (data.episodes || []).map((ep) => ({
+              id: `ep-${cleanId}-${seasonNumber}-${ep.episode_number}`,
+              number: ep.episode_number,
+              title: ep.name || `Epis\xF3dio ${ep.episode_number}`,
+              description: ep.overview || "Sinopse oficial deste epis\xF3dio n\xE3o informada.",
+              image: ep.still_path ? `${TMDB_IMAGE_BASE}${ep.still_path}` : "",
+              stillPath: ep.still_path,
+              airDate: ep.air_date,
+              releaseDate: ep.air_date
+            }));
+            if (mapped.length > 0) {
+              this.seasonEpisodesCache.set(cacheKey, { eps: mapped, timestamp: Date.now() });
+              return mapped;
+            }
+            return [];
+          } catch (err) {
+            console.warn(`Erro ao carregar epis\xF3dios da T${seasonNumber} (TMDB ID ${cleanId}):`, err);
+            if (cached && cached.eps.length > 0) {
+              return cached.eps;
+            }
+            try {
+              const imdbId = await this.getImdbId(cleanId, "series");
+              if (imdbId) {
+                const cineMeta = await this.getCinemetaMeta("series", imdbId);
+                if (cineMeta?.videos) {
+                  const filtered = cineMeta.videos.filter((v) => v.season === seasonNumber);
+                  if (filtered.length > 0) {
+                    const cineMapped = filtered.map((v) => ({
+                      id: v.id || `${imdbId}:${v.season}:${v.number}`,
+                      number: v.number,
+                      title: v.name || v.title || `Epis\xF3dio ${v.number}`,
+                      description: v.overview || v.description || "Sinopse oficial via cat\xE1logo Stremio Cinemeta.",
+                      image: v.thumbnail || "",
+                      airDate: v.released,
+                      releaseDate: v.released
+                    }));
+                    this.seasonEpisodesCache.set(cacheKey, { eps: cineMapped, timestamp: Date.now() });
+                    return cineMapped;
+                  }
+                }
+              }
+            } catch {
+            }
+            return [];
+          } finally {
+            this.inFlightSeasonEpisodes.delete(cacheKey);
+          }
+        })();
+        this.inFlightSeasonEpisodes.set(cacheKey, fetchPromise);
+        return fetchPromise;
       }
       async getSeasonEpisodesByImdb(imdbId, seasonNumber) {
         const fromTmdb = await this.findByImdb(imdbId);
@@ -7693,6 +7776,41 @@ var init_featuredCatalogItems = __esm({
             title: "Renascimento",
             description: "Light Yagami encontra o Death Note deixado pelo shinigami Ryuk no p\xE1tio de sua escola.",
             image: "https://image.tmdb.org/t/p/w500/t7X24mF4NzsX4I74z29hXU507y8.jpg"
+          }
+        ]
+      },
+      // 14. DR. STONE (aniList: 105333 / tmdb: 86031 / mal: 38691 / imdb: tt9679542)
+      {
+        id: "anime-dr-stone",
+        canonicalId: "anime:anilist:105333",
+        title: "Dr. Stone",
+        originalTitle: "Dr.STONE",
+        type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
+        rating: 8.6,
+        year: 2019,
+        image: "https://image.tmdb.org/t/p/w500/xEbnuDJXA0MYVV1zjizGWgOhSPE.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/lN13BPAEnc5iXmoxxBQHOZ1ScfZ.jpg",
+        description: "Milhares de anos ap\xF3s um fen\xF4meno misterioso transformar toda a humanidade em pedra, o jovem g\xEAnio da ci\xEAncia Senku Ishigami desperta determinado a reconstruir a civiliza\xE7\xE3o do zero atrav\xE9s da ci\xEAncia.",
+        genres: ["Anime", "Fic\xE7\xE3o Cient\xEDfica", "Aventura", "Com\xE9dia", "A\xE7\xE3o"],
+        aniListId: 105333,
+        tmdbId: "86031",
+        imdbId: "tt9679542",
+        malId: 38691,
+        seasonsCount: 3,
+        isFeatured: true,
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
+        episodes: [
+          {
+            id: "dr-stone-s1e1",
+            number: 1,
+            season: 1,
+            title: "Stone World",
+            description: "Tudo come\xE7a quando um clar\xE3o misterioso petrifica a humanidade inteira. Mil\xEAnios depois, o g\xEAnio Senku desperta em um mundo de pedra.",
+            image: "https://image.tmdb.org/t/p/w500/tsySP3maZBXg1XnPK0BcOwYfozS.jpg",
+            airDate: "2019-07-05",
+            releaseDate: "2019-07-05"
           }
         ]
       }
@@ -14328,14 +14446,19 @@ var init_aniListClient = __esm({
         const genres = Array.from(/* @__PURE__ */ new Set(["Anime", ...media2.genres || []]));
         const cleanDesc = (media2.description || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim();
         const episodeCount = media2.episodes || (isMovie ? 1 : 12);
+        const releaseYear = media2.seasonYear || media2.startDate?.year || (/* @__PURE__ */ new Date()).getFullYear();
+        const formattedDate = media2.startDate?.year ? `${media2.startDate.year}-${String(media2.startDate.month || 1).padStart(2, "0")}-${String(media2.startDate.day || 1).padStart(2, "0")}` : `${releaseYear}-01-01`;
         const episodes2 = isMovie ? void 0 : Array.from({ length: Math.min(episodeCount, 1500) }, (_, idx) => {
           const epNum = idx + 1;
           return {
-            id: `ep-${epNum}`,
+            id: `ep-${media2.id}-${epNum}`,
             number: epNum,
+            season: 1,
             title: `Epis\xF3dio ${epNum}`,
             description: `Epis\xF3dio ${epNum} de ${mainTitle}`,
-            image: poster
+            image: poster,
+            airDate: formattedDate,
+            releaseDate: formattedDate
           };
         });
         return {
@@ -14382,6 +14505,8 @@ var init_aniListClient = __esm({
             seasonYear
             startDate {
               year
+              month
+              day
             }
             coverImage {
               extraLarge
@@ -14425,6 +14550,8 @@ var init_aniListClient = __esm({
             seasonYear
             startDate {
               year
+              month
+              day
             }
             coverImage {
               extraLarge
@@ -15917,7 +16044,7 @@ var init_CanonicalCatalogMaster = __esm({
         const origLower = (item.originalTitle || "").toLowerCase();
         const genres = (item.genres || []).map((g) => g.toLowerCase());
         const isExplicitAnime = item.type === "ANIME" /* ANIME */ || Boolean(item.aniListId) || Boolean(item.malId) || genres.includes("anime") || genres.includes("japonesa");
-        const isAnimeFranchise = /\b(naruto|bleach|one piece|dragon ball|death note|jujutsu kaisen|demon slayer|kimetsu no yaiba|my hero academia|boku no hero|attack on titan|shingeki no kyojin|fullmetal alchemist|hunter x hunter|tokyo ghoul|fairy tail|sword art online|evangelion|cowboy bebop|inuyasha|sailor moon|yu yu hakusho|steins;gate|code geass|chainsaw man|spy x family|solo leveling|black clover|vinland saga|frieren|dungeon meshi|mob psycho|haikyuu|gintama|berserk|slam dunk|akira|chihiro|totoro|mononoke|your name|kimi no na wa|suzume|boruto)\b/i.test(titleLower) || /\b(naruto|bleach|one piece|dragon ball|death note|jujutsu kaisen|demon slayer|kimetsu no yaiba|boku no hero|attack on titan|shingeki no kyojin|evangelion|chainsaw man|frieren)\b/i.test(origLower);
+        const isAnimeFranchise = /\b(naruto|bleach|one piece|dragon ball|death note|jujutsu kaisen|demon slayer|kimetsu no yaiba|my hero academia|boku no hero|attack on titan|shingeki no kyojin|fullmetal alchemist|hunter x hunter|tokyo ghoul|fairy tail|sword art online|evangelion|cowboy bebop|inuyasha|sailor moon|yu yu hakusho|steins;gate|code geass|chainsaw man|spy x family|solo leveling|black clover|vinland saga|frieren|dungeon meshi|mob psycho|haikyuu|gintama|berserk|slam dunk|akira|chihiro|totoro|mononoke|your name|kimi no na wa|suzume|boruto|dr\.?\s*stone)\b/i.test(titleLower) || /\b(naruto|bleach|one piece|dragon ball|death note|jujutsu kaisen|demon slayer|kimetsu no yaiba|boku no hero|attack on titan|shingeki no kyojin|evangelion|chainsaw man|frieren|dr\.?\s*stone)\b/i.test(origLower);
         const isLiveAction = /live[- ]action|a série$|: a série|o filme \(live-action\)/i.test(titleLower);
         if ((isExplicitAnime || isAnimeFranchise) && !isLiveAction) {
           return "ANIME" /* ANIME */;
@@ -16371,6 +16498,9 @@ var init_canonicalIdentity = __esm({
         }
         if (/bleach.*thousand|bleach.*sennen/i.test(item.title) || /bleach.*thousand|bleach.*sennen/i.test(item.originalTitle || "")) {
           aliases.push("bleach sennen kessen hen", "bleach sennen kessen-hen", "bleach thousand-year blood war", "bleach: sennen kessen-hen", "bleach: thousand-year blood war");
+        }
+        if (/dr\.?\s*stone/i.test(item.title) || /dr\.?\s*stone/i.test(item.originalTitle || "")) {
+          aliases.push("dr. stone", "dr stone", "dr.stone", "dokuta suton", "\u30C9\u30AF\u30BF\u30FC\u30B9\u30C8\u30FC\u30F3");
         }
         if (/verity/i.test(item.title) || /verity/i.test(item.originalTitle || "")) {
           aliases.push("verity", "the verity");

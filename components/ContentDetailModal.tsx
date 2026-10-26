@@ -20,6 +20,7 @@ import { streamValidator } from '../src/core/providers/streamValidator';
 import { similarTitlesService } from '../src/core/recommendations/similarTitlesService';
 import { userPreferenceStore } from '../src/core/recommendations/userPreferenceStore';
 import { episodeAvailabilityService } from '../src/core/episodes/episodeAvailabilityService';
+import { animeSeasonMappingService } from '../src/core/anime/animeSeasonMappingService';
 import { sourceVerificationService, VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../src/core/providers/sourceVerificationService';
 import { watchPartyService } from '../src/core/watchparty/WatchPartyService';
 import { uiSoundService } from '../src/core/audio/uiSoundService';
@@ -194,14 +195,28 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     return storageService.getPlaybackContinuity(initialItem);
   }, [initialItem]);
 
-  const [currentSeason, setCurrentSeason] = useState<number>(() => initialSeason || initialContinuity.season || 1);
-  const [totalSeasons, setTotalSeasons] = useState(initialItem.seasonsCount || 1);
+  const initialAnimeMapping = useMemo(() => {
+    return animeSeasonMappingService.resolveAnimeTmdbIdentity(initialItem);
+  }, [initialItem]);
+
+  const [currentSeason, setCurrentSeason] = useState<number>(() => {
+    if (initialSeason) return initialSeason;
+    if (initialContinuity.hasStarted && initialContinuity.season) return initialContinuity.season;
+    if (initialAnimeMapping?.defaultSeason) return initialAnimeMapping.defaultSeason;
+    return 1;
+  });
+  const [totalSeasons, setTotalSeasons] = useState(() => {
+    if (initialItem.seasonsCount && initialItem.seasonsCount > 0) return initialItem.seasonsCount;
+    if (initialAnimeMapping) return 3;
+    return 1;
+  });
   const [availableSeasons, setAvailableSeasons] = useState<number[]>(() => {
     if (initialItem.episodes && initialItem.episodes.length > 0) {
       const sSet = new Set(initialItem.episodes.map((e: any) => Number(e.season ?? 1)).filter((s: number) => s > 0));
       if (sSet.size > 0) return Array.from(sSet).sort((a: number, b: number) => a - b);
     }
-    return Array.from({ length: Math.max(1, initialItem.seasonsCount || 1) }, (_, i) => i + 1);
+    const count = initialItem.seasonsCount || (initialAnimeMapping ? 3 : 1);
+    return Array.from({ length: Math.max(1, count) }, (_, i) => i + 1);
   });
   const [isPlaying, setIsPlaying] = useState(false);
   const [resolvedStreams, setResolvedStreams] = useState<StremioStream[]>([]);
@@ -294,6 +309,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     return [];
   });
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
+  const [retryEpisodeTrigger, setRetryEpisodeTrigger] = useState(0);
 
   // Parâmetros do player (filme ou série/EP)
   const [currentEpisodeParams, setCurrentEpisodeParams] = useState<{season: number, episode: number} | null>(null);
@@ -361,9 +377,10 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
 
     const gen = ++prefetchGenerationRef.current;
     const targetType = isMovie ? 'movie' : (targetItem.type === ContentType.ANIME ? 'anime' : 'series');
+    const animeMapped = animeSeasonMappingService.resolveAnimeTmdbIdentity(targetItem);
     const targetId = {
-      tmdbId: targetItem.tmdbId,
-      imdbId: targetItem.imdbId,
+      tmdbId: targetItem.tmdbId || animeMapped?.tmdbId,
+      imdbId: targetItem.imdbId || animeMapped?.imdbId,
       id: targetItem.id,
       title: targetItem.title,
       originalTitle: targetItem.originalTitle,
@@ -621,11 +638,22 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
         let details: any = null;
         const fetchPromise = (async () => {
           const rawId = currentItem.tmdbId || currentItem.id;
-          const cleanTmdbId = typeof rawId === 'string' ? rawId.replace(/^tmdb-?/i, '') : String(rawId);
+          let cleanTmdbId = typeof rawId === 'string' ? rawId.replace(/^tmdb-?/i, '') : String(rawId);
+          let animeMapped = animeSeasonMappingService.resolveAnimeTmdbIdentity(currentItem);
+          if (!cleanTmdbId || !/^\d+$/.test(cleanTmdbId)) {
+            if (animeMapped?.tmdbId) {
+              cleanTmdbId = animeMapped.tmdbId;
+            } else {
+              const discovered = await animeSeasonMappingService.discoverAnimeTmdbIdentity(currentItem);
+              if (discovered?.tmdbId) {
+                cleanTmdbId = discovered.tmdbId;
+              }
+            }
+          }
           if (cleanTmdbId && /^\d+$/.test(cleanTmdbId)) {
             return await tmdbService.getDetails(cleanTmdbId, currentItem.type, currentItem.mediaFormat);
-          } else if (currentItem.imdbId || currentItem.id.startsWith('tt')) {
-            const targetImdb = currentItem.imdbId || currentItem.id;
+          } else if (currentItem.imdbId || animeMapped?.imdbId || currentItem.id.startsWith('tt')) {
+            const targetImdb = currentItem.imdbId || animeMapped?.imdbId || currentItem.id;
             return await tmdbService.getDetailsByImdb(targetImdb, currentItem.type, currentItem.mediaFormat);
           }
           return null;
@@ -638,12 +666,13 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
         ]);
 
         if (active && details && details.item && canonicalIdentityService.isSameWork(currentItem, details.item)) {
+          const animeMapped = animeSeasonMappingService.resolveAnimeTmdbIdentity(currentItem);
           setItem(prev => ({
             ...prev,
             ...details.item,
             id: prev.id, // Preserva rigorosamente o ID inicial para evitar remount do ZapiPlayer
-            imdbId: details.imdbId || prev.imdbId,
-            tmdbId: details.item?.tmdbId || prev.tmdbId,
+            imdbId: details.imdbId || animeMapped?.imdbId || prev.imdbId,
+            tmdbId: details.item?.tmdbId || animeMapped?.tmdbId || prev.tmdbId,
             director: details.director || prev.director,
             cast: details.cast && details.cast.length > 0 ? details.cast : prev.cast
           }));
@@ -652,11 +681,21 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
             setAvailableSeasons(validSeasons);
             setTotalSeasons(validSeasons.length);
             if (!validSeasons.includes(currentSeason)) {
-              setCurrentSeason(validSeasons[0] || 1);
+              const defaultSeason = (animeMapped?.defaultSeason && validSeasons.includes(animeMapped.defaultSeason))
+                ? animeMapped.defaultSeason
+                : (validSeasons[0] || 1);
+              setCurrentSeason(defaultSeason);
             }
           } else if (details.seasonsCount && details.seasonsCount > 1) {
             setTotalSeasons(details.seasonsCount);
-            setAvailableSeasons(Array.from({ length: details.seasonsCount }, (_, i) => i + 1));
+            const countSeasons = Array.from({ length: details.seasonsCount }, (_, i) => i + 1);
+            setAvailableSeasons(countSeasons);
+            if (!countSeasons.includes(currentSeason)) {
+              const defaultSeason = (animeMapped?.defaultSeason && countSeasons.includes(animeMapped.defaultSeason))
+                ? animeMapped.defaultSeason
+                : (countSeasons[0] || 1);
+              setCurrentSeason(defaultSeason);
+            }
           }
         }
       } catch (err) {
@@ -698,12 +737,23 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
       try {
         const fetchEpPromise = (async () => {
           const rawId = item.tmdbId || item.id;
-          const cleanTmdbId = typeof rawId === 'string' ? rawId.replace(/^tmdb-?/i, '') : String(rawId);
+          let cleanTmdbId = typeof rawId === 'string' ? rawId.replace(/^tmdb-?/i, '') : String(rawId);
+          let animeMapped = animeSeasonMappingService.resolveAnimeTmdbIdentity(item);
+          if (!cleanTmdbId || !/^\d+$/.test(cleanTmdbId)) {
+            if (animeMapped?.tmdbId) {
+              cleanTmdbId = animeMapped.tmdbId;
+            } else {
+              const discovered = await animeSeasonMappingService.discoverAnimeTmdbIdentity(item);
+              if (discovered?.tmdbId) {
+                cleanTmdbId = discovered.tmdbId;
+              }
+            }
+          }
           if (cleanTmdbId && /^\d+$/.test(cleanTmdbId)) {
             const eps = await tmdbService.getSeasonEpisodes(cleanTmdbId, currentSeason);
             if (eps && eps.length > 0) return eps;
           }
-          const targetImdb = item.imdbId || (item.id.startsWith('tt') ? item.id : null);
+          const targetImdb = item.imdbId || animeMapped?.imdbId || (item.id.startsWith('tt') ? item.id : null);
           if (targetImdb) {
             const eps = await tmdbService.getSeasonEpisodesByImdb(targetImdb, currentSeason);
             if (eps && eps.length > 0) return eps;
@@ -722,47 +772,43 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
         ]);
 
         if (active) {
-          // 1. Filtragem rigorosa por Data de Estreia Oficial (Oculta episódios futuros e fictícios)
-          const airedEps = episodeAvailabilityService.filterAiredEpisodes(rawEps);
-
-          // 2. Filtragem imediata por cache de fontes verificadas (Abertura instantânea do modal)
-          const initialDisplayEps = airedEps.filter(ep => {
-            const cached = episodeAvailabilityService.getCachedAvailability(item.id, currentSeason, ep.number);
-            return !cached.checked || cached.hasSource || cached.isTemporaryError;
+          // 1. Filtragem rigorosa por Data de Estreia Oficial (sem descartar episódios reais lançados)
+          const airedEps = episodeAvailabilityService.filterAiredEpisodes(rawEps, {
+            seriesYear: item.year,
+            totalEpisodesCount: rawEps.length
           });
 
-          setEpisodes(uniqueEpisodes(initialDisplayEps));
+          if (airedEps.length > 0) {
+            setEpisodes(uniqueEpisodes(airedEps));
+          } else if (rawEps.length === 0) {
+            // Em caso de erro temporário de rede ou timeout, preserva os episódios se já existirem
+            setEpisodes(prev => prev.length > 0 ? prev : []);
+          } else {
+            setEpisodes([]);
+          }
           setIsLoadingEpisodes(false);
 
-          // 3. Auditoria em segundo plano das fontes para episódios ainda não verificados
+          // 2. Auditoria/Pré-validação em segundo plano sem apagar episódios da interface
+          // Mantém integridade total dos metadados independente do status de streams individuais
           (async () => {
-            for (const ep of initialDisplayEps) {
+            for (const ep of airedEps) {
               if (!active) break;
               const cached = episodeAvailabilityService.getCachedAvailability(item.id, currentSeason, ep.number);
               if (cached.checked) continue;
 
-              const hasSource = await episodeAvailabilityService.verifyEpisodeAvailability(
+              await episodeAvailabilityService.verifyEpisodeAvailability(
                 item,
                 currentSeason,
                 ep.number,
                 (ep as any).airDate || (ep as any).releaseDate
-              );
-
-              if (!active) break;
-              if (!hasSource) {
-                // Remove da lista apenas se comprovadamente sem fontes (não em erros temporários)
-                const check = episodeAvailabilityService.getCachedAvailability(item.id, currentSeason, ep.number);
-                if (check.checked && !check.hasSource && !check.isTemporaryError) {
-                  setEpisodes(prev => prev.filter(e => e.number !== ep.number));
-                }
-              }
+              ).catch(() => {});
             }
           })().catch(() => {});
         }
       } catch (e) {
         console.warn('Erro ao carregar episódios:', e);
         if (active) {
-          setEpisodes([]);
+          setEpisodes(prev => prev.length > 0 ? prev : []);
         }
       } finally {
         if (active) {
@@ -772,7 +818,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     };
     fetchEpisodes();
     return () => { active = false; };
-  }, [hasEpisodes, item.tmdbId, item.imdbId, item.id, item.episodes, currentSeason, item.backdrop, item.image]);
+  }, [hasEpisodes, item.tmdbId, item.imdbId, item.id, item.episodes, currentSeason, item.backdrop, item.image, retryEpisodeTrigger]);
 
   // Pre-fetch / Resolve Streams whenever play is triggered
   const startPlayback = async (
@@ -1474,7 +1520,16 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
                       <span>Carregando episódios da Temporada {currentSeason}...</span>
                     </div>
                   ) : episodes.length === 0 ? (
-                    <div className="p-6 sm:p-8 text-center text-gray-400 text-sm">Não foi possível carregar os episódios agora. Tente novamente mais tarde.</div>
+                    <div className="p-6 sm:p-8 flex flex-col items-center justify-center gap-3 text-center text-gray-400 text-sm">
+                      <span>Não foi possível carregar os episódios no momento.</span>
+                      <button
+                        type="button"
+                        onClick={() => setRetryEpisodeTrigger(v => v + 1)}
+                        className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:bg-white/30 text-white text-xs font-semibold transition-all cursor-pointer"
+                      >
+                        Tentar novamente
+                      </button>
+                    </div>
                   ) : (
                     episodes.map((ep) => (
                       <EpisodeTvRow

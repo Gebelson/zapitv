@@ -156,8 +156,8 @@ export class CanonicalCatalogMaster {
     );
 
     const isAnimeFranchise = (
-      /\b(naruto|bleach|one piece|dragon ball|death note|jujutsu kaisen|demon slayer|kimetsu no yaiba|my hero academia|boku no hero|attack on titan|shingeki no kyojin|fullmetal alchemist|hunter x hunter|tokyo ghoul|fairy tail|sword art online|evangelion|cowboy bebop|inuyasha|sailor moon|yu yu hakusho|steins;gate|code geass|chainsaw man|spy x family|solo leveling|black clover|vinland saga|frieren|dungeon meshi|mob psycho|haikyuu|gintama|berserk|slam dunk|akira|chihiro|totoro|mononoke|your name|kimi no na wa|suzume|boruto)\b/i.test(titleLower) ||
-      /\b(naruto|bleach|one piece|dragon ball|death note|jujutsu kaisen|demon slayer|kimetsu no yaiba|boku no hero|attack on titan|shingeki no kyojin|evangelion|chainsaw man|frieren)\b/i.test(origLower)
+      /\b(naruto|bleach|one piece|dragon ball|death note|jujutsu kaisen|demon slayer|kimetsu no yaiba|my hero academia|boku no hero|attack on titan|shingeki no kyojin|fullmetal alchemist|hunter x hunter|tokyo ghoul|fairy tail|sword art online|evangelion|cowboy bebop|inuyasha|sailor moon|yu yu hakusho|steins;gate|code geass|chainsaw man|spy x family|solo leveling|black clover|vinland saga|frieren|dungeon meshi|mob psycho|haikyuu|gintama|berserk|slam dunk|akira|chihiro|totoro|mononoke|your name|kimi no na wa|suzume|boruto|dr\.?\s*stone)\b/i.test(titleLower) ||
+      /\b(naruto|bleach|one piece|dragon ball|death note|jujutsu kaisen|demon slayer|kimetsu no yaiba|boku no hero|attack on titan|shingeki no kyojin|evangelion|chainsaw man|frieren|dr\.?\s*stone)\b/i.test(origLower)
     );
 
     // Se tiver marcação explícita de live-action ocidental, não é anime

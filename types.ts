@@ -72,6 +72,8 @@ export interface ContentItem {
     videoUrl?: string;
     offlineAllowed?: boolean;
     quality?: '4K' | '1080p' | '720p' | '480p' | 'HD' | 'SD';
+    airDate?: string;
+    releaseDate?: string;
   }[];
 }
 

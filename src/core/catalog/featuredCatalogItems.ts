@@ -1903,6 +1903,42 @@ export const FEATURED_ANIME_ITEMS: ContentItem[] = [
         image: 'https://image.tmdb.org/t/p/w500/t7X24mF4NzsX4I74z29hXU507y8.jpg'
       }
     ]
+  },
+
+  // 14. DR. STONE (aniList: 105333 / tmdb: 86031 / mal: 38691 / imdb: tt9679542)
+  {
+    id: 'anime-dr-stone',
+    canonicalId: 'anime:anilist:105333',
+    title: 'Dr. Stone',
+    originalTitle: 'Dr.STONE',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 8.6,
+    year: 2019,
+    image: 'https://image.tmdb.org/t/p/w500/xEbnuDJXA0MYVV1zjizGWgOhSPE.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/lN13BPAEnc5iXmoxxBQHOZ1ScfZ.jpg',
+    description: 'Milhares de anos após um fenômeno misterioso transformar toda a humanidade em pedra, o jovem gênio da ciência Senku Ishigami desperta determinado a reconstruir a civilização do zero através da ciência.',
+    genres: ['Anime', 'Ficção Científica', 'Aventura', 'Comédia', 'Ação'],
+    aniListId: 105333,
+    tmdbId: '86031',
+    imdbId: 'tt9679542',
+    malId: 38691,
+    seasonsCount: 3,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'dr-stone-s1e1',
+        number: 1,
+        season: 1,
+        title: 'Stone World',
+        description: 'Tudo começa quando um clarão misterioso petrifica a humanidade inteira. Milênios depois, o gênio Senku desperta em um mundo de pedra.',
+        image: 'https://image.tmdb.org/t/p/w500/tsySP3maZBXg1XnPK0BcOwYfozS.jpg',
+        airDate: '2019-07-05',
+        releaseDate: '2019-07-05'
+      }
+    ]
   }
 ];
 

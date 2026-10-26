@@ -129,6 +129,9 @@ export class CanonicalIdentityService {
     if (/bleach.*thousand|bleach.*sennen/i.test(item.title) || /bleach.*thousand|bleach.*sennen/i.test(item.originalTitle || '')) {
       aliases.push('bleach sennen kessen hen', 'bleach sennen kessen-hen', 'bleach thousand-year blood war', 'bleach: sennen kessen-hen', 'bleach: thousand-year blood war');
     }
+    if (/dr\.?\s*stone/i.test(item.title) || /dr\.?\s*stone/i.test(item.originalTitle || '')) {
+      aliases.push('dr. stone', 'dr stone', 'dr.stone', 'dokuta suton', 'ドクターストーン');
+    }
     if (/verity/i.test(item.title) || /verity/i.test(item.originalTitle || '')) {
       aliases.push('verity', 'the verity');
     }

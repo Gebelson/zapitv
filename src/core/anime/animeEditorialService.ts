@@ -153,7 +153,7 @@ const EDITORIAL_SEEDS: Record<string, { title: string; titles: CuratedTitle[] }>
       { canonicalName: 'Bleach', aliases: ['bleach'] },
       { canonicalName: 'Hunter x Hunter', aliases: ['hunter × hunter'] },
       { canonicalName: 'Haikyu!!', aliases: ['haikyuu!!'] },
-      { canonicalName: 'Dr. Stone', aliases: ['dr. stone: new world', 'dr stone'] },
+      { canonicalName: 'Dr. Stone', aliases: ['dr. stone: new world', 'dr. stone: stone wars', 'dr stone'], aniListId: 105333, tmdbId: '86031' },
       { canonicalName: 'Fire Force', aliases: ['enn enn no shouboutai'] }
     ]
   },
