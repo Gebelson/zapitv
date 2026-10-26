@@ -529,6 +529,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
                 userName={userName}
                 avatarUrl={avatarUrl}
                 accountPlan={accountPlan}
+                anchorRef={profileRef}
               />
             </div>
           </div>

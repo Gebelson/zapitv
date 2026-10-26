@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bookmark, Clock, Settings, RotateCw, ChevronRight } from 'lucide-react';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { uiSoundService } from '../../core/audio/uiSoundService';
+import { useTvViewport } from '../../core/tv/tvViewportService';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvProfileMenuProps {
@@ -12,6 +14,7 @@ interface TvProfileMenuProps {
   userName?: string;
   avatarUrl?: string;
   accountPlan?: string;
+  anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
 const TvProfileMenuItem: React.FC<{
@@ -20,7 +23,8 @@ const TvProfileMenuItem: React.FC<{
   label: string;
   onClick: () => void;
   disabled?: boolean;
-}> = ({ focusKey, icon, label, onClick, disabled }) => {
+  onArrowPress?: (direction: string) => boolean;
+}> = ({ focusKey, icon, label, onClick, disabled, onArrowPress }) => {
   const { ref, focused } = useTvFocusable({
     focusKey,
     onEnterPress: () => {
@@ -28,6 +32,7 @@ const TvProfileMenuItem: React.FC<{
         onClick();
       }
     },
+    onArrowPress,
     autoScroll: true
   });
 
@@ -66,10 +71,12 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
   onNavigate,
   userName = 'Meu Perfil',
   avatarUrl,
-  accountPlan
+  accountPlan,
+  anchorRef
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const viewport = useTvViewport();
 
   const { ref: noriginRef, focusKey } = useFocusable({
     focusKey: 'tv-profile-menu',
@@ -153,13 +160,35 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
     (noriginRef as any).current = node;
   }, [noriginRef]);
 
+  // Posição ancorada calculada com precisão em relação ao botão de perfil e viewport da TV
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number }>({
+    top: viewport.headerHeight + 8,
+    right: viewport.safeMarginX
+  });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (anchorRef?.current && typeof window !== 'undefined') {
+      const rect = anchorRef.current.getBoundingClientRect();
+      const top = rect.bottom > 0 ? Math.round(rect.bottom + 8) : viewport.headerHeight + 8;
+      const right = rect.right > 0 ? Math.max(16, Math.round(window.innerWidth - rect.right)) : viewport.safeMarginX;
+      setMenuPosition({ top, right });
+    } else {
+      setMenuPosition({
+        top: viewport.headerHeight + 8,
+        right: viewport.safeMarginX
+      });
+    }
+  }, [isOpen, anchorRef, viewport.headerHeight, viewport.safeMarginX]);
+
   if (!isOpen) return null;
 
-  return (
+  const menuContent = (
     <FocusContext.Provider value={focusKey}>
-      {/* Overlay transparente para captura de clique externo */}
+      {/* Overlay 100% transparente: captura clique externo para fechar sem escurecimento visual da interface */}
       <div 
-        className="fixed inset-0 z-[150] bg-black/40 backdrop-blur-none"
+        data-testid="tv-profile-menu-overlay"
+        className="fixed inset-0 z-[150] bg-transparent pointer-events-auto select-none"
         onClick={() => {
           if (!isUpdating) {
             handleClose();
@@ -168,13 +197,17 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
         }}
       />
 
-      {/* Menu Suspenso Ancorado à Direita */}
+      {/* Menu Suspenso Ancorado à Direita com Glassmorphism e Sombra Cinematográfica */}
       <div
         ref={setCombinedRef}
-        className="fixed top-18 right-8 sm:right-12 z-[160] w-[320px] bg-[#0c121e]/98 border border-white/15 rounded-2xl shadow-2xl p-3 animate-in fade-in slide-in-from-top-2 duration-200 select-none"
+        data-testid="tv-profile-menu-dropdown"
+        className="fixed z-[160] w-[320px] bg-[#0c121e]/98 border border-white/15 rounded-2xl shadow-2xl p-3 animate-in fade-in slide-in-from-top-2 duration-200 select-none pointer-events-auto"
         style={{
+          top: `${menuPosition.top}px`,
+          right: `${menuPosition.right}px`,
           boxShadow: '0 20px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 125, 247, 0.25)'
         }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Cabeçalho do Perfil */}
         <div className="flex items-center gap-3 px-3 py-2.5 mb-2 border-b border-white/10">
@@ -193,12 +226,18 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
           </div>
         </div>
 
-        {/* Itens do Menu */}
+        {/* Itens do Menu com Navegação D-Pad Delimitada */}
         <div className="space-y-1">
           <TvProfileMenuItem
             focusKey="tv-menu-mylist"
             icon={<Bookmark className="w-4 h-4" />}
             label="Minha Lista"
+            onArrowPress={(direction) => {
+              if (direction === 'up' || direction === 'left' || direction === 'right') {
+                return false;
+              }
+              return true;
+            }}
             onClick={() => {
               uiSoundService.play('click');
               onClose();
@@ -210,6 +249,12 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
             focusKey="tv-menu-history"
             icon={<Clock className="w-4 h-4" />}
             label="Histórico"
+            onArrowPress={(direction) => {
+              if (direction === 'left' || direction === 'right') {
+                return false;
+              }
+              return true;
+            }}
             onClick={() => {
               uiSoundService.play('click');
               onClose();
@@ -221,6 +266,12 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
             focusKey="tv-menu-settings"
             icon={<Settings className="w-4 h-4" />}
             label="Configurações"
+            onArrowPress={(direction) => {
+              if (direction === 'left' || direction === 'right') {
+                return false;
+              }
+              return true;
+            }}
             onClick={() => {
               uiSoundService.play('click');
               onClose();
@@ -236,6 +287,12 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
             focusKey="tv-menu-update"
             icon={<RotateCw className={`w-4 h-4 ${isUpdating ? 'animate-spin text-cyan-400' : ''}`} />}
             label={isUpdating ? "Atualizando..." : "Atualizar ZapiTV"}
+            onArrowPress={(direction) => {
+              if (direction === 'down' || direction === 'left' || direction === 'right') {
+                return false;
+              }
+              return true;
+            }}
             onClick={handleUpdateApp}
             disabled={isUpdating}
           />
@@ -243,4 +300,11 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
       </div>
     </FocusContext.Provider>
   );
+
+  // Renderiza via Portal no document.body para isolar do transform-gpu e stacking context do header
+  if (typeof document !== 'undefined' && document.body) {
+    return createPortal(menuContent, document.body);
+  }
+
+  return menuContent;
 };
