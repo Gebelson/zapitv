@@ -17,41 +17,41 @@ const heroCode = fs.readFileSync(mobileHeroPath, 'utf8').replace(/\r\n/g, '\n');
 const logoServiceCode = fs.readFileSync(heroLogoServicePath, 'utf8').replace(/\r\n/g, '\n');
 
 // --------------------------------------------------------------------------
-// 1. Verificação de Substituição de Títulos por Logos Oficiais
+// 1. Verificação de Título em Texto Puro (Sem Logos de Conteúdos)
 // --------------------------------------------------------------------------
-console.log('1. Validando substituição visual do título por Logo Oficial...');
+console.log('1. Validando renderização exclusiva do título textual em <h1>...');
 
 assert(
-  heroCode.includes("import { heroLogoService } from '../../core/catalog/heroLogoService'"),
-  'MobileHero.tsx deve importar heroLogoService'
+  !heroCode.includes('heroLogoService'),
+  'MobileHero.tsx NÃO deve importar nem invocar heroLogoService (títulos exclusivamente em texto)'
 );
 
 assert(
-  heroCode.includes('displayedSlide.logoUrl ?') &&
-  heroCode.includes('<img') &&
-  heroCode.includes('hero-logo-') &&
-  heroCode.includes('object-contain object-left') &&
-  heroCode.includes('drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]'),
-  'MobileHero.tsx deve renderizar a logo com contenção de proporção, alinhamento à esquerda e sombra para legibilidade'
+  heroCode.includes('<h1') && heroCode.includes('{slideItem.title}'),
+  'MobileHero.tsx deve renderizar o título textual diretamente em <h1>'
 );
 
 assert(
-  heroCode.includes('max-h-14') && (heroCode.includes('max-w-[75%]') || heroCode.includes('sm:max-w-[280px]')),
-  'Logo oficial deve possuir dimensões limitadas (max-h-14 e max-w-[75%]) para evitar gigantismo'
+  !heroCode.includes('displayedSlide.logoUrl') && !heroCode.includes('hero-logo-'),
+  'MobileHero.tsx NÃO deve renderizar imagens de logos de conteúdos'
 );
 
 assert(
-  heroCode.includes('<span className="sr-only">{slideItem.title}</span>'),
-  'Deve manter o título acessível para leitores de tela através de span sr-only'
+  heroCode.includes("fontFamily: \"'Sora', sans-serif\"") || heroCode.includes("fontFamily: ''Sora', sans-serif'"),
+  'Título deve utilizar a fonte Sora'
 );
 
 assert(
-  heroCode.includes('heroLogoService.markLogoFailed') &&
-  heroCode.includes('logoUrl: null'),
-  'Em caso de erro de carregamento da logo, deve acionar fallback para o título textual sem deixar o banner sem identificação'
+  heroCode.includes('font-extrabold') || heroCode.includes('font-bold'),
+  'Título deve possuir peso Bold ou ExtraBold'
 );
 
-console.log('  -> Renderização de logos oficiais, dimensões, legibilidade e acessibilidade validadas.');
+assert(
+  heroCode.includes('text-left') || heroCode.includes('justify-start'),
+  'Título deve possuir alinhamento à esquerda'
+);
+
+console.log('  -> Renderização de título textual puro em <h1> validada com sucesso.');
 
 // --------------------------------------------------------------------------
 // 2. Remoção Completa da Sinopse do Banner Mobile

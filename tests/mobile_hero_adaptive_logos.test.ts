@@ -18,7 +18,6 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 import { heroLogoService, TMDBRawLogo, CANONICAL_PRODUCTIONS } from '../src/core/catalog/heroLogoService';
-import { getAdaptiveLogoClasses } from '../src/components/mobile/MobileHero';
 import { ContentItem, ContentType } from '../types';
 
 console.log('=== ZAPITV | SUÍTE DE TESTES: LOGOS DO BANNER MOBILE ===\n');
@@ -116,52 +115,44 @@ assert.strictEqual(sortedQuality[0].file_path, '/high_en.png', 'Logo EN de alta 
 console.log('✓ Teste 2 aprovado: Hierarquia de idiomas e filtros de qualidade comprovados.\n');
 
 // --------------------------------------------------------------------------
-// TESTE 3: Dimensionamento Adaptativo (getAdaptiveLogoClasses)
+// TESTE 3: Dimensionamento Adaptativo de Tipografia do Título
 // --------------------------------------------------------------------------
-console.log('[Teste 3] Dimensionamento adaptativo por proporção de aspecto (aspect ratio)...');
+console.log('[Teste 3] Dimensionamento adaptativo por comprimento do título em MobileHero.tsx...');
 
-// 1. Logo quase quadrada / compacta (ex: Dandadan PT-BR ~1.37)
-const compactClass = getAdaptiveLogoClasses(1.37);
-assert.ok(compactClass.includes('h-[76px]') || compactClass.includes('h-[84px]'), 'Logo compacta deve receber altura ampliada (~76-84px)');
-assert.ok(compactClass.includes('max-h-[88px]'), 'Logo compacta deve possuir limite seguro max-h-[88px]');
-assert.ok(compactClass.includes('max-w-[65%]'), 'Logo compacta não pode estourar largura segura');
+const heroFile = path.resolve(process.cwd(), 'src/components/mobile/MobileHero.tsx');
+const heroCode = fs.readFileSync(heroFile, 'utf8');
 
-// 2. Logo semi-compacta (ex: Dandadan EN Horiz ~2.61)
-const semiClass = getAdaptiveLogoClasses(2.61);
-assert.ok(semiClass.includes('h-[52px]') || semiClass.includes('h-[58px]'), 'Logo semi-compacta deve ter altura equilibrada');
+// 1. Títulos longos (> 30 chars, ex: Bleach: Thousand-Year Blood War)
+assert.ok(heroCode.includes('slideItem.title.length > 30'), 'Deve haver regra de escalonamento para títulos longos > 30');
+assert.ok(heroCode.includes('text-lg xs:text-xl sm:text-2xl'), 'Títulos longos devem utilizar text-lg/xl/2xl');
 
-// 3. Logo horizontal padrão (ex: Death Note ~3.54, Blue Lock ~4.39)
-const horizClass = getAdaptiveLogoClasses(3.54);
-assert.ok(horizClass.includes('h-11') && horizClass.includes('max-h-14'), 'Logo horizontal deve manter altura clássica h-11 e max-h-14');
-assert.ok(horizClass.includes('max-w-[80%]'), 'Logo horizontal aproveita até 80% da largura');
+// 2. Títulos médios (> 18 chars, ex: Chainsaw Man, Verdade Oculta)
+assert.ok(heroCode.includes('slideItem.title.length > 18'), 'Deve haver regra de escalonamento para títulos médios > 18');
+assert.ok(heroCode.includes('text-xl xs:text-2xl sm:text-3xl'), 'Títulos médios devem utilizar text-xl/2xl/3xl');
 
-// 4. Logo ultra-larga (ex: Chainsaw Man ~8.98)
-const ultraWideClass = getAdaptiveLogoClasses(8.98);
-assert.ok(ultraWideClass.includes('h-[36px]') || ultraWideClass.includes('h-[42px]'), 'Logo ultra-larga deve ter altura moderada (~36-42px)');
-assert.ok(ultraWideClass.includes('max-w-[85%]'), 'Logo ultra-larga pode utilizar até 85% de largura');
+// 3. Títulos curtos (<= 18 chars, ex: Dan Da Dan, Death Note, Blue Lock)
+assert.ok(heroCode.includes('text-2xl xs:text-3xl sm:text-4xl'), 'Títulos curtos devem utilizar text-2xl/3xl/4xl');
 
-// 5. Fallback sem aspect ratio
-const defaultClass = getAdaptiveLogoClasses(undefined);
-assert.ok(defaultClass.includes('max-h-14') && defaultClass.includes('max-w-[75%]'), 'Fallback padrão deve conter max-h-14 e max-w-[75%]');
+// 4. Quebra e linhas
+assert.ok(heroCode.includes('line-clamp-2'), 'Título deve ter limite de até duas linhas (line-clamp-2)');
+assert.ok(heroCode.includes('break-words'), 'Título deve ter quebra de linha natural (break-words)');
+assert.ok(heroCode.includes("fontFamily: \"'Sora', sans-serif\"") || heroCode.includes("fontFamily: ''Sora', sans-serif'"), 'Fonte Sora deve ser usada');
 
-console.log('✓ Teste 3 aprovado: Todas as categorias de proporção visual calibradas harmoniosamente.\n');
+console.log('✓ Teste 3 aprovado: Todas as categorias de título calibradas harmoniosamente.\n');
 
 // --------------------------------------------------------------------------
 // TESTE 4: Preservação de Layout e Alinhamento Inferior (items-end)
 // --------------------------------------------------------------------------
 console.log('[Teste 4] Auditoria do layout do banner mobile (MobileHero.tsx)...');
 
-const heroFile = path.resolve(process.cwd(), 'src/components/mobile/MobileHero.tsx');
-const heroCode = fs.readFileSync(heroFile, 'utf8');
-
 // Alinhamento inferior que permite crescimento para cima sem deslocar botões
 assert.ok(
   heroCode.includes('flex items-end justify-start mb-3.5') || heroCode.includes('items-end'),
-  'Área de logo deve utilizar items-end para crescer para cima preservando a distância inferior'
+  'Área de título deve utilizar items-end para crescer para cima preservando a distância inferior'
 );
 
 // Preservação estrita dos botões de ação e distâncias
-assert.ok(heroCode.includes('mb-3.5'), 'Distância entre a logo e os botões deve ser exatamente mb-3.5');
+assert.ok(heroCode.includes('mb-3.5'), 'Distância entre o título e os botões deve ser exatamente mb-3.5');
 assert.ok(heroCode.includes('min-h-[44px]'), 'Botão Assistir deve manter área de toque mínima 44px');
 assert.ok(heroCode.includes('w-11 h-11 min-w-[44px] min-h-[44px]'), 'Botões secundários (Detalhes e Lista) mantidos em 44x44');
 assert.ok(heroCode.includes('pb-[9px]'), 'Padding inferior do banner mantido exatamente em 9px');
@@ -172,10 +163,10 @@ assert.ok(heroCode.includes('slideItem.genres'), 'Metadados de gênero preservad
 assert.ok(heroCode.includes('slideItem.year'), 'Metadados de ano preservados');
 assert.ok(heroCode.includes('slideItem.rating'), 'Metadados de classificação/nota preservados');
 
-// Legibilidade limpa: sem bordas artificiais, apenas sombra suave
+// Legibilidade limpa: sombra suave para legibilidade contra o fundo
 assert.ok(
-  heroCode.includes('drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]'),
-  'Logo deve utilizar sombra sutil para legibilidade contra o fundo sem molduras pesadas'
+  heroCode.includes('drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)]') || heroCode.includes('drop-shadow'),
+  'Título deve utilizar sombra sutil para legibilidade contra o fundo'
 );
 
 console.log('✓ Teste 4 aprovado: Posição milimétrica dos botões, dots, metadados e banner 100% preservada.\n');
@@ -242,7 +233,6 @@ console.log('[Teste 6] Resolução de logos com a API TMDB para os 4 títulos...
   console.log('========================================================================');
   console.log(' TODOS OS 6 TESTES DE LOGOS DO BANNER MOBILE PASSARAM COM SUCESSO! ');
   console.log('========================================================================');
-  process.exit(0);
 })().catch((err) => {
   console.error(err);
   process.exit(1);

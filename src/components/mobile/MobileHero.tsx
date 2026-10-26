@@ -5,7 +5,6 @@ import { uiSoundService } from '../../core/audio/uiSoundService';
 import { heroCarouselStore, MAX_HERO_DISPLAY_COUNT } from '../../core/catalog/heroCarouselStore';
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { heroImageService, ZAPITV_HERO_FALLBACK_IMAGE } from '../../core/catalog/heroImageService';
-import { heroLogoService } from '../../core/catalog/heroLogoService';
 
 interface MobileHeroProps {
   featuredItems: ContentItem[];
@@ -18,40 +17,7 @@ interface MobileHeroProps {
 export interface ActiveHeroSlide {
   item: ContentItem;
   imageUrl: string;
-  logoUrl?: string | null;
-  aspectRatio?: number;
   generation: number;
-}
-
-/**
- * Retorna as classes de dimensionamento adaptativo para a logo no banner mobile.
- * Garante que logos compactas/quase quadradas (ex: Dandadan PT-BR ~1.37) recebam altura proporcional
- * para preencher harmoniosamente a área visual, enquanto logos ultra-largas (ex: Chainsaw Man ~8.98)
- * aproveitam a largura com altura contida sem cortar ou distorcer a arte.
- */
-export function getAdaptiveLogoClasses(aspectRatio?: number): string {
-  if (!aspectRatio || isNaN(aspectRatio)) {
-    return 'h-11 xs:h-13 sm:h-14 max-h-14 max-w-[75%] sm:max-w-[280px]';
-  }
-
-  // 1. Logos Compactas / Quase Quadradas (AR <= 1.8 - Ex: Dandadan PT-BR ~1.37)
-  // Altura aumentada para preencher a área visual sem gigantismo (~76px-84px)
-  if (aspectRatio <= 1.8) {
-    return 'h-[68px] xs:h-[76px] sm:h-[84px] max-h-[88px] max-w-[65%] sm:max-w-[240px]';
-  }
-
-  // 2. Logos Semi-Compactas (1.8 < AR <= 3.2 - Ex: Dandadan Horiz ~2.6)
-  if (aspectRatio <= 3.2) {
-    return 'h-[52px] xs:h-[58px] sm:h-[64px] max-h-[68px] max-w-[75%] sm:max-w-[280px]';
-  }
-
-  // 3. Logos Horizontais Padrão (3.2 < AR <= 5.0 - Ex: Death Note ~3.54, Blue Lock ~4.39)
-  if (aspectRatio <= 5.0) {
-    return 'h-11 xs:h-13 sm:h-14 max-h-14 max-w-[80%] sm:max-w-[290px]';
-  }
-
-  // 4. Logos Ultra-Horizontais (AR > 5.0 - Ex: Chainsaw Man ~8.98, Blue Lock JA ~5.5)
-  return 'h-[36px] xs:h-[42px] sm:h-[46px] max-h-[48px] max-w-[85%] sm:max-w-[320px]';
 }
 
 export const MobileHero: React.FC<MobileHeroProps> = ({
@@ -81,26 +47,22 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
   const total = activeItems.length;
   const targetItem = activeItems[currentIndex % Math.max(1, total)] || activeItems[0];
 
-  // Slide ativo unificado mantendo item, imagem validada, logo e geração rigorosamente sincronizados
+  // Slide ativo unificado mantendo item, imagem validada e geração rigorosamente sincronizados
   const [displayedSlide, setDisplayedSlide] = useState<ActiveHeroSlide | null>(() => {
     const initialItem = activeItems[0];
     if (!initialItem) return null;
     const candidates = heroImageService.getCandidateUrls(initialItem);
     const initialUrl = candidates.find(u => !heroImageService.isUrlFailed(u)) || ZAPITV_HERO_FALLBACK_IMAGE;
-    const initialMeta = heroLogoService.getResolvedLogoMetaSync(initialItem);
-    const initialLogo = initialMeta ? initialMeta.url : (heroLogoService.getResolvedLogoSync(initialItem) || null);
     return {
       item: initialItem,
       imageUrl: initialUrl,
-      logoUrl: initialLogo,
-      aspectRatio: initialMeta?.aspectRatio,
       generation: 0
     };
   });
   const [prevSlide, setPrevSlide] = useState<ActiveHeroSlide | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Transição coordenada atômica: garante que título/logo e imagem NUNCA pertençam a obras diferentes
+  // Transição coordenada atômica: garante que título, metadados e imagem pertençam à mesma obra
   useEffect(() => {
     if (!targetItem) return;
 
@@ -112,10 +74,7 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
 
     const transitionToSlide = async () => {
       try {
-        const [imageResult, logoResult] = await Promise.all([
-          heroImageService.resolveHeroImageForItem(targetItem, controller.signal),
-          heroLogoService.resolveLogoForItem(targetItem, controller.signal)
-        ]);
+        const imageResult = await heroImageService.resolveHeroImageForItem(targetItem, controller.signal);
         if (!isMounted || controller.signal.aborted || currentGen !== generationRef.current) {
           return;
         }
@@ -128,15 +87,9 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
         }
 
         const nextImageUrl = imageResult.url;
-        const nextLogoUrl = logoResult;
-        const nextMeta = heroLogoService.getResolvedLogoMetaSync(targetItem);
-        const nextAspectRatio = nextMeta?.aspectRatio;
 
-        // Se o slide exibido já é este item com a imagem e logo resolvidas idênticas, nada a alterar
-        if (isSameItem && displayedSlide && displayedSlide.imageUrl === nextImageUrl && displayedSlide.logoUrl === nextLogoUrl) {
-          if (nextAspectRatio && !displayedSlide.aspectRatio) {
-            setDisplayedSlide(prev => prev ? { ...prev, aspectRatio: nextAspectRatio } : null);
-          }
+        // Se o slide exibido já é este item com a imagem resolvida idêntica, nada a alterar
+        if (isSameItem && displayedSlide && displayedSlide.imageUrl === nextImageUrl) {
           return;
         }
 
@@ -149,8 +102,6 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
         setDisplayedSlide({
           item: targetItem,
           imageUrl: nextImageUrl,
-          logoUrl: nextLogoUrl,
-          aspectRatio: nextAspectRatio,
           generation: currentGen
         });
         setIsTransitioning(true);
@@ -162,13 +113,12 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
           }
         }, 500);
 
-        // Pré-carrega o próximo slide antecipadamente (imagem e logo)
+        // Pré-carrega o próximo slide antecipadamente (apenas imagem de fundo)
         if (total > 1) {
           const nextIndex = (currentIndex + 1) % total;
           const nextItem = activeItems[nextIndex];
           if (nextItem && nextItem.id !== targetItem.id) {
             heroImageService.preloadHeroItem(nextItem);
-            heroLogoService.preloadLogoForItem(nextItem);
           }
         }
       } catch {
@@ -296,42 +246,20 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
           )}
         </div>
 
-        {/* Título ou Logo Oficial */}
-        <div className="flex items-end justify-start mb-3.5 min-h-[56px] max-h-[88px]">
-          {displayedSlide.logoUrl ? (
-            <h1 className="flex items-end">
-              <span className="sr-only">{slideItem.title}</span>
-              <img
-                key={`hero-logo-${slideItem.id}-${displayedSlide.logoUrl}`}
-                src={displayedSlide.logoUrl}
-                alt={slideItem.title}
-                className={`${getAdaptiveLogoClasses(displayedSlide.aspectRatio)} w-auto object-contain object-left drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] filter`}
-                onLoad={(e) => {
-                  const w = e.currentTarget.naturalWidth;
-                  const h = e.currentTarget.naturalHeight;
-                  if (w > 0 && h > 0) {
-                    const ar = w / h;
-                    if (!displayedSlide.aspectRatio || Math.abs(displayedSlide.aspectRatio - ar) > 0.1) {
-                      setDisplayedSlide(prev => (prev ? { ...prev, aspectRatio: ar } : null));
-                    }
-                  }
-                }}
-                onError={() => {
-                  if (displayedSlide.logoUrl) {
-                    heroLogoService.markLogoFailed(displayedSlide.logoUrl);
-                  }
-                  setDisplayedSlide(prev => (prev ? { ...prev, logoUrl: null } : null));
-                }}
-              />
-            </h1>
-          ) : (
-            <h1
-              className="text-2xl xs:text-3xl font-black text-white leading-tight line-clamp-2 drop-shadow-md"
-              style={{ fontFamily: "'Sora', sans-serif" }}
-            >
-              {slideItem.title}
-            </h1>
-          )}
+        {/* Título Principal em Texto (Tipografia Sora, Branco, Sem Logos) */}
+        <div className="flex items-end justify-start mb-3.5 min-h-[56px]">
+          <h1
+            className={`font-extrabold text-white text-left tracking-tight line-clamp-2 break-words drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] ${
+              slideItem.title.length > 30
+                ? 'text-lg xs:text-xl sm:text-2xl leading-snug'
+                : slideItem.title.length > 18
+                ? 'text-xl xs:text-2xl sm:text-3xl leading-snug'
+                : 'text-2xl xs:text-3xl sm:text-4xl leading-tight'
+            }`}
+            style={{ fontFamily: "'Sora', sans-serif" }}
+          >
+            {slideItem.title}
+          </h1>
         </div>
 
         {/* Botões de Ação Principais (Ordem: 1. Assistir, 2. Detalhes, 3. Minha Lista) */}
