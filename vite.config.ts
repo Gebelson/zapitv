@@ -31,7 +31,9 @@ export default defineConfig(() => {
           const shell = readFileSync(path.join(outputDir, 'index.html'));
           const assets = readFileSync(path.join(outputDir, 'offline-assets.json'));
           const swPath = path.join(outputDir, 'sw.js');
-          const version = createHash('sha256').update(shell).update(assets).digest('hex').slice(0, 12);
+          let manifest = Buffer.from('');
+          try { manifest = readFileSync(path.join(outputDir, 'manifest.json')); } catch {}
+          const version = createHash('sha256').update(shell).update(assets).update(manifest).digest('hex').slice(0, 12);
           writeFileSync(swPath, readFileSync(swPath, 'utf8').replace('__BUILD_VERSION__', version));
         }
       }],
