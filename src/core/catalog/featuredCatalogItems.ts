@@ -1870,6 +1870,39 @@ export const FEATURED_ANIME_ITEMS: ContentItem[] = [
         image: 'https://image.tmdb.org/t/p/w500/9aICTTHECyRwB2pBHm3rAj1SgGg.jpg'
       }
     ]
+  },
+
+  // 13. DEATH NOTE (aniList: 1535 / tmdb: 13916 / mal: 1535 / imdb: tt0877057)
+  {
+    id: 'anime-death-note',
+    canonicalId: 'anime:anilist:1535',
+    title: 'Death Note',
+    originalTitle: 'Death Note',
+    type: ContentType.ANIME,
+    mediaFormat: 'series',
+    rating: 9.0,
+    year: 2006,
+    image: 'https://image.tmdb.org/t/p/w500/t7X24mF4NzsX4I74z29hXU507y8.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/original/96Hi2E4gUspXjD37v5kclq7gYv9.jpg',
+    description: 'Light Yagami encontra um caderno sobrenatural capaz de matar qualquer pessoa cujo nome seja escrito nele e inicia uma cruzada para livrar o mundo dos criminosos.',
+    genres: ['Anime', 'Suspense', 'Mistério', 'Sobrenatural'],
+    aniListId: 1535,
+    tmdbId: '13916',
+    imdbId: 'tt0877057',
+    malId: 1535,
+    seasonsCount: 1,
+    isFeatured: true,
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
+    episodes: [
+      {
+        id: 'dn-s1e1',
+        number: 1,
+        title: 'Renascimento',
+        description: 'Light Yagami encontra o Death Note deixado pelo shinigami Ryuk no pátio de sua escola.',
+        image: 'https://image.tmdb.org/t/p/w500/t7X24mF4NzsX4I74z29hXU507y8.jpg'
+      }
+    ]
   }
 ];
 
