@@ -18806,18 +18806,32 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         description: "Canal oficial com esportes radicais mundiais, automobilismo, skate, surfe, festivais e dan\xE7a."
       },
       {
-        id: "fifa-plus-br",
-        tvgId: "FIFAPlus.br",
-        tvgName: "FIFA+ Brasil",
-        name: "FIFA+ Brasil (Oficial)",
+        id: "caze-tv",
+        tvgId: "CazeTV.br",
+        tvgName: "Caz\xE9TV",
+        name: "Caz\xE9TV (Ao Vivo)",
         category: "esportes",
         groupTitle: "Esportes",
-        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/FIFA%2B_(2025).svg/960px-FIFA%2B_(2025).svg.png",
-        url: "https://e3be9ac5.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/TEctYnJfRklGQVBsdXNQb3J0dWd1ZXNlX0hMUw/playlist.m3u8",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Caz%C3%A9TV_logo.svg/1280px-Caz%C3%A9TV_logo.svg.png",
+        url: "http://138.204.86.4:8080/CAZE_TV/playlist.m3u8",
+        quality: "1080p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        description: "Maior canal esportivo digital independente do Brasil com partidas ao vivo em 1080p 60fps, campeonatos internacionais e debates."
+      },
+      {
+        id: "band-sports",
+        tvgId: "BandSports.br",
+        tvgName: "Band Sports",
+        name: "Band Sports",
+        category: "esportes",
+        groupTitle: "Esportes",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/BandSports_logo_2018.svg/512px-BandSports_logo_2018.svg.png",
+        url: "http://45.162.64.114/BAND_SPORTS/index.m3u8",
         quality: "720p",
         provider: _OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,
-        description: "Canal oficial da FIFA com partidas hist\xF3ricas de copas do mundo, document\xE1rios e jogos ao vivo em portugu\xEAs."
+        description: "Emissora esportiva do Grupo Bandeirantes com automobilismo, t\xEAnis, ligas internacionais e debates esportivos."
       },
       // =========================================================================
       // FILMES, SÉRIES & ENTRETENIMENTO (FAST Gratuitos e Autorizados)
@@ -19461,6 +19475,23 @@ var OfficialChannelProvider = class _OfficialChannelProvider {
         externalAccessUrl: "https://premiere.globo.com/",
         externalProviderName: "Premiere Play Oficial",
         description: "A maior cobertura de futebol ao vivo do Brasil, com todos os jogos das S\xE9ries A e B do Brasileir\xE3o."
+      },
+      {
+        id: "fifa-plus-br",
+        tvgId: "FIFAPlus.br",
+        tvgName: "FIFA+ Brasil",
+        name: "FIFA+ Brasil (Oficial)",
+        category: "esportes",
+        groupTitle: "Esportes",
+        tvgLogo: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/FIFA%2B_(2025).svg/960px-FIFA%2B_(2025).svg.png",
+        url: "",
+        quality: "720p",
+        provider: _OfficialChannelProvider.PROVIDER_NAME,
+        isOfficial: true,
+        requiresExternalAccess: true,
+        externalAccessUrl: "https://www.plus.fifa.com/",
+        externalProviderName: "FIFA+ Oficial (Web)",
+        description: "Canal oficial da FIFA com partidas hist\xF3ricas de copas do mundo, document\xE1rios e torneios mundiais."
       }
     ];
   }

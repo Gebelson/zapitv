@@ -137,7 +137,7 @@ export class ChannelNormalizer {
         } else {
           // Consulta cache de saúde prévio se houver ou validação pelo snapshot canônico
           const cached = sources[0]?.url ? liveStreamValidator.getCachedStatus(sources[0].url) : null;
-          initialStatus = cached || (VERIFIED_STREAMS_SNAPSHOT[canonicalId] ? 'AVAILABLE' : 'UNVERIFIED');
+          initialStatus = cached || (VERIFIED_STREAMS_SNAPSHOT[canonicalId] ? 'VERIFIED' : 'UNVERIFIED');
         }
 
         const newChannel: LiveChannel = {

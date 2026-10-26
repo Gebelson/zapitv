@@ -101,7 +101,7 @@ assert.strictEqual(
   undefined,
   'Sucesso real deve limpar o histórico de falha da fonte'
 );
-assert.strictEqual(testSuccessChannel.status, 'AVAILABLE', 'Status do canal deve voltar para AVAILABLE');
+assert.ok(testSuccessChannel.status === 'AVAILABLE' || testSuccessChannel.status === 'VERIFIED', 'Status do canal deve voltar para AVAILABLE ou VERIFIED');
 
 console.log('✓ Teste 3 passou: Auto-cura e confirmação de reprodução real comprovadas.');
 

@@ -51,9 +51,9 @@ export class ChannelHealthService {
         if (url !== channel.streamUrl) {
           channel.streamUrl = url;
         }
-        channel.status = 'AVAILABLE';
-        liveTvProviderRegistry.updateChannelStatus(channel.id, 'AVAILABLE');
-        return 'AVAILABLE';
+        channel.status = 'VERIFIED';
+        liveTvProviderRegistry.updateChannelStatus(channel.id, 'VERIFIED');
+        return 'VERIFIED';
       } else if (status === 'UNSTABLE') {
         anyUnstable = true;
       }
@@ -74,10 +74,10 @@ export class ChannelHealthService {
       liveTvProviderRegistry.updateChannelStatus(channel.id, 'EXTERNAL_ACCESS');
       return;
     }
-    channel.status = 'AVAILABLE';
+    channel.status = 'VERIFIED';
     liveStreamValidator.recordPlaybackSuccess(activeUrl, timeToFirstFrameMs);
     channelSourceResolver.markSourceSuccess(channel.id, activeUrl);
-    liveTvProviderRegistry.updateChannelStatus(channel.id, 'AVAILABLE');
+    liveTvProviderRegistry.updateChannelStatus(channel.id, 'VERIFIED');
   }
 
   /**

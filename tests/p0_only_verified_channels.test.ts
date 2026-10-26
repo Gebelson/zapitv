@@ -30,7 +30,8 @@ assert.ok(snapshotKeys.length >= 40, `Snapshot deve conter pelo menos 40 canais 
 assert.ok(VERIFIED_STREAMS_SNAPSHOT['tv-cultura'], 'TV Cultura deve constar no snapshot');
 assert.ok(VERIFIED_STREAMS_SNAPSHOT['cnn-brasil'], 'CNN Brasil deve constar no snapshot');
 assert.ok(VERIFIED_STREAMS_SNAPSHOT['record-news'], 'Record News deve constar no snapshot');
-assert.ok(VERIFIED_STREAMS_SNAPSHOT['fifa-plus-br'], 'FIFA+ deve constar no snapshot');
+assert.ok(VERIFIED_STREAMS_SNAPSHOT['caze-tv'], 'CazéTV deve constar no snapshot');
+assert.ok(VERIFIED_STREAMS_SNAPSHOT['band-sports'], 'Band Sports deve constar no snapshot');
 
 console.log(`✓ Teste 1 aprovado: Snapshot carregado com ${snapshotKeys.length} canais verificados em 0ms.\n`);
 
@@ -88,7 +89,7 @@ console.log(`✓ Teste 2 aprovado: Todos os ${verifiedFromProvider.length} canai
 // -----------------------------------------------------------------------------------------
 // TESTE 3: Canais com Acesso Externo Ocultos da Exibição Pública
 // -----------------------------------------------------------------------------------------
-console.log('[Teste 3] Verificação de ocultação dos 12 canais de acesso externo...');
+console.log('[Teste 3] Verificação de ocultação dos 13 canais de acesso externo...');
 
 const externalIds = [
   'globo-oficial',
@@ -102,7 +103,8 @@ const externalIds = [
   'sportv-2-oficial',
   'sportv-3-oficial',
   'espn-oficial',
-  'premiere-oficial'
+  'premiere-oficial',
+  'fifa-plus-br'
 ];
 
 for (const extId of externalIds) {
@@ -114,7 +116,7 @@ for (const extId of externalIds) {
   );
 }
 
-console.log('✓ Teste 3 aprovado: 100% dos 12 canais de acesso externo estão ausentes da lista pública.\n');
+console.log('✓ Teste 3 aprovado: 100% dos 13 canais de acesso externo estão ausentes da lista pública.\n');
 
 // -----------------------------------------------------------------------------------------
 // TESTE 4: Preservação Íntegra dos Metadados Internos (getAllChannels)
@@ -157,7 +159,8 @@ for (const ch of esportesChannels) {
   assert.strictEqual(ch.requiresExternalAccess, false, `Canal ${ch.name} em 'esportes' não pode ser externo`);
   assert.ok(ch.status === 'VERIFIED' || ch.status === 'AVAILABLE');
 }
-assert.ok(esportesChannels.some(c => c.id === 'fifa-plus-br'), 'FIFA+ deve estar em esportes');
+assert.ok(esportesChannels.some(c => c.id === 'caze-tv'), 'CazéTV deve estar em esportes');
+assert.ok(esportesChannels.some(c => c.id === 'band-sports'), 'Band Sports deve estar em esportes');
 assert.ok(esportesChannels.some(c => c.id === 'red-bull-tv-br'), 'Red Bull TV deve estar em esportes');
 
 console.log('✓ Teste 5 aprovado: Todas as categorias contêm exclusivamente canais verificados.\n');

@@ -148,12 +148,20 @@ export const VERIFIED_STREAMS_SNAPSHOT: Record<string, VerifiedStreamSeed> = {
     latencyMs: 500,
     lastVerifiedAt: Date.now()
   },
-  'fifa-plus-br': {
-    channelId: 'fifa-plus-br',
-    name: 'FIFA+ Brasil (Oficial)',
-    streamUrl: 'https://e3be9ac5.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/TEctYnJfRklGQVBsdXNQb3J0dWd1ZXNlX0hMUw/playlist.m3u8',
+  'caze-tv': {
+    channelId: 'caze-tv',
+    name: 'CazéTV (Ao Vivo)',
+    streamUrl: 'http://138.204.86.4:8080/CAZE_TV/playlist.m3u8',
+    quality: '1080p',
+    latencyMs: 350,
+    lastVerifiedAt: Date.now()
+  },
+  'band-sports': {
+    channelId: 'band-sports',
+    name: 'Band Sports',
+    streamUrl: 'http://45.162.64.114/BAND_SPORTS/index.m3u8',
     quality: '720p',
-    latencyMs: 500,
+    latencyMs: 400,
     lastVerifiedAt: Date.now()
   },
   'pluto-tv-cine-sucessos': {

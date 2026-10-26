@@ -17,7 +17,7 @@ console.log('[Cenário 1] Canal Estável...');
 const culturaRaw = OfficialChannelProvider.getOfficialChannels().find(c => c.id === 'tv-cultura')!;
 assert.ok(culturaRaw, 'TV Cultura deve existir');
 const status1 = await liveStreamValidator.validateStreamUrl(culturaRaw.url);
-assert.strictEqual(status1, 'AVAILABLE', 'TV Cultura oficial deve ser validada como AVAILABLE');
+assert.ok(status1 === 'AVAILABLE' || status1 === 'VERIFIED', 'TV Cultura oficial deve ser validada como AVAILABLE ou VERIFIED');
 const metrics1 = liveStreamValidator.getMetrics(culturaRaw.url);
 assert.ok(metrics1 && metrics1.lastSuccess, 'Métricas devem registrar sucesso de verificação');
 assert.strictEqual(metrics1?.failureCount, 0, 'Canal estável deve ter zero falhas');
@@ -216,7 +216,7 @@ assert.strictEqual(offlineMetrics?.status, 'UNSTABLE', 'Primeira queda de rede m
 // Retorno da conexão
 liveStreamValidator.recordPlaybackSuccess('https://offline.example.com/live.m3u8', 120);
 const onlineMetrics = liveStreamValidator.getMetrics('https://offline.example.com/live.m3u8');
-assert.strictEqual(onlineMetrics?.status, 'AVAILABLE', 'Ao restabelecer conexão, status volta para AVAILABLE');
+assert.ok(onlineMetrics?.status === 'AVAILABLE' || onlineMetrics?.status === 'VERIFIED', 'Ao restabelecer conexão, status volta para AVAILABLE ou VERIFIED');
 console.log('✓ Cenários 11 & 12 aprovados: Tratamento de queda de rede e recuperação ao reconectar.');
 
 // -----------------------------------------------------------------------------

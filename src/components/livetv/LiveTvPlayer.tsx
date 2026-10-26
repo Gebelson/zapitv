@@ -243,20 +243,19 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       setIsPlaying(false);
 
       if (onNextChannel) {
-        setFallbackNotice('Transmissão instável. Avançando automaticamente...');
+        setFallbackNotice('Transmissão indisponível. Avançando para o próximo canal verificado...');
         setTimeout(() => {
           if (activeChannelIdRef.current === channel.id) {
             onNextChannel();
           }
-        }, 2200);
+        }, 1800);
       } else if (onClose) {
-        setHasError(true);
-        setErrorMessage(reason || 'Esta transmissão está temporariamente indisponível.');
+        setFallbackNotice('Transmissão indisponível. Retornando à grade de canais...');
         setTimeout(() => {
           if (activeChannelIdRef.current === channel.id) {
             onClose();
           }
-        }, 3500);
+        }, 1800);
       } else {
         setHasError(true);
         setErrorMessage(reason || 'Esta transmissão está temporariamente indisponível.');
@@ -583,17 +582,27 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
     setIsUsingFallback(resolved.isFallback);
 
     if (resolved.allSourcesFailed || !resolved.hasEligibleSource || !resolved.primaryUrl) {
+      liveTvProviderRegistry.updateChannelStatus(channel.id, 'UNAVAILABLE');
       setPlaybackStatus('unavailable');
-      setHasError(true);
-      setErrorMessage('Todas as fontes deste canal estão temporariamente indisponíveis.');
       setIsLoading(false);
       setIsPlaying(false);
       if (onNextChannel) {
+        setFallbackNotice('Transmissão indisponível. Avançando para o próximo canal verificado...');
         setTimeout(() => {
           if (activeChannelIdRef.current === channel.id) {
             onNextChannel();
           }
-        }, 2200);
+        }, 1800);
+      } else if (onClose) {
+        setFallbackNotice('Transmissão indisponível. Retornando à grade de canais...');
+        setTimeout(() => {
+          if (activeChannelIdRef.current === channel.id) {
+            onClose();
+          }
+        }, 1800);
+      } else {
+        setHasError(true);
+        setErrorMessage('Todas as fontes deste canal estão temporariamente indisponíveis.');
       }
       return;
     }
@@ -787,6 +796,14 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
                 className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
               >
                 Próximo Canal <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+              >
+                Voltar à Grade
               </button>
             )}
           </div>

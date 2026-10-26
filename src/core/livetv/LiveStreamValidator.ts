@@ -108,7 +108,7 @@ export class LiveStreamValidator {
     for (const seed of Object.values(VERIFIED_STREAMS_SNAPSHOT)) {
       if (!this.metricsMap.has(seed.streamUrl)) {
         this.metricsMap.set(seed.streamUrl, {
-          status: 'AVAILABLE',
+          status: 'VERIFIED',
           testedUrl: seed.streamUrl,
           timestamp: now,
           latencyMs: seed.latencyMs,
@@ -477,7 +477,7 @@ export class LiveStreamValidator {
 
         // ETAPA D & E: SUCESSO DE VALIDAÇÃO
         this.updateMetrics(url, {
-          status: 'AVAILABLE',
+          status: 'VERIFIED',
           httpStatus,
           contentType,
           latencyMs,
@@ -485,7 +485,7 @@ export class LiveStreamValidator {
           segmentAccessible: true,
           lastSuccess: Date.now()
         });
-        return 'AVAILABLE';
+        return 'VERIFIED';
 
       } catch (err: any) {
         const isTimeout = err.name === 'AbortError' || err.name === 'TimeoutError';
@@ -513,7 +513,7 @@ export class LiveStreamValidator {
     if (!url) return;
     const existing = this.metricsMap.get(url);
     this.updateMetrics(url, {
-      status: 'AVAILABLE',
+      status: 'VERIFIED',
       lastSuccess: Date.now(),
       timeToFirstFrameMs: timeToFirstFrameMs ?? existing?.timeToFirstFrameMs,
       failureCount: 0
