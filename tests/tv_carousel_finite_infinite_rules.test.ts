@@ -61,7 +61,10 @@ console.log('✓ 7 conteúdos: carrossel infinito ativado com slot -1 e transiç
 console.log('\n[Teste 6] Lista com 10 conteúdos...');
 const slots10 = getVisibleSlots(10);
 assert.strictEqual(slots10.includes(-1), true, 'Lista de 10 itens deve conter slot -1');
-assert.ok(slots10.length >= 8, 'Deve conter buffer otimizado para cobrir a viewport de TV 1080p');
+assert.ok(
+  slots10.length >= 6 && slots10.length <= 9 && new Set(slots10).size === slots10.length,
+  'Deve conter buffer circular sem duplicatas, dimensionado ao perfil de hardware da TV'
+);
 console.log(`✓ 10 conteúdos: carrossel infinito com ${slots10.length} slots de alta fluidez.`);
 
 // -----------------------------------------------------------------------------

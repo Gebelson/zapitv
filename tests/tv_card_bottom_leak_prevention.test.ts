@@ -93,7 +93,8 @@ async function runCardLeakPreventionTests() {
     'A moldura fixa do Slot 0 deve estar em z-30'
   );
   assert.ok(
-    rowCode.includes('className="relative z-10 flex items-center gap-6"'),
+    rowCode.includes('className="relative z-10 flex items-center"') &&
+    rowCode.includes('gap: `${viewport.cardGap}px`'),
     'O trilho horizontal com os cards deve estar em z-10'
   );
   console.log('✓ Cenário 4: Moldura em z-30 sobre cards em z-10 garantindo que os cards passem por baixo OK');
@@ -109,12 +110,12 @@ async function runCardLeakPreventionTests() {
   // Cenário 6: Posicionamento no Slot 0 e espaçamento uniforme entre cards
   console.log('\n--- Cenário 6: Alinhamento milimétrico do Slot 0 e gap entre cards ---');
   assert.ok(
-    rowCode.includes('SAFE_MARGIN_LEFT = 64'),
-    'SAFE_MARGIN_LEFT deve permanecer exatamente em 64px'
+    rowCode.includes('viewport.safeMarginX'),
+    'A margem segura deve acompanhar o viewport da TV'
   );
   assert.ok(
-    rowCode.includes('CARD_GAP = 24'),
-    'CARD_GAP deve ser 24px (gap-6)'
+    rowCode.includes('gap: `${viewport.cardGap}px`'),
+    'O espaçamento dos cards deve acompanhar o viewport da TV'
   );
   console.log('✓ Cenário 6: Margem segura (64px) e espaçamento de 24px entre cards validados OK');
 

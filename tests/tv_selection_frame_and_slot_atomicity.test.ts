@@ -211,7 +211,8 @@ async function runSelectionAndSlotAtomicityTests() {
     'A moldura deve estar posicionada estritamente em z-30 para sobrepor os cards'
   );
   assert.ok(
-    contentRowCode.includes('className="relative z-10 flex items-center gap-6"'),
+    contentRowCode.includes('className="relative z-10 flex items-center"') &&
+    contentRowCode.includes('gap: `${viewport.cardGap}px`'),
     'O track deslizante deve estar posicionado em z-10 para correr por baixo da moldura'
   );
   assert.ok(

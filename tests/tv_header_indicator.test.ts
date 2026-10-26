@@ -49,8 +49,9 @@ async function runTvHeaderIndicatorTests() {
     'TvHeader deve renderizar o elemento único de indicador com data-testid="tv-nav-indicator"'
   );
   assert.ok(
-    headerCode.includes('w-8') && headerCode.includes('h-[3px]'),
-    'O indicador deve possuir 32px de largura (w-8) e 3px de altura'
+    headerCode.includes("viewport.scaleCategory === 'compact' ? 24 : viewport.scaleCategory === 'standard' ? 28 : 32") &&
+    headerCode.includes('width: `${indicatorWidth}px`') && headerCode.includes('h-[3px]'),
+    'O indicador deve ter largura responsiva de 24/28/32px e 3px de altura'
   );
   assert.ok(
     headerCode.includes('bg-cyan-400') && headerCode.includes('rounded-full'),
@@ -60,7 +61,7 @@ async function runTvHeaderIndicatorTests() {
     headerCode.includes('shadow-[0_0_10px_#00e5ff]'),
     'O indicador deve possuir brilho ciano discreto'
   );
-  console.log('✓ Cenário 2: Único elemento indicador absoluto estilizado com 32x3px, cyan e glow discreto OK');
+  console.log('✓ Cenário 2: Único indicador responsivo com 3px de altura, cyan e glow discreto OK');
 
   // Cenário 3: Transição suave e aceleração GPU com cubic-bezier(0.22, 1, 0.36, 1)
   console.log('\n--- Cenário 3: Animação fluida com translate3d e curva desacelerada ---');
@@ -82,8 +83,8 @@ async function runTvHeaderIndicatorTests() {
     'O cálculo deve centralizar o indicador na posição exata do botão'
   );
   assert.ok(
-    headerCode.includes('Math.round(centerX - 16)'),
-    'A coordenada de translação deve subtrair metade da largura (16px) para centralizar perfeitamente'
+    headerCode.includes('Math.round(centerX - currentIndicatorW / 2)'),
+    'A coordenada deve subtrair metade da largura responsiva para centralizar o indicador'
   );
   console.log('✓ Cenário 4: Centralização matemática exata com sub-pixel precision OK');
 

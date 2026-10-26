@@ -124,22 +124,23 @@ async function runTvAppInterfaceTests() {
     !tvHeaderCode.includes('bg-black/40'),
     'TvHeader NÃO deve conter retângulo/cápsula envolvendo os links de navegação'
   );
+  const tvViewportCode = fs.readFileSync(path.resolve(process.cwd(), 'src/core/tv/tvViewportService.ts'), 'utf8');
   assert(
-    tvHeaderCode.includes('text-[22px]') || tvHeaderCode.includes('text-[23px]') || tvHeaderCode.includes('text-[24px]'),
-    'TvHeader deve utilizar tipografia ampliada proporcional a Smart TVs 1080p'
+    tvHeaderCode.includes('fontSize={viewport.navFontSize}') && tvViewportCode.includes('navFontSize = 21'),
+    'TvHeader deve utilizar tipografia proporcional ao viewport, incluindo Smart TVs 1080p'
   );
   assert(
     !tvHeaderCode.includes('-bottom-2') &&
-    tvHeaderCode.includes('top-[calc(100%+5px)]') &&
-    tvHeaderCode.includes('left-1/2 -translate-x-1/2'),
-    'TvHeader deve aproximar o indicador da página ativa a 5px do texto, centralizado'
+    tvHeaderCode.includes('data-testid="tv-nav-indicator"') &&
+    tvHeaderCode.includes('transform: `translate3d(${indicatorX}px, 0, 0)`'),
+    'TvHeader deve manter o indicador alinhado dinamicamente ao link ativo'
   );
   assert(
     tvHeaderCode.includes('src="/zapitv-text.png"') &&
-    (tvHeaderCode.includes('translateY(3px)') || tvHeaderCode.includes('translate-y-[3px]')),
-    'TvHeader deve aplicar transform: translateY(3px) exclusivamente ao texto ZapiTV da logo'
+    tvHeaderCode.includes("transform: 'translateY(2px)'"),
+    'TvHeader deve preservar o ajuste vertical do texto ZapiTV da logo'
   );
-  console.log('✓ Teste 9: Header flutuante livre, indicador ativo a 5px e texto da logo deslocado 3px OK');
+  console.log('✓ Teste 9: Header flutuante responsivo, indicador alinhado e logo preservada OK');
 
   // Teste 10: Banner no topo absoluto, degradê de legibilidade e blur progressivo
   assert(

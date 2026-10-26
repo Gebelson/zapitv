@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import { getVisibleSlots } from '../src/components/tv/TvContentRow';
 
 async function runTvCarouselHorizontalTransitionsTests() {
   console.log('--- Teste de Suavização das Transições Horizontais dos Carrosséis (Smart TV) ---');
@@ -76,8 +77,9 @@ async function runTvCarouselHorizontalTransitionsTests() {
 
   // Teste 6: Carrossel finito para 1-6 itens e circular infinito para >= 7 itens
   assert(
-    contentRowCode.includes('count === 2) return [0, 1]') &&
-    contentRowCode.includes('count === 7) return [-1, 0, 1, 2, 3, 4, 5, 6]'),
+    JSON.stringify(getVisibleSlots(2)) === JSON.stringify([0, 1]) &&
+    JSON.stringify(getVisibleSlots(6)) === JSON.stringify([0, 1, 2, 3, 4, 5]) &&
+    getVisibleSlots(7)[0] === -1 && getVisibleSlots(7)[1] === 0,
     'getVisibleSlots deve fornecer carrossel finito para 1 a 6 itens e infinito para >= 7 itens'
   );
   console.log('✓ Teste 6: Regra estrita de carrossel finito (1-6) e infinito (>=7) OK');
@@ -90,19 +92,21 @@ async function runTvCarouselHorizontalTransitionsTests() {
   );
   console.log('✓ Teste 7: Acionamento de Enter no item de destino durante o deslocamento OK');
 
-  // Teste 8: Preservação integral do layout, safe margin (64px) e moldura externa ciano
+  // Teste 8: Preservação integral do layout, margem segura responsiva e moldura externa ciano
   assert(
-    contentRowCode.includes('SAFE_MARGIN_LEFT = 64') &&
+    contentRowCode.includes('viewport.safeMarginX') &&
     contentRowCode.includes('border-cyan-400') &&
     contentRowCode.includes('getCardAmbientGlow'),
-    'TvContentRow deve preservar a margem segura de 64px, moldura de foco ciano e glow ambiente'
+    'TvContentRow deve preservar a margem segura responsiva, moldura de foco ciano e glow ambiente'
   );
   console.log('✓ Teste 8: Preservação da geometria, identidade visual e acabamento refinado OK');
 
   console.log('\nTodos os 8 testes de suavização horizontal dos carrosséis passaram com 100% de sucesso!\n');
 }
 
-runTvCarouselHorizontalTransitionsTests().catch((err) => {
+runTvCarouselHorizontalTransitionsTests().then(() => {
+  process.exit(0);
+}).catch((err) => {
   console.error('\n❌ Falha nos testes de suavização horizontal:', err);
   process.exit(1);
 });

@@ -84,12 +84,12 @@ async function runTvHeaderBlurTests() {
   );
   console.log('✓ Teste 6: Degradê cinematográfico escuro integrado harmoniosamente ao desfoque');
 
-  // 2.4 Isolamento de nitidez dos elementos interativos (z-10 vs z-0)
+  // 2.4 Isolamento de nitidez dos elementos interativos (container z-10 vs fundo z-0)
   assert(
     tvHeaderContent.includes('absolute z-0 inset-x-0 top-0') &&
-    tvHeaderContent.includes('relative z-10 flex items-center gap-3.5') && // Logo
-    tvHeaderContent.includes('absolute z-10 left-1/2 -translate-x-1/2') && // Nav links
-    tvHeaderContent.includes('relative z-10 flex items-center gap-4 sm:gap-5'), // Busca e perfil
+    tvHeaderContent.includes('relative z-10 flex items-center justify-between w-full h-full') &&
+    tvHeaderContent.includes('flex-1 flex items-center justify-center min-w-0 relative') &&
+    tvHeaderContent.includes('flex items-center flex-shrink-0 ml-auto'),
     'Todos os elementos do header (Logo, links, busca e perfil) devem estar em camada z-10, mantendo 100% de nitidez'
   );
   console.log('✓ Teste 7: Elementos do cabeçalho (logo, links, busca, perfil) preservados em z-10 com 100% de nitidez');

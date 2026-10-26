@@ -33,7 +33,8 @@ async function runSelectionFrameTests() {
   // Cenário 1: Geometria compartilhada 2:3 entre capa e moldura
   console.log('--- Cenário 1: Geometria compartilhada 2:3 entre capa e moldura ---');
   assert.ok(
-    contentRowCode.includes('w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px]') &&
+    contentRowCode.includes('width: `${cardWidth}px`') &&
+    contentRowCode.includes('width: `${viewport.cardWidth}px`') &&
     contentRowCode.includes('relative w-full aspect-[2/3]'),
     'TvContentRow deve estruturar a moldura com as mesmas classes de largura e aspect-[2/3] dos slots'
   );
@@ -89,7 +90,8 @@ async function runSelectionFrameTests() {
     'A moldura deve estar posicionada em z-30'
   );
   assert.ok(
-    contentRowCode.includes('className="relative z-10 flex items-center gap-6"'),
+    contentRowCode.includes('className="relative z-10 flex items-center"') &&
+    contentRowCode.includes('gap: `${viewport.cardGap}px`'),
     'O trilho horizontal (trackRef) deve estar posicionado em z-10'
   );
   console.log('✓ Cenário 5: Moldura em z-30 sobre cards em z-10 sem invasão visual de contorno OK');
@@ -97,8 +99,8 @@ async function runSelectionFrameTests() {
   // Cenário 6: Moldura estática na margem segura de 64px e geometria compartilhada
   console.log('\n--- Cenário 6: Moldura estática no Slot 0 ---');
   assert.ok(
-    contentRowCode.includes('SAFE_MARGIN_LEFT = 64'),
-    'SAFE_MARGIN_LEFT deve permanecer em 64px'
+    contentRowCode.includes('viewport.safeMarginX'),
+    'A margem segura deve acompanhar o viewport da TV'
   );
   assert.ok(
     contentRowCode.includes('selectionGeometry') || contentRowCode.includes('left: `${SAFE_MARGIN_LEFT}px`'),
@@ -109,7 +111,7 @@ async function runSelectionFrameTests() {
   // Cenário 7: Glow ambiente com geometria compartilhada
   console.log('\n--- Cenário 7: Glow ambiente com geometria compartilhada 2:3 ---');
   assert.ok(
-    contentRowCode.includes('w-[220px] sm:w-[245px] md:w-[260px] lg:w-[275px]') &&
+    contentRowCode.includes('width: `${cardWidth}px`') &&
     contentRowCode.includes('getCardAmbientGlow'),
     'O glow ambiente de fundo deve utilizar a mesma geometria 2:3 dos slots'
   );

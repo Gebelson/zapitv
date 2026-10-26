@@ -74,11 +74,12 @@ async function runTests() {
   );
   console.log('✓ Cenário 5: Estado focado preserva font-medium sem forçar peso diferente OK');
 
-  // Cenário 6: Tamanho da fonte preservado intacto
-  console.log('\n--- Cenário 6: Tamanho da fonte text-[20px] lg:text-[23px] preservado ---');
+  // Cenário 6: Tamanho da fonte acompanha o viewport sem alterar o peso
+  console.log('\n--- Cenário 6: Tamanho da fonte responsivo preservado ---');
   assert(
-    navTabButtonDef.includes('text-[20px] lg:text-[23px]'),
-    'TvNavTabButton deve preservar exatamente a escala tipográfica proporcional text-[20px] lg:text-[23px]'
+    navTabButtonDef.includes('style={{ fontSize: fontSize ? `${fontSize}px` : undefined }}') &&
+    tvHeaderCode.includes('fontSize={viewport.navFontSize}'),
+    'TvNavTabButton deve receber a escala tipográfica proporcional ao viewport'
   );
   console.log('✓ Cenário 6: Escala tipográfica mantida inalterada OK');
 
