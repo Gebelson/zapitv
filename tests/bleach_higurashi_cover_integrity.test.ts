@@ -215,3 +215,5 @@ console.log('✓ Teste 6 aprovado: CatalogMetadataIntegrityAuditor audita perfei
 console.log('========================================================================');
 console.log('TODOS OS TESTES DE INTEGRIDADE BLEACH vs HIGURASHI FORAM APROVADOS! 🚀');
 console.log('========================================================================\n');
+// As verificações são síncronas; serviços importados podem manter timers ativos.
+process.exit(0);

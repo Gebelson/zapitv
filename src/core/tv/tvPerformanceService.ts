@@ -134,7 +134,8 @@ class TvPerformanceService {
     }
 
     const ua = (customUa || (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '').toLowerCase();
-    const nav = (typeof navigator !== 'undefined' ? navigator : {}) as any;
+    // Um UA fornecido para diagnóstico/teste não deve herdar o hardware do executor.
+    const nav = (!customUa && typeof navigator !== 'undefined' ? navigator : {}) as any;
     const isFireTv = this.isFireTv(ua);
     const isSamsungTv = /tizen|maple|samsung.*(?:tv|smarttv)|mediastationx|media\s*station\s*x/i.test(ua);
     const hwConcurrency = nav.hardwareConcurrency || 4;
