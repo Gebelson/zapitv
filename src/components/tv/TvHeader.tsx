@@ -11,6 +11,7 @@ export type TvTab = 'home' | 'movies' | 'series' | 'animes' | 'featured';
 
 interface TvHeaderProps {
   suspended?: boolean;
+  hidden?: boolean;
   currentTab: TvTab;
   onSelectTab: (tab: TvTab) => void;
   onOpenSearch: () => void;
@@ -92,6 +93,7 @@ const TvNavTabButton: React.FC<{
 
 export const TvHeader: React.FC<TvHeaderProps> = ({
   suspended = false,
+  hidden = false,
   currentTab,
   onSelectTab,
   onOpenSearch,
@@ -266,7 +268,10 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     <FocusContext.Provider value={focusKey}>
       <header
         ref={noriginRef as any}
-        className="fixed top-0 inset-x-0 z-[120] h-24 sm:h-[100px] px-14 sm:px-16 flex items-center justify-between pointer-events-none select-none border-none shadow-none bg-transparent"
+        data-testid="tv-header"
+        className={`fixed top-0 inset-x-0 z-[120] h-24 sm:h-[100px] px-14 sm:px-16 flex items-center justify-between select-none border-none shadow-none bg-transparent transition-all duration-300 transform-gpu ${
+          hidden ? 'opacity-0 -translate-y-full pointer-events-none invisible' : 'opacity-100 translate-y-0 pointer-events-none'
+        }`}
       >
         {/* Camada de fundo flutuante com Desfoque Real e Degradê Escuro Cinematográfico */}
         <div
@@ -389,7 +394,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
           />
           <TvNavTabButton
             focusKey="tv-nav-featured"
-            label="Em Destaque"
+            label="Ao Vivo"
             isActive={currentTab === 'featured'}
             onFocusTab={handleTabFocus}
             onBlurTab={handleTabBlur}

@@ -6,7 +6,7 @@ import path from 'path';
  * Teste de Validação Estrita do Peso da Fonte dos Links do Header da Smart TV
  *
  * Requisitos:
- * 1. Os 5 links de navegação (Início, Filmes, Séries, Animes, Em Destaque) devem usar exclusivamente font-medium (font-weight: 500).
+ * 1. Os 5 links de navegação (Início, Filmes, Séries, Animes, Ao Vivo) devem usar exclusivamente font-medium (font-weight: 500).
  * 2. font-bold e font-extrabold devem ser totalmente removidos de todos os estados (normal, focado e ativo).
  * 3. Tamanho da fonte text-[20px] lg:text-[23px] mantido.
  * 4. Nenhuma outra propriedade (cores, espaçamento, efeitos de foco, navegação) modificada.
@@ -27,7 +27,7 @@ async function runTests() {
     tvHeaderCode.includes('label="Filmes"') &&
     tvHeaderCode.includes('label="Séries"') &&
     tvHeaderCode.includes('label="Animes"') &&
-    tvHeaderCode.includes('label="Em Destaque"'),
+    tvHeaderCode.includes('label="Ao Vivo"'),
     'TvHeader deve renderizar os 5 links com TvNavTabButton'
   );
   console.log('✓ Cenário 1: 5 links de navegação confirmados OK');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense, lazy } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ContentItem, ContentType, User, Profile } from '../../../types';
 import { storageService } from '../../core/storage/storageService';
@@ -19,6 +19,7 @@ import { TvHeader, TvTab } from '../../components/tv/TvHeader';
 import { TvHomeView } from '../../components/tv/TvHomeView';
 import { TvCategoryView } from '../../components/tv/TvCategoryView';
 import { TvAnimeView } from '../../components/tv/TvAnimeView';
+import { TvLiveView } from '../../components/tv/live/TvLiveView';
 import { TvSearchView } from '../../components/tv/TvSearchView';
 import { TvListView } from '../../components/tv/TvListView';
 import { TvSettingsView } from '../../components/tv/TvSettingsView';
@@ -113,7 +114,7 @@ export const TvApp: React.FC<TvAppProps> = ({
     if (path.includes('/filmes')) return 'movies';
     if (path.includes('/series')) return 'series';
     if (path.includes('/animes')) return 'animes';
-    if (path.includes('/em-destaque')) return 'featured';
+    if (path.includes('/em-destaque') || path.includes('/ao-vivo') || path.includes('/destaques')) return 'featured';
     return 'home';
   });
 
@@ -144,6 +145,44 @@ export const TvApp: React.FC<TvAppProps> = ({
   useEffect(() => watchPartyService.subscribe(event => {
     if (event === 'state_changed') setPartyActive(watchPartyService.getRoomState().isActive);
   }), []);
+
+  // Controle de ocultação automática do Header na aba Ao Vivo (featured)
+  const [isLiveHeaderHidden, setIsLiveHeaderHidden] = useState(false);
+  const liveHeaderTimerRef = useRef<any>(null);
+
+  const resetLiveHeaderTimeout = useCallback(() => {
+    if (liveHeaderTimerRef.current) {
+      clearTimeout(liveHeaderTimerRef.current);
+    }
+    liveHeaderTimerRef.current = setTimeout(() => {
+      if (currentTab === 'featured' && !specialView && !selectedDetailItem && !playingItem) {
+        setIsLiveHeaderHidden(true);
+      }
+    }, 4000);
+  }, [currentTab, specialView, selectedDetailItem, playingItem]);
+
+  useEffect(() => {
+    if (currentTab === 'featured') {
+      setIsLiveHeaderHidden(false);
+      resetLiveHeaderTimeout();
+    } else {
+      setIsLiveHeaderHidden(false);
+      if (liveHeaderTimerRef.current) clearTimeout(liveHeaderTimerRef.current);
+    }
+    return () => {
+      if (liveHeaderTimerRef.current) clearTimeout(liveHeaderTimerRef.current);
+    };
+  }, [currentTab, resetLiveHeaderTimeout]);
+
+  const handleRevealLiveHeader = useCallback(() => {
+    setIsLiveHeaderHidden(false);
+    resetLiveHeaderTimeout();
+    setTimeout(() => {
+      try {
+        setFocus('tv-nav-featured');
+      } catch {}
+    }, 60);
+  }, [resetLiveHeaderTimeout]);
 
   // Retorno imediato ao topo absoluto (0, 0) ao selecionar qualquer aba do header
   const resetScrollToTop = useCallback(() => {
@@ -487,6 +526,7 @@ export const TvApp: React.FC<TvAppProps> = ({
           {specialView !== 'search' && (
             <TvHeader
               suspended={screensaverActive}
+              hidden={currentTab === 'featured' && isLiveHeaderHidden}
               currentTab={currentTab}
               onSelectTab={handleSelectTab}
               onOpenSearch={() => {
@@ -580,13 +620,9 @@ export const TvApp: React.FC<TvAppProps> = ({
                 suspended={screensaverActive}
               />
             ) : (
-              <TvCategoryView
-                categoryTitle="Em Destaque"
-                upFocusKey="tv-nav-featured"
-                items={featuredItems.length > 0 ? featuredItems : unifiedTrending}
-                onSelectItem={handleOpenDetailModal}
-                onPlayItem={(it) => handleStartPlay(it)}
-                suspended={screensaverActive}
+              <TvLiveView
+                onTriggerHeader={handleRevealLiveHeader}
+                isHeaderVisible={!isLiveHeaderHidden}
               />
             )}
           </main>

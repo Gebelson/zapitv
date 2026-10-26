@@ -33,8 +33,8 @@ async function runTvAppInterfaceTests() {
     tvHeaderCode.includes('label="Filmes"') &&
     tvHeaderCode.includes('label="Séries"') &&
     tvHeaderCode.includes('label="Animes"') &&
-    tvHeaderCode.includes('label="Em Destaque"'),
-    'TvHeader deve conter apenas Início, Filmes, Séries, Animes e Em Destaque'
+    tvHeaderCode.includes('label="Ao Vivo"'),
+    'TvHeader deve conter apenas Início, Filmes, Séries, Animes e Ao Vivo'
   );
   console.log('✓ Teste 2: "Minha Lista" removida da navegação superior conforme especificação');
 
