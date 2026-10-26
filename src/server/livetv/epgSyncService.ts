@@ -301,6 +301,7 @@ export class EpgSyncService {
     if (ch.id === 'pluto-tv-canal-uol' && channelsMap.has('Canal UOL')) return true;
     if (ch.id === 'globo-oficial' && channelsMap.has('Globo SP_local')) return true;
     if (ch.id === 'band-nacional' && channelsMap.has('Band SP_local')) return true;
+    if (ch.id === 'band-sports' && channelsMap.has('BAND SPORTS HD')) return true;
     if (ch.id === 'record-tv-oficial' && channelsMap.has('Record SP_local')) return true;
     if (ch.id === 'sbt-nacional' && channelsMap.has('SBT')) return true;
     if (ch.id === 'sportv-oficial' && channelsMap.has('sportv')) return true;
@@ -320,6 +321,7 @@ export class EpgSyncService {
     if (ch.id === 'pluto-tv-canal-uol' && map.has('Canal UOL')) return map.get('Canal UOL')!;
     if (ch.id === 'globo-oficial' && map.has('Globo SP_local')) return map.get('Globo SP_local')!;
     if (ch.id === 'band-nacional' && map.has('Band SP_local')) return map.get('Band SP_local')!;
+    if (ch.id === 'band-sports' && map.has('BAND SPORTS HD')) return map.get('BAND SPORTS HD')!;
     if (ch.id === 'record-tv-oficial' && map.has('Record SP_local')) return map.get('Record SP_local')!;
     if (ch.id === 'sbt-nacional' && map.has('SBT')) return map.get('SBT')!;
     if (ch.id === 'sportv-oficial' && map.has('sportv')) return map.get('sportv')!;

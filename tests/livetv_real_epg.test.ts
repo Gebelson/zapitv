@@ -121,7 +121,23 @@ const animeEpg = epgService.getCurrentEpgState(plutoAnime);
 assert.strictEqual(animeEpg.hasVerifiedSchedule, true, 'Pluto TV Anime deve possuir grade verificada real');
 assert.notStrictEqual(animeEpg.currentProgram.title, 'Programação não disponível');
 
-console.log(`✓ Teste 3 aprovado: TV Cultura ("${culturaEpg.currentProgram.title}"), TV Brasil ("${brasilEpg.currentProgram.title}") e Pluto Anime com grade real.\n`);
+const bandSports: LiveChannel = {
+  id: 'band-sports',
+  name: 'Band Sports',
+  category: 'esportes',
+  categoryLabel: 'Esportes',
+  streamUrl: 'http://45.162.64.114/BAND_SPORTS/index.m3u8',
+  quality: '720p',
+  isOfficial: true,
+  logo: 'https://example.com/bandsports.png',
+  status: 'AVAILABLE'
+};
+
+const bandSportsEpg = epgService.getCurrentEpgState(bandSports);
+assert.strictEqual(bandSportsEpg.hasVerifiedSchedule, true, 'Band Sports deve possuir grade verificada real');
+assert.notStrictEqual(bandSportsEpg.currentProgram.title, 'Programação não disponível');
+
+console.log(`✓ Teste 3 aprovado: TV Cultura ("${culturaEpg.currentProgram.title}"), TV Brasil ("${brasilEpg.currentProgram.title}"), Pluto Anime e Band Sports com grade real.\n`);
 
 // -----------------------------------------------------------------------------------------
 // TESTE 4: Proteção Contra Alucinação em Canais Sem Grade (hasVerifiedSchedule = false)
