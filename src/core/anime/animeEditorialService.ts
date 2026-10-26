@@ -35,7 +35,7 @@ const EDITORIAL_SEEDS: Record<string, { title: string; titles: CuratedTitle[] }>
     titles: [
       { canonicalName: 'Solo Leveling', aliases: ['ore dake level up na ken', 'solo leveling: reawakening'], aniListId: 151807 },
       { canonicalName: 'Dandadan', aliases: ['dan da dan'], aniListId: 171018 },
-      { canonicalName: 'Bleach: Thousand-Year Blood War', aliases: ['bleach: sennen kessen-hen', 'bleach'], aniListId: 114446 },
+      { canonicalName: 'Bleach: Thousand-Year Blood War', aliases: ['bleach: sennen kessen-hen', 'bleach tybw'], aniListId: 116674 },
       { canonicalName: 'Re:Zero - Starting Life in Another World', aliases: ['re:zero kara hajimeru isekai seikatsu', 're:zero'], aniListId: 163134 },
       { canonicalName: 'Blue Lock', aliases: ['blue lock vs u-20', 'blue lock 2nd season'], aniListId: 163148 },
       { canonicalName: 'Ranma 1/2', aliases: ['ranma 1/2 (2024)', 'ranma 1/2 remake'], minYear: 2024 },
@@ -70,7 +70,7 @@ const EDITORIAL_SEEDS: Record<string, { title: string; titles: CuratedTitle[] }>
       { canonicalName: 'Fullmetal Alchemist: Brotherhood', aliases: ['hagane no renkinjutsushi: brotherhood'], aniListId: 5114 },
       { canonicalName: 'Spy x Family', aliases: ['spy × family', 'spy x family code: white'], aniListId: 140960 },
       { canonicalName: 'Haikyu!!', aliases: ['haikyuu!!', 'haikyu!'], aniListId: 20464 },
-      { canonicalName: 'Bleach', aliases: ['bleach: thousand-year blood war'], aniListId: 269 },
+      { canonicalName: 'Bleach', aliases: ['bleach (2004)'], aniListId: 269 },
       { canonicalName: 'Vinland Saga', aliases: ['vinland saga season 2'], aniListId: 101348 },
       { canonicalName: 'Mob Psycho 100', aliases: ['mob psycho 100 ii', 'mob psycho 100 iii'], aniListId: 21507 }
     ]
@@ -86,7 +86,7 @@ const EDITORIAL_SEEDS: Record<string, { title: string; titles: CuratedTitle[] }>
       { canonicalName: 'Frieren: Beyond Journey\'s End', aliases: ['sousou no frieren', 'frieren e a jornada para o além'], aniListId: 154587 },
       { canonicalName: 'Kaiju No. 8', aliases: ['kaijuu 8-gou'], aniListId: 153288 },
       { canonicalName: 'Demon Slayer: Kimetsu no Yaiba', aliases: ['kimetsu no yaiba'], aniListId: 101922 },
-      { canonicalName: 'Bleach: Thousand-Year Blood War', aliases: ['bleach: sennen kessen-hen'], aniListId: 114446 },
+      { canonicalName: 'Bleach: Thousand-Year Blood War', aliases: ['bleach: sennen kessen-hen', 'bleach tybw'], aniListId: 116674 },
       { canonicalName: 'Spy x Family', aliases: ['spy × family'], aniListId: 140960 }
     ]
   },
@@ -100,7 +100,7 @@ const EDITORIAL_SEEDS: Record<string, { title: string; titles: CuratedTitle[] }>
       { canonicalName: 'One Piece', aliases: ['one piece'] },
       { canonicalName: 'Chainsaw Man', aliases: ['chainsawman'] },
       { canonicalName: 'Naruto Shippuden', aliases: ['naruto'] },
-      { canonicalName: 'Bleach', aliases: ['bleach: thousand-year blood war'] },
+      { canonicalName: 'Bleach', aliases: ['bleach (2004)'] },
       { canonicalName: 'Hunter x Hunter', aliases: ['hunter × hunter'] },
       { canonicalName: 'Black Clover', aliases: ['black clover'] },
       { canonicalName: 'Kaiju No. 8', aliases: ['kaijuu 8-gou'] },

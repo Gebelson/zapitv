@@ -334,27 +334,31 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
   // ANIME VERIFICADO - BLEACH (CANÔNICO)
   {
     id: 'anime-bleach-tvmeter',
+    canonicalId: 'anime:anilist:116674',
     title: 'Bleach: Thousand-Year Blood War',
     originalTitle: 'Bleach: Sennen Kessen-hen',
     type: ContentType.ANIME,
+    mediaFormat: 'series',
     rating: 9.0,
     year: 2022,
-    image: 'https://image.tmdb.org/t/p/w500/dx28DE7EgLy0FatOvnaUg0k9j92.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/original/o0NsbcIvsllg6CJX0FBFY8wWbsn.jpg',
-    description: 'A paz é subitamente quebrada quando as sirenes de alerta ecoam pela Sociedade das Almas.',
-    genres: ['Anime', 'Ação', 'Animação', 'Fantasia'],
+    image: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx116674-p3zK4PUX2Aag.jpg',
+    backdrop: 'https://s4.anilist.co/file/anilistcdn/media/anime/banner/116674-l2YlIyJzvGSV.jpg',
+    description: 'A guerra milenar entre os Shinigamis da Soul Society e o exército Quincy liderado por Yhwach chega ao seu clímax destrutivo.',
+    genres: ['Anime', 'Ação', 'Animação', 'Fantasia', 'Sobrenatural'],
+    aniListId: 116674,
     tmdbId: '30984',
+    malId: 41467,
     imdbId: 'tt0434665',
     seasonsCount: 3,
-    availabilityStatus: 'declared',
-    audioStatus: 'other',
+    availabilityStatus: 'verified',
+    audioStatus: 'pt-br-dubbed',
     episodes: [
       {
         id: 'bleach-tybw-ep1',
         number: 1,
-        title: 'Episódio 1',
-        description: 'O retorno dos Quincies.',
-        image: ''
+        title: 'Episódio 1: Guerra de Sangue',
+        description: 'A Soul Society é surpreendida por um ataque coordenado do Wandenreich.',
+        image: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx116674-p3zK4PUX2Aag.jpg'
       }
     ]
   },

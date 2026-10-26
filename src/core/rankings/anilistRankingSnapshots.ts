@@ -285,7 +285,7 @@ export const OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS: AniListMonthlySnapshot[] = [
       { position: 2, aniListId: 113415, title: 'Jujutsu Kaisen', year: 2020, score: 96.0, popularityRank: 2, trendingRank: 2, format: 'TV', referenceDate: '2026-09-30', capturedAt: 1790822400000 },
       { position: 3, aniListId: 101922, title: 'Demon Slayer: Kimetsu no Yaiba', year: 2019, score: 95.5, popularityRank: 3, trendingRank: 3, format: 'TV', referenceDate: '2026-09-30', capturedAt: 1790822400000 },
       { position: 4, aniListId: 154587, title: "Frieren: Beyond Journey's End", year: 2023, score: 93.8, popularityRank: 4, trendingRank: 4, format: 'TV', referenceDate: '2026-09-30', capturedAt: 1790822400000 },
-      { position: 5, aniListId: 114446, title: 'Bleach: Thousand-Year Blood War', year: 2022, score: 93.2, popularityRank: 5, trendingRank: 5, format: 'TV', referenceDate: '2026-09-30', capturedAt: 1790822400000 },
+      { position: 5, aniListId: 116674, title: 'Bleach: Thousand-Year Blood War', year: 2022, score: 93.2, popularityRank: 5, trendingRank: 5, format: 'TV', referenceDate: '2026-09-30', capturedAt: 1790822400000 },
       { position: 6, aniListId: 171018, title: 'Dandadan', year: 2024, score: 92.9, popularityRank: 6, trendingRank: 6, format: 'TV', referenceDate: '2026-09-30', capturedAt: 1790822400000 },
       { position: 7, aniListId: 127230, title: 'Chainsaw Man', year: 2022, score: 91.2, popularityRank: 7, trendingRank: 7, format: 'TV', referenceDate: '2026-09-30', capturedAt: 1790822400000 },
       { position: 8, aniListId: 16498, title: 'Attack on Titan', year: 2013, score: 90.4, popularityRank: 8, trendingRank: 8, format: 'TV', referenceDate: '2026-09-30', capturedAt: 1790822400000 },

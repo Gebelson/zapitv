@@ -139,7 +139,77 @@ export class CatalogMetadataIntegrityAuditor {
       }
     }
 
-    // 3. Verificação de Tipo vs AniList ID
+    // 3. Verificação estrita para Bleach: Thousand-Year Blood War
+    const isBleachTybw = (
+      item.id === 'anime-bleach-tybw' ||
+      item.id === 'anime-bleach-tvmeter' ||
+      item.title?.toLowerCase().includes('thousand-year blood war') ||
+      item.originalTitle?.toLowerCase().includes('sennen kessen-hen') ||
+      (item.title?.toLowerCase().includes('bleach') && item.year === 2022) ||
+      item.aniListId === 116674
+    );
+
+    if (isBleachTybw) {
+      if (item.type !== ContentType.ANIME) {
+        issues.push({
+          severity: 'CRITICAL',
+          category: 'MEDIA_TYPE',
+          message: `Bleach TYBW deve possuir tipo ANIME, encontrado: ${item.type}`
+        });
+      }
+      if (item.year !== 2022) {
+        issues.push({
+          severity: 'CRITICAL',
+          category: 'IDENTITY',
+          message: `Ano de Bleach TYBW deve ser 2022, encontrado: ${item.year}`
+        });
+      }
+      if (item.aniListId === 114446) {
+        issues.push({
+          severity: 'CRITICAL',
+          category: 'IDENTITY',
+          message: `Bleach TYBW não pode conter AniList ID 114446 (Higurashi: When They Cry - GOU). Deve ser 116674.`
+        });
+      }
+      if (item.aniListId && item.aniListId !== 116674) {
+        issues.push({
+          severity: 'CRITICAL',
+          category: 'IDENTITY',
+          message: `AniList ID esperado para Bleach TYBW é 116674, encontrado: ${item.aniListId}`
+        });
+      }
+
+      // Proibição expressa de imagens de Higurashi (114446, H6uxjVi8wBoo, DTd4xfGx7DJB)
+      if (poster.includes('114446') || poster.includes('H6uxjVi8wBoo')) {
+        issues.push({
+          severity: 'CRITICAL',
+          category: 'IMAGE_MISMATCH',
+          message: `Bleach TYBW está com pôster de Higurashi: When They Cry - GOU (${poster})`
+        });
+      }
+      if (backdrop.includes('114446') || backdrop.includes('DTd4xfGx7DJB')) {
+        issues.push({
+          severity: 'CRITICAL',
+          category: 'IMAGE_MISMATCH',
+          message: `Bleach TYBW está com backdrop de Higurashi: When They Cry - GOU (${backdrop})`
+        });
+      }
+
+      // Verificação dos episódios de Bleach TYBW
+      if (Array.isArray(item.episodes) && item.episodes.length > 0) {
+        item.episodes.forEach((ep) => {
+          if (ep.image && (ep.image.includes('114446') || ep.image.includes('H6uxjVi8wBoo') || ep.image.includes('DTd4xfGx7DJB'))) {
+            issues.push({
+              severity: 'CRITICAL',
+              category: 'EPISODE_IMAGE',
+              message: `Episódio ${ep.number} (${ep.id}) de Bleach TYBW está com miniatura de Higurashi`
+            });
+          }
+        });
+      }
+    }
+
+    // 4. Verificação de Tipo vs AniList ID
     if (item.aniListId && item.type !== ContentType.ANIME) {
       issues.push({
         severity: 'CRITICAL',
@@ -148,7 +218,7 @@ export class CatalogMetadataIntegrityAuditor {
       });
     }
 
-    // 4. Verificação de Episódios: Miniatura não deve ser idêntica ao pôster vertical quando disponível
+    // 5. Verificação de Episódios: Miniatura não deve ser idêntica ao pôster vertical quando disponível
     if (Array.isArray(item.episodes)) {
       item.episodes.forEach(ep => {
         if (ep.image && isCorruptedPosterUrl(ep.image)) {

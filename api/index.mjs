@@ -339,27 +339,31 @@ var init_verifiedCatalog = __esm({
       // ANIME VERIFICADO - BLEACH (CANÔNICO)
       {
         id: "anime-bleach-tvmeter",
+        canonicalId: "anime:anilist:116674",
         title: "Bleach: Thousand-Year Blood War",
         originalTitle: "Bleach: Sennen Kessen-hen",
         type: "ANIME" /* ANIME */,
+        mediaFormat: "series",
         rating: 9,
         year: 2022,
-        image: "https://image.tmdb.org/t/p/w500/dx28DE7EgLy0FatOvnaUg0k9j92.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/o0NsbcIvsllg6CJX0FBFY8wWbsn.jpg",
-        description: "A paz \xE9 subitamente quebrada quando as sirenes de alerta ecoam pela Sociedade das Almas.",
-        genres: ["Anime", "A\xE7\xE3o", "Anima\xE7\xE3o", "Fantasia"],
+        image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx116674-p3zK4PUX2Aag.jpg",
+        backdrop: "https://s4.anilist.co/file/anilistcdn/media/anime/banner/116674-l2YlIyJzvGSV.jpg",
+        description: "A guerra milenar entre os Shinigamis da Soul Society e o ex\xE9rcito Quincy liderado por Yhwach chega ao seu cl\xEDmax destrutivo.",
+        genres: ["Anime", "A\xE7\xE3o", "Anima\xE7\xE3o", "Fantasia", "Sobrenatural"],
+        aniListId: 116674,
         tmdbId: "30984",
+        malId: 41467,
         imdbId: "tt0434665",
         seasonsCount: 3,
-        availabilityStatus: "declared",
-        audioStatus: "other",
+        availabilityStatus: "verified",
+        audioStatus: "pt-br-dubbed",
         episodes: [
           {
             id: "bleach-tybw-ep1",
             number: 1,
-            title: "Epis\xF3dio 1",
-            description: "O retorno dos Quincies.",
-            image: ""
+            title: "Epis\xF3dio 1: Guerra de Sangue",
+            description: "A Soul Society \xE9 surpreendida por um ataque coordenado do Wandenreich.",
+            image: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx116674-p3zK4PUX2Aag.jpg"
           }
         ]
       },
@@ -14991,8 +14995,14 @@ var init_PosterRecoveryService = __esm({
       // The Glory / A Lição backdrop associado indevidamente
       "dqZENchTd7lp5zht7BdlqM7RBPd",
       // Spider-Man poster associado indevidamente a Frieren
-      "4HodYYKEIsGOdinkGi2Ucz6X9i0"
+      "4HodYYKEIsGOdinkGi2Ucz6X9i0",
       // Spider-Man backdrop associado indevidamente a Frieren
+      "bx114446",
+      // Higurashi poster associado indevidamente a Bleach TYBW
+      "114446-H6uxjVi8wBoo",
+      // Higurashi poster fragment associado indevidamente a Bleach
+      "114446-DTd4xfGx7DJB"
+      // Higurashi banner fragment associado indevidamente a Bleach
     ];
     NEGATIVE_TTL_MS = 3 * 60 * 1e3;
     VERIFIED_TTL_MS = 30 * 24 * 60 * 60 * 1e3;
@@ -15056,7 +15066,7 @@ var init_PosterRecoveryService = __esm({
                     }
                   } else if (typeof entry.url === "string" && entry.url.startsWith("http")) {
                     if (!entry.url.includes("undefined") && !entry.url.includes("broken_404") && !isCorruptedPosterUrl(entry.url)) {
-                      if (!k.includes("13916") && !k.includes("136283")) {
+                      if (!k.includes("13916") && !k.includes("136283") && !k.includes("114446")) {
                         this.memoryCache.set(k, {
                           url: entry.url,
                           status: entry.status || "stored",
@@ -15067,7 +15077,7 @@ var init_PosterRecoveryService = __esm({
                     }
                   }
                 } else if (typeof entry === "string" && entry.startsWith("http")) {
-                  if (!isCorruptedPosterUrl(entry) && !k.includes("13916") && !k.includes("136283")) {
+                  if (!isCorruptedPosterUrl(entry) && !k.includes("13916") && !k.includes("136283") && !k.includes("114446")) {
                     this.memoryCache.set(k, {
                       url: entry,
                       status: "stored",
@@ -15086,7 +15096,7 @@ var init_PosterRecoveryService = __esm({
               Object.entries(parsedV2).forEach(([k, v]) => {
                 if (v === NO_IMAGE_SENTINEL || v === "__NO_IMAGE__") return;
                 if (typeof v === "string" && v.startsWith("http")) {
-                  if (v.includes("undefined") || v.includes("broken_404") || isCorruptedPosterUrl(v) || k.includes("13916") || k.includes("136283") || v.includes("metahub.space") && v.includes("tt31828574")) return;
+                  if (v.includes("undefined") || v.includes("broken_404") || isCorruptedPosterUrl(v) || k.includes("13916") || k.includes("136283") || k.includes("114446") || v.includes("metahub.space") && v.includes("tt31828574")) return;
                   if (!this.memoryCache.has(k)) {
                     this.memoryCache.set(k, {
                       url: v,
@@ -15141,7 +15151,7 @@ var init_PosterRecoveryService = __esm({
       sanitizeKnownCorruptedImages() {
         const keysToDelete = [];
         this.memoryCache.forEach((entry, key) => {
-          if (isCorruptedPosterUrl(entry.url) || key.includes("13916") || key.includes("136283") || key.includes("frieren") && isCorruptedPosterUrl(entry.url)) {
+          if (isCorruptedPosterUrl(entry.url) || key.includes("13916") || key.includes("136283") || key.includes("114446") || key.includes("bleach") && (entry.url.includes("114446") || isCorruptedPosterUrl(entry.url)) || key.includes("frieren") && isCorruptedPosterUrl(entry.url)) {
             keysToDelete.push(key);
           }
         });
@@ -15366,13 +15376,83 @@ var init_PosterRecoveryService = __esm({
         }
       }
       /**
-       * Consulta a API oficial do AniList (GraphQL) por ID numérico
+       * Valida se a mídia retornada pelo AniList corresponde à obra esperada,
+       * prevenindo que IDs descalibrados ou buscas imprecisas associem capas de produções estrangeiras.
        */
-      async queryAniListById(id) {
+      isMatchingAnimeMedia(media2, target) {
+        if (!media2 || !target) return false;
+        const itemTitles = [];
+        if (typeof target === "string") {
+          if (target.trim()) itemTitles.push(target.trim());
+        } else {
+          if (target.title?.trim()) itemTitles.push(target.title.trim());
+          if (target.originalTitle?.trim()) itemTitles.push(target.originalTitle.trim());
+        }
+        if (itemTitles.length === 0) return true;
+        const mediaTitles = [
+          media2.title?.romaji,
+          media2.title?.english,
+          media2.title?.native,
+          ...Array.isArray(media2.synonyms) ? media2.synonyms : []
+        ].filter((t) => Boolean(t && typeof t === "string" && t.trim().length > 0));
+        if (mediaTitles.length === 0) return true;
+        const clean2 = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim();
+        const stopwords = /* @__PURE__ */ new Set([
+          "the",
+          "a",
+          "an",
+          "no",
+          "ni",
+          "na",
+          "to",
+          "de",
+          "do",
+          "da",
+          "e",
+          "o",
+          "em",
+          "for",
+          "of",
+          "and",
+          "part",
+          "season",
+          "arc"
+        ]);
+        for (const itTitle of itemTitles) {
+          const cleanIt = clean2(itTitle);
+          if (!cleanIt) continue;
+          const itWords = cleanIt.split(" ").filter((w) => w.length >= 3 && !stopwords.has(w));
+          for (const medTitle of mediaTitles) {
+            const cleanMed = clean2(medTitle);
+            if (!cleanMed) continue;
+            if (cleanMed.includes(cleanIt) || cleanIt.includes(cleanMed)) {
+              return true;
+            }
+            const medWords = cleanMed.split(" ").filter((w) => w.length >= 3 && !stopwords.has(w));
+            const commonWords = itWords.filter((w) => medWords.includes(w));
+            if (commonWords.length > 0) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+      /**
+       * Consulta a API oficial do AniList (GraphQL) por ID numérico
+       * Valida se a obra retornada corresponde ao conteúdo solicitado.
+       */
+      async queryAniListById(id, target) {
         if (!id || id <= 0) return null;
         const query = `
       query ($id: Int) {
         Media (id: $id, type: ANIME) {
+          id
+          title {
+            romaji
+            english
+            native
+          }
+          synonyms
           coverImage { extraLarge large medium }
           bannerImage
         }
@@ -15388,11 +15468,19 @@ var init_PosterRecoveryService = __esm({
           if (!res.ok) return null;
           const data = await res.json();
           const media2 = data?.data?.Media;
+          if (!media2) return null;
+          if (target && !this.isMatchingAnimeMedia(media2, target)) {
+            const titleDesc = typeof target === "string" ? target : target.title || target.id;
+            console.warn(
+              `[PosterRecoveryService] AniList ID ${id} (${media2?.title?.english || media2?.title?.romaji}) rejeitado por n\xE3o corresponder a "${titleDesc}".`
+            );
+            return null;
+          }
           const cover = media2?.coverImage?.extraLarge || media2?.coverImage?.large || media2?.coverImage?.medium;
-          if (cover && typeof cover === "string" && cover.startsWith("http")) {
+          if (cover && typeof cover === "string" && cover.startsWith("http") && !isCorruptedPosterUrl(cover)) {
             return cover;
           }
-          if (media2?.bannerImage && typeof media2.bannerImage === "string" && media2.bannerImage.startsWith("http")) {
+          if (media2?.bannerImage && typeof media2.bannerImage === "string" && media2.bannerImage.startsWith("http") && !isCorruptedPosterUrl(media2.bannerImage)) {
             return media2.bannerImage;
           }
         } catch {
@@ -15401,13 +15489,21 @@ var init_PosterRecoveryService = __esm({
       }
       /**
        * Consulta a API oficial do AniList (GraphQL) por título para animes
+       * Valida se a obra retornada corresponde ao conteúdo solicitado.
        */
-      async queryAniList(title) {
+      async queryAniList(title, target) {
         if (!title || title.trim().length < 2) return null;
         const cleanSearch = title.replace(/\s*\([^)]*\)/g, "").trim();
         const query = `
       query ($search: String) {
         Media (search: $search, type: ANIME) {
+          id
+          title {
+            romaji
+            english
+            native
+          }
+          synonyms
           coverImage { extraLarge large medium }
           bannerImage
         }
@@ -15423,11 +15519,19 @@ var init_PosterRecoveryService = __esm({
           if (!res.ok) return null;
           const data = await res.json();
           const media2 = data?.data?.Media;
+          if (!media2) return null;
+          const checkTarget = target || cleanSearch;
+          if (!this.isMatchingAnimeMedia(media2, checkTarget)) {
+            console.warn(
+              `[PosterRecoveryService] AniList busca "${cleanSearch}" retornou "${media2?.title?.english || media2?.title?.romaji}" n\xE3o correspondente. Rejeitado.`
+            );
+            return null;
+          }
           const cover = media2?.coverImage?.extraLarge || media2?.coverImage?.large || media2?.coverImage?.medium;
-          if (cover && typeof cover === "string" && cover.startsWith("http")) {
+          if (cover && typeof cover === "string" && cover.startsWith("http") && !isCorruptedPosterUrl(cover)) {
             return cover;
           }
-          if (media2?.bannerImage && typeof media2.bannerImage === "string" && media2.bannerImage.startsWith("http")) {
+          if (media2?.bannerImage && typeof media2.bannerImage === "string" && media2.bannerImage.startsWith("http") && !isCorruptedPosterUrl(media2.bannerImage)) {
             return media2.bannerImage;
           }
         } catch {
@@ -15561,7 +15665,7 @@ var init_PosterRecoveryService = __esm({
             }
             if (targetAniListId) {
               diag.attempts.push(`anilist_id:${targetAniListId}`);
-              const anilistCover = await this.queryAniListById(targetAniListId);
+              const anilistCover = await this.queryAniListById(targetAniListId, item);
               if (anilistCover && !isCorruptedPosterUrl(anilistCover) && await this.validateImageUrl(anilistCover)) {
                 this.setCachedPoster(item, anilistCover, "verified", "anilist_id");
                 diag.recoveredSource = "anilist_id";
@@ -15573,7 +15677,7 @@ var init_PosterRecoveryService = __esm({
             }
             const animeTitle = item.originalTitle || item.title;
             diag.attempts.push(`anilist_title:${animeTitle}`);
-            const anilistCoverByTitle = await this.queryAniList(animeTitle);
+            const anilistCoverByTitle = await this.queryAniList(animeTitle, item);
             if (anilistCoverByTitle && !isCorruptedPosterUrl(anilistCoverByTitle) && await this.validateImageUrl(anilistCoverByTitle)) {
               this.setCachedPoster(item, anilistCoverByTitle, "verified", "anilist_title");
               diag.recoveredSource = "anilist_title";
@@ -20847,7 +20951,7 @@ var OFFICIAL_ANILIST_MONTHLY_SNAPSHOTS = [
       { position: 2, aniListId: 113415, title: "Jujutsu Kaisen", year: 2020, score: 96, popularityRank: 2, trendingRank: 2, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
       { position: 3, aniListId: 101922, title: "Demon Slayer: Kimetsu no Yaiba", year: 2019, score: 95.5, popularityRank: 3, trendingRank: 3, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
       { position: 4, aniListId: 154587, title: "Frieren: Beyond Journey's End", year: 2023, score: 93.8, popularityRank: 4, trendingRank: 4, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
-      { position: 5, aniListId: 114446, title: "Bleach: Thousand-Year Blood War", year: 2022, score: 93.2, popularityRank: 5, trendingRank: 5, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
+      { position: 5, aniListId: 116674, title: "Bleach: Thousand-Year Blood War", year: 2022, score: 93.2, popularityRank: 5, trendingRank: 5, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
       { position: 6, aniListId: 171018, title: "Dandadan", year: 2024, score: 92.9, popularityRank: 6, trendingRank: 6, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
       { position: 7, aniListId: 127230, title: "Chainsaw Man", year: 2022, score: 91.2, popularityRank: 7, trendingRank: 7, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },
       { position: 8, aniListId: 16498, title: "Attack on Titan", year: 2013, score: 90.4, popularityRank: 8, trendingRank: 8, format: "TV", referenceDate: "2026-09-30", capturedAt: 17908224e5 },

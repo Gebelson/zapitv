@@ -14,7 +14,10 @@ export const CORRUPTED_POSTER_FRAGMENTS = [
   'bnTXjwOwdUz8MKFyQCNf0hG4fdL', // The Glory / A Lição poster associado indevidamente
   'AjwoDj77HLlqcpwEGqsnvMXm5my', // The Glory / A Lição backdrop associado indevidamente
   'dqZENchTd7lp5zht7BdlqM7RBPd', // Spider-Man poster associado indevidamente a Frieren
-  '4HodYYKEIsGOdinkGi2Ucz6X9i0'  // Spider-Man backdrop associado indevidamente a Frieren
+  '4HodYYKEIsGOdinkGi2Ucz6X9i0', // Spider-Man backdrop associado indevidamente a Frieren
+  'bx114446',                   // Higurashi poster associado indevidamente a Bleach TYBW
+  '114446-H6uxjVi8wBoo',        // Higurashi poster fragment associado indevidamente a Bleach
+  '114446-DTd4xfGx7DJB'         // Higurashi banner fragment associado indevidamente a Bleach
 ];
 
 export function isCorruptedPosterUrl(url: string | null | undefined): boolean {
@@ -148,7 +151,7 @@ export class PosterRecoveryService {
                 }
               } else if (typeof entry.url === 'string' && entry.url.startsWith('http')) {
                 if (!entry.url.includes('undefined') && !entry.url.includes('broken_404') && !isCorruptedPosterUrl(entry.url)) {
-                  if (!k.includes('13916') && !k.includes('136283')) {
+                  if (!k.includes('13916') && !k.includes('136283') && !k.includes('114446')) {
                     this.memoryCache.set(k, {
                       url: entry.url,
                       status: entry.status || 'stored',
@@ -159,7 +162,7 @@ export class PosterRecoveryService {
                 }
               }
             } else if (typeof entry === 'string' && entry.startsWith('http')) {
-              if (!isCorruptedPosterUrl(entry) && !k.includes('13916') && !k.includes('136283')) {
+              if (!isCorruptedPosterUrl(entry) && !k.includes('13916') && !k.includes('136283') && !k.includes('114446')) {
                 this.memoryCache.set(k, {
                   url: entry,
                   status: 'stored',
@@ -181,7 +184,7 @@ export class PosterRecoveryService {
             // NUNCA importar marcadores negativos da v2 (elimina o bloqueio que causava capas com fundo escuro e Play)
             if (v === NO_IMAGE_SENTINEL || v === '__NO_IMAGE__') return;
             if (typeof v === 'string' && v.startsWith('http')) {
-              if (v.includes('undefined') || v.includes('broken_404') || isCorruptedPosterUrl(v) || k.includes('13916') || k.includes('136283') || (v.includes('metahub.space') && v.includes('tt31828574'))) return;
+              if (v.includes('undefined') || v.includes('broken_404') || isCorruptedPosterUrl(v) || k.includes('13916') || k.includes('136283') || k.includes('114446') || (v.includes('metahub.space') && v.includes('tt31828574'))) return;
               if (!this.memoryCache.has(k)) {
                 this.memoryCache.set(k, {
                   url: v,
@@ -239,6 +242,8 @@ export class PosterRecoveryService {
         isCorruptedPosterUrl(entry.url) ||
         key.includes('13916') ||
         key.includes('136283') ||
+        key.includes('114446') ||
+        (key.includes('bleach') && (entry.url.includes('114446') || isCorruptedPosterUrl(entry.url))) ||
         (key.includes('frieren') && isCorruptedPosterUrl(entry.url))
       ) {
         keysToDelete.push(key);
@@ -491,13 +496,86 @@ export class PosterRecoveryService {
   }
 
   /**
-   * Consulta a API oficial do AniList (GraphQL) por ID numérico
+   * Valida se a mídia retornada pelo AniList corresponde à obra esperada,
+   * prevenindo que IDs descalibrados ou buscas imprecisas associem capas de produções estrangeiras.
    */
-  private async queryAniListById(id: number): Promise<string | null> {
+  public isMatchingAnimeMedia(media: any, target: ContentItem | string): boolean {
+    if (!media || !target) return false;
+
+    const itemTitles: string[] = [];
+    if (typeof target === 'string') {
+      if (target.trim()) itemTitles.push(target.trim());
+    } else {
+      if (target.title?.trim()) itemTitles.push(target.title.trim());
+      if (target.originalTitle?.trim()) itemTitles.push(target.originalTitle.trim());
+    }
+
+    if (itemTitles.length === 0) return true;
+
+    const mediaTitles = [
+      media.title?.romaji,
+      media.title?.english,
+      media.title?.native,
+      ...(Array.isArray(media.synonyms) ? media.synonyms : [])
+    ].filter((t): t is string => Boolean(t && typeof t === 'string' && t.trim().length > 0));
+
+    if (mediaTitles.length === 0) return true;
+
+    const clean = (s: string) =>
+      s
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const stopwords = new Set([
+      'the', 'a', 'an', 'no', 'ni', 'na', 'to', 'de', 'do', 'da', 'e', 'o', 'em', 'for', 'of', 'and', 'part', 'season', 'arc'
+    ]);
+
+    for (const itTitle of itemTitles) {
+      const cleanIt = clean(itTitle);
+      if (!cleanIt) continue;
+      const itWords = cleanIt.split(' ').filter(w => w.length >= 3 && !stopwords.has(w));
+
+      for (const medTitle of mediaTitles) {
+        const cleanMed = clean(medTitle);
+        if (!cleanMed) continue;
+
+        // Correspondência por contenção direta
+        if (cleanMed.includes(cleanIt) || cleanIt.includes(cleanMed)) {
+          return true;
+        }
+
+        const medWords = cleanMed.split(' ').filter(w => w.length >= 3 && !stopwords.has(w));
+        // Correspondência por palavras-chave principais compartilhadas (ex: bleach, frieren, dandadan)
+        const commonWords = itWords.filter(w => medWords.includes(w));
+        if (commonWords.length > 0) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Consulta a API oficial do AniList (GraphQL) por ID numérico
+   * Valida se a obra retornada corresponde ao conteúdo solicitado.
+   */
+  private async queryAniListById(id: number, target?: ContentItem | string): Promise<string | null> {
     if (!id || id <= 0) return null;
     const query = `
       query ($id: Int) {
         Media (id: $id, type: ANIME) {
+          id
+          title {
+            romaji
+            english
+            native
+          }
+          synonyms
           coverImage { extraLarge large medium }
           bannerImage
         }
@@ -513,11 +591,22 @@ export class PosterRecoveryService {
       if (!res.ok) return null;
       const data = await res.json();
       const media = data?.data?.Media;
+      if (!media) return null;
+
+      // Validação semântica: rejeita mídia se o título retornado do AniList não corresponder ao item
+      if (target && !this.isMatchingAnimeMedia(media, target)) {
+        const titleDesc = typeof target === 'string' ? target : (target.title || target.id);
+        console.warn(
+          `[PosterRecoveryService] AniList ID ${id} (${media?.title?.english || media?.title?.romaji}) rejeitado por não corresponder a "${titleDesc}".`
+        );
+        return null;
+      }
+
       const cover = media?.coverImage?.extraLarge || media?.coverImage?.large || media?.coverImage?.medium;
-      if (cover && typeof cover === 'string' && cover.startsWith('http')) {
+      if (cover && typeof cover === 'string' && cover.startsWith('http') && !isCorruptedPosterUrl(cover)) {
         return cover;
       }
-      if (media?.bannerImage && typeof media.bannerImage === 'string' && media.bannerImage.startsWith('http')) {
+      if (media?.bannerImage && typeof media.bannerImage === 'string' && media.bannerImage.startsWith('http') && !isCorruptedPosterUrl(media.bannerImage)) {
         return media.bannerImage;
       }
     } catch {
@@ -528,13 +617,21 @@ export class PosterRecoveryService {
 
   /**
    * Consulta a API oficial do AniList (GraphQL) por título para animes
+   * Valida se a obra retornada corresponde ao conteúdo solicitado.
    */
-  private async queryAniList(title: string): Promise<string | null> {
+  private async queryAniList(title: string, target?: ContentItem | string): Promise<string | null> {
     if (!title || title.trim().length < 2) return null;
     const cleanSearch = title.replace(/\s*\([^)]*\)/g, '').trim();
     const query = `
       query ($search: String) {
         Media (search: $search, type: ANIME) {
+          id
+          title {
+            romaji
+            english
+            native
+          }
+          synonyms
           coverImage { extraLarge large medium }
           bannerImage
         }
@@ -550,11 +647,21 @@ export class PosterRecoveryService {
       if (!res.ok) return null;
       const data = await res.json();
       const media = data?.data?.Media;
+      if (!media) return null;
+
+      const checkTarget = target || cleanSearch;
+      if (!this.isMatchingAnimeMedia(media, checkTarget)) {
+        console.warn(
+          `[PosterRecoveryService] AniList busca "${cleanSearch}" retornou "${media?.title?.english || media?.title?.romaji}" não correspondente. Rejeitado.`
+        );
+        return null;
+      }
+
       const cover = media?.coverImage?.extraLarge || media?.coverImage?.large || media?.coverImage?.medium;
-      if (cover && typeof cover === 'string' && cover.startsWith('http')) {
+      if (cover && typeof cover === 'string' && cover.startsWith('http') && !isCorruptedPosterUrl(cover)) {
         return cover;
       }
-      if (media?.bannerImage && typeof media.bannerImage === 'string' && media.bannerImage.startsWith('http')) {
+      if (media?.bannerImage && typeof media.bannerImage === 'string' && media.bannerImage.startsWith('http') && !isCorruptedPosterUrl(media.bannerImage)) {
         return media.bannerImage;
       }
     } catch {
@@ -715,7 +822,7 @@ export class PosterRecoveryService {
 
         if (targetAniListId) {
           diag.attempts.push(`anilist_id:${targetAniListId}`);
-          const anilistCover = await this.queryAniListById(targetAniListId);
+          const anilistCover = await this.queryAniListById(targetAniListId, item);
           if (anilistCover && !isCorruptedPosterUrl(anilistCover) && await this.validateImageUrl(anilistCover)) {
             this.setCachedPoster(item, anilistCover, 'verified', 'anilist_id');
             diag.recoveredSource = 'anilist_id';
@@ -728,7 +835,7 @@ export class PosterRecoveryService {
 
         const animeTitle = item.originalTitle || item.title;
         diag.attempts.push(`anilist_title:${animeTitle}`);
-        const anilistCoverByTitle = await this.queryAniList(animeTitle);
+        const anilistCoverByTitle = await this.queryAniList(animeTitle, item);
         if (anilistCoverByTitle && !isCorruptedPosterUrl(anilistCoverByTitle) && await this.validateImageUrl(anilistCoverByTitle)) {
           this.setCachedPoster(item, anilistCoverByTitle, 'verified', 'anilist_title');
           diag.recoveredSource = 'anilist_title';
