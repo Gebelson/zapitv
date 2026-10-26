@@ -21,6 +21,7 @@ interface LiveTvPlayerProps {
   autoPlay?: boolean;
   initialMuted?: boolean;
   isInteractive?: boolean;
+  tvLinearMode?: boolean;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
   onNextChannel?: () => void;
@@ -49,6 +50,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   autoPlay = true,
   initialMuted = false,
   isInteractive = true,
+  tvLinearMode,
   isExpanded = false,
   onToggleExpand,
   onNextChannel,
@@ -56,6 +58,9 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   onClose,
   channelIndexInfo
 }) => {
+  const isTv = tvModeService.isTvMode() || (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv'));
+  const isLinearTv = tvLinearMode !== undefined ? tvLinearMode : isTv;
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -76,7 +81,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   const [volume, setVolume] = useState(() => liveTvPreferences.getState().volume);
   const [isMuted, setIsMuted] = useState(initialMuted);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showControls, setShowControls] = useState(true);
+  const [showControls, setShowControls] = useState(() => !isLinearTv);
   const [availableQualities, setAvailableQualities] = useState<string[]>(['Auto']);
   const [selectedQuality, setSelectedQuality] = useState('Auto');
   const [showQualityMenu, setShowQualityMenu] = useState(false);
@@ -92,7 +97,6 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   const mediaRecoveryCountRef = useRef<number>(0);
   const playStartTimeRef = useRef<number>(0);
 
-  const isTv = tvModeService.isTvMode() || (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv'));
   const STARTUP_TIMEOUT_MS = isTv ? 10000 : 7000;
   const MAX_STALL_TIMEOUT_S = isTv ? 16 : 12;
 
@@ -130,6 +134,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
 
   // Manipulação de atividade do cursor para ocultar controles
   const handleUserActivity = useCallback(() => {
+    if (isLinearTv) return;
     setShowControls(true);
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     controlsTimeoutRef.current = setTimeout(() => {
@@ -138,7 +143,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
         setShowQualityMenu(false);
       }
     }, 3500);
-  }, [isPlaying]);
+  }, [isPlaying, isLinearTv]);
 
   // Alterna Tela Cheia
   const toggleFullscreen = useCallback(() => {
@@ -715,15 +720,15 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       onMouseMove={handleUserActivity}
       onClick={handleUserActivity}
       className={`relative w-full h-full bg-black flex items-center justify-center select-none overflow-hidden font-sans group ${
-        isFullscreen ? 'fixed inset-0 z-[5000]' : 'rounded-2xl'
+        isFullscreen ? 'fixed inset-0 z-[5000]' : isLinearTv ? 'rounded-none' : 'rounded-2xl'
       }`}
     >
       {/* Vídeo HTML5 HLS */}
       <video
         ref={videoRef}
-        className="w-full h-full object-contain bg-black cursor-pointer"
+        className={`w-full h-full object-contain bg-black ${isLinearTv ? 'cursor-default' : 'cursor-pointer'}`}
         playsInline
-        onClick={togglePlay}
+        onClick={isLinearTv ? undefined : togglePlay}
         onLoadedData={() => {
           if (activeChannelIdRef.current !== channel.id) return;
           if (videoRef.current && (videoRef.current.videoWidth > 0 || videoRef.current.readyState >= 2)) {
@@ -767,13 +772,23 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       {/* Tela de Aguardando Interação do Usuário (Autoplay Bloqueado) */}
       {playbackStatus === 'waiting_interaction' && !hasError && (
         <div 
+          role="button"
+          tabIndex={0}
           onClick={togglePlay}
-          className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm cursor-pointer animate-in fade-in"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              togglePlay();
+            }
+          }}
+          className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm cursor-pointer animate-in fade-in focus:outline-none focus:ring-2 focus:ring-[#007df7]"
         >
           <div className="w-16 h-16 rounded-full bg-[#007df7] flex items-center justify-center text-white shadow-xl shadow-[#007df7]/40 hover:scale-110 active:scale-95 transition-all">
             <Play className="w-8 h-8 fill-current ml-1" />
           </div>
-          <span className="text-white text-sm font-bold mt-4">Clique para reproduzir transmissão ao vivo</span>
+          <span className="text-white text-sm font-bold mt-4">
+            {isLinearTv ? 'Pressione OK para reproduzir transmissão ao vivo' : 'Clique para reproduzir transmissão ao vivo'}
+          </span>
           <span className="text-slate-400 text-xs mt-1">Interação necessária pelo navegador</span>
         </div>
       )}
@@ -828,52 +843,55 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
         </div>
       )}
 
-      {/* Top Header Bar (Canal & Fechar se fullscreen/modal) */}
-      <div
-        className={`absolute top-0 inset-x-0 p-4 md:p-6 bg-gradient-to-b from-black/90 via-black/40 to-transparent z-40 flex items-center justify-between transition-opacity duration-300 ${
-          showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-white/10 p-1.5 backdrop-blur-md border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
-            <img src={channel.logo} alt={channel.name} className="w-full h-full object-contain" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-white font-black text-sm md:text-base leading-tight drop-shadow">{channel.name}</h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-600/90 text-white flex items-center gap-1 shadow-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" /> AO VIVO
-              </span>
-              {isUsingFallback && (
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/80 text-black">
-                  Backup
-                </span>
-              )}
+      {/* Top Header Bar (Canal & Fechar se fullscreen/modal) - Omitida no modo linear da TV */}
+      {!isLinearTv && (
+        <div
+          data-testid="live-player-top-header"
+          className={`absolute top-0 inset-x-0 p-4 md:p-6 bg-gradient-to-b from-black/90 via-black/40 to-transparent z-40 flex items-center justify-between transition-opacity duration-300 ${
+            showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white/10 p-1.5 backdrop-blur-md border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+              <img src={channel.logo} alt={channel.name} className="w-full h-full object-contain" />
             </div>
-            <span className="text-gray-400 text-xs font-medium">{channel.categoryLabel}</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-white font-black text-sm md:text-base leading-tight drop-shadow">{channel.name}</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-600/90 text-white flex items-center gap-1 shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" /> AO VIVO
+                </span>
+                {isUsingFallback && (
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/80 text-black">
+                    Backup
+                  </span>
+                )}
+              </div>
+              <span className="text-gray-400 text-xs font-medium">{channel.categoryLabel}</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {channelIndexInfo && (
+              <span className="text-white/60 text-xs font-bold px-3 py-1 bg-white/10 rounded-full border border-white/10 backdrop-blur-md hidden sm:inline-block">
+                Canal {channelIndexInfo.current} de {channelIndexInfo.total}
+              </span>
+            )}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10"
+                title="Fechar Player"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
+      )}
 
-        <div className="flex items-center gap-2">
-          {channelIndexInfo && (
-            <span className="text-white/60 text-xs font-bold px-3 py-1 bg-white/10 rounded-full border border-white/10 backdrop-blur-md hidden sm:inline-block">
-              Canal {channelIndexInfo.current} de {channelIndexInfo.total}
-            </span>
-          )}
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/10"
-              title="Fechar Player"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Setas de Zapear nas laterais (hover ou touch) */}
-      {isInteractive && (
+      {/* Setas de Zapear nas laterais (hover ou touch) - Apenas interativo fora da TV linear */}
+      {isInteractive && !isLinearTv && (
         <>
           {onPrevChannel && (
             <button
@@ -900,99 +918,102 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
         </>
       )}
 
-      {/* Barra Inferior de Controles */}
-      <div
-        className={`absolute bottom-0 inset-x-0 p-4 md:p-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent z-40 transition-opacity duration-300 flex items-center justify-between ${
-          showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-      >
-        {/* Lado Esquerdo: Play/Pause, Volume */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={togglePlay}
-            className="w-10 h-10 rounded-full bg-white/10 hover:bg-[#007df7] text-white flex items-center justify-center transition-all hover:scale-105"
-            title={isPlaying ? 'Pausar' : 'Reproduzir'}
-          >
-            {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
-          </button>
-
-          <div className="flex items-center gap-2 group/vol">
+      {/* Barra Inferior de Controles Tradicionais - Omitida no modo linear da TV */}
+      {!isLinearTv && (
+        <div
+          data-testid="live-player-bottom-bar"
+          className={`absolute bottom-0 inset-x-0 p-4 md:p-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent z-40 transition-opacity duration-300 flex items-center justify-between ${
+            showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+        >
+          {/* Lado Esquerdo: Play/Pause, Volume */}
+          <div className="flex items-center gap-3">
             <button
-              onClick={toggleMute}
-              className="text-gray-300 hover:text-white transition-colors p-1.5"
-              title={isMuted ? 'Ativar som' : 'Silenciar'}
+              onClick={togglePlay}
+              className="w-10 h-10 rounded-full bg-white/10 hover:bg-[#007df7] text-white flex items-center justify-center transition-all hover:scale-105"
+              title={isPlaying ? 'Pausar' : 'Reproduzir'}
             >
-              {isMuted || volume === 0 ? <VolumeX className="w-5 h-5 text-red-400" /> : <Volume2 className="w-5 h-5" />}
+              {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
             </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={isMuted ? 0 : volume}
-              onChange={(e) => handleVolumeChange(Number(e.target.value))}
-              className="w-16 sm:w-24 accent-[#007df7] cursor-pointer"
-            />
+
+            <div className="flex items-center gap-2 group/vol">
+              <button
+                onClick={toggleMute}
+                className="text-gray-300 hover:text-white transition-colors p-1.5"
+                title={isMuted ? 'Ativar som' : 'Silenciar'}
+              >
+                {isMuted || volume === 0 ? <VolumeX className="w-5 h-5 text-red-400" /> : <Volume2 className="w-5 h-5" />}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={isMuted ? 0 : volume}
+                onChange={(e) => handleVolumeChange(Number(e.target.value))}
+                className="w-16 sm:w-24 accent-[#007df7] cursor-pointer"
+              />
+            </div>
           </div>
-        </div>
 
-        {/* Lado Direito: Qualidade, PiP, Tela Cheia */}
-        <div className="flex items-center gap-2">
-          {/* Seletor de Qualidade */}
-          <div className="relative">
-            <button
-              onClick={() => setShowQualityMenu(!showQualityMenu)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10"
-              title="Qualidade de Vídeo"
-            >
-              <Settings className="w-3.5 h-3.5" />
-              <span>{selectedQuality}</span>
-            </button>
+          {/* Lado Direito: Qualidade, PiP, Tela Cheia */}
+          <div className="flex items-center gap-2">
+            {/* Seletor de Qualidade */}
+            <div className="relative">
+              <button
+                onClick={() => setShowQualityMenu(!showQualityMenu)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10"
+                title="Qualidade de Vídeo"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>{selectedQuality}</span>
+              </button>
 
-            {showQualityMenu && (
-              <div className="absolute bottom-full right-0 mb-2 w-32 bg-[#0f121a]/95 border border-white/15 rounded-xl p-2 shadow-2xl backdrop-blur-xl animate-in fade-in z-50">
-                <span className="text-[10px] uppercase font-bold text-gray-400 px-2 py-1 block">Qualidade</span>
-                {availableQualities.map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => changeQuality(q)}
-                    className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                      selectedQuality === q ? 'bg-[#007df7] text-white' : 'text-gray-300 hover:bg-white/10'
-                    }`}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
+              {showQualityMenu && (
+                <div className="absolute bottom-full right-0 mb-2 w-32 bg-[#0f121a]/95 border border-white/15 rounded-xl p-2 shadow-2xl backdrop-blur-xl animate-in fade-in z-50">
+                  <span className="text-[10px] uppercase font-bold text-gray-400 px-2 py-1 block">Qualidade</span>
+                  {availableQualities.map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => changeQuality(q)}
+                      className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                        selectedQuality === q ? 'bg-[#007df7] text-white' : 'text-gray-300 hover:bg-white/10'
+                      }`}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Botão Picture-in-Picture */}
+            {isPipSupported && (
+              <button
+                onClick={handleTogglePip}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                  isPipActive
+                    ? 'bg-[#007df7] text-white shadow-lg shadow-[#007df7]/40 ring-1 ring-[#007df7]'
+                    : 'bg-white/10 hover:bg-white/20 text-white'
+                }`}
+                title={isPipActive ? 'Sair da Imagem em Imagem' : 'Imagem em Imagem'}
+                aria-label="Imagem em imagem"
+              >
+                <PictureInPicture2 className="w-5 h-5" />
+              </button>
             )}
-          </div>
 
-          {/* Botão Picture-in-Picture */}
-          {isPipSupported && (
+            {/* Botão de Tela Cheia */}
             <button
-              onClick={handleTogglePip}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                isPipActive
-                  ? 'bg-[#007df7] text-white shadow-lg shadow-[#007df7]/40 ring-1 ring-[#007df7]'
-                  : 'bg-white/10 hover:bg-white/20 text-white'
-              }`}
-              title={isPipActive ? 'Sair da Imagem em Imagem' : 'Imagem em Imagem'}
-              aria-label="Imagem em imagem"
+              onClick={toggleFullscreen}
+              className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all"
+              title={isFullscreen ? 'Sair da Tela Cheia' : 'Tela Cheia'}
             >
-              <PictureInPicture2 className="w-5 h-5" />
+              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </button>
-          )}
-
-          {/* Botão de Tela Cheia */}
-          <button
-            onClick={toggleFullscreen}
-            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all"
-            title={isFullscreen ? 'Sair da Tela Cheia' : 'Tela Cheia'}
-          >
-            {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-          </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

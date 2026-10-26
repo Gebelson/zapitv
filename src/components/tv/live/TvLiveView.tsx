@@ -412,6 +412,7 @@ export const TvLiveView: React.FC<TvLiveViewProps> = ({
           autoPlay={true}
           initialMuted={false}
           isInteractive={false}
+          tvLinearMode={true}
           onNextChannel={handleNextChannel}
           onPrevChannel={handlePrevChannel}
         />
