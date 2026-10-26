@@ -2,7 +2,7 @@
  * ZapiTV — Suíte de Testes: Novo Ícone Oficial do Aplicativo (PWA / Favicon / Apple Touch)
  * 
  * Validação rigorosa dos requisitos:
- * 1. Existência e integridade da matriz original: C:\Users\gebel\Downloads\Mobile Icon.jpg.
+ * 1. Existência e integridade do ícone oficial versionado em public/.
  * 2. Existência de todos os 8 arquivos gerados em public/:
  *    - pwa-512x512.png (512x512)
  *    - pwa-192x192.png (192x192)
@@ -36,17 +36,20 @@ import path from 'node:path';
 console.log('=== ZAPITV | TESTES DO NOVO ÍCONE OFICIAL DO APLICATIVO (PWA / FAVICON) ===\n');
 
 // -----------------------------------------------------------------------------------------
-// TESTE 1: Existência da Matriz Oficial Original
+// TESTE 1: Integridade do Ícone Oficial Versionado
 // -----------------------------------------------------------------------------------------
-console.log('[Teste 1] Verificação da imagem matriz oficial...');
-const sourceMatrixPath = 'C:\\Users\\gebel\\Downloads\\Mobile Icon.jpg';
+console.log('[Teste 1] Verificação do ícone oficial versionado...');
+const sourceMatrixPath = path.resolve(process.cwd(), 'public', 'pwa-512x512.png');
 assert.ok(
   fs.existsSync(sourceMatrixPath),
-  `A imagem matriz oficial deve existir em ${sourceMatrixPath}`
+  `O ícone oficial deve existir em ${sourceMatrixPath}`
 );
-const sourceStats = fs.statSync(sourceMatrixPath);
-assert.ok(sourceStats.size > 10000, 'A imagem matriz oficial deve possuir tamanho consistente (>10KB)');
-console.log(`✓ Teste 1 aprovado: Matriz oficial encontrada (${sourceStats.size} bytes).\n`);
+const sourceBytes = fs.readFileSync(sourceMatrixPath);
+assert.ok(sourceBytes.length > 10000, 'O ícone oficial deve possuir tamanho consistente (>10KB)');
+assert.ok(sourceBytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])), 'O ícone oficial deve ser um PNG válido');
+assert.strictEqual(sourceBytes.readUInt32BE(16), 512, 'O ícone oficial deve ter largura de 512px');
+assert.strictEqual(sourceBytes.readUInt32BE(20), 512, 'O ícone oficial deve ter altura de 512px');
+console.log(`✓ Teste 1 aprovado: Ícone oficial 512x512 encontrado (${sourceBytes.length} bytes).\n`);
 
 // -----------------------------------------------------------------------------------------
 // TESTE 2: Verificação dos 8 Arquivos Gerados em public/
