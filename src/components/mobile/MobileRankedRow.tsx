@@ -18,6 +18,9 @@ export const MobileRankedRow: React.FC<MobileRankedRowProps> = ({
   icon: Icon = Flame
 }) => {
   const rowRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const isDraggingRef = useRef<boolean>(false);
 
   if (!items || items.length === 0) return null;
 
@@ -28,6 +31,36 @@ export const MobileRankedRow: React.FC<MobileRankedRowProps> = ({
     }
     return { item: entry as ContentItem, rank: idx + 1 };
   });
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    isDraggingRef.current = false;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStartX.current !== null && touchStartY.current !== null) {
+      const diffX = Math.abs(e.touches[0].clientX - touchStartX.current);
+      const diffY = Math.abs(e.touches[0].clientY - touchStartY.current);
+      if (diffX > 6 || diffY > 6) {
+        isDraggingRef.current = true;
+      }
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStartX.current !== null) {
+      const diff = Math.abs(e.changedTouches[0].clientX - touchStartX.current);
+      if (diff > 50) {
+        uiSoundService.play('slide');
+      }
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+    setTimeout(() => {
+      isDraggingRef.current = false;
+    }, 60);
+  };
 
   return (
     <section className="my-5 select-none" aria-label={title}>
@@ -45,8 +78,17 @@ export const MobileRankedRow: React.FC<MobileRankedRowProps> = ({
 
       <div
         ref={rowRef}
-        className="flex gap-4 overflow-x-auto no-scrollbar px-4 py-2 scroll-smooth"
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className="flex gap-4 overflow-x-auto overflow-y-hidden no-scrollbar px-4 pt-2 pb-6 scroll-smooth will-change-scroll"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-x',
+          overscrollBehaviorX: 'contain',
+          overscrollBehaviorY: 'none',
+          overflowAnchor: 'none'
+        }}
       >
         {normalized.map(({ item, rank }) => {
           const imgSrc = posterRecoveryService.getCachedPoster(item) || item.image || item.backdrop;
@@ -58,6 +100,7 @@ export const MobileRankedRow: React.FC<MobileRankedRowProps> = ({
               role="button"
               tabIndex={0}
               onClick={() => {
+                if (isDraggingRef.current) return;
                 uiSoundService.play('click');
                 onItemClick(item);
               }}
@@ -69,7 +112,7 @@ export const MobileRankedRow: React.FC<MobileRankedRowProps> = ({
                 }
               }}
               aria-label={`Posição ${rank}: ${item.title}`}
-              className="relative flex items-end shrink-0 cursor-pointer active:scale-95 transition-transform group focus:outline-none"
+              className="relative flex items-end shrink-0 cursor-pointer active:opacity-90 transition-opacity group focus:outline-none"
               style={{ width: isTwoDigits ? '160px' : '150px' }}
             >
               {/* Número Gigante Estilizado Monumental Atrás da Capa - Sólido Branco */}
