@@ -24,6 +24,7 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:catalog-longevity
+      - run: npm run test:mobile-ranked-stability
   search-performance:
     runs-on: ubuntu-latest
     steps:
