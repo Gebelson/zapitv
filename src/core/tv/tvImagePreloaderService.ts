@@ -187,7 +187,7 @@ export class TvImagePreloaderService {
     }
 
     // Se reprodução de vídeo estiver ativa e a prioridade for secundária, ignora
-    if (this.isPlaybackActive && priority > 1) {
+    if (this._isPlaybackActive && priority > 1) {
       return Promise.resolve(false);
     }
 

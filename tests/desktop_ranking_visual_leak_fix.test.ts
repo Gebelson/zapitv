@@ -73,7 +73,7 @@ console.log('  -> Carrossel finito e dissipação vertical de sombra preservados
 // 6. Invariância dos carrosséis mobile e de TV
 console.log('\n6. Verificando que carrosséis mobile e de TV permaneceram inalterados...');
 const mobileHomeCode = fs.readFileSync(path.resolve('src/components/mobile/MobileHomeView.tsx'), 'utf8');
-assert.ok(mobileHomeCode.includes('MobileRankedRow'), 'MobileHomeView deve permanecer intacto');
+assert.ok(mobileHomeCode.includes('MobileContentRow'), 'MobileHomeView deve permanecer intacto');
 const tvRowCode = fs.readFileSync(path.resolve('src/components/tv/TvContentRow.tsx'), 'utf8');
 assert.ok(tvRowCode.includes('TvCard16x9'), 'TvContentRow deve permanecer intacto');
 console.log('  -> Carrosséis mobile e de TV permanecem 100% preservados.');

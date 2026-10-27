@@ -15020,7 +15020,7 @@ var init_tvImagePreloaderService = __esm({
         if (!url || typeof url !== "string" || !url.startsWith("http")) {
           return Promise.resolve(false);
         }
-        if (this.isPlaybackActive && priority > 1) {
+        if (this._isPlaybackActive && priority > 1) {
           return Promise.resolve(false);
         }
         this.metrics.totalRequested++;

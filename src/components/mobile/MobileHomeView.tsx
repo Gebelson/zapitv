@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Flame } from 'lucide-react';
 import { ContentItem } from '../../../types';
 import { MobileHero } from './MobileHero';
 import { MobileContentRow } from './MobileContentRow';
-import { MobileRankedRow } from './MobileRankedRow';
 import { storageService, WatchProgress } from '../../core/storage/storageService';
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication';
@@ -73,10 +71,6 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
     };
   }, []);
 
-  // Top 10 Filmes do Mês para o carrossel de ranking na Home
-  const top10Movies = (featuredSelection?.featuredMovies || trendingItems.slice(0, 10))
-    .slice(0, 10)
-    .map((item: ContentItem, idx: number) => ({ item, rank: idx + 1 }));
 
   return (
     <div className="pb-28">
@@ -108,17 +102,7 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
         />
       )}
 
-      {/* 4. Top 10 do Mês (com números gigantes) */}
-      {top10Movies.length > 0 && (
-        <MobileRankedRow
-          title="Top 10 do Mês"
-          items={top10Movies}
-          onItemClick={onSelectContent}
-          icon={Flame}
-        />
-      )}
-
-      {/* 5. Recomendados para Você e Demais Carrosséis Personalizados (Sem subtítulos) */}
+      {/* 4. Recomendados para Você e Demais Carrosséis Personalizados (Sem subtítulos) */}
       {personalizedRows.map(row => (
         <MobileContentRow
           key={`mobile-rec-${row.id}`}

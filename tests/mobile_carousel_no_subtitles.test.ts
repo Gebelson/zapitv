@@ -94,9 +94,10 @@ assert(
   homeViewCode.includes('title="Em Alta Agora"'),
   'Deve conter carrossel Em Alta Agora'
 );
-assert(
+assert.strictEqual(
   homeViewCode.includes('title="Top 10 do Mês"'),
-  'Deve conter carrossel Top 10 do Mês'
+  false,
+  'Não deve conter carrossel Top 10 do Mês'
 );
 assert(
   homeViewCode.includes('personalizedRows.map'),

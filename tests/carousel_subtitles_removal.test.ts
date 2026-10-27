@@ -111,9 +111,10 @@ assert.ok(
   mobileHomeCode.includes('title="Em Alta Agora"'),
   'MobileHomeView.tsx deve manter o carrossel Em Alta Agora'
 );
-assert.ok(
+assert.strictEqual(
   mobileHomeCode.includes('title="Top 10 do Mês"'),
-  'MobileHomeView.tsx deve manter o carrossel Top 10 do Mês'
+  false,
+  'MobileHomeView.tsx não deve conter o carrossel Top 10 do Mês'
 );
 console.log('  -> MobileHomeView.tsx não possui mais passagem de subtítulos.');
 
