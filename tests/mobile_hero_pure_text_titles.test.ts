@@ -130,8 +130,12 @@ async function runTestSuite() {
   // =========================================================================
   console.log('\n--- 5. Auditoria de Posicionamento e Botões ---');
 
-  // Container de título alinhado ao fundo (items-end) para crescer para cima
-  assert.ok(heroCode.includes('flex items-end justify-start mb-3.5 min-h-[56px]'), 'Container do título deve ter items-end e min-h-[56px]');
+  // Bloco unificado de informações e título alinhado à esquerda com gap de 6 a 8px
+  assert.ok(
+    heroCode.includes('flex flex-col items-start justify-end mb-3.5 gap-1.5 sm:gap-2') ||
+    heroCode.includes('gap-1.5 sm:gap-2'),
+    'Bloco unificado de informações e título deve estar alinhado à esquerda com gap de 6 a 8px'
+  );
 
   // Botões de ação preservados
   assert.ok(heroCode.includes('flex-1 py-3 px-4 rounded-xl bg-[#007df7]'), 'Botão Assistir azul mantido em flex-1');

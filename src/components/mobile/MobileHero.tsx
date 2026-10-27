@@ -228,26 +228,27 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
 
       {/* Conteúdo sobreposto */}
       <div className="absolute inset-0 flex flex-col justify-end px-4 pb-[9px] z-10 max-w-lg mx-auto">
-        {/* Metadados: Gêneros / Ano / Classificação */}
-        <div className="flex items-center gap-1.5 flex-wrap mb-1.5 text-[11px] text-slate-300 font-medium">
-          {slideItem.genres && slideItem.genres.length > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-white/10 backdrop-blur-md font-semibold text-white text-[10px]">
-              {slideItem.genres[0]}
-            </span>
-          )}
-          {slideItem.year && (
-            <span>• {slideItem.year}</span>
-          )}
-          {slideItem.rating > 0 && (
-            <span className="text-amber-400 font-bold">• ★ {slideItem.rating.toFixed(1)}</span>
-          )}
-          {slideItem.duration && (
-            <span>• {slideItem.duration}m</span>
-          )}
-        </div>
+        {/* Bloco Unificado de Informações e Título Alinhado à Esquerda (Espaçamento vertical de 6 a 8px) */}
+        <div className="flex flex-col items-start justify-end mb-3.5 gap-1.5 sm:gap-2">
+          {/* Categoria, ano e avaliação */}
+          <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-300 font-medium">
+            {slideItem.genres && slideItem.genres.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-white/10 backdrop-blur-md font-semibold text-white text-[10px]">
+                {slideItem.genres[0]}
+              </span>
+            )}
+            {slideItem.year && (
+              <span>• {slideItem.year}</span>
+            )}
+            {slideItem.rating > 0 && (
+              <span className="text-amber-400 font-bold">• ★ {slideItem.rating.toFixed(1)}</span>
+            )}
+            {slideItem.duration && (
+              <span>• {slideItem.duration}m</span>
+            )}
+          </div>
 
-        {/* Título Principal em Texto (Tipografia Sora, Branco, Sem Logos) */}
-        <div className="flex items-end justify-start mb-3.5 min-h-[56px]">
+          {/* Título do conteúdo logo abaixo com proximidade imediata */}
           <h1
             className={`font-extrabold text-white text-left tracking-tight line-clamp-2 break-words drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] ${
               slideItem.title.length > 30

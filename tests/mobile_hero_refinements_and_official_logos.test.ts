@@ -65,8 +65,8 @@ assert(
 );
 
 assert(
-  heroCode.includes('min-h-[52px]') || heroCode.includes('min-h-[56px]'),
-  'Estrutura do título/logo deve possuir min-height garantindo estabilidade vertical sem provocar queda dos metadados ou botões'
+  heroCode.includes('gap-1.5 sm:gap-2') || heroCode.includes('min-h-[52px]') || heroCode.includes('min-h-[56px]'),
+  'Estrutura unificada de título e metadados deve garantir proximidade ideal de 6 a 8px'
 );
 
 console.log('  -> Sinopse removida com sucesso e estabilidade de layout preservada.');

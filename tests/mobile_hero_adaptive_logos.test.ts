@@ -145,10 +145,10 @@ console.log('✓ Teste 3 aprovado: Todas as categorias de título calibradas har
 // --------------------------------------------------------------------------
 console.log('[Teste 4] Auditoria do layout do banner mobile (MobileHero.tsx)...');
 
-// Alinhamento inferior que permite crescimento para cima sem deslocar botões
+// Alinhamento inferior que permite crescimento preservando a distância inferior
 assert.ok(
-  heroCode.includes('flex items-end justify-start mb-3.5') || heroCode.includes('items-end'),
-  'Área de título deve utilizar items-end para crescer para cima preservando a distância inferior'
+  heroCode.includes('flex flex-col items-start justify-end mb-3.5') || heroCode.includes('justify-end') || heroCode.includes('items-end'),
+  'Área de título e metadados deve utilizar justify-end preservando alinhamento e distância inferior'
 );
 
 // Preservação estrita dos botões de ação e distâncias
