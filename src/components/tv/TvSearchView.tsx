@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Search, X, ArrowLeft, Delete, Sparkles } from 'lucide-react';
+import { Search, X, ArrowLeft, Delete, Sparkles, Trash2 } from 'lucide-react';
 import { ContentItem } from '../../../types';
 import { TvCard16x9 } from './TvCard16x9';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
@@ -64,6 +64,7 @@ interface TvVirtualKeyProps {
   style?: React.CSSProperties;
   isFireTv?: boolean;
   onArrowRightFromEdge?: () => void;
+  ariaLabel?: string;
 }
 
 const TvVirtualKey: React.FC<TvVirtualKeyProps> = ({
@@ -74,7 +75,8 @@ const TvVirtualKey: React.FC<TvVirtualKeyProps> = ({
   focusKey,
   style,
   isFireTv = false,
-  onArrowRightFromEdge
+  onArrowRightFromEdge,
+  ariaLabel
 }) => {
   const { ref, focused } = useTvFocusable({
     focusKey,
@@ -94,6 +96,7 @@ const TvVirtualKey: React.FC<TvVirtualKeyProps> = ({
       type="button"
       data-focus-key={focusKey}
       data-tv-focused={focused ? "true" : undefined}
+      aria-label={ariaLabel}
       onClick={() => onPress(char)}
       style={{ ...style, minHeight: style?.height }}
       className={`select-none ${isFireTv ? 'rounded-lg' : 'rounded-xl'} font-bold flex items-center justify-center transition-all duration-150 outline-none cursor-pointer ${
@@ -628,7 +631,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
               {/* Linha de Utilidades: Espaço (3 cols), Apagar (2 cols), Limpar (1 col) */}
               <TvVirtualKey
                 char=" "
-                displayLabel={<span className="flex items-center justify-center gap-1 uppercase tracking-wider font-bold">␣ Espaço</span>}
+                displayLabel={<span className="uppercase tracking-wider font-bold">ESPAÇO</span>}
                 onPress={handleVirtualKeyPress}
                 focusKey="tv-key-space"
                 style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${Math.round(viewport.keyboardFontSize * 0.9)}px` }}
@@ -637,7 +640,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
               />
               <TvVirtualKey
                 char="BACKSPACE"
-                displayLabel={<span className="flex items-center justify-center gap-1 uppercase tracking-wider font-bold">⌫ Apagar</span>}
+                displayLabel={<span className="uppercase tracking-wider font-bold">APAGAR</span>}
                 onPress={handleVirtualKeyPress}
                 focusKey="tv-key-backspace"
                 style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${Math.round(viewport.keyboardFontSize * 0.9)}px` }}
@@ -646,7 +649,14 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
               />
               <TvVirtualKey
                 char="CLEAR"
-                displayLabel={<span className="flex items-center justify-center uppercase tracking-wider font-bold">Limpar</span>}
+                ariaLabel="Limpar pesquisa"
+                displayLabel={
+                  <Trash2 className={
+                    isFireTv
+                      ? (viewport.scaleCategory === 'compact' ? 'w-3.5 h-3.5' : 'w-4 h-4')
+                      : (viewport.scaleCategory === 'compact' ? 'w-4 h-4' : 'w-5 h-5')
+                  } />
+                }
                 onPress={handleVirtualKeyPress}
                 focusKey="tv-key-clear"
                 style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${Math.round(viewport.keyboardFontSize * 0.9)}px` }}
