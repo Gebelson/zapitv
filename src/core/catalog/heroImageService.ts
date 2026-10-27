@@ -182,20 +182,21 @@ class HeroImageService {
         }
       };
 
-      const finish = (success: boolean) => {
+      const finish = (success: boolean, cacheFailure = true) => {
         if (settled) return;
         settled = true;
         cleanup();
         if (success) {
           this.markUrlValidated(cleanUrl);
-        } else {
+        } else if (cacheFailure) {
           this.markUrlFailed(cleanUrl);
         }
         resolve(success);
       };
 
       const onAbort = () => {
-        finish(false);
+        finish(false, false);
+        img.removeAttribute?.('src');
       };
 
       if (signal) {

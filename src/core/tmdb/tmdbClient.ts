@@ -365,7 +365,7 @@ class TMDBClientService {
     return null;
   }
 
-  public async getCinemetaCatalog(type: 'movie' | 'series', genre?: string, skip?: number, timeoutMs = 8000): Promise<ContentItem[]> {
+  public async getCinemetaCatalog(type: 'movie' | 'series', genre?: string, skip?: number, timeoutMs = 8000, strict = false): Promise<ContentItem[]> {
     try {
       let url = `${CINEMETA_BASE_URL}/catalog/${type}/top`;
       const extras: string[] = [];
@@ -375,12 +375,13 @@ class TMDBClientService {
       url += '.json';
 
       const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      if (strict && !res.ok && (res.status === 408 || res.status === 429 || res.status >= 500)) throw new Error(`Cinemeta ${res.status}`);
       if (res.ok) {
         const data = await res.json();
         return (data.metas || []).map((m: CinemetaMetaItem) => formatCinemetaItem(m));
       }
-    } catch {
-      // Ignora erro
+    } catch (error) {
+      if (strict) throw error;
     }
     return [];
   }

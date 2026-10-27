@@ -5,6 +5,7 @@
  */
 
 import { StremioStream } from '../stremio/stremioTypes';
+import { sanitizePlaybackReason } from '../tracking/mediaLoadingTracker';
 
 export interface QuarantinedItem {
   id: string; // Hash, URL ou assinatura
@@ -146,7 +147,7 @@ export class StreamQuarantineService {
     };
     this.quarantinedMap.set(cleanId, item);
     this.saveToStorage();
-    console.error(`🚨 [QUARANTINE] Fonte isolada permanentemente: "${cleanId}" | Motivo: ${reason}`);
+    console.error('[QUARANTINE]', sanitizePlaybackReason(`Fonte isolada: "${cleanId}" | Motivo: ${reason}`));
     this.listeners.forEach(fn => fn());
   }
 

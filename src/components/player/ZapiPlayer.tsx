@@ -1093,13 +1093,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Inicia a reprodução da vinheta institucional ZapiTV com a mídia principal já pré-bufferizada em background
   const startIntroIfReady = useCallback(() => {
     if (!isMountedRef.current) return;
-    const isPtBrAbsent = !hasDynamicallyConfirmedPtBr &&
+    const isPtBrAbsent = forcedNonDubbedPrompt || (!hasDynamicallyConfirmedPtBr &&
       !ptBrConfirmedOnceRef.current &&
       item.audioStatus !== 'pt-br-original' &&
       item.audioStatus !== 'pt-br-dubbed' &&
       !currentStream?.isDubbed &&
       !currentStream?.isPtBr &&
-      (ptBrAvailabilityState === 'unavailable' || forcedNonDubbedPrompt);
+      ptBrAvailabilityState === 'unavailable');
 
     // Nunca toca a vinheta enquanto a busca de fontes estiver pendente, se não houver fontes ou se o aviso de dublagem estiver pendente
     if (isLoadingStreams || allSourcesFailed || showNonDubbedPromptRef.current || !streams || streams.length === 0) return;
@@ -1375,6 +1375,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   useEffect(() => {
     setHlsAudioTracks([]);
     setSelectedHlsAudioTrack(0);
+    selectedHlsAudioTrackRef.current = -1;
+    setActiveAudioId(null);
+    setHasDynamicallyConfirmedPtBr(false);
+    ptBrConfirmedOnceRef.current = false;
+    setForcedNonDubbedPrompt(false);
   }, [selectedStreamIndex]);
 
 
@@ -2181,6 +2186,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   // Determina se o conteúdo atual possui áudio dublado ou original em Português Brasileiro
   const hasBrazilianAudio = useMemo(() => {
+    const activeTrack = hlsAudioTracks.find(track => track.id === selectedHlsAudioTrack);
+    if (activeTrack) {
+      const language = audioSelectionManager.resolveTrackLanguage(activeTrack);
+      if (language !== 'unknown' && language !== 'other') return language === 'pt-BR';
+    }
+    const actual = audioSelectionManager.trackLanguageAvailability(hlsAudioTracks, 'pt-BR');
+    if (actual !== 'unknown') return actual === 'available';
     // 1. Verifica audioStatus do metadado do item
     if (item.audioStatus === 'pt-br-original' || item.audioStatus === 'pt-br-dubbed') return true;
     // 2. Confirmação dinâmica no player
@@ -2191,7 +2203,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       if (classification.isDubbed || classification.isPtBr || currentStream.isDubbed || currentStream.isPtBr) return true;
     }
     return ptBrAvailabilityState === 'confirmed';
-  }, [item.audioStatus, hasDynamicallyConfirmedPtBr, currentStream, ptBrAvailabilityState]);
+  }, [item.audioStatus, hasDynamicallyConfirmedPtBr, currentStream, ptBrAvailabilityState, hlsAudioTracks, selectedHlsAudioTrack]);
 
   // Fetch subtitles via subtitleService (automatic IMDb resolution, flags, PT-BR top priority, stream-aware)
   useEffect(() => {
@@ -2817,53 +2829,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   // Seleciona a faixa de áudio HLS correspondente à preferência do usuário (PT-BR, JA, EN, ES)
   const pickMatchingHlsAudioTrack = (
-    tracks: Array<{ id: number; name: string; lang: string }>,
-    targetLang: string
-  ) => {
-    if (!tracks || tracks.length === 0) return null;
-    const lang = (targetLang || 'pt-BR').toLowerCase();
-
-    // 1. Português / Dublado
-    if (lang === 'pt-br' || lang === 'pt' || lang === 'pob') {
-      return tracks.find(t => 
-        /^(por|pt|pob|bra)$/i.test(t.lang) || 
-        /portugu[eê]s|dublado|brazil|brasil/i.test(t.name)
-      ) || null;
-    }
-
-    // 2. Japonês (essencial para anime)
-    if (lang === 'ja' || lang === 'ja-jp' || lang === 'jpn') {
-      return tracks.find(t => 
-        /^(ja|jp|jpn|japanese)$/i.test(t.lang) || 
-        /japon[eê]s|japanese|original/i.test(t.name)
-      ) || null;
-    }
-
-    // 3. Inglês
-    if (lang === 'en' || lang === 'en-us' || lang === 'eng') {
-      return tracks.find(t => 
-        /^(en|eng|english)$/i.test(t.lang) || 
-        /ingl[eê]s|english|original/i.test(t.name)
-      ) || null;
-    }
-
-    // 4. Espanhol
-    if (lang === 'es' || lang === 'es-es' || lang === 'es-419' || lang === 'spa') {
-      return tracks.find(t => 
-        /^(es|spa|spanish)$/i.test(t.lang) || 
-        /espanhol|spanish|castellano/i.test(t.name)
-      ) || null;
-    }
-
-    // 5. Fallback por prefixo (ex: 'fr', 'de', 'it')
-    if (lang.length >= 2) {
-      const prefix = lang.slice(0, 2);
-      const prefixMatch = tracks.find(t => t.lang.toLowerCase().startsWith(prefix));
-      if (prefixMatch) return prefixMatch;
-    }
-
-    return null;
-  };
+    tracks: Array<{ id: number; name: string; lang: string }>, targetLang: string
+  ) => audioSelectionManager.findMatchingTrack(tracks, targetLang);
 
   // Initialize Video Playback (HLS or Native MP4) — Re-executa APENAS quando a URL da fonte mudar
   useEffect(() => {
@@ -3017,17 +2984,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           setHlsAudioTracks(tracks);
 
           // Sincronização dinâmica: detecta se alguma faixa real é em Português
-          const hasPtTrack = tracks.some(t => 
-            /^(por|pt|pob|bra)$/i.test(t.lang) || 
-            /portugu[eê]s|dublado|brazil|brasil/i.test(t.name)
-          );
-          if (hasPtTrack) {
-            setHasDynamicallyConfirmedPtBr(true);
-            ptBrConfirmedOnceRef.current = true;
+          const hasPtTrack = tracks.some(t => audioSelectionManager.resolveTrackLanguage(t) === 'pt-BR');
+          setHasDynamicallyConfirmedPtBr(hasPtTrack);
+          ptBrConfirmedOnceRef.current = hasPtTrack;
+          if (audioSelectionManager.normalizeLanguageCode(preferredAudioLang) === 'pt-BR' &&
+            audioSelectionManager.trackLanguageAvailability(tracks, 'pt-BR') === 'unavailable') {
+            setForcedNonDubbedPrompt(true);
           }
 
           // Se o usuário já tiver selecionado uma faixa, preserva-a
-          if (selectedHlsAudioTrackRef.current >= 0 && tracks.some(t => t.id === selectedHlsAudioTrackRef.current)) {
+          if (selectedHlsAudioTrackRef.current >= 0 && tracks.some(t => t.id === selectedHlsAudioTrackRef.current && audioSelectionManager.resolveTrackLanguage(t) === audioSelectionManager.normalizeLanguageCode(preferredAudioLang))) {
             if (hls.audioTrack !== selectedHlsAudioTrackRef.current) {
               hls.audioTrack = selectedHlsAudioTrackRef.current;
             }
@@ -3101,17 +3067,16 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           setHlsAudioTracks(tracks);
 
           // Sincronização dinâmica: detecta se alguma faixa real é em Português
-          const hasPtTrack = tracks.some(t => 
-            /^(por|pt|pob|bra)$/i.test(t.lang) || 
-            /portugu[eê]s|dublado|brazil|brasil/i.test(t.name)
-          );
-          if (hasPtTrack) {
-            setHasDynamicallyConfirmedPtBr(true);
-            ptBrConfirmedOnceRef.current = true;
+          const hasPtTrack = tracks.some(t => audioSelectionManager.resolveTrackLanguage(t) === 'pt-BR');
+          setHasDynamicallyConfirmedPtBr(hasPtTrack);
+          ptBrConfirmedOnceRef.current = hasPtTrack;
+          if (audioSelectionManager.normalizeLanguageCode(preferredAudioLang) === 'pt-BR' &&
+            audioSelectionManager.trackLanguageAvailability(tracks, 'pt-BR') === 'unavailable') {
+            setForcedNonDubbedPrompt(true);
           }
 
           // Se o usuário já tiver selecionado uma faixa, preserva-a através de seeks e atualizações
-          if (selectedHlsAudioTrackRef.current >= 0 && tracks.some(t => t.id === selectedHlsAudioTrackRef.current)) {
+          if (selectedHlsAudioTrackRef.current >= 0 && tracks.some(t => t.id === selectedHlsAudioTrackRef.current && audioSelectionManager.resolveTrackLanguage(t) === audioSelectionManager.normalizeLanguageCode(preferredAudioLang))) {
             if (hls.audioTrack !== selectedHlsAudioTrackRef.current) {
               hls.audioTrack = selectedHlsAudioTrackRef.current;
             }
@@ -3208,7 +3173,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         if (html5AudioTracks && html5AudioTracks.length > 0) {
           for (let i = 0; i < html5AudioTracks.length; i++) {
             const trk = html5AudioTracks[i];
-            if (/^(por|pt|pob|bra)$/i.test(trk.language) || /portugu[eê]s|dublado|brasil/i.test(trk.label)) {
+            if (audioSelectionManager.resolveTrackLanguage({ lang: trk.language, name: trk.label }) === 'pt-BR') {
               setHasDynamicallyConfirmedPtBr(true);
               break;
             }
@@ -3271,7 +3236,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         if (html5AudioTracks && html5AudioTracks.length > 0) {
           for (let i = 0; i < html5AudioTracks.length; i++) {
             const trk = html5AudioTracks[i];
-            if (/^(por|pt|pob|bra)$/i.test(trk.language) || /portugu[eê]s|dublado|brasil/i.test(trk.label)) {
+            if (audioSelectionManager.resolveTrackLanguage({ lang: trk.language, name: trk.label }) === 'pt-BR') {
               setHasDynamicallyConfirmedPtBr(true);
               ptBrConfirmedOnceRef.current = true;
               break;

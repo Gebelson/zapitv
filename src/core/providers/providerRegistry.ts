@@ -58,6 +58,13 @@ export function stremioEpisodeId(baseId: string, episode?: { season: number; epi
     : baseId;
 }
 
+export function findCatalogEpisode(episodes: ContentItem['episodes'], requested?: { season: number; episode: number }) {
+  const season = requested?.season ?? 1;
+  const number = requested?.episode ?? 1;
+  const matches = (episodes ?? []).filter(ep => (ep.season ?? 1) === season && ep.number === number);
+  return matches.length && new Set(matches.map(ep => ep.videoUrl)).size === 1 ? matches[0] : undefined;
+}
+
 // Verificação passiva em cache de prontidão do Stremio Engine local (sem spawn de processos)
 let localEngineCache = { active: false, lastCheck: 0 };
 export async function isLocalStremioEngineOnline(): Promise<boolean> {
@@ -609,8 +616,7 @@ class ProviderRegistryService {
     // 0. Extração imediata de fontes locais (0ms) sem aguardar requisições de rede
     if (openItem) {
       if ((type === 'series' || type === 'anime') && openItem.episodes && openItem.episodes.length > 0) {
-        const epNum = episode?.episode || 1;
-        const epObj = (episode?.season || 1) === 1 ? openItem.episodes.find(e => e.number === epNum) : undefined;
+        const epObj = findCatalogEpisode(openItem.episodes, episode);
         if (epObj?.videoUrl) {
           const directUrl = epObj.videoUrl;
           const proxyUrl = directUrl.startsWith('http') ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
@@ -648,14 +654,13 @@ class ProviderRegistryService {
 
     if (catalogItem) {
       if ((type === 'series' || type === 'anime') && catalogItem.episodes && catalogItem.episodes.length > 0) {
-        const epNum = episode?.episode || 1;
-        const epObj = (episode?.season || 1) === 1 ? catalogItem.episodes.find(e => e.number === epNum) : undefined;
+        const epObj = findCatalogEpisode(catalogItem.episodes, episode);
         if (epObj?.videoUrl && !epObj.videoUrl.includes('Caminandes') && !epObj.videoUrl.includes('Night_of_the_Living_Dead')) {
           const directUrl = epObj.videoUrl;
           const proxyUrl = directUrl.startsWith('http') ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
           const isDubbed = catalogItem.audioStatus === 'pt-br-dubbed';
           streams.push({
-            name: `${catalogItem.title} - T${episode?.season || 1}E${epObj.number}`,
+            name: `${catalogItem.title} - T${episode?.season ?? 1}E${epObj.number}`,
             title: `[EPISÓDIO ${epObj.number}] ${epObj.title} (${isDubbed ? 'Dublado PT-BR' : 'Stream HD'})`,
             url: proxyUrl,
             sourceType: epObj.videoUrl.includes('.m3u8') ? 'hls' : 'mp4',

@@ -335,7 +335,10 @@ class TvViewportService {
       if (this.resizeThrottleTimer) return;
       this.resizeThrottleTimer = setTimeout(() => {
         this.resizeThrottleTimer = null;
-        this.currentMetrics = this.computeMetrics();
+        const next = this.computeMetrics();
+        if (next.isFireTv && this.currentMetrics.isFireTv &&
+          (Object.keys(next) as (keyof TvViewportMetrics)[]).every(key => next[key] === this.currentMetrics[key])) return;
+        this.currentMetrics = next;
         this.applyRootClasses();
         this.notifySubscribers();
       }, 60);

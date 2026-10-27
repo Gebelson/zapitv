@@ -43,6 +43,8 @@ export class AudioSelectionManager {
   public normalizeLanguageCode(textOrLang: string): string {
     const raw = (textOrLang || '').trim().toLowerCase();
     if (!raw) return 'unknown';
+    const regional = raw.match(/^(ja|en|es|ko|fr|de|it)[-_][a-z0-9]{2,8}$/i);
+    if (regional) return regional[1];
 
     // 1. Português do Brasil
     if (
@@ -248,6 +250,21 @@ export class AudioSelectionManager {
    *   possuem fontes web-ready e acessíveis no momento.
    * - O check azul (`isCurrent`) é ativado estritamente para o ID do áudio confirmado.
    */
+  public resolveTrackLanguage(track: { lang?: string; name?: string }): string {
+    const declared = this.normalizeLanguageCode(track.lang || '');
+    return declared !== 'unknown' && declared !== 'other' ? declared : this.normalizeLanguageCode(track.name || '');
+  }
+
+  public findMatchingTrack<T extends { lang?: string; name?: string }>(tracks: T[], target: string): T | null {
+    const language = this.normalizeLanguageCode(target);
+    return language === 'unknown' || language === 'other' ? null : tracks.find(track => this.resolveTrackLanguage(track) === language) || null;
+  }
+
+  public trackLanguageAvailability(tracks: { lang?: string; name?: string }[], target: string): 'available' | 'unavailable' | 'unknown' {
+    if (this.findMatchingTrack(tracks, target)) return 'available';
+    return !tracks.length || tracks.some(track => ['other', 'unknown'].includes(this.resolveTrackLanguage(track))) ? 'unknown' : 'unavailable';
+  }
+
   public buildAudioOptions(params: {
     item: AudioContextItem;
     streams: StremioStream[];
@@ -263,7 +280,7 @@ export class AudioSelectionManager {
     // CENÁRIO A: HLS com múltiplas faixas de áudio nativas no manifesto
     if (hlsTracks && hlsTracks.length > 1) {
       hlsTracks.forEach(track => {
-        const normCode = this.normalizeLanguageCode(track.lang || track.name);
+        const normCode = this.resolveTrackLanguage(track);
         const resolvedLang = normCode !== 'unknown' ? normCode : 'other';
         const display = this.getLanguageDisplay(resolvedLang);
         const isOriginal = resolvedLang === originalLang;
@@ -313,7 +330,8 @@ export class AudioSelectionManager {
     }>();
 
     for (const itemStream of webReadyStreamsWithIndices) {
-      const detectedLang = this.inspectStreamAudioLanguage(itemStream.stream, originalLang);
+      const detectedLang = itemStream.index === currentStreamIndex && hlsTracks.length === 1 ?
+        this.resolveTrackLanguage(hlsTracks[0]) : this.inspectStreamAudioLanguage(itemStream.stream, originalLang);
       if (detectedLang !== 'unknown') {
         const existing = foundLanguages.get(detectedLang);
         if (!existing) {

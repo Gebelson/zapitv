@@ -33,9 +33,9 @@ interface LiveTvPlayerProps {
 const maskStreamUrl = (u: string): string => {
   try {
     const parsed = new URL(u);
-    return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+    return parsed.origin;
   } catch {
-    return u.split('?')[0];
+    return '[invalid-url]';
   }
 };
 
@@ -96,6 +96,15 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   const networkRetryCountRef = useRef<number>(0);
   const mediaRecoveryCountRef = useRef<number>(0);
   const playStartTimeRef = useRef<number>(0);
+  const deferredTimersRef = useRef(new Set<ReturnType<typeof setTimeout>>());
+  const scheduleDeferred = useCallback((callback: () => void, delay: number) => {
+    const generation = playbackGenerationRef.current;
+    const timer = setTimeout(() => {
+      deferredTimersRef.current.delete(timer);
+      if (playbackGenerationRef.current === generation) callback();
+    }, delay);
+    deferredTimersRef.current.add(timer);
+  }, []);
 
   const STARTUP_TIMEOUT_MS = isTv ? 10000 : 7000;
   const MAX_STALL_TIMEOUT_S = isTv ? 16 : 12;
@@ -168,6 +177,8 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   const cleanupPlayer = useCallback(() => {
     // Incrementa geração de reprodução para invalidar callbacks assíncronos anteriores
     playbackGenerationRef.current += 1;
+    deferredTimersRef.current.forEach(timer => clearTimeout(timer));
+    deferredTimersRef.current.clear();
 
     if (startupWatchdogTimeoutRef.current) {
       clearTimeout(startupWatchdogTimeoutRef.current);
@@ -235,8 +246,8 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       setPlaybackStatus('recovering');
       setFallbackNotice(`Alternando para fonte alternativa (${nextSource.quality || 'Backup'})...`);
       setIsUsingFallback(true);
-      setTimeout(() => setFallbackNotice(null), 4000);
       playStreamUrl(nextSource.url);
+      scheduleDeferred(() => setFallbackNotice(null), 4000);
     } else {
       logLiveTvDiag('Todas as fontes esgotadas para o canal', {
         channelId: channel.id,
@@ -249,14 +260,14 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
 
       if (onNextChannel) {
         setFallbackNotice('Transmissão indisponível. Avançando para o próximo canal verificado...');
-        setTimeout(() => {
+        scheduleDeferred(() => {
           if (activeChannelIdRef.current === channel.id) {
             onNextChannel();
           }
         }, 1800);
       } else if (onClose) {
         setFallbackNotice('Transmissão indisponível. Retornando à grade de canais...');
-        setTimeout(() => {
+        scheduleDeferred(() => {
           if (activeChannelIdRef.current === channel.id) {
             onClose();
           }
@@ -296,14 +307,14 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       setIsPlaying(false);
       if (onNextChannel) {
         setFallbackNotice('Transmissão indisponível. Avançando para o próximo canal verificado...');
-        setTimeout(() => {
+        scheduleDeferred(() => {
           if (activeChannelIdRef.current === channel.id) {
             onNextChannel();
           }
         }, 1800);
       } else if (onClose) {
         setFallbackNotice('Transmissão indisponível. Retornando à grade de canais...');
-        setTimeout(() => {
+        scheduleDeferred(() => {
           if (activeChannelIdRef.current === channel.id) {
             onClose();
           }
@@ -611,14 +622,14 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       setIsPlaying(false);
       if (onNextChannel) {
         setFallbackNotice('Transmissão indisponível. Avançando para o próximo canal verificado...');
-        setTimeout(() => {
+        scheduleDeferred(() => {
           if (activeChannelIdRef.current === channel.id) {
             onNextChannel();
           }
         }, 1800);
       } else if (onClose) {
         setFallbackNotice('Transmissão indisponível. Retornando à grade de canais...');
-        setTimeout(() => {
+        scheduleDeferred(() => {
           if (activeChannelIdRef.current === channel.id) {
             onClose();
           }
@@ -637,11 +648,23 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   useEffect(() => {
     activeChannelIdRef.current = channel.id;
     attemptedUrlsThisSessionRef.current.clear();
-    initPlayback();
+    if (!channel.requiresExternalAccess) initPlayback();
     return () => {
       cleanupPlayer();
     };
   }, [channel.id]);
+
+  useEffect(() => {
+    if (!channel.requiresExternalAccess) return;
+    scheduleDeferred(() => {
+      if (onNextChannel) onNextChannel();
+      else onClose?.();
+    }, 50);
+    return () => {
+      deferredTimersRef.current.forEach(timer => clearTimeout(timer));
+      deferredTimersRef.current.clear();
+    };
+  }, [channel.id, channel.requiresExternalAccess, onNextChannel, onClose, scheduleDeferred]);
 
   // Atualiza volume e mudo
   const handleVolumeChange = (newVol: number) => {
@@ -694,13 +717,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
     }
   };
 
-  // Salvaguarda: se o canal exigir acesso externo, não exibe tela estática e aciona transição segura
   if (channel.requiresExternalAccess) {
-    if (onNextChannel) {
-      setTimeout(() => onNextChannel(), 50);
-    } else if (onClose) {
-      setTimeout(() => onClose(), 50);
-    }
     return (
       <div
         ref={containerRef}

@@ -417,12 +417,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   }, [activeProfile?.id, activeProfile?.isChild]);
 
   const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState(false);
-  const [moviesPage, setMoviesPage] = useState(2);
-  const [seriesPage, setSeriesPage] = useState(2);
-  const [animesPage, setAnimesPage] = useState(2);
-  const moviesPageRef = useRef(2);
-  const seriesPageRef = useRef(2);
-  const animesPageRef = useRef(2);
+  const [moviesPage, setMoviesPage] = useState(0);
+  const [seriesPage, setSeriesPage] = useState(0);
+  const [animesPage, setAnimesPage] = useState(0);
+  const moviesPageRef = useRef(0);
+  const seriesPageRef = useRef(0);
+  const animesPageRef = useRef(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const isLoadingMoreRef = useRef(false);
   const [hasMoreMovies, setHasMoreMovies] = useState(true);
@@ -508,12 +508,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       }
     }
     setSelectedGenre(genre);
-    setMoviesPage(1);
-    moviesPageRef.current = 1;
-    setSeriesPage(1);
-    seriesPageRef.current = 1;
-    setAnimesPage(1);
-    animesPageRef.current = 1;
+    setMoviesPage(0);
+    moviesPageRef.current = 0;
+    setSeriesPage(0);
+    seriesPageRef.current = 0;
+    setAnimesPage(0);
+    animesPageRef.current = 0;
   }, [activeProfile]);
 
   // Função pura para extrair itens elegíveis da categoria respeitando o filtro de gênero
@@ -574,9 +574,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }));
 
     // 2. Reseta paginação da categoria
-    if (view === 'movies') { setMoviesPage(1); moviesPageRef.current = 1; }
-    else if (view === 'series') { setSeriesPage(1); seriesPageRef.current = 1; }
-    else if (view === 'animes') { setAnimesPage(1); animesPageRef.current = 1; }
+    if (view === 'movies') { setMoviesPage(0); moviesPageRef.current = 0; }
+    else if (view === 'series') { setSeriesPage(0); seriesPageRef.current = 0; }
+    else if (view === 'animes') { setAnimesPage(0); animesPageRef.current = 0; }
 
     // 3. Aplica a ordenação ao catálogo COMPLETO daquela categoria
     const targetKey = getSnapshotKeyForView(view, selectedGenre, newSort);
@@ -974,6 +974,10 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           const currentSort = categorySorts.movies || 'recommended';
           const targetKey = getSnapshotKeyForView('movies', selectedGenre, currentSort);
           const res = await catalogDiscoveryService.discoverMovies(1, selectedGenre);
+          if (!isMounted || currentViewRef.current !== 'movies') return;
+          if (!res.isPartial) { moviesPageRef.current = 1; setMoviesPage(1); }
+          setHasMoreMovies(res.hasMore);
+
           if (isMounted && res.items.length > 0 && currentViewRef.current === 'movies') {
             const onlyMovies = res.items.filter(i => searchService.isMovieItem(i, false));
             setPopularMovies(prev => deduplicateContentItems([...prev, ...onlyMovies]).filter(i => searchService.isMovieItem(i, false)));
@@ -1003,12 +1007,16 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               );
               return { ...prev, [targetKey]: updated.filter(i => searchService.isMovieItem(i, false)) };
             });
-            setMoviesPage(1);
+            setMoviesPage(res.isPartial ? 0 : 1);
           }
         } else if (currentView === 'series') {
           const currentSort = categorySorts.series || 'recommended';
           const targetKey = getSnapshotKeyForView('series', selectedGenre, currentSort);
           const res = await catalogDiscoveryService.discoverSeries(1, selectedGenre);
+          if (!isMounted || currentViewRef.current !== 'series') return;
+          if (!res.isPartial) { seriesPageRef.current = 1; setSeriesPage(1); }
+          setHasMoreSeries(res.hasMore);
+
           if (isMounted && res.items.length > 0 && currentViewRef.current === 'series') {
             const onlySeries = res.items.filter(i => searchService.isSeriesItem(i));
             setPopularSeries(prev => deduplicateContentItems([...prev, ...onlySeries]).filter(i => searchService.isSeriesItem(i)));
@@ -1038,12 +1046,16 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               );
               return { ...prev, [targetKey]: updated.filter(i => searchService.isSeriesItem(i)) };
             });
-            setSeriesPage(1);
+            setSeriesPage(res.isPartial ? 0 : 1);
           }
         } else if (currentView === 'animes') {
           const currentSort = categorySorts.animes || 'recommended';
           const targetKey = getSnapshotKeyForView('animes', selectedGenre, currentSort);
           const res = await catalogDiscoveryService.discoverAnimes(1, selectedGenre);
+          if (!isMounted || currentViewRef.current !== 'animes') return;
+          if (!res.isPartial) { animesPageRef.current = 1; setAnimesPage(1); }
+          setHasMoreAnimes(res.hasMore);
+
           if (isMounted && res.items.length > 0 && currentViewRef.current === 'animes') {
             const onlyAnimes = res.items.filter(i => searchService.isAnimeItem(i));
             setAnimeItems(prev => deduplicateContentItems([...prev, ...onlyAnimes]).filter(i => searchService.isAnimeItem(i)));
@@ -1073,7 +1085,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               );
               return { ...prev, [targetKey]: updated.filter(i => searchService.isAnimeItem(i)) };
             });
-            setAnimesPage(1);
+            setAnimesPage(res.isPartial ? 0 : 1);
           }
         }
       } catch (e) {
@@ -1086,7 +1098,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   }, [selectedGenre, currentView, categorySorts, activeProfile?.id, activeProfile?.isChild, getSnapshotKeyForView]);
 
   // Paginação e carregamento incremental sob demanda ("Carregar Mais" / Infinite Scroll sem limites artificiais)
-  const handleLoadMore = useCallback(async (view: AppView) => {
+  const catalogRetryRef = useRef({ key: '', until: 0, failures: 0 });
+  const handleLoadMore = useCallback(async (view: AppView, manual = false) => {
+    const retryKey = `${view}:${selectedGenre}`;
+    if (!manual && catalogRetryRef.current.key === retryKey &&
+      (Date.now() < catalogRetryRef.current.until || catalogRetryRef.current.failures >= 3)) return;
+    if (manual) catalogRetryRef.current = { key: retryKey, until: 0, failures: 0 };
     if (isLoadingMoreRef.current) return;
     const isBrowse = view === 'movies' || view === 'series' || view === 'animes';
     if (!isBrowse) return;
@@ -1098,8 +1115,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     try {
       if (view === 'movies') {
         let nextPage = moviesPageRef.current + 1;
-        moviesPageRef.current = nextPage;
-        setMoviesPage(nextPage);
         let attempts = 0;
         const maxAttempts = 8;
         let newItems: ContentItem[] = [];
@@ -1107,6 +1122,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
         while (attempts < maxAttempts) {
           const res = await catalogDiscoveryService.discoverMovies(nextPage, selectedGenre);
+          if (!res.isPartial) {
+            moviesPageRef.current = nextPage;
+            setMoviesPage(nextPage);
+          }
+          catalogRetryRef.current = { key: retryKey, until: res.isPartial ? Date.now() + 3000 : 0,
+            failures: res.isPartial ? (catalogRetryRef.current.key === retryKey ? catalogRetryRef.current.failures : 0) + 1 : 0 };
           hasMore = res.hasMore;
           const onlyMovies = res.items.filter(i => searchService.isMovieItem(i, false));
 
@@ -1114,13 +1135,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             newItems.push(...onlyMovies);
           }
 
-          if (newItems.length >= 20 || !hasMore) {
+          if (newItems.length >= 20 || !hasMore || res.isPartial) {
             break;
           }
 
           nextPage++;
-          moviesPageRef.current = nextPage;
-          setMoviesPage(nextPage);
           attempts++;
         }
 
@@ -1157,8 +1176,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         setHasMoreMovies(hasMore);
       } else if (view === 'series') {
         let nextPage = seriesPageRef.current + 1;
-        seriesPageRef.current = nextPage;
-        setSeriesPage(nextPage);
         let attempts = 0;
         const maxAttempts = 8;
         let newItems: ContentItem[] = [];
@@ -1166,6 +1183,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
         while (attempts < maxAttempts) {
           const res = await catalogDiscoveryService.discoverSeries(nextPage, selectedGenre);
+          if (!res.isPartial) {
+            seriesPageRef.current = nextPage;
+            setSeriesPage(nextPage);
+          }
+          catalogRetryRef.current = { key: retryKey, until: res.isPartial ? Date.now() + 3000 : 0,
+            failures: res.isPartial ? (catalogRetryRef.current.key === retryKey ? catalogRetryRef.current.failures : 0) + 1 : 0 };
           hasMore = res.hasMore;
           const onlySeries = res.items.filter(i => searchService.isSeriesItem(i));
 
@@ -1173,13 +1196,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             newItems.push(...onlySeries);
           }
 
-          if (newItems.length >= 20 || !hasMore) {
+          if (newItems.length >= 20 || !hasMore || res.isPartial) {
             break;
           }
 
           nextPage++;
-          seriesPageRef.current = nextPage;
-          setSeriesPage(nextPage);
           attempts++;
         }
 
@@ -1216,8 +1237,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         setHasMoreSeries(hasMore);
       } else if (view === 'animes') {
         let nextPage = animesPageRef.current + 1;
-        animesPageRef.current = nextPage;
-        setAnimesPage(nextPage);
         let attempts = 0;
         const maxAttempts = 8;
         let newItems: ContentItem[] = [];
@@ -1225,6 +1244,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
         while (attempts < maxAttempts) {
           const res = await catalogDiscoveryService.discoverAnimes(nextPage, selectedGenre);
+          if (!res.isPartial) {
+            animesPageRef.current = nextPage;
+            setAnimesPage(nextPage);
+          }
+          catalogRetryRef.current = { key: retryKey, until: res.isPartial ? Date.now() + 3000 : 0,
+            failures: res.isPartial ? (catalogRetryRef.current.key === retryKey ? catalogRetryRef.current.failures : 0) + 1 : 0 };
           hasMore = res.hasMore;
           const onlyAnimes = res.items.filter(i => searchService.isAnimeItem(i));
 
@@ -1232,13 +1257,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             newItems.push(...onlyAnimes);
           }
 
-          if (newItems.length >= 20 || !hasMore) {
+          if (newItems.length >= 20 || !hasMore || res.isPartial) {
             break;
           }
 
           nextPage++;
-          animesPageRef.current = nextPage;
-          setAnimesPage(nextPage);
           attempts++;
         }
 
@@ -1275,7 +1298,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         setHasMoreAnimes(hasMore);
       }
     } catch (e) {
-      console.warn('Erro ao carregar mais itens:', e);
+      catalogRetryRef.current = { key: retryKey, until: Date.now() + 3000,
+        failures: (catalogRetryRef.current.key === retryKey ? catalogRetryRef.current.failures : 0) + 1 };
+      console.warn('Erro temporário ao carregar mais itens. A página será mantida para nova tentativa.');
     } finally {
       isLoadingMoreRef.current = false;
       setIsLoadingMore(false);

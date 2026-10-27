@@ -21,6 +21,7 @@ interface TvContentRowProps {
   onRowDown?: () => void;
   isNearViewport?: boolean;
   onRowFocus?: (rowId: string) => void;
+  onNearEnd?: () => void;
 }
 
 // Margem segura da interface padrão (substituída dinamicamente por tvViewportService)
@@ -68,7 +69,8 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   onRowUp,
   onRowDown,
   isNearViewport = true,
-  onRowFocus
+  onRowFocus,
+  onNearEnd
 }) => {
   const viewport = useTvViewport();
   const isFireTv = tvPerformanceService.isFireTv();
@@ -113,15 +115,18 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
         const topOffset = Math.round(slotRect.top - containerRect.top);
         setCardWidth(w);
         setStepSize(w + viewport.cardGap);
-        setSelectionGeometry({
+        const nextGeometry = {
           top: topOffset,
           left: viewport.safeMarginX,
           width: w,
           height: h > 80 ? h : Math.round(w * 1.5)
-        });
+        };
+        setSelectionGeometry(previous => isFireTv && previous.top === nextGeometry.top &&
+          previous.left === nextGeometry.left && previous.width === nextGeometry.width &&
+          previous.height === nextGeometry.height ? previous : nextGeometry);
       }
     }
-  }, [viewport.cardGap, viewport.safeMarginX]);
+  }, [viewport.cardGap, viewport.safeMarginX, isFireTv]);
 
   useEffect(() => {
     // No Fire TV, se a fileira não estiver visível ou focada, evita medição forçada no DOM
@@ -320,6 +325,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     },
     onArrowPress: (direction) => {
       if (direction === 'right') {
+        if (currentIndex >= items.length - 4) onNearEnd?.();
         slideNext();
         return false; // Intercepta para deslocar o track mantendo o foco fixo no Slot 0
       }

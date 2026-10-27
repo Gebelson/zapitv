@@ -10,6 +10,8 @@ import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { canonicalCatalogMaster } from '../../core/catalog/CanonicalCatalogMaster';
 import { catalogReleaseStore } from '../../core/catalog/CatalogReleaseStore';
+import { catalogDiscoveryService } from '../../core/catalog/CatalogDiscoveryService';
+import { CatalogPaginationSession } from '../../core/catalog/catalogPaginationSession';
 import { searchService } from '../../core/search/searchService';
 import { watchPartyService } from '../../core/watchparty/WatchPartyService';
 import { useTvIdle } from '../../core/tv/useTvIdle';
@@ -80,6 +82,17 @@ export const TvApp: React.FC<TvAppProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const viewport = useTvViewport();
+  const [additionalCatalog, setAdditionalCatalog] = useState<ContentItem[]>([]);
+  const catalogMounted = useRef(true);
+  useEffect(() => {
+    catalogMounted.current = true;
+    return () => { catalogMounted.current = false; };
+  }, []);
+  const pagination = useMemo(() => ({
+    movies: new CatalogPaginationSession(page => catalogDiscoveryService.discoverMovies(page)),
+    series: new CatalogPaginationSession(page => catalogDiscoveryService.discoverSeries(page)),
+    animes: new CatalogPaginationSession(page => catalogDiscoveryService.discoverAnimes(page))
+  }), []);
 
   // Inicializa navegação espacial e define o foco inicial no botão Assistir do Hero
   useEffect(() => {
@@ -120,6 +133,14 @@ export const TvApp: React.FC<TvAppProps> = ({
     if (path.includes('/em-destaque') || path.includes('/ao-vivo') || path.includes('/destaques')) return 'featured';
     return 'home';
   });
+  const loadMoreCategory = useCallback(() => {
+    if (currentTab !== 'movies' && currentTab !== 'series' && currentTab !== 'animes') return;
+    void pagination[currentTab].loadNext().then(result => {
+      if (catalogMounted.current && result?.items.length) {
+        setAdditionalCatalog(previous => deduplicateContentItems([...previous, ...result.items]));
+      }
+    }).catch(() => console.warn('[TV catalog] Página preservada para nova tentativa após falha temporária.'));
+  }, [currentTab, pagination]);
 
   // Visões especiais além das abas
   const [specialView, setSpecialView] = useState<'search' | 'mylist' | 'history' | 'settings' | null>(() => {
@@ -292,6 +313,7 @@ export const TvApp: React.FC<TvAppProps> = ({
   const fullTvCatalog = useMemo(() => {
     const combined = [
       ...(content || []),
+      ...additionalCatalog,
       ...(popularMovies || []),
       ...(popularSeries || []),
       ...(animeItems || []),
@@ -304,7 +326,7 @@ export const TvApp: React.FC<TvAppProps> = ({
       ...canonicalCatalogMaster.getPublicCatalog('animes'),
     ];
     return catalogEligibilityService.filterEligibleItemsSync(deduplicateContentItems(combined));
-  }, [content, popularMovies, popularSeries, animeItems, trendingItems, featuredItems, releasedItems, catalogEligibilityTick]);
+  }, [content, popularMovies, popularSeries, animeItems, trendingItems, featuredItems, releasedItems, catalogEligibilityTick, additionalCatalog]);
 
   // Listas por categoria unificadas aproveitando fullTvCatalog + resultados obtidos da rede
   const unifiedMovies = useMemo(() => {
@@ -619,6 +641,7 @@ export const TvApp: React.FC<TvAppProps> = ({
             ) : currentTab === 'movies' ? (
               <TvCategoryView
                 categoryTitle="Filmes"
+                onLoadMore={loadMoreCategory}
                 upFocusKey="tv-nav-movies"
                 items={unifiedMovies}
                 onSelectItem={handleOpenDetailModal}
@@ -628,6 +651,7 @@ export const TvApp: React.FC<TvAppProps> = ({
             ) : currentTab === 'series' ? (
               <TvCategoryView
                 categoryTitle="Séries"
+                onLoadMore={loadMoreCategory}
                 upFocusKey="tv-nav-series"
                 items={unifiedSeries}
                 onSelectItem={handleOpenDetailModal}
@@ -636,6 +660,7 @@ export const TvApp: React.FC<TvAppProps> = ({
               />
             ) : currentTab === 'animes' ? (
               <TvAnimeView
+                onLoadMore={loadMoreCategory}
                 items={unifiedAnimes}
                 upFocusKey="tv-nav-animes"
                 allContent={fullTvCatalog}

@@ -11,6 +11,7 @@ interface TvCategoryViewProps {
   onPlayItem: (item: ContentItem) => void;
   suspended?: boolean;
   upFocusKey?: string;
+  onLoadMore?: () => void;
 }
 
 export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
@@ -19,7 +20,8 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
   onSelectItem,
   onPlayItem,
   suspended = false,
-  upFocusKey
+  upFocusKey,
+  onLoadMore
 }) => {
   const resolvedUpFocusKey = upFocusKey || (
     categoryTitle === 'Filmes' ? 'tv-nav-movies' :
@@ -139,6 +141,7 @@ export const TvCategoryView: React.FC<TvCategoryViewProps> = memo(({
           title={`Todos os ${categoryTitle} Populares`}
           rowId={`all-${categoryTitle.toLowerCase()}`}
           items={items}
+          onNearEnd={onLoadMore}
           onItemClick={onSelectItem}
           onRowUp={handleFirstRowUpPress}
         />

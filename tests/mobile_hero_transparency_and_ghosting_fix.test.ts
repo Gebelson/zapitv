@@ -84,8 +84,8 @@ async function runTests() {
     'MobileHero deve gerenciar as fases de transição via fadePhase'
   );
   assert.ok(
-    heroCode.includes("new Image()"),
-    'MobileHero deve pré-carregar na memória (new Image()) antes de transicionar'
+    heroCode.includes('heroImageService.validateAndPreloadImage(nextImageUrl, 4500, controller.signal)'),
+    'MobileHero deve usar o pré-carregamento compartilhado com timeout e cancelamento antes de transicionar'
   );
   assert.ok(
     heroCode.includes('fade-out') && heroCode.includes('fade-in'),

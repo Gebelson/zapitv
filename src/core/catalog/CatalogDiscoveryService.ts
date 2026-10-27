@@ -16,9 +16,22 @@ export interface DiscoveryResult {
   hasMore: boolean;
   totalDiscovered: number;
   totalAvailable: number;
+  isPartial?: boolean;
 }
 
 export class CatalogDiscoveryService {
+  private requireDiscoveryResponse(results: PromiseSettledResult<unknown>[]): boolean {
+    const hasItems = results.some(result => result.status === 'fulfilled' &&
+      (Array.isArray(result.value) ? result.value.length > 0 :
+        !!result.value && Array.isArray((result.value as { items?: unknown[] }).items) &&
+        (result.value as { items: unknown[] }).items.length > 0));
+    if (!hasItems && results.some(result => result.status === 'rejected')) throw new Error('CATALOG_TEMPORARILY_UNAVAILABLE');
+    return results.some(result => result.status === 'rejected');
+  }
+
+  private cinemetaCatalog(type: 'movie' | 'series', genre?: string, skip?: number) {
+    return tmdbService.getCinemetaCatalog(type, genre, skip, 8000, true);
+  }
   private dedupeCache = new Map<string, ContentItem>();
   private resultCache = new Map<string, { expiresAt: number; result: DiscoveryResult }>();
   private inFlight = new Map<string, Promise<DiscoveryResult>>();
@@ -32,7 +45,7 @@ export class CatalogDiscoveryService {
 
     const generation = this.cacheGeneration;
     const request = fetchResult().then(result => {
-      if (generation === this.cacheGeneration && result.items.length > 0) {
+      if (generation === this.cacheGeneration && result.items.length > 0 && !result.isPartial) {
         if (this.resultCache.size >= 100) this.resultCache.delete(this.resultCache.keys().next().value!);
         this.resultCache.set(key, { result, expiresAt: Date.now() + 5 * 60 * 1000 });
       }
@@ -179,7 +192,8 @@ export class CatalogDiscoveryService {
         if ((!existing.genres || existing.genres.length === 0) && item.genres) existing.genres = item.genres;
         if (!existing.backdrop && item.backdrop) existing.backdrop = item.backdrop;
         if (!existing.image && item.image) existing.image = item.image;
-        // Se já foi descoberto anteriormente, NÃO re-adiciona para evitar cards duplicados na paginação
+        // The same item must remain available in another query/filter; dedupe is per batch and UI snapshot.
+        unique.push(existing);
         continue;
       }
 
@@ -215,13 +229,14 @@ export class CatalogDiscoveryService {
 
   private async discoverMoviesUncached(page: number, genre?: string): Promise<DiscoveryResult> {
     const rawResults: ContentItem[] = [];
+    let isPartial = false;
     const genreKey = genre || 'Todos';
     const isAdultGenre = genre === 'Adulto';
 
     try {
       if (isAdultGenre) {
         const skip = (page - 1) * 20;
-        const cineRes = await tmdbService.getCinemetaCatalog('movie', 'Adult', skip);
+        const cineRes = await this.cinemetaCatalog('movie', 'Adult', skip);
         for (const it of cineRes) {
           it.isAdult = true;
           if (!it.genres?.includes('Adulto')) it.genres = ['Adulto', ...(it.genres || [])];
@@ -231,10 +246,11 @@ export class CatalogDiscoveryService {
         const genreId = MOVIE_GENRE_NAME_TO_ID[genre];
         const discoverPromise = page <= 500 ? tmdbService.getDiscoverMoviesWithMeta(page, genreId) : Promise.resolve({ items: [], total: 0 });
         const cinemetaPromise = page <= 500
-          ? (page === 1 ? tmdbService.getCinemetaCatalog('movie', genre) : Promise.resolve([]))
-          : tmdbService.getCinemetaCatalog('movie', genre, (page - 501) * 20);
+          ? (page === 1 ? this.cinemetaCatalog('movie', genre) : Promise.resolve([]))
+          : this.cinemetaCatalog('movie', genre, (page - 501) * 20);
 
         const [discoverRes, cineRes] = await Promise.allSettled([discoverPromise, cinemetaPromise]);
+        isPartial = this.requireDiscoveryResponse([discoverRes, cineRes]);
         if (discoverRes.status === 'fulfilled') {
           rawResults.push(...discoverRes.value.items);
           if (discoverRes.value.total > 0 && !this.knownTotals[`movies_${genreKey}`]) {
@@ -246,10 +262,11 @@ export class CatalogDiscoveryService {
         const popularPromise = page <= 500 ? tmdbService.getPopularMoviesWithMeta(page) : Promise.resolve({ items: [], total: 0 });
         const topRatedPromise = page <= 3 ? tmdbService.getTopRatedMovies(page) : Promise.resolve([]);
         const cinemetaPromise = page <= 500
-          ? (page === 1 ? tmdbService.getCinemetaCatalog('movie', undefined, 0) : Promise.resolve([]))
-          : tmdbService.getCinemetaCatalog('movie', undefined, (page - 501) * 20);
+          ? (page === 1 ? this.cinemetaCatalog('movie', undefined, 0) : Promise.resolve([]))
+          : this.cinemetaCatalog('movie', undefined, (page - 501) * 20);
 
         const [popRes, topRes, cineRes] = await Promise.allSettled([popularPromise, topRatedPromise, cinemetaPromise]);
+        isPartial = this.requireDiscoveryResponse([popRes, topRes, cineRes]);
         if (popRes.status === 'fulfilled') {
           rawResults.push(...popRes.value.items);
         }
@@ -257,7 +274,7 @@ export class CatalogDiscoveryService {
         if (cineRes.status === 'fulfilled') rawResults.push(...cineRes.value);
       }
     } catch (err) {
-      console.warn(`[CatalogDiscoveryService] Erro ao descobrir filmes (pág ${page}):`, err);
+      throw new Error('CATALOG_TEMPORARILY_UNAVAILABLE: filmes');
     }
 
     if (page === 1 && !isAdultGenre) {
@@ -280,6 +297,7 @@ export class CatalogDiscoveryService {
       items,
       page,
       hasMore: rawResults.length > 0 || items.length > 0,
+      isPartial,
       totalDiscovered: this.dedupeCache.size,
       totalAvailable: this.getTotalAvailable('movies', genre)
     };
@@ -294,13 +312,14 @@ export class CatalogDiscoveryService {
 
   private async discoverSeriesUncached(page: number, genre?: string): Promise<DiscoveryResult> {
     const rawResults: ContentItem[] = [];
+    let isPartial = false;
     const genreKey = genre || 'Todos';
     const isAdultGenre = genre === 'Adulto';
 
     try {
       if (isAdultGenre) {
         const skip = (page - 1) * 20;
-        const cineRes = await tmdbService.getCinemetaCatalog('series', 'Adult', skip);
+        const cineRes = await this.cinemetaCatalog('series', 'Adult', skip);
         for (const it of cineRes) {
           it.isAdult = true;
           if (!it.genres?.includes('Adulto')) it.genres = ['Adulto', ...(it.genres || [])];
@@ -310,10 +329,11 @@ export class CatalogDiscoveryService {
         const genreId = TV_GENRE_NAME_TO_ID[genre];
         const discoverPromise = page <= 500 ? tmdbService.getDiscoverSeriesWithMeta(page, genreId) : Promise.resolve({ items: [], total: 0 });
         const cinemetaPromise = page <= 500
-          ? (page === 1 ? tmdbService.getCinemetaCatalog('series', genre) : Promise.resolve([]))
-          : tmdbService.getCinemetaCatalog('series', genre, (page - 501) * 20);
+          ? (page === 1 ? this.cinemetaCatalog('series', genre) : Promise.resolve([]))
+          : this.cinemetaCatalog('series', genre, (page - 501) * 20);
 
         const [discoverRes, cineRes] = await Promise.allSettled([discoverPromise, cinemetaPromise]);
+        isPartial = this.requireDiscoveryResponse([discoverRes, cineRes]);
         if (discoverRes.status === 'fulfilled') {
           rawResults.push(...discoverRes.value.items);
           if (discoverRes.value.total > 0 && !this.knownTotals[`series_${genreKey}`]) {
@@ -324,17 +344,18 @@ export class CatalogDiscoveryService {
       } else {
         const popularPromise = page <= 500 ? tmdbService.getPopularSeriesWithMeta(page) : Promise.resolve({ items: [], total: 0 });
         const cinemetaPromise = page <= 500
-          ? (page === 1 ? tmdbService.getCinemetaCatalog('series', undefined, 0) : Promise.resolve([]))
-          : tmdbService.getCinemetaCatalog('series', undefined, (page - 501) * 20);
+          ? (page === 1 ? this.cinemetaCatalog('series', undefined, 0) : Promise.resolve([]))
+          : this.cinemetaCatalog('series', undefined, (page - 501) * 20);
 
         const [popRes, cineRes] = await Promise.allSettled([popularPromise, cinemetaPromise]);
+        isPartial = this.requireDiscoveryResponse([popRes, cineRes]);
         if (popRes.status === 'fulfilled') {
           rawResults.push(...popRes.value.items);
         }
         if (cineRes.status === 'fulfilled') rawResults.push(...cineRes.value);
       }
     } catch (err) {
-      console.warn(`[CatalogDiscoveryService] Erro ao descobrir séries (pág ${page}):`, err);
+      throw new Error('CATALOG_TEMPORARILY_UNAVAILABLE: séries');
     }
 
     if (page === 1 && !isAdultGenre) {
@@ -357,6 +378,7 @@ export class CatalogDiscoveryService {
       items,
       page,
       hasMore: rawResults.length > 0 || items.length > 0,
+      isPartial,
       totalDiscovered: this.dedupeCache.size,
       totalAvailable: this.getTotalAvailable('series', genre)
     };
@@ -371,12 +393,13 @@ export class CatalogDiscoveryService {
 
   private async discoverAnimesUncached(page: number, genre?: string): Promise<DiscoveryResult> {
     const rawResults: ContentItem[] = [];
+    let isPartial = false;
     const isAdultGenre = genre === 'Adulto';
 
     try {
       if (isAdultGenre) {
         const skip = (page - 1) * 20;
-        const cineRes = await tmdbService.getCinemetaCatalog('series', 'Hentai', skip);
+        const cineRes = await this.cinemetaCatalog('series', 'Hentai', skip);
         for (const it of cineRes) {
           it.isAdult = true;
           it.type = ContentType.ANIME;
@@ -390,11 +413,12 @@ export class CatalogDiscoveryService {
         // 2. Busca Filmes de Anime convencionais
         const movieAnimePromise = page <= 500 ? tmdbService.getAnimeMoviesWithMeta(page) : Promise.resolve({ items: [], total: 0 });
         // 3. Suporte contínuo via Cinemeta além da página 500
-        const cinemetaPromise = page > 500 ? tmdbService.getCinemetaCatalog('series', 'Animation', (page - 501) * 20) : Promise.resolve([]);
+        const cinemetaPromise = page > 500 ? this.cinemetaCatalog('series', 'Animation', (page - 501) * 20) : Promise.resolve([]);
         // 4. Integração oficial e enriquecimento com AniList
         const anilistPromise = page <= 10 ? aniListClient.getPopularAnimes(page, 20) : Promise.resolve([]);
 
         const [tvRes, movieRes, cineRes, aniRes] = await Promise.allSettled([tvAnimePromise, movieAnimePromise, cinemetaPromise, anilistPromise]);
+        isPartial = this.requireDiscoveryResponse([tvRes, movieRes, cineRes, aniRes]);
 
         if (tvRes.status === 'fulfilled') {
           rawResults.push(...tvRes.value.items);
@@ -426,12 +450,13 @@ export class CatalogDiscoveryService {
           items,
           page,
           hasMore: rawResults.length > 0 || items.length > 0,
+      isPartial,
           totalDiscovered: this.dedupeCache.size,
           totalAvailable: this.getTotalAvailable('animes', genre)
         };
       }
     } catch (err) {
-      console.warn(`[CatalogDiscoveryService] Erro ao descobrir animes (pág ${page}):`, err);
+      throw new Error('CATALOG_TEMPORARILY_UNAVAILABLE: animes');
     }
 
     if (page === 1 && !isAdultGenre) {
@@ -460,6 +485,7 @@ export class CatalogDiscoveryService {
       items,
       page,
       hasMore: rawResults.length > 0 || items.length > 0,
+      isPartial,
       totalDiscovered: this.dedupeCache.size,
       totalAvailable: this.getTotalAvailable('animes', genre)
     };

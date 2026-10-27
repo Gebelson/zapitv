@@ -14,6 +14,7 @@ import { StremioStream } from '../stremio/stremioTypes';
 import { CanonicalMediaIdentity, canonicalIdentityService } from './canonicalIdentity';
 import { streamQuarantineService } from '../security/streamQuarantineService';
 import { ContentType } from '../../../types';
+import { sanitizePlaybackReason } from '../tracking/mediaLoadingTracker';
 
 export type SourceConfidence = 'VERIFIED' | 'PROVISIONAL' | 'SUSPICIOUS' | 'REJECTED' | 'QUARANTINED';
 
@@ -109,12 +110,12 @@ export class SourceConfidenceEngine {
       episode: identity.episode,
       providerId: stream.providerId,
       providerName: stream.providerName,
-      streamTitle: stream.title || stream.name,
-      streamUrl: stream.url,
-      declaredTitle,
+      streamTitle: sanitizePlaybackReason(stream.title || stream.name),
+      streamUrl: stream.url ? '[redacted-url]' : undefined,
+      declaredTitle: sanitizePlaybackReason(declaredTitle),
       isMatch: result.isMatch,
       confidence: result.confidence,
-      reasons: result.reasons
+      reasons: result.reasons.map(reason => sanitizePlaybackReason(reason) || '')
     };
 
     this.diagnosticHistory.unshift(record);
@@ -123,7 +124,7 @@ export class SourceConfidenceEngine {
     }
 
     if (!result.isMatch) {
-      console.warn(`[IdentityValidator] ❌ Fonte rejeitada para "${identity.title}" (${identity.type}${identity.year ? ' ' + identity.year : ''}): ${result.reasons.join(' • ')} [stream: ${stream.title || stream.name || stream.url}]`);
+      console.warn('[IdentityValidator]', sanitizePlaybackReason(`Fonte rejeitada para "${identity.title}" (${identity.type}): ${result.reasons.join(' • ')} [stream: ${stream.title || stream.name || 'unnamed source'}]`));
     }
   }
 
@@ -203,7 +204,7 @@ export class SourceConfidenceEngine {
       return evalResult;
     }
 
-    const episodeTag = streamTitle.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b|(\d{1,2})[ªa]?\s*temporada\s*(?:epis[oó]dio|ep)\s*(\d{1,3})\b|(?:temporada|season)\s*(\d{1,2})\s*(?:epis[oó]dio|ep|episode)\s*(\d{1,3})\b|\b(\d{1,2})x(\d{1,3})\b)/i);
+    const episodeTag = `${streamTitle} ${streamName}`.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b|(\d{1,2})[ªa]?\s*temporada\s*(?:epis[oó]dio|ep)\s*(\d{1,3})\b|(?:temporada|season)\s*(\d{1,2})\s*(?:epis[oó]dio|ep|episode)\s*(\d{1,3})\b|\b(\d{1,2})x(\d{1,3})\b)/i);
     const parsedSeason = episodeTag ? Number(episodeTag[1] || episodeTag[3] || episodeTag[5] || episodeTag[7] || episodeTag[9]) : undefined;
     const parsedEpisode = episodeTag ? Number(episodeTag[2] || episodeTag[4] || episodeTag[6] || episodeTag[8] || episodeTag[10]) : undefined;
 
@@ -213,7 +214,7 @@ export class SourceConfidenceEngine {
       this.recordDiagnostic(stream, identity, evalResult);
       return evalResult;
     }
-    if (episodeTag && identity.season && identity.episode &&
+    if (episodeTag && identity.season !== undefined && identity.episode !== undefined &&
         (parsedSeason !== identity.season || parsedEpisode !== identity.episode)) {
       reasons.push('Temporada ou episódio diferente do solicitado');
       const evalResult: StreamConfidenceEvaluation = { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };

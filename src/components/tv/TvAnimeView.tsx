@@ -14,6 +14,7 @@ interface TvAnimeViewProps {
   onPlayItem: (item: ContentItem) => void;
   suspended?: boolean;
   upFocusKey?: string;
+  onLoadMore?: () => void;
 }
 
 export const TvAnimeView: React.FC<TvAnimeViewProps> = memo(({
@@ -22,7 +23,8 @@ export const TvAnimeView: React.FC<TvAnimeViewProps> = memo(({
   onSelectItem,
   onPlayItem,
   suspended = false,
-  upFocusKey
+  upFocusKey,
+  onLoadMore
 }) => {
   // Unifica e valida todos os animes elegíveis disponíveis no catálogo da ZapiTV
   const availableAnimes = useMemo(() => {
@@ -37,6 +39,10 @@ export const TvAnimeView: React.FC<TvAnimeViewProps> = memo(({
   const editorialCategories = useMemo(() => {
     return animeEditorialService.getEditorialCategories(availableAnimes);
   }, [availableAnimes]);
+  const hasUnlistedItems = useMemo(() => {
+    const listed = new Set(editorialCategories.flatMap(category => category.items.map(item => item.id)));
+    return availableAnimes.some(item => !listed.has(item.id));
+  }, [availableAnimes, editorialCategories]);
 
   // Destaques principais para o Hero Banner automático (top 6 títulos da curadoria)
   const heroSlides = useMemo(() => {
@@ -53,7 +59,7 @@ export const TvAnimeView: React.FC<TvAnimeViewProps> = memo(({
 
   const firstRowKey = editorialCategories.length > 0
     ? `row-${editorialCategories[0].id}`
-    : 'row-anime-popular';
+    : 'row-anime-all-fallback';
 
   const handleHeroDownPress = useCallback(() => {
     setFocus(firstRowKey);
@@ -136,18 +142,20 @@ export const TvAnimeView: React.FC<TvAnimeViewProps> = memo(({
             title={category.title}
             rowId={category.id}
             items={category.items}
+            onNearEnd={onLoadMore}
             onItemClick={onSelectItem}
             onRowUp={idx === 0 ? handleFirstRowUpPress : undefined}
           />
         ))}
 
-        {editorialCategories.length === 0 && availableAnimes.length > 0 && (
+        {(editorialCategories.length === 0 || hasUnlistedItems) && availableAnimes.length > 0 && (
           <TvContentRow
             title="Todos os Animes Populares"
             rowId="anime-all-fallback"
             items={availableAnimes}
+            onNearEnd={onLoadMore}
             onItemClick={onSelectItem}
-            onRowUp={handleFirstRowUpPress}
+            onRowUp={editorialCategories.length === 0 ? handleFirstRowUpPress : undefined}
           />
         )}
       </div>

@@ -94,17 +94,8 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
           return;
         }
 
-        // Pré-carrega a imagem na memória antes de iniciar a transição
-        await new Promise<void>((resolve) => {
-          const img = new Image();
-          img.src = nextImageUrl;
-          if (img.complete) {
-            resolve();
-          } else {
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
-          }
-        });
+        // Reuse bounded, abortable loading; do not start an untracked second Image request.
+        await heroImageService.validateAndPreloadImage(nextImageUrl, 4500, controller.signal);
 
         if (!isMounted || controller.signal.aborted || currentGen !== generationRef.current) {
           return;
@@ -235,7 +226,9 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
             const candidates = heroImageService.getCandidateUrls(displayedSlide.item);
             const nextCand = candidates.find(u => u !== currentDisplayImage && !heroImageService.isUrlFailed(u));
             const fallbackUrl = nextCand || ZAPITV_HERO_FALLBACK_IMAGE;
-            setDisplayedSlide(prev => (prev ? { ...prev, imageUrl: fallbackUrl } : null));
+            setDisplayedSlide(prev => prev && prev.generation === displayedSlide.generation &&
+              prev.item.id === displayedSlide.item.id && prev.imageUrl === currentDisplayImage
+              ? { ...prev, imageUrl: fallbackUrl } : prev);
           }}
         />
 
