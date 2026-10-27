@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { FeatureErrorBoundary } from './src/components/common/FeatureErrorBoundary';
 import { initializeDatabase, db as localDb } from './db';
+import { storageService } from './src/core/storage/storageService';
 import './index.css';
 
 let bootstrapPromise: Promise<any> | null = null;
@@ -12,7 +13,7 @@ const ENRICHED_MOVIES_SYNC_KEY = 'zapitv_enriched_sync_v6';
 
 async function loadInitialState() {
       // 1. Executa inicialização da base e leitura de configurações em paralelo
-      const [baseContent, localCustomSections, kvEntries] = await Promise.all([
+      const [baseContent, localCustomSections, kvEntries, localLists] = await Promise.all([
         initializeDatabase(),
         localDb.customSections.toArray(),
         localDb.keyValueStore.bulkGet([
@@ -22,7 +23,8 @@ async function loadInitialState() {
           'zapitv_local_mylist',
           'zapitv_section_titles',
           'zapitv_section_titles_manual_v1'
-        ])
+        ]),
+        Promise.all([storageService.getFavorites(), storageService.getMyList()])
       ]);
 
       let localContent = baseContent;
@@ -47,8 +49,7 @@ async function loadInitialState() {
       }
 
       const theme = kvEntries[0] ? kvEntries[0].value : true;
-      const savedFavs = kvEntries[2]?.value || [];
-      const savedList = kvEntries[3]?.value || [];
+      const [savedFavs, savedList] = localLists;
 
       const defaultProfile = {
         id: 'p1',

@@ -708,8 +708,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     // 1. Hidratação local imediata de Continuar Assistindo e Favoritos
     Promise.allSettled([
       storageService.getContinueWatching(),
-      storageService.getFavorites()
-    ]).then(([progressRes, favsRes]) => {
+      storageService.getFavorites(),
+      storageService.getMyList()
+    ]).then(([progressRes, favsRes, myListRes]) => {
       if (!isMounted) return;
       if (progressRes.status === 'fulfilled') {
         setContinueWatchingList(progressRes.value);
@@ -717,9 +718,10 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         const favItems = contentRef.current.filter(c => favs.includes(c.id));
         userPreferenceStore.seedFromExistingContinuity(activeProfile?.id || 'default', progressRes.value, favItems);
       }
-      if (favsRes.status === 'fulfilled' && favsRes.value.length > 0) {
+      if (favsRes.status === 'fulfilled') {
         setFavorites(favsRes.value);
       }
+      if (myListRes.status === 'fulfilled') setMyList(myListRes.value);
     });
 
     // 2. Descoberta online em segundo plano após o primeiro paint (não bloqueia a TV nem a Home)
@@ -1400,6 +1402,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             unsubscribes.push(onSnapshot(doc(firestoreDb, 'keyValueStore', `zapitv_mylist_${currentUser.id}`), (doc) => {
               if (doc.exists() && Array.isArray(doc.data().value)) {
                 const incoming = doc.data().value as string[];
+                void storageService.saveMyList(incoming);
                 setMyList(prev => {
                   if (prev.length === incoming.length && prev.every((id, idx) => id === incoming[idx])) {
                     return prev;
@@ -1417,6 +1420,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             unsubscribes.push(onSnapshot(doc(firestoreDb, 'keyValueStore', `zapitv_favorites_${currentUser.id}`), (doc) => {
               if (doc.exists() && Array.isArray(doc.data().value)) {
                 const incoming = doc.data().value as string[];
+                void storageService.saveFavorites(incoming);
                 setFavorites(prev => {
                   if (prev.length === incoming.length && prev.every((id, idx) => id === incoming[idx])) {
                     return prev;
@@ -2034,8 +2038,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const toggleMyListById = useCallback(async (id: string) => {
     if (!currentUser) return;
     uiSoundService.prime();
-    const isAdding = !myList.includes(id);
-    const newList = isAdding ? [...myList, id] : myList.filter(i => i !== id);
+    const newList = await storageService.toggleMyList(id);
+    const isAdding = newList.includes(id);
     setMyList(newList);
 
     const target = content.find(i => i.id === id);
@@ -2062,8 +2066,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   const toggleFavoriteById = useCallback(async (id: string) => {
     if (!currentUser) return;
-    const isAdding = !favorites.includes(id);
-    const newFavorites = isAdding ? [...favorites, id] : favorites.filter(i => i !== id);
+    const newFavorites = await storageService.toggleFavorite(id);
+    const isAdding = newFavorites.includes(id);
     setFavorites(newFavorites);
 
     const target = content.find(i => i.id === id);

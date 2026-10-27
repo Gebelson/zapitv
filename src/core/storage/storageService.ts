@@ -1,4 +1,3 @@
-import { db } from '../../../db';
 import { ContentItem, ContentType } from '../../../types';
 import { theatricalFilterService } from '../catalog/theatricalFilterService';
 import { userPreferenceStore } from '../recommendations/userPreferenceStore';
@@ -8,26 +7,9 @@ import { hybridRecommendationEngine } from '../recommendations/hybridRecommendat
 import { bannedContentRegistry } from '../catalog/BannedContentRegistry';
 import { searchService } from '../search/searchService';
 
-export interface WatchProgress {
-  contentId: string;
-  item: ContentItem;
-  season?: number;
-  episode?: number;
-  currentTime: number;
-  duration: number;
-  percentage: number;
-  updatedAt: string;
-}
-
-export interface EpisodeWatchProgress {
-  contentId: string;
-  season: number;
-  episode: number;
-  currentTime: number;
-  duration: number;
-  percentage: number;
-  updatedAt: string;
-}
+import { LocalDataStore, localDataStore } from './localDataStore';
+import { WatchProgress, EpisodeWatchProgress, WatchState, watchStateCodec, contentKey, sameContent, episodeKey, normalizeProgress, normalizeEpisode, normalizeWatchState, mergeWatchStates, listCodec, normalizeIds } from './watchState';
+export type { WatchProgress, EpisodeWatchProgress } from './watchState';
 
 export interface PlaybackContinuityInfo {
   hasStarted: boolean;
@@ -56,61 +38,30 @@ export function formatPlaybackTime(seconds: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-class StorageService {
-  private readonly FAVORITES_KEY = 'zapitv_local_favorites';
-  private readonly HISTORY_KEY = 'zapitv_local_history';
-  private readonly PROGRESS_KEY = 'zapitv_local_progress';
-  private readonly EPISODE_PROGRESS_KEY = 'zapitv_episode_progress';
-  private readonly SETTINGS_KEY = 'zapitv_local_settings';
+export class StorageService {
+  private itemProgressCache = new Map<string, WatchProgress>();
+  private episodeProgressCache = new Map<string, EpisodeWatchProgress>();
+  private ready: Promise<void>;
 
-  private itemProgressCache: Map<string, WatchProgress> = new Map();
-  private episodeProgressCache: Map<string, EpisodeWatchProgress> = new Map();
-
-  constructor() {
-    this.initSyncCaches();
+  constructor(private dataStore: LocalDataStore = localDataStore) {
+    this.applyWatchState(this.dataStore.readSync(watchStateCodec));
+    this.ready = this.syncFromDb();
   }
 
-  private initSyncCaches(): void {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const itemData = localStorage.getItem(this.PROGRESS_KEY);
-        if (itemData) {
-          const list: WatchProgress[] = JSON.parse(itemData);
-          if (Array.isArray(list)) {
-            list.forEach(p => {
-              if (p?.contentId) this.itemProgressCache.set(p.contentId, p);
-            });
-          }
-        }
-
-        const epData = localStorage.getItem(this.EPISODE_PROGRESS_KEY);
-        if (epData) {
-          const map: Record<string, EpisodeWatchProgress> = JSON.parse(epData);
-          if (map && typeof map === 'object') {
-            Object.entries(map).forEach(([key, val]) => {
-              if (val) this.episodeProgressCache.set(key, val);
-            });
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Erro ao carregar cache de progresso local:', e);
-    }
-
-    // Sync from IndexedDB in background
-    this.syncFromDb().catch(() => {});
-    this.purgeBannedItemsFromStorage();
+  private applyWatchState(state: WatchState): void {
+    this.itemProgressCache = new Map(state.items.map(p => [contentKey(p.item), p]));
+    this.episodeProgressCache = new Map(Object.entries(state.episodes));
   }
 
   public purgeBannedItemsFromStorage(): void {
     if (typeof window === 'undefined' || !window.localStorage) return;
     try {
       // 1. Purga itens de progresso em memória
-      for (const [key] of this.itemProgressCache.entries()) {
-        if (bannedContentRegistry.isBannedKeyOrId(key)) this.itemProgressCache.delete(key);
+      for (const [key, progress] of this.itemProgressCache.entries()) {
+        if (bannedContentRegistry.isBannedKeyOrId(progress.contentId)) this.itemProgressCache.delete(key);
       }
-      for (const [key] of this.episodeProgressCache.entries()) {
-        if (bannedContentRegistry.isBannedKeyOrId(key)) this.episodeProgressCache.delete(key);
+      for (const [key, progress] of this.episodeProgressCache.entries()) {
+        if (bannedContentRegistry.isBannedKeyOrId(progress.contentId)) this.episodeProgressCache.delete(key);
       }
 
       // 2. Limpa registros globais no localStorage via registro centralizado
@@ -119,21 +70,7 @@ class StorageService {
   }
 
   public async syncFromDb(): Promise<void> {
-    try {
-      const row = await db.keyValueStore.get(this.PROGRESS_KEY);
-      if (row && Array.isArray(row.value)) {
-        row.value.forEach((p: WatchProgress) => {
-          if (p?.contentId) this.itemProgressCache.set(p.contentId, p);
-        });
-      }
-
-      const epRow = await db.keyValueStore.get(this.EPISODE_PROGRESS_KEY);
-      if (epRow && epRow.value && typeof epRow.value === 'object') {
-        Object.entries(epRow.value).forEach(([key, val]) => {
-          this.episodeProgressCache.set(key, val as EpisodeWatchProgress);
-        });
-      }
-    } catch {}
+    this.applyWatchState(await this.dataStore.read(watchStateCodec));
   }
 
   public getEpisodeKey(contentId: string, season: number, episode: number): string {
@@ -170,6 +107,7 @@ class StorageService {
       if (itemOrId.imdbId) {
         keys.add(itemOrId.imdbId.trim());
       }
+      if (itemOrId.canonicalId) keys.add(itemOrId.canonicalId);
       if (itemOrId.tmdbId) {
         const rawTmdb = String(itemOrId.tmdbId).trim();
         keys.add(rawTmdb);
@@ -183,51 +121,34 @@ class StorageService {
    * Resolve canonicamente o registro de progresso geral do item
    */
   public resolveWatchProgress(itemOrId: string | ContentItem): WatchProgress | null {
-    const candidateKeys = this.getCandidateKeys(itemOrId);
-    for (const k of candidateKeys) {
-      const found = this.itemProgressCache.get(k);
-      if (found) return found;
-    }
-
-    const targetTitle = typeof itemOrId === 'object' && itemOrId?.title ? itemOrId.title.trim().toLowerCase() : '';
-    for (const p of this.itemProgressCache.values()) {
-      if (candidateKeys.includes(p.contentId)) return p;
-      if (p.item) {
-        const itemKeys = this.getCandidateKeys(p.item);
-        if (candidateKeys.some(ck => itemKeys.includes(ck))) return p;
-        if (targetTitle && p.item.title && p.item.title.trim().toLowerCase() === targetTitle) {
-          return p;
-        }
-      }
-    }
-    return null;
+    const candidates = [...this.itemProgressCache.values()].filter(p => {
+      if (typeof itemOrId === 'object') return sameContent(p.item, itemOrId);
+      const keys = this.getCandidateKeys(itemOrId);
+      return keys.includes(p.contentId) || this.getCandidateKeys(p.item).some(key => keys.includes(key));
+    });
+    // A string without a media type can be ambiguous (TMDB movie and TV IDs overlap).
+    return candidates.length === 1 ? candidates[0] : null;
   }
 
-  /**
-   * Resolve canonicamente o progresso de um episódio específico
-   */
   public resolveEpisodeWatchProgress(
-    itemOrId: string | ContentItem, 
-    season: number, 
+    itemOrId: string | ContentItem,
+    season: number,
     episode: number
   ): EpisodeWatchProgress | null {
-    const candidateKeys = this.getCandidateKeys(itemOrId);
-    for (const k of candidateKeys) {
-      const epKey = this.getEpisodeKey(k, season, episode);
-      const found = this.episodeProgressCache.get(epKey);
+    if (typeof itemOrId === 'object' && (itemOrId.type === ContentType.MOVIE || itemOrId.mediaFormat === 'movie')) return null;
+    const parent = this.resolveWatchProgress(itemOrId);
+    const ids = this.getCandidateKeys(itemOrId);
+    if (!parent && typeof itemOrId === 'string' && [...this.itemProgressCache.values()].some(p =>
+      ids.includes(p.contentId) || this.getCandidateKeys(p.item).some(id => ids.includes(id)))) return null;
+    const key = parent ? contentKey(parent.item) : typeof itemOrId === 'object' ? contentKey(itemOrId) : undefined;
+    if (key) {
+      const found = this.episodeProgressCache.get(episodeKey(key, season, episode));
       if (found) return found;
     }
-
-    const suffix = `_s${season}_e${episode}`;
-    for (const [key, val] of this.episodeProgressCache.entries()) {
-      if (key.endsWith(suffix)) {
-        const prefix = key.slice(0, -suffix.length);
-        if (candidateKeys.includes(prefix)) {
-          return val;
-        }
-      }
-    }
-    return null;
+    const candidates = [...this.episodeProgressCache.values()].filter(p =>
+      p.season === season && p.episode === episode && ids.includes(p.contentId) &&
+      (p.contentKey ? p.contentKey === key : typeof itemOrId === 'string' && !key));
+    return candidates.length === 1 ? candidates[0] : null;
   }
 
   /**
@@ -240,7 +161,7 @@ class StorageService {
   ): PlaybackContinuityInfo {
     const savedProg = this.resolveWatchProgress(itemOrId);
     const isEpisodic = typeof itemOrId === 'object' 
-      ? (itemOrId.type === ContentType.SERIES || itemOrId.type === ContentType.ANIME || Boolean(itemOrId.seasonsCount && itemOrId.seasonsCount > 0))
+      ? itemOrId.mediaFormat !== 'movie' && (itemOrId.type === ContentType.SERIES || itemOrId.type === ContentType.ANIME || Boolean(itemOrId.seasonsCount && itemOrId.seasonsCount > 0))
       : Boolean(savedProg?.season !== undefined || savedProg?.episode !== undefined);
 
     if (!savedProg || (!savedProg.currentTime && !savedProg.percentage)) {
@@ -379,102 +300,72 @@ class StorageService {
     return this.resolveEpisodeWatchProgress(contentId, season, episode);
   }
 
-  public async getFavorites(): Promise<string[]> {
-    try {
-      const row = await db.keyValueStore.get(this.FAVORITES_KEY);
-      return row ? row.value : [];
-    } catch {
-      const saved = localStorage.getItem(this.FAVORITES_KEY);
-      return saved ? JSON.parse(saved) : [];
-    }
+  public getFavorites(): Promise<string[]> {
+    return this.dataStore.read(listCodec('favorites'));
   }
 
   public async saveFavorites(favorites: string[]): Promise<void> {
-    try {
-      await db.keyValueStore.put({ key: this.FAVORITES_KEY, value: favorites });
-    } catch {
-      localStorage.setItem(this.FAVORITES_KEY, JSON.stringify(favorites));
-    }
+    await this.dataStore.update(listCodec('favorites'), () => normalizeIds(favorites));
     recommendationEngine.invalidateCache();
     hybridRecommendationEngine.invalidateCache();
   }
 
   public async toggleFavorite(id: string): Promise<string[]> {
-    const list = await this.getFavorites();
-    const next = list.includes(id) ? list.filter(item => item !== id) : [...list, id];
-    await this.saveFavorites(next);
+    const next = await this.dataStore.update(listCodec('favorites'), list =>
+      list.includes(id) ? list.filter(value => value !== id) : [...list, id]);
+    recommendationEngine.invalidateCache();
+    hybridRecommendationEngine.invalidateCache();
     return next;
   }
 
-  public async getContinueWatching(): Promise<WatchProgress[]> {
-    try {
-      const row = await db.keyValueStore.get(this.PROGRESS_KEY);
-      if (row && Array.isArray(row.value)) return row.value;
-    } catch {}
-    
-    try {
-      const saved = localStorage.getItem(this.PROGRESS_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {}
+  public getMyList(): Promise<string[]> {
+    return this.dataStore.read(listCodec('mylist'));
+  }
 
-    return Array.from(this.itemProgressCache.values());
+  public async saveMyList(ids: string[]): Promise<void> {
+    await this.dataStore.update(listCodec('mylist'), () => normalizeIds(ids));
+  }
+
+  public toggleMyList(id: string): Promise<string[]> {
+    return this.dataStore.update(listCodec('mylist'), list =>
+      list.includes(id) ? list.filter(value => value !== id) : [...list, id]);
+  }
+
+  public async getContinueWatching(): Promise<WatchProgress[]> {
+    await this.ready;
+    await this.syncFromDb();
+    return [...this.itemProgressCache.values()];
   }
 
   public async saveProgress(progress: WatchProgress): Promise<void> {
-    // 1. Calcula porcentagem normalizada (se assistiu >= 92% marca 100% como concluído)
-    const rawPct = progress.duration > 0 ? (progress.currentTime / progress.duration) * 100 : 0;
-    const percentage = rawPct >= 92 ? 100 : Math.max(1, Math.round(rawPct));
-    const normalizedProgress: WatchProgress = {
-      ...progress,
-      percentage
-    };
-
-    // 2. Atualiza cache em memória
-    this.itemProgressCache.set(normalizedProgress.contentId, normalizedProgress);
-
-    // 3. Atualiza lista de continuar assistindo
-    const list = await this.getContinueWatching();
-    const existingIndex = list.findIndex(p => p.contentId === normalizedProgress.contentId);
-    
-    let next: WatchProgress[];
-    if (existingIndex !== -1) {
-      next = [...list];
-      next[existingIndex] = normalizedProgress;
-    } else {
-      next = [normalizedProgress, ...list];
-    }
-    next = next.slice(0, 30);
-
-    try {
-      localStorage.setItem(this.PROGRESS_KEY, JSON.stringify(next));
-      await db.keyValueStore.put({ key: this.PROGRESS_KEY, value: next });
-    } catch {
-      try {
-        localStorage.setItem(this.PROGRESS_KEY, JSON.stringify(next));
-      } catch {}
-    }
-
-    // 4. Se for série/anime com temporada e episódio, salva progresso por episódio
-    if (normalizedProgress.season !== undefined && normalizedProgress.episode !== undefined) {
-      const epKey = this.getEpisodeKey(normalizedProgress.contentId, normalizedProgress.season, normalizedProgress.episode);
-      const epRecord: EpisodeWatchProgress = {
-        contentId: normalizedProgress.contentId,
-        season: normalizedProgress.season,
-        episode: normalizedProgress.episode,
-        currentTime: normalizedProgress.currentTime,
-        duration: normalizedProgress.duration,
-        percentage,
-        updatedAt: normalizedProgress.updatedAt
-      };
-      this.episodeProgressCache.set(epKey, epRecord);
-
-      try {
-        const epMapObj: Record<string, EpisodeWatchProgress> = {};
-        this.episodeProgressCache.forEach((v, k) => { epMapObj[k] = v; });
-        localStorage.setItem(this.EPISODE_PROGRESS_KEY, JSON.stringify(epMapObj));
-        await db.keyValueStore.put({ key: this.EPISODE_PROGRESS_KEY, value: epMapObj });
-      } catch {}
-    }
+    const normalizedProgress = normalizeProgress(progress);
+    if (!normalizedProgress) return;
+    await this.ready;
+    const state = await this.dataStore.update(watchStateCodec, current => {
+      const existing = current.items.find(p => sameContent(p.item, normalizedProgress.item));
+      const episodes = { ...current.episodes };
+      let episodeChanged = false;
+      if (normalizedProgress.season !== undefined && normalizedProgress.episode !== undefined) {
+        const { item, ...episode } = normalizedProgress;
+        const key = episodeKey(contentKey(item), normalizedProgress.season, normalizedProgress.episode);
+        if (!episodes[key] || Date.parse(episodes[key].updatedAt) < Date.parse(episode.updatedAt)) {
+          episodes[key] = { ...episode, season: normalizedProgress.season, episode: normalizedProgress.episode, contentKey: contentKey(item) };
+          episodeChanged = true;
+        }
+      }
+      if (existing && Date.parse(existing.updatedAt) > Date.parse(normalizedProgress.updatedAt)) {
+        return episodeChanged ? mergeWatchStates({ items: current.items, episodes }) : current;
+      }
+      if (existing && existing.updatedAt === normalizedProgress.updatedAt && existing.currentTime === normalizedProgress.currentTime &&
+        existing.duration === normalizedProgress.duration && !episodeChanged) return current;
+      const items = [...current.items];
+      const index = existing ? items.indexOf(existing) : -1;
+      if (index >= 0) items[index] = normalizedProgress;
+      else items.unshift(normalizedProgress);
+      return mergeWatchStates({ items, episodes }, { items: existing ? [existing] : [], episodes: {} });
+    });
+    this.applyWatchState(state);
+    const percentage = normalizedProgress.percentage;
 
     // 5. Emite evento global para atualizar miniaturas e cards instantaneamente sem recarregar a tela
     if (typeof window !== 'undefined') {
@@ -507,87 +398,71 @@ class StorageService {
   }
 
   public async getProgress(contentId: string): Promise<WatchProgress | null> {
-    const inMem = this.itemProgressCache.get(contentId);
-    if (inMem) return inMem;
-    const list = await this.getContinueWatching();
-    return list.find(p => p.contentId === contentId) || null;
+    await this.ready;
+    return this.resolveWatchProgress(contentId);
   }
 
-  public async deleteProgress(contentId: string): Promise<void> {
-    this.itemProgressCache.delete(contentId);
-    const list = await this.getContinueWatching();
-    const next = list.filter(p => p.contentId !== contentId);
-    try {
-      localStorage.setItem(this.PROGRESS_KEY, JSON.stringify(next));
-      await db.keyValueStore.put({ key: this.PROGRESS_KEY, value: next });
-    } catch {
-      try {
-        localStorage.setItem(this.PROGRESS_KEY, JSON.stringify(next));
-      } catch {}
-    }
+  public async deleteProgress(itemOrId: string | ContentItem): Promise<void> {
+    await this.ready;
+    const state = await this.dataStore.update(watchStateCodec, current => {
+      const matches = current.items.filter(p => typeof itemOrId === 'object' ? sameContent(p.item, itemOrId) : p.contentId === itemOrId);
+      if (matches.length !== 1) return current;
+      const target = matches[0];
+      const unambiguousId = current.items.filter(p => p.contentId === target.contentId).length === 1;
+      return {
+        items: current.items.filter(p => p !== target),
+        episodes: Object.fromEntries(Object.entries(current.episodes).filter(([, p]) =>
+          p.contentKey ? p.contentKey !== contentKey(target.item) : !unambiguousId || p.contentId !== target.contentId))
+      };
+    });
+    this.applyWatchState(state);
   }
 
   public async clearAllProgress(): Promise<void> {
-    this.itemProgressCache.clear();
-    this.episodeProgressCache.clear();
-    try {
-      localStorage.removeItem(this.PROGRESS_KEY);
-      localStorage.removeItem(this.EPISODE_PROGRESS_KEY);
-      await db.keyValueStore.delete(this.PROGRESS_KEY);
-      await db.keyValueStore.delete(this.EPISODE_PROGRESS_KEY);
-    } catch {
-      try {
-        localStorage.removeItem(this.PROGRESS_KEY);
-        localStorage.removeItem(this.EPISODE_PROGRESS_KEY);
-      } catch {}
-    }
+    await this.ready;
+    this.applyWatchState(await this.dataStore.update(watchStateCodec, () => ({ items: [], episodes: {} })));
+    await this.dataStore.removeLegacy(watchStateCodec);
   }
 
   public async exportDataAsJson(): Promise<string> {
-    const favorites = await this.getFavorites();
-    const progress = await this.getContinueWatching();
-    const epMapObj: Record<string, EpisodeWatchProgress> = {};
-    this.episodeProgressCache.forEach((v, k) => { epMapObj[k] = v; });
-    const providers = localStorage.getItem('zapitv_providers_config');
-
+    await this.getContinueWatching();
+    let providers: unknown[] = [];
+    try {
+      const saved = JSON.parse(localStorage.getItem('zapitv_providers_config') || '[]');
+      if (Array.isArray(saved)) providers = saved;
+    } catch {}
     const data = {
-      version: "1.1",
-      exportDate: new Date().toISOString(),
-      favorites,
-      progress,
-      episodeProgress: epMapObj,
-      providers: providers ? JSON.parse(providers) : []
+      version: '2.0', exportDate: new Date().toISOString(),
+      favorites: await this.getFavorites(), myList: await this.getMyList(),
+      progress: [...this.itemProgressCache.values()],
+      episodeProgress: Object.fromEntries(this.episodeProgressCache), providers
     };
-
     return JSON.stringify(data, null, 2);
   }
 
   public async importDataFromJson(jsonString: string): Promise<boolean> {
     try {
       const data = JSON.parse(jsonString);
-      if (Array.isArray(data.favorites)) {
-        await this.saveFavorites(data.favorites);
+      if (!data || typeof data !== 'object' || Array.isArray(data) ||
+        !['progress', 'episodeProgress', 'favorites', 'myList', 'providers'].some(key => key in data) ||
+        (data.version !== undefined && !['1.0', '1.1', '2.0'].includes(String(data.version))) ||
+        (data.episodeProgress !== undefined && (!data.episodeProgress || typeof data.episodeProgress !== 'object' || Array.isArray(data.episodeProgress))) ||
+        (data.episodeProgress && Object.values(data.episodeProgress).some(p => !normalizeEpisode(p))) ||
+        (data.progress !== undefined && (!Array.isArray(data.progress) || data.progress.some((p: unknown) => !normalizeProgress(p)))) ||
+        (data.favorites !== undefined && (!Array.isArray(data.favorites) || data.favorites.some((id: unknown) => typeof id !== 'string'))) ||
+        (data.myList !== undefined && (!Array.isArray(data.myList) || data.myList.some((id: unknown) => typeof id !== 'string')))) return false;
+      await this.ready;
+      if (data.progress || data.episodeProgress) {
+        const imported = normalizeWatchState({ items: data.progress, episodes: data.episodeProgress });
+        this.applyWatchState(await this.dataStore.update(watchStateCodec, current => mergeWatchStates(current, imported)));
       }
-      if (Array.isArray(data.progress)) {
-        await db.keyValueStore.put({ key: this.PROGRESS_KEY, value: data.progress });
-        localStorage.setItem(this.PROGRESS_KEY, JSON.stringify(data.progress));
-        data.progress.forEach((p: WatchProgress) => {
-          if (p?.contentId) this.itemProgressCache.set(p.contentId, p);
-        });
-      }
-      if (data.episodeProgress && typeof data.episodeProgress === 'object') {
-        await db.keyValueStore.put({ key: this.EPISODE_PROGRESS_KEY, value: data.episodeProgress });
-        localStorage.setItem(this.EPISODE_PROGRESS_KEY, JSON.stringify(data.episodeProgress));
-        Object.entries(data.episodeProgress).forEach(([key, val]) => {
-          this.episodeProgressCache.set(key, val as EpisodeWatchProgress);
-        });
-      }
+      if (data.favorites) await this.dataStore.update(listCodec('favorites'), list => normalizeIds([...list, ...data.favorites]));
+      if (data.myList) await this.dataStore.update(listCodec('mylist'), list => normalizeIds([...list, ...data.myList]));
       if (Array.isArray(data.providers)) {
-        localStorage.setItem('zapitv_providers_config', JSON.stringify(data.providers));
+        try { localStorage.setItem('zapitv_providers_config', JSON.stringify(data.providers)); } catch { return false; }
       }
       return true;
-    } catch (e) {
-      console.error("Erro ao importar JSON:", e);
+    } catch {
       return false;
     }
   }

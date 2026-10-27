@@ -35,6 +35,8 @@ const COMMON_THEMES = [
 export class UserPreferenceStore {
   private inMemoryProfiles: Map<string, UserPreferenceProfile> = new Map();
   private interactionHistory: Map<string, UserInteraction[]> = new Map();
+  private hydratedProfiles = new Set<string>();
+  private checkedDatabase = new Set<string>();
   private readonly STORAGE_PREFIX = 'zapitv_user_prefs_';
   private readonly INTERACTIONS_PREFIX = 'zapitv_user_interactions_';
 
@@ -55,7 +57,7 @@ export class UserPreferenceStore {
    * Carrega perfil síncrono inicial do localStorage para evitar atrasos na primeira renderização.
    */
   private hydrateFromLocalSync(): void {
-    if (typeof window === 'undefined' || !window.localStorage) return;
+    if (typeof window === 'undefined') return;
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -63,9 +65,11 @@ export class UserPreferenceStore {
           const profileId = key.replace(this.STORAGE_PREFIX, '');
           const raw = localStorage.getItem(key);
           if (raw) {
-            const parsed = JSON.parse(raw);
-            if (parsed && typeof parsed === 'object') {
+            let parsed: unknown;
+            try { parsed = JSON.parse(raw); } catch { continue; }
+            if (this.isStoredProfile(parsed, profileId)) {
               this.inMemoryProfiles.set(profileId, parsed);
+              this.hydratedProfiles.add(profileId);
             }
           }
         }
@@ -73,6 +77,15 @@ export class UserPreferenceStore {
     } catch (e) {
       console.warn('Erro ao hidratar preferências locais do ZapiTV:', e);
     }
+  }
+
+  private isStoredProfile(value: unknown, profileId: string): value is UserPreferenceProfile {
+    const p = value as UserPreferenceProfile | null;
+    return !!p && p.profileId === profileId && Number.isFinite(p.lastUpdated) &&
+      Number.isFinite(p.interactionCount) && Array.isArray(p.watchedContentIds) &&
+      Array.isArray(p.completedContentIds) && Array.isArray(p.favoriteContentIds) &&
+      ['genreAffinities', 'themeAffinities', 'directorAffinities', 'castAffinities', 'typeAffinities']
+        .every(key => !!(p as unknown as Record<string, unknown>)[key] && typeof (p as unknown as Record<string, unknown>)[key] === 'object');
   }
 
   /**
@@ -107,12 +120,19 @@ export class UserPreferenceStore {
    * Garante tolerância a falhas e preserva os dados existentes sem exigir login.
    */
   public async persistProfile(profileId: string = 'default', profile?: UserPreferenceProfile): Promise<void> {
-    const targetProfile = profile || this.inMemoryProfiles.get(profileId) || this.getPreferencesSync(profileId);
+    let targetProfile = profile || this.inMemoryProfiles.get(profileId) || this.getPreferencesSync(profileId);
+    if (!this.hydratedProfiles.has(profileId) && !this.checkedDatabase.has(profileId) && targetProfile.interactionCount === 0) {
+      const isChild = targetProfile.isChild;
+      targetProfile = { ...await this.getPreferences(profileId), isChild };
+      this.inMemoryProfiles.set(profileId, targetProfile);
+    }
+    const storageKey = `${this.STORAGE_PREFIX}${profileId}`;
     try {
-      const storageKey = `${this.STORAGE_PREFIX}${profileId}`;
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.setItem(storageKey, JSON.stringify(targetProfile));
       }
+    } catch {}
+    try {
       await db.keyValueStore.put({ key: storageKey, value: targetProfile });
     } catch (e) {
       // Falha silenciosa e graciosa em ambientes sem IndexedDB ou storage bloqueado
@@ -135,15 +155,15 @@ export class UserPreferenceStore {
    * Obtém o perfil de preferências atualizado (IndexedDB + memória).
    */
   public async getPreferences(profileId: string = 'default'): Promise<UserPreferenceProfile> {
-    const mem = this.inMemoryProfiles.get(profileId);
-    if (mem && mem.interactionCount > 0) {
-      return mem;
-    }
-
+    if (this.checkedDatabase.has(profileId)) return this.getPreferencesSync(profileId);
     try {
       const dbRow = await db.keyValueStore.get(`${this.STORAGE_PREFIX}${profileId}`);
-      if (dbRow && dbRow.value) {
+      this.checkedDatabase.add(profileId);
+      const mem = this.inMemoryProfiles.get(profileId);
+      if (dbRow && this.isStoredProfile(dbRow.value, profileId) &&
+        (!mem || (!(this.hydratedProfiles.has(profileId) || mem.interactionCount > 0)) || dbRow.value.lastUpdated > mem.lastUpdated)) {
         this.inMemoryProfiles.set(profileId, dbRow.value);
+        this.hydratedProfiles.add(profileId);
         return dbRow.value;
       }
     } catch (e) {
@@ -422,6 +442,8 @@ export class UserPreferenceStore {
    */
   public async clearPreferences(profileId: string = 'default'): Promise<void> {
     this.inMemoryProfiles.delete(profileId);
+    this.hydratedProfiles.delete(profileId);
+    this.checkedDatabase.delete(profileId);
     this.interactionHistory.delete(profileId);
 
     const storageKey = `${this.STORAGE_PREFIX}${profileId}`;
@@ -429,6 +451,8 @@ export class UserPreferenceStore {
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.removeItem(storageKey);
       }
+    } catch {}
+    try {
       await db.keyValueStore.delete(storageKey);
     } catch (e) {
       // Ignorar
