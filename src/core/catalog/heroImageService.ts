@@ -2,7 +2,7 @@ import { ContentItem } from '../../../types';
 import { posterRecoveryService, isCorruptedPosterUrl } from './PosterRecoveryService';
 import { isValidHeroImageUrl } from './heroCarouselStore';
 
-export const ZAPITV_HERO_FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80';
+export const ZAPITV_HERO_FALLBACK_IMAGE = '/zapitv-logo-dark.png';
 
 export interface HeroImageResolutionResult {
   url: string;

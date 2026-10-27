@@ -1,8 +1,8 @@
-import React, { memo, useState } from 'react';
+import React, { memo, useState, useRef, useEffect, useCallback } from 'react';
 import { Star, Play } from 'lucide-react';
 import { ContentItem, ContentType } from '../../../types';
 import { storageService, PlaybackContinuityInfo } from '../../core/storage/storageService';
-import { posterRecoveryService } from '../../core/catalog/PosterRecoveryService';
+import { posterRecoveryService, isCorruptedPosterUrl } from '../../core/catalog/PosterRecoveryService';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 
 interface MobileCardProps {
@@ -22,10 +22,39 @@ export const MobileCard: React.FC<MobileCardProps> = memo(({
   variant = 'grid',
   className = ''
 }) => {
-  const [imgSrc, setImgSrc] = useState<string>(() => {
-    return posterRecoveryService.getCachedPoster(item) || item.image || item.backdrop || '';
-  });
-  const [hasError, setHasError] = useState(false);
+  const getInitialPoster = (targetItem: ContentItem): string => {
+    if (!targetItem) return '';
+    const cached = posterRecoveryService.getCachedPoster(targetItem);
+    if (cached && !isCorruptedPosterUrl(cached)) return cached;
+    const direct = targetItem.image || targetItem.poster || targetItem.backdrop || '';
+    if (direct && !isCorruptedPosterUrl(direct)) return direct;
+    return '';
+  };
+
+  const initialPoster = getInitialPoster(item);
+  const [prevItemId, setPrevItemId] = useState(item.id);
+  const [imgSrc, setImgSrc] = useState<string>(initialPoster);
+  const [hasError, setHasError] = useState<boolean>(!initialPoster);
+
+  const isMountedRef = useRef(true);
+  const currentItemIdRef = useRef(item.id);
+  currentItemIdRef.current = item.id;
+  const isRecoveringRef = useRef(false);
+  const generationRef = useRef(0);
+  const recoveryAttemptsRef = useRef(0);
+  const failedUrlsRef = useRef<Set<string>>(new Set());
+
+  // Sincronização síncrona no render na reciclagem ou troca de item
+  if (prevItemId !== item.id) {
+    setPrevItemId(item.id);
+    generationRef.current++;
+    recoveryAttemptsRef.current = 0;
+    failedUrlsRef.current.clear();
+    isRecoveringRef.current = false;
+    const nextPoster = getInitialPoster(item);
+    setImgSrc(nextPoster);
+    setHasError(!nextPoster);
+  }
 
   // Progresso de reprodução síncrono
   const continuity: PlaybackContinuityInfo = showProgress
@@ -35,6 +64,97 @@ export const MobileCard: React.FC<MobileCardProps> = memo(({
   const handleClick = () => {
     uiSoundService.play('click');
     onItemClick(item);
+  };
+
+  // Acionamento central de recuperação de poster via posterRecoveryService
+  const triggerRecovery = useCallback(async () => {
+    if (isRecoveringRef.current || !item) return;
+
+    // Limite de segurança de 3 tentativas por ciclo de vida do item para evitar loops
+    if (recoveryAttemptsRef.current >= 3) {
+      setHasError(true);
+      return;
+    }
+
+    const activeId = item.id;
+    const activeGen = generationRef.current;
+    recoveryAttemptsRef.current++;
+    isRecoveringRef.current = true;
+
+    try {
+      const recovered = await posterRecoveryService.recoverPoster(item);
+      if (!isMountedRef.current || currentItemIdRef.current !== activeId || generationRef.current !== activeGen) {
+        return;
+      }
+
+      if (recovered && !isCorruptedPosterUrl(recovered) && !failedUrlsRef.current.has(recovered)) {
+        setImgSrc(recovered);
+        setHasError(false);
+      } else {
+        setHasError(true);
+      }
+    } catch {
+      if (isMountedRef.current && currentItemIdRef.current === activeId && generationRef.current === activeGen) {
+        setHasError(true);
+      }
+    } finally {
+      isRecoveringRef.current = false;
+    }
+  }, [item]);
+
+  // Recuperação proativa se o card iniciar sem imagem
+  useEffect(() => {
+    isMountedRef.current = true;
+    if (hasError && !isRecoveringRef.current && recoveryAttemptsRef.current === 0) {
+      triggerRecovery();
+    }
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [hasError, item.id, triggerRecovery]);
+
+  // Listener para sincronizar assim que uma capa for descoberta em segundo plano
+  useEffect(() => {
+    const unsubscribe = posterRecoveryService.subscribe((recoveredItemId, newUrl) => {
+      if (!isMountedRef.current || currentItemIdRef.current !== item.id) return;
+      const isMatch = recoveredItemId === item.id || (item.imdbId && recoveredItemId === item.imdbId);
+      if (isMatch && newUrl && !isCorruptedPosterUrl(newUrl) && !failedUrlsRef.current.has(newUrl)) {
+        setImgSrc(newUrl);
+        setHasError(false);
+      }
+    });
+    return unsubscribe;
+  }, [item.id, item.imdbId]);
+
+  // Tratamento de falha de carregamento de imagem: reporta falha, tenta alternativas locais e dispara recuperação
+  const handleImgError = (e?: React.SyntheticEvent<HTMLImageElement>) => {
+    if (e?.currentTarget && e.currentTarget.getAttribute('data-item-id') !== String(item.id)) {
+      return;
+    }
+
+    if (imgSrc) {
+      failedUrlsRef.current.add(imgSrc);
+      posterRecoveryService.reportImageFailure(item, imgSrc);
+    }
+
+    const cached = posterRecoveryService.getCachedPoster(item);
+    const candidates = [
+      cached || '',
+      item.poster || '',
+      item.backdrop || '',
+      ...(Array.isArray(item.images) ? item.images : []),
+      ...(Array.isArray(item.backdrops) ? item.backdrops : [])
+    ].filter((url): url is string => Boolean(url && typeof url === 'string' && url.startsWith('http') && !isCorruptedPosterUrl(url)));
+
+    const nextCandidate = candidates.find(url => url !== imgSrc && !failedUrlsRef.current.has(url));
+
+    if (nextCandidate) {
+      setImgSrc(nextCandidate);
+      setHasError(false);
+    } else {
+      setHasError(true);
+      triggerRecovery();
+    }
   };
 
   const isAnime = item.type === ContentType.ANIME || item.genres?.includes('Anime');
@@ -60,31 +180,41 @@ export const MobileCard: React.FC<MobileCardProps> = memo(({
     >
       {/* Pôster com proporção 2:3 */}
       <div className="relative w-full aspect-[2/3] rounded-xl overflow-hidden bg-slate-900 border border-white/10 shadow-md">
-        <img
-          src={hasError ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=300' : imgSrc}
-          alt={item.title}
-          loading="lazy"
-          className="w-full h-full object-cover"
-          onError={() => {
-            if (!hasError && item.backdrop && imgSrc !== item.backdrop) {
-              setImgSrc(item.backdrop);
-            } else {
-              setHasError(true);
-            }
-          }}
-        />
+        {!hasError && imgSrc ? (
+          <img
+            key={`${item.id}-${imgSrc}`}
+            data-item-id={item.id}
+            src={imgSrc}
+            alt={item.title}
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover"
+            onError={handleImgError}
+          />
+        ) : (
+          /* Placeholder Neutro e Elegante com Identidade ZapiTV (Sem capas genéricas externas) */
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#090d16] to-[#030712] p-3 text-center">
+            <div className="w-10 h-10 rounded-full bg-[#007df7]/15 border border-[#007df7]/30 flex items-center justify-center mb-2 shadow-inner">
+              <Play className="w-4 h-4 text-[#007df7] fill-[#007df7] ml-0.5" />
+            </div>
+            <span className="text-[11px] font-bold text-slate-200 line-clamp-2 px-1 leading-tight tracking-tight">
+              {item.title}
+            </span>
+          </div>
+        )}
 
         {/* Gradiente inferior para profundidade */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 pointer-events-none" />
 
         {/* Badge de tipo no topo esquerdo */}
-        <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-md text-white/90 border border-white/10">
+        <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-md text-white/90 border border-white/10 pointer-events-none">
           {typeBadge}
         </span>
 
         {/* Avaliação no topo direito se houver */}
         {item.rating > 0 && (
-          <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-black/60 backdrop-blur-md text-amber-400 flex items-center gap-0.5 border border-white/10">
+          <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-black/60 backdrop-blur-md text-amber-400 flex items-center gap-0.5 border border-white/10 pointer-events-none">
             <Star className="w-2.5 h-2.5 fill-amber-400" />
             <span>{item.rating.toFixed(1)}</span>
           </div>

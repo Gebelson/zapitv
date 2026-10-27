@@ -574,7 +574,7 @@ const Header: React.FC<HeaderProps> = ({
                           alt={item.title} 
                           className="w-10 h-14 object-cover rounded-lg shrink-0 shadow-sm"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=200';
+                            (e.target as HTMLImageElement).src = '/zapitv-logo-card.png';
                           }}
                         />
                         <div className="flex-1 min-w-0">

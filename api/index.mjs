@@ -5974,8 +5974,8 @@ var init_featuredCatalogItems = __esm({
         type: "FILME" /* MOVIE */,
         rating: 7.9,
         year: 2026,
-        image: "https://images.metahub.space/poster/medium/tt29971038/img",
-        backdrop: "https://images.metahub.space/background/medium/tt29971038/img",
+        image: "",
+        backdrop: "",
         description: "Um thriller eletrizante sobre sobreviv\xEAncia e dilemas morais em uma situa\xE7\xE3o extrema.",
         genres: ["Drama", "Suspense"],
         imdbId: "tt29971038",
@@ -6458,8 +6458,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 7.9,
         year: 2026,
-        image: "https://images.metahub.space/poster/medium/tt29458920/img",
-        backdrop: "https://images.metahub.space/background/medium/tt29458920/img",
+        image: "",
+        backdrop: "",
         description: "Cr\xF4nica visceral das tens\xF5es geopol\xEDticas e opera\xE7\xF5es t\xE1ticas em um conflito global em larga escala.",
         genres: ["Guerra", "A\xE7\xE3o", "Drama"],
         imdbId: "tt29458920",
@@ -6860,8 +6860,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8,
         year: 2022,
-        image: "https://image.tmdb.org/t/p/w500/fwLoHQw2iW3oFqP3yJ3y751i9cE.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/9faGSFi5jam6pDWGNd0ip80ioXA.jpg",
+        image: "https://image.tmdb.org/t/p/w500/52HfpGpVVPN73PJcOkm7ym0OLKD.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/lmnwVdMb5BmejgE7IPULc42dUfm.jpg",
         description: 'Dwight "The General" Manfredi, um l\xEDder da m\xE1fia de Nova York, \xE9 libertado ap\xF3s 25 anos na pris\xE3o e exilado por seu chefe para abrir opera\xE7\xF5es em Tulsa, Oklahoma.',
         genres: ["Crime", "Drama"],
         imdbId: "tt16358384",
@@ -6876,7 +6876,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Para o Oeste, Velho",
             description: "Dwight chega em Tulsa ap\xF3s 25 anos de pris\xE3o e rapidamente monta sua nova equipe local.",
-            image: "https://image.tmdb.org/t/p/w500/fwLoHQw2iW3oFqP3yJ3y751i9cE.jpg"
+            image: "https://image.tmdb.org/t/p/original/lmnwVdMb5BmejgE7IPULc42dUfm.jpg"
           }
         ]
       },
@@ -6888,8 +6888,8 @@ var init_featuredCatalogItems = __esm({
         type: "FILME" /* MOVIE */,
         rating: 7.7,
         year: 2024,
-        image: "https://image.tmdb.org/t/p/w500/9h2rAuvmsmQk9m36Bsm5D154P2q.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/p5ozvmdgsmbWe0H8wf4tIcAOFhm.jpg",
+        image: "https://image.tmdb.org/t/p/w500/lHKNS35r4RTa9GO72vdadMLxoiV.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/p5ozvmdgsmbWe0H8Xk7Rc8SCwAB.jpg",
         description: "Riley agora \xE9 uma adolescente e sua central de controle passa por uma reforma para dar espa\xE7o a emo\xE7\xF5es inesperadas: Ansiedade, Inveja, T\xE9dio e Vergonha.",
         genres: ["Anima\xE7\xE3o", "Fam\xEDlia", "Aventura", "Com\xE9dia"],
         imdbId: "tt22022452",
@@ -6906,8 +6906,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8.7,
         year: 2018,
-        image: "https://image.tmdb.org/t/p/w500/peNC0eyc3TQJa6x4TdKIIIRiz09.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/9xxLWtn8vKfZgnapG1T5k2n1A1x.jpg",
+        image: "https://image.tmdb.org/t/p/w500/rrOYi7Zj2OmBojo1VuuZM129gic.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/ynSOcgDLZfdLCZfRSYZGiTgYJVo.jpg",
         description: "John Dutton lidera sua fam\xEDlia em uma luta incans\xE1vel para defender seu vasto rancho em Montana contra especuladores imobili\xE1rios, reservas ind\xEDgenas e o primeiro parque nacional dos EUA.",
         genres: ["Drama", "Faroeste"],
         imdbId: "tt4236770",
@@ -6922,7 +6922,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Primeiro Dia de Ca\xE7a",
             description: "John Dutton defende os limites de seu rancho contra opositores.",
-            image: "https://image.tmdb.org/t/p/w500/peNC0eyc3TQJa6x4TdKIIIRiz09.jpg"
+            image: "https://image.tmdb.org/t/p/original/ynSOcgDLZfdLCZfRSYZGiTgYJVo.jpg"
           }
         ]
       },
@@ -6934,8 +6934,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 7.3,
         year: 2022,
-        image: "https://image.tmdb.org/t/p/w500/nJUHX3DPIPC4RjDGL0xUCzNAl5e.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/1qpUk27LVI9UoK2GU0987Lz9m17.jpg",
+        image: "https://image.tmdb.org/t/p/w500/4UmNhZCEu8Vt3byMvNxNEPyf8EY.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/zW0v2YT74C6tRafzqqBkfSqLAN0.jpg",
         description: "No s\xE9culo XXVI, a humanidade enfrenta a maior amea\xE7a \xE0 sua sobreviv\xEAncia: a alian\xE7a alien\xEDgena conhecida como Covenant. O supersoldado Master Chief lidera a resist\xEAncia.",
         genres: ["A\xE7\xE3o", "Aventura", "Fic\xE7\xE3o Cient\xEDfica"],
         imdbId: "tt2934286",
@@ -6950,7 +6950,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Contato",
             description: "Em Madrigal, Master Chief e os Spartans salvam colonos rebeldes de um ataque Covenant.",
-            image: "https://image.tmdb.org/t/p/w500/nJUHX3DPIPC4RjDGL0xUCzNAl5e.jpg"
+            image: "https://image.tmdb.org/t/p/original/zW0v2YT74C6tRafzqqBkfSqLAN0.jpg"
           }
         ]
       },
@@ -6962,8 +6962,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8.6,
         year: 2019,
-        image: "https://image.tmdb.org/t/p/w500/eU1i6eHXlzMOlEq0ku1R07Y9W7r.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/o7Qi2v4uWQ8scZ1VR7G951478p8.jpg",
+        image: "https://image.tmdb.org/t/p/w500/sWgBv7LV2PRoQgkxwlibdGXKz1S.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/9zcbqSxdsRMZWHYtyCd1nXPr2xq.jpg",
         description: "Ap\xF3s a queda do Imp\xE9rio Gal\xE1ctico, um ca\xE7ador de recompensas solit\xE1rio navega pelos confins da gal\xE1xia, protegendo uma misteriosa crian\xE7a com poderes da For\xE7a.",
         genres: ["Fic\xE7\xE3o Cient\xEDfica", "A\xE7\xE3o", "Aventura"],
         imdbId: "tt8111088",
@@ -6978,7 +6978,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Cap\xEDtulo 1: O Mandaloriano",
             description: "Um ca\xE7ador de recompensas aceita um contrato clandestino com grande pagamento.",
-            image: "https://image.tmdb.org/t/p/w500/eU1i6eHXlzMOlEq0ku1R07Y9W7r.jpg"
+            image: "https://image.tmdb.org/t/p/original/9zcbqSxdsRMZWHYtyCd1nXPr2xq.jpg"
           }
         ]
       },
@@ -6990,8 +6990,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8.2,
         year: 2021,
-        image: "https://image.tmdb.org/t/p/w500/voHUmlvjysv923Zq98bYFqE4x9a.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/k47JEUTQsSMN539ygmgWIt3IR7W.jpg",
+        image: "https://image.tmdb.org/t/p/w500/2TwPJfPiBI2lVrofggw3H0b4cDC.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/q3jHCb4dMfYF6ojikKuHd6LscxC.jpg",
         description: "Ap\xF3s roubar o Tesseract, o Deus da Trapa\xE7a \xE9 capturado pela Autoridade de Vari\xE2ncia Temporal (AVT) e precisa consertar a linha do tempo do multiverso.",
         genres: ["Fic\xE7\xE3o Cient\xEDfica", "A\xE7\xE3o", "Aventura"],
         imdbId: "tt9140554",
@@ -7006,7 +7006,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Glorioso Prop\xF3sito",
             description: "Loki \xE9 julgado na AVT ap\xF3s fugir com o Tesseract.",
-            image: "https://image.tmdb.org/t/p/w500/voHUmlvjysv923Zq98bYFqE4x9a.jpg"
+            image: "https://image.tmdb.org/t/p/original/q3jHCb4dMfYF6ojikKuHd6LscxC.jpg"
           }
         ]
       },
@@ -7018,8 +7018,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8.7,
         year: 2022,
-        image: "https://image.tmdb.org/t/p/w500/p4T5Wz9EaD010bW328Z7p4YjO38.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/9i3A33K34j4o9Z10bW328Z7p4Yj.jpg",
+        image: "https://image.tmdb.org/t/p/w500/3DjOAUBR8Hra4R9kK9U8jDaoqyC.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/ixgFmf1X59PUZam2qbAfskx2gQr.jpg",
         description: "Mark lidera uma equipe na Lumon Industries cujos funcion\xE1rios passaram por um procedimento cir\xFArgico que separa suas mem\xF3rias profissionais de suas vidas pessoais.",
         genres: ["Drama", "Mist\xE9rio", "Fic\xE7\xE3o Cient\xEDfica"],
         imdbId: "tt11280740",
@@ -7034,7 +7034,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Boas Not\xEDcias Sobre o Inferno",
             description: "Mark Scout lidera a equipe de refinamento de macrodados ap\xF3s a promo\xE7\xE3o inesperada.",
-            image: "https://image.tmdb.org/t/p/w500/p4T5Wz9EaD010bW328Z7p4YjO38.jpg"
+            image: "https://image.tmdb.org/t/p/original/ixgFmf1X59PUZam2qbAfskx2gQr.jpg"
           }
         ]
       },
@@ -7046,8 +7046,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8.7,
         year: 2019,
-        image: "https://image.tmdb.org/t/p/w500/7Ns6tO3aYjUvXQ4w4J7s8E7Yj.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/n6bUvigpRFqSwmPp1m2U5vFzQvH.jpg",
+        image: "https://image.tmdb.org/t/p/w500/in1R2dDc421JxsoRWaIIAqVI2KE.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/bq28ajZaoMyzEIm6REelqyqtEDZ.jpg",
         description: "Um grupo de vigilantes liderado por Billy Bruto combate super-her\xF3is corruptos que abusam de seus poderes e trabalham para uma megacorpora\xE7\xE3o bilion\xE1ria.",
         genres: ["A\xE7\xE3o", "Com\xE9dia", "Fic\xE7\xE3o Cient\xEDfica"],
         imdbId: "tt1190634",
@@ -7062,7 +7062,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "O Nome do Jogo",
             description: "Hughie sofre uma perda tr\xE1gica e \xE9 recrutado por Billy Bruto.",
-            image: "https://image.tmdb.org/t/p/w500/7Ns6tO3aYjUvXQ4w4J7s8E7Yj.jpg"
+            image: "https://image.tmdb.org/t/p/original/bq28ajZaoMyzEIm6REelqyqtEDZ.jpg"
           }
         ]
       },
@@ -7074,8 +7074,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8.4,
         year: 2024,
-        image: "https://image.tmdb.org/t/p/w500/AnsSKR9LuK0T9bEmJfpRG9UmvHQ.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/mo0A4bK1K1100bW328Z7p4YjO38.jpg",
+        image: "https://image.tmdb.org/t/p/w500/tQRX6GbYooU7kUaarKf5YXDTONy.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/coaPCIqQBPUZsOnJcWZxhaORcDT.jpg",
         description: "Duzentos anos ap\xF3s o apocalipse nuclear, uma habitante pac\xEDfica de um luxuoso abrigo subterr\xE2neo \xE9 for\xE7ada a subir \xE0 superf\xEDcie e descobre um deserto bizarro e violento.",
         genres: ["Fic\xE7\xE3o Cient\xEDfica", "A\xE7\xE3o", "Aventura"],
         imdbId: "tt12637874",
@@ -7090,7 +7090,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "O Fim",
             description: "Lucy deixa o Ref\xFAgio 33 para resgatar seu pai sequestrado.",
-            image: "https://image.tmdb.org/t/p/w500/AnsSKR9LuK0T9bEmJfpRG9UmvHQ.jpg"
+            image: "https://image.tmdb.org/t/p/original/coaPCIqQBPUZsOnJcWZxhaORcDT.jpg"
           }
         ]
       },
@@ -7102,8 +7102,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8.7,
         year: 2021,
-        image: "https://image.tmdb.org/t/p/w500/yDWJYRAwMNKbWvt8G8q9bEmJfpR.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/6VmF0cE4Xw8bYFqE4x9a10bW328.jpg",
+        image: "https://image.tmdb.org/t/p/w500/qhb7RWU9ad9a5m3HbeRRXzjaMXf.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/9qrroces8C6R9aKr08hACNPVXdZ.jpg",
         description: "Mark Grayson \xE9 um adolescente comum, exceto pelo fato de seu pai ser o super-her\xF3i mais poderoso do planeta. Ao completar 17 anos, seus poderes come\xE7am a despertar.",
         genres: ["Anima\xE7\xE3o", "A\xE7\xE3o", "Fic\xE7\xE3o Cient\xEDfica", "Drama"],
         imdbId: "tt6741278",
@@ -7118,7 +7118,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "J\xE1 Era Hora",
             description: "Mark desenvolve superpoderes e come\xE7a o treinamento com Omni-Man.",
-            image: "https://image.tmdb.org/t/p/w500/yDWJYRAwMNKbWvt8G8q9bEmJfpR.jpg"
+            image: "https://image.tmdb.org/t/p/original/9qrroces8C6R9aKr08hACNPVXdZ.jpg"
           }
         ]
       },
@@ -7158,8 +7158,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8.8,
         year: 2023,
-        image: "https://image.tmdb.org/t/p/w500/uKvVjHNqB5VmOrdxqAt2V7J9Gmx.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/9J2mmpvK7S3b3bYFqE4x9a10b32.jpg",
+        image: "https://image.tmdb.org/t/p/w500/qWo5TP7mBijoZrfxBJkUMctkBt0.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/lY2DhbA7Hy44fAKddr06UrXWWaQ.jpg",
         description: "Vinte anos ap\xF3s uma infec\xE7\xE3o f\xFAngica destruir a civiliza\xE7\xE3o, Joel \xE9 contratado para contrabandear Ellie, uma jovem de 14 anos imune ao fungo, para fora de uma zona de quarentena opressiva.",
         genres: ["Drama", "Fic\xE7\xE3o Cient\xEDfica", "A\xE7\xE3o", "Aventura"],
         imdbId: "tt3581920",
@@ -7174,7 +7174,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Quando Voc\xEA Estiver Perdido na Escurid\xE3o",
             description: "Joel e Tess recebem a miss\xE3o de escoltar Ellie em dire\xE7\xE3o ao Oeste.",
-            image: "https://image.tmdb.org/t/p/w500/uKvVjHNqB5VmOrdxqAt2V7J9Gmx.jpg"
+            image: "https://image.tmdb.org/t/p/original/lY2DhbA7Hy44fAKddr06UrXWWaQ.jpg"
           }
         ]
       },
@@ -7186,8 +7186,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8.9,
         year: 2018,
-        image: "https://image.tmdb.org/t/p/w500/7DVk0X2qB8w8bYFqE4x9a10bW32.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/c4J2mmpvK7S3b3bYFqE4x9a10b32.jpg",
+        image: "https://image.tmdb.org/t/p/w500/z0XiwdrCQ9yVIr4O0pxzaAYRxdW.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/d87JXX3DLkRJMfm5StCmmnmhHuX.jpg",
         description: "A fam\xEDlia Roy \xE9 conhecida por controlar a Waystar RoyCo, um dos maiores conglomerados de m\xEDdia do mundo. Quando o patriarca decide se afastar, os quatro filhos disputam o controle da empresa.",
         genres: ["Drama"],
         imdbId: "tt7660850",
@@ -7202,7 +7202,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Celebra\xE7\xE3o",
             description: "No anivers\xE1rio de 80 anos de Logan Roy, ele surpreende seus filhos com um an\xFAncio sobre o futuro da empresa.",
-            image: "https://image.tmdb.org/t/p/w500/7DVk0X2qB8w8bYFqE4x9a10bW32.jpg"
+            image: "https://image.tmdb.org/t/p/original/d87JXX3DLkRJMfm5StCmmnmhHuX.jpg"
           }
         ]
       },
@@ -7242,7 +7242,7 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8.1,
         year: 2022,
-        image: "https://image.tmdb.org/t/p/w500/9PFonBhy4cQy7Jz20ZyZuZu37ao.jpg",
+        image: "https://image.tmdb.org/t/p/w500/7rxiQrZjrer0RB9qNA8rHYFo53R.jpg",
         backdrop: "https://image.tmdb.org/t/p/original/iHSwvRVsRyxpX7FE7GbviaDvgGZ.jpg",
         description: "Wandinha Addams ingressa na Academia Nunca Mais, onde tenta dominar suas habilidades ps\xEDquicas emergentes, investigar uma onda de assassinatos e solucionar um mist\xE9rio familiar.",
         genres: ["Com\xE9dia", "Mist\xE9rio", "Fantasia"],
@@ -7258,7 +7258,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Wandinha \xC9 S\xF3 Problema",
             description: "Ap\xF3s ser expulsa da escola regular, Wandinha \xE9 enviada para a Academia Nunca Mais.",
-            image: "https://image.tmdb.org/t/p/w500/9PFonBhy4cQy7Jz20ZyZuZu37ao.jpg"
+            image: "https://image.tmdb.org/t/p/original/iHSwvRVsRyxpX7FE7GbviaDvgGZ.jpg"
           }
         ]
       },
@@ -7270,8 +7270,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8,
         year: 2021,
-        image: "https://image.tmdb.org/t/p/w500/dDlG1v7n0D28eNl8w8bYFqE4x9a.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/oaGvjJZmpvK7S3b3bYFqE4x9a10.jpg",
+        image: "https://image.tmdb.org/t/p/w500/6gcHdboppvplmBWxvROc96NJnmm.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/2meX1nMdScFOoV4370rqHWKmXhY.jpg",
         description: "Centenas de jogadores endividados aceitam um convite estranho para competir em jogos infantis tradicionais, onde o pr\xEAmio \xE9 uma fortuna bilion\xE1ria e a penalidade \xE9 fatal.",
         genres: ["A\xE7\xE3o", "Suspense", "Drama"],
         imdbId: "tt10919420",
@@ -7286,7 +7286,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Batatinha Frita 1, 2, 3",
             description: "Gi-hun aceita o misterioso cart\xE3o de visita e acorda em um dormit\xF3rio com centenas de outros jogadores.",
-            image: "https://image.tmdb.org/t/p/w500/dDlG1v7n0D28eNl8w8bYFqE4x9a.jpg"
+            image: "https://image.tmdb.org/t/p/original/2meX1nMdScFOoV4370rqHWKmXhY.jpg"
           }
         ]
       },
@@ -7298,8 +7298,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8.4,
         year: 2023,
-        image: "https://image.tmdb.org/t/p/w500/kK9w8vK1m9x2eX2xK1v8a7Z4.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/vK1m9x2eX2xK1v8a7Z4kK9w8vK1.jpg",
+        image: "https://image.tmdb.org/t/p/w500/fehHs3wK0wefw2hEuo8qnXpaNRt.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/iO6gWPay7C5R8caA5Cqta0RwT5C.jpg",
         description: "Dois casais vizinhos entram em conflito em um condom\xEDnio fechado na Barra da Tijuca ap\xF3s uma briga entre seus filhos adolescentes, desencadeando consequ\xEAncias imprevis\xEDveis.",
         genres: ["Drama", "Suspense"],
         tmdbId: "224673",
@@ -7313,7 +7313,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Epis\xF3dio 1",
             description: "Uma briga na quadra de esportes do condom\xEDnio Barra Diamond desencadeia uma rivalidade destrutiva entre fam\xEDlias vizinhas.",
-            image: "https://image.tmdb.org/t/p/w500/kK9w8vK1m9x2eX2xK1v8a7Z4.jpg"
+            image: "https://image.tmdb.org/t/p/original/iO6gWPay7C5R8caA5Cqta0RwT5C.jpg"
           }
         ]
       },
@@ -7325,8 +7325,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8.6,
         year: 2017,
-        image: "https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq2.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/FuXrg3G8fep5Mm79vTfgq23r4LY.jpg",
+        image: "https://image.tmdb.org/t/p/w500/lRMfH8F2sIsjeJsYGwXFu4LW40A.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/ew4Jn4uokNsLLoQjHy1E8NX74qZ.jpg",
         description: "Em um hospital p\xFAblico no sub\xFArbio do Rio de Janeiro, uma equipe m\xE9dica liderada pelos doutores Evandro e Carolina enfrenta dilemas \xE9ticos e a escassez cr\xF4nica de recursos para salvar vidas.",
         genres: ["Drama"],
         imdbId: "tt7631376",
@@ -7341,7 +7341,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Epis\xF3dio 1",
             description: "Dr. Evandro e Dra. Carolina precisam realizar cirurgias simult\xE2neas de extrema urg\xEAncia sem equipamentos essenciais.",
-            image: "https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq2.jpg"
+            image: "https://image.tmdb.org/t/p/original/ew4Jn4uokNsLLoQjHy1E8NX74qZ.jpg"
           }
         ]
       },
@@ -7353,8 +7353,8 @@ var init_featuredCatalogItems = __esm({
         type: "S\xC9RIE" /* SERIES */,
         rating: 8.3,
         year: 2016,
-        image: "https://image.tmdb.org/t/p/w500/fL6K0z0wYV8x1q9eX2xK1v8a7Z2.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/YV8x1q9eX2xK1v8a7Z2fL6K0z0w.jpg",
+        image: "https://image.tmdb.org/t/p/w500/uGj0VhydzfMiYXGdx0ps4pKpcN2.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/smSbK5cd8T9XHcxEUcems23BDEF.jpg",
         description: "Quatro hist\xF3rias independentes mas interligadas no Recife exploram o limite \xE9tico entre lei, vingan\xE7a pessoal e o conceito de justi\xE7a ap\xF3s sete anos de pris\xE3o dos protagonistas.",
         genres: ["Drama", "Crime"],
         imdbId: "tt6007424",
@@ -7369,7 +7369,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Elisa e Vicente",
             description: "Vicente \xE9 preso ap\xF3s assassinar a noiva Isabela em um acesso de ci\xFAmes; a m\xE3e de Isabela jura vingan\xE7a.",
-            image: "https://image.tmdb.org/t/p/w500/fL6K0z0wYV8x1q9eX2xK1v8a7Z2.jpg"
+            image: "https://image.tmdb.org/t/p/original/smSbK5cd8T9XHcxEUcems23BDEF.jpg"
           }
         ]
       }
@@ -7633,8 +7633,8 @@ var init_featuredCatalogItems = __esm({
         mediaFormat: "series",
         rating: 8.9,
         year: 1999,
-        image: "https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/4MCKNAc6AbWjEsM2crWsNmecOCU.jpg",
+        image: "https://image.tmdb.org/t/p/w500/9ltisibeD4gzqjM1AzmQwCdyirQ.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/v38qp4bySLTXYu3MF8r5GD51FN3.jpg",
         description: "Monkey D. Luffy navega pelos mares com o bando do Chap\xE9u de Palha em busca do tesouro supremo e o t\xEDtulo de Rei dos Piratas.",
         genres: ["Anime", "A\xE7\xE3o", "Aventura", "Com\xE9dia"],
         aniListId: 21,
@@ -7650,7 +7650,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Eu Sou Luffy! O Homem Que Ser\xE1 o Rei dos Piratas!",
             description: "Luffy emerge de um barril e conhece Koby a bordo do navio da terr\xEDvel capit\xE3 Alvida.",
-            image: "https://image.tmdb.org/t/p/w500/fcXdJlbSdUEeMSJFsXKszvGgS6p.jpg"
+            image: "https://image.tmdb.org/t/p/original/v38qp4bySLTXYu3MF8r5GD51FN3.jpg"
           }
         ]
       },
@@ -7664,8 +7664,8 @@ var init_featuredCatalogItems = __esm({
         mediaFormat: "series",
         rating: 8.4,
         year: 2022,
-        image: "https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq1.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/179rKqc8kE3P0x4H2e1wV8x5h7Z.jpg",
+        image: "https://image.tmdb.org/t/p/w500/vaIREdPGZOnW9Jrs86mheVVlIQQ.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/lysUnU6V0VfcthDbviuVlIqgHOR.jpg",
         description: "Um espi\xE3o mestre precisa forjar uma fam\xEDlia de mentira para cumprir sua miss\xE3o secreta, sem saber que sua filha l\xEA mentes e sua esposa \xE9 uma assassina de aluguel.",
         genres: ["Anime", "Com\xE9dia", "A\xE7\xE3o", "Espionagem"],
         aniListId: 140960,
@@ -7681,7 +7681,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Opera\xE7\xE3o Strix",
             description: "O agente Twilight adota a pequena Anya em um orfanato para ingressar na elite de Berlint.",
-            image: "https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fep5Mm79vTfgq1.jpg"
+            image: "https://image.tmdb.org/t/p/original/lysUnU6V0VfcthDbviuVlIqgHOR.jpg"
           }
         ]
       },
@@ -7695,8 +7695,8 @@ var init_featuredCatalogItems = __esm({
         mediaFormat: "series",
         rating: 8.3,
         year: 2024,
-        image: "https://image.tmdb.org/t/p/w500/fL6K0z0wYV8x1q9eX2xK1v8a7Z1.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/7kK1q2w8vK1m9x2eX2xK1v8a7Z2.jpg",
+        image: "https://image.tmdb.org/t/p/w500/h5LTn4hSQ7Hvls9FO7MV6ACms2V.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/8bLHf0adxZo10lOpQOMkw5r33X4.jpg",
         description: "Kafka Hibino realiza o trabalho ingrato de limpar carca\xE7as de monstros gigantes at\xE9 que um parasita alien\xEDgena o transforma no primeiro homem-kaiju.",
         genres: ["Anime", "A\xE7\xE3o", "Fic\xE7\xE3o Cient\xEDfica"],
         aniListId: 153288,
@@ -7712,7 +7712,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "O Homem Que Se Tornou um Monstro",
             description: "Kafka reflete sobre seu sonho abandonado das For\xE7as de Defesa enquanto limpa os restos de uma fera colossal.",
-            image: "https://image.tmdb.org/t/p/w500/fL6K0z0wYV8x1q9eX2xK1v8a7Z1.jpg"
+            image: "https://image.tmdb.org/t/p/original/8bLHf0adxZo10lOpQOMkw5r33X4.jpg"
           }
         ]
       },
@@ -7757,8 +7757,8 @@ var init_featuredCatalogItems = __esm({
         mediaFormat: "series",
         rating: 9,
         year: 2006,
-        image: "https://image.tmdb.org/t/p/w500/t7X24mF4NzsX4I74z29hXU507y8.jpg",
-        backdrop: "https://image.tmdb.org/t/p/original/96Hi2E4gUspXjD37v5kclq7gYv9.jpg",
+        image: "https://image.tmdb.org/t/p/w500/tCZFfYTIwrR7n94J6G14Y4hAFU6.jpg",
+        backdrop: "https://image.tmdb.org/t/p/original/koBa94NxTaGe2FoDzlXMuJptsv0.jpg",
         description: "Light Yagami encontra um caderno sobrenatural capaz de matar qualquer pessoa cujo nome seja escrito nele e inicia uma cruzada para livrar o mundo dos criminosos.",
         genres: ["Anime", "Suspense", "Mist\xE9rio", "Sobrenatural"],
         aniListId: 1535,
@@ -7775,7 +7775,7 @@ var init_featuredCatalogItems = __esm({
             number: 1,
             title: "Renascimento",
             description: "Light Yagami encontra o Death Note deixado pelo shinigami Ryuk no p\xE1tio de sua escola.",
-            image: "https://image.tmdb.org/t/p/w500/t7X24mF4NzsX4I74z29hXU507y8.jpg"
+            image: "https://image.tmdb.org/t/p/original/koBa94NxTaGe2FoDzlXMuJptsv0.jpg"
           }
         ]
       },
@@ -15220,6 +15220,7 @@ var init_tvImagePreloaderService = __esm({
 // src/core/catalog/PosterRecoveryService.ts
 function isCorruptedPosterUrl(url) {
   if (!url || typeof url !== "string") return false;
+  if (url.includes("unsplash.com") || url.includes("photo-1489599849927")) return true;
   return CORRUPTED_POSTER_FRAGMENTS.some((frag) => url.includes(frag));
 }
 function logRecoveryDiagnostic(diag) {
@@ -15264,8 +15265,12 @@ var init_PosterRecoveryService = __esm({
       // Higurashi poster associado indevidamente a Bleach TYBW
       "114446-H6uxjVi8wBoo",
       // Higurashi poster fragment associado indevidamente a Bleach
-      "114446-DTd4xfGx7DJB"
+      "114446-DTd4xfGx7DJB",
       // Higurashi banner fragment associado indevidamente a Bleach
+      "photo-1489599849927-2ee91cede3ba",
+      // Foto genérica de sala de cinema Unsplash
+      "unsplash.com"
+      // Qualquer imagem de fallback genérico do Unsplash
     ];
     NEGATIVE_TTL_MS = 3 * 60 * 1e3;
     VERIFIED_TTL_MS = 30 * 24 * 60 * 60 * 1e3;
