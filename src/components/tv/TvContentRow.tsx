@@ -19,6 +19,8 @@ interface TvContentRowProps {
   badge?: string;
   onRowUp?: () => void;
   onRowDown?: () => void;
+  isNearViewport?: boolean;
+  onRowFocus?: (rowId: string) => void;
 }
 
 // Margem segura da interface padrão (substituída dinamicamente por tvViewportService)
@@ -64,9 +66,12 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   showProgress = false,
   badge,
   onRowUp,
-  onRowDown
+  onRowDown,
+  isNearViewport = true,
+  onRowFocus
 }) => {
   const viewport = useTvViewport();
+  const isFireTv = tvPerformanceService.isFireTv();
   const containerRef = useRef<HTMLDivElement>(null);
   const trackContainerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -119,6 +124,9 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   }, [viewport.cardGap, viewport.safeMarginX]);
 
   useEffect(() => {
+    // No Fire TV, se a fileira não estiver visível ou focada, evita medição forçada no DOM
+    if (isFireTv && !isNearViewport) return;
+
     measureGeometry();
     const rafId = requestAnimationFrame(measureGeometry);
     window.addEventListener('resize', measureGeometry);
@@ -134,7 +142,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
       window.removeEventListener('resize', measureGeometry);
       if (observer) observer.disconnect();
     };
-  }, [measureGeometry]);
+  }, [measureGeometry, isFireTv, isNearViewport]);
 
   const isFinite = items.length >= 1 && items.length <= 6;
 
@@ -297,6 +305,9 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   const { ref: noriginRef, focused } = useTvFocusable({
     focusKey,
     soundType: 'hoverCard',
+    onFocus: () => {
+      onRowFocus?.(rowId);
+    },
     onEnterPress: () => {
       if (!items || items.length === 0) return;
       // Se estiver no meio de um deslizamento, abre o item que está chegando à seleção ativa
@@ -347,6 +358,12 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
     }
   }, [focused]);
 
+  useEffect(() => {
+    if (focused && onRowFocus) {
+      onRowFocus(rowId);
+    }
+  }, [focused, onRowFocus, rowId]);
+
   // Limpeza de timers
   useEffect(() => {
     return () => {
@@ -371,6 +388,7 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   // Pré-carregamento e decodificação antecipada das capas na direção de navegação
   useEffect(() => {
     if (!items || items.length === 0) return;
+    if (isFireTv && !focused && !isNearViewport) return;
 
     if (isFinite) {
       // Modo finito: pré-carrega todas as capas da lista com prioridade adequada
@@ -400,10 +418,50 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
         if (items[itemIdx]) posterRecoveryService.preloadItemPoster(items[itemIdx], 3);
       }
     });
-  }, [currentIndex, focused, items, visibleSlots, isFinite]);
+  }, [currentIndex, focused, items, visibleSlots, isFinite, isFireTv, isNearViewport]);
 
   if (!items || items.length === 0) {
     return null;
+  }
+
+  const isWindowActive = !isFireTv || focused || isNearViewport !== false;
+
+  if (!isWindowActive) {
+    const placeholderHeight = Math.round(viewport.cardWidth * 1.5) + (viewport.scaleCategory === 'compact' ? 40 : 64);
+    return (
+      <FocusContext.Provider value={focusKey}>
+        <section 
+          ref={setRowRef}
+          id={`row-${rowId}`}
+          data-row-id={rowId}
+          data-focus-key={focusKey}
+          data-tv-focused={focused ? "true" : undefined}
+          className="w-full mb-6 sm:mb-8 lg:mb-12 select-none overflow-hidden focus:outline-none"
+          aria-label={title}
+        >
+          <div 
+            className="mb-1.5 sm:mb-2"
+            style={{
+              paddingLeft: `${viewport.safeMarginX}px`,
+              paddingRight: `${viewport.safeMarginX}px`
+            }}
+          >
+            <h2 
+              style={{ fontSize: `${viewport.rowTitleSize}px` }}
+              className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-wide drop-shadow-md"
+            >
+              {title}
+            </h2>
+          </div>
+          <div 
+            ref={trackContainerRef}
+            className={`relative w-full overflow-hidden ${viewport.scaleCategory === 'compact' ? 'py-5' : 'py-8'}`}
+            style={{ height: `${placeholderHeight}px` }}
+            aria-hidden="true"
+          />
+        </section>
+      </FocusContext.Provider>
+    );
   }
 
   const negativeSlotsCount = visibleSlots.filter(s => s < 0).length;

@@ -11313,6 +11313,33 @@ var init_tvPerformanceService = __esm({
         this.inputLatencies = [];
         this.lastInputLatencyMs = 0;
       }
+      /**
+       * Snapshot consolidado de telemetria para diagnóstico anônimo
+       */
+      getTelemetrySnapshot() {
+        const metrics = this.getMetrics();
+        let p95 = 0;
+        if (this.inputLatencies.length > 0) {
+          const sorted = [...this.inputLatencies].sort((a, b) => a - b);
+          const p95Idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95));
+          p95 = Number(sorted[p95Idx].toFixed(1));
+        }
+        let heapUsedMb;
+        if (typeof performance !== "undefined" && performance.memory?.usedJSHeapSize) {
+          heapUsedMb = Number((performance.memory.usedJSHeapSize / (1024 * 1024)).toFixed(1));
+        }
+        let preloaderQueueLength;
+        if (typeof window !== "undefined" && window.__tvImagePreloaderService?.getMetrics) {
+          preloaderQueueLength = window.__tvImagePreloaderService.getMetrics().queueLength;
+        }
+        return {
+          metrics,
+          p95InputLatencyMs: p95,
+          samplesCount: this.inputLatencies.length,
+          preloaderQueueLength,
+          heapUsedMb
+        };
+      }
     };
     tvPerformanceService = TvPerformanceService.getInstance();
   }
@@ -14869,12 +14896,13 @@ var init_tvImagePreloaderService = __esm({
     init_tvPerformanceService();
     TvImagePreloaderService = class _TvImagePreloaderService {
       constructor() {
-        // Limite estrito de imagens decodificadas na memória (80 imagens @ w500 ~ 15-20MB de VRAM)
-        this.MAX_DECODED_ENTRIES = 80;
+        // Limite estrito de imagens decodificadas na memória (50 no Fire TV / 80 no padrão)
+        this.MAX_DECODED_FIRETV = 50;
+        this.MAX_DECODED_STANDARD = 80;
         // Concorrência máxima calibrada para o processador de TV Samsung Tizen / WebKit
         this.MAX_CONCURRENT_WORKERS = 3;
-        // Timeout de 6 segundos por imagem para evitar prender a fila em conexões instáveis
-        this.LOAD_TIMEOUT_MS = 6e3;
+        // Timeout de 5 segundos por imagem para evitar prender a fila em conexões instáveis
+        this.LOAD_TIMEOUT_MS = 5e3;
         // Cache LRU de imagens decodificadas prontas para pintura instantânea
         this.readyCache = new LruCache(80);
         // Cache de URLs com erro (TTL de 60 segundos) para evitar loops de requisições 404
@@ -14884,6 +14912,9 @@ var init_tvImagePreloaderService = __esm({
         // Fila de prioridade de pré-carregamento
         this.queue = [];
         this.activeWorkers = 0;
+        this._isPaused = false;
+        this._isPlaybackActive = false;
+        this.pauseTimer = null;
         // Métricas de diagnóstico e observabilidade
         this.metrics = {
           totalRequested: 0,
@@ -14894,14 +14925,79 @@ var init_tvImagePreloaderService = __esm({
           failedLoads: 0,
           currentQueueSize: 0,
           activeWorkers: 0,
-          readyCacheSize: 0
+          readyCacheSize: 0,
+          isPaused: false,
+          isPlaybackActive: false
         };
+        if (typeof window !== "undefined") {
+          window.__tvImagePreloaderService = this;
+        }
       }
       static getInstance() {
         if (!_TvImagePreloaderService.instance) {
           _TvImagePreloaderService.instance = new _TvImagePreloaderService();
         }
         return _TvImagePreloaderService.instance;
+      }
+      /**
+       * Pausa o pré-carregamento temporariamente durante navegação D-Pad rápida
+       * para conceder 100% de prioridade da CPU à resposta visual do controle remoto.
+       */
+      pause(durationMs = 180) {
+        this._isPaused = true;
+        this.metrics.isPaused = true;
+        if (this.pauseTimer) {
+          clearTimeout(this.pauseTimer);
+        }
+        this.pauseTimer = setTimeout(() => {
+          this._isPaused = false;
+          this.metrics.isPaused = false;
+          this.pauseTimer = null;
+          this.processQueue();
+        }, durationMs);
+      }
+      isPaused() {
+        return this._isPaused;
+      }
+      /**
+       * Ativa ou desativa a suspensão de pré-carregamento durante reprodução de vídeo
+       */
+      setPlaybackActive(active) {
+        this._isPlaybackActive = active;
+        this.metrics.isPlaybackActive = active;
+        if (!active) {
+          this.processQueue();
+        } else {
+          this.cancelLowPriority();
+        }
+      }
+      isPlaybackActive() {
+        return this._isPlaybackActive;
+      }
+      /**
+       * Cancela tarefas de baixa prioridade (prioridade 3) da fila
+       */
+      cancelLowPriority() {
+        const kept = [];
+        for (const t of this.queue) {
+          if (t.priority === 3) {
+            t.resolve(false);
+          } else {
+            kept.push(t);
+          }
+        }
+        this.queue = kept;
+        this.metrics.currentQueueSize = this.queue.length;
+      }
+      /**
+       * Limpa todas as tarefas pendentes da fila (ex: ao trocar de página)
+       */
+      cancelAllPending() {
+        for (const t of this.queue) {
+          t.resolve(false);
+        }
+        this.queue = [];
+        this.metrics.currentQueueSize = 0;
       }
       /**
        * Verifica se a imagem já foi baixada e decodificada na memória da TV
@@ -14922,6 +15018,9 @@ var init_tvImagePreloaderService = __esm({
        */
       preload(url, priority = 2) {
         if (!url || typeof url !== "string" || !url.startsWith("http")) {
+          return Promise.resolve(false);
+        }
+        if (this.isPlaybackActive && priority > 1) {
           return Promise.resolve(false);
         }
         this.metrics.totalRequested++;
@@ -14963,6 +15062,21 @@ var init_tvImagePreloaderService = __esm({
           }
           return;
         }
+        const isFireTv = tvPerformanceService.isFireTv();
+        const maxQueue = isFireTv ? 16 : 40;
+        if (this.queue.length >= maxQueue && task.priority > 1) {
+          let lowestIdx = -1;
+          for (let i = this.queue.length - 1; i >= 0; i--) {
+            if (this.queue[i].priority === 3) {
+              lowestIdx = i;
+              break;
+            }
+          }
+          if (lowestIdx !== -1) {
+            const discarded = this.queue.splice(lowestIdx, 1)[0];
+            discarded.resolve(false);
+          }
+        }
         this.queue.push(task);
         this.sortQueue();
         this.metrics.currentQueueSize = this.queue.length;
@@ -14985,9 +15099,12 @@ var init_tvImagePreloaderService = __esm({
         return this.MAX_CONCURRENT_WORKERS;
       }
       /**
-       * Drena a fila respeitando o limite máximo de concorrência
+       * Drena a fila respeitando o limite máximo de concorrência e o estado de pausa
        */
       processQueue() {
+        if (this._isPaused || this._isPlaybackActive) {
+          return;
+        }
         if (this.activeWorkers >= this.getMaxConcurrentWorkers() || this.queue.length === 0) {
           this.metrics.activeWorkers = this.activeWorkers;
           this.metrics.currentQueueSize = this.queue.length;
@@ -15074,7 +15191,9 @@ var init_tvImagePreloaderService = __esm({
           ...this.metrics,
           readyCacheSize: this.readyCache.size,
           activeWorkers: this.activeWorkers,
-          currentQueueSize: this.queue.length
+          currentQueueSize: this.queue.length,
+          isPaused: this._isPaused,
+          isPlaybackActive: this._isPlaybackActive
         };
       }
       /**
@@ -15086,6 +15205,12 @@ var init_tvImagePreloaderService = __esm({
         this.inFlight.clear();
         this.queue = [];
         this.activeWorkers = 0;
+        this._isPaused = false;
+        this._isPlaybackActive = false;
+        if (this.pauseTimer) {
+          clearTimeout(this.pauseTimer);
+          this.pauseTimer = null;
+        }
       }
     };
     tvImagePreloaderService = TvImagePreloaderService.getInstance();

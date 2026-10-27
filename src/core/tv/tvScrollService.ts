@@ -3,7 +3,12 @@
  * 
  * Gerenciador unificado de rolagem vertical cinematográfica e coordenada para Smart TV.
  * Elimina rolagens simultâneas, saltos de scrollTop e chamadas conflitantes de scrollIntoView.
+ * Pausa o pré-carregamento de imagens em segundo plano durante movimentos verticais rápidos
+ * para prioridade máxima de resposta ao controle remoto.
  */
+
+import { tvPerformanceService } from './tvPerformanceService';
+import { tvImagePreloaderService } from './tvImagePreloaderService';
 
 class TvScrollService {
   private static instance: TvScrollService;
@@ -30,6 +35,9 @@ class TvScrollService {
     if (!element) return;
     if (this.isScrollingToHero) return;
 
+    // Prioridade máxima ao controle remoto: pausa pré-carregamento durante o deslocamento
+    tvImagePreloaderService.pause(180);
+
     this.targetRowElement = element;
     if (this.pendingRowScrollRaf !== null) {
       if (typeof cancelAnimationFrame !== 'undefined') {
@@ -43,6 +51,7 @@ class TvScrollService {
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const isRapid = now - this.lastRowScrollTime < 180;
     this.lastRowScrollTime = now;
+    const isFireTv = tvPerformanceService.isFireTv();
 
     const executeScroll = () => {
       this.pendingRowScrollRaf = null;
@@ -50,8 +59,9 @@ class TvScrollService {
 
       try {
         if (typeof (this.targetRowElement as any).scrollIntoView === 'function') {
+          // No Fire TV ou durante toques rápidos, comportamento 'auto' evita fila de animações no compositor
           this.targetRowElement.scrollIntoView({
-            behavior: isRapid ? 'auto' : 'smooth',
+            behavior: (isRapid || isFireTv) ? 'auto' : 'smooth',
             block: 'center'
           });
         }
@@ -77,6 +87,8 @@ class TvScrollService {
   public scrollToHero(onComplete?: () => void): void {
     if (this.isScrollingToHero) return;
 
+    tvImagePreloaderService.pause(250);
+
     if (typeof window === 'undefined') {
       onComplete?.();
       return;
@@ -95,8 +107,14 @@ class TvScrollService {
       this.heroScrollTimer = null;
     }
 
+    const isFireTv = tvPerformanceService.isFireTv();
+
     try {
-      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      window.scrollTo({ 
+        top: 0, 
+        left: 0, 
+        behavior: isFireTv ? 'auto' : 'smooth' 
+      });
     } catch {
       window.scrollTo(0, 0);
     }
@@ -122,7 +140,7 @@ class TvScrollService {
 
     const handleScrollEnd = () => finish();
     window.addEventListener('scrollend', handleScrollEnd, { once: true });
-    this.heroScrollTimer = setTimeout(finish, 380);
+    this.heroScrollTimer = setTimeout(finish, isFireTv ? 120 : 380);
   }
 
   public isScrolling(): boolean {

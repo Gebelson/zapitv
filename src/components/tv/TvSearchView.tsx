@@ -7,6 +7,7 @@ import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { searchService, SearchCategory } from '../../core/search/searchService';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { useTvViewport } from '../../core/tv/tvViewportService';
+import { tvPerformanceService } from '../../core/tv/tvPerformanceService';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvSearchViewProps {
@@ -217,7 +218,10 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<SearchCategory>('all');
   const resultsContainerRef = useRef<HTMLDivElement>(null);
   const resultsSentinelRef = useRef<HTMLDivElement>(null);
-  const [visibleCount, setVisibleCount] = useState(48);
+  const isFireTv = tvPerformanceService.isFireTv();
+  const initialBatch = isFireTv ? 18 : 48;
+  const incrementBatch = isFireTv ? 12 : 48;
+  const [visibleCount, setVisibleCount] = useState(initialBatch);
 
   const { ref: noriginRef, focusKey } = useFocusable({
     focusKey: 'tv-search-screen',
@@ -407,9 +411,9 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
   }, [query, selectedCategory, allContent, searchableIndex]);
 
   useEffect(() => {
-    setVisibleCount(48);
+    setVisibleCount(initialBatch);
     if (resultsContainerRef.current) resultsContainerRef.current.scrollTop = 0;
-  }, [query, selectedCategory]);
+  }, [query, selectedCategory, initialBatch]);
 
   useEffect(() => {
     const root = resultsContainerRef.current;
@@ -418,7 +422,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
     if (typeof IntersectionObserver === 'undefined') {
       const loadOnScroll = () => {
         if (root.scrollTop + root.clientHeight >= root.scrollHeight - 600) {
-          setVisibleCount(count => Math.min(searchResults.length, count + 48));
+          setVisibleCount(count => Math.min(searchResults.length, count + incrementBatch));
         }
       };
       root.addEventListener('scroll', loadOnScroll, { passive: true });
@@ -426,18 +430,19 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
     }
     const observer = new IntersectionObserver(entries => {
       if (entries[0]?.isIntersecting) {
-        setVisibleCount(count => Math.min(searchResults.length, count + 48));
+        setVisibleCount(count => Math.min(searchResults.length, count + incrementBatch));
       }
     }, { root, rootMargin: '600px' });
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [visibleCount, searchResults]);
+  }, [visibleCount, searchResults, incrementBatch]);
 
   const handleCardFocus = useCallback((index: number) => {
-    if (index >= visibleCount - 12) {
-      setVisibleCount(count => Math.min(searchResults.length, count + 48));
+    const threshold = isFireTv ? 6 : 12;
+    if (index >= visibleCount - threshold) {
+      setVisibleCount(count => Math.min(searchResults.length, count + incrementBatch));
     }
-  }, [visibleCount, searchResults.length]);
+  }, [visibleCount, searchResults.length, isFireTv, incrementBatch]);
 
   // Lista dinâmica de sugestões baseada no catálogo e termo digitado
   const suggestions = useMemo(() => {

@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { tvModeService } from '../../core/tv/tvModeService';
+import { tvPerformanceService } from '../../core/tv/tvPerformanceService';
 
 export const ZAPI_LOGO_ASSET_VERSION = 'v=20261023_aa';
 
@@ -33,6 +34,8 @@ export interface ZapiAnimatedLogoProps {
  *   o canal alfa de vídeos WebM e renderizam fundo preto, além de consumir decodificadores
  *   de hardware limitados. Para Smart TV, utiliza Animated WebP/APNG com antialiasing perfeito
  *   em tag de imagem 2D com transparência real e aceleração de composição sem serrilhado.
+ * - Fire TV: utiliza versão PNG estática de alta definição para poupar ciclos contínuos de decodificação
+ *   na GPU e CPU limitadas do stick, restaurando a fluidez máxima da navegação.
  * - Desktop/Web: utiliza WebM VP9 transparente com canal alfa ou Picture/WebP/APNG com fallback.
  * - Cache-busting automático (?v=...) garante que o Media Station X e browsers de TV não usem cache legado.
  * - Elimina 100% do fundo preto e o serrilhado de rotação em todas as telas.
@@ -53,6 +56,7 @@ export const ZapiAnimatedLogo: React.FC<ZapiAnimatedLogoProps> = memo(({
   // Na Smart TV, o hardware de vídeo decodifica WebM com fundo preto e retém decodificadores de vídeo.
   // Usar Animated WebP ou APNG garante transparência perfeita sem usar hardware video decoder.
   const isTv = typeof window !== 'undefined' && tvModeService.isTvMode();
+  const isFireTv = typeof window !== 'undefined' && tvPerformanceService.isFireTv();
   const shouldUseImage = mode === 'image' || (mode === 'auto' && isTv);
 
   const finalWebp = withVersion(webpSrc);
@@ -61,6 +65,28 @@ export const ZapiAnimatedLogo: React.FC<ZapiAnimatedLogoProps> = memo(({
   const finalVideo = withVersion(videoSrc);
 
   if (shouldUseImage) {
+    if (isFireTv) {
+      // No Fire TV: usa imagem estática de alta definição para evitar loops contínuos de re-rasterização
+      // e liberar os ciclos da GPU/CPU para resposta imediata ao controle remoto
+      return (
+        <picture className="w-full h-full flex items-center justify-center pointer-events-none select-none bg-transparent">
+          <source srcSet={finalPng} type="image/png" />
+          <img
+            src={finalPng}
+            alt={alt}
+            className={`w-full h-full object-contain pointer-events-none select-none bg-transparent ${className}`}
+            draggable={false}
+            style={{
+              imageRendering: 'auto',
+              WebkitBackfaceVisibility: 'hidden',
+              backfaceVisibility: 'hidden',
+              transform: 'translateZ(0)',
+            }}
+          />
+        </picture>
+      );
+    }
+
     return (
       <picture className="w-full h-full flex items-center justify-center pointer-events-none select-none bg-transparent">
         <source srcSet={finalWebp} type="image/webp" />
@@ -98,32 +124,13 @@ export const ZapiAnimatedLogo: React.FC<ZapiAnimatedLogoProps> = memo(({
       className={`w-full h-full object-contain pointer-events-none select-none bg-transparent ${className}`}
       aria-label={alt}
       style={{
+        imageRendering: 'auto',
         WebkitBackfaceVisibility: 'hidden',
         backfaceVisibility: 'hidden',
         transform: 'translateZ(0)',
       }}
     >
-      <source src={finalVideo} type="video/webm; codecs=vp9" />
-      <picture className="w-full h-full flex items-center justify-center">
-        <source srcSet={finalWebp} type="image/webp" />
-        <source srcSet={finalApng} type="image/apng" />
-        <img
-          src={finalWebp}
-          alt={alt}
-          className={`w-full h-full object-contain pointer-events-none select-none ${className}`}
-          draggable={false}
-          style={{
-            imageRendering: 'auto',
-            WebkitBackfaceVisibility: 'hidden',
-            backfaceVisibility: 'hidden',
-            transform: 'translateZ(0)',
-          }}
-          onError={(e) => {
-            const target = e.currentTarget as HTMLImageElement;
-            target.src = finalPng;
-          }}
-        />
-      </picture>
+      <source src={finalVideo} type="video/webm" />
     </video>
   );
 });

@@ -321,6 +321,41 @@ class TvPerformanceService {
     this.inputLatencies = [];
     this.lastInputLatencyMs = 0;
   }
+
+  /**
+   * Snapshot consolidado de telemetria para diagnóstico anônimo
+   */
+  public getTelemetrySnapshot(): {
+    metrics: TvPerformanceMetrics;
+    p95InputLatencyMs: number;
+    samplesCount: number;
+    preloaderQueueLength?: number;
+    heapUsedMb?: number;
+  } {
+    const metrics = this.getMetrics();
+    let p95 = 0;
+    if (this.inputLatencies.length > 0) {
+      const sorted = [...this.inputLatencies].sort((a, b) => a - b);
+      const p95Idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95));
+      p95 = Number(sorted[p95Idx].toFixed(1));
+    }
+    let heapUsedMb: number | undefined;
+    if (typeof performance !== 'undefined' && (performance as any).memory?.usedJSHeapSize) {
+      heapUsedMb = Number(((performance as any).memory.usedJSHeapSize / (1024 * 1024)).toFixed(1));
+    }
+    let preloaderQueueLength: number | undefined;
+    if (typeof window !== 'undefined' && (window as any).__tvImagePreloaderService?.getMetrics) {
+      preloaderQueueLength = (window as any).__tvImagePreloaderService.getMetrics().queueLength;
+    }
+
+    return {
+      metrics,
+      p95InputLatencyMs: p95,
+      samplesCount: this.inputLatencies.length,
+      preloaderQueueLength,
+      heapUsedMb
+    };
+  }
 }
 
 export const tvPerformanceService = TvPerformanceService.getInstance();

@@ -5,6 +5,8 @@ import { heroCarouselStore, HERO_CAROUSEL_STORAGE_KEY } from '../../core/catalog
 import { TvHeroBanner } from './TvHeroBanner';
 import { TvContentRow } from './TvContentRow';
 import { streamingPlatformExclusivesService } from '../../core/platforms/StreamingPlatformExclusivesService';
+import { tvPerformanceService } from '../../core/tv/tvPerformanceService';
+import { tvScrollService } from '../../core/tv/tvScrollService';
 import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvHomeViewProps {
@@ -130,19 +132,40 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
     return '';
   }, [continueWatchingItems, trendingItems, platformRows, popularMovies, popularSeries, animeItems, featuredItems]);
 
-  const isScrollingToHeroRef = useRef(false);
-  const scrollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [activeRowId, setActiveRowId] = useState<string>(firstActiveRowId);
 
-  // Limpeza de timers ao desmontar
-  useEffect(() => {
-    return () => {
-      if (scrollTimerRef.current) {
-        clearTimeout(scrollTimerRef.current);
-        scrollTimerRef.current = null;
-      }
-      isScrollingToHeroRef.current = false;
-    };
-  }, []);
+  // Mapeamento ordenado de todas as fileiras ativas
+  const orderedRowIds = useMemo(() => {
+    const ids: string[] = [];
+    if (continueWatchingItems.length > 0) ids.push('continue-watching');
+    if (trendingItems.length > 0) ids.push('trending');
+    if (platformRows.netflix) ids.push('exclusive-netflix');
+    if (popularMovies.length > 0) ids.push('popular-movies');
+    if (platformRows.prime) ids.push('exclusive-prime');
+    if (platformRows.hbo) ids.push('exclusive-hbo');
+    if (platformRows.apple) ids.push('exclusive-apple');
+    if (popularSeries.length > 0) ids.push('popular-series');
+    if (platformRows.disney) ids.push('exclusive-disney');
+    if (platformRows.paramount) ids.push('exclusive-paramount');
+    if (platformRows.globoplay) ids.push('exclusive-globoplay');
+    if (animeItems.length > 0) ids.push('popular-animes');
+    if (platformRows.crunchyroll) ids.push('exclusive-crunchyroll');
+    if (featuredItems.length > 1) ids.push('featured-all');
+    return ids;
+  }, [continueWatchingItems.length, trendingItems.length, platformRows, popularMovies.length, popularSeries.length, animeItems.length, featuredItems.length]);
+
+  const isFireTv = tvPerformanceService.isFireTv();
+
+  // No Fire TV, monta os cards internos apenas para as primeiras 3 fileiras e janela de +/- 2 da fileira focada
+  const isRowNear = useCallback((rowId: string) => {
+    if (!isFireTv) return true;
+    const rowIndex = orderedRowIds.indexOf(rowId);
+    if (rowIndex === -1) return true;
+    if (rowIndex < 3) return true;
+    const activeIndex = activeRowId ? orderedRowIds.indexOf(activeRowId) : 0;
+    if (activeIndex === -1) return rowIndex < 3;
+    return Math.abs(rowIndex - activeIndex) <= 2;
+  }, [isFireTv, orderedRowIds, activeRowId]);
 
   const handleHeroDownPress = useCallback(() => {
     if (firstActiveRowId) {
@@ -152,70 +175,9 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
   }, [firstActiveRowId]);
 
   const handleFirstRowUpPress = useCallback(() => {
-    // 7. Evita múltiplas animações simultâneas caso o usuário pressione repetidamente as setas
-    if (isScrollingToHeroRef.current) return;
-
-    if (typeof window === 'undefined') {
+    tvScrollService.scrollToHero(() => {
       setFocus('tv-hero-play');
-      return;
-    }
-
-    const currentScrollY = window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
-
-    // Se já estiver no topo absoluto, apenas transfere o foco imediatamente
-    if (currentScrollY <= 2) {
-      setFocus('tv-hero-play');
-      return;
-    }
-
-    isScrollingToHeroRef.current = true;
-
-    // 1 & 2. Utiliza uma ÚNICA estratégia de rolagem suave nativa para retornar ao banner principal,
-    // eliminando comandos concorrentes ou conflitantes de scrollTop/scrollIntoView
-    try {
-      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-    } catch {
-      window.scrollTo(0, 0);
-    }
-
-    // 3, 4 & 5. Coordena a transferência de foco para 'tv-hero-play' com a conclusão da rolagem (~380ms),
-    // preservando a curva de desaceleração suave (ease-out) e impedindo que o foco nativo provoque saltos
-    if (scrollTimerRef.current) {
-      clearTimeout(scrollTimerRef.current);
-      scrollTimerRef.current = null;
-    }
-
-    let finished = false;
-    const finishTransition = () => {
-      if (finished) return;
-      finished = true;
-
-      window.removeEventListener('scrollend', handleScrollEnd);
-      if (scrollTimerRef.current) {
-        clearTimeout(scrollTimerRef.current);
-        scrollTimerRef.current = null;
-      }
-
-      // 8. Garante que o banner fique perfeitamente enquadrado ao final da rolagem
-      if (window.scrollY !== 0) {
-        window.scrollTo(0, 0);
-      }
-
-      // Transfere o foco de forma suave para o botão Assistir do Hero já perfeitamente posicionado
-      setFocus('tv-hero-play');
-      isScrollingToHeroRef.current = false;
-    };
-
-    const handleScrollEnd = () => {
-      finishTransition();
-    };
-
-    // Suporta evento nativo scrollend quando disponível
-    window.addEventListener('scrollend', handleScrollEnd, { once: true });
-
-    // Fallback coordenado com duração aproximada de 380ms (faixa ideal de 350-500ms)
-    // para Smart TVs onde o evento scrollend não é emitido
-    scrollTimerRef.current = setTimeout(finishTransition, 380);
+    });
   }, []);
 
   const editorialItems = useMemo(() => featuredItems.slice(1), [featuredItems]);
@@ -246,6 +208,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             onItemClick={onSelectItem}
             showProgress
             onRowUp={firstActiveRowId === 'continue-watching' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('continue-watching')}
+            onRowFocus={setActiveRowId}
           />
         )}
 
@@ -257,6 +221,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={trendingItems}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'trending' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('trending')}
+            onRowFocus={setActiveRowId}
           />
         )}
 
@@ -268,6 +234,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={platformRows.netflix.items}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'exclusive-netflix' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('exclusive-netflix')}
+            onRowFocus={setActiveRowId}
           />
         )}
 
@@ -279,6 +247,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={popularMovies}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'popular-movies' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('popular-movies')}
+            onRowFocus={setActiveRowId}
           />
         )}
 
@@ -290,6 +260,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={platformRows.prime.items}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'exclusive-prime' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('exclusive-prime')}
+            onRowFocus={setActiveRowId}
           />
         )}
 
@@ -301,6 +273,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={platformRows.hbo.items}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'exclusive-hbo' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('exclusive-hbo')}
+            onRowFocus={setActiveRowId}
           />
         )}
 
@@ -312,6 +286,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={platformRows.apple.items}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'exclusive-apple' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('exclusive-apple')}
+            onRowFocus={setActiveRowId}
           />
         )}
 
@@ -323,6 +299,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={popularSeries}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'popular-series' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('popular-series')}
+            onRowFocus={setActiveRowId}
           />
         )}
 
@@ -334,6 +312,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={platformRows.disney.items}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'exclusive-disney' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('exclusive-disney')}
+            onRowFocus={setActiveRowId}
           />
         )}
 
@@ -345,6 +325,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={platformRows.paramount.items}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'exclusive-paramount' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('exclusive-paramount')}
+            onRowFocus={setActiveRowId}
           />
         )}
 
@@ -356,6 +338,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={platformRows.globoplay.items}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'exclusive-globoplay' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('exclusive-globoplay')}
+            onRowFocus={setActiveRowId}
           />
         )}
 
@@ -367,6 +351,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={animeItems}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'popular-animes' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('popular-animes')}
+            onRowFocus={setActiveRowId}
           />
         )}
 
@@ -378,6 +364,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={platformRows.crunchyroll.items}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'exclusive-crunchyroll' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('exclusive-crunchyroll')}
+            onRowFocus={setActiveRowId}
           />
         )}
 
@@ -389,6 +377,8 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
             items={editorialItems}
             onItemClick={onSelectItem}
             onRowUp={firstActiveRowId === 'featured-all' ? handleFirstRowUpPress : undefined}
+            isNearViewport={isRowNear('featured-all')}
+            onRowFocus={setActiveRowId}
           />
         )}
       </div>

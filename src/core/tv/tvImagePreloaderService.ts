@@ -1,19 +1,21 @@
 /**
  * ZAPITV — TV IMAGE PRELOADER SERVICE
  *
- * Gerenciador inteligente de pré-carregamento e decodificação antecipada de capas para Smart TV (Samsung Tizen / Media Station X).
+ * Gerenciador inteligente de pré-carregamento e decodificação antecipada de capas para Smart TV (Samsung Tizen / Media Station X / Fire TV).
  * 
  * Funcionalidades:
  * 1. Pré-carregamento e decodificação via new Image() e img.decode() em segundo plano.
  * 2. Fallback seguro para navegadores de TV sem suporte a decode().
- * 3. Cache em memória com limite estrito (LRU de até 80 imagens decodificadas) para evitar estouro de heap V8 e VRAM na TV.
- * 4. Fila com controle de concorrência limitada (máx 3 downloads/decodificações simultâneos).
+ * 3. Cache em memória com limite estrito adaptativo (50 imagens no Fire TV, 80 nas demais TVs) para evitar estouro de heap V8 e VRAM na TV.
+ * 4. Fila com controle de concorrência adaptativa (máx 2 no Fire TV / eco, 3 em TVs padrão).
  * 5. Deduplicação de requisições em voo (inFlight map) para evitar downloads repetidos de uma mesma URL.
  * 6. Cache de falhas temporárias para evitar retry-storms em URLs quebradas ou 404.
  * 7. Priorização inteligente:
  *    - Prioridade 1 (Alta): Capa atual, próxima (+1, +2) e anterior (-1) na direção da navegação do carrossel focado.
  *    - Prioridade 2 (Normal): Fileiras adjacentes (acima e abaixo) e slots visíveis 3 e 4.
  *    - Prioridade 3 (Baixa): Demais capas sob demanda.
+ * 8. Suspensão temporária durante navegação D-Pad rápida para prioridade total ao controle remoto.
+ * 9. Suspensão total durante reprodução de vídeo para liberar 100% da CPU/GPU/Rede para o player.
  */
 
 import { LruCache } from '../cache/LruCache';
@@ -29,6 +31,8 @@ export interface PreloadMetrics {
   currentQueueSize: number;
   activeWorkers: number;
   readyCacheSize: number;
+  isPaused: boolean;
+  isPlaybackActive: boolean;
 }
 
 interface PreloadTask {
@@ -41,12 +45,13 @@ interface PreloadTask {
 export class TvImagePreloaderService {
   private static instance: TvImagePreloaderService;
 
-  // Limite estrito de imagens decodificadas na memória (80 imagens @ w500 ~ 15-20MB de VRAM)
-  private readonly MAX_DECODED_ENTRIES = 80;
+  // Limite estrito de imagens decodificadas na memória (50 no Fire TV / 80 no padrão)
+  private readonly MAX_DECODED_FIRETV = 50;
+  private readonly MAX_DECODED_STANDARD = 80;
   // Concorrência máxima calibrada para o processador de TV Samsung Tizen / WebKit
   private readonly MAX_CONCURRENT_WORKERS = 3;
-  // Timeout de 6 segundos por imagem para evitar prender a fila em conexões instáveis
-  private readonly LOAD_TIMEOUT_MS = 6000;
+  // Timeout de 5 segundos por imagem para evitar prender a fila em conexões instáveis
+  private readonly LOAD_TIMEOUT_MS = 5000;
 
   // Cache LRU de imagens decodificadas prontas para pintura instantânea
   private readyCache = new LruCache<string, boolean>(80);
@@ -58,6 +63,9 @@ export class TvImagePreloaderService {
   // Fila de prioridade de pré-carregamento
   private queue: PreloadTask[] = [];
   private activeWorkers = 0;
+  private _isPaused = false;
+  private _isPlaybackActive = false;
+  private pauseTimer: any = null;
 
   // Métricas de diagnóstico e observabilidade
   private metrics: PreloadMetrics = {
@@ -69,16 +77,89 @@ export class TvImagePreloaderService {
     failedLoads: 0,
     currentQueueSize: 0,
     activeWorkers: 0,
-    readyCacheSize: 0
+    readyCacheSize: 0,
+    isPaused: false,
+    isPlaybackActive: false
   };
 
-  private constructor() {}
+  private constructor() {
+    if (typeof window !== 'undefined') {
+      (window as any).__tvImagePreloaderService = this;
+    }
+  }
 
   public static getInstance(): TvImagePreloaderService {
     if (!TvImagePreloaderService.instance) {
       TvImagePreloaderService.instance = new TvImagePreloaderService();
     }
     return TvImagePreloaderService.instance;
+  }
+
+  /**
+   * Pausa o pré-carregamento temporariamente durante navegação D-Pad rápida
+   * para conceder 100% de prioridade da CPU à resposta visual do controle remoto.
+   */
+  public pause(durationMs = 180): void {
+    this._isPaused = true;
+    this.metrics.isPaused = true;
+    if (this.pauseTimer) {
+      clearTimeout(this.pauseTimer);
+    }
+    this.pauseTimer = setTimeout(() => {
+      this._isPaused = false;
+      this.metrics.isPaused = false;
+      this.pauseTimer = null;
+      this.processQueue();
+    }, durationMs);
+  }
+
+  public isPaused(): boolean {
+    return this._isPaused;
+  }
+
+  /**
+   * Ativa ou desativa a suspensão de pré-carregamento durante reprodução de vídeo
+   */
+  public setPlaybackActive(active: boolean): void {
+    this._isPlaybackActive = active;
+    this.metrics.isPlaybackActive = active;
+    if (!active) {
+      this.processQueue();
+    } else {
+      // Limpa tarefas de baixa prioridade ao iniciar vídeo
+      this.cancelLowPriority();
+    }
+  }
+
+  public isPlaybackActive(): boolean {
+    return this._isPlaybackActive;
+  }
+
+  /**
+   * Cancela tarefas de baixa prioridade (prioridade 3) da fila
+   */
+  public cancelLowPriority(): void {
+    const kept: PreloadTask[] = [];
+    for (const t of this.queue) {
+      if (t.priority === 3) {
+        t.resolve(false);
+      } else {
+        kept.push(t);
+      }
+    }
+    this.queue = kept;
+    this.metrics.currentQueueSize = this.queue.length;
+  }
+
+  /**
+   * Limpa todas as tarefas pendentes da fila (ex: ao trocar de página)
+   */
+  public cancelAllPending(): void {
+    for (const t of this.queue) {
+      t.resolve(false);
+    }
+    this.queue = [];
+    this.metrics.currentQueueSize = 0;
   }
 
   /**
@@ -102,6 +183,11 @@ export class TvImagePreloaderService {
    */
   public preload(url?: string, priority: 1 | 2 | 3 = 2): Promise<boolean> {
     if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+      return Promise.resolve(false);
+    }
+
+    // Se reprodução de vídeo estiver ativa e a prioridade for secundária, ignora
+    if (this.isPlaybackActive && priority > 1) {
       return Promise.resolve(false);
     }
 
@@ -159,6 +245,24 @@ export class TvImagePreloaderService {
       return;
     }
 
+    // No Fire TV, limita o tamanho da fila para não acumular trabalho invisível
+    const isFireTv = tvPerformanceService.isFireTv();
+    const maxQueue = isFireTv ? 16 : 40;
+    if (this.queue.length >= maxQueue && task.priority > 1) {
+      // Descarta tarefa de baixa prioridade mais antiga
+      let lowestIdx = -1;
+      for (let i = this.queue.length - 1; i >= 0; i--) {
+        if (this.queue[i].priority === 3) {
+          lowestIdx = i;
+          break;
+        }
+      }
+      if (lowestIdx !== -1) {
+        const discarded = this.queue.splice(lowestIdx, 1)[0];
+        discarded.resolve(false);
+      }
+    }
+
     this.queue.push(task);
     this.sortQueue();
     this.metrics.currentQueueSize = this.queue.length;
@@ -184,9 +288,13 @@ export class TvImagePreloaderService {
   }
 
   /**
-   * Drena a fila respeitando o limite máximo de concorrência
+   * Drena a fila respeitando o limite máximo de concorrência e o estado de pausa
    */
   private processQueue(): void {
+    if (this._isPaused || this._isPlaybackActive) {
+      return;
+    }
+
     if (this.activeWorkers >= this.getMaxConcurrentWorkers() || this.queue.length === 0) {
       this.metrics.activeWorkers = this.activeWorkers;
       this.metrics.currentQueueSize = this.queue.length;
@@ -268,7 +376,6 @@ export class TvImagePreloaderService {
             await img.decode();
             finalize(true);
           } catch {
-            // Em caso de rejeição no decode() do navegador, os bytes já foram baixados com sucesso
             finalize(true);
           }
         } else {
@@ -292,7 +399,9 @@ export class TvImagePreloaderService {
       ...this.metrics,
       readyCacheSize: this.readyCache.size,
       activeWorkers: this.activeWorkers,
-      currentQueueSize: this.queue.length
+      currentQueueSize: this.queue.length,
+      isPaused: this._isPaused,
+      isPlaybackActive: this._isPlaybackActive
     };
   }
 
@@ -305,6 +414,12 @@ export class TvImagePreloaderService {
     this.inFlight.clear();
     this.queue = [];
     this.activeWorkers = 0;
+    this._isPaused = false;
+    this._isPlaybackActive = false;
+    if (this.pauseTimer) {
+      clearTimeout(this.pauseTimer);
+      this.pauseTimer = null;
+    }
   }
 }
 

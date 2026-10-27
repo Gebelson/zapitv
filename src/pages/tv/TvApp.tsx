@@ -29,6 +29,7 @@ import { TvScreensaver } from '../../components/tv/TvScreensaver';
 import { TvWatchError } from '../../components/tv/TvWatchError';
 import { ZapiLoader } from '../../components/common/ZapiLoader';
 import { useTvViewport } from '../../core/tv/tvViewportService';
+import { tvImagePreloaderService } from '../../core/tv/tvImagePreloaderService';
 import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 
@@ -147,6 +148,15 @@ export const TvApp: React.FC<TvAppProps> = ({
   useEffect(() => watchPartyService.subscribe(event => {
     if (event === 'state_changed') setPartyActive(watchPartyService.getRoomState().isActive);
   }), []);
+
+  // Suspende 100% do pré-carregamento de catálogo durante a reprodução para priorizar buffer e decodificação do player
+  useEffect(() => {
+    const isPlaying = Boolean(playingItem);
+    tvImagePreloaderService.setPlaybackActive(isPlaying);
+    return () => {
+      tvImagePreloaderService.setPlaybackActive(false);
+    };
+  }, [playingItem]);
 
   // Controle de ocultação automática do Header na aba Ao Vivo (featured)
   const [isLiveHeaderHidden, setIsLiveHeaderHidden] = useState(false);

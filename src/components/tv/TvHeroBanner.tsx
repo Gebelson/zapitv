@@ -201,6 +201,11 @@ export const TvHeroBanner: React.FC<TvHeroBannerProps> = memo(({
 
   // Alguns destaques têm pôster vertical no campo backdrop; verifica a imagem real antes de ampliá-la.
   const resolveBannerImage = useCallback(async (slide: ContentItem) => {
+    // No Fire TV, seleciona diretamente o melhor candidato sem instanciar Image() concorrente com timeout
+    if (tvPerformanceService.isFireTv()) {
+      const best = slide.backdrop || slide.image || slide.poster || '';
+      return { url: best, portrait: false };
+    }
     const candidates = [...new Set([slide.backdrop, slide.image, slide.poster].filter((url): url is string => Boolean(url)))];
     let bestLandscape: { url: string; portrait: boolean; width: number } | null = null;
     let bestPortrait: { url: string; portrait: boolean } | null = null;
