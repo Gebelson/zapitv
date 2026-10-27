@@ -62,6 +62,7 @@ interface TvVirtualKeyProps {
   className?: string;
   focusKey: string;
   style?: React.CSSProperties;
+  isFireTv?: boolean;
   onArrowRightFromEdge?: () => void;
 }
 
@@ -72,6 +73,7 @@ const TvVirtualKey: React.FC<TvVirtualKeyProps> = ({
   className = '',
   focusKey,
   style,
+  isFireTv = false,
   onArrowRightFromEdge
 }) => {
   const { ref, focused } = useTvFocusable({
@@ -94,7 +96,7 @@ const TvVirtualKey: React.FC<TvVirtualKeyProps> = ({
       data-tv-focused={focused ? "true" : undefined}
       onClick={() => onPress(char)}
       style={{ ...style, minHeight: style?.height }}
-      className={`select-none rounded-xl font-bold flex items-center justify-center transition-all duration-150 outline-none cursor-pointer ${
+      className={`select-none ${isFireTv ? 'rounded-lg' : 'rounded-xl'} font-bold flex items-center justify-center transition-all duration-150 outline-none cursor-pointer ${
         focused
           ? 'border-2 border-cyan-400 bg-cyan-500/35 text-white shadow-[0_0_18px_rgba(0,229,255,0.7)] scale-105 z-20'
           : 'border border-white/10 bg-white/5 text-gray-200 hover:bg-white/15 hover:text-white'
@@ -113,6 +115,7 @@ interface TvFilterTabProps {
   label: string;
   isActive: boolean;
   scaleCategory?: string;
+  isFireTv?: boolean;
   onSelect: (id: SearchCategory) => void;
   onArrowLeftEdge?: () => void;
 }
@@ -122,6 +125,7 @@ const TvFilterTab: React.FC<TvFilterTabProps> = ({
   label,
   isActive,
   scaleCategory,
+  isFireTv = false,
   onSelect,
   onArrowLeftEdge
 }) => {
@@ -137,6 +141,10 @@ const TvFilterTab: React.FC<TvFilterTabProps> = ({
     }
   });
 
+  const sizeClasses = isFireTv
+    ? (scaleCategory === 'compact' ? 'px-2.5 py-1 text-[11px] rounded-lg' : scaleCategory === 'standard' ? 'px-3.5 py-1.5 text-xs rounded-lg' : 'px-4 py-1.5 text-sm rounded-lg')
+    : (scaleCategory === 'compact' ? 'px-3 py-1.5 text-xs rounded-lg' : 'px-5 py-2 text-base rounded-xl');
+
   return (
     <button
       ref={ref as any}
@@ -145,7 +153,7 @@ const TvFilterTab: React.FC<TvFilterTabProps> = ({
       data-tv-focused={focused ? "true" : undefined}
       data-tv-active={isActive ? "true" : undefined}
       onClick={() => onSelect(id)}
-      className={`${scaleCategory === 'compact' ? 'px-3 py-1.5 text-xs rounded-lg' : 'px-5 py-2 text-base rounded-xl'} font-bold transition-all duration-150 outline-none cursor-pointer ${
+      className={`${sizeClasses} font-bold transition-all duration-150 outline-none cursor-pointer ${
         focused
           ? 'border-2 border-cyan-400 bg-cyan-500/35 text-white shadow-[0_0_20px_rgba(0,229,255,0.7)] scale-105 z-20'
           : isActive
@@ -164,6 +172,7 @@ const TvFilterTab: React.FC<TvFilterTabProps> = ({
 interface TvSearchSuggestionItemProps {
   text: string;
   index: number;
+  isFireTv?: boolean;
   onSelect: (text: string) => void;
   onArrowRightEdge?: () => void;
 }
@@ -171,6 +180,7 @@ interface TvSearchSuggestionItemProps {
 const TvSearchSuggestionItem: React.FC<TvSearchSuggestionItemProps> = ({
   text,
   index,
+  isFireTv = false,
   onSelect,
   onArrowRightEdge
 }) => {
@@ -193,14 +203,16 @@ const TvSearchSuggestionItem: React.FC<TvSearchSuggestionItemProps> = ({
       data-focus-key={`tv-suggest-${index}`}
       data-tv-focused={focused ? "true" : undefined}
       onClick={() => onSelect(text)}
-      className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm transition-all duration-150 flex items-center justify-between outline-none cursor-pointer ${
+      className={`w-full text-left ${
+        isFireTv ? 'px-2.5 py-1.5 rounded-lg text-xs' : 'px-3.5 py-2.5 rounded-xl text-sm'
+      } transition-all duration-150 flex items-center justify-between outline-none cursor-pointer ${
         focused
-          ? 'border-2 border-cyan-400 bg-cyan-500/25 text-white font-bold shadow-[0_0_16px_rgba(0,229,255,0.5)] scale-102 pl-4 z-10'
+          ? `border-2 border-cyan-400 bg-cyan-500/25 text-white font-bold shadow-[0_0_16px_rgba(0,229,255,0.5)] scale-102 ${isFireTv ? 'pl-3' : 'pl-4'} z-10`
           : 'border border-transparent text-gray-300 hover:text-white hover:bg-white/10'
       }`}
     >
       <span className="truncate">{text}</span>
-      <span className={`text-xs ml-2 ${focused ? 'text-cyan-400 font-bold' : 'text-gray-500'}`}>➔</span>
+      <span className={`${isFireTv ? 'text-[10px]' : 'text-xs'} ml-2 ${focused ? 'text-cyan-400 font-bold' : 'text-gray-500'}`}>➔</span>
     </button>
   );
 };
@@ -218,7 +230,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<SearchCategory>('all');
   const resultsContainerRef = useRef<HTMLDivElement>(null);
   const resultsSentinelRef = useRef<HTMLDivElement>(null);
-  const isFireTv = tvPerformanceService.isFireTv();
+  const isFireTv = viewport.isFireTv || tvPerformanceService.isFireTv();
   const initialBatch = isFireTv ? 18 : 48;
   const incrementBatch = isFireTv ? 12 : 48;
   const [visibleCount, setVisibleCount] = useState(initialBatch);
@@ -531,50 +543,68 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
         <div 
           style={{ width: `${viewport.searchSidebarWidth}px` }} 
           className={`flex-shrink-0 h-full flex flex-col border-r border-white/10 bg-[#070b13]/95 backdrop-blur-xl overflow-y-auto z-20 shadow-2xl ${
-            viewport.scaleCategory === 'compact' ? 'p-3' : viewport.scaleCategory === 'standard' ? 'p-4 sm:p-5' : 'p-6 sm:p-7'
+            isFireTv
+              ? (viewport.scaleCategory === 'compact' ? 'p-2.5' : viewport.scaleCategory === 'standard' ? 'p-3.5' : 'p-4')
+              : (viewport.scaleCategory === 'compact' ? 'p-3' : viewport.scaleCategory === 'standard' ? 'p-4 sm:p-5' : 'p-6 sm:p-7')
           }`}
         >
           {/* Botão Voltar da Tela de Busca */}
-          <div className={viewport.scaleCategory === 'compact' ? 'mb-2.5' : 'mb-4'}>
+          <div className={isFireTv ? (viewport.scaleCategory === 'compact' ? 'mb-2' : 'mb-3') : (viewport.scaleCategory === 'compact' ? 'mb-2.5' : 'mb-4')}>
             <button
               ref={backRef as any}
               type="button"
               data-focus-key="tv-search-back"
               data-tv-focused={isBackFocused ? "true" : undefined}
               onClick={onClose}
-              className={`w-full flex items-center justify-center gap-2 rounded-xl font-bold tracking-wide transition-all duration-150 outline-none cursor-pointer ${
-                viewport.scaleCategory === 'compact' ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-base'
+              className={`w-full flex items-center justify-center gap-1.5 rounded-xl font-bold tracking-wide transition-all duration-150 outline-none cursor-pointer ${
+                isFireTv
+                  ? (viewport.scaleCategory === 'compact' ? 'px-2.5 py-1.5 text-[11px]' : viewport.scaleCategory === 'standard' ? 'px-3 py-2 text-xs' : 'px-3.5 py-2 text-sm')
+                  : (viewport.scaleCategory === 'compact' ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-base')
               } ${
                 isBackFocused
                   ? 'border-2 border-cyan-400 bg-cyan-500/30 text-white shadow-[0_0_20px_rgba(0,229,255,0.6)] scale-102 font-extrabold'
                   : 'border border-white/15 bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white'
               }`}
             >
-              <ArrowLeft className={viewport.scaleCategory === 'compact' ? "w-3.5 h-3.5 text-cyan-400" : "w-5 h-5 text-cyan-400"} />
+              <ArrowLeft className={
+                isFireTv
+                  ? (viewport.scaleCategory === 'compact' ? "w-3 h-3 text-cyan-400" : "w-4 h-4 text-cyan-400")
+                  : (viewport.scaleCategory === 'compact' ? "w-3.5 h-3.5 text-cyan-400" : "w-5 h-5 text-cyan-400")
+              } />
               <span>Voltar</span>
             </button>
           </div>
 
           {/* Campo de Busca Visual com Texto Digitado */}
-          <div className={viewport.scaleCategory === 'compact' ? 'mb-3' : 'mb-5'}>
+          <div className={isFireTv ? (viewport.scaleCategory === 'compact' ? 'mb-2.5' : 'mb-3.5') : (viewport.scaleCategory === 'compact' ? 'mb-3' : 'mb-5')}>
             <div
               ref={inputFocusRef}
               data-focus-key="tv-search-input"
               data-tv-focused={isInputFocused ? "true" : undefined}
-              className={`flex items-center gap-2.5 bg-[#0d1422] rounded-xl border transition-all duration-200 ${
-                viewport.scaleCategory === 'compact' ? 'px-3 py-2' : 'px-4 py-3'
+              className={`flex items-center ${isFireTv ? 'gap-2' : 'gap-2.5'} bg-[#0d1422] rounded-xl border transition-all duration-200 ${
+                isFireTv
+                  ? (viewport.scaleCategory === 'compact' ? 'px-2.5 py-1.5' : viewport.scaleCategory === 'standard' ? 'px-3 py-2' : 'px-3.5 py-2')
+                  : (viewport.scaleCategory === 'compact' ? 'px-3 py-2' : 'px-4 py-3')
               } ${
                 isInputFocused
                   ? 'border-2 border-cyan-400 shadow-[0_0_20px_rgba(0,229,255,0.45)] scale-101'
                   : 'border border-white/15'
               }`}
             >
-              <Search className={`${viewport.scaleCategory === 'compact' ? 'w-4 h-4' : 'w-5 h-5'} flex-shrink-0 ${isInputFocused ? 'text-cyan-400' : 'text-gray-400'}`} />
-              <div className={`flex-1 text-white font-semibold truncate flex items-center ${viewport.scaleCategory === 'compact' ? 'text-xs min-h-[20px]' : 'text-base min-h-[24px]'}`}>
+              <Search className={`${
+                isFireTv
+                  ? (viewport.scaleCategory === 'compact' ? 'w-3.5 h-3.5' : 'w-4 h-4')
+                  : (viewport.scaleCategory === 'compact' ? 'w-4 h-4' : 'w-5 h-5')
+              } flex-shrink-0 ${isInputFocused ? 'text-cyan-400' : 'text-gray-400'}`} />
+              <div className={`flex-1 text-white font-semibold truncate flex items-center ${
+                isFireTv
+                  ? (viewport.scaleCategory === 'compact' ? 'text-[11px] min-h-[18px]' : 'text-xs min-h-[20px]')
+                  : (viewport.scaleCategory === 'compact' ? 'text-xs min-h-[20px]' : 'text-base min-h-[24px]')
+              }`}>
                 {query ? (
                   <>
                     <span className="tracking-wide">{query}</span>
-                    <span className="inline-block w-1.5 h-4 ml-1.5 bg-cyan-400 animate-pulse" />
+                    <span className="inline-block w-1.5 h-3.5 ml-1 bg-cyan-400 animate-pulse" />
                   </>
                 ) : (
                   <span className="text-gray-500 font-normal">Digite para pesquisar...</span>
@@ -586,15 +616,15 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                   onClick={() => setQuery('')}
                   className="p-1 rounded-full text-gray-400 hover:text-white hover:bg-white/10"
                 >
-                  <X className="w-4 h-4" />
+                  <X className={isFireTv ? "w-3.5 h-3.5" : "w-4 h-4"} />
                 </button>
               )}
             </div>
           </div>
 
           {/* Teclado Virtual Integrado */}
-          <div className={viewport.scaleCategory === 'compact' ? 'mb-3' : 'mb-6'}>
-            <div className={`grid grid-cols-6 w-full ${viewport.scaleCategory === 'compact' ? 'gap-1' : 'gap-2'}`}>
+          <div className={isFireTv ? (viewport.scaleCategory === 'compact' ? 'mb-2.5' : 'mb-4') : (viewport.scaleCategory === 'compact' ? 'mb-3' : 'mb-6')}>
+            <div className={`grid grid-cols-6 w-full ${isFireTv ? (viewport.scaleCategory === 'compact' ? 'gap-1' : 'gap-1.5') : (viewport.scaleCategory === 'compact' ? 'gap-1' : 'gap-2')}`}>
               {/* Linha de Utilidades: Espaço (3 cols), Apagar (2 cols), Limpar (1 col) */}
               <TvVirtualKey
                 char=" "
@@ -603,6 +633,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                 focusKey="tv-key-space"
                 style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${Math.round(viewport.keyboardFontSize * 0.9)}px` }}
                 className="col-span-3"
+                isFireTv={isFireTv}
               />
               <TvVirtualKey
                 char="BACKSPACE"
@@ -611,6 +642,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                 focusKey="tv-key-backspace"
                 style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${Math.round(viewport.keyboardFontSize * 0.9)}px` }}
                 className="col-span-2"
+                isFireTv={isFireTv}
               />
               <TvVirtualKey
                 char="CLEAR"
@@ -619,6 +651,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                 focusKey="tv-key-clear"
                 style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${Math.round(viewport.keyboardFontSize * 0.9)}px` }}
                 className="col-span-1"
+                isFireTv={isFireTv}
                 onArrowRightFromEdge={handleJumpToResults}
               />
 
@@ -634,6 +667,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                       focusKey={`tv-key-${k}`}
                       style={{ height: `${viewport.keyboardKeyHeight}px`, fontSize: `${viewport.keyboardFontSize}px` }}
                       className="uppercase font-bold"
+                      isFireTv={isFireTv}
                       onArrowRightFromEdge={isRightEdge ? handleJumpToResults : undefined}
                     />
                   );
@@ -643,17 +677,18 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
           </div>
 
           {/* Lista de Sugestões logo abaixo do teclado */}
-          <div className={`mt-auto border-t border-white/10 ${viewport.scaleCategory === 'compact' ? 'pt-2' : 'pt-3'}`}>
-            <div className="flex items-center gap-1.5 mb-2.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+          <div className={`mt-auto border-t border-white/10 ${isFireTv ? (viewport.scaleCategory === 'compact' ? 'pt-1.5' : 'pt-2') : (viewport.scaleCategory === 'compact' ? 'pt-2' : 'pt-3')}`}>
+            <div className={`flex items-center gap-1.5 ${isFireTv ? 'mb-1.5 text-[10px]' : 'mb-2.5 text-xs'} font-semibold text-gray-400 uppercase tracking-wider`}>
+              <Sparkles className={`${isFireTv ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-cyan-400`} />
               <span>{query ? 'Sugestões Relacionadas' : 'Categorias & Temas Populares'}</span>
             </div>
-            <div className="flex flex-col gap-1">
+            <div className={`flex flex-col ${isFireTv ? 'gap-0.5' : 'gap-1'}`}>
               {suggestions.map((sug, idx) => (
                 <TvSearchSuggestionItem
                   key={`sug-${sug}-${idx}`}
                   text={sug}
                   index={idx}
+                  isFireTv={isFireTv}
                   onSelect={(text) => {
                     uiSoundService.play('click');
                     setQuery(text);
@@ -672,13 +707,23 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
         <div 
           ref={resultsContainerRef}
           className={`flex-1 h-full flex flex-col overflow-y-auto ${
-            viewport.scaleCategory === 'compact' ? 'p-3.5 sm:p-4' : viewport.scaleCategory === 'standard' ? 'p-5 sm:p-6' : 'p-8 lg:p-10'
+            isFireTv
+              ? (viewport.scaleCategory === 'compact' ? 'p-3' : viewport.scaleCategory === 'standard' ? 'p-4' : 'p-5')
+              : (viewport.scaleCategory === 'compact' ? 'p-3.5 sm:p-4' : viewport.scaleCategory === 'standard' ? 'p-5 sm:p-6' : 'p-8 lg:p-10')
           }`}
         >
           {/* Cabeçalho da Direita: Termo Pesquisado e Abas de Categoria */}
-          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 ${viewport.scaleCategory === 'compact' ? 'mb-4 pb-3' : 'mb-8 pb-5'}`}>
+          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 ${
+            isFireTv
+              ? (viewport.scaleCategory === 'compact' ? 'mb-3 pb-2' : 'mb-4 pb-3')
+              : (viewport.scaleCategory === 'compact' ? 'mb-4 pb-3' : 'mb-8 pb-5')
+          }`}>
             <div>
-              <h1 className={`font-extrabold tracking-tight text-white flex items-center gap-2.5 ${viewport.scaleCategory === 'compact' ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl'}`}>
+              <h1 className={`font-extrabold tracking-tight text-white flex items-center gap-2 ${
+                isFireTv
+                  ? (viewport.scaleCategory === 'compact' ? 'text-sm' : viewport.scaleCategory === 'standard' ? 'text-base' : 'text-lg')
+                  : (viewport.scaleCategory === 'compact' ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl')
+              }`}>
                 {query.trim() ? (
                   <>
                     <span>Resultados para</span>
@@ -690,13 +735,17 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                   <span>Títulos em Alta e Recomendados</span>
                 )}
               </h1>
-              <p className={`text-gray-400 mt-0.5 ${viewport.scaleCategory === 'compact' ? 'text-xs' : 'text-sm'}`}>
+              <p className={`text-gray-400 mt-0.5 ${
+                isFireTv
+                  ? (viewport.scaleCategory === 'compact' ? 'text-[10px]' : 'text-xs')
+                  : (viewport.scaleCategory === 'compact' ? 'text-xs' : 'text-sm')
+              }`}>
                 {searchResults.length} {searchResults.length === 1 ? 'título disponível' : 'títulos disponíveis'}
               </p>
             </div>
 
             {/* Filtros de Categoria: Todos | Filmes | Séries | Animes */}
-            <div className="flex items-center gap-2.5 flex-wrap">
+            <div className={`flex items-center ${isFireTv ? 'gap-1.5' : 'gap-2.5'} flex-wrap`}>
               {CATEGORIES.map((cat, idx) => (
                 <TvFilterTab
                   key={`cat-${cat.id}`}
@@ -704,6 +753,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                   label={cat.label}
                   isActive={selectedCategory === cat.id}
                   scaleCategory={viewport.scaleCategory}
+                  isFireTv={isFireTv}
                   onSelect={(id) => {
                     uiSoundService.play('toggle');
                     setSelectedCategory(id);
@@ -721,7 +771,9 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                 style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
-                  gap: viewport.scaleCategory === 'compact' ? '10px' : viewport.scaleCategory === 'standard' ? '14px' : '18px'
+                  gap: isFireTv
+                    ? (viewport.scaleCategory === 'compact' ? '8px' : viewport.scaleCategory === 'standard' ? '10px' : '12px')
+                    : (viewport.scaleCategory === 'compact' ? '10px' : viewport.scaleCategory === 'standard' ? '14px' : '18px')
                 }}
               >
                 {searchResults.slice(0, visibleCount).map((item, idx) => (
@@ -741,13 +793,13 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center py-24 text-center">
-              <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-4 text-gray-500">
-                <Search className="w-8 h-8 text-gray-400" />
+              <div className={`${isFireTv ? 'w-12 h-12' : 'w-16 h-16'} rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-4 text-gray-500`}>
+                <Search className={`${isFireTv ? 'w-6 h-6' : 'w-8 h-8'} text-gray-400`} />
               </div>
-              <h2 className="text-xl font-bold text-gray-200 mb-1">
+              <h2 className={`${isFireTv ? 'text-base' : 'text-xl'} font-bold text-gray-200 mb-1`}>
                 Nenhum título encontrado para "{query}".
               </h2>
-              <p className="text-sm text-gray-500 max-w-md">
+              <p className={`${isFireTv ? 'text-xs' : 'text-sm'} text-gray-500 max-w-md`}>
                 Tente pesquisar com palavras diferentes, títulos originais, atores ou alterne a categoria selecionada.
               </p>
             </div>

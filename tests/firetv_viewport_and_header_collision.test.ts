@@ -70,22 +70,34 @@ async function runTestSuite() {
     };
   }
 
-  // 1.1 Fire TV Stick 960x540 (Compact)
+  // 1.1 Fire TV Stick 960x540 (Compact - Tokens calibrados e reduzidos 8%-15% exclusivos Fire TV)
   mockViewport(960, 540, 2.0);
   const metricsCompact = tvViewportService.computeMetrics();
   assert.strictEqual(metricsCompact.scaleCategory, 'compact', '960x540 deve ser categorizado como compact');
-  assert.strictEqual(metricsCompact.headerHeight, 60, 'Header height em compact deve ser 60px');
-  assert.strictEqual(metricsCompact.safeMarginX, 32, 'Safe margin X em compact deve ser 32px');
-  assert.strictEqual(metricsCompact.logoIconSize, 34, 'Logo icon size em compact deve ser 34px');
-  assert.strictEqual(metricsCompact.logoTextHeight, 18, 'Logo text height em compact deve ser 18px');
-  assert.strictEqual(metricsCompact.navFontSize, 14, 'Nav font size em compact deve ser 14px');
-  assert.strictEqual(metricsCompact.navGap, 10, 'Nav gap em compact deve ser 10px');
+  assert.strictEqual(metricsCompact.headerHeight, 52, 'Header height em Fire TV compact deve ser 52px');
+  assert.strictEqual(metricsCompact.safeMarginX, 28, 'Safe margin X em Fire TV compact deve ser 28px');
+  assert.strictEqual(metricsCompact.logoIconSize, 30, 'Logo icon size em Fire TV compact deve ser 30px');
+  assert.strictEqual(metricsCompact.logoTextHeight, 16, 'Logo text height em Fire TV compact deve ser 16px');
+  assert.strictEqual(metricsCompact.navFontSize, 12, 'Nav font size em Fire TV compact deve ser 12px');
+  assert.strictEqual(metricsCompact.navGap, 8, 'Nav gap em Fire TV compact deve ser 8px');
   assert.strictEqual(metricsCompact.cardWidth, 132, 'Card width em compact deve ser 132px');
   assert.strictEqual(metricsCompact.cardGap, 12, 'Card gap em compact deve ser 12px');
   assert.strictEqual(metricsCompact.searchSidebarWidth, 260, 'Search sidebar width em compact deve ser 260px');
   assert.strictEqual(metricsCompact.keyboardKeyHeight, 30, 'Keyboard key height em compact deve ser 30px');
-  assert.strictEqual(metricsCompact.loaderSize, 76, 'Loader size em compact deve ser 76px');
+  assert.strictEqual(metricsCompact.loaderSize, 68, 'Loader size em Fire TV compact deve ser 68px');
   console.log('  ✅ Viewport Compact (960x540 / Fire TV Stick) validado com sucesso.');
+
+  // 1.1b Smart TV Normal em Compact (Samsung Tizen 960x540) - Preservação dos valores originais
+  (window as any).__MOCK_DEVICE_FAMILY__ = 'tizen';
+  const metricsTizenCompact = tvViewportService.computeMetrics();
+  assert.strictEqual(metricsTizenCompact.headerHeight, 60, 'Header height em Tizen compact deve ser 60px');
+  assert.strictEqual(metricsTizenCompact.safeMarginX, 32, 'Safe margin X em Tizen compact deve ser 32px');
+  assert.strictEqual(metricsTizenCompact.logoIconSize, 34, 'Logo icon size em Tizen compact deve ser 34px');
+  assert.strictEqual(metricsTizenCompact.logoTextHeight, 18, 'Logo text height em Tizen compact deve ser 18px');
+  assert.strictEqual(metricsTizenCompact.navFontSize, 14, 'Nav font size em Tizen compact deve ser 14px');
+  assert.strictEqual(metricsTizenCompact.loaderSize, 76, 'Loader size em Tizen compact deve ser 76px');
+  delete (window as any).__MOCK_DEVICE_FAMILY__;
+  console.log('  ✅ Viewport Compact em Tizen/Smart TVs normais preserva tokens originais com isolamento total.');
 
   // 1.2 Resolução Standard 1280x720 (720p)
   mockViewport(1280, 720, 1.5);

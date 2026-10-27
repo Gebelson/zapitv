@@ -78,22 +78,49 @@ function getProfileMenuConfig(isFireTv: boolean, scaleCategory: 'compact' | 'sta
   if (scaleCategory === 'compact') {
     // Fire TV Stick (960x540 CSS px)
     return {
-      menuWidth: 240,       // Faixa de referência: 230-260px
-      menuPadding: 8,       // Faixa de referência: 8-10px
-      menuRadius: 12,      // Faixa de referência: 12-16px
-      avatarSize: 28,       // Faixa de referência: 28-32px
+      menuWidth: 215,       // Alvo: 215px
+      menuPadding: 7,
+      menuRadius: 10,
+      avatarSize: 26,       // Alvo: 26px
+      avatarBorder: 1.5,
+      headerPaddingX: 7,
+      headerPaddingY: 4.5,
+      headerMarginBottom: 5,
+      userNameFontSize: 11, // Alvo: 10,5-11px
+      planFontSize: 9.5,
+      itemHeight: 29.5,     // Alvo: 29-30px
+      itemPaddingX: 7,
+      itemPaddingY: 3,
+      itemRadius: 7,
+      itemFontSize: 10.5,   // Alvo: 10,5-11px
+      iconSize: 12,         // Alvo: 12px
+      iconBoxPadding: 3.5,
+      iconBoxRadius: 5,
+      chevronSize: 12,
+      itemsGap: 2.5,
+      dividerMarginY: 3.5
+    };
+  }
+
+  if (scaleCategory === 'standard') {
+    // Fire TV 720p (1280x720 CSS px)
+    return {
+      menuWidth: 225,       // Alvo: 225px
+      menuPadding: 8,
+      menuRadius: 11,
+      avatarSize: 28,       // Alvo: 28px
       avatarBorder: 1.5,
       headerPaddingX: 8,
-      headerPaddingY: 6,
-      headerMarginBottom: 6,
-      userNameFontSize: 12, // Faixa de referência: 11-12px
+      headerPaddingY: 5.5,
+      headerMarginBottom: 5,
+      userNameFontSize: 11.5, // Alvo: 11-11,5px
       planFontSize: 10,
-      itemHeight: 32,       // Faixa de referência: 32-36px
+      itemHeight: 31.5,     // Alvo: 31-32px
       itemPaddingX: 8,
-      itemPaddingY: 4,
+      itemPaddingY: 3.5,
       itemRadius: 8,
-      itemFontSize: 11,     // Faixa de referência: 11-12px
-      iconSize: 13,         // Faixa de referência: 13-15px
+      itemFontSize: 11,     // Alvo: 11-11,5px
+      iconSize: 13,         // Alvo: 13px
       iconBoxPadding: 4,
       iconBoxRadius: 6,
       chevronSize: 13,
@@ -102,56 +129,29 @@ function getProfileMenuConfig(isFireTv: boolean, scaleCategory: 'compact' | 'sta
     };
   }
 
-  if (scaleCategory === 'standard') {
-    // Fire TV 720p (1280x720 CSS px)
-    return {
-      menuWidth: 250,       // Faixa de referência: 230-260px
-      menuPadding: 9,       // Faixa de referência: 8-10px
-      menuRadius: 14,      // Faixa de referência: 12-16px
-      avatarSize: 30,       // Faixa de referência: 28-32px
-      avatarBorder: 1.5,
-      headerPaddingX: 10,
-      headerPaddingY: 7,
-      headerMarginBottom: 6,
-      userNameFontSize: 12.5,
-      planFontSize: 10.5,
-      itemHeight: 34,       // Faixa de referência: 32-36px
-      itemPaddingX: 10,
-      itemPaddingY: 5,
-      itemRadius: 9,
-      itemFontSize: 12,     // Faixa de referência: 11-12px
-      iconSize: 14,         // Faixa de referência: 13-15px
-      iconBoxPadding: 5,
-      iconBoxRadius: 7,
-      chevronSize: 14,
-      itemsGap: 3,
-      dividerMarginY: 5
-    };
-  }
-
   // Fire TV 1080p / 4K Max / Cube (1920x1080 CSS px)
   return {
-    menuWidth: 260,         // Faixa de referência: 230-260px
-    menuPadding: 10,        // Faixa de referência: 8-10px
-    menuRadius: 16,        // Faixa de referência: 12-16px
-    avatarSize: 32,         // Faixa de referência: 28-32px
-    avatarBorder: 2,
-    headerPaddingX: 12,
-    headerPaddingY: 8,
-    headerMarginBottom: 8,
-    userNameFontSize: 13,
-    planFontSize: 11,
-    itemHeight: 36,         // Faixa de referência: 32-36px
-    itemPaddingX: 12,
-    itemPaddingY: 6,
-    itemRadius: 10,
-    itemFontSize: 12,       // Faixa de referência: 11-12px
-    iconSize: 15,           // Faixa de referência: 13-15px
-    iconBoxPadding: 6,
-    iconBoxRadius: 8,
-    chevronSize: 15,
-    itemsGap: 4,
-    dividerMarginY: 6
+    menuWidth: 235,         // Alvo: 235px
+    menuPadding: 8.5,
+    menuRadius: 12,
+    avatarSize: 30,         // Alvo: 30px
+    avatarBorder: 1.5,
+    headerPaddingX: 9,
+    headerPaddingY: 6,
+    headerMarginBottom: 6,
+    userNameFontSize: 12,   // Alvo: 11,5-12px
+    planFontSize: 10.5,
+    itemHeight: 33.5,       // Alvo: 33-34px
+    itemPaddingX: 9,
+    itemPaddingY: 4,
+    itemRadius: 9,
+    itemFontSize: 11.5,     // Alvo: 11,5-12px
+    iconSize: 14,           // Alvo: 14px
+    iconBoxPadding: 4.5,
+    iconBoxRadius: 7,
+    chevronSize: 14,
+    itemsGap: 3.5,
+    dividerMarginY: 4.5
   };
 }
 
@@ -218,7 +218,7 @@ const TvProfileMenuItem: React.FC<{
     >
       <div 
         className="flex items-center min-w-0"
-        style={{ gap: isFireTv ? '8px' : '12px' }}
+        style={{ gap: isFireTv ? '6px' : '12px' }}
       >
         <div 
           className={`shrink-0 flex items-center justify-center ${
@@ -431,7 +431,7 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
             paddingTop: `${config.headerPaddingY}px`,
             paddingBottom: `${config.headerPaddingY}px`,
             marginBottom: `${config.headerMarginBottom}px`,
-            gap: isFireTv ? '8px' : '12px'
+            gap: isFireTv ? '6px' : '12px'
           }}
         >
           <div 

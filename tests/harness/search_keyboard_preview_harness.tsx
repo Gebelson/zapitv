@@ -5,6 +5,12 @@ import { tvNavigationManager } from '../../src/core/tv/tvNavigationManager';
 import { ContentItem } from '../../types';
 import '../../index.css';
 
+const queryParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+const mockDeviceFamily = queryParams.get('deviceFamily');
+if (typeof window !== 'undefined' && mockDeviceFamily) {
+  (window as any).__MOCK_DEVICE_FAMILY__ = mockDeviceFamily;
+}
+
 const MOCK_ITEMS: ContentItem[] = [
   {
     id: 'movie-oppenheimer',

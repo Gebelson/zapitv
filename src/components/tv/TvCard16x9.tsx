@@ -256,6 +256,7 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
   const hasValidProgress = showProgress && progressPercent > 2 && progressPercent < 95;
 
   const ambientGlowStyle = useMemo(() => getCardAmbientGlow(item), [item]);
+  const isFireTv = tvPerformanceService.isFireTv();
 
   return (
     <div
@@ -324,11 +325,11 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
         <div className="absolute inset-x-0 bottom-0 h-14 sm:h-18 bg-gradient-to-t from-black/90 via-black/45 to-transparent pointer-events-none" />
 
         {/* Informações Sobrepostas no Card Vertical Proporcionais ao Viewport */}
-        <div className="absolute inset-x-0 bottom-0 p-2 sm:p-2.5 flex flex-col justify-end pointer-events-none">
-          <div className="flex items-center gap-1 mb-0.5 text-[9px] sm:text-[10px] font-semibold text-gray-300">
+        <div className={`absolute inset-x-0 bottom-0 ${isFireTv ? 'p-1.5' : 'p-2 sm:p-2.5'} flex flex-col justify-end pointer-events-none`}>
+          <div className={`flex items-center gap-1 mb-0.5 ${isFireTv ? 'text-[8px]' : 'text-[9px] sm:text-[10px]'} font-semibold text-gray-300`}>
             {item.rating ? (
-              <span className="inline-flex items-center gap-0.5 text-amber-400 font-bold bg-black/60 px-1 py-0.2 rounded text-[8.5px] sm:text-[9px] border border-amber-400/30">
-                <Star className="w-2 h-2 fill-amber-400" />
+              <span className={`inline-flex items-center gap-0.5 text-amber-400 font-bold bg-black/60 ${isFireTv ? 'px-0.5 py-0.2 text-[7.5px]' : 'px-1 py-0.2 text-[8.5px] sm:text-[9px]'} rounded border border-amber-400/30`}>
+                <Star className={`${isFireTv ? 'w-1.5 h-1.5' : 'w-2 h-2'} fill-amber-400`} />
                 {item.rating.toFixed(1)}
               </span>
             ) : null}
@@ -336,14 +337,14 @@ export const TvCard16x9: React.FC<TvCardProps> = memo(({
             {isEpisodic && (
               <>
                 <span>•</span>
-                <span className="text-cyan-300 font-medium truncate max-w-[80px]">
+                <span className={`text-cyan-300 font-medium truncate ${isFireTv ? 'max-w-[60px]' : 'max-w-[80px]'}`}>
                   {continuity?.label || (item.type === ContentType.ANIME ? 'Anime' : 'Série')}
                 </span>
               </>
             )}
           </div>
 
-          <h3 className="text-[10.5px] sm:text-xs font-bold text-white tracking-tight line-clamp-1 drop-shadow-md">
+          <h3 className={`${isFireTv ? 'text-[9.5px]' : 'text-[10.5px] sm:text-xs'} font-bold text-white tracking-tight line-clamp-1 drop-shadow-md`}>
             {item.title}
           </h3>
         </div>

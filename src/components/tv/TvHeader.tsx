@@ -28,10 +28,11 @@ const TvNavTabButton: React.FC<{
   isActive: boolean;
   fontSize?: number;
   scaleCategory?: TvScaleCategory;
+  isFireTv?: boolean;
   onClick: () => void;
   onFocusTab: (key: string, el: HTMLElement | null) => void;
   onBlurTab: (key: string) => void;
-}> = ({ focusKey, label, isActive, fontSize, scaleCategory = 'expanded', onClick, onFocusTab, onBlurTab }) => {
+}> = ({ focusKey, label, isActive, fontSize, scaleCategory = 'expanded', isFireTv = false, onClick, onFocusTab, onBlurTab }) => {
   const { ref, focused } = useTvFocusable({
     focusKey,
     onEnterPress: onClick,
@@ -71,11 +72,9 @@ const TvNavTabButton: React.FC<{
     }
   }, [focused, focusKey, onFocusTab, onBlurTab]);
 
-  const paddingClass = scaleCategory === 'compact'
-    ? 'py-1 px-2'
-    : scaleCategory === 'standard'
-    ? 'py-1.5 px-2.5'
-    : 'py-2 px-3';
+  const paddingClass = isFireTv
+    ? (scaleCategory === 'compact' ? 'py-0.5 px-1.5' : scaleCategory === 'standard' ? 'py-1 px-2' : 'py-1.5 px-2.5')
+    : (scaleCategory === 'compact' ? 'py-1 px-2' : scaleCategory === 'standard' ? 'py-1.5 px-2.5' : 'py-2 px-3');
 
   return (
     <button
@@ -117,8 +116,11 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
   const isFireTvOrEco = tvPerformanceService.isFireTv() || tvPerformanceService.getHardwareProfile() === 'eco';
   const logoVideoRef = useRef<HTMLVideoElement>(null);
   const viewport = useTvViewport();
+  const isFireTv = viewport.isFireTv;
 
-  const indicatorWidth = viewport.scaleCategory === 'compact' ? 24 : viewport.scaleCategory === 'standard' ? 28 : 32;
+  const indicatorWidth = isFireTv
+    ? (viewport.scaleCategory === 'compact' ? 20 : viewport.scaleCategory === 'standard' ? 24 : 28)
+    : (viewport.scaleCategory === 'compact' ? 24 : viewport.scaleCategory === 'standard' ? 28 : 32);
   const indicatorBottom = viewport.scaleCategory === 'compact' ? 10 : viewport.scaleCategory === 'standard' ? 16 : 22;
   const actionBtnSize = viewport.actionBtnSize;
   const searchIconSize = viewport.actionIconSize;
@@ -147,12 +149,14 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
     let computedTop = 42;
     if (navRect.width > 0 && buttonRect.width > 0) {
       centerX = (buttonRect.left + buttonRect.width / 2) - navRect.left;
-      computedTop = Math.round(buttonRect.bottom - navRect.top + 3);
+      computedTop = Math.round(buttonRect.bottom - navRect.top + (isFireTv ? 2 : 3));
     } else {
       centerX = buttonEl.offsetLeft + (buttonEl.offsetWidth || 80) / 2;
-      computedTop = Math.round(buttonEl.offsetTop + buttonEl.offsetHeight + 3);
+      computedTop = Math.round(buttonEl.offsetTop + buttonEl.offsetHeight + (isFireTv ? 2 : 3));
     }
-    const currentIndicatorW = viewport.scaleCategory === 'compact' ? 24 : viewport.scaleCategory === 'standard' ? 28 : 32;
+    const currentIndicatorW = isFireTv
+      ? (viewport.scaleCategory === 'compact' ? 20 : viewport.scaleCategory === 'standard' ? 24 : 28)
+      : (viewport.scaleCategory === 'compact' ? 24 : viewport.scaleCategory === 'standard' ? 28 : 32);
     const targetX = Math.round(centerX - currentIndicatorW / 2);
 
     setIndicatorTop(computedTop);
@@ -173,7 +177,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
       setIndicatorVisible(true);
       isIndicatorVisibleRef.current = true;
     }
-  }, [viewport.scaleCategory]);
+  }, [viewport.scaleCategory, isFireTv]);
 
   const handleTabFocus = useCallback((key: string, buttonEl: HTMLElement | null) => {
     if (blurTimerRef.current) {
@@ -306,7 +310,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
         <div
           aria-hidden="true"
           className="absolute z-0 inset-x-0 top-0 pointer-events-none select-none overflow-hidden"
-          style={{ height: `${viewport.headerHeight + 50}px` }}
+          style={{ height: `${viewport.headerHeight + (isFireTv ? 38 : 50)}px` }}
         >
           {/* Desfoque Real Progressivo via backdrop-filter e máscara gradual */}
           <div
@@ -342,7 +346,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
               uiSoundService.play('navigate');
               onSelectTab('home');
             }}
-            className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 cursor-pointer group/logo outline-none focus:outline-none pointer-events-auto"
+            className={`flex items-center ${isFireTv ? 'gap-1' : 'gap-1.5 sm:gap-2'} flex-shrink-0 cursor-pointer group/logo outline-none focus:outline-none pointer-events-auto`}
           >
             <div 
               className="flex items-center justify-center relative flex-shrink-0"
@@ -396,6 +400,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
               label="Início"
               fontSize={viewport.navFontSize}
               scaleCategory={viewport.scaleCategory}
+              isFireTv={isFireTv}
               isActive={currentTab === 'home'}
               onFocusTab={handleTabFocus}
               onBlurTab={handleTabBlur}
@@ -409,6 +414,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
               label="Filmes"
               fontSize={viewport.navFontSize}
               scaleCategory={viewport.scaleCategory}
+              isFireTv={isFireTv}
               isActive={currentTab === 'movies'}
               onFocusTab={handleTabFocus}
               onBlurTab={handleTabBlur}
@@ -422,6 +428,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
               label="Séries"
               fontSize={viewport.navFontSize}
               scaleCategory={viewport.scaleCategory}
+              isFireTv={isFireTv}
               isActive={currentTab === 'series'}
               onFocusTab={handleTabFocus}
               onBlurTab={handleTabBlur}
@@ -435,6 +442,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
               label="Animes"
               fontSize={viewport.navFontSize}
               scaleCategory={viewport.scaleCategory}
+              isFireTv={isFireTv}
               isActive={currentTab === 'animes'}
               onFocusTab={handleTabFocus}
               onBlurTab={handleTabBlur}
@@ -448,6 +456,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
               label="Ao Vivo"
               fontSize={viewport.navFontSize}
               scaleCategory={viewport.scaleCategory}
+              isFireTv={isFireTv}
               isActive={currentTab === 'featured'}
               onFocusTab={handleTabFocus}
               onBlurTab={handleTabBlur}
@@ -461,7 +470,7 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
           {/* 3. Região Direita: Busca e Perfil (flex-shrink-0 ml-auto) */}
           <div 
             className="flex items-center flex-shrink-0 ml-auto pointer-events-auto"
-            style={{ gap: viewport.scaleCategory === 'compact' ? '12px' : '16px' }}
+            style={{ gap: isFireTv ? (viewport.scaleCategory === 'compact' ? '8px' : '12px') : (viewport.scaleCategory === 'compact' ? '12px' : '16px') }}
           >
             {/* Botão de Busca */}
             <button

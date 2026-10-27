@@ -77,12 +77,16 @@ class TvViewportService {
    */
   public computeMetrics(customUa?: string): TvViewportMetrics {
     const ua = (customUa || (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '').toLowerCase();
-    const isExplicitNonFireTv = /tizen|maple|samsung.*(?:tv|smarttv)|webos|lg\s*browser/i.test(ua) || 
-      (/mediastationx|media\s*station\s*x/i.test(ua) && !(/aft|amazon|fire/i.test(ua)));
+    const mockFamily = typeof window !== 'undefined' ? (window as any).__MOCK_DEVICE_FAMILY__ : undefined;
+
+    const isExplicitNonFireTv = mockFamily ? mockFamily !== 'firetv' : (
+      /tizen|maple|samsung.*(?:tv|smarttv)|webos|lg\s*browser/i.test(ua) || 
+      (/mediastationx|media\s*station\s*x/i.test(ua) && !(/aft|amazon|fire/i.test(ua)))
+    );
 
     if (typeof window === 'undefined') {
-      const isFireTv = !isExplicitNonFireTv && tvPerformanceService.isFireTv(customUa);
-      const deviceFamily = isFireTv ? 'firetv' : tvPerformanceService.getDeviceFamily(customUa);
+      const isFireTv = !isExplicitNonFireTv && (mockFamily === 'firetv' || tvPerformanceService.isFireTv(customUa));
+      const deviceFamily = isFireTv ? 'firetv' : (mockFamily || tvPerformanceService.getDeviceFamily(customUa));
 
       return {
         width: 1920,
@@ -95,14 +99,14 @@ class TvViewportService {
         scaleCategory: 'expanded',
         isFireTv,
         deviceFamily,
-        headerHeight: 92,
-        safeMarginX: 64,
-        logoIconSize: 48,
-        logoTextHeight: 28,
-        navFontSize: 21,
-        navGap: 28,
-        actionBtnSize: 52,
-        actionIconSize: 26,
+        headerHeight: isFireTv ? 82 : 92,
+        safeMarginX: isFireTv ? 56 : 64,
+        logoIconSize: isFireTv ? 42 : 48,
+        logoTextHeight: isFireTv ? 24 : 28,
+        navFontSize: isFireTv ? 18 : 21,
+        navGap: isFireTv ? 24 : 28,
+        actionBtnSize: isFireTv ? 46 : 52,
+        actionIconSize: isFireTv ? 23 : 26,
         heroTitleSize: 48,
         heroBtnHeight: 54,
         heroDotsBottom: 48,
@@ -111,11 +115,11 @@ class TvViewportService {
         cardWidth: 265,
         cardGap: 20,
         rowTitleSize: 24,
-        searchSidebarWidth: isFireTv ? 380 : 380,
-        keyboardKeyHeight: isFireTv ? 44 : 46,
-        keyboardFontSize: isFireTv ? 16 : 17,
+        searchSidebarWidth: isFireTv ? 360 : 380,
+        keyboardKeyHeight: isFireTv ? 42 : 46,
+        keyboardFontSize: isFireTv ? 15 : 17,
         loaderSize: 120,
-        hudMaxW: 'max-w-5xl'
+        hudMaxW: isFireTv ? 'max-w-[900px]' : 'max-w-5xl'
       };
     }
 
@@ -130,11 +134,12 @@ class TvViewportService {
 
     // Detecção segura e isolada da família do dispositivo
     const isFireTv = !isExplicitNonFireTv && (
+      mockFamily === 'firetv' ||
       tvPerformanceService.isFireTv(customUa) || 
       // Fallback para mock/ambiente de teste do Fire TV Stick (960x540 DPR 2.0) sem UA explícito de outra plataforma
       ((!ua || ua.includes('node')) && width <= 960 && height <= 540 && dpr >= 1.8)
     );
-    const deviceFamily = isFireTv ? 'firetv' : tvPerformanceService.getDeviceFamily(customUa);
+    const deviceFamily = isFireTv ? 'firetv' : (mockFamily || tvPerformanceService.getDeviceFamily(customUa));
 
     // Categorização de escala da Smart TV:
     // - compact: Fire TV Stick ou telas com largura <= 1080px ou altura <= 600px
@@ -150,6 +155,7 @@ class TvViewportService {
     }
 
     // Parâmetros de design fluidos e proporcionais a cada categoria
+    // Padrão não-Fire TV (Samsung Tizen, LG webOS, MSX, desktop) preservado integralmente
     let headerHeight = 92;
     let safeMarginX = 64;
     let logoIconSize = 48;
@@ -166,72 +172,120 @@ class TvViewportService {
     let cardWidth = 265;
     let cardGap = 20;
     let rowTitleSize = 24;
-    let searchSidebarWidth = isFireTv ? 380 : 380;
-    let keyboardKeyHeight = isFireTv ? 44 : 46;
-    let keyboardFontSize = isFireTv ? 16 : 17;
+    let searchSidebarWidth = 380;
+    let keyboardKeyHeight = 46;
+    let keyboardFontSize = 17;
     let loaderSize = 120;
     let hudMaxW = 'max-w-5xl';
 
-    if (scaleCategory === 'compact') {
-      headerHeight = 60;
-      safeMarginX = 32;
-      logoIconSize = 34;
-      logoTextHeight = 18;
-      navFontSize = 14;
-      navGap = 10;
-      actionBtnSize = 38;
-      actionIconSize = 18;
-      heroTitleSize = 24;
-      heroBtnHeight = 36;
-      heroDotsBottom = 20;
-      heroDotsWidth = 18;
-      heroDotsHeight = 4;
-      // Proporção precisa para 6,5 capas na tela de 960x540 (6 completas + 48.5% da 7ª capa visível)
-      cardWidth = 132;
-      cardGap = 12;
-      rowTitleSize = 16;
-      loaderSize = 76;
-      hudMaxW = 'max-w-3xl';
+    if (isFireTv) {
+      headerHeight = 82;
+      safeMarginX = 56;
+      logoIconSize = 42;
+      logoTextHeight = 24;
+      navFontSize = 18;
+      navGap = 24;
+      actionBtnSize = 46;
+      actionIconSize = 23;
+      searchSidebarWidth = 360;
+      keyboardKeyHeight = 42;
+      keyboardFontSize = 15;
+      loaderSize = 104;
+      hudMaxW = 'max-w-[900px]';
+    }
 
-      // Dimensionamento do teclado e coluna lateral isolado por família de dispositivo:
+    if (scaleCategory === 'compact') {
       if (isFireTv) {
+        // Amazon Fire TV Stick compacto (960x540 / viewport reduzido)
+        headerHeight = 52;
+        safeMarginX = 28;
+        logoIconSize = 30;
+        logoTextHeight = 16;
+        navFontSize = 12;
+        navGap = 8;
+        actionBtnSize = 34;
+        actionIconSize = 16;
+        heroTitleSize = 22;
+        heroBtnHeight = 33;
+        heroDotsBottom = 18;
+        heroDotsWidth = 16;
+        heroDotsHeight = 4;
+        cardWidth = 132;
+        cardGap = 12;
+        rowTitleSize = 15;
+        loaderSize = 68;
+        hudMaxW = 'max-w-[620px]';
         searchSidebarWidth = 260;
         keyboardKeyHeight = 30;
         keyboardFontSize = 11;
       } else {
-        // Smart TVs normais (Samsung Tizen, MSX, etc.): altura confortável, sem achatamento
+        // Smart TVs normais (Samsung Tizen, MSX, etc.): proporções originais
+        headerHeight = 60;
+        safeMarginX = 32;
+        logoIconSize = 34;
+        logoTextHeight = 18;
+        navFontSize = 14;
+        navGap = 10;
+        actionBtnSize = 38;
+        actionIconSize = 18;
+        heroTitleSize = 24;
+        heroBtnHeight = 36;
+        heroDotsBottom = 20;
+        heroDotsWidth = 18;
+        heroDotsHeight = 4;
+        cardWidth = 132;
+        cardGap = 12;
+        rowTitleSize = 16;
+        loaderSize = 76;
+        hudMaxW = 'max-w-3xl';
         searchSidebarWidth = 300;
         keyboardKeyHeight = 38;
         keyboardFontSize = 14;
       }
     } else if (scaleCategory === 'standard') {
-      headerHeight = 76;
-      safeMarginX = 48;
-      logoIconSize = 42;
-      logoTextHeight = 22;
-      navFontSize = 17;
-      navGap = 18;
-      actionBtnSize = 44;
-      actionIconSize = 22;
-      heroTitleSize = 36;
-      heroBtnHeight = 46;
-      heroDotsBottom = 34;
-      heroDotsWidth = 24;
-      heroDotsHeight = 6;
-      // Proporção precisa para 6,5 capas na tela de 1280x720 (6 completas + 49% da 7ª capa visível)
-      cardWidth = 175;
-      cardGap = 16;
-      rowTitleSize = 20;
-      loaderSize = 96;
-      hudMaxW = 'max-w-4xl';
-
-      // Dimensionamento do teclado e coluna lateral isolado por família de dispositivo:
       if (isFireTv) {
+        // Amazon Fire TV standard (1280x720 / 720p)
+        headerHeight = 68;
+        safeMarginX = 42;
+        logoIconSize = 37;
+        logoTextHeight = 19;
+        navFontSize = 15;
+        navGap = 15;
+        actionBtnSize = 38;
+        actionIconSize = 19;
+        heroTitleSize = 32;
+        heroBtnHeight = 41;
+        heroDotsBottom = 30;
+        heroDotsWidth = 21;
+        heroDotsHeight = 5;
+        cardWidth = 175;
+        cardGap = 16;
+        rowTitleSize = 18;
+        loaderSize = 84;
+        hudMaxW = 'max-w-[760px]';
         searchSidebarWidth = 330;
         keyboardKeyHeight = 36;
         keyboardFontSize = 14;
       } else {
-        // Smart TVs normais (Samsung Tizen, MSX, etc.): dimensões confortáveis e proporcionais
+        // Smart TVs normais (Samsung Tizen, MSX, etc.): proporções originais
+        headerHeight = 76;
+        safeMarginX = 48;
+        logoIconSize = 42;
+        logoTextHeight = 22;
+        navFontSize = 17;
+        navGap = 18;
+        actionBtnSize = 44;
+        actionIconSize = 22;
+        heroTitleSize = 36;
+        heroBtnHeight = 46;
+        heroDotsBottom = 34;
+        heroDotsWidth = 24;
+        heroDotsHeight = 6;
+        cardWidth = 175;
+        cardGap = 16;
+        rowTitleSize = 20;
+        loaderSize = 96;
+        hudMaxW = 'max-w-4xl';
         searchSidebarWidth = 340;
         keyboardKeyHeight = 42;
         keyboardFontSize = 15;
@@ -301,12 +355,17 @@ class TvViewportService {
     if (!root || !body) return;
 
     // Atualiza classes semânticas no elemento raiz
-    root.classList.remove('tv-vp-compact', 'tv-vp-standard', 'tv-vp-expanded');
-    body.classList.remove('tv-vp-compact', 'tv-vp-standard', 'tv-vp-expanded');
+    root.classList.remove('tv-vp-compact', 'tv-vp-standard', 'tv-vp-expanded', 'tv-firetv');
+    body.classList.remove('tv-vp-compact', 'tv-vp-standard', 'tv-vp-expanded', 'tv-firetv');
 
     const catClass = `tv-vp-${this.currentMetrics.scaleCategory}`;
     root.classList.add(catClass);
     body.classList.add(catClass);
+
+    if (this.currentMetrics.isFireTv) {
+      root.classList.add('tv-firetv');
+      body.classList.add('tv-firetv');
+    }
 
     // CSS Custom Properties para componentes acessarem nativamente em estilos
     root.style.setProperty('--tv-header-height', `${this.currentMetrics.headerHeight}px`);
