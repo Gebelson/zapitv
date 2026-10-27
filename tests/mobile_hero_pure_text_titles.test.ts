@@ -143,8 +143,8 @@ async function runTestSuite() {
   assert.ok(heroCode.includes('pb-[9px]'), 'Padding inferior do banner mantido em 9px');
   assert.ok(heroCode.includes('mt-[19px]'), 'Margem superior dos dots mantida em 19px');
 
-  // Camada anti-flash preservada
-  assert.ok(heroCode.includes('prevImage') && heroCode.includes('currentDisplayImage'), 'Camada anti-flash preservada');
+  // Camada de imagem sem sobreposição preservada
+  assert.ok(heroCode.includes('currentDisplayImage'), 'Imagem atual totalmente opaca preservada');
   assert.ok(heroCode.includes('preloadHeroItem'), 'Pré-carregamento de imagens de fundo preservado');
 
   console.log('  ✅ Posicionamento de botões, dots, metadados e camadas anti-flash 100% preservados.');

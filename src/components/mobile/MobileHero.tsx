@@ -20,6 +20,8 @@ export interface ActiveHeroSlide {
   generation: number;
 }
 
+export type HeroFadePhase = 'idle' | 'fade-out' | 'fade-in';
+
 export const MobileHero: React.FC<MobileHeroProps> = ({
   featuredItems,
   myList = [],
@@ -59,10 +61,9 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
       generation: 0
     };
   });
-  const [prevSlide, setPrevSlide] = useState<ActiveHeroSlide | null>(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [fadePhase, setFadePhase] = useState<HeroFadePhase>('idle');
 
-  // Transição coordenada atômica: garante que título, metadados e imagem pertençam à mesma obra
+  // Transição coordenada atômica: passagem limpa por fundo escuro sólido (#05070a) sem sobreposição
   useEffect(() => {
     if (!targetItem) return;
 
@@ -93,27 +94,53 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
           return;
         }
 
-        // Atualização atômica coordenada:
-        // Preserva o slide anterior na camada de baixo para transição suave sem flash
-        if (displayedSlide) {
-          setPrevSlide(displayedSlide);
+        // Pré-carrega a imagem na memória antes de iniciar a transição
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.src = nextImageUrl;
+          if (img.complete) {
+            resolve();
+          } else {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+          }
+        });
+
+        if (!isMounted || controller.signal.aborted || currentGen !== generationRef.current) {
+          return;
         }
 
-        setDisplayedSlide({
-          item: targetItem,
-          imageUrl: nextImageUrl,
-          generation: currentGen
-        });
-        setIsTransitioning(true);
-
-        setTimeout(() => {
-          if (isMounted && currentGen === generationRef.current) {
-            setPrevSlide(null);
-            setIsTransitioning(false);
+        // Transição limpa com passagem por fundo escuro sólido:
+        // Elimina qualquer mistura ou sobreposição com a imagem do banner anterior
+        if (displayedSlide) {
+          setFadePhase('fade-out');
+          await new Promise(r => setTimeout(r, 150));
+          if (!isMounted || controller.signal.aborted || currentGen !== generationRef.current) {
+            return;
           }
-        }, 500);
 
-        // Pré-carrega o próximo slide antecipadamente (apenas imagem de fundo)
+          setDisplayedSlide({
+            item: targetItem,
+            imageUrl: nextImageUrl,
+            generation: currentGen
+          });
+          setFadePhase('fade-in');
+
+          await new Promise(r => setTimeout(r, 200));
+          if (!isMounted || controller.signal.aborted || currentGen !== generationRef.current) {
+            return;
+          }
+          setFadePhase('idle');
+        } else {
+          setDisplayedSlide({
+            item: targetItem,
+            imageUrl: nextImageUrl,
+            generation: currentGen
+          });
+          setFadePhase('idle');
+        }
+
+        // Pré-carrega o próximo slide antecipadamente
         if (total > 1) {
           const nextIndex = (currentIndex + 1) % total;
           const nextItem = activeItems[nextIndex];
@@ -149,9 +176,8 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
   const slideItem = displayedSlide?.item || targetItem;
   if (!slideItem || !displayedSlide) return null;
 
-  // Aliases sincronizados para a camada dupla anti-flash do banner
+  // Imagem do slide ativo
   const currentDisplayImage = displayedSlide.imageUrl;
-  const prevImage = prevSlide?.imageUrl || null;
 
   const isInList = myList.includes(slideItem.id);
   const isPlayable = catalogEligibilityService.isItemPubliclyPlayableSync(slideItem);
@@ -191,25 +217,17 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
       onTouchEnd={handleTouchEnd}
       className="relative w-full h-[58vh] min-h-[420px] max-h-[560px] overflow-hidden select-none bg-[#05070a]"
     >
-      {/* Imagem de Fundo com Enquadramento Otimizado para Mobile */}
-      <div className="absolute inset-0">
-        {/* Camada do slide anterior preservada durante transição para eliminar flash preto */}
-        {prevImage && (
-          <img
-            src={prevImage}
-            alt=""
-            aria-hidden="true"
-            className="absolute inset-0 w-full h-full object-cover object-top filter brightness-[0.9]"
-          />
-        )}
-
-        {/* Camada ativa do slide atual com transição suave */}
+      {/* Imagem de Fundo com Enquadramento Otimizado para Mobile e Fundo Sólido Anti-Transparência */}
+      <div className="absolute inset-0 bg-[#05070a]">
+        {/* Camada ativa do slide atual com imagem totalmente opaca sobre fundo sólido escuro */}
         <img
           key={`hero-bg-${displayedSlide.item.id}-${currentDisplayImage}`}
           src={currentDisplayImage}
           alt={displayedSlide.item.title}
-          className={`w-full h-full object-cover object-top filter brightness-[0.9] transition-opacity duration-500 ${
-            isTransitioning ? 'opacity-90' : 'opacity-100'
+          className={`w-full h-full object-cover object-top filter brightness-[0.9] transition-opacity ${
+            fadePhase === 'fade-out'
+              ? 'opacity-0 duration-150 ease-out'
+              : 'opacity-100 duration-200 ease-in'
           }`}
           onError={() => {
             // Em caso de erro em tempo de execução, registra a falha e tenta o próximo candidato para o item ativo
@@ -221,7 +239,7 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
           }}
         />
 
-        {/* Gradientes cinematográficos para legibilidade mobile */}
+        {/* Gradientes cinematográficos aplicados exclusivamente sobre a imagem do conteúdo atual */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#05070a] via-[#05070a]/60 to-transparent pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-to-b from-[#05070a]/80 via-transparent to-transparent opacity-80 pointer-events-none" />
       </div>

@@ -200,14 +200,14 @@ assert(heroCode.includes('h-[58vh]') || heroCode.includes('min-h-[420px]'), 'Mob
 assert(heroCode.includes('object-cover object-top'), 'MobileHero deve usar object-cover object-top');
 assert(heroCode.includes('from-[#05070a]'), 'MobileHero deve ter gradiente from-[#05070a]');
 
-// 2. Camada dupla de transição (elimina tela preta e flashes brancos)
+// 2. Camada única totalmente opaca sobre fundo sólido escuro (elimina sobreposição e transparência de banners anteriores)
 assert(
-  heroCode.includes('prevImage') && heroCode.includes('currentDisplayImage'),
-  'MobileHero deve manter prevImage e currentDisplayImage para crossfade sem flash preto'
+  heroCode.includes('currentDisplayImage'),
+  'MobileHero deve renderizar a imagem oficial atual (currentDisplayImage)'
 );
 assert(
-  heroCode.includes('transition-opacity duration-500'),
-  'MobileHero deve ter transição suave de opacidade duration-500'
+  heroCode.includes('fadePhase') && heroCode.includes('bg-[#05070a]'),
+  'MobileHero deve transicionar sobre fundo sólido escuro anti-transparência'
 );
 
 // 3. Pré-carregamento do próximo slide
