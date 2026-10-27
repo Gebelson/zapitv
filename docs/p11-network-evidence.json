@@ -1,0 +1,89 @@
+{
+  "testedAt": "2026-10-27T17:56:56.997Z",
+  "catalog": [
+    {
+      "method": "discoverMovies",
+      "offline": {
+        "error": "temporary_discovery_failure"
+      },
+      "online": {
+        "count": 36,
+        "hasMore": true,
+        "partial": false
+      }
+    },
+    {
+      "method": "discoverSeries",
+      "offline": {
+        "error": "temporary_discovery_failure"
+      },
+      "online": {
+        "count": 20,
+        "hasMore": true,
+        "partial": false
+      }
+    },
+    {
+      "method": "discoverAnimes",
+      "offline": {
+        "error": "temporary_discovery_failure"
+      },
+      "online": {
+        "count": 59,
+        "hasMore": true,
+        "partial": false
+      }
+    }
+  ],
+  "live": {
+    "channel": "tv-camara",
+    "initial": {
+      "time": 127.030298,
+      "readyState": 4,
+      "error": null,
+      "frames": 574
+    },
+    "offline": {
+      "time": 155.901951,
+      "readyState": 2,
+      "error": null,
+      "frames": 1437
+    },
+    "reconnected": {
+      "time": 185.448468,
+      "readyState": 4,
+      "error": null,
+      "frames": 2325
+    },
+    "final": {
+      "time": 201.466435,
+      "readyState": 4,
+      "error": null,
+      "frames": 2805
+    },
+    "events": [
+      {
+        "type": "waiting",
+        "at": 1524.2000000476837,
+        "time": 0
+      },
+      {
+        "type": "playing",
+        "at": 2338.800000011921,
+        "time": 108.042415
+      },
+      {
+        "type": "waiting",
+        "at": 50239.5,
+        "time": 155.901951
+      },
+      {
+        "type": "playing",
+        "at": 56857.700000047684,
+        "time": 155.946843
+      }
+    ],
+    "audioAuditioned": false
+  },
+  "completedAt": "2026-10-27T17:58:39.532Z"
+}

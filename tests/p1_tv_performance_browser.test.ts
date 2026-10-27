@@ -4,7 +4,7 @@ import { chromium, type Browser } from 'playwright';
 import fs from 'node:fs';
 
 async function run() {
-  const server = await createServer({ server: { port: 0, host: '127.0.0.1' }, logLevel: 'error' });
+  const server = await createServer({ server: { port: 0, host: '127.0.0.1', watch: null }, logLevel: 'error' });
   let browser: Browser | undefined;
   const results: Record<string, unknown>[] = [];
   try {
@@ -39,13 +39,27 @@ async function run() {
         assert.equal(metrics.isFireTv, device === 'FireTV');
         if ((process.env.P1_ASSERT_OPTIMIZED === '1' || process.argv.includes('--verify')) && device === 'FireTV') assert.ok(metrics.commits <= 2);
         await page.evaluate(() => (window as any).p1Focus());
+        await page.locator('[data-focus-key="row-p1-row"][data-tv-focused="true"]').waitFor();
         await page.keyboard.press('ArrowRight');
         await page.waitForTimeout(400);
+        await page.waitForFunction(() => (document.querySelector('[data-row-id="p1-row"] .relative.z-10.flex') as HTMLElement)?.style.transition === 'none');
+        await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
         await page.keyboard.press('Enter');
-        await page.waitForFunction(() => (window as any).p1Metrics.selected === 'fixture-1');
-        for (const key of ['ArrowLeft', 'ArrowLeft', 'ArrowRight']) {
+        await page.waitForFunction(() => (window as any).p1Metrics.selected !== '');
+        assert.equal(await page.evaluate(() => (window as any).p1Metrics.selected), 'fixture-1');
+        for (const [key, expected] of [['ArrowLeft', 'fixture-0'], ['ArrowLeft', 'fixture-39'], ['ArrowRight', 'fixture-0']]) {
           await page.keyboard.press(key);
-          await page.waitForTimeout(400);
+          await page.waitForFunction(() => {
+            const track = document.querySelector('[data-row-id="p1-row"] .relative.z-10.flex') as HTMLElement | null;
+            return track && track.style.transition !== 'none';
+          });
+          await page.waitForFunction(() => {
+            const track = document.querySelector('[data-row-id="p1-row"] .relative.z-10.flex') as HTMLElement | null;
+            return track?.style.transition === 'none';
+          });
+          await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+          await page.keyboard.press('Enter');
+          assert.equal(await page.evaluate(() => (window as any).p1Metrics.selected), expected);
         }
         assert.equal(await page.evaluate(() => (window as any).p1Metrics.pagesRequested), 1, 'remote navigation reaches the pagination callback at the end of the row');
         results.push({ device, ...metrics, keyboard: 'ArrowRight + Enter passed' });

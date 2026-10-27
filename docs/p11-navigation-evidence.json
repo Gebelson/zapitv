@@ -1,0 +1,705 @@
+{
+  "testedAt": "2026-10-27T17:56:18.039Z",
+  "results": [
+    {
+      "device": "desktop",
+      "simulated": false,
+      "pages": [
+        {
+          "route": "/filmes",
+          "elapsedMs": 11996,
+          "initial": {
+            "dom": 860,
+            "images": 26,
+            "bodyCharacters": 882,
+            "route": "/filmes"
+          },
+          "final": {
+            "dom": 1131,
+            "images": 36,
+            "focused": null
+          },
+          "keyDispatchRoundTripMs": [],
+          "heapBytes": 26179040
+        },
+        {
+          "route": "/series",
+          "elapsedMs": 10887,
+          "initial": {
+            "dom": 860,
+            "images": 26,
+            "bodyCharacters": 770,
+            "route": "/series"
+          },
+          "final": {
+            "dom": 813,
+            "images": 24,
+            "focused": null
+          },
+          "keyDispatchRoundTripMs": [],
+          "heapBytes": 59145420
+        },
+        {
+          "route": "/animes",
+          "elapsedMs": 11769,
+          "initial": {
+            "dom": 860,
+            "images": 26,
+            "bodyCharacters": 1005,
+            "route": "/animes"
+          },
+          "final": {
+            "dom": 1266,
+            "images": 41,
+            "focused": null
+          },
+          "keyDispatchRoundTripMs": [],
+          "heapBytes": 35811812
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "device": "mobile",
+      "simulated": true,
+      "pages": [
+        {
+          "route": "/filmes",
+          "elapsedMs": 9344,
+          "initial": {
+            "dom": 2986,
+            "images": 228,
+            "bodyCharacters": 7555,
+            "route": "/filmes"
+          },
+          "final": {
+            "dom": 2986,
+            "images": 228,
+            "focused": null
+          },
+          "keyDispatchRoundTripMs": [],
+          "heapBytes": 25064568
+        },
+        {
+          "route": "/series",
+          "elapsedMs": 9030,
+          "initial": {
+            "dom": 1293,
+            "images": 92,
+            "bodyCharacters": 2829,
+            "route": "/series"
+          },
+          "final": {
+            "dom": 1293,
+            "images": 92,
+            "focused": null
+          },
+          "keyDispatchRoundTripMs": [],
+          "heapBytes": 28267252
+        },
+        {
+          "route": "/animes",
+          "elapsedMs": 8944,
+          "initial": {
+            "dom": 1618,
+            "images": 117,
+            "bodyCharacters": 4147,
+            "route": "/animes"
+          },
+          "final": {
+            "dom": 1618,
+            "images": 117,
+            "focused": null
+          },
+          "keyDispatchRoundTripMs": [],
+          "heapBytes": 34922292
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "device": "FireTV",
+      "simulated": true,
+      "pages": [
+        {
+          "route": "/tv/filmes",
+          "elapsedMs": 13722,
+          "initial": {
+            "dom": 1121,
+            "images": 85,
+            "bodyCharacters": 2707,
+            "route": "/tv/filmes"
+          },
+          "final": {
+            "dom": 1124,
+            "images": 85,
+            "focused": "tv-hero-play"
+          },
+          "keyDispatchRoundTripMs": [
+            164,
+            29,
+            42,
+            59,
+            85,
+            78,
+            33,
+            26,
+            43,
+            51,
+            22,
+            46,
+            27,
+            37,
+            36
+          ],
+          "focusSequence": [
+            {
+              "key": "ArrowDown",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowUp",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowDown",
+              "focus": "tv-hero-play"
+            }
+          ],
+          "heapBytes": 38737476
+        },
+        {
+          "route": "/tv/series",
+          "elapsedMs": 12722,
+          "initial": {
+            "dom": 1283,
+            "images": 85,
+            "bodyCharacters": 3216,
+            "route": "/tv/series"
+          },
+          "final": {
+            "dom": 1286,
+            "images": 85,
+            "focused": "tv-hero-play"
+          },
+          "keyDispatchRoundTripMs": [
+            65,
+            31,
+            44,
+            13,
+            20,
+            62,
+            70,
+            54,
+            25,
+            83,
+            35,
+            32,
+            48,
+            8,
+            56
+          ],
+          "focusSequence": [
+            {
+              "key": "ArrowDown",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowUp",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowDown",
+              "focus": "tv-hero-play"
+            }
+          ],
+          "heapBytes": 43499064
+        },
+        {
+          "route": "/tv/animes",
+          "elapsedMs": 13668,
+          "initial": {
+            "dom": 1412,
+            "images": 94,
+            "bodyCharacters": 3979,
+            "route": "/tv/animes"
+          },
+          "final": {
+            "dom": 1415,
+            "images": 94,
+            "focused": "tv-hero-play"
+          },
+          "keyDispatchRoundTripMs": [
+            89,
+            14,
+            94,
+            16,
+            75,
+            82,
+            29,
+            54,
+            23,
+            23,
+            22,
+            39,
+            65,
+            62,
+            36
+          ],
+          "focusSequence": [
+            {
+              "key": "ArrowDown",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowUp",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowDown",
+              "focus": "tv-hero-play"
+            }
+          ],
+          "heapBytes": 58735176
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "device": "Samsung",
+      "simulated": true,
+      "pages": [
+        {
+          "route": "/tv/filmes",
+          "elapsedMs": 14310,
+          "initial": {
+            "dom": 1122,
+            "images": 85,
+            "bodyCharacters": 2707,
+            "route": "/tv/filmes"
+          },
+          "final": {
+            "dom": 1131,
+            "images": 85,
+            "focused": "row-all-filmes"
+          },
+          "keyDispatchRoundTripMs": [
+            767,
+            23,
+            87,
+            34,
+            52,
+            64,
+            66,
+            59,
+            97,
+            55,
+            82,
+            32,
+            115,
+            14,
+            28
+          ],
+          "focusSequence": [
+            {
+              "key": "ArrowDown",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowUp",
+              "focus": "row-all-filmes"
+            },
+            {
+              "key": "ArrowDown",
+              "focus": "row-all-filmes"
+            }
+          ],
+          "heapBytes": 38642364
+        },
+        {
+          "route": "/tv/series",
+          "elapsedMs": 13454,
+          "initial": {
+            "dom": 1284,
+            "images": 85,
+            "bodyCharacters": 3216,
+            "route": "/tv/series"
+          },
+          "final": {
+            "dom": 1287,
+            "images": 85,
+            "focused": "tv-hero-play"
+          },
+          "keyDispatchRoundTripMs": [
+            97,
+            44,
+            101,
+            40,
+            98,
+            81,
+            76,
+            31,
+            57,
+            36,
+            22,
+            23,
+            37,
+            10,
+            39
+          ],
+          "focusSequence": [
+            {
+              "key": "ArrowDown",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowUp",
+              "focus": "row-all-séries"
+            },
+            {
+              "key": "ArrowDown",
+              "focus": "tv-hero-play"
+            }
+          ],
+          "heapBytes": 52130328
+        },
+        {
+          "route": "/tv/animes",
+          "elapsedMs": 13438,
+          "initial": {
+            "dom": 1413,
+            "images": 94,
+            "bodyCharacters": 3970,
+            "route": "/tv/animes"
+          },
+          "final": {
+            "dom": 1416,
+            "images": 94,
+            "focused": "tv-hero-play"
+          },
+          "keyDispatchRoundTripMs": [
+            90,
+            31,
+            31,
+            87,
+            24,
+            25,
+            24,
+            71,
+            74,
+            81,
+            13,
+            68,
+            49,
+            5,
+            48
+          ],
+          "focusSequence": [
+            {
+              "key": "ArrowDown",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowRight",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowUp",
+              "focus": "row-anime-simulcasts"
+            },
+            {
+              "key": "ArrowDown",
+              "focus": "tv-hero-play"
+            }
+          ],
+          "heapBytes": 71305316
+        }
+      ],
+      "pageErrors": []
+    }
+  ]
+}

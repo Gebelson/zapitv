@@ -1,0 +1,4455 @@
+{
+  "startedAt": "2026-10-27T17:42:51.435Z",
+  "origin": "http://localhost:4000",
+  "vodPlayback": false,
+  "catalog": [
+    {
+      "category": "movies",
+      "pages": [
+        {
+          "page": 1,
+          "count": 75,
+          "uniqueAccumulated": 75,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 715
+        },
+        {
+          "page": 2,
+          "count": 36,
+          "uniqueAccumulated": 104,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 132
+        },
+        {
+          "page": 3,
+          "count": 37,
+          "uniqueAccumulated": 134,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 116
+        },
+        {
+          "page": 4,
+          "count": 20,
+          "uniqueAccumulated": 144,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 116
+        },
+        {
+          "page": 5,
+          "count": 19,
+          "uniqueAccumulated": 159,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 117
+        },
+        {
+          "page": 6,
+          "count": 19,
+          "uniqueAccumulated": 174,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 115
+        }
+      ],
+      "filterDrama": {
+        "count": 62,
+        "partial": false,
+        "sample": [
+          {
+            "id": "tmdb-1236045",
+            "title": "Sobrevivência"
+          },
+          {
+            "id": "tmdb-1780005",
+            "title": "Contra o Furacão"
+          },
+          {
+            "id": "tmdb-1248832",
+            "title": "Digger"
+          }
+        ]
+      },
+      "eofVerified": false
+    },
+    {
+      "category": "series",
+      "pages": [
+        {
+          "page": 1,
+          "count": 66,
+          "uniqueAccumulated": 66,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 114
+        },
+        {
+          "page": 2,
+          "count": 20,
+          "uniqueAccumulated": 72,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 117
+        },
+        {
+          "page": 3,
+          "count": 19,
+          "uniqueAccumulated": 85,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 116
+        },
+        {
+          "page": 4,
+          "count": 19,
+          "uniqueAccumulated": 99,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 116
+        },
+        {
+          "page": 5,
+          "count": 18,
+          "uniqueAccumulated": 115,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 113
+        },
+        {
+          "page": 6,
+          "count": 17,
+          "uniqueAccumulated": 131,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 110
+        }
+      ],
+      "filterDrama": {
+        "count": 67,
+        "partial": false,
+        "sample": [
+          {
+            "id": "tmdb-1416",
+            "title": "Grey's Anatomy"
+          },
+          {
+            "id": "tmdb-2734",
+            "title": "Lei & Ordem: Unidade de Vítimas Especiais"
+          },
+          {
+            "id": "tt0460681",
+            "title": "Supernatural"
+          }
+        ]
+      },
+      "eofVerified": false
+    },
+    {
+      "category": "animes",
+      "pages": [
+        {
+          "page": 1,
+          "count": 56,
+          "uniqueAccumulated": 56,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 380
+        },
+        {
+          "page": 2,
+          "count": 59,
+          "uniqueAccumulated": 109,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 325
+        },
+        {
+          "page": 3,
+          "count": 60,
+          "uniqueAccumulated": 161,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 341
+        },
+        {
+          "page": 4,
+          "count": 58,
+          "uniqueAccumulated": 205,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 322
+        },
+        {
+          "page": 5,
+          "count": 60,
+          "uniqueAccumulated": 253,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 326
+        },
+        {
+          "page": 6,
+          "count": 58,
+          "uniqueAccumulated": 299,
+          "partial": false,
+          "hasMore": true,
+          "durationMs": 335
+        }
+      ],
+      "filterDrama": {
+        "count": 19,
+        "partial": false,
+        "sample": [
+          {
+            "id": "tmdb-220542",
+            "title": "Diários de uma Apotecária"
+          },
+          {
+            "id": "tmdb-209867",
+            "title": "Frieren e a Jornada para o Além"
+          },
+          {
+            "id": "tmdb-45247",
+            "title": "Chihayafuru"
+          }
+        ]
+      },
+      "eofVerified": false
+    }
+  ],
+  "titles": [
+    {
+      "title": "Sussurros do Coração",
+      "id": "tmdb-37797",
+      "imdbId": "tt0113824",
+      "tmdbId": "37797",
+      "resolvedTitle": "Sussurros do Coração",
+      "year": 1995,
+      "type": "ANIME",
+      "attempts": [
+        {
+          "provider": "zapitv-show-subtitle-pt-br",
+          "count": 105,
+          "success": true,
+          "timeout": false,
+          "durationMs": 16
+        },
+        {
+          "provider": "zapitv-cinema-aberto",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 41
+        },
+        {
+          "provider": "zapitv-blender-open",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 41
+        },
+        {
+          "provider": "zapitv-public-domain",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 6
+        },
+        {
+          "provider": "torrentio-brazuca",
+          "count": 55,
+          "success": true,
+          "timeout": false,
+          "durationMs": 57
+        },
+        {
+          "provider": "zapitv-mico-leao-dublado",
+          "count": 10,
+          "success": true,
+          "timeout": false,
+          "durationMs": 107
+        },
+        {
+          "provider": "torrentio-global",
+          "count": 50,
+          "success": true,
+          "timeout": false,
+          "durationMs": 91
+        },
+        {
+          "provider": "magnetflix-animes",
+          "count": 2,
+          "success": true,
+          "timeout": false,
+          "durationMs": 231
+        },
+        {
+          "provider": "fenixflix-animes",
+          "count": 3,
+          "success": true,
+          "timeout": false,
+          "durationMs": 282
+        },
+        {
+          "provider": "froststream-http",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 570
+        }
+      ],
+      "sources": [
+        {
+          "provider": "Magnetflix\nHD",
+          "declaredTitle": "🎬 Sussurros do Coração (1995)\n📺 HD • HLS\n🔊 Dublado PT-BR\n⚡ Servidor: Magnetflix #27",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FenixFlix 1080p",
+          "declaredTitle": "🐦‍🔥 Sussurros do Coração\n🇧🇷🇺🇸 Dual Áudio\n📍 FenixHub",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "Magnetflix\nHD",
+          "declaredTitle": "🎬 Sussurros do Coração (1995)\n📺 HD • HLS\n💬 Legendado PT-BR\n⚡ Servidor: Magnetflix #02",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "💬 Torrentio\n4k",
+          "declaredTitle": "Whisper of The Heart 4k\n👤 1 💾 11.86 GB ⚙️ TorrentGalaxy",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n4k",
+          "declaredTitle": "Whisper of The Heart 4k\n👤 1 💾 11.86 GB ⚙️ TorrentGalaxy",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper.Of.The.Heart.1995.JAPANESE.1080p.BluRay.H264.AAC-VXT\n👤 2 💾 2.12 GB ⚙️ RARBG",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart (Mimi wo Sumaseba) 1995 1080p Bluray x265 10Bit AAC 5.1 - GetSchwifty\n👤 2 💾 2.9 GB ⚙️ 1337x",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart 1995 1080p BluRay\n👤 65 💾 2.05 GB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper Of The Heart 1995 1080p BluRay x264-MELiTE\n👤 20 💾 7.65 GB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper Of The Heart 1995 NORDiC 1080p WEB-DL H 264 DDP5 1-NoTrace\n👤 18 💾 7.34 GB ⚙️ ThePirateBay\n🇩🇰 / 🇫🇮 / 🇸🇪 / 🇳🇴",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart 1995 1080p NF WEB-DL DDP5 1 HEVC-Saon\n👤 4 💾 2.59 GB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[ZeroCool] Whisper of the Heart getting railed in a sundress and knocked up on a dirt road edition.\n👤 4 💾 31.79 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper.of.the.Heart.1995.DUBBED.1080p.BluRay.x265-RARBG\n👤 3 💾 1.73 GB ⚙️ RARBG\nDubbed",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper.of.the.Heart.1995.JAPANESE.1080p.BluRay.x265-VXT\n👤 1 💾 1.73 GB ⚙️ RARBG",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart 1995 1080p BluRay\n👤 65 💾 2.05 GB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper Of The Heart 1995 1080p BluRay x264-MELiTE\n👤 20 💾 7.65 GB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper Of The Heart 1995 NORDiC 1080p WEB-DL H 264 DDP5 1-NoTrace\n👤 18 💾 7.34 GB ⚙️ ThePirateBay\n🇩🇰 / 🇫🇮 / 🇸🇪 / 🇳🇴",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Шепот сердца / Mimi wo Sumaseba / Whisper of the Heart (1995) BDRip 1080p | D | ZeroVoice\n👤 5 💾 6.95 GB ⚙️ Rutor\n🇬🇧 / 🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart 1995 1080p NF WEB-DL DDP5 1 HEVC-Saon\n👤 4 💾 2.59 GB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[ZeroCool] Whisper of the Heart getting railed in a sundress and knocked up on a dirt road edition.\n👤 4 💾 31.79 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Шёпот сердца / Mimi wo sumaseba (1995) BDRip 1080p от Leonardo and Scarabey | P\n👤 4 💾 8.37 GB ⚙️ Rutor\n🇷🇺 / 🇩🇪",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper.of.the.Heart.1995.DUBBED.1080p.BluRay.x265-RARBG\n👤 3 💾 1.73 GB ⚙️ RARBG\nDubbed",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Шепот сердца / Whisper of the Heart / Mimi wo Sumaseba (1995) BDRip-HEVC 1080p от RIPS CLUB | P P2 A L1\n👤 3 💾 9.49 GB ⚙️ Rutor\n🇷🇺 / 🇺🇦",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Шепот сердца / Mimi wo Sumaseba / Whisper of the Heart (1995) BDRip 1080p | D | ZeroVoice\n👤 2 💾 6.95 GB ⚙️ Rutor\n🇬🇧 / 🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio",
+          "declaredTitle": "Sussurros Do Coracao (1995) Dublado\n👤 0 💾 612.64 MB ⚙️ EXT\nDubbed / 🇵🇹",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart 1995 1080p BluRay\n👤 65 💾 2.05 GB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Whisper Of The Heart 1995 1080p BluRay x264-MELiTE\n👤 20 💾 7.65 GB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Whisper Of The Heart 1995 NORDiC 1080p WEB-DL H 264 DDP5 1-NoTrace\n👤 18 💾 7.34 GB ⚙️ ThePirateBay\n🇩🇰 / 🇫🇮 / 🇸🇪 / 🇳🇴",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart 1995 1080p NF WEB-DL DDP5 1 HEVC-Saon\n👤 4 💾 2.59 GB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[ZeroCool] Whisper of the Heart getting railed in a sundress and knocked up on a dirt road edition.\n👤 4 💾 31.79 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Whisper.of.the.Heart.1995.DUBBED.1080p.BluRay.x265-RARBG\n👤 3 💾 1.73 GB ⚙️ RARBG\nDubbed",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Whisper.Of.The.Heart.1995.JAPANESE.1080p.BluRay.H264.AAC-VXT\n👤 2 💾 2.12 GB ⚙️ RARBG",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart (Mimi wo Sumaseba) 1995 1080p Bluray x265 10Bit AAC 5.1 - GetSchwifty\n👤 2 💾 2.9 GB ⚙️ 1337x",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Whisper.of.the.Heart.1995.JAPANESE.1080p.BluRay.x265-VXT\n👤 1 💾 1.73 GB ⚙️ RARBG",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "Sussurros Do Coracao (1995) Dublado\n👤 0 💾 612.64 MB ⚙️ EXT\nDubbed / 🇵🇹",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊💬 Torrentio",
+          "declaredTitle": "Sussurros Do Coracao (1995) Dublado\n👤 0 💾 612.64 MB ⚙️ EXT\nDubbed / 🇵🇹",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Whisper of the Heart aka Mimi wo sumaseba (1995) 720p BRRiP x264\n👤 38 💾 794.45 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Whisper of the Heart 1995 720p BluRay\n👤 15 💾 1020.19 MB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Whisper of the Heart aka Mimi wo sumaseba (1995) 720p BRRiP x264\n👤 38 💾 794.45 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Whisper of the Heart 1995 720p BluRay\n👤 15 💾 1020.19 MB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nDVDRip",
+          "declaredTitle": "Шепот сердца / Mimi o Sumaseba / Mimi Wo Sumaseba / Whisper of the Heart / If You Listen Closely / Шёпот сердца [Movie] [RUS(int)] [1995 DVDRip]\n👤 10 💾 1.15 GB ⚙️ Rutracker\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "Whisper of the Heart aka Mimi wo sumaseba (1995) 720p BRRiP x264\n👤 38 💾 794.45 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "Whisper of the Heart 1995 720p BluRay\n👤 15 💾 1020.19 MB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Kuro] Whisper of the Heart (BD 1920x1038 FLAC 5.1) | Mimi wo Sumaseba | 耳をすませば\n👤 4 💾 10.14 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Kuro] Whisper of the Heart (BD 1920x1038 FLAC 5.1) | Mimi wo Sumaseba | 耳をすませば\n👤 4 💾 10.14 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Kuro] Whisper of the Heart (BD 1920x1038 FLAC 5.1) | Mimi wo Sumaseba | 耳をすませば\n👤 4 💾 10.14 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "Whisper Of The Heart (1995) - BD 1080p HEVC x265 [Dual-Audio] [Multi-Sub] [TeamLapiz]\n👤 1 💾 18.07 GB ⚙️ NyaaSi\nDubbed / Multi Subs / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart (1995) [1080p x265 HEVC 10bit BluRay Dual Audio AAC 5.1] [Prof]\n👤 117 💾 3.98 GB ⚙️ 1337x\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart (1995) [BD 1080p Hi10P 5.1 AAC dual-audio][kuchikirukia].mkv\n👤 12 💾 16 GB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart (1995) 1080p Bdrip Dual Audio AAC 5.1 10bits x265 Rapta\n👤 1 💾 1.99 GB ⚙️ EXT\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart (1995) [1080p x265 HEVC 10bit BluRay Dual Audio AAC 5.1] [Prof]\n👤 117 💾 3.98 GB ⚙️ 1337x\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart (1995) [BD 1080p Hi10P 5.1 AAC dual-audio][kuchikirukia].mkv\n👤 12 💾 16 GB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart (1995) [1080p x265 HEVC 10bit BluRay Dual Audio AAC 5.1] [Prof]\n👤 117 💾 3.98 GB ⚙️ 1337x\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart (1995) [BD 1080p Hi10P 5.1 AAC dual-audio][kuchikirukia].mkv\n👤 12 💾 16 GB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart (1995) 1080p Bdrip Dual Audio AAC 5.1 10bits x265 Rapta\n👤 1 💾 1.99 GB ⚙️ EXT\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio",
+          "declaredTitle": "[Exiled-Destiny] Whisper Of The Heart (Movie) [Dual Audio]\n[Exiled-Destiny]_Whisper_Of_The_Heart_Movie_Part1_(B010E5DE).mkv\n👤 2 💾 700.17 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "Whisper of the Heart (1995) [1080p x265 HEVC 10bit BluRay Dual Audio AAC 5.1] [Prof]\n👤 117 💾 3.98 GB ⚙️ 1337x\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "Whisper of the Heart (1995) [BD 1080p Hi10P 5.1 AAC dual-audio][kuchikirukia].mkv\n👤 12 💾 16 GB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "Whisper of the Heart (1995) 1080p Bdrip Dual Audio AAC 5.1 10bits x265 Rapta\n👤 1 💾 1.99 GB ⚙️ EXT\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "[Exiled-Destiny] Whisper Of The Heart (Movie) [Dual Audio]\n[Exiled-Destiny]_Whisper_Of_The_Heart_Movie_Part1_(B010E5DE).mkv\n👤 2 💾 700.17 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart (1995) [1080p x265 HEVC 10bit BluRay Dual Audio AAC 5.1] [Prof]\n👤 117 💾 3.98 GB ⚙️ 1337x\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Whisper of the Heart (1995) [BD 1080p Hi10P 5.1 AAC dual-audio][kuchikirukia].mkv\n👤 12 💾 16 GB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio",
+          "declaredTitle": "[Exiled-Destiny] Whisper Of The Heart (Movie) [Dual Audio]\n[Exiled-Destiny]_Whisper_Of_The_Heart_Movie_Part1_(B010E5DE).mkv\n👤 2 💾 700.17 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio",
+          "declaredTitle": "[Exiled-Destiny] Whisper Of The Heart (Movie) [Dual Audio]\n[Exiled-Destiny]_Whisper_Of_The_Heart_Movie_Part1_(B010E5DE).mkv\n👤 2 💾 700.17 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio",
+          "declaredTitle": "[Exiled-Destiny] Whisper Of The Heart (Movie) [Dual Audio]\n[Exiled-Destiny]_Whisper_Of_The_Heart_Movie_Part1_(B010E5DE).mkv\n👤 2 💾 700.17 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        }
+      ],
+      "playback": "not_started_identity_and_rights_not_confirmed"
+    },
+    {
+      "title": "Lupin",
+      "id": "tmdb-96677",
+      "imdbId": "tt2531336",
+      "tmdbId": "96677",
+      "resolvedTitle": "Lupin",
+      "year": 2021,
+      "type": "SÉRIE",
+      "episode": {
+        "season": 1,
+        "episode": 1
+      },
+      "attempts": [
+        {
+          "provider": "zapitv-show-subtitle-pt-br",
+          "count": 81,
+          "success": true,
+          "timeout": false,
+          "durationMs": 9
+        },
+        {
+          "provider": "zapitv-mico-leao-dublado",
+          "count": 2,
+          "success": true,
+          "timeout": false,
+          "durationMs": 24
+        },
+        {
+          "provider": "torrentio-brazuca",
+          "count": 33,
+          "success": true,
+          "timeout": false,
+          "durationMs": 39
+        },
+        {
+          "provider": "torrentio-global",
+          "count": 48,
+          "success": true,
+          "timeout": false,
+          "durationMs": 38
+        },
+        {
+          "provider": "zapitv-cinema-aberto",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 103
+        },
+        {
+          "provider": "zapitv-blender-open",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 103
+        },
+        {
+          "provider": "zapitv-public-domain",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 72
+        },
+        {
+          "provider": "froststream-http",
+          "count": 4,
+          "success": true,
+          "timeout": false,
+          "durationMs": 202
+        },
+        {
+          "provider": "fenixflix-animes",
+          "count": 1,
+          "success": true,
+          "timeout": false,
+          "durationMs": 235
+        },
+        {
+          "provider": "magnetflix-animes",
+          "count": 0,
+          "success": false,
+          "timeout": true,
+          "durationMs": 12044
+        }
+      ],
+      "sources": [
+        {
+          "provider": "FrostStream 720p",
+          "declaredTitle": "🎬 Lupin 2021 (2021)\n🥏 T01·E01\n🌊 Carbon\n🌎 Português",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FrostStream 720p",
+          "declaredTitle": "🎬 Lupin 2021 (2021)\n🥏 T01·E01\n🌊 Carbon\n🌎 Português",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FrostStream 720p",
+          "declaredTitle": "🎬 Lupin\n🥏 T01·E01\n🌊 Azure\n🌎 Português",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FrostStream 720p",
+          "declaredTitle": "🎬 Lupin\n🥏 T01·E01\n🌊 Azure\n🌎 Português",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FenixFlix 1080p",
+          "declaredTitle": "🐦‍🔥 Lupin\n⏸️ T01 EP01\n🇧🇷🇺🇸 Dual Áudio\n📍 FenixHub",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "💬 Torrentio\n4k HDR",
+          "declaredTitle": "Lupin S01 FRENCH 2160p NF WEBRip x265 10bit HDR DDP5 1-182K\nLupin.S01E01.2160p.NF.WEBRiP.DDP5.1.HDR.x265-182K[eztv.re].mkv\n👤 32 💾 3.6 GB ⚙️ EZTV\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n4k HDR",
+          "declaredTitle": "Lupin.S01.FRENCH.2160p.NF.WEB-DL.x265.10bit.HDR.DDP5.1-AGLET[rartv]\nLupin.S01E01.Chapter.1.2160p.NF.WEB-DL.DDP5.1.DV.HDR10.H.265-AGLET.mkv\n👤 7 💾 6.01 GB ⚙️ RARBG\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n4k",
+          "declaredTitle": "Lupin.S01.FRENCH.2160p.NF.WEB-DL.x265.10bit.SDR.DDP5.1-AGLET[rartv]\nLupin.S01E01.Chapter.1.2160p.NF.WEB-DL.DDP5.1.H.265-AGLET.mkv\n👤 3 💾 4.04 GB ⚙️ RARBG\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n4k HDR",
+          "declaredTitle": "Lupin S01 FRENCH 2160p NF WEBRip x265 10bit HDR DDP5 1-182K\nLupin.S01E01.2160p.NF.WEBRiP.DDP5.1.HDR.x265-182K[eztv.re].mkv\n👤 32 💾 3.6 GB ⚙️ EZTV\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n4k HDR",
+          "declaredTitle": "Lupin.S01.FRENCH.2160p.NF.WEB-DL.x265.10bit.HDR.DDP5.1-AGLET[rartv]\nLupin.S01E01.Chapter.1.2160p.NF.WEB-DL.DDP5.1.DV.HDR10.H.265-AGLET.mkv\n👤 7 💾 6.01 GB ⚙️ RARBG\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n4k",
+          "declaredTitle": "Lupin.S01.FRENCH.2160p.NF.WEB-DL.x265.10bit.SDR.DDP5.1-AGLET[rartv]\nLupin.S01E01.Chapter.1.2160p.NF.WEB-DL.DDP5.1.H.265-AGLET.mkv\n👤 3 💾 4.04 GB ⚙️ RARBG\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n4k HDR",
+          "declaredTitle": "Lupin S01 FRENCH 2160p NF WEBRip x265 10bit HDR DDP5 1-182K\nLupin.S01E01.2160p.NF.WEBRiP.DDP5.1.HDR.x265-182K[eztv.re].mkv\n👤 32 💾 3.6 GB ⚙️ EZTV\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n4k HDR",
+          "declaredTitle": "Lupin.S01.FRENCH.2160p.NF.WEB-DL.x265.10bit.HDR.DDP5.1-AGLET[rartv]\nLupin.S01E01.Chapter.1.2160p.NF.WEB-DL.DDP5.1.DV.HDR10.H.265-AGLET.mkv\n👤 7 💾 6.01 GB ⚙️ RARBG\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n4k",
+          "declaredTitle": "Lupin.S01.FRENCH.2160p.NF.WEB-DL.x265.10bit.SDR.DDP5.1-AGLET[rartv]\nLupin.S01E01.Chapter.1.2160p.NF.WEB-DL.DDP5.1.H.265-AGLET.mkv\n👤 3 💾 4.04 GB ⚙️ RARBG\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01.COMPLETE.FRENCH.1080p.NF.WEBRip.DDP5.1.x264-STRONTiUM[TGx] ⭐\nLupin.S01E01.1080p.WEB.H264-STRONTiUM.mkv\n👤 135 💾 1.62 GB ⚙️ 1337x\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01.FRENCH.1080p.NF.WEBRip.DDP5.1.x264-STRONTiUM[rartv]\nLupin.S01E01.1080p.WEB.H264-STRONTiUM.mkv\n👤 54 💾 1.62 GB ⚙️ RARBG\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin S01 DUBBED 1080p NF WEBRip DDP5 1 x264-NOGRP\nLupin.S01E01.DUBBED.1080p.NF.WEBRip.DDP5.1.x264-NOGRP[eztv.re].mkv\n👤 12 💾 1.62 GB ⚙️ EZTV\nDubbed",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01.1080p.WEBRip.x264.[ExYuSubs]\nLupin.S01E01.1080p.WEBRip.x264.[ExYuSubs].mp4\n👤 4 💾 1022.98 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01E01-05.1080p.WEBRip.ITA.FRA.DDP5.1.x264-BlackBit\nLupin.S01E01.Capitolo.1.1080p.WEBRip.ITA.FRA.DDP5.1.x264-BlackBit.mkv\n👤 3 💾 1.83 GB ⚙️ 1337x\n🇮🇹 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin S01 FRENCH 1080p NF WEBRip DDP5 1 x264-STRONTiUM\nLupin.S01E01.1080p.WEB.H264-STRONTiUM[eztv.re].mkv\n👤 3 💾 1.62 GB ⚙️ EZTV\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin.2021 S01E01-E10\nLupin.2021.S01E01.FRENCH.1080p.WEB.x264-FW.mkv\n👤 2 💾 2.03 GB ⚙️ EXT\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01.FRENCH.1080p.WEB.H265-GL0P\nLupin.S01E01.FRENCH.1080p.WEB.H265-GL0P.mkv\n👤 2 💾 936.03 MB ⚙️ EXT\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin (2021) S01 1080p NF Web-DL [EN-FR-TR] DDP5.1 H.264-TURG\nLupin (2021) S01E01 1080p NF Web-DL [EN-FR-TR] DDP5.1 H.264-TURG.mkv\n👤 2 💾 1.37 GB ⚙️ TorrentGalaxy\n🇬🇧 / 🇫🇷 / 🇹🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01.COMPLETE.FRENCH.1080p.NF.WEBRip.DDP5.1.x264-STRONTiUM[TGx] ⭐\nLupin.S01E01.1080p.WEB.H264-STRONTiUM.mkv\n👤 135 💾 1.62 GB ⚙️ 1337x\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01.FRENCH.1080p.NF.WEBRip.DDP5.1.x264-STRONTiUM[rartv]\nLupin.S01E01.1080p.WEB.H264-STRONTiUM.mkv\n👤 54 💾 1.62 GB ⚙️ RARBG\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin S01 DUBBED 1080p NF WEBRip DDP5 1 x264-NOGRP\nLupin.S01E01.DUBBED.1080p.NF.WEBRip.DDP5.1.x264-NOGRP[eztv.re].mkv\n👤 12 💾 1.62 GB ⚙️ EZTV\nDubbed",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01.1080p.WEBRip.x264.[ExYuSubs]\nLupin.S01E01.1080p.WEBRip.x264.[ExYuSubs].mp4\n👤 4 💾 1022.98 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01E01-05.1080p.WEBRip.ITA.FRA.DDP5.1.x264-BlackBit\nLupin.S01E01.Capitolo.1.1080p.WEBRip.ITA.FRA.DDP5.1.x264-BlackBit.mkv\n👤 3 💾 1.83 GB ⚙️ 1337x\n🇮🇹 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin S01 FRENCH 1080p NF WEBRip DDP5 1 x264-STRONTiUM\nLupin.S01E01.1080p.WEB.H264-STRONTiUM[eztv.re].mkv\n👤 3 💾 1.62 GB ⚙️ EZTV\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin.2021 S01E01-E10\nLupin.2021.S01E01.FRENCH.1080p.WEB.x264-FW.mkv\n👤 2 💾 2.03 GB ⚙️ EXT\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01.FRENCH.1080p.WEB.H265-GL0P\nLupin.S01E01.FRENCH.1080p.WEB.H265-GL0P.mkv\n👤 2 💾 936.03 MB ⚙️ EXT\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin (2021) S01 1080p NF Web-DL [EN-FR-TR] DDP5.1 H.264-TURG\nLupin (2021) S01E01 1080p NF Web-DL [EN-FR-TR] DDP5.1 H.264-TURG.mkv\n👤 2 💾 1.37 GB ⚙️ TorrentGalaxy\n🇬🇧 / 🇫🇷 / 🇹🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Люпен / Lupin [01x01-05 из 10] (2021) WEB-DL 1080p | Netflix\nLupin.S01E01.Chapter.1.1080p.NF.WEB-DL.DDP5.1.H.264-3cTWeB_Kyle.mkv\n👤 2 💾 1.83 GB ⚙️ Rutor\n🇷🇺 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Люпен / Lupin [01x01-05 из 10] (2021) WEB-DL 1080p | LostFilm\nLupin.S01E01.mkv\n👤 1 💾 1.74 GB ⚙️ Rutor\n🇷🇺 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01.COMPLETE.FRENCH.1080p.NF.WEBRip.DDP5.1.x264-STRONTiUM[TGx] ⭐\nLupin.S01E01.1080p.WEB.H264-STRONTiUM.mkv\n👤 135 💾 1.62 GB ⚙️ 1337x\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01.FRENCH.1080p.NF.WEBRip.DDP5.1.x264-STRONTiUM[rartv]\nLupin.S01E01.1080p.WEB.H264-STRONTiUM.mkv\n👤 54 💾 1.62 GB ⚙️ RARBG\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Lupin S01 DUBBED 1080p NF WEBRip DDP5 1 x264-NOGRP\nLupin.S01E01.DUBBED.1080p.NF.WEBRip.DDP5.1.x264-NOGRP[eztv.re].mkv\n👤 12 💾 1.62 GB ⚙️ EZTV\nDubbed",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01.1080p.WEBRip.x264.[ExYuSubs]\nLupin.S01E01.1080p.WEBRip.x264.[ExYuSubs].mp4\n👤 4 💾 1022.98 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01E01-05.1080p.WEBRip.ITA.FRA.DDP5.1.x264-BlackBit\nLupin.S01E01.Capitolo.1.1080p.WEBRip.ITA.FRA.DDP5.1.x264-BlackBit.mkv\n👤 3 💾 1.83 GB ⚙️ 1337x\n🇮🇹 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Lupin S01 FRENCH 1080p NF WEBRip DDP5 1 x264-STRONTiUM\nLupin.S01E01.1080p.WEB.H264-STRONTiUM[eztv.re].mkv\n👤 3 💾 1.62 GB ⚙️ EZTV\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Lupin.2021 S01E01-E10\nLupin.2021.S01E01.FRENCH.1080p.WEB.x264-FW.mkv\n👤 2 💾 2.03 GB ⚙️ EXT\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01.FRENCH.1080p.WEB.H265-GL0P\nLupin.S01E01.FRENCH.1080p.WEB.H265-GL0P.mkv\n👤 2 💾 936.03 MB ⚙️ EXT\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Lupin (2021) S01 1080p NF Web-DL [EN-FR-TR] DDP5.1 H.264-TURG\nLupin (2021) S01E01 1080p NF Web-DL [EN-FR-TR] DDP5.1 H.264-TURG.mkv\n👤 2 💾 1.37 GB ⚙️ TorrentGalaxy\n🇬🇧 / 🇫🇷 / 🇹🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n360p",
+          "declaredTitle": "Lupin Season 1 2 - threesixtyp\nLupin S01 (360p re-webrip)/Lupin S01E01.mp4\n👤 3 💾 147.32 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\nWEBRip",
+          "declaredTitle": "Lupin.S01-04.ITA.WEBRIP.x264-mkeagle3\nLupin.1x01.Capitolo.1.ITA.WEBRIP.x264-mkeagle3.mkv\n👤 17 💾 439.4 MB ⚙️ EXT\n🇮🇹",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\nWEBRip",
+          "declaredTitle": "Lupin.S01.FRENCH.WEBRip.x264-ION10\nLupin.S01E01.FRENCH.WEBRip.x264-ION10.mp4\n👤 2 💾 442.18 MB ⚙️ RARBG\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\nWEBRip",
+          "declaredTitle": "Lupin.S01.DUBBED.WEBRip.x264-ION10\nLupin.S01E01.DUBBED.WEBRip.x264-ION10.mp4\n👤 1 💾 442.18 MB ⚙️ RARBG\nDubbed",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\nWEB-DL",
+          "declaredTitle": "Люпен / Lupin [S01-02] (2021) WEB-DLRip-AVC от Generalfilm | КПК | Пифагор\nLyupen.S01.2021.WEB-DLRip-AVC.KPK.Dub.GF/Lyupen.s01e01.2021.WEB-DLRip-AVC.KPK.Dub.GF.mp4\n👤 3 💾 213.47 MB ⚙️ Rutor\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Lupin.S01.COMPLETE.FRENCH.720p.NF.WEBRip.x264-GalaxyTV\nLupin.S01E01.720p.NF.WEBRip.x264-GalaxyTV.mkv\n👤 56 💾 350.56 MB ⚙️ ThePirateBay\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Lupin.SEASON.01.S01.COMPLETE.FRENCH.720p.10bit.WEBRip.2CH.x265.HEVC-PSA\nLupin.S01E01.FRENCH.720p.10bit.WEBRip.2CH.x265.HEVC-PSA.mkv\n👤 10 💾 241.73 MB ⚙️ 1337x\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Lupin S01 DUBBED 720p NF WEBRip DDP5 1 x264-NOGRP\nLupin.S01E01.DUBBED.720p.NF.WEBRip.DDP5.1.x264-NOGRP[eztv.re].mkv\n👤 10 💾 989.64 MB ⚙️ EZTV\nDubbed",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Lupin.S01.COMPLETE.FRENCH.720p.NF.WEBRip.x264-GalaxyTV\nLupin.S01E01.720p.NF.WEBRip.x264-GalaxyTV.mkv\n👤 56 💾 350.56 MB ⚙️ ThePirateBay\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Lupin.SEASON.01.S01.COMPLETE.FRENCH.720p.10bit.WEBRip.2CH.x265.HEVC-PSA\nLupin.S01E01.FRENCH.720p.10bit.WEBRip.2CH.x265.HEVC-PSA.mkv\n👤 10 💾 241.73 MB ⚙️ 1337x\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Lupin S01 DUBBED 720p NF WEBRip DDP5 1 x264-NOGRP\nLupin.S01E01.DUBBED.720p.NF.WEBRip.DDP5.1.x264-NOGRP[eztv.re].mkv\n👤 10 💾 989.64 MB ⚙️ EZTV\nDubbed",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Люпен / Lupin [S01] (2021) WEB-DL 720p | Пифагор\nLupin.S01E01.720p.WEB.H264.mkv\n👤 1 💾 1.18 GB ⚙️ Rutor\n🇷🇺 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n360p",
+          "declaredTitle": "Lupin Season 1 2 - threesixtyp\nLupin S01 (360p re-webrip)/Lupin S01E01.mp4\n👤 3 💾 147.32 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEBRip",
+          "declaredTitle": "Lupin.S01-04.ITA.WEBRIP.x264-mkeagle3\nLupin.1x01.Capitolo.1.ITA.WEBRIP.x264-mkeagle3.mkv\n👤 17 💾 439.4 MB ⚙️ EXT\n🇮🇹",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEBRip",
+          "declaredTitle": "Lupin.S01.FRENCH.WEBRip.x264-ION10\nLupin.S01E01.FRENCH.WEBRip.x264-ION10.mp4\n👤 2 💾 442.18 MB ⚙️ RARBG\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEBRip",
+          "declaredTitle": "Lupin.S01.DUBBED.WEBRip.x264-ION10\nLupin.S01E01.DUBBED.WEBRip.x264-ION10.mp4\n👤 1 💾 442.18 MB ⚙️ RARBG\nDubbed",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n400p",
+          "declaredTitle": "Люпен / Lupin [01x01-05 из 10] (2021) WEBRip | IdeaFilm\nLupin.S01E01.WEBRip.400p.IdeaFilm.avi\n👤 1 💾 647.32 MB ⚙️ Rutor\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n360p",
+          "declaredTitle": "Lupin Season 1 2 - threesixtyp\nLupin S01 (360p re-webrip)/Lupin S01E01.mp4\n👤 3 💾 147.32 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEBRip",
+          "declaredTitle": "Lupin.S01-04.ITA.WEBRIP.x264-mkeagle3\nLupin.1x01.Capitolo.1.ITA.WEBRIP.x264-mkeagle3.mkv\n👤 17 💾 439.4 MB ⚙️ EXT\n🇮🇹",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Люпен / Lupin [S01-03] (2021-2023) WEB-DLRip | LostFilm\nS01/Lupin.S01E01.avi\n👤 13 💾 550.44 MB ⚙️ Rutor\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Люпен / Lupin [S01-02] (2021) WEB-DLRip | TVShows\nLupin (Season 1) TVShows WEB-DLRip/Lupin.S01E01.WEB-DLRip.TVShows.RGzsRutracker.[Wentworth_Miller].avi\n👤 5 💾 708.98 MB ⚙️ Rutor\n🇷🇺 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Люпен / Lupin [S01-02] (2021) WEB-DLRip-AVC от Generalfilm | КПК | Пифагор\nLyupen.S01.2021.WEB-DLRip-AVC.KPK.Dub.GF/Lyupen.s01e01.2021.WEB-DLRip-AVC.KPK.Dub.GF.mp4\n👤 3 💾 213.47 MB ⚙️ Rutor\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEBRip",
+          "declaredTitle": "Lupin.S01.FRENCH.WEBRip.x264-ION10\nLupin.S01E01.FRENCH.WEBRip.x264-ION10.mp4\n👤 2 💾 442.18 MB ⚙️ RARBG\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEBRip",
+          "declaredTitle": "Lupin.S01.DUBBED.WEBRip.x264-ION10\nLupin.S01E01.DUBBED.WEBRip.x264-ION10.mp4\n👤 1 💾 442.18 MB ⚙️ RARBG\nDubbed",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "Lupin.S01.COMPLETE.FRENCH.720p.NF.WEBRip.x264-GalaxyTV\nLupin.S01E01.720p.NF.WEBRip.x264-GalaxyTV.mkv\n👤 56 💾 350.56 MB ⚙️ ThePirateBay\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "Lupin.SEASON.01.S01.COMPLETE.FRENCH.720p.10bit.WEBRip.2CH.x265.HEVC-PSA\nLupin.S01E01.FRENCH.720p.10bit.WEBRip.2CH.x265.HEVC-PSA.mkv\n👤 10 💾 241.73 MB ⚙️ 1337x\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "Lupin S01 DUBBED 720p NF WEBRip DDP5 1 x264-NOGRP\nLupin.S01E01.DUBBED.720p.NF.WEBRip.DDP5.1.x264-NOGRP[eztv.re].mkv\n👤 10 💾 989.64 MB ⚙️ EZTV\nDubbed",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n480p",
+          "declaredTitle": "Lupin S01E01 480p x264-mSD\n👤 3 💾 358.38 MB ⚙️ EZTV",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n480p",
+          "declaredTitle": "Lupin S01E01 480p x264-mSD\n👤 2 💾 358.38 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n480p",
+          "declaredTitle": "Lupin S01E01 480p x264-mSD\n👤 3 💾 358.38 MB ⚙️ EZTV",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n480p",
+          "declaredTitle": "Lupin S01E01 480p x264-mSD\n👤 2 💾 358.38 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n480p",
+          "declaredTitle": "Lupin S01E01 480p x264-mSD\n👤 3 💾 358.38 MB ⚙️ EZTV",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n480p",
+          "declaredTitle": "Lupin S01E01 480p x264-mSD\n👤 2 💾 358.38 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n4k DV",
+          "declaredTitle": "Lupin S01E01 Chapter 1 2160p NF WEB-DL DUAL DDP5 1 DV H 265-Kitsune\n👤 15 💾 6.99 GB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇯🇵 / 🇷🇺 / 🇮🇹 / 🇵🇹 / 🇪🇸 / 🇰🇷 / 🇨🇳 / 🇫🇷 / 🇩🇪 / 🇳🇱 / 🇵🇱 / 🇨🇿 / 🇭🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n4k DV",
+          "declaredTitle": "Lupin S01E01 Chapter 1 2160p NF WEB-DL DUAL DDP5 1 DV H 265-Kitsune\n👤 15 💾 6.99 GB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇯🇵 / 🇷🇺 / 🇮🇹 / 🇵🇹 / 🇪🇸 / 🇰🇷 / 🇨🇳 / 🇫🇷 / 🇩🇪 / 🇳🇱 / 🇵🇱 / 🇨🇿 / 🇭🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n4k DV",
+          "declaredTitle": "Lupin S01E01 Chapter 1 2160p NF WEB-DL DUAL DDP5 1 DV H 265-Kitsune\n👤 15 💾 6.99 GB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇯🇵 / 🇷🇺 / 🇮🇹 / 🇵🇹 / 🇪🇸 / 🇰🇷 / 🇨🇳 / 🇫🇷 / 🇩🇪 / 🇳🇱 / 🇵🇱 / 🇨🇿 / 🇭🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n4k DV",
+          "declaredTitle": "Lupin S01E01 Chapter 1 2160p NF WEB-DL DUAL DDP5 1 DV H 265-Kitsune\n👤 15 💾 6.99 GB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇯🇵 / 🇷🇺 / 🇮🇹 / 🇵🇹 / 🇪🇸 / 🇰🇷 / 🇨🇳 / 🇫🇷 / 🇩🇪 / 🇳🇱 / 🇵🇱 / 🇨🇿 / 🇭🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n4k DV",
+          "declaredTitle": "Lupin S01E01 Chapter 1 2160p NF WEB-DL DUAL DDP5 1 DV H 265-Kitsune\n👤 15 💾 6.99 GB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇯🇵 / 🇷🇺 / 🇮🇹 / 🇵🇹 / 🇪🇸 / 🇰🇷 / 🇨🇳 / 🇫🇷 / 🇩🇪 / 🇳🇱 / 🇵🇱 / 🇨🇿 / 🇭🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin 1ª Temporada Completa 2021 [1080p] [DUAL]\nLupin_S01E01_1080p.x264.DUAL.COMANDO.TO_.mkv\n👤 53 💾 985.92 MB ⚙️ Comando\nDual Audio / 🇵🇹 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin 1ª Temporada Completa 2021 [1080p] [DUAL]\nLupin_S01E01_1080p.x264.DUAL.COMANDO.TO_.mkv\n👤 53 💾 985.92 MB ⚙️ Comando\nDual Audio / 🇵🇹 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Lupin.S01.iTALiAN.MULTi.1080p.WEB.x264-MeM\nLupin.S01E01.Capitolo.1.iTALiAN.MULTi.1080p.WEB.x264-MeM.mkv\n👤 11 💾 1.83 GB ⚙️ ilCorSaRoNeRo\nMulti Audio / 🇮🇹 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "Lupin 1ª Temporada Completa 2021 [1080p] [DUAL]\nLupin_S01E01_1080p.x264.DUAL.COMANDO.TO_.mkv\n👤 53 💾 985.92 MB ⚙️ Comando\nDual Audio / 🇵🇹 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Lupin 1ª Temporada Completa 2021 [1080p] [DUAL]\nLupin_S01E01_1080p.x264.DUAL.COMANDO.TO_.mkv\n👤 53 💾 985.92 MB ⚙️ Comando\nDual Audio / 🇵🇹 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Lupin 1ª Temporada Completa 2021 [1080p] [DUAL]\nLupin_S01E01_1080p.x264.DUAL.COMANDO.TO_.mkv\n👤 53 💾 985.92 MB ⚙️ Comando\nDual Audio / 🇵🇹 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        }
+      ],
+      "playback": "not_started_identity_and_rights_not_confirmed"
+    },
+    {
+      "title": "Jimihen!!",
+      "id": "tmdb-113360",
+      "imdbId": "tt13490144",
+      "tmdbId": "113360",
+      "resolvedTitle": "Jimihen!! Jimiko o Kae Chau Jun Isei Kouyuu",
+      "year": 2021,
+      "type": "ANIME",
+      "episode": {
+        "season": 1,
+        "episode": 1
+      },
+      "attempts": [
+        {
+          "provider": "zapitv-cinema-aberto",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 12
+        },
+        {
+          "provider": "zapitv-blender-open",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 12
+        },
+        {
+          "provider": "zapitv-public-domain",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 6
+        },
+        {
+          "provider": "zapitv-mico-leao-dublado",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 451
+        },
+        {
+          "provider": "torrentio-brazuca",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 791
+        },
+        {
+          "provider": "torrentio-global",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 788
+        },
+        {
+          "provider": "zapitv-show-subtitle-pt-br",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 1481
+        },
+        {
+          "provider": "froststream-http",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 1877
+        },
+        {
+          "provider": "fenixflix-animes",
+          "count": 1,
+          "success": true,
+          "timeout": false,
+          "durationMs": 4436
+        },
+        {
+          "provider": "magnetflix-animes",
+          "count": 0,
+          "success": false,
+          "timeout": true,
+          "durationMs": 12026
+        }
+      ],
+      "sources": [
+        {
+          "provider": "FenixFlix 1080p",
+          "declaredTitle": "🐦‍🔥 Jimihen!! Jimiko o Kae Chau Jun Isei Kouyuu\n⏸️ T01 EP01\n🇯🇵 Legendado\n🚗 Arthur",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        }
+      ],
+      "playback": "not_started_identity_and_rights_not_confirmed"
+    },
+    {
+      "title": "Chicago Typewriter",
+      "id": "tmdb-70528",
+      "imdbId": "tt6516076",
+      "tmdbId": "70528",
+      "resolvedTitle": "Chicago Typewriter",
+      "year": 2017,
+      "type": "SÉRIE",
+      "episode": {
+        "season": 1,
+        "episode": 1
+      },
+      "attempts": [
+        {
+          "provider": "zapitv-show-subtitle-pt-br",
+          "count": 10,
+          "success": true,
+          "timeout": false,
+          "durationMs": 8
+        },
+        {
+          "provider": "zapitv-cinema-aberto",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 15
+        },
+        {
+          "provider": "zapitv-blender-open",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 16
+        },
+        {
+          "provider": "zapitv-public-domain",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 8
+        },
+        {
+          "provider": "torrentio-global",
+          "count": 5,
+          "success": true,
+          "timeout": false,
+          "durationMs": 34
+        },
+        {
+          "provider": "torrentio-brazuca",
+          "count": 5,
+          "success": true,
+          "timeout": false,
+          "durationMs": 45
+        },
+        {
+          "provider": "zapitv-mico-leao-dublado",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 60
+        },
+        {
+          "provider": "fenixflix-animes",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 696
+        },
+        {
+          "provider": "froststream-http",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 804
+        },
+        {
+          "provider": "magnetflix-animes",
+          "count": 0,
+          "success": false,
+          "timeout": true,
+          "durationMs": 12041
+        }
+      ],
+      "sources": [
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Чикагская печатная машинка / Sikago tajagi / Chicago Typewriter [16 из 16] [2017 WEB-DL] [RAW] [1080p] MVO (Мобильное телевидение) по заказу телеканала Дорама\nChicago.Typewriter.2017.S01E01.WEB-DL.108",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Chicago.Typewriter.S01.COMPLETE.1080p.KOREAN.10bit.2CH.x265.[HashMiner]\nChicago.Typewriter.S01E01.1080p.KOREAN.10bit.2CH.x265.[HashMiner].mkv\n👤 2 💾 875.4 MB ⚙️ TorrentGalaxy\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Chicago.Typewriter.S01.KOREAN.1080p.NF.WEBRip.DDP2.0.x264-TEPES[rartv]\nChicago.Typewriter.S01E01.1080p.NF.WEB-DL.DDP2.0.x264-TEPES.mkv\n👤 0 💾 2.59 GB ⚙️ RARBG\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Chicago.Typewriter.S01.COMPLETE.1080p.KOREAN.10bit.2CH.x265.[HashMiner]\nChicago.Typewriter.S01E01.1080p.KOREAN.10bit.2CH.x265.[HashMiner].mkv\n👤 2 💾 875.4 MB ⚙️ TorrentGalaxy\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Chicago.Typewriter.S01.KOREAN.1080p.NF.WEBRip.DDP2.0.x264-TEPES[rartv]\nChicago.Typewriter.S01E01.1080p.NF.WEB-DL.DDP2.0.x264-TEPES.mkv\n👤 0 💾 2.59 GB ⚙️ RARBG\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Chicago.Typewriter.S01.COMPLETE.1080p.KOREAN.10bit.2CH.x265.[HashMiner]\nChicago.Typewriter.S01E01.1080p.KOREAN.10bit.2CH.x265.[HashMiner].mkv\n👤 2 💾 875.4 MB ⚙️ TorrentGalaxy\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Chicago.Typewriter.S01.KOREAN.1080p.NF.WEBRip.DDP2.0.x264-TEPES[rartv]\nChicago.Typewriter.S01E01.1080p.NF.WEB-DL.DDP2.0.x264-TEPES.mkv\n👤 0 💾 2.59 GB ⚙️ RARBG\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\nWEB",
+          "declaredTitle": "Chicago Typewriter S01E01 WEB X264-ASiANA\n👤 1 💾 784.09 MB ⚙️ EZTV",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\nWEBRip",
+          "declaredTitle": "Chicago.Typewriter.S01.KOREAN.WEBRip.x264-ION10\nChicago.Typewriter.S01E01.WEBRip.x264-ION10.mp4\n👤 0 💾 726.32 MB ⚙️ RARBG\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Chicago.Typewriter.S01.KOREAN.720p.NF.WEBRip.DDP2.0.x264-TEPES[rartv]\nChicago.Typewriter.S01E01.720p.NF.WEB-DL.DDP2.0.x264-TEPES.mkv\n👤 0 💾 1.29 GB ⚙️ RARBG\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB",
+          "declaredTitle": "Chicago Typewriter S01E01 WEB X264-ASiANA\n👤 1 💾 784.09 MB ⚙️ EZTV",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEBRip",
+          "declaredTitle": "Chicago.Typewriter.S01.KOREAN.WEBRip.x264-ION10\nChicago.Typewriter.S01E01.WEBRip.x264-ION10.mp4\n👤 0 💾 726.32 MB ⚙️ RARBG\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB",
+          "declaredTitle": "Chicago Typewriter S01E01 WEB X264-ASiANA\n👤 1 💾 784.09 MB ⚙️ EZTV",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEBRip",
+          "declaredTitle": "Chicago.Typewriter.S01.KOREAN.WEBRip.x264-ION10\nChicago.Typewriter.S01E01.WEBRip.x264-ION10.mp4\n👤 0 💾 726.32 MB ⚙️ RARBG\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "Chicago.Typewriter.S01.KOREAN.720p.NF.WEBRip.DDP2.0.x264-TEPES[rartv]\nChicago.Typewriter.S01E01.720p.NF.WEB-DL.DDP2.0.x264-TEPES.mkv\n👤 0 💾 1.29 GB ⚙️ RARBG\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        }
+      ],
+      "playback": "not_started_identity_and_rights_not_confirmed"
+    },
+    {
+      "title": "Resident Evil (2026)",
+      "id": "tmdb-1423191",
+      "imdbId": "tt35538033",
+      "year": 2026,
+      "type": "FILME",
+      "status": "catalog_not_eligible",
+      "playback": "not_started"
+    },
+    {
+      "title": "Hope: O Primeiro Impacto",
+      "id": "tmdb-1058424",
+      "imdbId": "tt27369017",
+      "tmdbId": "1058424",
+      "resolvedTitle": "Hope: O Primeiro Impacto",
+      "year": 2026,
+      "type": "FILME",
+      "attempts": [
+        {
+          "provider": "zapitv-cinema-aberto",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 15
+        },
+        {
+          "provider": "zapitv-blender-open",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 14
+        },
+        {
+          "provider": "zapitv-public-domain",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 17
+        },
+        {
+          "provider": "zapitv-mico-leao-dublado",
+          "count": 3,
+          "success": true,
+          "timeout": false,
+          "durationMs": 51
+        },
+        {
+          "provider": "magnetflix-animes",
+          "count": 1,
+          "success": true,
+          "timeout": false,
+          "durationMs": 70
+        },
+        {
+          "provider": "zapitv-show-subtitle-pt-br",
+          "count": 116,
+          "success": true,
+          "timeout": false,
+          "durationMs": 91
+        },
+        {
+          "provider": "fenixflix-animes",
+          "count": 1,
+          "success": true,
+          "timeout": false,
+          "durationMs": 173
+        },
+        {
+          "provider": "froststream-http",
+          "count": 2,
+          "success": true,
+          "timeout": false,
+          "durationMs": 219
+        },
+        {
+          "provider": "torrentio-global",
+          "count": 72,
+          "success": true,
+          "timeout": false,
+          "durationMs": 231
+        },
+        {
+          "provider": "torrentio-brazuca",
+          "count": 54,
+          "success": true,
+          "timeout": false,
+          "durationMs": 307
+        }
+      ],
+      "sources": [
+        {
+          "provider": "FrostStream 1080p",
+          "declaredTitle": "🎬 Hope O Primeiro Impacto\n🌊 Azure\n🧩 Legendado",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FrostStream 1080p",
+          "declaredTitle": "🎬 Hope O Primeiro Impacto\n🌊 Azure\n🧩 Legendado",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "Magnetflix\nHD",
+          "declaredTitle": "🎬 Hope: O Primeiro Impacto (2026)\n📺 HD • HLS\n💬 Legendado PT-BR\n⚡ Servidor: Magnetflix #27",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FenixFlix 1080p",
+          "declaredTitle": "🐦‍🔥 Hope: O Primeiro Impacto\n🇰🇷 Legendado\n⭐️ Hollymovies",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.1080p.WEBRip.Korean.10Bit.DDP5.1.x265-NeoNoir\n👤 3657 💾 2.63 GB ⚙️ 1337x\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 1080p Korean WEB-DL HEVC x265 5.1 BONE\n👤 2027 💾 1.99 GB ⚙️ 1337x\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope - O Primeiro Impacto 2026 1080p Korean WEB-DL HEVC x265 5.1\n👤 224 💾 1.99 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.KOREAN.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA\n👤 135 💾 2.65 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.KOREAN.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA\n👤 114 💾 2.65 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu 2026 1080p WEBRip\n👤 100 💾 2.62 GB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu 2026 1080p WEBRip\n👤 100 💾 2.89 GB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.WEB-DL.1080p.x264\n👤 61 💾 3.36 GB ⚙️ EXT\n🇰🇷 / 🇨🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.KOREAN.1080p.WEBRip.x265-KONTRAST\n👤 57 💾 4.05 GB ⚙️ 1337x\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope (2026) KOR subITA 1080p x265 - MIRCrew\n👤 56 💾 4.91 GB ⚙️ EXT\n🇮🇹 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 1080p Korean WEB-DL HEVC x265 5 1-BONE\n👤 20 💾 1.99 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 1080p WEB h264-EDITH\n👤 18 💾 7.97 GB ⚙️ EXT\n🇬🇧 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu (2026) WEB-DL 1080p [UKR_KOR] [Hurtom]\n👤 18 💾 9.65 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇺🇦",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 SUBBED REPACK 1080p WEB h264-EDITH\n👤 15 💾 7.97 GB ⚙️ EXT\n🇬🇧 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 1080p WEBRip Korean 10bit DDP5 1 x265-NeoNoir\n👤 15 💾 2.63 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu.2026.D.WEB-DL.1080p\n👤 10 💾 10.46 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope (2026) KOR subITA 1080p x265 - MIRCrew\n👤 9 💾 4.91 GB ⚙️ EXT\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu (2026) WEB-DL 1080p [UKR_KOR] [Hurtom]\n👤 9 💾 9.65 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇺🇦",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu (2026) 1080p WEBRip x265 10bit 5.1-WORLD\n👤 7 💾 2.62 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu (2026) 1080p WEBRip 5 1-WORLD\n👤 7 💾 2.89 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.1080p.WEBRip.Korean.10Bit.DDP5.1.x265-NeoNoir\n👤 3657 💾 2.63 GB ⚙️ 1337x\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 1080p Korean WEB-DL HEVC x265 5.1 BONE\n👤 2027 💾 1.99 GB ⚙️ 1337x\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Надежда / Hope (2026) WEB-DL 1080p | D Р\n👤 569 💾 10.08 GB ⚙️ Rutor\n🇷🇺 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope - O Primeiro Impacto 2026 1080p Korean WEB-DL HEVC x265 5.1\n👤 224 💾 1.99 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Надежда / Hope (2026) WEB-DL 1080p | D Р | LostFilm HDrezka Studio\n👤 159 💾 10.5 GB ⚙️ Rutor",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.KOREAN.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA\n👤 135 💾 2.65 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Надежда / Hope (2026) WEBRip-HEVC 1080p | D Р L\n👤 132 💾 7.86 GB ⚙️ Rutor\n🇬🇧 / 🇷🇺 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.KOREAN.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA\n👤 114 💾 2.65 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu 2026 1080p WEBRip\n👤 100 💾 2.62 GB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu 2026 1080p WEBRip\n👤 100 💾 2.89 GB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.WEB-DL.1080p.x264\n👤 61 💾 3.36 GB ⚙️ EXT\n🇰🇷 / 🇨🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.KOREAN.1080p.WEBRip.x265-KONTRAST\n👤 57 💾 4.05 GB ⚙️ 1337x\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope (2026) KOR subITA 1080p x265 - MIRCrew\n👤 56 💾 4.91 GB ⚙️ EXT\n🇮🇹 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Надежда / Hopeu / Hope (2026) WEB-DL 1080p | P | HDrezka Studio\n👤 47 💾 9.65 GB ⚙️ Rutor\n🇷🇺 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 1080p Korean WEB-DL HEVC x265 5 1-BONE\n👤 20 💾 1.99 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 1080p WEB h264-EDITH\n👤 18 💾 7.97 GB ⚙️ EXT\n🇬🇧 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu (2026) WEB-DL 1080p [UKR_KOR] [Hurtom]\n👤 18 💾 9.65 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇺🇦",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 SUBBED REPACK 1080p WEB h264-EDITH\n👤 15 💾 7.97 GB ⚙️ EXT\n🇬🇧 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 1080p WEBRip Korean 10bit DDP5 1 x265-NeoNoir\n👤 15 💾 2.63 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu.2026.D.WEB-DL.1080p\n👤 10 💾 10.46 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope (2026) KOR subITA 1080p x265 - MIRCrew\n👤 9 💾 4.91 GB ⚙️ EXT\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu (2026) WEB-DL 1080p [UKR_KOR] [Hurtom]\n👤 9 💾 9.65 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇺🇦",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu (2026) 1080p WEBRip x265 10bit 5.1-WORLD\n👤 7 💾 2.62 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu (2026) 1080p WEBRip 5 1-WORLD\n👤 7 💾 2.89 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.1080p.WEBRip.Korean.10Bit.DDP5.1.x265-NeoNoir\n👤 3657 💾 2.63 GB ⚙️ 1337x\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 1080p Korean WEB-DL HEVC x265 5.1 BONE\n👤 2027 💾 1.99 GB ⚙️ 1337x\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope - O Primeiro Impacto 2026 1080p Korean WEB-DL HEVC x265 5.1\n👤 224 💾 1.99 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.KOREAN.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA\n👤 135 💾 2.65 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.KOREAN.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA\n👤 114 💾 2.65 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hopeu 2026 1080p WEBRip\n👤 100 💾 2.62 GB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hopeu 2026 1080p WEBRip\n👤 100 💾 2.89 GB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.WEB-DL.1080p.x264\n👤 61 💾 3.36 GB ⚙️ EXT\n🇰🇷 / 🇨🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.KOREAN.1080p.WEBRip.x265-KONTRAST\n👤 57 💾 4.05 GB ⚙️ 1337x\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope (2026) KOR subITA 1080p x265 - MIRCrew\n👤 56 💾 4.91 GB ⚙️ EXT\n🇮🇹 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 1080p Korean WEB-DL HEVC x265 5 1-BONE\n👤 20 💾 1.99 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 1080p WEB h264-EDITH\n👤 18 💾 7.97 GB ⚙️ EXT\n🇬🇧 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hopeu (2026) WEB-DL 1080p [UKR_KOR] [Hurtom]\n👤 18 💾 9.65 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇺🇦",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 SUBBED REPACK 1080p WEB h264-EDITH\n👤 15 💾 7.97 GB ⚙️ EXT\n🇬🇧 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope 2026 1080p WEBRip Korean 10bit DDP5 1 x265-NeoNoir\n👤 15 💾 2.63 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hopeu.2026.D.WEB-DL.1080p\n👤 10 💾 10.46 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope (2026) KOR subITA 1080p x265 - MIRCrew\n👤 9 💾 4.91 GB ⚙️ EXT\n🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hopeu (2026) WEB-DL 1080p [UKR_KOR] [Hurtom]\n👤 9 💾 9.65 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇺🇦",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hopeu (2026) 1080p WEBRip x265 10bit 5.1-WORLD\n👤 7 💾 2.62 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hopeu (2026) 1080p WEBRip 5 1-WORLD\n👤 7 💾 2.89 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\nWEB-DL",
+          "declaredTitle": "Hopeu.(2026).WEB-DLRip-AVC.Ukr\n👤 44 💾 2.43 GB ⚙️ EXT\n🇬🇧 / 🇺🇦",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\nWEB-DL",
+          "declaredTitle": "Hopeu.2026.WEB-DLRip\n👤 32 💾 2.19 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\nWEB-DL",
+          "declaredTitle": "Hopeu.2026.D.WEB-DLRip\n👤 6 💾 2.05 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\nWEB-DL",
+          "declaredTitle": "Hopeu.2026.D.WEB-DLRip\n👤 6 💾 2.05 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Hopeu 2026 720p WEBRip\n👤 100 💾 1.41 GB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Hopeu 2026 720p AMZN WEB-DL DD 5 1 H 264-playWEB\n👤 43 💾 4.24 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Hope.2026.KOREAN.720p.10bit.WEBRip.6CH.x265.HEVC-PSA\n👤 31 💾 1.36 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Hopeu 2026 720p WEBRip\n👤 100 💾 1.41 GB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Надежда / Hope (2026) WEB-DL 720p от NiTrID | D Р\n👤 91 💾 4.87 GB ⚙️ Rutor\n🇷🇺 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Hopeu 2026 720p AMZN WEB-DL DD 5 1 H 264-playWEB\n👤 43 💾 4.24 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Hope.2026.KOREAN.720p.10bit.WEBRip.6CH.x265.HEVC-PSA\n👤 31 💾 1.36 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Hopeu.(2026).WEB-DLRip-AVC.Ukr\n👤 44 💾 2.43 GB ⚙️ EXT\n🇬🇧 / 🇺🇦",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Hopeu.2026.WEB-DLRip\n👤 32 💾 2.19 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Hopeu.2026.D.WEB-DLRip\n👤 6 💾 2.05 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Hopeu.2026.D.WEB-DLRip\n👤 6 💾 2.05 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Надежда / Hope (2026) WEB-DLRip-AVC от DoMiNo & селезень | D P | HDrezka Studio\n👤 159 💾 2.64 GB ⚙️ Rutor\n🇷🇺 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Надежда / Hope (2026) WEB-DLRip от NiTrID | D Р\n👤 61 💾 2.19 GB ⚙️ Rutor\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Hopeu.(2026).WEB-DLRip-AVC.Ukr\n👤 44 💾 2.43 GB ⚙️ EXT\n🇬🇧 / 🇺🇦",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Надежда / Hope (2026) WEB-DLRip-AVC от ExKinoRay | D Р | LostFilm HDrezka Studio\n👤 37 💾 1.07 GB ⚙️ Rutor\n🇷🇺 / 🇰🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Hopeu.2026.WEB-DLRip\n👤 32 💾 2.19 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Hopeu.2026.D.WEB-DLRip\n👤 6 💾 2.05 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\nWEB-DL",
+          "declaredTitle": "Hopeu.2026.D.WEB-DLRip\n👤 6 💾 2.05 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "Hopeu 2026 720p WEBRip\n👤 100 💾 1.41 GB ⚙️ YTS",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "Hopeu 2026 720p AMZN WEB-DL DD 5 1 H 264-playWEB\n👤 43 💾 4.24 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "Hope.2026.KOREAN.720p.10bit.WEBRip.6CH.x265.HEVC-PSA\n👤 31 💾 1.36 GB ⚙️ EXT\n🇬🇧 / 🇰🇷 / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 1080p 2.2GB\n👤 13 💾 2.2 GB ⚙️ EXT\nDual Audio / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 1080p 2.2GB\n👤 13 💾 2.2 GB ⚙️ EXT\nDual Audio / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 1080p 2.2GB\n👤 13 💾 2.2 GB ⚙️ EXT\nDual Audio / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 1080p 2.2GB\n👤 13 💾 2.2 GB ⚙️ EXT\nDual Audio / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 1080p 2.2GB\n👤 13 💾 2.2 GB ⚙️ EXT\nDual Audio / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n720p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 720p 1.2GB\n👤 42 💾 1.21 GB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇰🇷 / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 720p 1.2GB\n👤 42 💾 1.21 GB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇰🇷 / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 720p 1.2GB\n👤 42 💾 1.21 GB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇰🇷 / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 720p 1.2GB\n👤 42 💾 1.21 GB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇰🇷 / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 720p 1.2GB\n👤 42 💾 1.21 GB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇰🇷 / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n480p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 480p 500MB\n👤 9 💾 516.93 MB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇰🇷 / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n480p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 480p 500MB\n👤 9 💾 516.93 MB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇰🇷 / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n480p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 480p 500MB\n👤 9 💾 516.93 MB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇰🇷 / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n480p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 480p 500MB\n👤 9 💾 516.93 MB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇰🇷 / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n480p",
+          "declaredTitle": "Hope.2026 WEBRip Hindi CLEAN Dual Audio 480p 500MB\n👤 9 💾 516.93 MB ⚙️ EXT\nDual Audio / 🇬🇧 / 🇰🇷 / 🇮🇳",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu.2026.MULTi.Ai.1080p.10bit.WEB-DL.DDP5.1.x265.HEVC-AdL\n👤 8 💾 3.6 GB ⚙️ EXT\nMulti Audio / 🇬🇧 / 🇰🇷 / 🇵🇱",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.MULTi.1080p.WEB.H264-YTO\n👤 5 💾 2.76 GB ⚙️ EXT\nMulti Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope MULTI WEBRIP 1080p 2026\n👤 323 💾 10.15 GB ⚙️ Torrent9\nMulti Audio / 🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hopeu.2026.MULTi.Ai.1080p.10bit.WEB-DL.DDP5.1.x265.HEVC-AdL\n👤 8 💾 3.6 GB ⚙️ EXT\nMulti Audio / 🇬🇧 / 🇰🇷 / 🇵🇱",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.MULTi.1080p.WEB.H264-YTO\n👤 5 💾 2.76 GB ⚙️ EXT\nMulti Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hopeu.2026.MULTi.Ai.1080p.10bit.WEB-DL.DDP5.1.x265.HEVC-AdL\n👤 8 💾 3.6 GB ⚙️ EXT\nMulti Audio / 🇬🇧 / 🇰🇷 / 🇵🇱",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Hope.2026.MULTi.1080p.WEB.H264-YTO\n👤 5 💾 2.76 GB ⚙️ EXT\nMulti Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        }
+      ],
+      "playback": "not_started_identity_and_rights_not_confirmed"
+    },
+    {
+      "title": "Bleach: Thousand-Year Blood War",
+      "id": "tt14986406",
+      "imdbId": "tt14986406",
+      "tmdbId": "215105",
+      "resolvedTitle": "Bleach: Thousand-Year Blood War",
+      "year": 2022,
+      "type": "SÉRIE",
+      "episode": {
+        "season": 1,
+        "episode": 1
+      },
+      "attempts": [
+        {
+          "provider": "zapitv-cinema-aberto",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 11
+        },
+        {
+          "provider": "zapitv-blender-open",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 11
+        },
+        {
+          "provider": "zapitv-public-domain",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 7
+        },
+        {
+          "provider": "torrentio-brazuca",
+          "count": 57,
+          "success": true,
+          "timeout": false,
+          "durationMs": 207
+        },
+        {
+          "provider": "torrentio-global",
+          "count": 50,
+          "success": true,
+          "timeout": false,
+          "durationMs": 214
+        },
+        {
+          "provider": "zapitv-mico-leao-dublado",
+          "count": 14,
+          "success": true,
+          "timeout": false,
+          "durationMs": 279
+        },
+        {
+          "provider": "zapitv-show-subtitle-pt-br",
+          "count": 107,
+          "success": true,
+          "timeout": false,
+          "durationMs": 643
+        },
+        {
+          "provider": "froststream-http",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 779
+        },
+        {
+          "provider": "fenixflix-animes",
+          "count": 2,
+          "success": true,
+          "timeout": false,
+          "durationMs": 2022
+        },
+        {
+          "provider": "magnetflix-animes",
+          "count": 0,
+          "success": false,
+          "timeout": true,
+          "durationMs": 12027
+        }
+      ],
+      "sources": [
+        {
+          "provider": "Torrentio\n4k",
+          "declaredTitle": "[NC-Raws] 死神 千年血战篇 / Bleach: Sennen Kessen-hen - 01 (B-Global 3840x2160 HEVC AAC MKV)\n👤 2 💾 906.74 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n4k",
+          "declaredTitle": "[NC-Raws] 死神 千年血战篇 / Bleach: Sennen Kessen-hen - 01 (B-Global 3840x2160 HEVC AAC MKV)\n👤 2 💾 906.74 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "BLEACH.Thousand-Year.Blood.War.S01.JAPANESE.1080p.DSNP.WEBRip.AAC2.0.x264-NTb [eztv]\nBLEACH.Thousand-Year.Blood.War.S01E01.Thousand-Year.Blood.War.The.Blood.Warfare.1080p.DSNP.WEB-DL.AAC2.0.H.264-NTb[",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[AkihitoSubs] Bleach Sennen Kessen Hen (Thousand-Year Blood War) - S01E01 (367) [1080p HEVC x265 10Bit][AAC]\n👤 9 💾 886.66 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Bleach - Thousand-Year Blood War (Amber)(TVShows)\nBleach - Thousand-Year Blood War - S01E01 - Amber [1080p].mkv\n👤 6 💾 1.22 GB ⚙️ EXT\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Nokiya-Fansubs] Bleach - Sennen Kessen-hen 1-26 | Thousand-Year Blood War [1080p WEB-DL] (Batch)\n[Nokiya] Bleach - Sennen Kessen-hen - 01v3.mkv\n👤 5 💾 1.02 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Bleach - Thousand-Year Blood War (Amber)(TVShows)\nBleach - Thousand-Year Blood War - S01E01 - Amber [1080p].mkv\n👤 4 💾 1.22 GB ⚙️ EXT\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[CameEsp] Bleach - Sennen Kessen-hen - 01 [1080p][ESP-LAT-ENG][mkv].mkv\n👤 4 💾 1.02 GB ⚙️ NyaaSi\n🇬🇧 / 🇪🇸 / 🇲🇽",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Nokiya] Bleach - Sennen Kessen-hen (1-13) | Thousand-Year Blood War [1080p WEB-DL] (Batch)\n[Nokiya] Bleach - Sennen Kessen-hen - 01v2.mkv\n👤 3 💾 1.02 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Bleach - Thousand-Year Blood War (Amber)(TVShows)\nBleach - Thousand-Year Blood War - S01E01 - Amber [1080p].mkv\n👤 2 💾 1.22 GB ⚙️ EXT\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Bleach - Sennen Kessen-hen\n👤 2 💾 4.55 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "BLEACH.Thousand-Year.Blood.War.S01E01.1080p.DSNP.WEBRip.AAC2.0.x264-alfaHD[rartv]\n👤 1 💾 1.02 GB ⚙️ RARBG",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio",
+          "declaredTitle": "[Lazy] Bleach Thousand-Year Blood War - 01v2 [F35ABDE5].mkv\n👤 2 💾 1.3 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "BLEACH.Thousand-Year.Blood.War.S01.JAPANESE.1080p.DSNP.WEBRip.AAC2.0.x264-NTb [eztv]\nBLEACH.Thousand-Year.Blood.War.S01E01.Thousand-Year.Blood.War.The.Blood.Warfare.1080p.DSNP.WEB-DL.AAC2.0.H.264-NTb[",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[AkihitoSubs] Bleach Sennen Kessen Hen (Thousand-Year Blood War) - S01E01 (367) [1080p HEVC x265 10Bit][AAC]\n👤 9 💾 886.66 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "BLEACH.Thousand-Year.Blood.War.S01E01.1080p.DSNP.WEBRip.AAC2.0.x264-alfaHD[rartv]\n👤 1 💾 1.02 GB ⚙️ RARBG",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "BLEACH.Thousand-Year.Blood.War.S01.JAPANESE.1080p.DSNP.WEBRip.AAC2.0.x264-NTb [eztv]\nBLEACH.Thousand-Year.Blood.War.S01E01.Thousand-Year.Blood.War.The.Blood.Warfare.1080p.DSNP.WEB-DL.AAC2.0.H.264-NTb[",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[AkihitoSubs] Bleach Sennen Kessen Hen (Thousand-Year Blood War) - S01E01 (367) [1080p HEVC x265 10Bit][AAC]\n👤 9 💾 886.66 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Блич: Тысячелетняя кровавая война / Bleach: Sennen Kessen-hen [S01] (2022) WEBRip 1080p | AniPlague\n[AniPlague] Bleach Sennen Kessen-hen 01 [WEB-DL 1080p AVC AAC].mkv\n👤 7 💾 1.06 GB ⚙️ Rutor\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Bleach - Thousand-Year Blood War (Amber)(TVShows)\nBleach - Thousand-Year Blood War - S01E01 - Amber [1080p].mkv\n👤 6 💾 1.22 GB ⚙️ EXT\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Nokiya-Fansubs] Bleach - Sennen Kessen-hen 1-26 | Thousand-Year Blood War [1080p WEB-DL] (Batch)\n[Nokiya] Bleach - Sennen Kessen-hen - 01v3.mkv\n👤 5 💾 1.02 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Bleach - Thousand-Year Blood War (Amber)(TVShows)\nBleach - Thousand-Year Blood War - S01E01 - Amber [1080p].mkv\n👤 4 💾 1.22 GB ⚙️ EXT\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[CameEsp] Bleach - Sennen Kessen-hen - 01 [1080p][ESP-LAT-ENG][mkv].mkv\n👤 4 💾 1.02 GB ⚙️ NyaaSi\n🇬🇧 / 🇪🇸 / 🇲🇽",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Nokiya] Bleach - Sennen Kessen-hen (1-13) | Thousand-Year Blood War [1080p WEB-DL] (Batch)\n[Nokiya] Bleach - Sennen Kessen-hen - 01v2.mkv\n👤 3 💾 1.02 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Bleach - Thousand-Year Blood War (Amber)(TVShows)\nBleach - Thousand-Year Blood War - S01E01 - Amber [1080p].mkv\n👤 2 💾 1.22 GB ⚙️ EXT\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Bleach - Sennen Kessen-hen\n👤 2 💾 4.55 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Bleach - Thousand-Year Blood War (Amber)(TVShows)\nBleach - Thousand-Year Blood War - S01E01 - Amber [1080p].mkv\n👤 6 💾 1.22 GB ⚙️ EXT\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Nokiya-Fansubs] Bleach - Sennen Kessen-hen 1-26 | Thousand-Year Blood War [1080p WEB-DL] (Batch)\n[Nokiya] Bleach - Sennen Kessen-hen - 01v3.mkv\n👤 5 💾 1.02 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Bleach - Thousand-Year Blood War (Amber)(TVShows)\nBleach - Thousand-Year Blood War - S01E01 - Amber [1080p].mkv\n👤 4 💾 1.22 GB ⚙️ EXT\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[CameEsp] Bleach - Sennen Kessen-hen - 01 [1080p][ESP-LAT-ENG][mkv].mkv\n👤 4 💾 1.02 GB ⚙️ NyaaSi\n🇬🇧 / 🇪🇸 / 🇲🇽",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Nokiya] Bleach - Sennen Kessen-hen (1-13) | Thousand-Year Blood War [1080p WEB-DL] (Batch)\n[Nokiya] Bleach - Sennen Kessen-hen - 01v2.mkv\n👤 3 💾 1.02 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Bleach - Thousand-Year Blood War (Amber)(TVShows)\nBleach - Thousand-Year Blood War - S01E01 - Amber [1080p].mkv\n👤 2 💾 1.22 GB ⚙️ EXT\n🇷🇺",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Bleach - Sennen Kessen-hen\n👤 2 💾 4.55 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "BLEACH Thousand-Year Blood War S01 JAPANESE 720p DSNP WEBRip AAC2 0 x264-NTb\nBLEACH.Thousand-Year.Blood.War.S01E01.720p.DSNP.WEB-DL.AAC2.0.H.264-NTb[eztv.re].mkv\n👤 9 💾 606.62 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "BLEACH Thousand-Year Blood War S01 JAPANESE 720p DSNP WEBRip AAC2 0 x264-NTb\nBLEACH.Thousand-Year.Blood.War.S01E01.720p.DSNP.WEB-DL.AAC2.0.H.264-NTb[eztv.re].mkv\n👤 9 💾 606.62 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "BLEACH Thousand-Year Blood War S01 JAPANESE 720p DSNP WEBRip AAC2 0 x264-NTb\nBLEACH.Thousand-Year.Blood.War.S01E01.720p.DSNP.WEB-DL.AAC2.0.H.264-NTb[eztv.re].mkv\n👤 9 💾 606.62 MB ⚙️ ThePirateBay",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio",
+          "declaredTitle": "[Lazy] Bleach Thousand-Year Blood War - 01v2 [F35ABDE5].mkv\n👤 2 💾 1.3 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Almighty] Bleach: Sennen Kessen Hen [Part.1][BD 1920x1080 x264 10bit FLAC]\n[Almighty] Bleach： Sennen Kessen Hen - 01 [BD 1920x1080 x264 10bit FLAC].mkv\n👤 2 💾 2.56 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Almighty] Bleach: Sennen Kessen Hen [Part.1][BD 1920x1080 x264 10bit FLAC]\n[Almighty] Bleach： Sennen Kessen Hen - 01 [BD 1920x1080 x264 10bit FLAC].mkv\n👤 2 💾 2.56 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n720p",
+          "declaredTitle": "[Breeze] Bleach Thousand-Year Blood War (S17 P1) [720p][AV1][Multi-Sub EN ES PT][dual audio]\n[Breeze] Bleach Thousand-Year Blood War - 01v2 [720p][AV1][Multi-Sub][dual audio].mkv\n👤 3 💾 274.88 MB ⚙️ ",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Bleach.Thousand-Year.Blood.War.S01E01.The.Blodd.Warfare.1080p.WEB.DL.DUAL\n👤 1 💾 1.05 GB ⚙️ Comando\nDubbed / Dual Audio / 🇵🇹",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[EMBER] Bleach: Thousand-Year Blood War (2022) (Season 1) [1080p] [Dual Audio HEVC WEBRip] (Bleach: Sennen Kessen-hen) (Batch)\nS01E01-The Blood Warfare [1BCEF3BD].mkv\n👤 22 💾 545.75 MB ⚙️ NyaaSi\nDubb",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Breeze] Bleach: Sennen Kessen Hen | Thousand-Year Blood War P1 [1080p BD][AV1][dual audio]\n[Breeze] Bleach Sennen Kessen-hen - 01 [1080p BD][AV1][dual audio].mkv\n👤 12 💾 1008.58 MB ⚙️ NyaaSi\nDubbed ",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Cleo] Bleach: Sennen Kessen-hen | Bleach: Thousand-Year Blood War [Dual Audio 10bit BD1080p][HEVC-x265]\n[Cleo]Bleach_Sennen_Kessen-hen_-_01_(Dual Audio_10bit_BD1080p_x265).mkv\n👤 11 💾 433 MB ⚙️ 1337",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Sokudo] Bleach: Thousand-Year Blood War [1080p BD][AV1][dual audio]\n[Sokudo] Bleach Sennen Kessen-hen - 01 [1080p BD][AV1][dual audio].mkv\n👤 3 💾 279.74 MB ⚙️ 1337x\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[EMBER] Bleach: Thousand-Year Blood War (2022) (Season 1) [1080p] [Dual Audio HEVC WEBRip] (Bleach: Sennen Kessen-hen) (Batch)\nS01E01-The Blood Warfare [1BCEF3BD].mkv\n👤 22 💾 545.75 MB ⚙️ NyaaSi\nDubb",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Breeze] Bleach: Sennen Kessen Hen | Thousand-Year Blood War P1 [1080p BD][AV1][dual audio]\n[Breeze] Bleach Sennen Kessen-hen - 01 [1080p BD][AV1][dual audio].mkv\n👤 12 💾 1008.58 MB ⚙️ NyaaSi\nDubbed ",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Cleo] Bleach: Sennen Kessen-hen | Bleach: Thousand-Year Blood War [Dual Audio 10bit BD1080p][HEVC-x265]\n[Cleo]Bleach_Sennen_Kessen-hen_-_01_(Dual Audio_10bit_BD1080p_x265).mkv\n👤 11 💾 433 MB ⚙️ 1337",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Sokudo] Bleach: Thousand-Year Blood War [1080p BD][AV1][dual audio]\n[Sokudo] Bleach Sennen Kessen-hen - 01 [1080p BD][AV1][dual audio].mkv\n👤 3 💾 279.74 MB ⚙️ 1337x\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "Bleach.Thousand-Year.Blood.War.S01E01.The.Blodd.Warfare.1080p.WEB.DL.DUAL\n👤 1 💾 1.05 GB ⚙️ Comando\nDubbed / Dual Audio / 🇵🇹",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "[EMBER] Bleach: Thousand-Year Blood War (2022) (Season 1) [1080p] [Dual Audio HEVC WEBRip] (Bleach: Sennen Kessen-hen) (Batch)\nS01E01-The Blood Warfare [1BCEF3BD].mkv\n👤 22 💾 545.75 MB ⚙️ NyaaSi\nDubb",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "[Breeze] Bleach: Sennen Kessen Hen | Thousand-Year Blood War P1 [1080p BD][AV1][dual audio]\n[Breeze] Bleach Sennen Kessen-hen - 01 [1080p BD][AV1][dual audio].mkv\n👤 12 💾 1008.58 MB ⚙️ NyaaSi\nDubbed ",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "[Cleo] Bleach: Sennen Kessen-hen | Bleach: Thousand-Year Blood War [Dual Audio 10bit BD1080p][HEVC-x265]\n[Cleo]Bleach_Sennen_Kessen-hen_-_01_(Dual Audio_10bit_BD1080p_x265).mkv\n👤 11 💾 433 MB ⚙️ 1337",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "[Sokudo] Bleach: Thousand-Year Blood War [1080p BD][AV1][dual audio]\n[Sokudo] Bleach Sennen Kessen-hen - 01 [1080p BD][AV1][dual audio].mkv\n👤 3 💾 279.74 MB ⚙️ 1337x\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Bleach.Thousand-Year.Blood.War.S01E01.The.Blodd.Warfare.1080p.WEB.DL.DUAL\n👤 1 💾 1.05 GB ⚙️ Comando\nDubbed / Dual Audio / 🇵🇹",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[EMBER] Bleach: Thousand-Year Blood War (2022) (Season 1) [1080p] [Dual Audio HEVC WEBRip] (Bleach: Sennen Kessen-hen) (Batch)\nS01E01-The Blood Warfare [1BCEF3BD].mkv\n👤 22 💾 545.75 MB ⚙️ NyaaSi\nDubb",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Breeze] Bleach: Sennen Kessen Hen | Thousand-Year Blood War P1 [1080p BD][AV1][dual audio]\n[Breeze] Bleach Sennen Kessen-hen - 01 [1080p BD][AV1][dual audio].mkv\n👤 12 💾 1008.58 MB ⚙️ NyaaSi\nDubbed ",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Cleo] Bleach: Sennen Kessen-hen | Bleach: Thousand-Year Blood War [Dual Audio 10bit BD1080p][HEVC-x265]\n[Cleo]Bleach_Sennen_Kessen-hen_-_01_(Dual Audio_10bit_BD1080p_x265).mkv\n👤 11 💾 433 MB ⚙️ 1337",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Sokudo] Bleach: Thousand-Year Blood War [1080p BD][AV1][dual audio]\n[Sokudo] Bleach Sennen Kessen-hen - 01 [1080p BD][AV1][dual audio].mkv\n👤 3 💾 279.74 MB ⚙️ 1337x\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[EMBER] Bleach: Thousand-Year Blood War (2022) (Season 1) [1080p] [Dual Audio HEVC WEBRip] (Bleach: Sennen Kessen-hen) (Batch)\nS01E01-The Blood Warfare [1BCEF3BD].mkv\n👤 22 💾 545.75 MB ⚙️ NyaaSi\nDubb",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Breeze] Bleach: Sennen Kessen Hen | Thousand-Year Blood War P1 [1080p BD][AV1][dual audio]\n[Breeze] Bleach Sennen Kessen-hen - 01 [1080p BD][AV1][dual audio].mkv\n👤 12 💾 1008.58 MB ⚙️ NyaaSi\nDubbed ",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Cleo] Bleach: Sennen Kessen-hen | Bleach: Thousand-Year Blood War [Dual Audio 10bit BD1080p][HEVC-x265]\n[Cleo]Bleach_Sennen_Kessen-hen_-_01_(Dual Audio_10bit_BD1080p_x265).mkv\n👤 11 💾 433 MB ⚙️ 1337",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Sokudo] Bleach: Thousand-Year Blood War [1080p BD][AV1][dual audio]\n[Sokudo] Bleach Sennen Kessen-hen - 01 [1080p BD][AV1][dual audio].mkv\n👤 3 💾 279.74 MB ⚙️ 1337x\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Bleach Thousand-Year Blood War - S01 E01-E13 - (MULTi-FRENCH/VOSTFR) BDrip 1080p FLAC x265-GundamGuy\nPartie 01/Bleach - Thousand-Year Blood War (2022) - 01 MULTi BDrip 1080p FLAC x265 v2-GundamGuy.mkv",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Bleach Thousand-Year Blood War - S01 E01-E13 - (MULTi-FRENCH/VOSTFR) BDrip 1080p FLAC x265-GundamGuy\nPartie 01/Bleach - Thousand-Year Blood War (2022) - 01 MULTi BDrip 1080p FLAC x265 v2-GundamGuy.mkv",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Bleach Thousand-Year Blood War - S01 E01-E13 - (MULTi-FRENCH/VOSTFR) BDrip 1080p FLAC x265-GundamGuy\nPartie 01/Bleach - Thousand-Year Blood War (2022) - 01 MULTi BDrip 1080p FLAC x265 v2-GundamGuy.mkv",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        }
+      ],
+      "playback": "not_started_identity_and_rights_not_confirmed"
+    },
+    {
+      "title": "Sword Art Online",
+      "id": "tmdb-45782",
+      "imdbId": "tt2250192",
+      "tmdbId": "45782",
+      "resolvedTitle": "Sword Art Online",
+      "year": 2012,
+      "type": "ANIME",
+      "episode": {
+        "season": 1,
+        "episode": 1
+      },
+      "attempts": [
+        {
+          "provider": "zapitv-cinema-aberto",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 13
+        },
+        {
+          "provider": "zapitv-blender-open",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 13
+        },
+        {
+          "provider": "zapitv-public-domain",
+          "count": 0,
+          "success": true,
+          "timeout": false,
+          "durationMs": 11
+        },
+        {
+          "provider": "magnetflix-animes",
+          "count": 1,
+          "success": true,
+          "timeout": false,
+          "durationMs": 93
+        },
+        {
+          "provider": "torrentio-brazuca",
+          "count": 50,
+          "success": true,
+          "timeout": false,
+          "durationMs": 197
+        },
+        {
+          "provider": "torrentio-global",
+          "count": 50,
+          "success": true,
+          "timeout": false,
+          "durationMs": 198
+        },
+        {
+          "provider": "fenixflix-animes",
+          "count": 8,
+          "success": true,
+          "timeout": false,
+          "durationMs": 232
+        },
+        {
+          "provider": "zapitv-mico-leao-dublado",
+          "count": 27,
+          "success": true,
+          "timeout": false,
+          "durationMs": 269
+        },
+        {
+          "provider": "froststream-http",
+          "count": 6,
+          "success": true,
+          "timeout": false,
+          "durationMs": 436
+        },
+        {
+          "provider": "zapitv-show-subtitle-pt-br",
+          "count": 100,
+          "success": true,
+          "timeout": false,
+          "durationMs": 480
+        }
+      ],
+      "sources": [
+        {
+          "provider": "FenixFlix 1080p",
+          "declaredTitle": "🐦‍🔥 Sword Art Online\n⏸️ T01 EP01\n🇧🇷 Dublado\n📍 FenixHub",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FenixFlix 1080p",
+          "declaredTitle": "🐦‍🔥 Sword Art Online\n⏸️ T01 EP01\n🇧🇷 Dublado\n🏴‍☠️ Anipiece",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FenixFlix 1080p",
+          "declaredTitle": "🐦‍🔥 Sword Art Online\n⏸️ T01 EP01\n🇧🇷 Dublado\n🏴‍☠️ Anipiece",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "Magnetflix\nHD",
+          "declaredTitle": "🎬 Sword Art Online • S01E01\n📺 HD • HLS\n🔊 Dublado PT-BR\n⚡ Servidor: Magnetflix #27-1",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FrostStream 720p",
+          "declaredTitle": "🎬 Sword Art Online\n🥏 T01·E01\n🌊 Neon\n🌎 Português",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FrostStream 720p",
+          "declaredTitle": "🎬 Sword Art Online\n🥏 T01·E01\n🌊 Neon\n🌎 Português",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FrostStream 720p",
+          "declaredTitle": "🎬 Sword Art Online 2012 (2012)\n🥏 T01·E01\n🌊 Carbon\n🌎 Português",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FrostStream 720p",
+          "declaredTitle": "🎬 Sword Art Online 2012 (2012)\n🥏 T01·E01\n🌊 Carbon\n🌎 Português",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FrostStream 720p",
+          "declaredTitle": "🎬 Sword Art Online\n🥏 T01·E01\n🌊 Azure\n🌎 Português",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FrostStream 720p",
+          "declaredTitle": "🎬 Sword Art Online\n🥏 T01·E01\n🌊 Azure\n🌎 Português",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FenixFlix 1080p",
+          "declaredTitle": "🐦‍🔥 Sword Art Online\n⏸️ T01 EP01\n🇯🇵 Legendado\n💧 Rubeo",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FenixFlix 1080p",
+          "declaredTitle": "🐦‍🔥 Sword Art Online\n⏸️ T01 EP01\n🇯🇵 Legendado\n🎭 Hiriro",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FenixFlix 1080p",
+          "declaredTitle": "🐦‍🔥 Sword Art Online\n⏸️ T01 EP01\n🇯🇵 Legendado\n🏴‍☠️ Anipiece",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FenixFlix 1080p",
+          "declaredTitle": "🐦‍🔥 Sword Art Online\n⏸️ T01 EP01\n🇯🇵 Legendado\n🏴‍☠️ Anipiece",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "FenixFlix 720p",
+          "declaredTitle": "🐦‍🔥 Sword Art Online\n⏸️ T01 EP01\n🇯🇵 Legendado\n🚗 Arthur",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "url"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[HorribleSubs] Sword Art Online (01-25) [1080p] (Batch)\n[HorribleSubs] Sword Art Online - 01 [1080p].mkv\n👤 12 💾 541.74 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Lia] Sword Art Online [Season 1-4 + Movie] [BD 1080p MIXED]\nSeason 1/[KH] Sword Art Online - S01E01 - The World of Swords.mkv\n👤 2 💾 2 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online - Staffel 1 [x265 1080p Opus - Ger / Jap Dub][GAE]\nStaffel 1/Sword Art Online - 01 - Welt der Schwerter.mkv\n👤 2 💾 349.37 MB ⚙️ 1337x\nDubbed / 🇩🇪",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online - 01 [1080p]\n👤 2 💾 541.66 MB ⚙️ HorribleSubs",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[JesuSub] Sword art online 02a - VOSTFR 1080p\nSword art online 02 - 01 [JesuSub] vostfr 1080p.mp4\n👤 1 💾 444.03 MB ⚙️ ThePirateBay\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Mysteria] Sword Art Online+Specials [BD 1080p] (HEVC x265 10-bit Opus)\nSeason 1/[Mysteria] Sword Art Online - 01.mkv\n👤 1 💾 1022.13 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Mysteria] Sword Art Online+Specials [BD 1080p] (HEVC x265 10-bit Opus)\nSeason 1/Sword Art Offline/[Mysteria] Sword Art Offline - 01.mkv\n👤 1 💾 181.49 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio",
+          "declaredTitle": "Sword Art Online (2012) [tvdbid-259640]\nSeason 01/Sword Art Online - S01E01 - The World of Swords.mkv\n👤 1 💾 1.38 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online - Staffel 1 [x265 1080p Opus - Ger / Jap Dub][GAE]\nStaffel 1/Sword Art Online - 01 - Welt der Schwerter.mkv\n👤 2 💾 349.37 MB ⚙️ 1337x\nDubbed / 🇩🇪",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "[HorribleSubs] Sword Art Online (01-25) [720p] (Batch)\n[HorribleSubs] Sword Art Online - 01 [720p].mkv\n👤 7 💾 321.79 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "Sword Art Online - Season 1 (720p) HD (Eng Dub) BrRip + SAO Extras (Offline Extra +) [KoTuWa]\nSAO S01E01 - The World of Swords (720p ENG) v2.mp4\n👤 6 💾 129.06 MB ⚙️ NyaaSi\nDubbed / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "[HorribleRips] Sword Art Online [720p]\n[HorribleRips] Sword Art Online - 01 [720p].mkv\n👤 1 💾 591.92 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "[Commie] Sword Art Online - Volume 1 [BD 720p AAC]\n[Commie] Sword Art Online - 01 [BD 720p AAC] [C839A2B4].mkv\n👤 1 💾 267.85 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "Sword Art Online - Season 1 (720p) HD (Eng Dub) BrRip + SAO Extras (Offline Extra +) [KoTuWa]\nSAO S01E01 - The World of Swords (720p ENG) v2.mp4\n👤 6 💾 129.06 MB ⚙️ NyaaSi\nDubbed / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online - Staffel 1 [x265 1080p Opus - Ger / Jap Dub][GAE]\nStaffel 1/Sword Art Online - 01 - Welt der Schwerter.mkv\n👤 2 💾 349.37 MB ⚙️ 1337x\nDubbed / 🇩🇪",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Mysteria] Sword Art Online+Specials [BD 1080p] (HEVC x265 10-bit Opus)\nSeason 1/[Mysteria] Sword Art Online - 01.mkv\n👤 1 💾 1022.13 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Mysteria] Sword Art Online+Specials [BD 1080p] (HEVC x265 10-bit Opus)\nSeason 1/Sword Art Offline/[Mysteria] Sword Art Offline - 01.mkv\n👤 1 💾 181.49 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online - Staffel 1 [x265 1080p Opus - Ger / Jap Dub][GAE]\nStaffel 1/Sword Art Online - 01 - Welt der Schwerter.mkv\n👤 2 💾 349.37 MB ⚙️ 1337x\nDubbed / 🇩🇪",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[HorribleSubs] Sword Art Online (01-25) [1080p] (Batch)\n[HorribleSubs] Sword Art Online - 01 [1080p].mkv\n👤 12 💾 541.74 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Lia] Sword Art Online [Season 1-4 + Movie] [BD 1080p MIXED]\nSeason 1/[KH] Sword Art Online - S01E01 - The World of Swords.mkv\n👤 2 💾 2 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online - 01 [1080p]\n👤 2 💾 541.66 MB ⚙️ HorribleSubs",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[JesuSub] Sword art online 02a - VOSTFR 1080p\nSword art online 02 - 01 [JesuSub] vostfr 1080p.mp4\n👤 1 💾 444.03 MB ⚙️ ThePirateBay\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[HorribleSubs] Sword Art Online (01-25) [1080p] (Batch)\n[HorribleSubs] Sword Art Online - 01 [1080p].mkv\n👤 12 💾 541.74 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Lia] Sword Art Online [Season 1-4 + Movie] [BD 1080p MIXED]\nSeason 1/[KH] Sword Art Online - S01E01 - The World of Swords.mkv\n👤 2 💾 2 GB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online - 01 [1080p]\n👤 2 💾 541.66 MB ⚙️ HorribleSubs",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[JesuSub] Sword art online 02a - VOSTFR 1080p\nSword art online 02 - 01 [JesuSub] vostfr 1080p.mp4\n👤 1 💾 444.03 MB ⚙️ ThePirateBay\n🇫🇷",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "[Commie] Sword Art Online - Volume 1 [BD 720p AAC]\n[Commie] Sword Art Online - 01 [BD 720p AAC] [C839A2B4].mkv\n👤 1 💾 267.85 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "[HorribleSubs] Sword Art Online (01-25) [720p] (Batch)\n[HorribleSubs] Sword Art Online - 01 [720p].mkv\n👤 7 💾 321.79 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Sword Art Online - Season 1 (720p) HD (Eng Dub) BrRip + SAO Extras (Offline Extra +) [KoTuWa]\nSAO S01E01 - The World of Swords (720p ENG) v2.mp4\n👤 6 💾 129.06 MB ⚙️ NyaaSi\nDubbed / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "[HorribleRips] Sword Art Online [720p]\n[HorribleRips] Sword Art Online - 01 [720p].mkv\n👤 1 💾 591.92 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "[HorribleSubs] Sword Art Online (01-25) [720p] (Batch)\n[HorribleSubs] Sword Art Online - 01 [720p].mkv\n👤 7 💾 321.79 MB ⚙️ NyaaSi",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Sword Art Online - Season 1 (720p) HD (Eng Dub) BrRip + SAO Extras (Offline Extra +) [KoTuWa]\nSAO S01E01 - The World of Swords (720p ENG) v2.mp4\n👤 6 💾 129.06 MB ⚙️ NyaaSi\nDubbed / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "Sword Art Online S01e01-25 [720p Ita Jap SubENG]\nSword Art Online - 01 - Il Mondo della Spada (720p).mkv\n👤 2 💾 532.5 MB ⚙️ ilCorSaRoNeRo\n🇮🇹",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio",
+          "declaredTitle": "Sword Art Online (2012) [tvdbid-259640]\nSeason 01/Sword Art Online - S01E01 - The World of Swords.mkv\n👤 1 💾 1.38 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio",
+          "declaredTitle": "Sword Art Online (2012) [tvdbid-259640]\nSeason 01/Sword Art Online - S01E01 - The World of Swords.mkv\n👤 1 💾 1.38 GB ⚙️ EXT",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p HDR",
+          "declaredTitle": "[Salieri] Sword Art Online S1 BD (1080p) (HDR) [Dual Audio]\n[Salieri] Sword Art Online - 01 (1080P) (HDR).mkv\n👤 1 💾 587.31 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Tenrai-Sensei] Sword Art Online S1+S2+S3+S4+Movies+OVAs [BD][1080p][HEVC 10bit x265][Dual Audio]\nSeason 1/Sword Art Online - S01E01 - The World Of Swords.mkv\n👤 223 💾 466.73 MB ⚙️ NyaaSi\nDubbed / Du",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Sokudo] Sword Art Online S1 v2 [1080p BD][AV1][dual audio]\n[Sokudo] Sword Art Online - 01 [1080p BD][AV1][dual audio].mkv\n👤 51 💾 238.75 MB ⚙️ NyaaSi\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online S01E01 The World of Swords 1080p CR WEB-DL DUAL DDP2 0 H 2\n👤 12 💾 1.4 GB ⚙️ ThePirateBay\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online (High Quality)(Dual Audio) [1080p] Blu-Ray Rip\nSword Art Online - 01 - The World Of Swords   [DarkDream].mkv\n👤 4 💾 3.15 GB ⚙️ 1337x\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[UDF] Sword Art Online S1 & S2 (BDRip 1080p x264 FLACx2) [dual-audio]\nSeason 01/[UDF] Sword Art Online - s01e01 [E60B71DE].mkv\n👤 3 💾 1.98 GB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[bonkai77] Sword Art Online [1080p] [DUAL-AUDIO] [HEVC] [x265] [10bit][N-HcLs]\nSword Art Online - 01 - The World of Swords [BAD31EBD].mkv\n👤 1 💾 198.61 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio",
+          "declaredTitle": "[Exiled-Destiny] Sword Art Online [Dual Audio]\n[Exiled-Destiny]_Sword_Art_Online_Ep01_(549819D7).mkv\n👤 5 💾 394.93 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p HDR",
+          "declaredTitle": "[Salieri] Sword Art Online S1 BD (1080p) (HDR) [Dual Audio]\n[Salieri] Sword Art Online - 01 (1080P) (HDR).mkv\n👤 1 💾 587.31 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Tenrai-Sensei] Sword Art Online S1+S2+S3+S4+Movies+OVAs [BD][1080p][HEVC 10bit x265][Dual Audio]\nSeason 1/Sword Art Online - S01E01 - The World Of Swords.mkv\n👤 223 💾 466.73 MB ⚙️ NyaaSi\nDubbed / Du",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[Sokudo] Sword Art Online S1 v2 [1080p BD][AV1][dual audio]\n[Sokudo] Sword Art Online - 01 [1080p BD][AV1][dual audio].mkv\n👤 51 💾 238.75 MB ⚙️ NyaaSi\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online S01E01 The World of Swords 1080p CR WEB-DL DUAL DDP2 0 H 2\n👤 12 💾 1.4 GB ⚙️ ThePirateBay\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online (High Quality)(Dual Audio) [1080p] Blu-Ray Rip\nSword Art Online - 01 - The World Of Swords   [DarkDream].mkv\n👤 4 💾 3.15 GB ⚙️ 1337x\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[UDF] Sword Art Online S1 & S2 (BDRip 1080p x264 FLACx2) [dual-audio]\nSeason 01/[UDF] Sword Art Online - s01e01 [E60B71DE].mkv\n👤 3 💾 1.98 GB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio",
+          "declaredTitle": "[Exiled-Destiny] Sword Art Online [Dual Audio]\n[Exiled-Destiny]_Sword_Art_Online_Ep01_(549819D7).mkv\n👤 5 💾 394.93 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p HDR",
+          "declaredTitle": "[Salieri] Sword Art Online S1 BD (1080p) (HDR) [Dual Audio]\n[Salieri] Sword Art Online - 01 (1080P) (HDR).mkv\n👤 1 💾 587.31 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "[Tenrai-Sensei] Sword Art Online S1+S2+S3+S4+Movies+OVAs [BD][1080p][HEVC 10bit x265][Dual Audio]\nSeason 1/Sword Art Online - S01E01 - The World Of Swords.mkv\n👤 223 💾 466.73 MB ⚙️ NyaaSi\nDubbed / Du",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "[Sokudo] Sword Art Online S1 v2 [1080p BD][AV1][dual audio]\n[Sokudo] Sword Art Online - 01 [1080p BD][AV1][dual audio].mkv\n👤 51 💾 238.75 MB ⚙️ NyaaSi\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "[Judas] Sword Art Online (Season 1) [BD 1080p][HEVC x265 10bit][Dual-Audio][Eng-Subs]\n[Judas] Sword Art Online S1 - 01.mkv\n👤 23 💾 228.85 MB ⚙️ NyaaSi\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "Sword Art Online S01E01 The World of Swords 1080p CR WEB-DL DUAL DDP2 0 H 2\n👤 12 💾 1.4 GB ⚙️ ThePirateBay\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "Sword Art Online (High Quality)(Dual Audio) [1080p] Blu-Ray Rip\nSword Art Online - 01 - The World Of Swords   [DarkDream].mkv\n👤 4 💾 3.15 GB ⚙️ 1337x\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "[UDF] Sword Art Online S1 & S2 (BDRip 1080p x264 FLACx2) [dual-audio]\nSeason 01/[UDF] Sword Art Online - s01e01 [E60B71DE].mkv\n👤 3 💾 1.98 GB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "[bonkai77] Sword Art Online [1080p] [DUAL-AUDIO] [HEVC] [x265] [10bit][N-HcLs]\nSword Art Online - 01 - The World of Swords [BAD31EBD].mkv\n👤 1 💾 198.61 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "[Exiled-Destiny] Sword Art Online [Dual Audio]\n[Exiled-Destiny]_Sword_Art_Online_Ep01_(549819D7).mkv\n👤 5 💾 394.93 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "[AnimeCreed] Sword Art Online S1 + II + Extra Edition Complete [\nSAO/[AC]  Sword Art Online - 01 [Blu-Ray][720p][Dual Audio][Lucifer22].mkv\n👤 5 💾 136.83 MB ⚙️ ThePirateBay\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n720p",
+          "declaredTitle": "[AnimeCreed] Sword Art Online S1 + II + Extra Edition Complete [\nSAO/[AC]  Sword Art Online - 01 [Blu-Ray][720p][Dual Audio][Lucifer22].mkv\n👤 5 💾 136.83 MB ⚙️ ThePirateBay\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n720p",
+          "declaredTitle": "[AnimeCreed] Sword Art Online S1 + II + Extra Edition Complete [\nSAO/[AC]  Sword Art Online - 01 [Blu-Ray][720p][Dual Audio][Lucifer22].mkv\n👤 5 💾 136.83 MB ⚙️ ThePirateBay\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[sam] Sword Art Online Season 1 (BD 1080p HEVC x265 10-bit FLAC) [Dual-Audio]\n[sam] Sword Art Online - 01 [BD 1080p FLAC] [D04B3CA3].mkv\n👤 39 💾 2.64 GB ⚙️ NyaaSi\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "Torrentio\n1080p",
+          "declaredTitle": "[sam] Sword Art Online Season 1 (BD 1080p HEVC x265 10-bit FLAC) [Dual-Audio]\n[sam] Sword Art Online - 01 [BD 1080p FLAC] [D04B3CA3].mkv\n👤 39 💾 2.64 GB ⚙️ NyaaSi\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "🔊 Mico-Leão Dublado\n1080p",
+          "declaredTitle": "[sam] Sword Art Online Season 1 (BD 1080p HEVC x265 10-bit FLAC) [Dual-Audio]\n[sam] Sword Art Online - 01 [BD 1080p FLAC] [D04B3CA3].mkv\n👤 39 💾 2.64 GB ⚙️ NyaaSi\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p HDR",
+          "declaredTitle": "[Salieri] Sword Art Online S1 BD (1080p) (HDR) [Dual Audio]\n[Salieri] Sword Art Online - 01 (1080P) (HDR).mkv\n👤 1 💾 587.31 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Tenrai-Sensei] Sword Art Online S1+S2+S3+S4+Movies+OVAs [BD][1080p][HEVC 10bit x265][Dual Audio]\nSeason 1/Sword Art Online - S01E01 - The World Of Swords.mkv\n👤 223 💾 466.73 MB ⚙️ NyaaSi\nDubbed / Du",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Sokudo] Sword Art Online S1 v2 [1080p BD][AV1][dual audio]\n[Sokudo] Sword Art Online - 01 [1080p BD][AV1][dual audio].mkv\n👤 51 💾 238.75 MB ⚙️ NyaaSi\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online S01E01 The World of Swords 1080p CR WEB-DL DUAL DDP2 0 H 2\n👤 12 💾 1.4 GB ⚙️ ThePirateBay\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online (High Quality)(Dual Audio) [1080p] Blu-Ray Rip\nSword Art Online - 01 - The World Of Swords   [DarkDream].mkv\n👤 4 💾 3.15 GB ⚙️ 1337x\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[UDF] Sword Art Online S1 & S2 (BDRip 1080p x264 FLACx2) [dual-audio]\nSeason 01/[UDF] Sword Art Online - s01e01 [E60B71DE].mkv\n👤 3 💾 1.98 GB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[bonkai77] Sword Art Online [1080p] [DUAL-AUDIO] [HEVC] [x265] [10bit][N-HcLs]\nSword Art Online - 01 - The World of Swords [BAD31EBD].mkv\n👤 1 💾 198.61 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p HDR",
+          "declaredTitle": "[Salieri] Sword Art Online S1 BD (1080p) (HDR) [Dual Audio]\n[Salieri] Sword Art Online - 01 (1080P) (HDR).mkv\n👤 1 💾 587.31 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Tenrai-Sensei] Sword Art Online S1+S2+S3+S4+Movies+OVAs [BD][1080p][HEVC 10bit x265][Dual Audio]\nSeason 1/Sword Art Online - S01E01 - The World Of Swords.mkv\n👤 223 💾 466.73 MB ⚙️ NyaaSi\nDubbed / Du",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[Sokudo] Sword Art Online S1 v2 [1080p BD][AV1][dual audio]\n[Sokudo] Sword Art Online - 01 [1080p BD][AV1][dual audio].mkv\n👤 51 💾 238.75 MB ⚙️ NyaaSi\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online S01E01 The World of Swords 1080p CR WEB-DL DUAL DDP2 0 H 2\n👤 12 💾 1.4 GB ⚙️ ThePirateBay\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "Sword Art Online (High Quality)(Dual Audio) [1080p] Blu-Ray Rip\nSword Art Online - 01 - The World Of Swords   [DarkDream].mkv\n👤 4 💾 3.15 GB ⚙️ 1337x\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[UDF] Sword Art Online S1 & S2 (BDRip 1080p x264 FLACx2) [dual-audio]\nSeason 01/[UDF] Sword Art Online - s01e01 [E60B71DE].mkv\n👤 3 💾 1.98 GB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "[AnimeCreed] Sword Art Online S1 + II + Extra Edition Complete [\nSAO/[AC]  Sword Art Online - 01 [Blu-Ray][720p][Dual Audio][Lucifer22].mkv\n👤 5 💾 136.83 MB ⚙️ ThePirateBay\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n720p",
+          "declaredTitle": "[AnimeCreed] Sword Art Online S1 + II + Extra Edition Complete [\nSAO/[AC]  Sword Art Online - 01 [Blu-Ray][720p][Dual Audio][Lucifer22].mkv\n👤 5 💾 136.83 MB ⚙️ ThePirateBay\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio",
+          "declaredTitle": "[Exiled-Destiny] Sword Art Online [Dual Audio]\n[Exiled-Destiny]_Sword_Art_Online_Ep01_(549819D7).mkv\n👤 5 💾 394.93 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio",
+          "declaredTitle": "[Exiled-Destiny] Sword Art Online [Dual Audio]\n[Exiled-Destiny]_Sword_Art_Online_Ep01_(549819D7).mkv\n👤 5 💾 394.93 MB ⚙️ NyaaSi\nDubbed / Dual Audio",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[sam] Sword Art Online Season 1 (BD 1080p HEVC x265 10-bit FLAC) [Dual-Audio]\n[sam] Sword Art Online - 01 [BD 1080p FLAC] [D04B3CA3].mkv\n👤 39 💾 2.64 GB ⚙️ NyaaSi\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        },
+        {
+          "provider": "💬 Torrentio\n1080p",
+          "declaredTitle": "[sam] Sword Art Online Season 1 (BD 1080p HEVC x265 10-bit FLAC) [Dual-Audio]\n[sam] Sword Art Online - 01 [BD 1080p FLAC] [D04B3CA3].mkv\n👤 39 💾 2.64 GB ⚙️ NyaaSi\nDubbed / Dual Audio / 🇬🇧",
+          "identityAccepted": true,
+          "claimedPtBr": true,
+          "language": "undeclared",
+          "transport": "torrent"
+        }
+      ],
+      "playback": "not_started_identity_and_rights_not_confirmed"
+    }
+  ],
+  "completedAt": "2026-10-27T17:54:00.199Z",
+  "live": [
+    {
+      "id": "tv-camara",
+      "currentTime": 148.321567,
+      "advancedSeconds": 16.000590999999986,
+      "width": 1920,
+      "height": 1080,
+      "readyState": 4,
+      "error": null,
+      "presentedFrames": 479,
+      "droppedFrames": 4,
+      "audioDecodedBytes": 365860,
+      "audioAuditioned": false
+    },
+    {
+      "id": "tv-senado",
+      "currentTime": 38.663349,
+      "advancedSeconds": 16.002290999999996,
+      "width": 870,
+      "height": 480,
+      "readyState": 4,
+      "error": null,
+      "presentedFrames": 480,
+      "droppedFrames": 0,
+      "audioDecodedBytes": 556563,
+      "audioAuditioned": false
+    }
+  ]
+}
