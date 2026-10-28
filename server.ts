@@ -20,6 +20,7 @@ import { authenticateAdmin } from "./src/server/database/firebaseAuth.ts";
 import { watchPartyRouter } from "./src/server/watchparty/routes.ts";
 import { authRouter } from "./src/server/auth/routes.ts";
 import { profilesRouter } from "./src/server/profiles/routes.ts";
+import { deviceAuthRouter, linkedDevicesRouter } from "./src/server/deviceAuth/routes.ts";
 import { publicHttpGet } from "./src/server/security/publicHttp.ts";
 import { normalizeProxyRange } from "./src/server/proxyRange.ts";
 import { epgSyncService } from "./src/server/livetv/epgSyncService.ts";
@@ -136,6 +137,8 @@ function createApp() {
   app.use('/api/watchparty', watchPartyRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/profiles', profilesRouter);
+  app.use('/api/device-auth', deviceAuthRouter);
+  app.use('/api/devices', linkedDevicesRouter);
 
   // Helper function to resolve open items to Stremio streams
   function resolveOpenItemStreams(rawId: string, seasonNum = 1, episodeNum = 1) {

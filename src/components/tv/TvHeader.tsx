@@ -20,6 +20,10 @@ interface TvHeaderProps {
   userName?: string;
   avatarUrl?: string;
   accountPlan?: string;
+  isAuthenticated?: boolean;
+  onOpenQrLink?: () => void;
+  onSwitchProfile?: () => void;
+  onLogout?: () => void;
 }
 
 const TvNavTabButton: React.FC<{
@@ -109,7 +113,11 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
   onNavigateProfileMenu,
   userName = 'Convidado',
   avatarUrl,
-  accountPlan
+  accountPlan,
+  isAuthenticated = false,
+  onOpenQrLink,
+  onSwitchProfile,
+  onLogout
 }) => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -539,6 +547,10 @@ export const TvHeader: React.FC<TvHeaderProps> = ({
                 avatarUrl={avatarUrl}
                 accountPlan={accountPlan}
                 anchorRef={profileRef}
+                isAuthenticated={isAuthenticated}
+                onOpenQrLink={onOpenQrLink}
+                onSwitchProfile={onSwitchProfile}
+                onLogout={onLogout}
               />
             </div>
           </div>

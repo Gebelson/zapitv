@@ -70,6 +70,7 @@ const CatalogDiagnosticModal = React.lazy(() => import('./src/components/catalog
 const ActorView = React.lazy(() => import('./src/pages/ActorView').then(module => ({ default: module.ActorView })));
 const WatchPartyModal = React.lazy(() => import('./src/components/watchparty/WatchPartyModal').then(module => ({ default: module.WatchPartyModal })));
 const TvApp = React.lazy(() => import('./src/pages/tv/TvApp').then(module => ({ default: module.TvApp })));
+const TvActivationView = React.lazy(() => import('./components/TvActivationView'));
 
 const GENRES_LIST = [
   'Ação', 'Adulto', 'Animação', 'Anime', 'Aventura', 'Biografia', 'Comédia', 
@@ -228,6 +229,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   const currentView: AppView = useMemo(() => {
     const path = location.pathname;
+    if (path === '/tv/ativar' || path.startsWith('/tv/ativar')) return 'tv-activate';
     if (path.startsWith('/tv')) return 'tv';
     if (isWatchRoute) return 'home';
     if (path === '/' || path.startsWith('/sala')) return 'home';
@@ -334,6 +336,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       case 'login':
       case 'signup': routeTo('/login'); break;
       case 'profile-selector': routeTo('/perfil-selector'); break;
+      case 'tv-activate': routeTo('/tv/ativar'); break;
       default: routeTo('/'); break;
     }
   }, [navigate]);
@@ -3012,6 +3015,34 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           initialEmail={initialState?.lastEmail}
           initialMode={currentView === 'signup' ? 'signup' : 'login'}
         />
+      </React.Suspense>
+    );
+  }
+
+  if (currentView === 'tv-activate') {
+    return (
+      <React.Suspense fallback={<ZapiLoader size="xl" />}>
+        <div className={`min-h-screen relative ${isDarkMode ? 'bg-[#05070a]' : 'bg-[#F8F9FC]'}`}>
+          <Header
+            isDarkMode={isDarkMode}
+            setIsDarkMode={setIsDarkMode}
+            currentUser={currentUser}
+            activeProfile={activeProfile}
+            currentView={currentView}
+            setCurrentView={setCurrentView}
+            onSwitchProfile={() => { setActiveProfile(null); setCurrentView('profile-selector'); }}
+            onSelectProfile={handleSelectProfile}
+            searchQuery=""
+            setSearchQuery={() => {}}
+            onLogout={handleLogout}
+            onOpenLogin={() => handleNavigateView('login')}
+            isAuthenticated={isAuthenticated}
+          />
+          <TvActivationView
+            currentUser={currentUser}
+            onNavigate={setCurrentView}
+          />
+        </div>
       </React.Suspense>
     );
   }

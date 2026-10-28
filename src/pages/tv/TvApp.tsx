@@ -34,6 +34,11 @@ import { useTvViewport } from '../../core/tv/tvViewportService';
 import { tvImagePreloaderService } from '../../core/tv/tvImagePreloaderService';
 import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { uiSoundService } from '../../core/audio/uiSoundService';
+import { TvQrLinkModal } from '../../components/tv/TvQrLinkModal';
+import { TvProfileSelector } from '../../components/tv/TvProfileSelector';
+import { profileClient } from '../../core/profile/profileClient';
+import { authClient } from '../../core/auth/authClient';
+import { resolveAvatarUrl } from '../../core/profile/avatarRegistry';
 
 // Lazy load do orquestrador de reprodução para máxima performance inicial na TV
 const ContentDetailModal = lazy(() => import('../../../components/ContentDetailModal'));
@@ -82,6 +87,68 @@ export const TvApp: React.FC<TvAppProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const viewport = useTvViewport();
+
+  // Estados de Vinculação QR Code e Perfis da Smart TV (P3.C)
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [isProfileSelectorOpen, setIsProfileSelectorOpen] = useState(false);
+  const [tvProfiles, setTvProfiles] = useState<Profile[]>([]);
+  const [activeTvProfile, setActiveTvProfile] = useState<Profile | null>(() => activeProfile || null);
+  const [isTvAuthenticated, setIsTvAuthenticated] = useState<boolean>(() => Boolean(currentUser));
+
+  useEffect(() => {
+    if (activeProfile) setActiveTvProfile(activeProfile);
+  }, [activeProfile]);
+
+  useEffect(() => {
+    if (currentUser) setIsTvAuthenticated(true);
+  }, [currentUser]);
+
+  const loadProfilesAndOpenSelector = useCallback(async () => {
+    try {
+      const items = await profileClient.list();
+      if (items.length > 0) {
+        const mapped: Profile[] = items.map(p => ({
+          id: p.id,
+          name: p.name,
+          avatar: resolveAvatarUrl(p.avatarId),
+          avatarId: p.avatarId,
+          isDefault: p.isDefault ? 1 : 0,
+          isChild: false,
+          displayOrder: p.displayOrder,
+        }));
+        setTvProfiles(mapped);
+        setIsProfileSelectorOpen(true);
+      }
+    } catch {}
+  }, []);
+
+  const handleTvLinked = useCallback(async (_userData: any) => {
+    setIsQrModalOpen(false);
+    setIsTvAuthenticated(true);
+    await loadProfilesAndOpenSelector();
+  }, [loadProfilesAndOpenSelector]);
+
+  const handleSelectTvProfile = useCallback(async (p: Profile) => {
+    try {
+      await profileClient.select(p.id);
+    } catch {}
+    setActiveTvProfile(p);
+    setIsProfileSelectorOpen(false);
+    setTimeout(() => {
+      try { setFocus('tv-hero-play'); } catch {}
+    }, 50);
+  }, []);
+
+  const handleTvLogout = useCallback(async () => {
+    try {
+      await authClient.logout();
+    } catch {}
+    setIsTvAuthenticated(false);
+    setActiveTvProfile(null);
+    setTvProfiles([]);
+    uiSoundService.play('click');
+  }, []);
+
   const [additionalCatalog, setAdditionalCatalog] = useState<ContentItem[]>([]);
   const catalogMounted = useRef(true);
   useEffect(() => {
@@ -599,9 +666,13 @@ export const TvApp: React.FC<TvAppProps> = ({
                   resetScrollToTop();
                 }
               }}
-              userName={activeProfile?.name || currentUser?.name || 'ZapiTV'}
-              avatarUrl={activeProfile?.avatar}
+              userName={activeTvProfile?.name || currentUser?.name || 'ZapiTV'}
+              avatarUrl={activeTvProfile?.avatar}
               accountPlan={currentUser?.status === 'Ativo' ? currentUser.plan?.trim() : undefined}
+              isAuthenticated={isTvAuthenticated}
+              onOpenQrLink={() => setIsQrModalOpen(true)}
+              onSwitchProfile={loadProfilesAndOpenSelector}
+              onLogout={handleTvLogout}
             />
           )}
 
@@ -710,6 +781,23 @@ export const TvApp: React.FC<TvAppProps> = ({
             />
           )}
           {screensaverActive && <TvScreensaver items={screensaverItems} />}
+
+          {/* Modal de Vinculação QR Code da Smart TV */}
+          <TvQrLinkModal
+            isOpen={isQrModalOpen}
+            onClose={() => setIsQrModalOpen(false)}
+            onLinked={handleTvLinked}
+          />
+
+          {/* Seletor de Perfis Smart TV */}
+          {isProfileSelectorOpen && tvProfiles.length > 0 && (
+            <TvProfileSelector
+              profiles={tvProfiles}
+              activeProfileId={activeTvProfile?.id}
+              onSelectProfile={handleSelectTvProfile}
+              onClose={() => setIsProfileSelectorOpen(false)}
+            />
+          )}
         </>
       )}
     </div>

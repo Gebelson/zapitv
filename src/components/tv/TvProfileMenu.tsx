@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bookmark, Clock, Settings, RotateCw, ChevronRight } from 'lucide-react';
+import { Bookmark, Clock, Settings, RotateCw, ChevronRight, Users, LogOut, QrCode } from 'lucide-react';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { uiSoundService } from '../../core/audio/uiSoundService';
@@ -16,6 +16,10 @@ interface TvProfileMenuProps {
   avatarUrl?: string;
   accountPlan?: string;
   anchorRef?: React.RefObject<HTMLElement | null>;
+  isAuthenticated?: boolean;
+  onOpenQrLink?: () => void;
+  onSwitchProfile?: () => void;
+  onLogout?: () => void;
 }
 
 interface ProfileMenuConfig {
@@ -259,7 +263,11 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
   userName = 'Meu Perfil',
   avatarUrl,
   accountPlan,
-  anchorRef
+  anchorRef,
+  isAuthenticated = false,
+  onOpenQrLink,
+  onSwitchProfile,
+  onLogout
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -529,6 +537,66 @@ export const TvProfileMenu: React.FC<TvProfileMenuProps> = ({
               onNavigate('settings');
             }}
           />
+
+          {/* Opção Entrar na ZapiTV quando anônimo */}
+          {!isAuthenticated && onOpenQrLink && (
+            <TvProfileMenuItem
+              focusKey="tv-menu-qr-login"
+              icon={<QrCode className="w-4 h-4 text-cyan-400" />}
+              label="Entrar na ZapiTV"
+              config={config}
+              isFireTv={isFireTv}
+              onArrowPress={(direction) => {
+                if (direction === 'left' || direction === 'right') return false;
+                return true;
+              }}
+              onClick={() => {
+                uiSoundService.play('click');
+                onClose();
+                onOpenQrLink();
+              }}
+            />
+          )}
+
+          {/* Opção Trocar Perfil quando autenticado */}
+          {isAuthenticated && onSwitchProfile && (
+            <TvProfileMenuItem
+              focusKey="tv-menu-switch-profile"
+              icon={<Users className="w-4 h-4 text-cyan-400" />}
+              label="Trocar Perfil"
+              config={config}
+              isFireTv={isFireTv}
+              onArrowPress={(direction) => {
+                if (direction === 'left' || direction === 'right') return false;
+                return true;
+              }}
+              onClick={() => {
+                uiSoundService.play('click');
+                onClose();
+                onSwitchProfile();
+              }}
+            />
+          )}
+
+          {/* Opção Sair da Conta quando autenticado */}
+          {isAuthenticated && onLogout && (
+            <TvProfileMenuItem
+              focusKey="tv-menu-logout"
+              icon={<LogOut className="w-4 h-4 text-red-400" />}
+              label="Sair da Conta"
+              config={config}
+              isFireTv={isFireTv}
+              onArrowPress={(direction) => {
+                if (direction === 'left' || direction === 'right') return false;
+                return true;
+              }}
+              onClick={() => {
+                uiSoundService.play('click');
+                onClose();
+                onLogout();
+              }}
+            />
+          )}
 
           {/* Divisor discreto para separar ação de sistema */}
           <div 

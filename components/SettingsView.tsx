@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Home, CreditCard, Shield, Monitor, User, ChevronRight, 
   ArrowLeft, Plus, Smartphone, Key, Mail, Phone, 
-  AlertCircle, PlayCircle, Lock, Users, HelpCircle, Settings, Edit3, Clock, Trash2, Info, ShieldCheck, Smile, Sun, Moon, Bell, X, Star, LogOut, Check, Copy, AlertTriangle, Gift, FileText, Volume2
+  AlertCircle, PlayCircle, Lock, Users, HelpCircle, Settings, Edit3, Clock, Trash2, Info, ShieldCheck, Smile, Sun, Moon, Bell, X, Star, LogOut, Check, Copy, AlertTriangle, Gift, FileText, Volume2, Tv, RefreshCw
 } from 'lucide-react';
 import { User as UserType, AppView, SiteNotification } from '../types';
 import { skipService } from '../src/core/skip/skipService';
@@ -13,6 +13,7 @@ import { userPreferenceStore } from '../src/core/recommendations/userPreferenceS
 import { recommendationEngine } from '../src/core/recommendations/recommendationEngine';
 import { consentManager } from '../src/core/recommendations/consentManager';
 import { uiSoundService } from '../src/core/audio/uiSoundService';
+import { deviceAuthClient, LinkedDevice } from '../src/core/deviceAuth/deviceAuthClient';
 
 interface SettingsViewProps {
   isDarkMode: boolean;
@@ -108,6 +109,44 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       showToast("Participação colaborativa revogada e dados purgados.");
     } else {
       showToast("Participação voluntária em recomendações coletivas ativada!");
+    }
+  };
+
+  // Dispositivos conectados reais (P3.C)
+  const [linkedDevices, setLinkedDevices] = useState<LinkedDevice[]>([]);
+  const [isLoadingDevices, setIsLoadingDevices] = useState<boolean>(false);
+  const [deviceToRevoke, setDeviceToRevoke] = useState<LinkedDevice | null>(null);
+  const [isRevokingDevice, setIsRevokingDevice] = useState<boolean>(false);
+
+  const loadLinkedDevices = async () => {
+    setIsLoadingDevices(true);
+    try {
+      const devs = await deviceAuthClient.listLinkedDevices();
+      setLinkedDevices(devs);
+    } catch {
+      // Ignora silenciosamente
+    } finally {
+      setIsLoadingDevices(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'devices') {
+      loadLinkedDevices();
+    }
+  }, [activeTab]);
+
+  const handleRevokeDevice = async (dev: LinkedDevice) => {
+    setIsRevokingDevice(true);
+    try {
+      await deviceAuthClient.revokeDevice(dev.id);
+      showToast(`${dev.deviceName} desvinculado com sucesso.`);
+      setDeviceToRevoke(null);
+      await loadLinkedDevices();
+    } catch (err: any) {
+      showToast(err.message || 'Erro ao desvincular aparelho.');
+    } finally {
+      setIsRevokingDevice(false);
     }
   };
 
@@ -901,36 +940,118 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       case 'devices':
         return (
           <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-            <h1 className={`text-[32px] font-black mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Aparelhos</h1>
-            <p className="text-sm text-gray-500 mb-8 font-medium">Gerencie onde sua conta está conectada</p>
-            
-            <div className={`border rounded-xl overflow-hidden shadow-sm mb-10 backdrop-blur-xl ${isDarkMode ? 'bg-[#151C26]/85 border-white/5' : 'bg-white/80 border-gray-200'}`}>
-               {[
-                 { name: 'Smart TV Samsung', loc: 'São Paulo, BR', active: 'Agora' },
-                 { name: 'iPhone 13', loc: 'São Paulo, BR', active: 'Há 2 horas' },
-                 { name: 'Chrome no Windows', loc: 'Rio de Janeiro, BR', active: 'Ontem' }
-               ].map((dev, i) => (
-                 <div key={i} className={`p-5 border-b last:border-0 flex justify-between items-center ${isDarkMode ? 'border-white/5' : 'border-gray-100'}`}>
-                    <div className="flex items-center gap-4">
-                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isDarkMode ? 'bg-white/5 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
-                          {dev.name.includes('TV') ? <Monitor className="w-5 h-5" /> : dev.name.includes('Phone') ? <Smartphone className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
-                       </div>
-                       <div>
-                          <p className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{dev.name}</p>
-                          <p className="text-xs text-gray-500">{dev.loc} • Último acesso: {dev.active}</p>
-                       </div>
-                    </div>
-                    <button onClick={() => showToast(`Desconectado de ${dev.name}`)} className={`text-xs font-bold ${isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-black'}`}>Sair</button>
-                 </div>
-               ))}
+            <div className="flex items-center justify-between mb-1">
+              <h1 className={`text-[32px] font-black ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Dispositivos conectados</h1>
+              <button
+                onClick={loadLinkedDevices}
+                disabled={isLoadingDevices}
+                className={`p-2 rounded-xl border flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+                  isDarkMode ? 'bg-white/5 border-white/10 text-white/70 hover:text-white' : 'bg-gray-100 border-gray-200 text-gray-600 hover:text-black'
+                }`}
+                title="Atualizar lista"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDevices ? 'animate-spin' : ''}`} />
+                <span>Atualizar</span>
+              </button>
             </div>
+            <p className="text-sm text-gray-500 mb-8 font-medium">Gerencie as Smart TVs e aparelhos vinculados à sua conta ZapiTV</p>
+            
+            {isLoadingDevices && linkedDevices.length === 0 ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-3">
+                <RefreshCw className="w-8 h-8 animate-spin text-[#007df7]" />
+                <span className="text-xs text-gray-500">Carregando aparelhos vinculados...</span>
+              </div>
+            ) : linkedDevices.length === 0 ? (
+              <div className={`p-8 border rounded-2xl text-center mb-10 ${isDarkMode ? 'bg-[#151C26]/85 border-white/5' : 'bg-white/80 border-gray-200'}`}>
+                <Tv className="w-12 h-12 mx-auto text-gray-500 mb-3 opacity-60" />
+                <p className={`font-bold text-base mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Nenhuma Smart TV vinculada</p>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                  Para conectar uma televisão, abra a ZapiTV na TV, selecione &quot;Entrar na ZapiTV&quot; e escaneie o QR Code com a câmera do celular.
+                </p>
+              </div>
+            ) : (
+              <div className={`border rounded-xl overflow-hidden shadow-sm mb-10 backdrop-blur-xl ${isDarkMode ? 'bg-[#151C26]/85 border-white/5' : 'bg-white/80 border-gray-200'}`}>
+                {linkedDevices.map((dev) => {
+                  const createdDate = new Date(dev.createdAt).toLocaleDateString('pt-BR');
+                  const lastActiveDate = new Date(dev.lastActiveAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+                  return (
+                    <div key={dev.id} className={`p-5 border-b last:border-0 flex justify-between items-center ${isDarkMode ? 'border-white/5' : 'border-gray-100'}`}>
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isDarkMode ? 'bg-white/5 text-[#00baa3]' : 'bg-gray-100 text-[#007df7]'}`}>
+                          <Tv className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{dev.deviceName}</p>
+                            {dev.isCurrentSession && (
+                              <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-[#007df7]/20 text-[#007df7]">
+                                Este aparelho
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            Vinculado em: {createdDate} • Último acesso: {lastActiveDate}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setDeviceToRevoke(dev)}
+                        className="text-xs font-bold text-red-400 hover:text-red-300 px-3 py-1.5 rounded-lg border border-red-500/20 hover:bg-red-500/10 transition-colors cursor-pointer"
+                      >
+                        Desvincular
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             
             <button 
               onClick={() => { onLogout(); showToast("Desconectado de todos os dispositivos."); }}
-              className="w-full py-4 border border-[#007df7]/30 text-[#007df7] rounded-xl font-bold uppercase tracking-widest hover:bg-[#007df7] hover:text-white transition-all"
+              className="w-full py-4 border border-[#007df7]/30 text-[#007df7] rounded-xl font-bold uppercase tracking-widest hover:bg-[#007df7] hover:text-white transition-all cursor-pointer"
             >
               Sair de todos os aparelhos
             </button>
+
+            {/* Modal de Confirmação de Revogação */}
+            {deviceToRevoke && (
+              <div className="fixed inset-0 z-[500] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className={`max-w-md w-full p-6 rounded-2xl border shadow-2xl ${isDarkMode ? 'bg-[#0f141c] border-white/10' : 'bg-white border-gray-200'}`}>
+                  <div className="w-12 h-12 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center mb-4">
+                    <Trash2 className="w-6 h-6" />
+                  </div>
+                  <h3 className={`text-lg font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Desvincular {deviceToRevoke.deviceName}?
+                  </h3>
+                  <p className="text-xs text-gray-500 mb-6 leading-relaxed">
+                    A sessão deste dispositivo será revogada imediatamente no servidor. A televisão perderá o acesso à sua conta até que um novo código seja gerado.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setDeviceToRevoke(null)}
+                      disabled={isRevokingDevice}
+                      className="flex-1 py-2.5 rounded-xl border border-white/10 text-xs font-bold text-gray-400 hover:text-white transition-all cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() => handleRevokeDevice(deviceToRevoke)}
+                      disabled={isRevokingDevice}
+                      className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-all shadow-lg shadow-red-500/20 cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      {isRevokingDevice ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Desvinculando...</span>
+                        </>
+                      ) : (
+                        <span>Sim, desvincular</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
       default:

@@ -22991,8 +22991,10 @@ import { drizzle } from "drizzle-orm/libsql";
 var schema_exports = {};
 __export(schema_exports, {
   adminAudit: () => adminAudit,
+  deviceLinkChallenges: () => deviceLinkChallenges,
   episodes: () => episodes,
   globalSettings: () => globalSettings,
+  linkedDevices: () => linkedDevices,
   loginAttempts: () => loginAttempts,
   media: () => media,
   mediaExternalIds: () => mediaExternalIds,
@@ -23165,6 +23167,43 @@ var profiles = sqliteTable("profiles", {
   index("profiles_user_id_idx").on(table.userId),
   index("profiles_user_id_order_idx").on(table.userId, table.displayOrder)
 ]);
+var deviceLinkChallenges = sqliteTable("device_link_challenges", {
+  id: text("id").primaryKey(),
+  deviceCodeHash: text("device_code_hash").notNull(),
+  userCode: text("user_code").notNull(),
+  status: text("status", { enum: ["pending", "approved", "rejected", "consumed", "expired"] }).notNull().default("pending"),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+  deviceName: text("device_name").notNull().default("Smart TV"),
+  deviceType: text("device_type").notNull().default("smart_tv"),
+  clientIp: text("client_ip"),
+  userAgent: text("user_agent"),
+  pollCount: integer("poll_count").notNull().default(0),
+  lastPolledAt: integer("last_polled_at"),
+  expiresAt: integer("expires_at").notNull(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  approvedAt: integer("approved_at"),
+  consumedAt: integer("consumed_at")
+}, (table) => [
+  uniqueIndex("device_link_challenges_device_code_hash_idx").on(table.deviceCodeHash),
+  uniqueIndex("device_link_challenges_user_code_idx").on(table.userCode),
+  index("device_link_challenges_status_expires_idx").on(table.status, table.expiresAt)
+]);
+var linkedDevices = sqliteTable("linked_devices", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  sessionId: text("session_id").notNull().references(() => sessions.id, { onDelete: "cascade" }),
+  deviceName: text("device_name").notNull(),
+  deviceType: text("device_type").notNull(),
+  clientIp: text("client_ip"),
+  userAgent: text("user_agent"),
+  lastActiveAt: integer("last_active_at").notNull(),
+  createdAt: integer("created_at").notNull(),
+  revokedAt: integer("revoked_at")
+}, (table) => [
+  index("linked_devices_user_id_idx").on(table.userId),
+  index("linked_devices_session_id_idx").on(table.sessionId)
+]);
 
 // src/server/database/client.ts
 import fs2 from "fs";
@@ -23252,6 +23291,46 @@ async function ensureAuthTables(database) {
     );
     CREATE INDEX IF NOT EXISTS profiles_user_id_idx ON profiles (user_id);
     CREATE INDEX IF NOT EXISTS profiles_user_id_order_idx ON profiles (user_id, display_order);
+
+    CREATE TABLE IF NOT EXISTS device_link_challenges (
+      id text PRIMARY KEY NOT NULL,
+      device_code_hash text NOT NULL,
+      user_code text NOT NULL,
+      status text DEFAULT 'pending' NOT NULL,
+      user_id text,
+      device_name text DEFAULT 'Smart TV' NOT NULL,
+      device_type text DEFAULT 'smart_tv' NOT NULL,
+      client_ip text,
+      user_agent text,
+      poll_count integer DEFAULT 0 NOT NULL,
+      last_polled_at integer,
+      expires_at integer NOT NULL,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      approved_at integer,
+      consumed_at integer,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS device_link_challenges_device_code_hash_idx ON device_link_challenges (device_code_hash);
+    CREATE UNIQUE INDEX IF NOT EXISTS device_link_challenges_user_code_idx ON device_link_challenges (user_code);
+    CREATE INDEX IF NOT EXISTS device_link_challenges_status_expires_idx ON device_link_challenges (status, expires_at);
+
+    CREATE TABLE IF NOT EXISTS linked_devices (
+      id text PRIMARY KEY NOT NULL,
+      user_id text NOT NULL,
+      session_id text NOT NULL,
+      device_name text NOT NULL,
+      device_type text NOT NULL,
+      client_ip text,
+      user_agent text,
+      last_active_at integer NOT NULL,
+      created_at integer NOT NULL,
+      revoked_at integer,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade,
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE INDEX IF NOT EXISTS linked_devices_user_id_idx ON linked_devices (user_id);
+    CREATE INDEX IF NOT EXISTS linked_devices_session_id_idx ON linked_devices (session_id);
   `);
 }
 
@@ -26172,7 +26251,6 @@ function requireCsrfProtection(req, res, next) {
   const origin = req.headers.origin;
   const referer = req.headers.referer;
   const host = req.headers.host;
-  const customClient = req.headers["x-zapi-client"];
   const hasCookie = Boolean(req.headers.cookie);
   const sourceUrl = origin || referer;
   if (sourceUrl && host) {
@@ -26184,7 +26262,7 @@ function requireCsrfProtection(req, res, next) {
     } catch {
       return res.status(403).json({ error: "Origem inv\xE1lida detectada." });
     }
-  } else if (!sourceUrl && hasCookie && !customClient && process.env.NODE_ENV === "production") {
+  } else if (!sourceUrl && hasCookie && process.env.NODE_ENV === "production") {
     return res.status(403).json({ error: "Origem da requisi\xE7\xE3o n\xE3o confi\xE1vel (CSRF bloqueado)." });
   }
   next();
@@ -26946,6 +27024,518 @@ profilesRouter.delete("/:id", async (req, res) => {
     const msg = err?.message || "";
     const status = msg.includes("n\xE3o pertence") ? 403 : msg.includes("\xFAnico perfil") ? 400 : 500;
     return res.status(status).json({ error: msg || "Erro ao excluir perfil." });
+  }
+});
+
+// src/server/deviceAuth/routes.ts
+import { Router as Router3 } from "express";
+
+// src/server/deviceAuth/deviceAuthService.ts
+import crypto6 from "crypto";
+import { eq as eq9, and as and8, isNull as isNull3, gt as gt4, sql as sql2 } from "drizzle-orm";
+var CHALLENGE_EXPIRY_MS = 10 * 60 * 1e3;
+var DEFAULT_POLL_INTERVAL_SEC = 5;
+var SLOW_DOWN_INTERVAL_SEC = 10;
+var USER_CODE_ALPHABET = "BCDFGHJKLMNPQRSTVWXYZ23456789";
+var validationAttempts = /* @__PURE__ */ new Map();
+function checkValidationRateLimit(ip) {
+  const now = Date.now();
+  const entry = validationAttempts.get(ip);
+  if (!entry || entry.expiresAt < now) {
+    return true;
+  }
+  return entry.count < 10;
+}
+function recordFailedValidationAttempt(ip) {
+  const now = Date.now();
+  const entry = validationAttempts.get(ip);
+  if (!entry || entry.expiresAt < now) {
+    validationAttempts.set(ip, { count: 1, expiresAt: now + 15 * 60 * 1e3 });
+  } else {
+    entry.count += 1;
+  }
+}
+function clearValidationAttempts(ip) {
+  validationAttempts.delete(ip);
+}
+function hashDeviceCode(deviceCode) {
+  return crypto6.createHash("sha256").update(deviceCode).digest("hex");
+}
+function generateDeviceCode() {
+  return crypto6.randomBytes(32).toString("hex");
+}
+function generateUserCode() {
+  const bytes = crypto6.randomBytes(8);
+  let code = "";
+  for (let i = 0; i < 8; i++) {
+    code += USER_CODE_ALPHABET[bytes[i] % USER_CODE_ALPHABET.length];
+  }
+  return `${code.slice(0, 4)}-${code.slice(4)}`;
+}
+function normalizeUserCode(input) {
+  if (!input || typeof input !== "string") return "";
+  return input.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+function formatUserCodeDisplay(normalized) {
+  if (normalized.length <= 4) return normalized;
+  return `${normalized.slice(0, 4)}-${normalized.slice(4, 8)}`;
+}
+function detectDeviceFromUserAgent(userAgent) {
+  if (!userAgent) {
+    return { deviceName: "Smart TV", deviceType: "smart_tv" };
+  }
+  const ua = userAgent.toLowerCase();
+  if (ua.includes("silk") || ua.includes("aft") || ua.includes("firetv")) {
+    return { deviceName: "Amazon Fire TV", deviceType: "firetv" };
+  }
+  if (ua.includes("tizen") || ua.includes("samsungbrowser")) {
+    return { deviceName: "Samsung Smart TV", deviceType: "tizen" };
+  }
+  if (ua.includes("webos") || ua.includes("web0s") || ua.includes("netcast")) {
+    return { deviceName: "LG Smart TV", deviceType: "webos" };
+  }
+  if (ua.includes("msx") || ua.includes("mediastationx")) {
+    return { deviceName: "Media Station X", deviceType: "msx" };
+  }
+  if (ua.includes("smarttv") || ua.includes("hbbtv") || ua.includes("appletv") || ua.includes("roku")) {
+    return { deviceName: "Smart TV", deviceType: "smart_tv" };
+  }
+  return { deviceName: "Smart TV", deviceType: "smart_tv" };
+}
+function getPublicBaseUrl(req) {
+  const envUrl = process.env.APP_URL || process.env.PUBLIC_URL;
+  if (envUrl && envUrl.trim()) {
+    return envUrl.trim().replace(/\/+$/, "");
+  }
+  if (req?.headers?.host) {
+    const host = req.headers.host;
+    const proto = req.headers["x-forwarded-proto"] || (req.protocol === "https" ? "https" : "http");
+    return `${proto}://${host}`.replace(/\/+$/, "");
+  }
+  return "https://zapitv.vercel.app";
+}
+async function createDeviceLinkChallenge(db, options) {
+  const deviceCode = generateDeviceCode();
+  const deviceCodeHash = hashDeviceCode(deviceCode);
+  const userCode = generateUserCode();
+  const { deviceName, deviceType } = detectDeviceFromUserAgent(options.userAgent);
+  const now = Date.now();
+  const expiresAt = now + CHALLENGE_EXPIRY_MS;
+  const challengeId = crypto6.randomUUID();
+  await db.db.insert(deviceLinkChallenges).values({
+    id: challengeId,
+    deviceCodeHash,
+    userCode,
+    status: "pending",
+    userId: null,
+    deviceName,
+    deviceType,
+    clientIp: options.clientIp?.slice(0, 45) || null,
+    userAgent: options.userAgent?.slice(0, 255) || null,
+    pollCount: 0,
+    lastPolledAt: null,
+    expiresAt,
+    createdAt: now,
+    updatedAt: now,
+    approvedAt: null,
+    consumedAt: null
+  });
+  const baseUrl = options.baseUrl || "https://zapitv.vercel.app";
+  const verificationUrl = `${baseUrl}/tv/ativar?code=${userCode}`;
+  return {
+    deviceCode,
+    userCode,
+    verificationUrl,
+    expiresIn: Math.floor(CHALLENGE_EXPIRY_MS / 1e3),
+    interval: DEFAULT_POLL_INTERVAL_SEC,
+    deviceName,
+    deviceType
+  };
+}
+async function pollDeviceLinkChallenge(db, deviceCode, options) {
+  if (!deviceCode || typeof deviceCode !== "string" || deviceCode.length < 32) {
+    return { status: "expired", error: "invalid_grant" };
+  }
+  const deviceCodeHash = hashDeviceCode(deviceCode);
+  const now = Date.now();
+  const found = await db.db.select().from(deviceLinkChallenges).where(eq9(deviceLinkChallenges.deviceCodeHash, deviceCodeHash)).limit(1);
+  if (!found || found.length === 0) {
+    return { status: "expired", error: "invalid_grant" };
+  }
+  const challenge = found[0];
+  if (challenge.status === "consumed") {
+    return { status: "consumed", error: "invalid_grant" };
+  }
+  if (challenge.status === "expired" || challenge.expiresAt < now) {
+    if (challenge.status !== "expired") {
+      await db.db.update(deviceLinkChallenges).set({ status: "expired", updatedAt: now }).where(eq9(deviceLinkChallenges.id, challenge.id));
+    }
+    return { status: "expired", error: "expired_token" };
+  }
+  if (challenge.status === "rejected") {
+    return { status: "rejected", error: "access_denied" };
+  }
+  if (challenge.lastPolledAt && now - challenge.lastPolledAt < 4e3) {
+    await db.db.update(deviceLinkChallenges).set({
+      pollCount: challenge.pollCount + 1,
+      lastPolledAt: now,
+      updatedAt: now
+    }).where(eq9(deviceLinkChallenges.id, challenge.id));
+    return { status: "slow_down", error: "slow_down", interval: SLOW_DOWN_INTERVAL_SEC };
+  }
+  await db.db.update(deviceLinkChallenges).set({
+    pollCount: challenge.pollCount + 1,
+    lastPolledAt: now,
+    updatedAt: now
+  }).where(eq9(deviceLinkChallenges.id, challenge.id));
+  if (challenge.status === "pending") {
+    return { status: "pending", interval: DEFAULT_POLL_INTERVAL_SEC };
+  }
+  if (challenge.status === "approved" && challenge.userId) {
+    const updateResult = await db.db.update(deviceLinkChallenges).set({
+      status: "consumed",
+      consumedAt: now,
+      updatedAt: now
+    }).where(
+      and8(
+        eq9(deviceLinkChallenges.id, challenge.id),
+        eq9(deviceLinkChallenges.status, "approved")
+      )
+    );
+    const refreshed = await db.db.select().from(deviceLinkChallenges).where(eq9(deviceLinkChallenges.id, challenge.id)).limit(1);
+    if (!refreshed || refreshed[0].status !== "consumed" || refreshed[0].consumedAt !== now) {
+      return { status: "consumed", error: "invalid_grant" };
+    }
+    const userRows = await db.db.select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      status: users.status
+    }).from(users).where(eq9(users.id, challenge.userId)).limit(1);
+    if (!userRows || userRows.length === 0 || userRows[0].status !== "active") {
+      return { status: "rejected", error: "access_denied" };
+    }
+    const linkedUser = userRows[0];
+    const newSession = await createSession(db, linkedUser.id, {
+      ipAddress: options?.clientIp || challenge.clientIp || void 0,
+      userAgent: options?.userAgent || challenge.userAgent || void 0
+    });
+    const linkedDeviceId = crypto6.randomUUID();
+    await db.db.insert(linkedDevices).values({
+      id: linkedDeviceId,
+      userId: linkedUser.id,
+      sessionId: newSession.sessionId,
+      deviceName: challenge.deviceName,
+      deviceType: challenge.deviceType,
+      clientIp: options?.clientIp || challenge.clientIp || null,
+      userAgent: options?.userAgent || challenge.userAgent || null,
+      lastActiveAt: now,
+      createdAt: now,
+      revokedAt: null
+    });
+    return {
+      status: "approved",
+      token: newSession.token,
+      expiresAt: newSession.expiresAt,
+      sessionId: newSession.sessionId,
+      user: {
+        id: linkedUser.id,
+        name: linkedUser.name,
+        email: linkedUser.email
+      }
+    };
+  }
+  return { status: "pending", interval: DEFAULT_POLL_INTERVAL_SEC };
+}
+async function validateDeviceUserCode(db, rawUserCode, clientIp) {
+  if (clientIp && !checkValidationRateLimit(clientIp)) {
+    return {
+      valid: false,
+      error: "Muitas tentativas inv\xE1lidas. Aguarde alguns minutos antes de tentar novamente."
+    };
+  }
+  const cleanCode = normalizeUserCode(rawUserCode);
+  if (!cleanCode || cleanCode.length < 6) {
+    if (clientIp) recordFailedValidationAttempt(clientIp);
+    return { valid: false, error: "C\xF3digo inv\xE1lido. Digite os 8 caracteres exibidos na TV." };
+  }
+  const formatted = formatUserCodeDisplay(cleanCode);
+  const now = Date.now();
+  const found = await db.db.select().from(deviceLinkChallenges).where(
+    and8(
+      sql2`REPLACE(${deviceLinkChallenges.userCode}, '-', '') = ${cleanCode}`,
+      gt4(deviceLinkChallenges.expiresAt, now),
+      eq9(deviceLinkChallenges.status, "pending")
+    )
+  ).limit(1);
+  if (!found || found.length === 0) {
+    if (clientIp) recordFailedValidationAttempt(clientIp);
+    return { valid: false, error: "C\xF3digo n\xE3o encontrado ou j\xE1 expirado. Gere um novo c\xF3digo na TV." };
+  }
+  const challenge = found[0];
+  if (clientIp) clearValidationAttempts(clientIp);
+  return {
+    valid: true,
+    challenge: {
+      userCode: challenge.userCode,
+      deviceName: challenge.deviceName,
+      deviceType: challenge.deviceType,
+      expiresAt: challenge.expiresAt,
+      createdAt: challenge.createdAt
+    }
+  };
+}
+async function approveDeviceLink(db, rawUserCode, userId) {
+  if (!userId) {
+    return { success: false, error: "Autentica\xE7\xE3o necess\xE1ria." };
+  }
+  const cleanCode = normalizeUserCode(rawUserCode);
+  if (!cleanCode) {
+    return { success: false, error: "C\xF3digo de vincula\xE7\xE3o inv\xE1lido." };
+  }
+  const now = Date.now();
+  const found = await db.db.select().from(deviceLinkChallenges).where(
+    and8(
+      sql2`REPLACE(${deviceLinkChallenges.userCode}, '-', '') = ${cleanCode}`,
+      gt4(deviceLinkChallenges.expiresAt, now),
+      eq9(deviceLinkChallenges.status, "pending")
+    )
+  ).limit(1);
+  if (!found || found.length === 0) {
+    return { success: false, error: "Desafio inv\xE1lido, expirado ou j\xE1 processado." };
+  }
+  const challenge = found[0];
+  await db.db.update(deviceLinkChallenges).set({
+    status: "approved",
+    userId,
+    approvedAt: now,
+    updatedAt: now
+  }).where(
+    and8(
+      eq9(deviceLinkChallenges.id, challenge.id),
+      eq9(deviceLinkChallenges.status, "pending")
+    )
+  );
+  return { success: true, message: "Dispositivo autorizado com sucesso!" };
+}
+async function rejectDeviceLink(db, rawUserCode) {
+  const cleanCode = normalizeUserCode(rawUserCode);
+  if (!cleanCode) {
+    return { success: false, error: "C\xF3digo inv\xE1lido." };
+  }
+  const now = Date.now();
+  const found = await db.db.select().from(deviceLinkChallenges).where(
+    and8(
+      sql2`REPLACE(${deviceLinkChallenges.userCode}, '-', '') = ${cleanCode}`,
+      eq9(deviceLinkChallenges.status, "pending")
+    )
+  ).limit(1);
+  if (found && found.length > 0) {
+    await db.db.update(deviceLinkChallenges).set({
+      status: "rejected",
+      updatedAt: now
+    }).where(eq9(deviceLinkChallenges.id, found[0].id));
+  }
+  return { success: true, message: "Vincula\xE7\xE3o recusada." };
+}
+async function listUserLinkedDevices(db, userId, currentSessionId) {
+  const rows = await db.db.select({
+    id: linkedDevices.id,
+    sessionId: linkedDevices.sessionId,
+    deviceName: linkedDevices.deviceName,
+    deviceType: linkedDevices.deviceType,
+    clientIp: linkedDevices.clientIp,
+    userAgent: linkedDevices.userAgent,
+    lastActiveAt: linkedDevices.lastActiveAt,
+    createdAt: linkedDevices.createdAt
+  }).from(linkedDevices).where(
+    and8(
+      eq9(linkedDevices.userId, userId),
+      isNull3(linkedDevices.revokedAt)
+    )
+  ).orderBy(sql2`${linkedDevices.lastActiveAt} DESC`);
+  return rows.map((r) => ({
+    id: r.id,
+    deviceName: r.deviceName,
+    deviceType: r.deviceType,
+    clientIp: r.clientIp,
+    userAgent: r.userAgent,
+    lastActiveAt: r.lastActiveAt,
+    createdAt: r.createdAt,
+    isCurrentSession: Boolean(currentSessionId && r.sessionId === currentSessionId)
+  }));
+}
+async function revokeUserLinkedDevice(db, userId, deviceId) {
+  const found = await db.db.select().from(linkedDevices).where(
+    and8(
+      eq9(linkedDevices.id, deviceId),
+      eq9(linkedDevices.userId, userId),
+      isNull3(linkedDevices.revokedAt)
+    )
+  ).limit(1);
+  if (!found || found.length === 0) {
+    return { success: false, error: "Dispositivo n\xE3o encontrado ou j\xE1 desvinculado." };
+  }
+  const device = found[0];
+  const now = Date.now();
+  await db.db.update(linkedDevices).set({ revokedAt: now }).where(eq9(linkedDevices.id, device.id));
+  await db.db.update(sessions).set({ revokedAt: now, updatedAt: now }).where(and8(eq9(sessions.id, device.sessionId), isNull3(sessions.revokedAt)));
+  return { success: true };
+}
+
+// src/server/deviceAuth/routes.ts
+var deviceAuthRouter = Router3();
+deviceAuthRouter.post("/challenge", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Servi\xE7o de autentica\xE7\xE3o de dispositivos temporariamente indispon\xEDvel." });
+    }
+    const userAgent = req.headers["user-agent"] || "";
+    const clientIp = req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "";
+    const baseUrl = getPublicBaseUrl(req);
+    const challenge = await createDeviceLinkChallenge(db, {
+      userAgent,
+      clientIp,
+      baseUrl
+    });
+    return res.status(201).json(challenge);
+  } catch (err) {
+    return res.status(500).json({ error: "Erro ao gerar desafio de vincula\xE7\xE3o." });
+  }
+});
+deviceAuthRouter.post("/poll", async (req, res) => {
+  try {
+    const { deviceCode } = req.body || {};
+    if (!deviceCode || typeof deviceCode !== "string") {
+      return res.status(400).json({ error: "C\xF3digo de dispositivo (deviceCode) obrigat\xF3rio." });
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Servi\xE7o temporariamente indispon\xEDvel." });
+    }
+    const clientIp = req.ip || req.headers["x-forwarded-for"] || "";
+    const userAgent = req.headers["user-agent"] || "";
+    const pollResult = await pollDeviceLinkChallenge(db, deviceCode, {
+      clientIp,
+      userAgent
+    });
+    if (pollResult.status === "approved" && pollResult.token) {
+      const isProduction3 = process.env.NODE_ENV === "production";
+      const cookieHeader = formatSetCookie(pollResult.token, {
+        expiresAt: pollResult.expiresAt,
+        isProduction: isProduction3
+      });
+      res.setHeader("Set-Cookie", cookieHeader);
+    }
+    if (pollResult.status === "slow_down") {
+      return res.status(400).json(pollResult);
+    }
+    if (pollResult.status === "expired" || pollResult.status === "consumed") {
+      return res.status(400).json(pollResult);
+    }
+    if (pollResult.status === "rejected") {
+      return res.status(403).json(pollResult);
+    }
+    return res.status(200).json(pollResult);
+  } catch (err) {
+    return res.status(500).json({ error: "Erro ao consultar status da vincula\xE7\xE3o." });
+  }
+});
+deviceAuthRouter.get("/validate", async (req, res) => {
+  try {
+    const code = req.query.code || "";
+    if (!code) {
+      return res.status(400).json({ valid: false, error: "C\xF3digo de vincula\xE7\xE3o obrigat\xF3rio." });
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ valid: false, error: "Servi\xE7o temporariamente indispon\xEDvel." });
+    }
+    const clientIp = req.ip || req.headers["x-forwarded-for"] || "";
+    const validation = await validateDeviceUserCode(db, code, clientIp);
+    if (!validation.valid) {
+      return res.status(400).json(validation);
+    }
+    return res.status(200).json(validation);
+  } catch (err) {
+    return res.status(500).json({ valid: false, error: "Erro ao validar c\xF3digo." });
+  }
+});
+deviceAuthRouter.post("/approve", requireCsrfProtection, authenticateUser, async (req, res) => {
+  try {
+    const { userCode } = req.body || {};
+    if (!userCode || typeof userCode !== "string") {
+      return res.status(400).json({ error: "C\xF3digo de usu\xE1rio (userCode) obrigat\xF3rio." });
+    }
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Autentica\xE7\xE3o necess\xE1ria." });
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Servi\xE7o temporariamente indispon\xEDvel." });
+    }
+    const result = await approveDeviceLink(db, userCode, req.user.id);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    return res.status(200).json(result);
+  } catch (err) {
+    return res.status(500).json({ error: "Erro ao aprovar vincula\xE7\xE3o do dispositivo." });
+  }
+});
+deviceAuthRouter.post("/reject", requireCsrfProtection, async (req, res) => {
+  try {
+    const { userCode } = req.body || {};
+    if (!userCode || typeof userCode !== "string") {
+      return res.status(400).json({ error: "C\xF3digo de usu\xE1rio (userCode) obrigat\xF3rio." });
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Servi\xE7o temporariamente indispon\xEDvel." });
+    }
+    const result = await rejectDeviceLink(db, userCode);
+    return res.status(200).json(result);
+  } catch (err) {
+    return res.status(500).json({ error: "Erro ao recusar vincula\xE7\xE3o." });
+  }
+});
+var linkedDevicesRouter = Router3();
+linkedDevicesRouter.get("/", authenticateUser, async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Autentica\xE7\xE3o necess\xE1ria." });
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Servi\xE7o temporariamente indispon\xEDvel." });
+    }
+    const devices = await listUserLinkedDevices(db, req.user.id, req.sessionId);
+    return res.status(200).json({ devices });
+  } catch (err) {
+    return res.status(500).json({ error: "Erro ao carregar dispositivos conectados." });
+  }
+});
+linkedDevicesRouter.delete("/:id", requireCsrfProtection, authenticateUser, async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Autentica\xE7\xE3o necess\xE1ria." });
+    }
+    const deviceId = req.params.id;
+    if (!deviceId) {
+      return res.status(400).json({ error: "ID do dispositivo obrigat\xF3rio." });
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Servi\xE7o temporariamente indispon\xEDvel." });
+    }
+    const result = await revokeUserLinkedDevice(db, req.user.id, deviceId);
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+    return res.status(200).json({ success: true, message: "Dispositivo desvinculado com sucesso." });
+  } catch (err) {
+    return res.status(500).json({ error: "Erro ao desvincular dispositivo." });
   }
 });
 
@@ -77846,6 +78436,8 @@ function createApp() {
   app2.use("/api/watchparty", watchPartyRouter);
   app2.use("/api/auth", authRouter);
   app2.use("/api/profiles", profilesRouter);
+  app2.use("/api/device-auth", deviceAuthRouter);
+  app2.use("/api/devices", linkedDevicesRouter);
   function resolveOpenItemStreams(rawId, seasonNum = 1, episodeNum = 1) {
     let cleanId = rawId.replace(/\.json$/, "");
     if (cleanId.includes(":")) {

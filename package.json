@@ -155,7 +155,8 @@
     "test:tv-live-traditional-controls": "tsx tests/tv_live_traditional_controls_removal.test.ts",
     "test:tv-live-hud-simplified": "tsx tests/tv_live_hud_simplified.test.ts",
     "test:audio-language-id": "tsx tests/p1_2_audio_language_identification.test.ts",
-    "test:p1-3a-pagination": "tsx tests/p1_3a_catalog_pagination.test.ts"
+    "test:p1-3a-pagination": "tsx tests/p1_3a_catalog_pagination.test.ts",
+    "test:p3-c-tv-qr-auth": "tsx tests/p3_c_tv_qr_auth.test.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
@@ -170,6 +171,7 @@
     "hls.js": "^1.7.3",
     "jose": "^6.2.12",
     "lucide-react": "^0.563.0",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.18.4",
@@ -179,6 +181,7 @@
     "@tailwindcss/vite": "^4.0.9",
     "@types/express": "^5.0.6",
     "@types/node": "^22.14.0",
+    "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-react": "^5.0.0",
     "drizzle-kit": "^0.31.11",
     "esbuild": "^0.24.2",

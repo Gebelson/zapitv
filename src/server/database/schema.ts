@@ -184,5 +184,50 @@ export const profiles = sqliteTable('profiles', {
   index('profiles_user_id_order_idx').on(table.userId, table.displayOrder),
 ]);
 
+// ============================================================================
+// VINCULAÇÃO DE SMART TVS POR QR CODE (P3.C)
+// RFC 8628 (OAuth 2.0 Device Authorization Grant adaptado)
+// ============================================================================
+
+export const deviceLinkChallenges = sqliteTable('device_link_challenges', {
+  id: text('id').primaryKey(),
+  deviceCodeHash: text('device_code_hash').notNull(),
+  userCode: text('user_code').notNull(),
+  status: text('status', { enum: ['pending', 'approved', 'rejected', 'consumed', 'expired'] }).notNull().default('pending'),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  deviceName: text('device_name').notNull().default('Smart TV'),
+  deviceType: text('device_type').notNull().default('smart_tv'),
+  clientIp: text('client_ip'),
+  userAgent: text('user_agent'),
+  pollCount: integer('poll_count').notNull().default(0),
+  lastPolledAt: integer('last_polled_at'),
+  expiresAt: integer('expires_at').notNull(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+  approvedAt: integer('approved_at'),
+  consumedAt: integer('consumed_at'),
+}, (table) => [
+  uniqueIndex('device_link_challenges_device_code_hash_idx').on(table.deviceCodeHash),
+  uniqueIndex('device_link_challenges_user_code_idx').on(table.userCode),
+  index('device_link_challenges_status_expires_idx').on(table.status, table.expiresAt),
+]);
+
+export const linkedDevices = sqliteTable('linked_devices', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  deviceName: text('device_name').notNull(),
+  deviceType: text('device_type').notNull(),
+  clientIp: text('client_ip'),
+  userAgent: text('user_agent'),
+  lastActiveAt: integer('last_active_at').notNull(),
+  createdAt: integer('created_at').notNull(),
+  revokedAt: integer('revoked_at'),
+}, (table) => [
+  index('linked_devices_user_id_idx').on(table.userId),
+  index('linked_devices_session_id_idx').on(table.sessionId),
+]);
+
+
 
 
