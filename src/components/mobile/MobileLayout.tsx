@@ -39,6 +39,12 @@ interface MobileLayoutProps {
   onOpenDiagnostics?: () => void;
   hasOpenModal?: boolean;
   onCloseModal?: () => void;
+  onLoadMore?: (category: 'movies' | 'series' | 'animes') => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  selectedGenre?: string;
+  onSelectGenre?: (genre: string) => void;
+  onCategoryChange?: (category: 'movies' | 'series' | 'animes') => void;
 }
 
 export const MobileLayout: React.FC<MobileLayoutProps> = ({
@@ -64,7 +70,13 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   featuredSelection,
   onOpenDiagnostics,
   hasOpenModal = false,
-  onCloseModal
+  onCloseModal,
+  onLoadMore,
+  hasMore = true,
+  isLoadingMore = false,
+  selectedGenre,
+  onSelectGenre,
+  onCategoryChange
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -238,6 +250,12 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             onSelectContent={onSelectContent}
             isGenreMenuOpen={isGenreMenuOpen}
             onToggleGenreMenu={setIsGenreMenuOpen}
+            onLoadMore={onLoadMore}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            selectedGenreProp={selectedGenre}
+            onSelectGenre={onSelectGenre}
+            onCategoryChange={onCategoryChange}
           />
         )}
 

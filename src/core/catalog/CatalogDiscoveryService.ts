@@ -408,14 +408,16 @@ export class CatalogDiscoveryService {
           rawResults.push(it);
         }
       } else {
+        const tvGenreId = (genre && genre !== 'Todos' && genre !== 'Anime' && genre !== 'Adulto') ? TV_GENRE_NAME_TO_ID[genre] : undefined;
+        const movieGenreId = (genre && genre !== 'Todos' && genre !== 'Anime' && genre !== 'Adulto') ? MOVIE_GENRE_NAME_TO_ID[genre] : undefined;
         // 1. Busca Séries de Anime convencionais
-        const tvAnimePromise = page <= 500 ? tmdbService.getAnimesWithMeta(page) : Promise.resolve({ items: [], total: 0 });
+        const tvAnimePromise = page <= 500 ? tmdbService.getAnimesWithMeta(page, tvGenreId) : Promise.resolve({ items: [], total: 0 });
         // 2. Busca Filmes de Anime convencionais
-        const movieAnimePromise = page <= 500 ? tmdbService.getAnimeMoviesWithMeta(page) : Promise.resolve({ items: [], total: 0 });
+        const movieAnimePromise = page <= 500 ? tmdbService.getAnimeMoviesWithMeta(page, movieGenreId) : Promise.resolve({ items: [], total: 0 });
         // 3. Suporte contínuo via Cinemeta além da página 500
         const cinemetaPromise = page > 500 ? this.cinemetaCatalog('series', 'Animation', (page - 501) * 20) : Promise.resolve([]);
         // 4. Integração oficial e enriquecimento com AniList
-        const anilistPromise = page <= 10 ? aniListClient.getPopularAnimes(page, 20) : Promise.resolve([]);
+        const anilistPromise = (page <= 10 && (!genre || genre === 'Todos' || genre === 'Anime')) ? aniListClient.getPopularAnimes(page, 20) : Promise.resolve([]);
 
         const [tvRes, movieRes, cineRes, aniRes] = await Promise.allSettled([tvAnimePromise, movieAnimePromise, cinemetaPromise, anilistPromise]);
         isPartial = this.requireDiscoveryResponse([tvRes, movieRes, cineRes, aniRes]);
@@ -436,13 +438,15 @@ export class CatalogDiscoveryService {
 
       // Filtro por sub-gênero caso o usuário selecione na dropdown
       if (genre && genre !== 'Todos' && genre !== 'Anime' && genre !== 'Adulto') {
-        const filtered = rawResults.filter(it => it.genres?.includes(genre));
-        const allowed = catalogEligibilityService.filterEligibleItemsSync(filtered, { allowAdult: false });
+        const filtered = rawResults.filter(it => it.genres?.includes(genre) || it.genres?.some(g => g.toLowerCase() === genre.toLowerCase()));
+        const sourceItems = filtered.length > 0 ? filtered : rawResults;
+        const allowed = catalogEligibilityService.filterEligibleItemsSync(sourceItems, { allowAdult: false });
         const onlyAnimes = allowed
           .filter(it => !adultContentService.isAdultContent(it))
           .map(it => {
             if (it.type !== ContentType.ANIME) it.type = ContentType.ANIME;
             if (!it.genres?.includes('Anime')) it.genres = ['Anime', ...(it.genres || [])];
+            if (!it.genres?.includes(genre)) it.genres.push(genre);
             return it;
           });
         const items = this.processAndDedupe(onlyAnimes, 'animes');
@@ -450,7 +454,7 @@ export class CatalogDiscoveryService {
           items,
           page,
           hasMore: rawResults.length > 0 || items.length > 0,
-      isPartial,
+          isPartial,
           totalDiscovered: this.dedupeCache.size,
           totalAvailable: this.getTotalAvailable('animes', genre)
         };

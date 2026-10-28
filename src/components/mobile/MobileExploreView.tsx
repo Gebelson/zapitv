@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, X, Check } from 'lucide-react';
 import { ContentItem } from '../../../types';
 import { MobileCard } from './MobileCard';
+import { ZapiLoader } from '../common/ZapiLoader';
 import { searchService } from '../../core/search/searchService';
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication';
@@ -19,6 +20,12 @@ interface MobileExploreViewProps {
   availableGenres?: string[];
   isGenreMenuOpen?: boolean;
   onToggleGenreMenu?: (isOpen: boolean) => void;
+  onLoadMore?: (category: 'movies' | 'series' | 'animes') => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  selectedGenreProp?: string;
+  onSelectGenre?: (genre: string) => void;
+  onCategoryChange?: (category: 'movies' | 'series' | 'animes') => void;
 }
 
 export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
@@ -26,7 +33,13 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
   allContent,
   onSelectContent,
   isGenreMenuOpen: controlledGenreMenuOpen,
-  onToggleGenreMenu
+  onToggleGenreMenu,
+  onLoadMore,
+  hasMore = true,
+  isLoadingMore = false,
+  selectedGenreProp,
+  onSelectGenre,
+  onCategoryChange
 }) => {
   const navigate = useNavigate();
 
@@ -40,8 +53,36 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<'movies' | 'series' | 'animes'>(
     resolveCategory(initialCategory)
   );
-  const [selectedGenre, setSelectedGenre] = useState<string>('Todos os gêneros');
+  const [selectedGenre, setSelectedGenre] = useState<string>(
+    selectedGenreProp || 'Todos os gêneros'
+  );
   const [internalGenreMenuOpen, setInternalGenreMenuOpen] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Sincroniza gênero externo se modificado no app
+  useEffect(() => {
+    if (selectedGenreProp) {
+      setSelectedGenre(selectedGenreProp === 'Todos' ? 'Todos os gêneros' : selectedGenreProp);
+    }
+  }, [selectedGenreProp]);
+
+  // Infinite Scroll Observer para o fim do catálogo mobile
+  useEffect(() => {
+    if (!hasMore || isLoadingMore || !onLoadMore) return;
+    const target = sentinelRef.current;
+    if (!target) return;
+
+    if (typeof IntersectionObserver !== 'undefined') {
+      const observer = new IntersectionObserver((entries) => {
+        if (entries[0]?.isIntersecting) {
+          onLoadMore(selectedCategory);
+        }
+      }, { rootMargin: '600px', threshold: 0.01 });
+
+      observer.observe(target);
+      return () => observer.disconnect();
+    }
+  }, [hasMore, isLoadingMore, onLoadMore, selectedCategory]);
 
   const isMenuOpen = controlledGenreMenuOpen !== undefined ? controlledGenreMenuOpen : internalGenreMenuOpen;
 
@@ -150,6 +191,9 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
   const handleSelectGenre = (genre: string) => {
     uiSoundService.play('click');
     setSelectedGenre(genre);
+    if (onSelectGenre) {
+      onSelectGenre(genre === 'Todos os gêneros' ? 'Todos' : genre);
+    }
     handleCloseGenreMenu();
   };
 
@@ -162,6 +206,9 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
     }
 
     setSelectedCategory(catId);
+    if (onCategoryChange) {
+      onCategoryChange(catId);
+    }
     navigate(catId === 'movies' ? '/filmes' : catId === 'series' ? '/series' : '/animes', { replace: true });
 
     // Verifica se o gênero atual permanece válido na nova categoria selecionada
@@ -286,6 +333,18 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
         {filteredItems.length === 0 && (
           <div className="py-20 text-center text-slate-400 text-sm">
             <p>Nenhum título encontrado para o gênero selecionado.</p>
+          </div>
+        )}
+
+        {/* Sentinela de Rolagem Infinita e Indicador de Carregamento Mobile */}
+        {hasMore && (
+          <div ref={sentinelRef} className="col-span-2 flex justify-center py-6 min-h-[48px] select-none">
+            {isLoadingMore && (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-gray-300 text-xs font-bold shadow-lg backdrop-blur-md">
+                <ZapiLoader size="sm" />
+                <span>Carregando mais conteúdos...</span>
+              </div>
+            )}
           </div>
         )}
       </div>

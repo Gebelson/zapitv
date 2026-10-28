@@ -447,14 +447,15 @@ class TMDBClientService {
     return (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.MOVIE));
   }
 
-  public async getAnimes(page = 1): Promise<ContentItem[]> {
-    const data = await this.getAnimesWithMeta(page);
+  public async getAnimes(page = 1, genreId?: number): Promise<ContentItem[]> {
+    const data = await this.getAnimesWithMeta(page, genreId);
     return data.items;
   }
 
-  public async getAnimesWithMeta(page = 1): Promise<{ items: ContentItem[], total: number }> {
+  public async getAnimesWithMeta(page = 1, genreId?: number): Promise<{ items: ContentItem[], total: number }> {
+    const genreParam = genreId ? `&with_genres=16,${genreId}` : '&with_genres=16';
     const data = await this.request(
-      `/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&page=${page}`
+      `/discover/tv?sort_by=popularity.desc&with_original_language=ja&page=${page}${genreParam}`
     );
     return {
       items: (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.ANIME)),
@@ -462,14 +463,15 @@ class TMDBClientService {
     };
   }
 
-  public async getAnimeMovies(page = 1): Promise<ContentItem[]> {
-    const data = await this.getAnimeMoviesWithMeta(page);
+  public async getAnimeMovies(page = 1, genreId?: number): Promise<ContentItem[]> {
+    const data = await this.getAnimeMoviesWithMeta(page, genreId);
     return data.items;
   }
 
-  public async getAnimeMoviesWithMeta(page = 1): Promise<{ items: ContentItem[], total: number }> {
+  public async getAnimeMoviesWithMeta(page = 1, genreId?: number): Promise<{ items: ContentItem[], total: number }> {
+    const genreParam = genreId ? `&with_genres=16,${genreId}` : '&with_genres=16';
     const data = await this.request(
-      `/discover/movie?with_genres=16&with_original_language=ja&sort_by=popularity.desc&page=${page}`
+      `/discover/movie?sort_by=popularity.desc&with_original_language=ja&page=${page}${genreParam}`
     );
     return {
       items: (data.results || []).map((r: TMDBRawItem) => formatContentItem(r, ContentType.ANIME)),

@@ -89,10 +89,23 @@ export const TvApp: React.FC<TvAppProps> = ({
     return () => { catalogMounted.current = false; };
   }, []);
   const pagination = useMemo(() => ({
-    movies: new CatalogPaginationSession(page => catalogDiscoveryService.discoverMovies(page)),
-    series: new CatalogPaginationSession(page => catalogDiscoveryService.discoverSeries(page)),
-    animes: new CatalogPaginationSession(page => catalogDiscoveryService.discoverAnimes(page))
+    movies: new CatalogPaginationSession(page => catalogDiscoveryService.discoverMovies(page), Math.max(0, Math.floor((popularMovies?.length || 0) / 20))),
+    series: new CatalogPaginationSession(page => catalogDiscoveryService.discoverSeries(page), Math.max(0, Math.floor((popularSeries?.length || 0) / 20))),
+    animes: new CatalogPaginationSession(page => catalogDiscoveryService.discoverAnimes(page), Math.max(0, Math.floor((animeItems?.length || 0) / 20)))
   }), []);
+
+  // Sincroniza o cursor de paginação da TV caso os catálogos iniciais já estejam carregados
+  useEffect(() => {
+    if (popularMovies && popularMovies.length >= 20 && pagination.movies.getPage() === 0) {
+      pagination.movies.setPage(Math.floor(popularMovies.length / 20));
+    }
+    if (popularSeries && popularSeries.length >= 20 && pagination.series.getPage() === 0) {
+      pagination.series.setPage(Math.floor(popularSeries.length / 20));
+    }
+    if (animeItems && animeItems.length >= 20 && pagination.animes.getPage() === 0) {
+      pagination.animes.setPage(Math.floor(animeItems.length / 20));
+    }
+  }, [popularMovies, popularSeries, animeItems, pagination]);
 
   // Inicializa navegação espacial e define o foco inicial no botão Assistir do Hero
   useEffect(() => {

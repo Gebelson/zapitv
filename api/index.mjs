@@ -427,40 +427,53 @@ var init_verifiedCatalog = __esm({
 });
 
 // src/core/audio/audioPreferenceService.ts
-var DUAL_PATTERNS, EXPLICIT_DUBBED_PATTERNS, DUBBED_PTBR_PATTERNS, PTBR_GENERAL_PATTERNS, SUBTITLED_ONLY_PATTERNS, FOREIGN_LANGUAGE_PATTERNS, AudioPreferenceService, audioPreferenceService;
+var DUAL_PATTERNS, DUAL_PT_PATTERNS, EXPLICIT_FOREIGN_DUB_PATTERNS, EXPLICIT_DUBBED_PATTERNS, DUBBED_PTBR_PATTERNS, PTBR_AUDIO_INDICATORS, SUBTITLED_ONLY_PATTERNS, FOREIGN_LANGUAGE_PATTERNS, AudioPreferenceService, audioPreferenceService;
 var init_audioPreferenceService = __esm({
   "src/core/audio/audioPreferenceService.ts"() {
     DUAL_PATTERNS = [
       /\b(dual[-_\s]?audio|dual[-_\s]?áudio|multi[-_\s]?audio|multi[-_\s]?áudio)\b/i,
       /\[dual[-_\s]?audio\]/i,
       /\[dual\]/i,
-      /\bdual\b(?!\s*[-_]?sub)/i,
-      /\bdual\s*latino\b/i
-      // latino can be foreign if not PT, handled below
+      /\bdual\b(?!\s*[-_]?sub)/i
+    ];
+    DUAL_PT_PATTERNS = [
+      /\[(?:jap|jpn|eng|ita|fre|ger|esp|en|ja)[/+](?:por|pob|pt[-_]?br)\]/i,
+      /\[(?:por|pob|pt[-_]?br)[/+](?:jap|jpn|eng|ita|fre|ger|esp|en|ja)\]/i,
+      /\b(?:jap|jpn|eng|ita|fre|ger|esp|en|ja)[/+](?:por|pob|pt[-_]?br)\b/i,
+      /\b(?:por|pob|pt[-_]?br)[/+](?:jap|jpn|eng|ita|fre|ger|esp|en|ja)\b/i,
+      /\b(dual[-_\s]?audio|dual[-_\s]?áudio|multi[-_\s]?audio|multi[-_\s]?áudio)\b.*?\b(dublado|pt[-_]?br|portugu[eê]s|nacional|brazuca)\b/i,
+      /\b(dublado|pt[-_]?br|portugu[eê]s|nacional|brazuca)\b.*?\b(dual[-_\s]?audio|dual[-_\s]?áudio|multi[-_\s]?audio|multi[-_\s]?áudio)\b/i,
+      /\[dual[-_\s]?audio\]\s*\[(?:dublado|pt[-_]?br)\]/i,
+      /\[(?:dublado|pt[-_]?br)\]\s*\[dual[-_\s]?audio\]/i,
+      /🇧🇷\s*(?:dual[-_\s]?audio|dual[-_\s]?áudio)/i,
+      /(?:dual[-_\s]?audio|dual[-_\s]?áudio)\s*🇧🇷/i
+    ];
+    EXPLICIT_FOREIGN_DUB_PATTERNS = [
+      { regex: /\b(dublado\s*(?:em\s*)?latino|audio\s*latino|áudio\s*latino|dublado\s*latino|en\s*español|en\s*espanhol|dublado\s*(?:em\s*)?espanhol|spanish\s*dub|dual\s*latino)\b/i, lang: "es", name: "latino/espanhol" },
+      { regex: /\b(english\s*dub|eng\s*dub|dublado\s*(?:em\s*)?ingl[eê]s|dub\s*ingl[eê]s|audio\s*ingles|áudio\s*ingl[eê]s)\b/i, lang: "en", name: "ingl\xEAs" },
+      { regex: /\b(dublado\s*(?:em\s*)?japon[eê]s|japanese\s*dub|audio\s*japones|áudio\s*japon[eê]s)\b/i, lang: "ja", name: "japon\xEAs" },
+      { regex: /\b(dublado\s*pt[-_]?pt|dublagem\s*portuguesa|vers[aã]o\s*portuguesa)\b/i, lang: "pt-PT", name: "portugu\xEAs de Portugal" }
     ];
     EXPLICIT_DUBBED_PATTERNS = [
       /\b(dublado|dublada|dublados|dublagem|dublagem\s*brasileira)\b/i,
       /\[dublado\]/i,
-      /\[dub\]/i,
-      /\b(fhd[-_]?dublado|hd[-_]?dublado|web[-_]?dl[-_]?dublado|pt[-_]?br\s*dub|fhd[-_]?dub|hd[-_]?dub)\b/i,
+      /\b(fhd[-_]?dublado|hd[-_]?dublado|web[-_]?dl[-_]?dublado|pt[-_]?br\s*dub)\b/i,
       /\b(audio|áudio)\s*(?:pt[-_]?br|portugu[eê]s|nacional|brasil|brasileiro)\b/i,
       /\b(?:pt[-_]?br|portugu[eê]s)\s*(?:audio|áudio)\b/i,
       /\b(brazuca|nacional)\b/i,
-      /🇧🇷\s*(?:dublado|dual|áudio|audio|dub\b)/i,
-      /🇧🇷.*?(?:dublado|dual|áudio|audio)/i
+      /🇧🇷\s*(?:dublado|dual|áudio|audio)/i,
+      /🇧🇷.*?(?:dublado|dual|áudio|audio)/i,
+      /🌎\s*(?:portugu[eê]s|pt[-_]?br)/i
     ];
     DUBBED_PTBR_PATTERNS = [
-      ...EXPLICIT_DUBBED_PATTERNS,
-      /🌎\s*portugu[eê]s/i,
-      /🌎\s*pt[-_]?br/i
+      ...EXPLICIT_DUBBED_PATTERNS
     ];
-    PTBR_GENERAL_PATTERNS = [
-      /\b(pt[-_]?br|portugu[eê]s[-_]?br|portugu[eê]s)\b/i,
-      /\[pt[-_]?br\]/i,
-      /\b(pob|por)\b/i,
-      /🇧🇷/,
-      /🌎\s*portugu[eê]s/i,
-      /🌎\s*pt[-_]?br/i
+    PTBR_AUDIO_INDICATORS = [
+      /\b(audio|áudio)\s*[:=-]?\s*(?:pt[-_]?br|portugu[eê]s|nacional|brasil|brasileiro)\b/i,
+      /\b(?:pt[-_]?br|portugu[eê]s)\s*[:=-]?\s*(?:audio|áudio)\b/i,
+      /\b(dublagem\s*brasileira|brazuca|nacional)\b/i,
+      /🌎\s*(?:portugu[eê]s|pt[-_]?br)/i,
+      /\[(?:por|pob)\]\s*(?:audio|áudio)/i
     ];
     SUBTITLED_ONLY_PATTERNS = [
       /\b(legendado|legendada|leg\b|subs?|softsubs?|hardsubs?|hardcoded|legenda[-_]?fixa|legenda[-_]?embutida|legenda[-_]?gravada)\b/i,
@@ -469,13 +482,18 @@ var init_audioPreferenceService = __esm({
       /\[hardsub\]/i,
       /\[hardsub[-_]?pt[-_]?br\]/i,
       /\bapenas\s*legendado\b/i,
-      /🇯🇵\s*legendado/i
+      /🇯🇵\s*legendado/i,
+      /🇰🇷\s*legendado/i
     ];
     FOREIGN_LANGUAGE_PATTERNS = [
       { regex: /\b(jap|ja\b|jpn|japanese|japon[eê]s)\b/i, lang: "ja" },
+      { regex: /\b(kor|ko\b|korean|coreano|kdrama|k[-_]?drama)\b/i, lang: "ko" },
       { regex: /\b(eng|en\b|english|ingl[eê]s)\b/i, lang: "en" },
-      { regex: /\b(esp|es\b|spanish|espanhol|castellano|latino)\b/i, lang: "es" },
-      { regex: /\b(pt[-_]?pt|portugu[eê]s[-_]?pt)\b/i, lang: "pt-PT" }
+      { regex: /\b(esp|es\b|spa|spanish|espanhol|castellano|latino)\b/i, lang: "es" },
+      { regex: /\b(pt[-_]?pt|portugu[eê]s[-_]?pt|lusitano)\b/i, lang: "pt-PT" },
+      { regex: /\b(fre|fr\b|french|franc[eê]s)\b/i, lang: "fr" },
+      { regex: /\b(ger|de\b|deu|german|alem[aã]o)\b/i, lang: "de" },
+      { regex: /\b(ita|it\b|italian|italiano)\b/i, lang: "it" }
     ];
     AudioPreferenceService = class {
       /**
@@ -484,51 +502,36 @@ var init_audioPreferenceService = __esm({
        */
       analyzeAudio(stream) {
         const combinedText = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""}`.toLowerCase();
-        const isDualAudio = DUAL_PATTERNS.some((p) => p.test(combinedText));
-        const hasExplicitDubbed = EXPLICIT_DUBBED_PATTERNS.some((p) => p.test(combinedText));
-        const hasDubbedPattern = DUBBED_PTBR_PATTERNS.some((p) => p.test(combinedText));
-        const hasPtBrGeneral = PTBR_GENERAL_PATTERNS.some((p) => p.test(combinedText));
-        const hasSubtitledOnlyPattern = SUBTITLED_ONLY_PATTERNS.some((p) => p.test(combinedText));
-        const hasExplicitBrazilianAudio = hasPtBrGeneral || /\b(audio|áudio)\s*pt(?:[-_]?br)?\b|\bdublagem\s*brasileira\b|\bbrazuca\b/i.test(combinedText);
-        const isExplicitSpanishAudio = /\b(latino|espa[nñ]ol|espanhol|castellano)\b/i.test(combinedText) && !hasExplicitBrazilianAudio;
-        if (isExplicitSpanishAudio) {
+        const isPtPt = /\b(pt[-_]?pt|portugu[eê]s[-_]?pt|lusitano)\b/i.test(combinedText);
+        const hasPtBrExplicit = /\b(pt[-_]?br|dublagem\s*brasileira|brazuca)\b/i.test(combinedText) || /🇧🇷/.test(combinedText);
+        if (isPtPt && !hasPtBrExplicit) {
           return {
             tier: "foreign",
             isPtBr: false,
             isDubbed: false,
             isDualAudio: false,
-            language: "es",
-            confidence: 0.9,
-            reason: "\xC1udio espanhol indicado explicitamente pela fonte"
-          };
-        }
-        const isExplicitlySubtitledOnly = hasSubtitledOnlyPattern && !hasExplicitDubbed && !isDualAudio;
-        const explicitlyBrazilian = hasExplicitDubbed || !hasSubtitledOnlyPattern && (hasDubbedPattern || hasPtBrGeneral || stream.isDubbed === true || stream.isPtBr === true || /\b(pt[-_]?br|pob|por[-_]?br|brazilian)\b/i.test(combinedText));
-        if (isDualAudio && explicitlyBrazilian && !isExplicitlySubtitledOnly) {
-          return {
-            tier: "dual_audio",
-            isPtBr: true,
-            isDubbed: true,
-            isDualAudio: true,
-            language: "dual",
+            language: "pt-PT",
             confidence: 0.95,
-            reason: "Dual \xC1udio com faixa PT-BR detectada"
+            reason: "\xC1udio em portugu\xEAs de Portugal (pt-PT)"
           };
         }
-        const isForeignOnly = /\b(latino|espa[nñ]ol|espanhol|castellano)\b/i.test(combinedText) && !hasExplicitDubbed && !hasPtBrGeneral && !stream.isDubbed && !stream.isPtBr;
-        const isPtPtOnly = /\b(pt[-_]?pt|portugu[eê]s[-_]?pt)\b/i.test(combinedText) && !/\b(pt[-_]?br|dublado|brazuca)\b/i.test(combinedText) && !/🇧🇷/.test(combinedText);
-        if (!isExplicitlySubtitledOnly && !isForeignOnly && !isPtPtOnly && (hasExplicitDubbed || !hasSubtitledOnlyPattern && (hasDubbedPattern || explicitlyBrazilian || stream.isDubbed === true))) {
-          return {
-            tier: "dubbed_ptbr",
-            isPtBr: true,
-            isDubbed: true,
-            isDualAudio: false,
-            language: "pt-BR",
-            confidence: 0.95,
-            reason: "\xC1udio dublado em portugu\xEAs brasileiro"
-          };
+        const hasExplicitBrazilianAudio = PTBR_AUDIO_INDICATORS.some((p) => p.test(combinedText)) || /\b(?:dublado\s*pt[-_]?br|áudio\s*dublado\s*pt[-_]?br)\b/i.test(combinedText);
+        for (const fed of EXPLICIT_FOREIGN_DUB_PATTERNS) {
+          if (fed.regex.test(combinedText) && !hasExplicitBrazilianAudio) {
+            return {
+              tier: "foreign",
+              isPtBr: false,
+              isDubbed: false,
+              isDualAudio: false,
+              language: fed.lang,
+              confidence: 0.95,
+              reason: `\xC1udio ${fed.name} indicado explicitamente pela fonte`
+            };
+          }
         }
-        if (hasPtBrGeneral && isExplicitlySubtitledOnly) {
+        const hasSubtitledOnlyPattern = SUBTITLED_ONLY_PATTERNS.some((p) => p.test(combinedText));
+        const isExplicitlySubtitledOnly = hasSubtitledOnlyPattern && !hasExplicitBrazilianAudio;
+        if (isExplicitlySubtitledOnly) {
           for (const foreign of FOREIGN_LANGUAGE_PATTERNS) {
             if (foreign.regex.test(combinedText)) {
               return {
@@ -537,7 +540,7 @@ var init_audioPreferenceService = __esm({
                 isDubbed: false,
                 isDualAudio: false,
                 language: foreign.lang,
-                confidence: 0.85,
+                confidence: 0.9,
                 reason: `\xC1udio original (${foreign.lang}) com indica\xE7\xE3o de legenda PT-BR`
               };
             }
@@ -548,8 +551,68 @@ var init_audioPreferenceService = __esm({
             isDubbed: false,
             isDualAudio: false,
             language: "original",
-            confidence: 0.8,
+            confidence: 0.85,
             reason: "\xC1udio original com legenda PT-BR"
+          };
+        }
+        const isDualAudioMarker = DUAL_PATTERNS.some((p) => p.test(combinedText));
+        if (isDualAudioMarker) {
+          const hasDualPtBr = DUAL_PT_PATTERNS.some((p) => p.test(combinedText)) || hasExplicitBrazilianAudio && !isExplicitlySubtitledOnly;
+          if (hasDualPtBr) {
+            return {
+              tier: "dual_audio",
+              isPtBr: true,
+              isDubbed: true,
+              isDualAudio: true,
+              language: "dual",
+              confidence: 0.95,
+              reason: "Dual \xC1udio com faixa PT-BR detectada"
+            };
+          }
+          for (const foreign of FOREIGN_LANGUAGE_PATTERNS) {
+            if (foreign.regex.test(combinedText)) {
+              return {
+                tier: "foreign",
+                isPtBr: false,
+                isDubbed: false,
+                isDualAudio: true,
+                language: foreign.lang,
+                confidence: 0.8,
+                reason: `Dual \xE1udio com idioma estrangeiro (${foreign.lang}) sem comprova\xE7\xE3o de faixa PT-BR`
+              };
+            }
+          }
+          return {
+            tier: "original",
+            isPtBr: false,
+            isDubbed: false,
+            isDualAudio: true,
+            language: "unknown",
+            confidence: 0.5,
+            reason: "Dual \xE1udio sem confirma\xE7\xE3o de faixa PT-BR"
+          };
+        }
+        const hasExplicitDubbed = EXPLICIT_DUBBED_PATTERNS.some((p) => p.test(combinedText));
+        if (hasExplicitDubbed && !isExplicitlySubtitledOnly) {
+          return {
+            tier: "dubbed_ptbr",
+            isPtBr: true,
+            isDubbed: true,
+            isDualAudio: false,
+            language: "pt-BR",
+            confidence: 0.95,
+            reason: "\xC1udio dublado em portugu\xEAs brasileiro"
+          };
+        }
+        if (!combinedText.trim() && (stream.isDubbed === true || stream.isPtBr === true)) {
+          return {
+            tier: "dubbed_ptbr",
+            isPtBr: true,
+            isDubbed: true,
+            isDualAudio: false,
+            language: "pt-BR",
+            confidence: 0.9,
+            reason: "Metadado expl\xEDcito da fonte indica \xE1udio PT-BR"
           };
         }
         for (const foreign of FOREIGN_LANGUAGE_PATTERNS) {
@@ -1011,7 +1074,7 @@ var init_subtitlePreferenceService = __esm({
       analyzeSubtitles(stream, hasExternalPtSub = false) {
         const combined = `${stream.name || ""} ${stream.title || ""} ${stream.description || ""}`.toLowerCase();
         const url = (stream.url || "").toLowerCase();
-        const hasPtBrIndication = /\b(pt[-_]?br|portugu[eê]s|legenda[-_]?pt|legendado)\b/i.test(combined);
+        const hasPtBrIndication = /\b(legenda[-_]?pt|legendado|legendada|leg[-_]?pt|softsub|hardsub)\b/i.test(combined) || /\b(pt[-_]?br|portugu[eê]s)\b/i.test(combined) && !/\bdublado\b/i.test(combined);
         if (HARDSUB_FOREIGN_PATTERNS.some((p) => p.test(combined))) {
           return {
             format: "hardsub_foreign",
@@ -1077,7 +1140,7 @@ var init_subtitlePreferenceService = __esm({
           isHardsub: false,
           isClean: false,
           isSoftsub: false,
-          hasPtSubtitle: hasExternalPtSub,
+          hasPtSubtitle: hasPtBrIndication || hasExternalPtSub,
           confidence: 0.5,
           details: "Formato de legenda n\xE3o identificado explicitamente nos metadados"
         };
@@ -1326,7 +1389,7 @@ var init_tmdbClient = __esm({
         }
         return null;
       }
-      async getCinemetaCatalog(type, genre, skip, timeoutMs = 8e3) {
+      async getCinemetaCatalog(type, genre, skip, timeoutMs = 8e3, strict = false) {
         try {
           let url = `${CINEMETA_BASE_URL}/catalog/${type}/top`;
           const extras = [];
@@ -1335,11 +1398,13 @@ var init_tmdbClient = __esm({
           if (extras.length > 0) url += `/${extras.join("&")}`;
           url += ".json";
           const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+          if (strict && !res.ok && (res.status === 408 || res.status === 429 || res.status >= 500)) throw new Error(`Cinemeta ${res.status}`);
           if (res.ok) {
             const data = await res.json();
             return (data.metas || []).map((m) => formatCinemetaItem(m));
           }
-        } catch {
+        } catch (error) {
+          if (strict) throw error;
         }
         return [];
       }
@@ -1395,26 +1460,28 @@ var init_tmdbClient = __esm({
         const data = await this.request(`/movie/now_playing?page=${page}`);
         return (data.results || []).map((r) => formatContentItem(r, "FILME" /* MOVIE */));
       }
-      async getAnimes(page = 1) {
-        const data = await this.getAnimesWithMeta(page);
+      async getAnimes(page = 1, genreId) {
+        const data = await this.getAnimesWithMeta(page, genreId);
         return data.items;
       }
-      async getAnimesWithMeta(page = 1) {
+      async getAnimesWithMeta(page = 1, genreId) {
+        const genreParam = genreId ? `&with_genres=16,${genreId}` : "&with_genres=16";
         const data = await this.request(
-          `/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&page=${page}`
+          `/discover/tv?sort_by=popularity.desc&with_original_language=ja&page=${page}${genreParam}`
         );
         return {
           items: (data.results || []).map((r) => formatContentItem(r, "ANIME" /* ANIME */)),
           total: data.total_results || 5474
         };
       }
-      async getAnimeMovies(page = 1) {
-        const data = await this.getAnimeMoviesWithMeta(page);
+      async getAnimeMovies(page = 1, genreId) {
+        const data = await this.getAnimeMoviesWithMeta(page, genreId);
         return data.items;
       }
-      async getAnimeMoviesWithMeta(page = 1) {
+      async getAnimeMoviesWithMeta(page = 1, genreId) {
+        const genreParam = genreId ? `&with_genres=16,${genreId}` : "&with_genres=16";
         const data = await this.request(
-          `/discover/movie?with_genres=16&with_original_language=ja&sort_by=popularity.desc&page=${page}`
+          `/discover/movie?sort_by=popularity.desc&with_original_language=ja&page=${page}${genreParam}`
         );
         return {
           items: (data.results || []).map((r) => formatContentItem(r, "ANIME" /* ANIME */)),
@@ -3027,10 +3094,252 @@ var init_videoAdBlocker = __esm({
   }
 });
 
+// src/core/tracking/mediaLoadingTracker.ts
+function sanitizePlaybackReason(value) {
+  if (typeof value !== "string") return void 0;
+  return value.replace(/(?:https?:\/\/|magnet:\?)[^\s)]+/gi, "[redacted-url]").replace(/(token|key|secret|signature|authorization)\s*[:=]\s*[^\s,;]+/gi, "$1=[redacted]").slice(0, 160);
+}
+function safeDetails(details) {
+  if (!details) return void 0;
+  const safe = {};
+  for (const [key, value] of Object.entries(details)) {
+    if (!SAFE_DETAIL_KEYS.has(key)) continue;
+    if (typeof value === "number" && Number.isFinite(value)) safe[key] = value;
+    else if (typeof value === "boolean") safe[key] = value;
+    else if (typeof value === "string") safe[key] = sanitizePlaybackReason(value) || "";
+  }
+  return Object.keys(safe).length ? safe : void 0;
+}
+var SAFE_DETAIL_KEYS, MediaLoadingTracker, mediaLoadingTracker;
+var init_mediaLoadingTracker = __esm({
+  "src/core/tracking/mediaLoadingTracker.ts"() {
+    SAFE_DETAIL_KEYS = /* @__PURE__ */ new Set([
+      "streamCount",
+      "rawStreamCount",
+      "cleanStreamsCount",
+      "providerCount",
+      "durationMs",
+      "season",
+      "episode",
+      "quality",
+      "navType",
+      "prefetched",
+      "progressive",
+      "stremioType",
+      "hasExternalPtSub",
+      "mediaSeconds",
+      "frames"
+    ]);
+    MediaLoadingTracker = class _MediaLoadingTracker {
+      constructor() {
+        this.traces = /* @__PURE__ */ new Map();
+        this.activeTraces = /* @__PURE__ */ new Map();
+        // canonicalId -> traceId
+        this.listeners = /* @__PURE__ */ new Set();
+      }
+      static getInstance() {
+        if (!_MediaLoadingTracker.instance) {
+          _MediaLoadingTracker.instance = new _MediaLoadingTracker();
+        }
+        return _MediaLoadingTracker.instance;
+      }
+      startTrace(canonicalId, title, mediaType, season, episode) {
+        const prior = this.getActiveTrace(canonicalId);
+        if (prior && !prior.endedAt) this.endTrace(prior.traceId, "CANCELLED");
+        const traceId = `trace_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const trace = {
+          traceId,
+          title,
+          canonicalId,
+          mediaType,
+          season,
+          episode,
+          currentStep: "LOADING_METADATA",
+          startedAt: Date.now(),
+          history: [
+            {
+              step: "LOADING_METADATA",
+              startedAt: Date.now()
+            }
+          ],
+          events: [],
+          providerAttempts: []
+        };
+        this.traces.set(traceId, trace);
+        if (this.traces.size > 40) {
+          const oldest = this.traces.keys().next().value;
+          if (oldest) this.traces.delete(oldest);
+        }
+        this.activeTraces.set(canonicalId, traceId);
+        this.logDebug(trace, "IN\xCDCIO", `Iniciando rastreamento de [${title}] (ID: ${canonicalId})`);
+        this.notify(trace);
+        return traceId;
+      }
+      getActiveTrace(canonicalId) {
+        const traceId = this.activeTraces.get(canonicalId);
+        return traceId ? this.traces.get(traceId) : void 0;
+      }
+      getTrace(traceId) {
+        return this.traces.get(traceId);
+      }
+      recordEvent(traceIdOrCanonicalId, event, service, result = "OK", details, errorCode, reason) {
+        const trace = this.traces.get(traceIdOrCanonicalId) || this.getActiveTrace(traceIdOrCanonicalId);
+        if (!trace || trace.endedAt) return;
+        const now = Date.now();
+        const previous = trace.events[trace.events.length - 1];
+        if (previous?.event === event && previous.result === result && previous.service === service) return;
+        if (previous) previous.next = event;
+        trace.events.push({
+          event,
+          at: now,
+          durationMs: now - (previous?.at || trace.startedAt),
+          service,
+          result,
+          previous: previous?.event,
+          details: safeDetails(details),
+          errorCode,
+          reason: sanitizePlaybackReason(reason)
+        });
+        if (trace.events.length > 50) trace.events.shift();
+        if (event === "PLAYBACK_CONFIRMED") this.endTrace(trace.traceId, "SUCCESS");
+        else if (event === "PLAYBACK_FAILED") {
+          trace.errorCode = errorCode || "PLAYER_RUNTIME_ERROR";
+          trace.errorDetails = sanitizePlaybackReason(reason);
+          this.endTrace(trace.traceId, "ERROR");
+        } else this.notify(trace);
+      }
+      getDiagnostic(traceIdOrCanonicalId) {
+        const trace = this.traces.get(traceIdOrCanonicalId) || this.getActiveTrace(traceIdOrCanonicalId);
+        if (!trace) return {};
+        return {
+          traceId: trace.traceId,
+          stage: trace.events[trace.events.length - 1]?.event,
+          errorCode: trace.errorCode,
+          reason: trace.errorDetails
+        };
+      }
+      transition(traceIdOrCanonicalId, nextStep, details, error) {
+        let trace = this.traces.get(traceIdOrCanonicalId);
+        if (!trace) {
+          const traceId = this.activeTraces.get(traceIdOrCanonicalId);
+          if (traceId) trace = this.traces.get(traceId);
+        }
+        if (!trace) return;
+        if (trace.endedAt) return;
+        const now = Date.now();
+        const currentStepTrace = trace.history[trace.history.length - 1];
+        if (currentStepTrace && !currentStepTrace.endedAt) {
+          currentStepTrace.endedAt = now;
+          currentStepTrace.durationMs = now - currentStepTrace.startedAt;
+        }
+        trace.currentStep = nextStep;
+        trace.history.push({
+          step: nextStep,
+          startedAt: now,
+          details: safeDetails(details),
+          error: sanitizePlaybackReason(error)
+        });
+        if (nextStep === "SEARCHING_SOURCES") this.recordEvent(trace.traceId, "DISCOVERY_STARTED", "providerRegistry", "STARTED");
+        if (nextStep === "VALIDATING_SOURCES") this.recordEvent(trace.traceId, "SOURCES_NORMALIZED", "providerRegistry", "OK", details);
+        if (nextStep === "SELECTING_AUDIO") this.recordEvent(trace.traceId, "CANDIDATES_FILTERED", "providerRegistry", "OK", details);
+        if (nextStep === "ERROR") {
+          trace.finalStatus = "ERROR";
+          trace.errorDetails = sanitizePlaybackReason(error || details?.message || details?.reason);
+          trace.endedAt = now;
+          trace.totalDurationMs = now - trace.startedAt;
+        } else if (nextStep === "UNAVAILABLE") {
+          trace.finalStatus = "UNAVAILABLE";
+          trace.endedAt = now;
+          trace.totalDurationMs = now - trace.startedAt;
+        } else if (nextStep === "TIMEOUT") {
+          trace.finalStatus = "TIMEOUT";
+          trace.errorDetails = sanitizePlaybackReason(error || "Opera\xE7\xE3o excedeu o tempo limite configurado");
+          trace.endedAt = now;
+          trace.totalDurationMs = now - trace.startedAt;
+        }
+        this.logDebug(trace, nextStep, `Transi\xE7\xE3o para [${nextStep}] (${currentStepTrace ? currentStepTrace.durationMs + "ms" : "0ms"})`, safeDetails(details));
+        this.notify(trace);
+      }
+      recordProviderAttempt(traceIdOrCanonicalId, attempt) {
+        let trace = this.traces.get(traceIdOrCanonicalId);
+        if (!trace) {
+          const traceId = this.activeTraces.get(traceIdOrCanonicalId);
+          if (traceId) trace = this.traces.get(traceId);
+        }
+        if (!trace) return;
+        trace.providerAttempts.push({ ...attempt, error: sanitizePlaybackReason(attempt.error) });
+        this.recordEvent(
+          trace.traceId,
+          "ADDON_RESPONSE_RECEIVED",
+          attempt.providerId,
+          attempt.success ? "OK" : "FAILED",
+          { streamCount: attempt.streamCount, durationMs: attempt.durationMs },
+          attempt.success ? void 0 : "SOURCE_DISCOVERY_FAILED",
+          attempt.error
+        );
+        this.notify(trace);
+      }
+      endTrace(traceIdOrCanonicalId, status) {
+        let trace = this.traces.get(traceIdOrCanonicalId);
+        if (!trace) {
+          const traceId = this.activeTraces.get(traceIdOrCanonicalId);
+          if (traceId) trace = this.traces.get(traceId);
+        }
+        if (!trace) return;
+        if (trace.endedAt) return;
+        const now = Date.now();
+        if (!trace.endedAt) {
+          trace.endedAt = now;
+          trace.totalDurationMs = now - trace.startedAt;
+        }
+        if (status && !trace.finalStatus && (status !== "SUCCESS" || trace.events.some((event) => event.event === "PLAYBACK_CONFIRMED"))) {
+          trace.finalStatus = status;
+        }
+        const lastStep = trace.history[trace.history.length - 1];
+        if (lastStep && !lastStep.endedAt) {
+          lastStep.endedAt = now;
+          lastStep.durationMs = now - lastStep.startedAt;
+        }
+        if (this.activeTraces.get(trace.canonicalId) === trace.traceId) this.activeTraces.delete(trace.canonicalId);
+        this.logDebug(trace, "FINALIZADO", `Trace encerrado com status [${trace.finalStatus || "CONCLU\xCDDO"}] em ${trace.totalDurationMs}ms`);
+        this.notify(trace);
+      }
+      logDebug(trace, step, msg, details) {
+        if (process.env.NODE_ENV !== "production") {
+          const epStr = trace.episode ? ` S${trace.season || 1}E${trace.episode}` : "";
+          console.log(
+            `%c[ZapiTV-Tracker]%c [${trace.title}${epStr}] ${step}: ${msg}`,
+            "background: #ff5500; color: white; padding: 2px 4px; border-radius: 4px; font-weight: bold;",
+            "color: #38bdf8;",
+            safeDetails(details) || ""
+          );
+        }
+      }
+      subscribe(listener) {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+      }
+      notify(trace) {
+        for (const listener of this.listeners) {
+          try {
+            listener(trace);
+          } catch {
+          }
+        }
+      }
+      getRecentTraces(limit = 20) {
+        return Array.from(this.traces.values()).sort((a, b) => b.startedAt - a.startedAt).slice(0, limit);
+      }
+    };
+    mediaLoadingTracker = MediaLoadingTracker.getInstance();
+  }
+});
+
 // src/core/security/streamQuarantineService.ts
 var STORAGE_QUARANTINE_KEY, KNOWN_MALICIOUS_HASHES, ADULT_ACTORS_AND_TERMS, StreamQuarantineService, streamQuarantineService;
 var init_streamQuarantineService = __esm({
   "src/core/security/streamQuarantineService.ts"() {
+    init_mediaLoadingTracker();
     STORAGE_QUARANTINE_KEY = "zapitv_stream_quarantine_v1";
     KNOWN_MALICIOUS_HASHES = [
       // Casos Hope: O Primeiro Impacto (Mia Khalifa porn / trotes falsos indexados como supostos WEB-DL)
@@ -3143,7 +3452,7 @@ var init_streamQuarantineService = __esm({
         };
         this.quarantinedMap.set(cleanId, item);
         this.saveToStorage();
-        console.error(`\u{1F6A8} [QUARANTINE] Fonte isolada permanentemente: "${cleanId}" | Motivo: ${reason}`);
+        console.error("[QUARANTINE]", sanitizePlaybackReason(`Fonte isolada: "${cleanId}" | Motivo: ${reason}`));
         this.listeners.forEach((fn) => fn());
       }
       /**
@@ -5293,247 +5602,6 @@ var init_subtitleService = __esm({
       }
     };
     subtitleService = new SubtitleService();
-  }
-});
-
-// src/core/tracking/mediaLoadingTracker.ts
-function sanitizePlaybackReason(value) {
-  if (typeof value !== "string") return void 0;
-  return value.replace(/(?:https?:\/\/|magnet:\?)[^\s)]+/gi, "[redacted-url]").replace(/(token|key|secret|signature|authorization)\s*[:=]\s*[^\s,;]+/gi, "$1=[redacted]").slice(0, 160);
-}
-function safeDetails(details) {
-  if (!details) return void 0;
-  const safe = {};
-  for (const [key, value] of Object.entries(details)) {
-    if (!SAFE_DETAIL_KEYS.has(key)) continue;
-    if (typeof value === "number" && Number.isFinite(value)) safe[key] = value;
-    else if (typeof value === "boolean") safe[key] = value;
-    else if (typeof value === "string") safe[key] = sanitizePlaybackReason(value) || "";
-  }
-  return Object.keys(safe).length ? safe : void 0;
-}
-var SAFE_DETAIL_KEYS, MediaLoadingTracker, mediaLoadingTracker;
-var init_mediaLoadingTracker = __esm({
-  "src/core/tracking/mediaLoadingTracker.ts"() {
-    SAFE_DETAIL_KEYS = /* @__PURE__ */ new Set([
-      "streamCount",
-      "rawStreamCount",
-      "cleanStreamsCount",
-      "providerCount",
-      "durationMs",
-      "season",
-      "episode",
-      "quality",
-      "navType",
-      "prefetched",
-      "progressive",
-      "stremioType",
-      "hasExternalPtSub",
-      "mediaSeconds",
-      "frames"
-    ]);
-    MediaLoadingTracker = class _MediaLoadingTracker {
-      constructor() {
-        this.traces = /* @__PURE__ */ new Map();
-        this.activeTraces = /* @__PURE__ */ new Map();
-        // canonicalId -> traceId
-        this.listeners = /* @__PURE__ */ new Set();
-      }
-      static getInstance() {
-        if (!_MediaLoadingTracker.instance) {
-          _MediaLoadingTracker.instance = new _MediaLoadingTracker();
-        }
-        return _MediaLoadingTracker.instance;
-      }
-      startTrace(canonicalId, title, mediaType, season, episode) {
-        const prior = this.getActiveTrace(canonicalId);
-        if (prior && !prior.endedAt) this.endTrace(prior.traceId, "CANCELLED");
-        const traceId = `trace_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        const trace = {
-          traceId,
-          title,
-          canonicalId,
-          mediaType,
-          season,
-          episode,
-          currentStep: "LOADING_METADATA",
-          startedAt: Date.now(),
-          history: [
-            {
-              step: "LOADING_METADATA",
-              startedAt: Date.now()
-            }
-          ],
-          events: [],
-          providerAttempts: []
-        };
-        this.traces.set(traceId, trace);
-        if (this.traces.size > 40) {
-          const oldest = this.traces.keys().next().value;
-          if (oldest) this.traces.delete(oldest);
-        }
-        this.activeTraces.set(canonicalId, traceId);
-        this.logDebug(trace, "IN\xCDCIO", `Iniciando rastreamento de [${title}] (ID: ${canonicalId})`);
-        this.notify(trace);
-        return traceId;
-      }
-      getActiveTrace(canonicalId) {
-        const traceId = this.activeTraces.get(canonicalId);
-        return traceId ? this.traces.get(traceId) : void 0;
-      }
-      getTrace(traceId) {
-        return this.traces.get(traceId);
-      }
-      recordEvent(traceIdOrCanonicalId, event, service, result = "OK", details, errorCode, reason) {
-        const trace = this.traces.get(traceIdOrCanonicalId) || this.getActiveTrace(traceIdOrCanonicalId);
-        if (!trace || trace.endedAt) return;
-        const now = Date.now();
-        const previous = trace.events[trace.events.length - 1];
-        if (previous?.event === event && previous.result === result && previous.service === service) return;
-        if (previous) previous.next = event;
-        trace.events.push({
-          event,
-          at: now,
-          durationMs: now - (previous?.at || trace.startedAt),
-          service,
-          result,
-          previous: previous?.event,
-          details: safeDetails(details),
-          errorCode,
-          reason: sanitizePlaybackReason(reason)
-        });
-        if (trace.events.length > 50) trace.events.shift();
-        if (event === "PLAYBACK_CONFIRMED") this.endTrace(trace.traceId, "SUCCESS");
-        else if (event === "PLAYBACK_FAILED") {
-          trace.errorCode = errorCode || "PLAYER_RUNTIME_ERROR";
-          trace.errorDetails = sanitizePlaybackReason(reason);
-          this.endTrace(trace.traceId, "ERROR");
-        } else this.notify(trace);
-      }
-      getDiagnostic(traceIdOrCanonicalId) {
-        const trace = this.traces.get(traceIdOrCanonicalId) || this.getActiveTrace(traceIdOrCanonicalId);
-        if (!trace) return {};
-        return {
-          traceId: trace.traceId,
-          stage: trace.events[trace.events.length - 1]?.event,
-          errorCode: trace.errorCode,
-          reason: trace.errorDetails
-        };
-      }
-      transition(traceIdOrCanonicalId, nextStep, details, error) {
-        let trace = this.traces.get(traceIdOrCanonicalId);
-        if (!trace) {
-          const traceId = this.activeTraces.get(traceIdOrCanonicalId);
-          if (traceId) trace = this.traces.get(traceId);
-        }
-        if (!trace) return;
-        if (trace.endedAt) return;
-        const now = Date.now();
-        const currentStepTrace = trace.history[trace.history.length - 1];
-        if (currentStepTrace && !currentStepTrace.endedAt) {
-          currentStepTrace.endedAt = now;
-          currentStepTrace.durationMs = now - currentStepTrace.startedAt;
-        }
-        trace.currentStep = nextStep;
-        trace.history.push({
-          step: nextStep,
-          startedAt: now,
-          details: safeDetails(details),
-          error: sanitizePlaybackReason(error)
-        });
-        if (nextStep === "SEARCHING_SOURCES") this.recordEvent(trace.traceId, "DISCOVERY_STARTED", "providerRegistry", "STARTED");
-        if (nextStep === "VALIDATING_SOURCES") this.recordEvent(trace.traceId, "SOURCES_NORMALIZED", "providerRegistry", "OK", details);
-        if (nextStep === "SELECTING_AUDIO") this.recordEvent(trace.traceId, "CANDIDATES_FILTERED", "providerRegistry", "OK", details);
-        if (nextStep === "ERROR") {
-          trace.finalStatus = "ERROR";
-          trace.errorDetails = sanitizePlaybackReason(error || details?.message || details?.reason);
-          trace.endedAt = now;
-          trace.totalDurationMs = now - trace.startedAt;
-        } else if (nextStep === "UNAVAILABLE") {
-          trace.finalStatus = "UNAVAILABLE";
-          trace.endedAt = now;
-          trace.totalDurationMs = now - trace.startedAt;
-        } else if (nextStep === "TIMEOUT") {
-          trace.finalStatus = "TIMEOUT";
-          trace.errorDetails = sanitizePlaybackReason(error || "Opera\xE7\xE3o excedeu o tempo limite configurado");
-          trace.endedAt = now;
-          trace.totalDurationMs = now - trace.startedAt;
-        }
-        this.logDebug(trace, nextStep, `Transi\xE7\xE3o para [${nextStep}] (${currentStepTrace ? currentStepTrace.durationMs + "ms" : "0ms"})`, safeDetails(details));
-        this.notify(trace);
-      }
-      recordProviderAttempt(traceIdOrCanonicalId, attempt) {
-        let trace = this.traces.get(traceIdOrCanonicalId);
-        if (!trace) {
-          const traceId = this.activeTraces.get(traceIdOrCanonicalId);
-          if (traceId) trace = this.traces.get(traceId);
-        }
-        if (!trace) return;
-        trace.providerAttempts.push({ ...attempt, error: sanitizePlaybackReason(attempt.error) });
-        this.recordEvent(
-          trace.traceId,
-          "ADDON_RESPONSE_RECEIVED",
-          attempt.providerId,
-          attempt.success ? "OK" : "FAILED",
-          { streamCount: attempt.streamCount, durationMs: attempt.durationMs },
-          attempt.success ? void 0 : "SOURCE_DISCOVERY_FAILED",
-          attempt.error
-        );
-        this.notify(trace);
-      }
-      endTrace(traceIdOrCanonicalId, status) {
-        let trace = this.traces.get(traceIdOrCanonicalId);
-        if (!trace) {
-          const traceId = this.activeTraces.get(traceIdOrCanonicalId);
-          if (traceId) trace = this.traces.get(traceId);
-        }
-        if (!trace) return;
-        if (trace.endedAt) return;
-        const now = Date.now();
-        if (!trace.endedAt) {
-          trace.endedAt = now;
-          trace.totalDurationMs = now - trace.startedAt;
-        }
-        if (status && !trace.finalStatus && (status !== "SUCCESS" || trace.events.some((event) => event.event === "PLAYBACK_CONFIRMED"))) {
-          trace.finalStatus = status;
-        }
-        const lastStep = trace.history[trace.history.length - 1];
-        if (lastStep && !lastStep.endedAt) {
-          lastStep.endedAt = now;
-          lastStep.durationMs = now - lastStep.startedAt;
-        }
-        if (this.activeTraces.get(trace.canonicalId) === trace.traceId) this.activeTraces.delete(trace.canonicalId);
-        this.logDebug(trace, "FINALIZADO", `Trace encerrado com status [${trace.finalStatus || "CONCLU\xCDDO"}] em ${trace.totalDurationMs}ms`);
-        this.notify(trace);
-      }
-      logDebug(trace, step, msg, details) {
-        if (process.env.NODE_ENV !== "production") {
-          const epStr = trace.episode ? ` S${trace.season || 1}E${trace.episode}` : "";
-          console.log(
-            `%c[ZapiTV-Tracker]%c [${trace.title}${epStr}] ${step}: ${msg}`,
-            "background: #ff5500; color: white; padding: 2px 4px; border-radius: 4px; font-weight: bold;",
-            "color: #38bdf8;",
-            safeDetails(details) || ""
-          );
-        }
-      }
-      subscribe(listener) {
-        this.listeners.add(listener);
-        return () => this.listeners.delete(listener);
-      }
-      notify(trace) {
-        for (const listener of this.listeners) {
-          try {
-            listener(trace);
-          } catch {
-          }
-        }
-      }
-      getRecentTraces(limit = 20) {
-        return Array.from(this.traces.values()).sort((a, b) => b.startedAt - a.startedAt).slice(0, limit);
-      }
-    };
-    mediaLoadingTracker = MediaLoadingTracker.getInstance();
   }
 });
 
@@ -11414,6 +11482,12 @@ var init_sourceMemory = __esm({
 function stremioEpisodeId(baseId, episode) {
   return episode && !/:\d+:\d+$/.test(baseId) ? `${baseId}:${episode.season}:${episode.episode}` : baseId;
 }
+function findCatalogEpisode(episodes2, requested) {
+  const season = requested?.season ?? 1;
+  const number = requested?.episode ?? 1;
+  const matches = (episodes2 ?? []).filter((ep) => (ep.season ?? 1) === season && ep.number === number);
+  return matches.length && new Set(matches.map((ep) => ep.videoUrl)).size === 1 ? matches[0] : void 0;
+}
 async function isLocalStremioEngineOnline() {
   const now = Date.now();
   if (now - localEngineCache.lastCheck < 15e3) {
@@ -11436,6 +11510,7 @@ var localEngineCache, DEFAULT_PROVIDERS, ProviderRegistryService, providerRegist
 var init_providerRegistry = __esm({
   "src/core/providers/providerRegistry.ts"() {
     init_stremioClient();
+    init_audioPreferenceService();
     init_verifiedCatalog();
     init_streamValidator();
     init_tmdbClient();
@@ -11887,8 +11962,7 @@ var init_providerRegistry = __esm({
         }
         if (openItem) {
           if ((type === "series" || type === "anime") && openItem.episodes && openItem.episodes.length > 0) {
-            const epNum = episode?.episode || 1;
-            const epObj = (episode?.season || 1) === 1 ? openItem.episodes.find((e) => e.number === epNum) : void 0;
+            const epObj = findCatalogEpisode(openItem.episodes, episode);
             if (epObj?.videoUrl) {
               const directUrl = epObj.videoUrl;
               const proxyUrl = directUrl.startsWith("http") ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
@@ -11926,14 +12000,13 @@ var init_providerRegistry = __esm({
         }
         if (catalogItem) {
           if ((type === "series" || type === "anime") && catalogItem.episodes && catalogItem.episodes.length > 0) {
-            const epNum = episode?.episode || 1;
-            const epObj = (episode?.season || 1) === 1 ? catalogItem.episodes.find((e) => e.number === epNum) : void 0;
+            const epObj = findCatalogEpisode(catalogItem.episodes, episode);
             if (epObj?.videoUrl && !epObj.videoUrl.includes("Caminandes") && !epObj.videoUrl.includes("Night_of_the_Living_Dead")) {
               const directUrl = epObj.videoUrl;
               const proxyUrl = directUrl.startsWith("http") ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
               const isDubbed = catalogItem.audioStatus === "pt-br-dubbed";
               streams.push({
-                name: `${catalogItem.title} - T${episode?.season || 1}E${epObj.number}`,
+                name: `${catalogItem.title} - T${episode?.season ?? 1}E${epObj.number}`,
                 title: `[EPIS\xD3DIO ${epObj.number}] ${epObj.title} (${isDubbed ? "Dublado PT-BR" : "Stream HD"})`,
                 url: proxyUrl,
                 sourceType: epObj.videoUrl.includes(".m3u8") ? "hls" : "mp4",
@@ -12210,11 +12283,9 @@ var init_providerRegistry = __esm({
                   const isDash = sUrl.includes(".mpd");
                   const isTorrent = Boolean(s.infoHash) || sUrl.includes("127.0.0.1:11470") || sUrl.includes("localhost:11470") || sUrl.includes(".torrent");
                   const isDirectVideo = !isTorrent && (sUrl.includes(".mp4") || sUrl.includes(".webm") || sUrl.includes(".ogv") || sUrl.includes("/api/proxy") || s.sourceType === "mp4" || Boolean(sUrl && !s.infoHash));
-                  const streamText = `${s.name || ""} ${s.title || ""} ${s.description || ""}`;
-                  const isExplicitlySubOnly = /\b(legendado|softsub|hardsub|sub\b|leg\b)\b/i.test(streamText) && !/dublado|dual|áudio|audio/i.test(streamText);
-                  const hasPtAudioIndicator = /dublado|dub\b|dual\b|audio\s*pt|áudio\s*pt|pt[-_]?br|portugu[êe]s|🌎\s*portugu[êe]s/i.test(streamText) || /🇧🇷/i.test(streamText) && !isExplicitlySubOnly;
-                  const isDubbed = Boolean(s.isDubbed) || !isExplicitlySubOnly && hasPtAudioIndicator || addon.isPtBr && !isExplicitlySubOnly && hasPtAudioIndicator;
-                  const isPtBr = Boolean(s.isPtBr) || addon.isPtBr || isDubbed || /pt[-_]?br|portugu[êe]s|pob|por\b|🇧🇷/i.test(streamText);
+                  const audioAnalysis = audioPreferenceService.analyzeAudio(s);
+                  const isDubbed = audioAnalysis.isDubbed;
+                  const isPtBr = audioAnalysis.isPtBr;
                   if (isHls || isDash || isDirectVideo) {
                     if (isHls && /^https:\/\/(?:[^/]+\.)?embedplayer2\.xyz\//i.test(sUrl)) {
                       parsedStreams.push({
@@ -16702,6 +16773,7 @@ var init_sourceConfidenceEngine = __esm({
     init_canonicalIdentity();
     init_streamQuarantineService();
     init_types();
+    init_mediaLoadingTracker();
     isKnownTechnicalOrReleaseWord = (word) => {
       return /^(s\d+e\d+|s\d+|e\d+|ep\d*|t\d+ep?\d+|t\d+|\d+x\d+|season|temporada|episodio|epis[oó]dio|capitulo|cap[ií]tulo|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|360p|hd|sd|fhd|uhd|bluray|bdrip|brrip|webrip|webdl|web|hdtv|dvdrip|dvd|x264|x265|hevc|h264|h265|avc|aac|ac3|eac3|dts|mp4|mkv|avi|webm|dublado|legendado|dual|multi|audio|áudio|pt|br|ptbr|pob|eng|sub|softsub|hardsub|remux|complete|ita|spa|fra|ger|rus|jap|kor|nf|amzn|atvp|dnp|hmax|dsnp|repack|proper)$/i.test(word);
     };
@@ -16753,19 +16825,19 @@ var init_sourceConfidenceEngine = __esm({
           episode: identity.episode,
           providerId: stream.providerId,
           providerName: stream.providerName,
-          streamTitle: stream.title || stream.name,
-          streamUrl: stream.url,
-          declaredTitle,
+          streamTitle: sanitizePlaybackReason(stream.title || stream.name),
+          streamUrl: stream.url ? "[redacted-url]" : void 0,
+          declaredTitle: sanitizePlaybackReason(declaredTitle),
           isMatch: result.isMatch,
           confidence: result.confidence,
-          reasons: result.reasons
+          reasons: result.reasons.map((reason) => sanitizePlaybackReason(reason) || "")
         };
         this.diagnosticHistory.unshift(record);
         if (this.diagnosticHistory.length > this.MAX_DIAGNOSTICS) {
           this.diagnosticHistory.pop();
         }
         if (!result.isMatch) {
-          console.warn(`[IdentityValidator] \u274C Fonte rejeitada para "${identity.title}" (${identity.type}${identity.year ? " " + identity.year : ""}): ${result.reasons.join(" \u2022 ")} [stream: ${stream.title || stream.name || stream.url}]`);
+          console.warn("[IdentityValidator]", sanitizePlaybackReason(`Fonte rejeitada para "${identity.title}" (${identity.type}): ${result.reasons.join(" \u2022 ")} [stream: ${stream.title || stream.name || "unnamed source"}]`));
         }
       }
       /**
@@ -16828,7 +16900,7 @@ var init_sourceConfidenceEngine = __esm({
           this.recordDiagnostic(stream, identity, evalResult2);
           return evalResult2;
         }
-        const episodeTag = streamTitle.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b|(\d{1,2})[ªa]?\s*temporada\s*(?:epis[oó]dio|ep)\s*(\d{1,3})\b|(?:temporada|season)\s*(\d{1,2})\s*(?:epis[oó]dio|ep|episode)\s*(\d{1,3})\b|\b(\d{1,2})x(\d{1,3})\b)/i);
+        const episodeTag = `${streamTitle} ${streamName}`.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b|(\d{1,2})[ªa]?\s*temporada\s*(?:epis[oó]dio|ep)\s*(\d{1,3})\b|(?:temporada|season)\s*(\d{1,2})\s*(?:epis[oó]dio|ep|episode)\s*(\d{1,3})\b|\b(\d{1,2})x(\d{1,3})\b)/i);
         const parsedSeason = episodeTag ? Number(episodeTag[1] || episodeTag[3] || episodeTag[5] || episodeTag[7] || episodeTag[9]) : void 0;
         const parsedEpisode = episodeTag ? Number(episodeTag[2] || episodeTag[4] || episodeTag[6] || episodeTag[8] || episodeTag[10]) : void 0;
         if (episodeTag && identity.type === "FILME" /* MOVIE */) {
@@ -16837,7 +16909,7 @@ var init_sourceConfidenceEngine = __esm({
           this.recordDiagnostic(stream, identity, evalResult2);
           return evalResult2;
         }
-        if (episodeTag && identity.season && identity.episode && (parsedSeason !== identity.season || parsedEpisode !== identity.episode)) {
+        if (episodeTag && identity.season !== void 0 && identity.episode !== void 0 && (parsedSeason !== identity.season || parsedEpisode !== identity.episode)) {
           reasons.push("Temporada ou epis\xF3dio diferente do solicitado");
           const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
           this.recordDiagnostic(stream, identity, evalResult2);

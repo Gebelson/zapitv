@@ -154,7 +154,8 @@
     "test:mobile-ranked-stability": "tsx tests/mobile_ranked_row_vertical_stability.test.ts",
     "test:tv-live-traditional-controls": "tsx tests/tv_live_traditional_controls_removal.test.ts",
     "test:tv-live-hud-simplified": "tsx tests/tv_live_hud_simplified.test.ts",
-    "test:audio-language-id": "tsx tests/p1_2_audio_language_identification.test.ts"
+    "test:audio-language-id": "tsx tests/p1_2_audio_language_identification.test.ts",
+    "test:p1-3a-pagination": "tsx tests/p1_3a_catalog_pagination.test.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
