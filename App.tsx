@@ -234,6 +234,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   const handleNavigateView = useCallback((view: AppView) => {
     setSelectedContent(null);
+    setIsPlayerOnlyPlayback(false);
     if (closedContentIdRef.current) closedContentIdRef.current = null;
     if (detailOriginRouteRef.current) detailOriginRouteRef.current = null;
     searchService.cancelPending();
@@ -1511,6 +1512,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
   });
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
+  const [isPlayerOnlyPlayback, setIsPlayerOnlyPlayback] = useState<boolean>(() => Boolean(parsedWatch.isWatch && !parsedWatch.isTv));
   const [watchRouteNotFound, setWatchRouteNotFound] = useState(false);
   const detailOriginRouteRef = useRef<string | null>(null);
   const closedContentIdRef = useRef<string | null>(null);
@@ -1530,9 +1532,13 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
     if (isPrevDetail && !isPrevWatch && !activeDetailId && !isWatchRoute && selectedContent) {
       setSelectedContent(null);
+    setIsPlayerOnlyPlayback(false);
+    }
+    if (!isWatchRoute && isPlayerOnlyPlayback) {
+      setIsPlayerOnlyPlayback(false);
     }
     prevDetailRoutePathRef.current = location.pathname;
-  }, [activeDetailId, isWatchRoute, selectedContent, location.pathname]);
+  }, [activeDetailId, isWatchRoute, selectedContent, location.pathname, isPlayerOnlyPlayback]);
 
   // Abertura in-loco de detalhes: abre o modal preservando a rota, página atual, scroll e contexto
   const handleSelectContent = useCallback((item: ContentItem) => {
@@ -1555,6 +1561,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
     closedContentIdRef.current = null;
     detailOriginRouteRef.current = location.pathname + location.search;
+    setIsPlayerOnlyPlayback(false);
     setSelectedContent(item);
     uiSoundService.play('detailOpen');
     return true;
@@ -1562,6 +1569,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   const handlePlayFromHero = useCallback((item: ContentItem) => {
     if (!handleSelectContent(item)) return;
+    setIsPlayerOnlyPlayback(true);
     const continuity = storageService.getPlaybackContinuity(item);
     navigate(getWatchRoute(item, continuity.season, continuity.episode));
   }, [handleSelectContent, navigate]);
@@ -1572,6 +1580,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       closedContentIdRef.current = String(currentId);
     }
     setSelectedContent(null);
+    setIsPlayerOnlyPlayback(false);
 
     const origin = detailOriginRouteRef.current;
     detailOriginRouteRef.current = null;
@@ -1590,6 +1599,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         navigate('/series', { replace: true });
       } else if (path.startsWith('/animes/')) {
         navigate('/animes', { replace: true });
+      } else if (parseWatchRoute(path).isWatch) {
+        navigate('/', { replace: true });
       }
     }
   }, [selectedContent, activeDetailId, location.pathname, navigate]);
@@ -1643,6 +1654,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
       if (localFound && acceptsRoute(localFound)) {
         if (active && closedContentIdRef.current !== activeDetailId) {
+          if (isWatchRoute) setIsPlayerOnlyPlayback(true);
           setSelectedContent(localFound);
         }
         return;
@@ -1663,6 +1675,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         }
 
         if (active && closedContentIdRef.current !== activeDetailId && details && acceptsRoute(details)) {
+          if (isWatchRoute) setIsPlayerOnlyPlayback(true);
           setSelectedContent(details);
         } else if (active && isWatchRoute) {
           setWatchRouteNotFound(true);
@@ -3214,6 +3227,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
       {selectedContent && (!isWatchRoute || ((selectedContent.id === parsedWatch.id || selectedContent.imdbId === parsedWatch.id || selectedContent.tmdbId === parsedWatch.id) && getWatchRoute(selectedContent).split('/')[2] === (parsedWatch.mediaType === 'movie' ? 'filme' : parsedWatch.mediaType === 'anime' ? 'anime' : 'serie'))) && (
         <React.Suspense fallback={<div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center"><ZapiLoader size="xl" /></div>}><ContentDetailModal
+          key={`content-detail-${selectedContent.id}`}
           item={selectedContent} 
           onClose={handleCloseDetailModal} 
           isDarkMode={isDarkMode}
@@ -3225,8 +3239,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           initialSeason={effectiveSeasonNum}
           initialEpisode={effectiveEpisodeNum}
           autoPlayInitialEpisode={effectiveAutoPlay}
-          playerOnly={isWatchRoute}
+          playerOnly={isWatchRoute && isPlayerOnlyPlayback}
           originRoute={detailOriginRouteRef.current}
+          onSelectContent={handleSelectContent}
         /></React.Suspense>
       )}
 

@@ -167,6 +167,7 @@ interface ContentDetailModalProps {
   autoPlayInitialEpisode?: boolean;
   playerOnly?: boolean;
   originRoute?: string | null;
+  onSelectContent?: (item: ContentItem) => void;
 }
 
 function uniqueEpisodes<T extends { number: number }>(episodes: T[]): T[] {
@@ -180,7 +181,7 @@ function uniqueEpisodes<T extends { number: number }>(episodes: T[]): T[] {
 
 export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({ 
   item: initialItem, onClose, isDarkMode, myList, favorites, onToggleList, onToggleFavorite, allContent,
-  initialSeason, initialEpisode, autoPlayInitialEpisode, playerOnly = false, originRoute
+  initialSeason, initialEpisode, autoPlayInitialEpisode, playerOnly = false, originRoute, onSelectContent
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -521,6 +522,19 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     }
     setPlaybackSessionId('');
     setSessionIntroPlayed(false);
+
+    const parsed = parseWatchRoute(location.pathname);
+    if (parsed.isWatch) {
+      const isTv = tvModeService.isTvMode() || location.pathname.startsWith('/tv');
+      if (isTv) {
+        navigate('/tv', { replace: true });
+      } else {
+        const origin = originRoute || modalOriginRouteRef.current;
+        const returnRoute = origin && !parseWatchRoute(origin).isWatch ? origin : '/';
+        navigate(returnRoute, { replace: true });
+      }
+    }
+
     if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
     closeTimeoutRef.current = setTimeout(() => {
       onClose();
@@ -563,6 +577,11 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     setPlaybackSessionId('');
     setSessionIntroPlayed(false);
 
+    if (playerOnly) {
+      onClose();
+      return;
+    }
+
     const parsed = parseWatchRoute(location.pathname);
     if (parsed.isWatch) {
       if (isTv) {
@@ -576,8 +595,6 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
         navigate(returnRoute, { replace: true });
       }
     }
-
-    if (playerOnly && isTv) onClose();
   }, [cancelAllPendingRequests, playbackSessionId, playerOnly, onClose, location.pathname, navigate, item, originRoute]);
 
   // Click outside to close (apenas quando não estiver no player e nenhum modal flutuante estiver aberto)
@@ -1213,7 +1230,11 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
           setPlaybackSessionId('');
           setSessionIntroPlayed(false);
           setIsSimilarExpanded(false);
-          setItem(similar);
+          if (onSelectContent) {
+            onSelectContent(similar);
+          } else {
+            setItem(similar);
+          }
         }}
         className="bg-white/5 border border-white/5 rounded-2xl overflow-hidden hover:bg-white/10 hover:border-white/10 transition-all group cursor-pointer"
       >
