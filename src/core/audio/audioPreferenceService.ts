@@ -136,9 +136,13 @@ export class AudioPreferenceService {
     const isExplicitlySubtitledOnly = hasSubtitledOnlyPattern && !hasExplicitBrazilianAudio;
 
     if (isExplicitlySubtitledOnly) {
-      // Verificar se há menção ao idioma original (japonês, coreano, inglês, espanhol, etc.)
+      // Remove blocos de legendas explícitas (ex: "Multi-Subs [EN][PT-BR][ES-LA]" ou "Subs: [EN, PT]")
+      // para evitar que códigos de idiomas de legenda ([EN], [ES]) sejam confundidos com o áudio original.
+      const textForAudio = combinedText.replace(/\b(?:multi[-_\s]?subs?|subtitles?|legendas?)\b(?:\s*\([^)]*\))?(?:\s*\[[^\]]+\])+/gi, ' ');
+
+      // Verificar se há menção ao idioma original no texto restante (japonês, coreano, inglês, espanhol, etc.)
       for (const foreign of FOREIGN_LANGUAGE_PATTERNS) {
-        if (foreign.regex.test(combinedText)) {
+        if (foreign.regex.test(textForAudio)) {
           return {
             tier: 'original',
             isPtBr: false,

@@ -383,13 +383,13 @@ class StreamValidator {
 
     // 2. Tag combinada S01E01, T01EP01, S1E1, T02 EP01
     const seMatches = Array.from(text.matchAll(/\b(?:s|t)0*(\d{1,2})\s*(?:e|ep)0*(\d{1,3})\b/gi));
-    for (const m of seMatches) {
+    const hasExactMatch = seMatches.length > 0 && seMatches.some(m => parseInt(m[1], 10) === season && parseInt(m[2], 10) === episode);
+    if (seMatches.length > 0 && !hasExactMatch) {
+      const m = seMatches[0];
       const sFound = parseInt(m[1], 10);
       const eFound = parseInt(m[2], 10);
-      if (sFound !== season || eFound !== episode) {
-        console.warn(`[StreamValidator] Stream rejeitado por temporada/episódio divergente [T${sFound}E${eFound} vs T${season}E${episode}]: ${streamTitle}`);
-        return false;
-      }
+      console.warn(`[StreamValidator] Stream rejeitado por temporada/episódio divergente [T${sFound}E${eFound} vs T${season}E${episode}]: ${streamTitle}`);
+      return false;
     }
 
     // 3. Temporada declarada explicitamente (ex: 'S01', 'T01', 'Season 1', 'Temporada 1')
@@ -399,6 +399,11 @@ class StreamValidator {
       const sFound = parseInt(m[1], 10);
       if (sFound > 0 && sFound <= 50) {
         if (sFound !== season) {
+          // Se o stream já possui a tag exata SxxExx para o episódio requisitado (ex: S01E01 em animes com dupla numeração de franquia como S17),
+          // não o rejeitamos por anotações secundárias de temporada em parênteses.
+          if (hasExactMatch) {
+            continue;
+          }
           const fullMatch = m[0].toLowerCase();
           if (fullMatch.startsWith('season') || fullMatch.startsWith('temporada') || fullMatch.startsWith('sais') || /^[st]0\d$/.test(fullMatch)) {
             console.warn(`[StreamValidator] Stream rejeitado por temporada divergente [T${sFound} vs T${season}]: ${streamTitle}`);

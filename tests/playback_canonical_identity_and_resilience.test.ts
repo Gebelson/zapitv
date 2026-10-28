@@ -137,7 +137,47 @@ const reInfiniteDarkness: StremioStream = {
 assert.equal(sourceConfidenceEngine.evaluate(reAnimationDeathIsland, re2026Identity).isMatch, false, 'Death Island (2023) rejeitado para RE 2026');
 assert.equal(sourceConfidenceEngine.evaluate(reAnimationDegeneration, re2026Identity).isMatch, false, 'Degeneration (2008) rejeitado para RE 2026');
 assert.equal(sourceConfidenceEngine.evaluate(reInfiniteDarkness, re2026Identity).isMatch, false, 'Infinite Darkness rejeitado para RE 2026');
-console.log('  ✓ Teste 2 passou: Animações de Resident Evil rejeitadas para live-action 2026.\n');
+
+// Validação de isolamento estrito entre filmes diferentes da franquia Resident Evil (sem ano no título do release)
+const re2002Item: ContentItem = {
+  id: 'movie-re-2002',
+  title: 'Resident Evil: O Hóspede Maldito',
+  originalTitle: 'Resident Evil',
+  type: ContentType.MOVIE,
+  year: 2002,
+  genres: ['Horror', 'Action'],
+  image: '',
+  rating: 6.7
+};
+const re2002Identity = canonicalIdentityService.buildIdentity(re2002Item);
+
+const reApocalypseNoYear: StremioStream = {
+  name: 'Addon',
+  title: 'Resident Evil Apocalypse 1080p Dual Audio.mkv',
+  url: 'https://cdn.example.com/re-apocalypse.mp4'
+};
+const reExtinctionNoYear: StremioStream = {
+  name: 'Addon',
+  title: 'Resident Evil Extinction 1080p Dual Audio.mkv',
+  url: 'https://cdn.example.com/re-extinction.mp4'
+};
+const reWelcomeRaccoonCity: StremioStream = {
+  name: 'Addon',
+  title: 'Resident Evil: Welcome to Raccoon City 1080p.mkv',
+  url: 'https://cdn.example.com/re-raccoon.mp4'
+};
+const re2002LegitStream: StremioStream = {
+  name: 'Addon',
+  title: 'Resident Evil (2002) 1080p BluRay Dual Audio.mkv',
+  url: 'https://cdn.example.com/re-2002.mp4'
+};
+
+assert.equal(sourceConfidenceEngine.evaluate(reApocalypseNoYear, re2002Identity).isMatch, false, 'Apocalypse deve ser rejeitado para Resident Evil 2002');
+assert.equal(sourceConfidenceEngine.evaluate(reExtinctionNoYear, re2002Identity).isMatch, false, 'Extinction deve ser rejeitado para Resident Evil 2002');
+assert.equal(sourceConfidenceEngine.evaluate(reWelcomeRaccoonCity, re2002Identity).isMatch, false, 'Welcome to Raccoon City deve ser rejeitado para Resident Evil 2002');
+assert.equal(sourceConfidenceEngine.evaluate(re2002LegitStream, re2002Identity).isMatch, true, 'Resident Evil 2002 legítimo deve ser aceito');
+
+console.log('  ✓ Teste 2 passou: Animações e filmes diferentes da franquia Resident Evil devidamente isolados.\n');
 
 // ------------------------------------------------------------------------------------------------
 // 3. Chicago Typewriter vs Chicago (filme 2002)
@@ -574,6 +614,46 @@ assert.equal(telemetria.stallsRecovered, 1, 'Contador de stalls recuperados deve
 assert.equal(telemetria.streamSourceType, 'hls');
 
 console.log('  ✓ Teste 13 passou: Recuperação de stalls e ABR adaptativo validados com sucesso.\n');
+
+// ------------------------------------------------------------------------------------------------
+// 14. Bleach: Thousand-Year Blood War (T1E1) — Dupla numeração de cena e áudio japonês original
+// ------------------------------------------------------------------------------------------------
+console.log('Teste 14: Bleach: Thousand-Year Blood War (T1E1) — Dupla numeração e áudio legítimo');
+const bleachItem: ContentItem = {
+  id: 'anime-bleach-tybw',
+  title: 'Bleach: Thousand-Year Blood War',
+  originalTitle: 'Bleach: Sennen Kessen-hen',
+  type: ContentType.ANIME,
+  year: 2022,
+  originalLanguage: 'ja',
+  genres: ['Anime', 'Action', 'Supernatural'],
+  image: '',
+  rating: 9.1
+};
+const bleachIdentity = canonicalIdentityService.buildIdentity(bleachItem, { season: 1, episode: 1 });
+
+const bleachAlfaHdStream: StremioStream = {
+  name: 'NyaaSi',
+  title: '[alfaHD] Bleach Sennen Kessen-hen S01E01 ( Bleach S17E01 - (367) ) 1080p DSNP WEB-DL AAC 2.0 x264 Multi-Subs (Thousand-Year Blood War) [EN][PT-BR][ES-LA] [F7298272]',
+  url: 'https://cdn.example.com/bleach-alfahd.mkv'
+};
+const bleachLegacyMovie: StremioStream = {
+  name: 'Torrentio',
+  title: 'Bleach: Memories of Nobody (2006) 1080p BluRay',
+  url: 'https://cdn.example.com/bleach-movie.mp4'
+};
+const bleachOldEpisodeRemaster: StremioStream = {
+  name: 'Torrentio',
+  title: 'Bleach 367 Remaster 1080p.mkv',
+  url: 'https://cdn.example.com/bleach-367.mkv'
+};
+
+assert.equal(streamValidator.isStreamMatchingEpisode(bleachAlfaHdStream, { season: 1, episode: 1 }), true, 'Bleach S01E01 com dupla tag S17E01 deve ser aceito');
+assert.equal(sourceConfidenceEngine.evaluate(bleachAlfaHdStream, bleachIdentity).isMatch, true, 'Bleach AlfaHD legítimo deve ser aceito por identidade');
+assert.equal(sourceConfidenceEngine.evaluate(bleachLegacyMovie, bleachIdentity).isMatch, false, 'Filme antigo de Bleach deve ser rejeitado para TYBW');
+assert.equal(sourceConfidenceEngine.evaluate(bleachOldEpisodeRemaster, bleachIdentity).isMatch, false, 'Remaster episódio 367 deve ser rejeitado para TYBW');
+
+console.log('  ✓ Teste 14 passou: Bleach TYBW aceita streams com dupla tag S01/S17 e rejeita filmes antigos.\n');
 
 console.log('========================================================================================');
 console.log('=== TODOS OS TESTES DE IDENTIDADE CANÔNICA, PROTEÇÃO E RESILIÊNCIA PASSARAM COM 100%! ===');

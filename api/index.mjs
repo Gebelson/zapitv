@@ -532,8 +532,9 @@ var init_audioPreferenceService = __esm({
         const hasSubtitledOnlyPattern = SUBTITLED_ONLY_PATTERNS.some((p) => p.test(combinedText));
         const isExplicitlySubtitledOnly = hasSubtitledOnlyPattern && !hasExplicitBrazilianAudio;
         if (isExplicitlySubtitledOnly) {
+          const textForAudio = combinedText.replace(/\b(?:multi[-_\s]?subs?|subtitles?|legendas?)\b(?:\s*\([^)]*\))?(?:\s*\[[^\]]+\])+/gi, " ");
           for (const foreign of FOREIGN_LANGUAGE_PATTERNS) {
-            if (foreign.regex.test(combinedText)) {
+            if (foreign.regex.test(textForAudio)) {
               return {
                 tier: "original",
                 isPtBr: false,
@@ -3897,19 +3898,22 @@ var init_streamValidator = __esm({
           }
         }
         const seMatches = Array.from(text2.matchAll(/\b(?:s|t)0*(\d{1,2})\s*(?:e|ep)0*(\d{1,3})\b/gi));
-        for (const m of seMatches) {
+        const hasExactMatch = seMatches.length > 0 && seMatches.some((m) => parseInt(m[1], 10) === season && parseInt(m[2], 10) === episode);
+        if (seMatches.length > 0 && !hasExactMatch) {
+          const m = seMatches[0];
           const sFound = parseInt(m[1], 10);
           const eFound = parseInt(m[2], 10);
-          if (sFound !== season || eFound !== episode) {
-            console.warn(`[StreamValidator] Stream rejeitado por temporada/epis\xF3dio divergente [T${sFound}E${eFound} vs T${season}E${episode}]: ${streamTitle}`);
-            return false;
-          }
+          console.warn(`[StreamValidator] Stream rejeitado por temporada/epis\xF3dio divergente [T${sFound}E${eFound} vs T${season}E${episode}]: ${streamTitle}`);
+          return false;
         }
         const sMatches = Array.from(text2.matchAll(/\b(?:season\s*|temporada\s*|sais(?:on)?\s*|s0*|t0*)(\d{1,2})\b(?!\s*-\s*\d)/gi));
         for (const m of sMatches) {
           const sFound = parseInt(m[1], 10);
           if (sFound > 0 && sFound <= 50) {
             if (sFound !== season) {
+              if (hasExactMatch) {
+                continue;
+              }
               const fullMatch = m[0].toLowerCase();
               if (fullMatch.startsWith("season") || fullMatch.startsWith("temporada") || fullMatch.startsWith("sais") || /^[st]0\d$/.test(fullMatch)) {
                 console.warn(`[StreamValidator] Stream rejeitado por temporada divergente [T${sFound} vs T${season}]: ${streamTitle}`);
@@ -16782,7 +16786,7 @@ var init_sourceConfidenceEngine = __esm({
       if ((word === "first" || word === "1st" || word === "second" || word === "2nd" || word === "third" || word === "3rd") && new RegExp(`\\b${word}\\s+(?:season|temporada)\\b`, "i").test(fullText)) {
         return false;
       }
-      return /^(ii|iii|iv|v|vi|vii|viii|ix|x|1st|2nd|3rd|4th|5th|first|second|third|part|cour|origins|reboot|remake|shippuden|boruto|returns|forever|revelations|unlimited|sansei|movie|filme|alicization|alternative|progressive|underworld|ordinal)$/i.test(word);
+      return /^(ii|iii|iv|v|vi|vii|viii|ix|x|1st|2nd|3rd|4th|5th|first|second|third|part|cour|origins|reboot|remake|shippuden|boruto|returns|forever|revelations|unlimited|sansei|movie|filme|alicization|alternative|progressive|underworld|ordinal|apocalypse|extinction|afterlife|retribution)$/i.test(word);
     };
     KNOWN_COLLISION_TITLES = [
       "lupin iii",
@@ -16985,30 +16989,35 @@ var init_sourceConfidenceEngine = __esm({
             }
           }
         }
-        if (/resident evil/i.test(identity.title) && !/vendetta|damnation|degeneration|infinite darkness|death island/i.test(identity.title)) {
-          if (/vendetta|damnation|degeneration|infinite darkness|death island|kadokawa|marza|anime|animado|animation|animated/i.test(combined)) {
+        if (/resident evil/i.test(identity.title)) {
+          const isAnimeTarget = /vendetta|damnation|degeneration|infinite darkness|death island/i.test(identity.title);
+          if (!isAnimeTarget && /vendetta|damnation|degeneration|infinite darkness|death island|kadokawa|marza|anime|animado|animation|animated/i.test(combined)) {
             reasons.push("Anima\xE7\xE3o 3D de Resident Evil (Kadokawa/Vendetta/etc.) n\xE3o pode substituir o filme live-action solicitado");
-            const evalResult2 = {
-              stream,
-              confidence: "REJECTED",
-              isMatch: false,
-              reasons,
-              canonicalTitle: identity.title
-            };
+            const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
             this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
             return evalResult2;
           }
-          const isTarget2026 = identity.year === 2026 || identity.imdbId === "tt13000574" || identity.tmdbId === "1423191" || /2026/.test(identity.title);
-          if (isTarget2026) {
-            if (/welcome to raccoon city|raccoon city|apocalypse|extinction|afterlife|retribution|final chapter|netflix/i.test(combined)) {
-              reasons.push("Adapta\xE7\xE3o anterior de Resident Evil n\xE3o corresponde \xE0 produ\xE7\xE3o live-action de 2026");
-              const evalResult2 = {
-                stream,
-                confidence: "REJECTED",
-                isMatch: false,
-                reasons,
-                canonicalTitle: identity.title
-              };
+          const franchiseSubtitles = [
+            { key: "apocalypse", label: "Apocalypse / Apocalipse" },
+            { key: "extinction", label: "Extinction / A Extin\xE7\xE3o" },
+            { key: "afterlife", label: "Afterlife / Recome\xE7o" },
+            { key: "retribution", label: "Retribution / Retribui\xE7\xE3o" },
+            { key: "final chapter", label: "The Final Chapter / O Cap\xEDtulo Final" },
+            { key: "welcome to raccoon city", label: "Welcome to Raccoon City / Bem-Vindo a Raccoon City" },
+            { key: "raccoon city", label: "Raccoon City" },
+            { key: "degeneration", label: "Degeneration / Degenera\xE7\xE3o" },
+            { key: "damnation", label: "Damnation / Condena\xE7\xE3o" },
+            { key: "vendetta", label: "Vendetta / A Vingan\xE7a" },
+            { key: "death island", label: "Death Island / Ilha da Morte" },
+            { key: "infinite darkness", label: "Infinite Darkness / No Escuro Absoluto" }
+          ];
+          const targetLower = `${identity.title} ${identity.originalTitle || ""}`.toLowerCase();
+          for (const sub of franchiseSubtitles) {
+            const streamHasSub = combined.includes(sub.key);
+            const targetHasSub = targetLower.includes(sub.key);
+            if (streamHasSub && !targetHasSub) {
+              reasons.push(`Filme diferente da franquia Resident Evil: stream cont\xE9m "${sub.label}"`);
+              const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
               this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
               return evalResult2;
             }

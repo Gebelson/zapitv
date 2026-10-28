@@ -58,7 +58,7 @@ const isDistinguishingTitleModifier = (word: string, isMovie: boolean = false, f
       new RegExp(`\\b${word}\\s+(?:season|temporada)\\b`, 'i').test(fullText)) {
     return false;
   }
-  return /^(ii|iii|iv|v|vi|vii|viii|ix|x|1st|2nd|3rd|4th|5th|first|second|third|part|cour|origins|reboot|remake|shippuden|boruto|returns|forever|revelations|unlimited|sansei|movie|filme|alicization|alternative|progressive|underworld|ordinal)$/i.test(word);
+  return /^(ii|iii|iv|v|vi|vii|viii|ix|x|1st|2nd|3rd|4th|5th|first|second|third|part|cour|origins|reboot|remake|shippuden|boruto|returns|forever|revelations|unlimited|sansei|movie|filme|alicization|alternative|progressive|underworld|ordinal|apocalypse|extinction|afterlife|retribution)$/i.test(word);
 };
 
 // Obras conhecidas que costumam colidir erroneamente em scrapers de torrents/animes
@@ -313,31 +313,38 @@ export class SourceConfidenceEngine {
       }
     }
 
-    // Caso específico Resident Evil: animação 3D substituindo filme live-action ou desvio de obra
-    if (/resident evil/i.test(identity.title) && !/vendetta|damnation|degeneration|infinite darkness|death island/i.test(identity.title)) {
-      if (/vendetta|damnation|degeneration|infinite darkness|death island|kadokawa|marza|anime|animado|animation|animated/i.test(combined)) {
+    // Caso específico Resident Evil: animação 3D substituindo filme live-action ou desvio de obra entre produções da franquia
+    if (/resident evil/i.test(identity.title)) {
+      const isAnimeTarget = /vendetta|damnation|degeneration|infinite darkness|death island/i.test(identity.title);
+      if (!isAnimeTarget && /vendetta|damnation|degeneration|infinite darkness|death island|kadokawa|marza|anime|animado|animation|animated/i.test(combined)) {
         reasons.push('Animação 3D de Resident Evil (Kadokawa/Vendetta/etc.) não pode substituir o filme live-action solicitado');
-        const evalResult: StreamConfidenceEvaluation = {
-          stream,
-          confidence: 'REJECTED',
-          isMatch: false,
-          reasons,
-          canonicalTitle: identity.title
-        };
+        const evalResult: StreamConfidenceEvaluation = { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
         this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
         return evalResult;
       }
-      const isTarget2026 = identity.year === 2026 || identity.imdbId === 'tt13000574' || identity.tmdbId === '1423191' || /2026/.test(identity.title);
-      if (isTarget2026) {
-        if (/welcome to raccoon city|raccoon city|apocalypse|extinction|afterlife|retribution|final chapter|netflix/i.test(combined)) {
-          reasons.push('Adaptação anterior de Resident Evil não corresponde à produção live-action de 2026');
-          const evalResult: StreamConfidenceEvaluation = {
-            stream,
-            confidence: 'REJECTED',
-            isMatch: false,
-            reasons,
-            canonicalTitle: identity.title
-          };
+
+      // Isolamento estrito entre os diferentes filmes e subtítulos da franquia Resident Evil
+      const franchiseSubtitles = [
+        { key: 'apocalypse', label: 'Apocalypse / Apocalipse' },
+        { key: 'extinction', label: 'Extinction / A Extinção' },
+        { key: 'afterlife', label: 'Afterlife / Recomeço' },
+        { key: 'retribution', label: 'Retribution / Retribuição' },
+        { key: 'final chapter', label: 'The Final Chapter / O Capítulo Final' },
+        { key: 'welcome to raccoon city', label: 'Welcome to Raccoon City / Bem-Vindo a Raccoon City' },
+        { key: 'raccoon city', label: 'Raccoon City' },
+        { key: 'degeneration', label: 'Degeneration / Degeneração' },
+        { key: 'damnation', label: 'Damnation / Condenação' },
+        { key: 'vendetta', label: 'Vendetta / A Vingança' },
+        { key: 'death island', label: 'Death Island / Ilha da Morte' },
+        { key: 'infinite darkness', label: 'Infinite Darkness / No Escuro Absoluto' }
+      ];
+      const targetLower = `${identity.title} ${identity.originalTitle || ''}`.toLowerCase();
+      for (const sub of franchiseSubtitles) {
+        const streamHasSub = combined.includes(sub.key);
+        const targetHasSub = targetLower.includes(sub.key);
+        if (streamHasSub && !targetHasSub) {
+          reasons.push(`Filme diferente da franquia Resident Evil: stream contém "${sub.label}"`);
+          const evalResult: StreamConfidenceEvaluation = { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
           this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
           return evalResult;
         }
