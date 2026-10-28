@@ -40,7 +40,7 @@ interface MobileLayoutProps {
   hasOpenModal?: boolean;
   onCloseModal?: () => void;
   onLoadMore?: (category: 'movies' | 'series' | 'animes') => void;
-  hasMore?: boolean;
+  hasMore?: boolean | { movies?: boolean; series?: boolean; animes?: boolean };
   isLoadingMore?: boolean;
   selectedGenre?: string;
   onSelectGenre?: (genre: string) => void;

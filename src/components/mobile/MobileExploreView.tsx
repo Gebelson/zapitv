@@ -21,7 +21,7 @@ interface MobileExploreViewProps {
   isGenreMenuOpen?: boolean;
   onToggleGenreMenu?: (isOpen: boolean) => void;
   onLoadMore?: (category: 'movies' | 'series' | 'animes') => void;
-  hasMore?: boolean;
+  hasMore?: boolean | { movies?: boolean; series?: boolean; animes?: boolean };
   isLoadingMore?: boolean;
   selectedGenreProp?: string;
   onSelectGenre?: (genre: string) => void;
@@ -66,9 +66,17 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
     }
   }, [selectedGenreProp]);
 
+  // hasMore isolado por categoria para garantir que Séries ou Animes nunca herdem estado de Filmes
+  const categoryHasMore = useMemo(() => {
+    if (typeof hasMore === 'object' && hasMore !== null) {
+      return Boolean(hasMore[selectedCategory] ?? true);
+    }
+    return typeof hasMore === 'boolean' ? hasMore : true;
+  }, [hasMore, selectedCategory]);
+
   // Infinite Scroll Observer para o fim do catálogo mobile
   useEffect(() => {
-    if (!hasMore || isLoadingMore || !onLoadMore) return;
+    if (!categoryHasMore || isLoadingMore || !onLoadMore) return;
     const target = sentinelRef.current;
     if (!target) return;
 
@@ -82,7 +90,7 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
       observer.observe(target);
       return () => observer.disconnect();
     }
-  }, [hasMore, isLoadingMore, onLoadMore, selectedCategory]);
+  }, [categoryHasMore, isLoadingMore, onLoadMore, selectedCategory]);
 
   const isMenuOpen = controlledGenreMenuOpen !== undefined ? controlledGenreMenuOpen : internalGenreMenuOpen;
 
@@ -337,7 +345,7 @@ export const MobileExploreView: React.FC<MobileExploreViewProps> = ({
         )}
 
         {/* Sentinela de Rolagem Infinita e Indicador de Carregamento Mobile */}
-        {hasMore && (
+        {categoryHasMore && (
           <div ref={sentinelRef} className="col-span-2 flex justify-center py-6 min-h-[48px] select-none">
             {isLoadingMore && (
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-gray-300 text-xs font-bold shadow-lg backdrop-blur-md">

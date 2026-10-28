@@ -970,15 +970,16 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     let isMounted = true;
     const loadGenreCatalog = async () => {
       try {
-        if (currentView === 'movies') {
+        const effectiveCategory = currentView === 'explore' ? 'movies' : currentView;
+        if (effectiveCategory === 'movies') {
           const currentSort = categorySorts.movies || 'recommended';
           const targetKey = getSnapshotKeyForView('movies', selectedGenre, currentSort);
           const res = await catalogDiscoveryService.discoverMovies(1, selectedGenre);
-          if (!isMounted || currentViewRef.current !== 'movies') return;
+          if (!isMounted || (currentViewRef.current !== 'movies' && currentViewRef.current !== 'explore')) return;
           if (!res.isPartial) { moviesPageRef.current = 1; setMoviesPage(1); }
           setHasMoreMovies(res.hasMore);
 
-          if (isMounted && res.items.length > 0 && currentViewRef.current === 'movies') {
+          if (isMounted && res.items.length > 0 && (currentViewRef.current === 'movies' || currentViewRef.current === 'explore')) {
             const onlyMovies = res.items.filter(i => searchService.isMovieItem(i, false));
             setPopularMovies(prev => deduplicateContentItems([...prev, ...onlyMovies]).filter(i => searchService.isMovieItem(i, false)));
             setContent(prev => deduplicateContentItems([...prev, ...onlyMovies]));
@@ -1009,15 +1010,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             });
             setMoviesPage(res.isPartial ? 0 : 1);
           }
-        } else if (currentView === 'series') {
+        } else if (effectiveCategory === 'series') {
           const currentSort = categorySorts.series || 'recommended';
           const targetKey = getSnapshotKeyForView('series', selectedGenre, currentSort);
           const res = await catalogDiscoveryService.discoverSeries(1, selectedGenre);
-          if (!isMounted || currentViewRef.current !== 'series') return;
+          if (!isMounted || (currentViewRef.current !== 'series' && currentViewRef.current !== 'explore')) return;
           if (!res.isPartial) { seriesPageRef.current = 1; setSeriesPage(1); }
           setHasMoreSeries(res.hasMore);
 
-          if (isMounted && res.items.length > 0 && currentViewRef.current === 'series') {
+          if (isMounted && res.items.length > 0 && (currentViewRef.current === 'series' || currentViewRef.current === 'explore')) {
             const onlySeries = res.items.filter(i => searchService.isSeriesItem(i));
             setPopularSeries(prev => deduplicateContentItems([...prev, ...onlySeries]).filter(i => searchService.isSeriesItem(i)));
             setContent(prev => deduplicateContentItems([...prev, ...onlySeries]));
@@ -1048,15 +1049,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             });
             setSeriesPage(res.isPartial ? 0 : 1);
           }
-        } else if (currentView === 'animes') {
+        } else if (effectiveCategory === 'animes') {
           const currentSort = categorySorts.animes || 'recommended';
           const targetKey = getSnapshotKeyForView('animes', selectedGenre, currentSort);
           const res = await catalogDiscoveryService.discoverAnimes(1, selectedGenre);
-          if (!isMounted || currentViewRef.current !== 'animes') return;
+          if (!isMounted || (currentViewRef.current !== 'animes' && currentViewRef.current !== 'explore')) return;
           if (!res.isPartial) { animesPageRef.current = 1; setAnimesPage(1); }
           setHasMoreAnimes(res.hasMore);
 
-          if (isMounted && res.items.length > 0 && currentViewRef.current === 'animes') {
+          if (isMounted && res.items.length > 0 && (currentViewRef.current === 'animes' || currentViewRef.current === 'explore')) {
             const onlyAnimes = res.items.filter(i => searchService.isAnimeItem(i));
             setAnimeItems(prev => deduplicateContentItems([...prev, ...onlyAnimes]).filter(i => searchService.isAnimeItem(i)));
             setContent(prev => deduplicateContentItems([...prev, ...onlyAnimes]));
@@ -1143,7 +1144,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           attempts++;
         }
 
-        if (currentViewRef.current !== 'movies') return;
+        if (currentViewRef.current !== 'movies' && currentViewRef.current !== 'explore') return;
 
         if (newItems.length > 0) {
           const eligibleNew = catalogEligibilityService.filterEligibleItemsSync(newItems);
@@ -1204,7 +1205,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           attempts++;
         }
 
-        if (currentViewRef.current !== 'series') return;
+        if (currentViewRef.current !== 'series' && currentViewRef.current !== 'explore') return;
 
         if (newItems.length > 0) {
           const eligibleNew = catalogEligibilityService.filterEligibleItemsSync(newItems);
@@ -1265,7 +1266,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           attempts++;
         }
 
-        if (currentViewRef.current !== 'animes') return;
+        if (currentViewRef.current !== 'animes' && currentViewRef.current !== 'explore') return;
 
         if (newItems.length > 0) {
           const eligibleNew = catalogEligibilityService.filterEligibleItemsSync(newItems);
@@ -3042,11 +3043,18 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             else if (isDiagnosticModalOpen) setIsDiagnosticModalOpen(false);
           }}
           onLoadMore={(cat) => handleLoadMore(cat || (currentView === 'explore' ? 'movies' : currentView))}
-          hasMore={(currentView === 'movies' || currentView === 'explore') ? hasMoreMovies : currentView === 'series' ? hasMoreSeries : currentView === 'animes' ? hasMoreAnimes : false}
+          hasMore={{
+            movies: hasMoreMovies,
+            series: hasMoreSeries,
+            animes: hasMoreAnimes
+          }}
           isLoadingMore={isLoadingMore}
           selectedGenre={selectedGenre}
           onSelectGenre={handleSelectGenre}
-          onCategoryChange={(cat) => handleNavigateView(cat)}
+          onCategoryChange={(cat) => {
+            const target = cat === 'movies' ? '/filmes' : cat === 'series' ? '/series' : '/animes';
+            navigate(tvModeService.formatInternalRoute(target), { replace: true });
+          }}
         />
       ) : (
         <>
