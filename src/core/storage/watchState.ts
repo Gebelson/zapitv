@@ -145,21 +145,47 @@ export function normalizeWatchState(value: unknown): WatchState {
     episodes: state?.episodes && typeof state.episodes === 'object' && !Array.isArray(state.episodes) ? state.episodes : {} });
 }
 
-export const watchStateCodec: DataCodec<WatchState> = {
-  key: 'zapitv_watch_state_v2',
-  legacyKeys: ['zapitv_local_progress', 'zapitv_episode_progress', 'zapitv_local_history'],
-  isValid: value => !!value && typeof value === 'object' && Array.isArray((value as WatchState).items) &&
-    !!(value as WatchState).episodes && typeof (value as WatchState).episodes === 'object' && !Array.isArray((value as WatchState).episodes),
-  normalize: normalizeWatchState,
-  migrate: copies => mergeWatchStates(...copies.map(value => normalizeWatchState(Array.isArray(value) ?
-    { items: value, episodes: {} } : { items: [], episodes: value })))
-};
+export interface StorageScope {
+  userId?: string | null;
+  profileId?: string | null;
+}
+
+export function scopedKey(baseKey: string, scope?: StorageScope | null): string {
+  if (scope && scope.userId && scope.profileId) {
+    return `usr_${scope.userId}_prf_${scope.profileId}_${baseKey}`;
+  }
+  return baseKey;
+}
+
+export function getWatchStateCodec(scope?: StorageScope | null): DataCodec<WatchState> {
+  const isScoped = Boolean(scope && scope.userId && scope.profileId);
+  return {
+    key: scopedKey('zapitv_watch_state_v2', scope),
+    legacyKeys: isScoped ? [] : ['zapitv_local_progress', 'zapitv_episode_progress', 'zapitv_local_history'],
+    isValid: value => !!value && typeof value === 'object' && Array.isArray((value as WatchState).items) &&
+      !!(value as WatchState).episodes && typeof (value as WatchState).episodes === 'object' && !Array.isArray((value as WatchState).episodes),
+    normalize: normalizeWatchState,
+    migrate: copies => mergeWatchStates(...copies.map(value => normalizeWatchState(Array.isArray(value) ?
+      { items: value, episodes: {} } : { items: [], episodes: value })))
+  };
+}
+
+export const watchStateCodec: DataCodec<WatchState> = getWatchStateCodec(null);
 
 export const normalizeIds = (value: unknown): string[] => Array.isArray(value) ?
   [...new Set(value.filter((id): id is string => typeof id === 'string' && !!id.trim()).map(id => id.trim()))] : [];
 
-export function listCodec(name: 'favorites' | 'mylist'): DataCodec<string[]> {
-  return { key: `zapitv_local_${name}_v2`, legacyKeys: [`zapitv_local_${name}`], normalize: normalizeIds,
+export function getListCodec(name: 'favorites' | 'mylist', scope?: StorageScope | null): DataCodec<string[]> {
+  const isScoped = Boolean(scope && scope.userId && scope.profileId);
+  return {
+    key: scopedKey(`zapitv_local_${name}_v2`, scope),
+    legacyKeys: isScoped ? [] : [`zapitv_local_${name}`],
+    normalize: normalizeIds,
     isValid: Array.isArray,
-    migrate: copies => normalizeIds(copies.flatMap(value => normalizeIds(value))) };
+    migrate: copies => normalizeIds(copies.flatMap(value => normalizeIds(value)))
+  };
+}
+
+export function listCodec(name: 'favorites' | 'mylist'): DataCodec<string[]> {
+  return getListCodec(name, null);
 }

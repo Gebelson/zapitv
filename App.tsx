@@ -39,6 +39,8 @@ import { AgeVerificationModal } from './components/AgeVerificationModal';
 import { recommendationEngine } from './src/core/recommendations/recommendationEngine';
 import { userPreferenceStore } from './src/core/recommendations/userPreferenceStore';
 import { authClient } from './src/core/auth/authClient';
+import { profileClient, ProfileItem } from './src/core/profile/profileClient';
+import { resolveAvatarUrl } from './src/core/profile/avatarRegistry';
 import { uiSoundService } from './src/core/audio/uiSoundService';
 import { hybridRecommendationEngine } from './src/core/recommendations/hybridRecommendationEngine';
 import { bannedContentRegistry } from './src/core/catalog/BannedContentRegistry';
@@ -131,13 +133,32 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   });
   const [activeProfile, setActiveProfile] = useState<Profile | null>(() => initialState.activeProfile || currentUser?.profiles?.[0] || null);
 
+  // Conversor utilitário de perfis da API para o modelo da aplicação
+  const toAppProfile = useCallback((item: ProfileItem): Profile => {
+    return {
+      id: item.id,
+      name: item.name,
+      avatar: resolveAvatarUrl(item.avatarId),
+      avatarId: item.avatarId,
+      isChild: false,
+      isDefault: item.isDefault,
+      displayOrder: item.displayOrder,
+    };
+  }, []);
+
   // Verificação de sessão real persistente via cookie HttpOnly no servidor (/api/auth/me)
   useEffect(() => {
     let mounted = true;
-    authClient.checkSession().then(({ authenticated, user }) => {
+    authClient.checkSession().then(async ({ authenticated, user, activeProfile: serverProfile }) => {
       if (!mounted) return;
       if (authenticated && user) {
         setIsAuthenticated(true);
+        const userProfiles = await profileClient.list();
+        const mappedProfiles = userProfiles.map(toAppProfile);
+        const resolvedActive = serverProfile
+          ? toAppProfile(serverProfile)
+          : mappedProfiles.find(p => p.isDefault === 1) || mappedProfiles[0] || null;
+
         const loggedUser: User = {
           id: user.id,
           name: user.name,
@@ -147,21 +168,32 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           memberSince: new Date(user.createdAt).toLocaleDateString('pt-BR'),
           plan: 'ZapiTV Premium',
           status: 'Ativo',
-          profiles: [
+          profiles: mappedProfiles.length > 0 ? mappedProfiles : [
             {
               id: `p-${user.id}`,
               name: user.name,
-              avatar: AVATARS[0],
+              avatar: resolveAvatarUrl(null),
               isChild: false
             }
           ]
         };
         setCurrentUser(loggedUser);
-        setActiveProfile(loggedUser.profiles[0]);
+        if (resolvedActive) {
+          setActiveProfile(resolvedActive);
+          await storageService.setScope({ userId: user.id, profileId: resolvedActive.id });
+          const [loadedList, loadedFavs] = await Promise.all([
+            storageService.getMyList(),
+            storageService.getFavorites(),
+          ]);
+          if (mounted) {
+            setMyList(loadedList);
+            setFavorites(loadedFavs);
+          }
+        }
       }
     }).catch(() => {});
     return () => { mounted = false; };
-  }, []);
+  }, [toAppProfile]);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -1909,6 +1941,10 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
       const res = await authClient.login(cleanEmail, pass);
       const user = res.user;
+      setIsAuthenticated(true);
+
+      const userProfiles = await profileClient.list();
+      const mappedProfiles = userProfiles.map(toAppProfile);
 
       const targetUser: User = {
         id: user.id,
@@ -1919,25 +1955,25 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         memberSince: new Date(user.createdAt).toLocaleDateString('pt-BR'),
         plan: 'ZapiTV Premium',
         status: 'Ativo',
-        profiles: [
+        profiles: mappedProfiles.length > 0 ? mappedProfiles : [
           {
             id: `p-${user.id}`,
             name: user.name,
-            avatar: AVATARS[0],
+            avatar: resolveAvatarUrl(null),
             isChild: false
           }
         ]
       };
 
       setCurrentUser(targetUser);
-      setActiveProfile(targetUser.profiles[0]);
-      setIsAuthenticated(true);
-      setCurrentView('home');
+      // Apresenta seletor de perfis após login
+      setActiveProfile(null);
+      setCurrentView('profile-selector');
       return null;
     } catch (err: any) {
       return err?.message || 'E-mail ou senha incorretos.';
     }
-  }, []);
+  }, [toAppProfile]);
 
   const handleSignup = useCallback(async (
     name: string,
@@ -1955,6 +1991,10 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         termsAccepted
       });
       const user = res.user;
+      setIsAuthenticated(true);
+
+      const userProfiles = await profileClient.list();
+      const mappedProfiles = userProfiles.map(toAppProfile);
 
       const newUser: User = {
         id: user.id,
@@ -1965,25 +2005,38 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         memberSince: new Date(user.createdAt).toLocaleDateString('pt-BR'),
         plan: 'ZapiTV Padrão',
         status: 'Ativo',
-        profiles: [
+        profiles: mappedProfiles.length > 0 ? mappedProfiles : [
           {
             id: `p-${user.id}`,
             name: user.name,
-            avatar: AVATARS[0],
+            avatar: resolveAvatarUrl(null),
             isChild: false
           }
         ]
       };
 
       setCurrentUser(newUser);
-      setActiveProfile(newUser.profiles[0]);
-      setIsAuthenticated(true);
-      setCurrentView('home');
+      setActiveProfile(null);
+      setCurrentView('profile-selector');
       return null;
     } catch (err: any) {
       return err?.message || 'Falha ao concluir o cadastro.';
     }
-  }, []);
+  }, [toAppProfile]);
+
+  const handleSelectProfile = useCallback(async (p: Profile) => {
+    setActiveProfile(p);
+    if (currentUser?.id) {
+      await storageService.setScope({ userId: currentUser.id, profileId: p.id });
+      const [list, favs] = await Promise.all([
+        storageService.getMyList(),
+        storageService.getFavorites(),
+      ]);
+      setMyList(list);
+      setFavorites(favs);
+    }
+    setCurrentView('home');
+  }, [currentUser?.id]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -1991,6 +2044,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     } catch (error) {
       console.warn("Erro ao deslogar no servidor:", error);
     }
+    await storageService.setScope(null);
     setIsAuthenticated(false);
     const defaultUser = initialState?.currentUser || {
       id: 'zapitv-anon-user',
@@ -2001,10 +2055,16 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       memberSince: '2026',
       plan: 'Gratuito',
       status: 'Ativo' as const,
-      profiles: [{ id: 'p-anon', name: 'Convidado', avatar: AVATARS[0], isChild: false }]
+      profiles: [{ id: 'p-anon', name: 'Convidado', avatar: resolveAvatarUrl(null), isChild: false }]
     };
     setCurrentUser(defaultUser);
     setActiveProfile(defaultUser.profiles?.[0] || null);
+    const [anonList, anonFavs] = await Promise.all([
+      storageService.getMyList(),
+      storageService.getFavorites(),
+    ]);
+    setMyList(anonList);
+    setFavorites(anonFavs);
     setCurrentView('home');
   }, [initialState]);
 
@@ -2958,15 +3018,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   if (isAuthenticated && (!activeProfile || currentView === 'profile-selector')) {
     return (
-      <React.Suspense fallback={<ZapiLoader size="xl" />}><ProfileSelectorView
-        user={currentUser} 
-        onSelectProfile={(p) => { 
-          setActiveProfile(p); 
-          setCurrentView('home'); 
-        }} 
-        onUpdateUser={updateUser} 
-        isDarkMode={isDarkMode} 
-      /></React.Suspense>
+      <React.Suspense fallback={<ZapiLoader size="xl" />}>
+        <ProfileSelectorView
+          user={currentUser} 
+          onSelectProfile={handleSelectProfile} 
+          onUpdateUser={updateUser} 
+          onClose={activeProfile ? () => setCurrentView('home') : undefined}
+          isDarkMode={isDarkMode} 
+        />
+      </React.Suspense>
     );
   }
 
@@ -2982,7 +3042,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           currentUser={currentUser}
           activeProfile={activeProfile}
           onSwitchProfile={() => { setActiveProfile(null); handleNavigateView('profile-selector'); }}
-          onSelectProfile={(p) => { setActiveProfile(p); handleNavigateView('home'); }}
+          onSelectProfile={handleSelectProfile}
           onLogout={handleLogout}
           notifications={siteNotifications}
           onSelectContent={handleSelectContent}
@@ -3060,7 +3120,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 setLiveSearchResults([]);
               }} 
               onSwitchProfile={() => { setActiveProfile(null); setCurrentView('profile-selector'); }}
-              onSelectProfile={(p) => { setActiveProfile(p); setCurrentView('home'); }}
+              onSelectProfile={handleSelectProfile}
               searchQuery={searchQuery} 
               setSearchQuery={setSearchQuery}
               onSearchSubmit={(q) => {

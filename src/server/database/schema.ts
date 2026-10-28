@@ -166,4 +166,23 @@ export const loginAttempts = sqliteTable('login_attempts', {
   index('login_attempts_identifier_time_idx').on(table.identifier, table.attemptAt),
 ]);
 
+// ============================================================================
+// MÚLTIPLOS PERFIS POR CONTA (P3.B)
+// ============================================================================
+
+export const profiles = sqliteTable('profiles', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  avatarId: text('avatar_id').notNull(),
+  isDefault: integer('is_default').notNull().default(0),
+  displayOrder: integer('display_order').notNull().default(0),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, (table) => [
+  index('profiles_user_id_idx').on(table.userId),
+  index('profiles_user_id_order_idx').on(table.userId, table.displayOrder),
+]);
+
+
 

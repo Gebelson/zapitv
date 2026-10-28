@@ -3558,14 +3558,14 @@ var init_LruCache = __esm({
       }
       pruneExpired() {
         const now = Date.now();
-        let count = 0;
+        let count2 = 0;
         for (const [key, entry] of this.map.entries()) {
           if (entry.expiresAt !== null && now > entry.expiresAt) {
             this.map.delete(key);
-            count++;
+            count2++;
           }
         }
-        return count;
+        return count2;
       }
       forEach(callback) {
         const now = Date.now();
@@ -18932,7 +18932,7 @@ var init_rewriteHlsManifest = __esm({
 
 // server.ts
 init_verifiedCatalog();
-import express2 from "express";
+import express3 from "express";
 import path6 from "path";
 import { fileURLToPath } from "url";
 import fs6 from "fs";
@@ -22996,6 +22996,7 @@ __export(schema_exports, {
   loginAttempts: () => loginAttempts,
   media: () => media,
   mediaExternalIds: () => mediaExternalIds,
+  profiles: () => profiles,
   sessions: () => sessions,
   sourceEvidenceTickets: () => sourceEvidenceTickets,
   sourceReliability: () => sourceReliability,
@@ -23151,6 +23152,19 @@ var loginAttempts = sqliteTable("login_attempts", {
 }, (table) => [
   index("login_attempts_identifier_time_idx").on(table.identifier, table.attemptAt)
 ]);
+var profiles = sqliteTable("profiles", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  avatarId: text("avatar_id").notNull(),
+  isDefault: integer("is_default").notNull().default(0),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull()
+}, (table) => [
+  index("profiles_user_id_idx").on(table.userId),
+  index("profiles_user_id_order_idx").on(table.userId, table.displayOrder)
+]);
 
 // src/server/database/client.ts
 import fs2 from "fs";
@@ -23224,6 +23238,20 @@ async function ensureAuthTables(database) {
       ip_address text
     );
     CREATE INDEX IF NOT EXISTS login_attempts_identifier_time_idx ON login_attempts (identifier, attempt_at);
+
+    CREATE TABLE IF NOT EXISTS profiles (
+      id text PRIMARY KEY NOT NULL,
+      user_id text NOT NULL,
+      name text NOT NULL,
+      avatar_id text NOT NULL,
+      is_default integer DEFAULT 0 NOT NULL,
+      display_order integer DEFAULT 0 NOT NULL,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE INDEX IF NOT EXISTS profiles_user_id_idx ON profiles (user_id);
+    CREATE INDEX IF NOT EXISTS profiles_user_id_order_idx ON profiles (user_id, display_order);
   `);
 }
 
@@ -25970,8 +25998,8 @@ watchPartyRouter.delete("/room/:roomId", async (req, res) => {
 
 // src/server/auth/routes.ts
 import express from "express";
-import crypto4 from "crypto";
-import { eq as eq7 } from "drizzle-orm";
+import crypto5 from "crypto";
+import { eq as eq8 } from "drizzle-orm";
 
 // src/server/auth/sessionService.ts
 import crypto2 from "crypto";
@@ -26144,6 +26172,8 @@ function requireCsrfProtection(req, res, next) {
   const origin = req.headers.origin;
   const referer = req.headers.referer;
   const host = req.headers.host;
+  const customClient = req.headers["x-zapi-client"];
+  const hasCookie = Boolean(req.headers.cookie);
   const sourceUrl = origin || referer;
   if (sourceUrl && host) {
     try {
@@ -26154,6 +26184,8 @@ function requireCsrfProtection(req, res, next) {
     } catch {
       return res.status(403).json({ error: "Origem inv\xE1lida detectada." });
     }
+  } else if (!sourceUrl && hasCookie && !customClient && process.env.NODE_ENV === "production") {
+    return res.status(403).json({ error: "Origem da requisi\xE7\xE3o n\xE3o confi\xE1vel (CSRF bloqueado)." });
   }
   next();
 }
@@ -26299,6 +26331,299 @@ var RateLimitService = class {
   }
 };
 
+// src/server/profiles/profileService.ts
+import crypto4 from "crypto";
+import { eq as eq7, and as and7, asc } from "drizzle-orm";
+
+// src/core/profile/avatarRegistry.ts
+function buildAvatarSvg(primary, secondary, shapePath) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+    <defs>
+      <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${primary}" />
+        <stop offset="100%" stop-color="${secondary}" />
+      </linearGradient>
+      <linearGradient id="inner" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25" />
+        <stop offset="100%" stop-color="#000000" stop-opacity="0.35" />
+      </linearGradient>
+    </defs>
+    <rect width="120" height="120" rx="28" fill="url(#g)" />
+    <rect width="120" height="120" rx="28" fill="url(#inner)" />
+    <g fill="#ffffff" opacity="0.95">
+      ${shapePath}
+    </g>
+  </svg>`.replace(/\s+/g, " ").trim();
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+var OFFICIAL_AVATARS = [
+  {
+    id: "zapi-avatar-cyan",
+    name: "Ciano Neon",
+    primaryColor: "#00baa3",
+    secondaryColor: "#007df7",
+    gradient: "linear-gradient(135deg, #00baa3 0%, #007df7 100%)",
+    svgShape: '<path d="M60 26 L86 52 L60 78 L34 52 Z M60 42 L70 52 L60 62 L50 52 Z M54 84 L66 84 L66 94 L54 94 Z" />',
+    dataUri: ""
+  },
+  {
+    id: "zapi-avatar-blue",
+    name: "Azul C\xF3smico",
+    primaryColor: "#007df7",
+    secondaryColor: "#4f46e5",
+    gradient: "linear-gradient(135deg, #007df7 0%, #4f46e5 100%)",
+    svgShape: '<path d="M60 28 C76.5 28 90 41.5 90 58 C90 74.5 76.5 88 60 88 C43.5 88 30 74.5 30 58 C30 41.5 43.5 28 60 28 Z M60 40 C50 40 42 48 42 58 C42 68 50 76 60 76 C70 76 78 68 78 58 C78 48 70 40 60 40 Z" />',
+    dataUri: ""
+  },
+  {
+    id: "zapi-avatar-purple",
+    name: "Cyber Violeta",
+    primaryColor: "#b273d8",
+    secondaryColor: "#7c3aed",
+    gradient: "linear-gradient(135deg, #b273d8 0%, #7c3aed 100%)",
+    svgShape: '<polygon points="60,25 72,48 95,52 78,69 82,93 60,81 38,93 42,69 25,52 48,48" />',
+    dataUri: ""
+  },
+  {
+    id: "zapi-avatar-emerald",
+    name: "Esmeralda",
+    primaryColor: "#10b981",
+    secondaryColor: "#047857",
+    gradient: "linear-gradient(135deg, #10b981 0%, #047857 100%)",
+    svgShape: '<path d="M60 25 L88 45 L88 75 L60 95 L32 75 L32 45 Z M60 38 L44 50 L44 70 L60 82 L76 70 L76 50 Z" />',
+    dataUri: ""
+  },
+  {
+    id: "zapi-avatar-amber",
+    name: "\xC2mbar Solar",
+    primaryColor: "#f59e0b",
+    secondaryColor: "#d97706",
+    gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+    svgShape: '<circle cx="60" cy="60" r="18" /><path d="M60 25 L60 35 M60 85 L60 95 M25 60 L35 60 M85 60 L95 60 M35 35 L42 42 M78 78 L85 85 M35 85 L42 78 M78 42 L85 35" stroke="#ffffff" stroke-width="4" stroke-linecap="round" fill="none" />',
+    dataUri: ""
+  },
+  {
+    id: "zapi-avatar-ruby",
+    name: "Rubi Intenso",
+    primaryColor: "#ef4444",
+    secondaryColor: "#b91c1c",
+    gradient: "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)",
+    svgShape: '<path d="M42 32 L78 32 L92 48 L60 92 L28 48 Z M45 44 L75 44 L60 76 Z" />',
+    dataUri: ""
+  },
+  {
+    id: "zapi-avatar-magenta",
+    name: "Magenta Neon",
+    primaryColor: "#ec4899",
+    secondaryColor: "#9333ea",
+    gradient: "linear-gradient(135deg, #ec4899 0%, #9333ea 100%)",
+    svgShape: '<path d="M48 35 L72 35 C80 35 86 41 86 49 C86 55 82 60 76 62 C83 64 88 70 88 77 C88 86 80 92 71 92 L48 92 Z M58 45 L58 56 L69 56 C72 56 75 53 75 50.5 C75 48 72 45 69 45 Z M58 66 L58 81 L71 81 C74 81 77 78 77 73.5 C77 69 74 66 71 66 Z" />',
+    dataUri: ""
+  },
+  {
+    id: "zapi-avatar-teal",
+    name: "Turquesa Glacial",
+    primaryColor: "#06b6d4",
+    secondaryColor: "#0e7490",
+    gradient: "linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)",
+    svgShape: '<path d="M60 25 L85 50 L60 95 L35 50 Z M60 40 L72 52 L60 78 L48 52 Z" />',
+    dataUri: ""
+  }
+];
+OFFICIAL_AVATARS.forEach((av) => {
+  av.dataUri = buildAvatarSvg(av.primaryColor, av.secondaryColor, av.svgShape);
+});
+var DEFAULT_AVATAR_ID = "zapi-avatar-cyan";
+var VALID_AVATAR_IDS = OFFICIAL_AVATARS.map((a) => a.id);
+
+// src/server/profiles/profileService.ts
+var MAX_PROFILES_PER_USER = process.env.MAX_PROFILES_PER_USER ? parseInt(process.env.MAX_PROFILES_PER_USER, 10) : 5;
+var ProfileService = class {
+  /**
+   * Garante a criação de um perfil inicial de maneira idempotente e segura contra corridas concorrentes.
+   */
+  static async ensureInitialProfile(db, userId, defaultName) {
+    const existing = await db.db.select().from(profiles).where(eq7(profiles.userId, userId)).orderBy(asc(profiles.displayOrder), asc(profiles.createdAt));
+    if (existing.length > 0) {
+      return existing[0];
+    }
+    let rawName = defaultName?.trim();
+    if (!rawName) {
+      const u = await db.db.select({ name: users.name }).from(users).where(eq7(users.id, userId)).limit(1);
+      rawName = u[0]?.name ? u[0].name.trim() : "Principal";
+    }
+    const firstName = (rawName || "Principal").split(" ")[0] || "Principal";
+    const safeName = firstName.slice(0, 30);
+    const profileId = crypto4.randomUUID();
+    const now = Date.now();
+    try {
+      await db.db.insert(profiles).values({
+        id: profileId,
+        userId,
+        name: safeName,
+        avatarId: DEFAULT_AVATAR_ID,
+        isDefault: 1,
+        displayOrder: 0,
+        createdAt: now,
+        updatedAt: now
+      });
+      return {
+        id: profileId,
+        userId,
+        name: safeName,
+        avatarId: DEFAULT_AVATAR_ID,
+        isDefault: 1,
+        displayOrder: 0,
+        createdAt: now,
+        updatedAt: now
+      };
+    } catch {
+      const raceWinner = await db.db.select().from(profiles).where(eq7(profiles.userId, userId)).orderBy(asc(profiles.displayOrder), asc(profiles.createdAt)).limit(1);
+      if (raceWinner.length > 0) {
+        return raceWinner[0];
+      }
+      throw new Error("Falha ao inicializar perfil da conta.");
+    }
+  }
+  /**
+   * Lista todos os perfis pertencentes ao usuário autenticado
+   */
+  static async listProfiles(db, userId, userName) {
+    let list = await db.db.select().from(profiles).where(eq7(profiles.userId, userId)).orderBy(asc(profiles.displayOrder), asc(profiles.createdAt));
+    if (list.length === 0) {
+      const initial = await this.ensureInitialProfile(db, userId, userName);
+      list = [initial];
+    }
+    return list;
+  }
+  /**
+   * Obtém um perfil específico garantindo que pertença à conta autenticada
+   */
+  static async getProfileById(db, userId, profileId) {
+    const found = await db.db.select().from(profiles).where(and7(eq7(profiles.id, profileId), eq7(profiles.userId, userId))).limit(1);
+    return found[0] || null;
+  }
+  /**
+   * Cria um novo perfil na conta autenticada
+   */
+  static async createProfile(db, userId, data) {
+    const cleanName = typeof data.name === "string" ? data.name.trim() : "";
+    if (!cleanName || cleanName.length < 2 || cleanName.length > 30) {
+      throw new Error("O nome do perfil deve ter entre 2 e 30 caracteres.");
+    }
+    if (/[\u0000-\u001F\u007F]/.test(cleanName)) {
+      throw new Error("O nome do perfil cont\xE9m caracteres inv\xE1lidos.");
+    }
+    let avatarId = data.avatarId ? String(data.avatarId).trim() : DEFAULT_AVATAR_ID;
+    if (!VALID_AVATAR_IDS.includes(avatarId)) {
+      avatarId = DEFAULT_AVATAR_ID;
+    }
+    const existing = await db.db.select().from(profiles).where(eq7(profiles.userId, userId)).orderBy(asc(profiles.displayOrder), asc(profiles.createdAt));
+    if (existing.length >= MAX_PROFILES_PER_USER) {
+      throw new Error(`Limite m\xE1ximo de ${MAX_PROFILES_PER_USER} perfis por conta atingido.`);
+    }
+    const profileId = crypto4.randomUUID();
+    const now = Date.now();
+    const nextOrder = existing.length;
+    const isDefault = existing.length === 0 ? 1 : 0;
+    await db.db.insert(profiles).values({
+      id: profileId,
+      userId,
+      name: cleanName,
+      avatarId,
+      isDefault,
+      displayOrder: nextOrder,
+      createdAt: now,
+      updatedAt: now
+    });
+    return {
+      id: profileId,
+      userId,
+      name: cleanName,
+      avatarId,
+      isDefault,
+      displayOrder: nextOrder,
+      createdAt: now,
+      updatedAt: now
+    };
+  }
+  /**
+   * Edita o nome e/ou avatar de um perfil pertencente à conta autenticada
+   */
+  static async updateProfile(db, userId, profileId, data) {
+    const existing = await this.getProfileById(db, userId, profileId);
+    if (!existing) {
+      throw new Error("Perfil n\xE3o encontrado ou n\xE3o pertence a esta conta.");
+    }
+    const updates = {
+      updatedAt: Date.now()
+    };
+    if (data.name !== void 0) {
+      const cleanName = typeof data.name === "string" ? data.name.trim() : "";
+      if (!cleanName || cleanName.length < 2 || cleanName.length > 30) {
+        throw new Error("O nome do perfil deve ter entre 2 e 30 caracteres.");
+      }
+      if (/[\u0000-\u001F\u007F]/.test(cleanName)) {
+        throw new Error("O nome do perfil cont\xE9m caracteres inv\xE1lidos.");
+      }
+      updates.name = cleanName;
+    }
+    if (data.avatarId !== void 0) {
+      const cleanAvatar = String(data.avatarId).trim();
+      if (!VALID_AVATAR_IDS.includes(cleanAvatar)) {
+        throw new Error("Identificador de avatar inv\xE1lido.");
+      }
+      updates.avatarId = cleanAvatar;
+    }
+    await db.db.update(profiles).set(updates).where(and7(eq7(profiles.id, profileId), eq7(profiles.userId, userId)));
+    const updated = await this.getProfileById(db, userId, profileId);
+    return updated;
+  }
+  /**
+   * Exclui um perfil com confirmação, impedindo a exclusão do último perfil da conta
+   */
+  static async deleteProfile(db, userId, profileId) {
+    const currentList = await db.db.select().from(profiles).where(eq7(profiles.userId, userId)).orderBy(asc(profiles.displayOrder), asc(profiles.createdAt));
+    const targetIndex = currentList.findIndex((p) => p.id === profileId);
+    if (targetIndex === -1) {
+      throw new Error("Perfil n\xE3o encontrado ou n\xE3o pertence a esta conta.");
+    }
+    if (currentList.length <= 1) {
+      throw new Error("N\xE3o \xE9 poss\xEDvel excluir o \xFAnico perfil da conta. Crie outro perfil antes de excluir este.");
+    }
+    const targetProfile = currentList[targetIndex];
+    const remaining = currentList.filter((p) => p.id !== profileId);
+    let nextActiveProfileId = remaining[0].id;
+    if (targetProfile.isDefault === 1) {
+      await db.db.update(profiles).set({ isDefault: 1, updatedAt: Date.now() }).where(eq7(profiles.id, remaining[0].id));
+      nextActiveProfileId = remaining[0].id;
+    } else {
+      const defaultProfile = remaining.find((p) => p.isDefault === 1);
+      if (defaultProfile) {
+        nextActiveProfileId = defaultProfile.id;
+      }
+    }
+    await db.db.delete(profiles).where(and7(eq7(profiles.id, profileId), eq7(profiles.userId, userId)));
+    return {
+      success: true,
+      nextActiveProfileId
+    };
+  }
+  /**
+   * Resolve o perfil ativo para a requisição com base no cookie ou padrão da conta
+   */
+  static async resolveActiveProfile(db, userId, requestedProfileId) {
+    const userProfiles = await this.listProfiles(db, userId);
+    if (userProfiles.length === 0) return null;
+    if (requestedProfileId) {
+      const matched = userProfiles.find((p) => p.id === requestedProfileId);
+      if (matched) return matched;
+    }
+    const defaultProfile = userProfiles.find((p) => p.isDefault === 1) || userProfiles[0];
+    return defaultProfile;
+  }
+};
+
 // src/server/auth/routes.ts
 var authRouter = express.Router();
 var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -26333,12 +26658,12 @@ authRouter.post("/register", async (req, res) => {
     if (!db) {
       return res.status(503).json({ error: "Banco de dados de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
     }
-    const existing = await db.db.select({ id: users.id }).from(users).where(eq7(users.email, cleanEmail)).limit(1);
+    const existing = await db.db.select({ id: users.id }).from(users).where(eq8(users.email, cleanEmail)).limit(1);
     if (existing.length > 0) {
       return res.status(409).json({ error: "Este e-mail j\xE1 est\xE1 cadastrado na ZapiTV." });
     }
     const passwordHash = await hashPassword(password);
-    const userId = crypto4.randomUUID();
+    const userId = crypto5.randomUUID();
     const now = Date.now();
     await db.db.insert(users).values({
       id: userId,
@@ -26396,7 +26721,7 @@ authRouter.post("/login", async (req, res) => {
       passwordHash: users.passwordHash,
       status: users.status,
       createdAt: users.createdAt
-    }).from(users).where(eq7(users.email, cleanEmail)).limit(1);
+    }).from(users).where(eq8(users.email, cleanEmail)).limit(1);
     if (foundUsers.length === 0) {
       await RateLimitService.recordFailure(db, cleanEmail, clientIp);
       await RateLimitService.recordFailure(db, clientIp, clientIp);
@@ -26438,26 +26763,41 @@ authRouter.post("/logout", async (req, res) => {
     if (token && db) {
       await revokeSession(db, token);
     }
-    res.setHeader("Set-Cookie", formatSetCookie("", { clear: true, isProduction }));
+    const clearSession = formatSetCookie("", { clear: true, isProduction });
+    const clearActiveProfile = `zapitv_active_profile=; Path=/; SameSite=Lax; Max-Age=0${isProduction ? "; Secure" : ""}`;
+    res.setHeader("Set-Cookie", [clearSession, clearActiveProfile]);
     return res.status(200).json({
       success: true,
       message: "Sess\xE3o encerrada com sucesso."
     });
   } catch (err) {
-    res.setHeader("Set-Cookie", formatSetCookie("", { clear: true, isProduction }));
+    const clearSession = formatSetCookie("", { clear: true, isProduction });
+    const clearActiveProfile = `zapitv_active_profile=; Path=/; SameSite=Lax; Max-Age=0${isProduction ? "; Secure" : ""}`;
+    res.setHeader("Set-Cookie", [clearSession, clearActiveProfile]);
     return res.status(200).json({ success: true });
   }
 });
-authRouter.get("/me", optionalUser, (req, res) => {
+authRouter.get("/me", optionalUser, async (req, res) => {
   if (req.user) {
+    let activeProfile = null;
+    try {
+      const db = await getValidDatabase();
+      if (db) {
+        const cookieProfileId = extractCookie(req.headers.cookie, "zapitv_active_profile");
+        activeProfile = await ProfileService.resolveActiveProfile(db, req.user.id, cookieProfileId);
+      }
+    } catch {
+    }
     return res.status(200).json({
       authenticated: true,
-      user: req.user
+      user: req.user,
+      activeProfile
     });
   }
   return res.status(200).json({
     authenticated: false,
-    user: null
+    user: null,
+    activeProfile: null
   });
 });
 authRouter.get("/user/:id", authenticateUser, (req, res) => {
@@ -26466,6 +26806,147 @@ authRouter.get("/user/:id", authenticateUser, (req, res) => {
     return res.status(403).json({ error: "Acesso negado aos dados de outro usu\xE1rio." });
   }
   return res.status(200).json({ user: req.user });
+});
+
+// src/server/profiles/routes.ts
+import express2 from "express";
+var profilesRouter = express2.Router();
+var ACTIVE_PROFILE_COOKIE = "zapitv_active_profile";
+var isProduction2 = process.env.NODE_ENV === "production";
+profilesRouter.use(authenticateUser);
+profilesRouter.use(requireCsrfProtection);
+function formatActiveProfileCookie(profileId, clear = false) {
+  if (clear) {
+    return `${ACTIVE_PROFILE_COOKIE}=; Path=/; SameSite=Lax; Max-Age=0${isProduction2 ? "; Secure" : ""}`;
+  }
+  const maxAge = 30 * 24 * 60 * 60;
+  return `${ACTIVE_PROFILE_COOKIE}=${encodeURIComponent(profileId)}; Path=/; SameSite=Lax; Max-Age=${maxAge}${isProduction2 ? "; Secure" : ""}`;
+}
+profilesRouter.get("/", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const userId = req.user.id;
+    const userName = req.user.name;
+    const list = await ProfileService.listProfiles(db, userId, userName);
+    return res.status(200).json({ profiles: list });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Erro ao carregar perfis." });
+  }
+});
+profilesRouter.get("/active", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const userId = req.user.id;
+    const cookieProfileId = extractCookie(req.headers.cookie, ACTIVE_PROFILE_COOKIE);
+    const active = await ProfileService.resolveActiveProfile(db, userId, cookieProfileId);
+    if (!active) {
+      return res.status(404).json({ error: "Nenhum perfil encontrado para esta conta." });
+    }
+    return res.status(200).json({ profile: active });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Erro ao identificar perfil ativo." });
+  }
+});
+profilesRouter.get("/avatars", (_req, res) => {
+  return res.status(200).json({
+    avatars: OFFICIAL_AVATARS.map((a) => ({
+      id: a.id,
+      name: a.name,
+      primaryColor: a.primaryColor,
+      secondaryColor: a.secondaryColor,
+      gradient: a.gradient,
+      dataUri: a.dataUri
+    }))
+  });
+});
+profilesRouter.post("/", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const userId = req.user.id;
+    const { name, avatarId } = req.body || {};
+    const created = await ProfileService.createProfile(db, userId, { name, avatarId });
+    return res.status(201).json({
+      message: "Perfil criado com sucesso!",
+      profile: created
+    });
+  } catch (err) {
+    const status = err?.message?.includes("Limite m\xE1ximo") || err?.message?.includes("caracteres") ? 400 : 500;
+    return res.status(status).json({ error: err?.message || "Erro ao criar perfil." });
+  }
+});
+profilesRouter.post("/:id/select", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const userId = req.user.id;
+    const profileId = req.params.id;
+    const profile = await ProfileService.getProfileById(db, userId, profileId);
+    if (!profile) {
+      return res.status(403).json({ error: "Perfil n\xE3o encontrado ou n\xE3o pertence a esta conta." });
+    }
+    res.setHeader("Set-Cookie", formatActiveProfileCookie(profile.id));
+    return res.status(200).json({
+      message: "Perfil ativado com sucesso!",
+      profile
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message || "Erro ao selecionar perfil." });
+  }
+});
+profilesRouter.put("/:id", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const userId = req.user.id;
+    const profileId = req.params.id;
+    const { name, avatarId } = req.body || {};
+    const updated = await ProfileService.updateProfile(db, userId, profileId, { name, avatarId });
+    return res.status(200).json({
+      message: "Perfil atualizado com sucesso!",
+      profile: updated
+    });
+  } catch (err) {
+    const msg = err?.message || "";
+    const status = msg.includes("n\xE3o pertence") ? 403 : msg.includes("caracteres") || msg.includes("inv\xE1lido") ? 400 : 500;
+    return res.status(status).json({ error: msg || "Erro ao atualizar perfil." });
+  }
+});
+profilesRouter.delete("/:id", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const userId = req.user.id;
+    const profileId = req.params.id;
+    const result = await ProfileService.deleteProfile(db, userId, profileId);
+    const currentActiveCookie = extractCookie(req.headers.cookie, ACTIVE_PROFILE_COOKIE);
+    if (currentActiveCookie === profileId) {
+      res.setHeader("Set-Cookie", formatActiveProfileCookie(result.nextActiveProfileId));
+    }
+    return res.status(200).json({
+      message: "Perfil exclu\xEDdo com sucesso.",
+      success: true,
+      nextActiveProfileId: result.nextActiveProfileId
+    });
+  } catch (err) {
+    const msg = err?.message || "";
+    const status = msg.includes("n\xE3o pertence") ? 403 : msg.includes("\xFAnico perfil") ? 400 : 500;
+    return res.status(status).json({ error: msg || "Erro ao excluir perfil." });
+  }
 });
 
 // src/server/security/publicHttp.ts
@@ -77134,7 +77615,7 @@ var EpgSyncService = class _EpgSyncService {
   parseXmltv(xml) {
     const map = /* @__PURE__ */ new Map();
     const progRegex = /<programme\s+([^>]+)>([\s\S]*?)<\/programme>/g;
-    let count = 0;
+    let count2 = 0;
     for (const match of xml.matchAll(progRegex)) {
       const attrs = match[1];
       const body = match[2];
@@ -77153,9 +77634,9 @@ var EpgSyncService = class _EpgSyncService {
       const category = catMatch ? catMatch[1].trim() : void 0;
       if (!map.has(ch)) map.set(ch, []);
       map.get(ch).push({ start, stop, title, desc: desc3, category });
-      count++;
+      count2++;
     }
-    return { totalProgrammes: count, channels: map };
+    return { totalProgrammes: count2, channels: map };
   }
   parseXmltvTimestamp(raw) {
     if (!raw) return null;
@@ -77293,7 +77774,7 @@ async function requireMaintenanceAdmin(req, res, next) {
   }
 }
 function createApp() {
-  const app2 = express2();
+  const app2 = express3();
   const activeRequests = /* @__PURE__ */ new Map();
   const validationWindows = /* @__PURE__ */ new Map();
   const allowPublicRequest = (key, limit) => {
@@ -77327,7 +77808,7 @@ function createApp() {
     }
     next();
   });
-  app2.use(express2.json());
+  app2.use(express3.json());
   app2.use("/api/watchparty", (req, res, next) => {
     if (!allowPublicRequest(`watchparty:${req.ip || "unknown"}`, 1800) || req.path === "/room/announce" && !allowPublicRequest(`watchparty-announce:${req.ip || "unknown"}`, 120)) {
       return res.status(429).set("Retry-After", "60").json({ error: "Muitas solicita\xE7\xF5es \xE0 sala." });
@@ -77364,6 +77845,7 @@ function createApp() {
   app2.use("/api/db", databaseRouter);
   app2.use("/api/watchparty", watchPartyRouter);
   app2.use("/api/auth", authRouter);
+  app2.use("/api/profiles", profilesRouter);
   function resolveOpenItemStreams(rawId, seasonNum = 1, episodeNum = 1) {
     let cleanId = rawId.replace(/\.json$/, "");
     if (cleanId.includes(":")) {
@@ -78564,7 +79046,7 @@ if (!process.env.VERCEL) {
       });
     } else {
       const distPath = path6.resolve(__dirname, "dist");
-      app.use(express2.static(distPath));
+      app.use(express3.static(distPath));
       app.get("/{*path}", (_req, res) => {
         res.sendFile("index.html", { root: distPath });
       });

@@ -92,6 +92,9 @@ export interface Profile {
   avatar: string;
   isChild: boolean;
   pin?: string; // Senha de 4 dígitos
+  avatarId?: string;
+  isDefault?: number;
+  displayOrder?: number;
 }
 
 export interface User {

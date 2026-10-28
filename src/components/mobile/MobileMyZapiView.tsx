@@ -11,6 +11,7 @@ import { storageService } from '../../core/storage/storageService';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication';
+import { resolveAvatarUrl } from '../../core/profile/avatarRegistry';
 
 interface MobileMyZapiViewProps {
   currentUser: User;
@@ -85,12 +86,9 @@ export const MobileMyZapiView: React.FC<MobileMyZapiViewProps> = ({
         <div className="flex items-center gap-3.5">
           <div className="relative">
             <img
-              src={activeProfile?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120'}
+              src={resolveAvatarUrl(activeProfile?.avatarId || activeProfile?.avatar)}
               alt={activeProfile?.name || 'Perfil'}
               className="w-14 h-14 rounded-2xl object-cover ring-2 ring-[#007df7] shadow-md"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120';
-              }}
             />
             {activeProfile?.isChild && (
               <span className="absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-md bg-amber-500 text-[8px] font-black text-black">

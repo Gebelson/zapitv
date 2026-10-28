@@ -8,6 +8,7 @@ import { uiSoundService } from '../src/core/audio/uiSoundService';
 import { searchService } from '../src/core/search/searchService';
 import { searchHistoryService } from '../src/core/search/searchHistoryService';
 import { ReportFeedbackModal } from '../src/components/feedback/ReportFeedbackModal';
+import { resolveAvatarUrl } from '../src/core/profile/avatarRegistry';
 
 interface HeaderProps {
   isDarkMode: boolean;
@@ -805,7 +806,7 @@ const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded overflow-hidden shadow-lg group-hover:scale-105 transition-transform">
-                <img src={activeProfile?.avatar || 'https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png'} className="w-full h-full object-cover" loading="lazy" />
+                <img src={resolveAvatarUrl(activeProfile?.avatarId || activeProfile?.avatar)} className="w-full h-full object-cover" loading="lazy" alt={activeProfile?.name || 'Perfil'} />
               </div>
               <div className={`w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] transition-transform duration-300 ${isDarkMode ? 'border-t-white' : 'border-t-gray-800'} ${showDropdown ? 'rotate-180' : ''}`} />
             </button>
@@ -823,7 +824,7 @@ const Header: React.FC<HeaderProps> = ({
                 {currentUser.profiles.filter(p => p.id !== activeProfile?.id).map(p => (
                   <button key={p.id} onClick={() => handleProfileSwitchRequest(p)} className="w-full flex items-center gap-3 px-3 py-2 rounded hover:underline transition-all group relative">
                     <div className="relative w-8 h-8 shrink-0">
-                      <img src={p.avatar} className="w-full h-full rounded" loading="lazy" />
+                      <img src={resolveAvatarUrl(p.avatarId || p.avatar)} className="w-full h-full rounded" loading="lazy" alt={p.name} />
                       {p.pin && (
                         <div className="absolute inset-0 bg-black/50 rounded flex items-center justify-center">
                           <Lock className="w-3 h-3 text-white" />

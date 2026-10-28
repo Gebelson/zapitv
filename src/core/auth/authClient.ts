@@ -5,6 +5,8 @@
  * Todas as requisições incluem credentials: 'include'.
  */
 
+import type { ProfileItem } from '../profile/profileClient';
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -25,7 +27,7 @@ class AuthClient {
   /**
    * Consulta a sessão ativa no servidor (/api/auth/me)
    */
-  async checkSession(): Promise<{ authenticated: boolean; user: AuthUser | null }> {
+  async checkSession(): Promise<{ authenticated: boolean; user: AuthUser | null; activeProfile: ProfileItem | null }> {
     try {
       const res = await fetch('/api/auth/me', {
         method: 'GET',
@@ -37,17 +39,18 @@ class AuthClient {
       });
 
       if (!res.ok) {
-        return { authenticated: false, user: null };
+        return { authenticated: false, user: null, activeProfile: null };
       }
 
       const data = await res.json();
       return {
         authenticated: Boolean(data.authenticated),
         user: data.user || null,
+        activeProfile: data.activeProfile || null,
       };
     } catch (err) {
       // Falha de rede ou offline: assume anônimo sem travar a aplicação
-      return { authenticated: false, user: null };
+      return { authenticated: false, user: null, activeProfile: null };
     }
   }
 

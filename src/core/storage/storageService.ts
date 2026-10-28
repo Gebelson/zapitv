@@ -8,8 +8,8 @@ import { bannedContentRegistry } from '../catalog/BannedContentRegistry';
 import { searchService } from '../search/searchService';
 
 import { LocalDataStore, localDataStore } from './localDataStore';
-import { WatchProgress, EpisodeWatchProgress, WatchState, watchStateCodec, contentKey, sameContent, episodeKey, normalizeProgress, normalizeEpisode, normalizeWatchState, mergeWatchStates, listCodec, normalizeIds } from './watchState';
-export type { WatchProgress, EpisodeWatchProgress } from './watchState';
+import { WatchProgress, EpisodeWatchProgress, WatchState, watchStateCodec, contentKey, sameContent, episodeKey, normalizeProgress, normalizeEpisode, normalizeWatchState, mergeWatchStates, listCodec, normalizeIds, StorageScope, getWatchStateCodec, getListCodec } from './watchState';
+export type { WatchProgress, EpisodeWatchProgress, StorageScope } from './watchState';
 
 export interface PlaybackContinuityInfo {
   hasStarted: boolean;
@@ -41,11 +41,35 @@ export function formatPlaybackTime(seconds: number): string {
 export class StorageService {
   private itemProgressCache = new Map<string, WatchProgress>();
   private episodeProgressCache = new Map<string, EpisodeWatchProgress>();
+  private currentScope: StorageScope | null = null;
   private ready: Promise<void>;
 
   constructor(private dataStore: LocalDataStore = localDataStore) {
     this.applyWatchState(this.dataStore.readSync(watchStateCodec));
     this.ready = this.syncFromDb();
+  }
+
+  public getScope(): StorageScope | null {
+    return this.currentScope;
+  }
+
+  public async setScope(scope: StorageScope | null): Promise<void> {
+    this.currentScope = scope;
+    await this.syncFromDb();
+    recommendationEngine.invalidateCache();
+    hybridRecommendationEngine.invalidateCache();
+  }
+
+  private getWatchCodec() {
+    return getWatchStateCodec(this.currentScope);
+  }
+
+  private getFavoritesCodec() {
+    return getListCodec('favorites', this.currentScope);
+  }
+
+  private getMyListCodec() {
+    return getListCodec('mylist', this.currentScope);
   }
 
   private applyWatchState(state: WatchState): void {
@@ -70,7 +94,7 @@ export class StorageService {
   }
 
   public async syncFromDb(): Promise<void> {
-    this.applyWatchState(await this.dataStore.read(watchStateCodec));
+    this.applyWatchState(await this.dataStore.read(this.getWatchCodec()));
   }
 
   public getEpisodeKey(contentId: string, season: number, episode: number): string {
@@ -301,17 +325,17 @@ export class StorageService {
   }
 
   public getFavorites(): Promise<string[]> {
-    return this.dataStore.read(listCodec('favorites'));
+    return this.dataStore.read(this.getFavoritesCodec());
   }
 
   public async saveFavorites(favorites: string[]): Promise<void> {
-    await this.dataStore.update(listCodec('favorites'), () => normalizeIds(favorites));
+    await this.dataStore.update(this.getFavoritesCodec(), () => normalizeIds(favorites));
     recommendationEngine.invalidateCache();
     hybridRecommendationEngine.invalidateCache();
   }
 
   public async toggleFavorite(id: string): Promise<string[]> {
-    const next = await this.dataStore.update(listCodec('favorites'), list =>
+    const next = await this.dataStore.update(this.getFavoritesCodec(), list =>
       list.includes(id) ? list.filter(value => value !== id) : [...list, id]);
     recommendationEngine.invalidateCache();
     hybridRecommendationEngine.invalidateCache();
@@ -319,15 +343,15 @@ export class StorageService {
   }
 
   public getMyList(): Promise<string[]> {
-    return this.dataStore.read(listCodec('mylist'));
+    return this.dataStore.read(this.getMyListCodec());
   }
 
   public async saveMyList(ids: string[]): Promise<void> {
-    await this.dataStore.update(listCodec('mylist'), () => normalizeIds(ids));
+    await this.dataStore.update(this.getMyListCodec(), () => normalizeIds(ids));
   }
 
   public toggleMyList(id: string): Promise<string[]> {
-    return this.dataStore.update(listCodec('mylist'), list =>
+    return this.dataStore.update(this.getMyListCodec(), list =>
       list.includes(id) ? list.filter(value => value !== id) : [...list, id]);
   }
 
@@ -341,7 +365,7 @@ export class StorageService {
     const normalizedProgress = normalizeProgress(progress);
     if (!normalizedProgress) return;
     await this.ready;
-    const state = await this.dataStore.update(watchStateCodec, current => {
+    const state = await this.dataStore.update(this.getWatchCodec(), current => {
       const existing = current.items.find(p => sameContent(p.item, normalizedProgress.item));
       const episodes = { ...current.episodes };
       let episodeChanged = false;
@@ -404,7 +428,7 @@ export class StorageService {
 
   public async deleteProgress(itemOrId: string | ContentItem): Promise<void> {
     await this.ready;
-    const state = await this.dataStore.update(watchStateCodec, current => {
+    const state = await this.dataStore.update(this.getWatchCodec(), current => {
       const matches = current.items.filter(p => typeof itemOrId === 'object' ? sameContent(p.item, itemOrId) : p.contentId === itemOrId);
       if (matches.length !== 1) return current;
       const target = matches[0];
@@ -420,8 +444,8 @@ export class StorageService {
 
   public async clearAllProgress(): Promise<void> {
     await this.ready;
-    this.applyWatchState(await this.dataStore.update(watchStateCodec, () => ({ items: [], episodes: {} })));
-    await this.dataStore.removeLegacy(watchStateCodec);
+    this.applyWatchState(await this.dataStore.update(this.getWatchCodec(), () => ({ items: [], episodes: {} })));
+    await this.dataStore.removeLegacy(this.getWatchCodec());
   }
 
   public async exportDataAsJson(): Promise<string> {
@@ -454,10 +478,10 @@ export class StorageService {
       await this.ready;
       if (data.progress || data.episodeProgress) {
         const imported = normalizeWatchState({ items: data.progress, episodes: data.episodeProgress });
-        this.applyWatchState(await this.dataStore.update(watchStateCodec, current => mergeWatchStates(current, imported)));
+        this.applyWatchState(await this.dataStore.update(this.getWatchCodec(), current => mergeWatchStates(current, imported)));
       }
-      if (data.favorites) await this.dataStore.update(listCodec('favorites'), list => normalizeIds([...list, ...data.favorites]));
-      if (data.myList) await this.dataStore.update(listCodec('mylist'), list => normalizeIds([...list, ...data.myList]));
+      if (data.favorites) await this.dataStore.update(this.getFavoritesCodec(), list => normalizeIds([...list, ...data.favorites]));
+      if (data.myList) await this.dataStore.update(this.getMyListCodec(), list => normalizeIds([...list, ...data.myList]));
       if (Array.isArray(data.providers)) {
         try { localStorage.setItem('zapitv_providers_config', JSON.stringify(data.providers)); } catch { return false; }
       }

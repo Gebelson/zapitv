@@ -15,8 +15,9 @@ import { eq } from 'drizzle-orm';
 import { getValidDatabase, authenticateUser, optionalUser, requireCsrfProtection, extractSessionToken } from './authMiddleware';
 import { users } from '../database/schema';
 import { hashPassword, verifyPassword } from './passwordService';
-import { createSession, revokeSession, formatSetCookie } from './sessionService';
+import { createSession, revokeSession, formatSetCookie, extractCookie } from './sessionService';
 import { RateLimitService } from './rateLimitService';
+import { ProfileService } from '../profiles/profileService';
 
 export const authRouter = express.Router();
 
@@ -223,16 +224,20 @@ authRouter.post('/logout', async (req, res) => {
       await revokeSession(db, token);
     }
 
-    // Limpa o cookie HttpOnly
-    res.setHeader('Set-Cookie', formatSetCookie('', { clear: true, isProduction }));
+    // Limpa o cookie HttpOnly de sessão e de perfil ativo
+    const clearSession = formatSetCookie('', { clear: true, isProduction });
+    const clearActiveProfile = `zapitv_active_profile=; Path=/; SameSite=Lax; Max-Age=0${isProduction ? '; Secure' : ''}`;
+    res.setHeader('Set-Cookie', [clearSession, clearActiveProfile]);
 
     return res.status(200).json({
       success: true,
       message: 'Sessão encerrada com sucesso.',
     });
   } catch (err) {
-    // Mesmo em falha interna, garante limpeza do cookie no cliente
-    res.setHeader('Set-Cookie', formatSetCookie('', { clear: true, isProduction }));
+    // Mesmo em falha interna, garante limpeza dos cookies no cliente
+    const clearSession = formatSetCookie('', { clear: true, isProduction });
+    const clearActiveProfile = `zapitv_active_profile=; Path=/; SameSite=Lax; Max-Age=0${isProduction ? '; Secure' : ''}`;
+    res.setHeader('Set-Cookie', [clearSession, clearActiveProfile]);
     return res.status(200).json({ success: true });
   }
 });
@@ -240,17 +245,28 @@ authRouter.post('/logout', async (req, res) => {
 /**
  * 4. CONSULTA DO ESTADO DA SESSÃO ATUAL (/me)
  */
-authRouter.get('/me', optionalUser, (req, res) => {
+authRouter.get('/me', optionalUser, async (req, res) => {
   if (req.user) {
+    let activeProfile = null;
+    try {
+      const db = await getValidDatabase();
+      if (db) {
+        const cookieProfileId = extractCookie(req.headers.cookie, 'zapitv_active_profile');
+        activeProfile = await ProfileService.resolveActiveProfile(db, req.user.id, cookieProfileId);
+      }
+    } catch {}
+
     return res.status(200).json({
       authenticated: true,
       user: req.user,
+      activeProfile,
     });
   }
 
   return res.status(200).json({
     authenticated: false,
     user: null,
+    activeProfile: null,
   });
 });
 

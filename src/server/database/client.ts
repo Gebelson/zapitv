@@ -82,6 +82,20 @@ export async function ensureAuthTables(database: Database): Promise<void> {
       ip_address text
     );
     CREATE INDEX IF NOT EXISTS login_attempts_identifier_time_idx ON login_attempts (identifier, attempt_at);
+
+    CREATE TABLE IF NOT EXISTS profiles (
+      id text PRIMARY KEY NOT NULL,
+      user_id text NOT NULL,
+      name text NOT NULL,
+      avatar_id text NOT NULL,
+      is_default integer DEFAULT 0 NOT NULL,
+      display_order integer DEFAULT 0 NOT NULL,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE INDEX IF NOT EXISTS profiles_user_id_idx ON profiles (user_id);
+    CREATE INDEX IF NOT EXISTS profiles_user_id_order_idx ON profiles (user_id, display_order);
   `);
 }
 

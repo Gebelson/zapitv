@@ -130,6 +130,8 @@ export function requireCsrfProtection(
   const origin = req.headers.origin;
   const referer = req.headers.referer;
   const host = req.headers.host;
+  const customClient = req.headers['x-zapi-client'];
+  const hasCookie = Boolean(req.headers.cookie);
 
   const sourceUrl = origin || referer;
 
@@ -142,6 +144,8 @@ export function requireCsrfProtection(
     } catch {
       return res.status(403).json({ error: 'Origem inválida detectada.' });
     }
+  } else if (!sourceUrl && hasCookie && !customClient && process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Origem da requisição não confiável (CSRF bloqueado).' });
   }
 
   next();
