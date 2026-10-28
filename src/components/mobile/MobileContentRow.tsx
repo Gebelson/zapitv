@@ -48,8 +48,13 @@ export const MobileContentRow: React.FC<MobileContentRowProps> = ({
           }
           touchStartX.current = null;
         }}
-        className="flex gap-3 overflow-x-auto no-scrollbar px-4 py-1 scroll-smooth will-change-scroll"
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        className="flex gap-3 overflow-x-auto overflow-y-hidden no-scrollbar px-4 py-1 scroll-smooth will-change-scroll"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-x pan-y',
+          overscrollBehaviorX: 'contain',
+          overscrollBehaviorY: 'none'
+        }}
       >
         {items.map((item, idx) => (
           <MobileCard

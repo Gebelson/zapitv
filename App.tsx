@@ -3041,8 +3041,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             if (selectedContent) handleCloseDetailModal();
             else if (isDiagnosticModalOpen) setIsDiagnosticModalOpen(false);
           }}
-          onLoadMore={(cat) => handleLoadMore(cat || currentView)}
-          hasMore={currentView === 'movies' ? hasMoreMovies : currentView === 'series' ? hasMoreSeries : currentView === 'animes' ? hasMoreAnimes : false}
+          onLoadMore={(cat) => handleLoadMore(cat || (currentView === 'explore' ? 'movies' : currentView))}
+          hasMore={(currentView === 'movies' || currentView === 'explore') ? hasMoreMovies : currentView === 'series' ? hasMoreSeries : currentView === 'animes' ? hasMoreAnimes : false}
           isLoadingMore={isLoadingMore}
           selectedGenre={selectedGenre}
           onSelectGenre={handleSelectGenre}

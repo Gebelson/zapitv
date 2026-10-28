@@ -207,6 +207,7 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       className="relative w-full h-[58vh] min-h-[420px] max-h-[560px] overflow-hidden select-none bg-[#05070a]"
+      style={{ touchAction: 'pan-y' }}
     >
       {/* Imagem de Fundo com Enquadramento Otimizado para Mobile e Fundo Sólido Anti-Transparência */}
       <div className="absolute inset-0 bg-[#05070a]">
