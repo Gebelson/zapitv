@@ -710,71 +710,97 @@ export class SyncService {
       }
 
       try {
-        // 1. Verificação de idempotência persistente na tabela processed_sync_mutations
-        const existing = await db.db
-          .select()
-          .from(processedSyncMutations)
-          .where(eq(processedSyncMutations.id, mut.id))
-          .limit(1);
-
-        if (existing.length > 0) {
-          // Mutação já persistida e processada com sucesso anteriormente
-          results.push({ id: mut.id, success: true, duplicate: true });
-          continue;
-        }
-
-        let conflictResolved = false;
-        switch (mut.type) {
-          case 'progress': {
-            const res = await this.saveProgress(db, profileId, {
-              ...mut.data,
-              updatedAt: mut.timestamp || mut.data?.updatedAt,
-              clientSendTime,
-            });
-            conflictResolved = Boolean(res.conflictResolved);
-            break;
-          }
-          case 'history': {
-            await this.recordHistory(db, profileId, {
-              ...mut.data,
-              watchedAt: mut.timestamp || mut.data?.watchedAt,
-              updatedAt: mut.timestamp || mut.data?.updatedAt,
-              clientSendTime,
-            });
-            break;
-          }
-          case 'my_list': {
-            const isRemoved = mut.action === 'remove' || Boolean(mut.data?.isRemoved);
-            const canonicalId = mut.data?.canonicalId || mut.data?.id;
-            const res = await this.setMyList(db, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
-            conflictResolved = Boolean(res.conflictResolved);
-            break;
-          }
-          case 'favorites': {
-            const isRemoved = mut.action === 'remove' || Boolean(mut.data?.isRemoved);
-            const canonicalId = mut.data?.canonicalId || mut.data?.id;
-            const res = await this.setFavorite(db, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
-            conflictResolved = Boolean(res.conflictResolved);
-            break;
-          }
-          default:
-            results.push({ id: mut.id, success: false, error: `Tipo de mutação desconhecido: ${mut.type}` });
-            continue;
-        }
-
-        // 2. Registra mutação na tabela persistente para garantia estrita de idempotência
         const now = Date.now();
         const sevenDays = 7 * 24 * 60 * 60 * 1000;
-        await db.db.insert(processedSyncMutations).values({
-          id: mut.id,
-          profileId,
-          mutationType: mut.type,
-          canonicalId: String(mut.data?.canonicalId || mut.data?.id || 'unknown').slice(0, 100),
-          processedAt: now,
-          expiresAt: now + sevenDays,
-        });
 
-        results.push({ id: mut.id, success: true, conflictResolved });
+        // 1. Reserva atômica da mutação na tabela processed_sync_mutations via chave primária.
+        // Garante atomicidade concorrente: se duas instâncias serverless receberem a mesma
+        // mutação simultaneamente, apenas uma conseguirá inserir a chave e a outra será
+        // deduplicada imediatamente sem reexecutar os efeitos mutativos.
+        let isClaimed = false;
+        try {
+          await db.db.insert(processedSyncMutations).values({
+            id: mut.id,
+            profileId,
+            mutationType: mut.type,
+            canonicalId: String(mut.data?.canonicalId || mut.data?.id || 'unknown').slice(0, 100),
+            processedAt: now,
+            expiresAt: now + sevenDays,
+          });
+          isClaimed = true;
+        } catch (insertErr: any) {
+          const rawErr = insertErr?.cause || insertErr;
+          const fullMsg = `${insertErr?.message || ''} ${rawErr?.message || ''} ${insertErr?.code || ''} ${rawErr?.code || ''}`;
+          if (
+            insertErr?.code === 'SQLITE_CONSTRAINT' ||
+            insertErr?.code === 'SQLITE_CONSTRAINT_PRIMARYKEY' ||
+            rawErr?.code === 'SQLITE_CONSTRAINT' ||
+            rawErr?.code === 'SQLITE_CONSTRAINT_PRIMARYKEY' ||
+            fullMsg.includes('UNIQUE') ||
+            fullMsg.includes('constraint') ||
+            fullMsg.includes('PRIMARY KEY') ||
+            fullMsg.includes('SQLITE_CONSTRAINT')
+          ) {
+            // Outra requisição concorrente já inseriu esta chave. Deduplica atomicamente!
+            results.push({ id: mut.id, success: true, duplicate: true });
+            continue;
+          }
+          throw insertErr;
+        }
+
+        // 2. Com a reserva atômica garantida, aplica os efeitos da mutação
+        let conflictResolved = false;
+        try {
+          switch (mut.type) {
+            case 'progress': {
+              const res = await this.saveProgress(db, profileId, {
+                ...mut.data,
+                updatedAt: mut.timestamp || mut.data?.updatedAt,
+                clientSendTime,
+              });
+              conflictResolved = Boolean(res.conflictResolved);
+              break;
+            }
+            case 'history': {
+              await this.recordHistory(db, profileId, {
+                ...mut.data,
+                watchedAt: mut.timestamp || mut.data?.watchedAt,
+                updatedAt: mut.timestamp || mut.data?.updatedAt,
+                clientSendTime,
+              });
+              break;
+            }
+            case 'my_list': {
+              const isRemoved = mut.action === 'remove' || Boolean(mut.data?.isRemoved);
+              const canonicalId = mut.data?.canonicalId || mut.data?.id;
+              const res = await this.setMyList(db, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
+              conflictResolved = Boolean(res.conflictResolved);
+              break;
+            }
+            case 'favorites': {
+              const isRemoved = mut.action === 'remove' || Boolean(mut.data?.isRemoved);
+              const canonicalId = mut.data?.canonicalId || mut.data?.id;
+              const res = await this.setFavorite(db, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
+              conflictResolved = Boolean(res.conflictResolved);
+              break;
+            }
+            default:
+              results.push({ id: mut.id, success: false, error: `Tipo de mutação desconhecido: ${mut.type}` });
+              // Libera a reserva se tipo de mutação for desconhecido
+              await db.db.delete(processedSyncMutations).where(eq(processedSyncMutations.id, mut.id));
+              continue;
+          }
+
+          results.push({ id: mut.id, success: true, conflictResolved });
+        } catch (mutationErr: any) {
+          // Se a mutação falhou na execução, remove a reserva para permitir retentativa futura válida
+          if (isClaimed) {
+            try {
+              await db.db.delete(processedSyncMutations).where(eq(processedSyncMutations.id, mut.id));
+            } catch {}
+          }
+          throw mutationErr;
+        }
       } catch (err: any) {
         results.push({ id: mut.id, success: false, error: err?.message || 'Falha ao aplicar mutação' });
       }

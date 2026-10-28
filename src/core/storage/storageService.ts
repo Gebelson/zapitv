@@ -61,6 +61,7 @@ export class StorageService {
 
   public async setScope(scope: StorageScope | null): Promise<void> {
     this.currentScope = scope;
+    syncQueue.setAccountScope(scope?.userId || null);
     await this.syncFromDb();
     recommendationEngine.invalidateCache();
     hybridRecommendationEngine.invalidateCache();
@@ -168,7 +169,7 @@ export class StorageService {
       }
 
       // 4. Descarrega mutações pendentes na outbox queue
-      await syncQueue.flush(profileId);
+      await syncQueue.flush(profileId, this.currentScope?.userId);
     } catch {}
   }
 
@@ -456,11 +457,15 @@ export class StorageService {
     hybridRecommendationEngine.invalidateCache();
 
     if (this.currentScope?.profileId) {
-      syncQueue.enqueue(this.currentScope.profileId, {
-        type: 'favorites',
-        action: wasRemoved ? 'remove' : 'set',
-        data: { canonicalId: id, isRemoved: wasRemoved },
-      });
+      syncQueue.enqueue(
+        this.currentScope.profileId,
+        {
+          type: 'favorites',
+          action: wasRemoved ? 'remove' : 'set',
+          data: { canonicalId: id, isRemoved: wasRemoved },
+        },
+        this.currentScope.userId
+      );
     }
 
     return next;
@@ -481,11 +486,15 @@ export class StorageService {
       const nextList = wasRemoved ? list.filter(value => value !== id) : [...list, id];
 
       if (this.currentScope?.profileId) {
-        syncQueue.enqueue(this.currentScope.profileId, {
-          type: 'my_list',
-          action: wasRemoved ? 'remove' : 'set',
-          data: { canonicalId: id, isRemoved: wasRemoved },
-        });
+        syncQueue.enqueue(
+          this.currentScope.profileId,
+          {
+            type: 'my_list',
+            action: wasRemoved ? 'remove' : 'set',
+            data: { canonicalId: id, isRemoved: wasRemoved },
+          },
+          this.currentScope.userId
+        );
       }
 
       return nextList;
@@ -589,21 +598,25 @@ export class StorageService {
           this.completedSynced.add(progressKey);
         }
 
-        syncQueue.enqueue(this.currentScope.profileId, {
-          type: 'progress',
-          action: 'save',
-          data: {
-            canonicalId,
-            contentType,
-            season,
-            episode,
-            positionSec,
-            durationSec,
-            progressPercent: normalizedProgress.percentage,
-            isCompleted,
-            updatedAt: eventTime,
+        syncQueue.enqueue(
+          this.currentScope.profileId,
+          {
+            type: 'progress',
+            action: 'save',
+            data: {
+              canonicalId,
+              contentType,
+              season,
+              episode,
+              positionSec,
+              durationSec,
+              progressPercent: normalizedProgress.percentage,
+              isCompleted,
+              updatedAt: eventTime,
+            },
           },
-        });
+          this.currentScope.userId
+        );
       }
 
       // Histórico é registrado na inicialização, na conclusão ou em intervalos de 60 minutos,
@@ -612,21 +625,25 @@ export class StorageService {
       if (lastHistSync === 0 || isFirstCompleted || eventTime - lastHistSync >= 60 * 60 * 1000) {
         this.lastRemoteHistorySync.set(progressKey, eventTime);
 
-        syncQueue.enqueue(this.currentScope.profileId, {
-          type: 'history',
-          action: 'save',
-          data: {
-            canonicalId,
-            contentType,
-            season,
-            episode,
-            title: normalizedProgress.item?.title,
-            posterUrl: normalizedProgress.item?.poster,
-            year: normalizedProgress.item?.year,
-            watchedAt: eventTime,
-            updatedAt: eventTime,
+        syncQueue.enqueue(
+          this.currentScope.profileId,
+          {
+            type: 'history',
+            action: 'save',
+            data: {
+              canonicalId,
+              contentType,
+              season,
+              episode,
+              title: normalizedProgress.item?.title,
+              posterUrl: normalizedProgress.item?.poster,
+              year: normalizedProgress.item?.year,
+              watchedAt: eventTime,
+              updatedAt: eventTime,
+            },
           },
-        });
+          this.currentScope.userId
+        );
       }
     }
   }

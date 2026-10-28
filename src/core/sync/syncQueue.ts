@@ -16,6 +16,7 @@ export class SyncQueueManager {
   private activeFlush: Set<string> = new Set();
   private retryTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private backoffAttempts: Map<string, number> = new Map();
+  private currentAccountId: string | null = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -25,66 +26,87 @@ export class SyncQueueManager {
     }
   }
 
-  private getStorageKey(profileId: string): string {
-    return `zapitv_outbox_${profileId}`;
+  public setAccountScope(accountId: string | null): void {
+    this.currentAccountId = accountId;
+  }
+
+  public getAccountScope(): string | null {
+    return this.currentAccountId;
+  }
+
+  public getStorageKey(profileId: string, accountId?: string | null): string {
+    const acc = accountId ?? this.currentAccountId;
+    return acc ? `zapitv_outbox_${acc}_${profileId}` : `zapitv_outbox_${profileId}`;
   }
 
   /**
-   * Carrega as mutações persistidas do perfil
+   * Carrega as mutações persistidas do perfil, com isolamento de conta e suporte a chaves legadas
    */
-  public getQueue(profileId: string): SyncMutationItem[] {
+  public getQueue(profileId: string, accountId?: string | null): SyncMutationItem[] {
     if (!profileId) return [];
 
-    const mem = this.inMemoryQueues.get(profileId);
+    const storageKey = this.getStorageKey(profileId, accountId);
+    const mem = this.inMemoryQueues.get(storageKey);
     if (mem) return mem;
 
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
-        const raw = localStorage.getItem(this.getStorageKey(profileId));
+        let raw = localStorage.getItem(storageKey);
+        // Fallback para chave legada zapitv_outbox_${profileId} se ainda não migrada
+        if (!raw && storageKey !== `zapitv_outbox_${profileId}`) {
+          raw = localStorage.getItem(`zapitv_outbox_${profileId}`);
+          if (raw) {
+            localStorage.setItem(storageKey, raw);
+            localStorage.removeItem(`zapitv_outbox_${profileId}`);
+          }
+        }
+
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
-            this.inMemoryQueues.set(profileId, parsed);
+            this.inMemoryQueues.set(storageKey, parsed);
             return parsed;
           }
         }
       } catch {}
     }
 
-    this.inMemoryQueues.set(profileId, []);
+    this.inMemoryQueues.set(storageKey, []);
     return [];
   }
 
   /**
    * Salva a fila localmente
    */
-  private saveQueue(profileId: string, queue: SyncMutationItem[]): void {
+  private saveQueue(profileId: string, queue: SyncMutationItem[], accountId?: string | null): void {
     if (!profileId) return;
-    this.inMemoryQueues.set(profileId, queue);
+    const storageKey = this.getStorageKey(profileId, accountId);
+    this.inMemoryQueues.set(storageKey, queue);
 
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
         if (queue.length === 0) {
-          localStorage.removeItem(this.getStorageKey(profileId));
+          localStorage.removeItem(storageKey);
         } else {
-          localStorage.setItem(this.getStorageKey(profileId), JSON.stringify(queue.slice(0, 500)));
+          localStorage.setItem(storageKey, JSON.stringify(queue.slice(0, 500)));
         }
       } catch {}
     }
   }
 
   /**
-   * Enfileira uma nova mutação para o perfil com coalescência inteligente
+   * Enfileira uma nova mutação para o perfil com coalescência inteligente e isolamento por conta
    */
   public enqueue(
     profileId: string,
-    mutation: Omit<SyncMutationItem, 'id' | 'timestamp'>
+    mutation: Omit<SyncMutationItem, 'id' | 'timestamp'>,
+    accountId?: string | null
   ): SyncMutationItem {
     if (!profileId) {
       throw new Error('profileId é obrigatório para enfileirar sincronização.');
     }
 
-    const queue = this.getQueue(profileId);
+    const queue = this.getQueue(profileId, accountId);
 
     // Coalesce para progresso de reprodução: se já existir progresso pendente para o mesmo conteúdo,
     // atualiza o registro existente em vez de acumular registros obsoletos na fila.
@@ -98,10 +120,10 @@ export class SyncQueueManager {
       if (idx >= 0) {
         queue[idx].data = { ...queue[idx].data, ...mutation.data };
         queue[idx].timestamp = Date.now();
-        this.saveQueue(profileId, queue);
+        this.saveQueue(profileId, queue, accountId);
 
         if (typeof navigator === 'undefined' || navigator.onLine) {
-          this.flush(profileId).catch(() => {});
+          this.flush(profileId, accountId).catch(() => {});
         }
         return queue[idx];
       }
@@ -114,11 +136,11 @@ export class SyncQueueManager {
     };
 
     queue.push(item);
-    this.saveQueue(profileId, queue);
+    this.saveQueue(profileId, queue, accountId);
 
     // Tenta descarregar se online
     if (typeof navigator === 'undefined' || navigator.onLine) {
-      this.flush(profileId).catch(() => {});
+      this.flush(profileId, accountId).catch(() => {});
     }
 
     return item;
@@ -127,32 +149,34 @@ export class SyncQueueManager {
   /**
    * Quantidade de mutações pendentes na fila
    */
-  public getPendingCount(profileId: string): number {
-    return this.getQueue(profileId).length;
+  public getPendingCount(profileId: string, accountId?: string | null): number {
+    return this.getQueue(profileId, accountId).length;
   }
 
   /**
-   * Limpa a fila do perfil
+   * Limpa a fila do perfil em memória e no localStorage
    */
-  public clearQueue(profileId: string): void {
-    const timer = this.retryTimeouts.get(profileId);
+  public clearQueue(profileId: string, accountId?: string | null): void {
+    const storageKey = this.getStorageKey(profileId, accountId);
+    const timer = this.retryTimeouts.get(storageKey);
     if (timer) {
       clearTimeout(timer);
-      this.retryTimeouts.delete(profileId);
+      this.retryTimeouts.delete(storageKey);
     }
-    this.inMemoryQueues.delete(profileId);
-    this.backoffAttempts.delete(profileId);
+    this.inMemoryQueues.delete(storageKey);
+    this.backoffAttempts.delete(storageKey);
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
-        localStorage.removeItem(this.getStorageKey(profileId));
+        localStorage.removeItem(storageKey);
       } catch {}
     }
   }
 
   /**
-   * Limpa todas as filas em memória e no localStorage (chamado no logout seguro)
+   * Pausa e descarrega filas em memória no logout, PRESERVANDO dados offline no localStorage
+   * sob a chave da conta/perfil. Impede descarte silencioso de dados ao deslogar.
    */
-  public clearAllQueues(): void {
+  public pauseAndUnloadQueues(): void {
     for (const [, timer] of this.retryTimeouts.entries()) {
       clearTimeout(timer);
     }
@@ -160,7 +184,14 @@ export class SyncQueueManager {
     this.inMemoryQueues.clear();
     this.backoffAttempts.clear();
     this.activeFlush.clear();
+    this.currentAccountId = null;
+  }
 
+  /**
+   * Purga explicitamente todas as filas do localStorage (requer ação intencional de descarte)
+   */
+  public purgeAllQueues(): void {
+    this.pauseAndUnloadQueues();
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
         const keysToRemove: string[] = [];
@@ -178,20 +209,28 @@ export class SyncQueueManager {
   }
 
   /**
+   * Mantido para compatibilidade com testes anteriores que chamam clearAllQueues()
+   */
+  public clearAllQueues(): void {
+    this.purgeAllQueues();
+  }
+
+  /**
    * Tenta enviar as mutações pendentes para o servidor
    */
-  public async flush(profileId: string): Promise<void> {
-    if (!profileId || this.activeFlush.has(profileId)) return;
+  public async flush(profileId: string, accountId?: string | null): Promise<void> {
+    const storageKey = this.getStorageKey(profileId, accountId);
+    if (!profileId || this.activeFlush.has(storageKey)) return;
 
     // Se estiver explicitamente offline no navegador, aguarda retorno
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       return;
     }
 
-    const queue = this.getQueue(profileId);
+    const queue = this.getQueue(profileId, accountId);
     if (queue.length === 0) return;
 
-    this.activeFlush.add(profileId);
+    this.activeFlush.add(storageKey);
 
     try {
       // Pega até 50 itens para envio em lote
@@ -203,31 +242,31 @@ export class SyncQueueManager {
       if (outcome && outcome.success) {
         // Remove os itens processados
         const remaining = queue.filter(m => !batchIds.has(m.id));
-        this.saveQueue(profileId, remaining);
-        this.backoffAttempts.delete(profileId);
+        this.saveQueue(profileId, remaining, accountId);
+        this.backoffAttempts.delete(storageKey);
 
         // Se ainda houver itens restantes, continua descarregando
         if (remaining.length > 0) {
-          setTimeout(() => this.flush(profileId), 100);
+          setTimeout(() => this.flush(profileId, accountId), 100);
         }
       }
     } catch {
       // Falha de rede: agenda retry com backoff exponencial limitado (2s, 4s, 8s... max 30s)
-      const attempts = (this.backoffAttempts.get(profileId) || 0) + 1;
-      this.backoffAttempts.set(profileId, attempts);
+      const attempts = (this.backoffAttempts.get(storageKey) || 0) + 1;
+      this.backoffAttempts.set(storageKey, attempts);
 
       const delayMs = Math.min(30000, 2000 * Math.pow(1.5, Math.min(attempts, 6)));
       
-      const existingTimer = this.retryTimeouts.get(profileId);
+      const existingTimer = this.retryTimeouts.get(storageKey);
       if (existingTimer) clearTimeout(existingTimer);
 
       const timer = setTimeout(() => {
-        this.flush(profileId).catch(() => {});
+        this.flush(profileId, accountId).catch(() => {});
       }, delayMs);
 
-      this.retryTimeouts.set(profileId, timer);
+      this.retryTimeouts.set(storageKey, timer);
     } finally {
-      this.activeFlush.delete(profileId);
+      this.activeFlush.delete(storageKey);
     }
   }
 
@@ -235,8 +274,11 @@ export class SyncQueueManager {
    * Descarrega todas as filas de perfis conhecidas
    */
   public flushAllActiveQueues(): void {
-    for (const [profileId] of this.inMemoryQueues.entries()) {
-      this.flush(profileId).catch(() => {});
+    for (const [key] of this.inMemoryQueues.entries()) {
+      const parts = key.replace('zapitv_outbox_', '').split('_');
+      const profileId = parts.length > 1 ? parts.slice(1).join('_') : parts[0];
+      const accountId = parts.length > 1 ? parts[0] : null;
+      this.flush(profileId, accountId).catch(() => {});
     }
   }
 }

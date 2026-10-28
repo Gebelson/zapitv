@@ -102,10 +102,15 @@ export function getPublicBaseUrl(req?: { headers?: Record<string, any>; protocol
   }
 
   // Se não configurada, deriva de forma segura
-  if (req?.headers?.host) {
-    const host = req.headers.host;
+  if (req?.headers?.['x-forwarded-host'] || req?.headers?.host) {
+    const host = (req.headers['x-forwarded-host'] as string) || req.headers.host;
     const proto = (req.headers['x-forwarded-proto'] as string) || (req.protocol === 'https' ? 'https' : 'http');
     return `${proto}://${host}`.replace(/\/+$/, '');
+  }
+
+  // Fallback para domínio do deployment atual na Vercel (Preview / Branch Deployment)
+  if (process.env.VERCEL_URL && process.env.VERCEL_URL.trim()) {
+    return `https://${process.env.VERCEL_URL.trim()}`.replace(/\/+$/, '');
   }
 
   return 'https://zapitv.vercel.app';

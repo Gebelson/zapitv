@@ -44,6 +44,11 @@ class AuthClient {
       }
 
       const data = await res.json();
+      if (data.authenticated && data.user?.id) {
+        syncQueue.setAccountScope(data.user.id);
+      } else {
+        syncQueue.setAccountScope(null);
+      }
       return {
         authenticated: Boolean(data.authenticated),
         user: data.user || null,
@@ -76,6 +81,10 @@ class AuthClient {
       throw new Error(data.error || 'Não foi possível concluir o cadastro.');
     }
 
+    if (data.user?.id) {
+      syncQueue.setAccountScope(data.user.id);
+    }
+
     return {
       user: data.user,
       message: data.message || 'Conta criada com sucesso!',
@@ -106,6 +115,10 @@ class AuthClient {
       throw new Error(data.error || 'E-mail ou senha incorretos.');
     }
 
+    if (data.user?.id) {
+      syncQueue.setAccountScope(data.user.id);
+    }
+
     return {
       user: data.user,
       message: data.message || 'Login realizado com sucesso!',
@@ -117,7 +130,7 @@ class AuthClient {
    */
   async logout(): Promise<boolean> {
     try {
-      syncQueue.clearAllQueues();
+      syncQueue.pauseAndUnloadQueues();
       const res = await fetch('/api/auth/logout', {
         method: 'POST',
         headers: {
