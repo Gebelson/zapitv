@@ -22998,6 +22998,7 @@ __export(schema_exports, {
   loginAttempts: () => loginAttempts,
   media: () => media,
   mediaExternalIds: () => mediaExternalIds,
+  processedSyncMutations: () => processedSyncMutations,
   profileFavorites: () => profileFavorites,
   profileMyList: () => profileMyList,
   profilePlaybackProgress: () => profilePlaybackProgress,
@@ -23269,6 +23270,17 @@ var profileFavorites = sqliteTable("profile_favorites", {
   uniqueIndex("profile_favorites_key_idx").on(table.profileId, table.canonicalId),
   index("profile_favorites_profile_status_idx").on(table.profileId, table.isRemoved, table.updatedAt)
 ]);
+var processedSyncMutations = sqliteTable("processed_sync_mutations", {
+  id: text("id").primaryKey(),
+  profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  mutationType: text("mutation_type").notNull(),
+  canonicalId: text("canonical_id").notNull(),
+  processedAt: integer("processed_at").notNull(),
+  expiresAt: integer("expires_at").notNull()
+}, (table) => [
+  index("processed_sync_mutations_profile_id_idx").on(table.profileId),
+  index("processed_sync_mutations_expires_at_idx").on(table.expiresAt)
+]);
 
 // src/server/database/client.ts
 import fs2 from "fs";
@@ -23475,6 +23487,18 @@ async function ensureAuthTables(database) {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS profile_favorites_key_idx ON profile_favorites (profile_id, canonical_id);
     CREATE INDEX IF NOT EXISTS profile_favorites_profile_status_idx ON profile_favorites (profile_id, is_removed, updated_at);
+
+    CREATE TABLE IF NOT EXISTS processed_sync_mutations (
+      id text PRIMARY KEY NOT NULL,
+      profile_id text NOT NULL,
+      mutation_type text NOT NULL,
+      canonical_id text NOT NULL,
+      processed_at integer NOT NULL,
+      expires_at integer NOT NULL,
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE INDEX IF NOT EXISTS processed_sync_mutations_profile_id_idx ON processed_sync_mutations (profile_id);
+    CREATE INDEX IF NOT EXISTS processed_sync_mutations_expires_at_idx ON processed_sync_mutations (expires_at);
   `);
 }
 
@@ -27684,8 +27708,27 @@ import express3 from "express";
 
 // src/server/sync/syncService.ts
 import crypto7 from "crypto";
-import { eq as eq10, and as and9, gt as gt5, desc as desc3 } from "drizzle-orm";
+import { eq as eq10, and as and9, gt as gt5, lt as lt2, desc as desc3 } from "drizzle-orm";
 var SyncService = class {
+  /**
+   * Normaliza carimbo de tempo considerando autoridade de tempo do servidor e desvio de relógio (clock skew).
+   * Se o cliente fornecer clientSendTime, calcula a idade relativa do evento no cliente (eventAge).
+   * Clampa timestamps no futuro (máximo serverNow).
+   */
+  static normalizeTimestamp(rawTimestamp, clientSendTime, serverNow = Date.now()) {
+    if (!rawTimestamp || isNaN(rawTimestamp)) {
+      return { effectiveEventTime: serverNow, serverNow };
+    }
+    if (rawTimestamp > serverNow + 3e4) {
+      return { effectiveEventTime: serverNow, serverNow };
+    }
+    if (clientSendTime && !isNaN(clientSendTime) && clientSendTime >= rawTimestamp) {
+      const eventAgeMs = Math.max(0, clientSendTime - rawTimestamp);
+      const estimatedTime = serverNow - eventAgeMs;
+      return { effectiveEventTime: Math.min(serverNow, estimatedTime), serverNow };
+    }
+    return { effectiveEventTime: rawTimestamp, serverNow };
+  }
   /**
    * Valida se o perfil existe e pertence ao usuário autenticado.
    * Lança erro com status apropriado se a validação falhar.
@@ -27708,9 +27751,8 @@ var SyncService = class {
   // PROGRESSO DE REPRODUÇÃO (profile_playback_progress)
   // ==========================================================================
   /**
-   * Salva ou atualiza o progresso de reprodução com resolução determinística de conflito.
-   * Se o progresso salvo no servidor possuir timestamp mais recente que o recebido,
-   * o registro do servidor é preservado para impedir retrocessos por dispositivos desatualizados.
+   * Salva ou atualiza o progresso de reprodução com resolução determinística de conflito
+   * e imunidade a relógios descalibrados.
    */
   static async saveProgress(db, profileId, input) {
     const canonicalId = String(input.canonicalId).trim();
@@ -27724,7 +27766,10 @@ var SyncService = class {
     const durationSec = Math.max(0, Math.floor(Number(input.durationSec) || 0));
     const progressPercent = durationSec > 0 ? Math.min(100, Math.round(positionSec / durationSec * 100)) : Number(input.progressPercent) || 0;
     const isCompleted = input.isCompleted ? 1 : 0;
-    const incomingTime = Number(input.updatedAt) || Date.now();
+    const { effectiveEventTime, serverNow } = this.normalizeTimestamp(
+      input.updatedAt,
+      input.clientSendTime
+    );
     const deviceName = input.deviceName ? String(input.deviceName).slice(0, 80) : null;
     const existing = await db.db.select().from(profilePlaybackProgress).where(
       and9(
@@ -27736,9 +27781,10 @@ var SyncService = class {
     ).limit(1);
     if (existing.length > 0) {
       const curr = existing[0];
-      if (curr.updatedAt > incomingTime) {
+      if (curr.updatedAt > effectiveEventTime && positionSec <= curr.positionSec) {
         return { record: curr, conflictResolved: true };
       }
+      const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
       const nextVersion = (curr.version || 1) + 1;
       await db.db.update(profilePlaybackProgress).set({
         contentType,
@@ -27748,7 +27794,7 @@ var SyncService = class {
         isCompleted,
         version: nextVersion,
         deviceName: deviceName ?? curr.deviceName,
-        updatedAt: incomingTime
+        updatedAt: nextUpdatedAt
       }).where(eq10(profilePlaybackProgress.id, curr.id));
       const updated = {
         ...curr,
@@ -27759,7 +27805,7 @@ var SyncService = class {
         isCompleted,
         version: nextVersion,
         deviceName: deviceName ?? curr.deviceName,
-        updatedAt: incomingTime
+        updatedAt: nextUpdatedAt
       };
       return { record: updated, conflictResolved: false };
     }
@@ -27777,7 +27823,7 @@ var SyncService = class {
       isCompleted,
       version: 1,
       deviceName,
-      updatedAt: incomingTime
+      updatedAt: serverNow
     };
     await db.db.insert(profilePlaybackProgress).values(newRecord);
     return { record: newRecord, conflictResolved: false };
@@ -27810,7 +27856,7 @@ var SyncService = class {
   // HISTÓRICO DE REPRODUÇÃO (profile_watch_history)
   // ==========================================================================
   /**
-   * Registra ou atualiza item no histórico.
+   * Registra ou atualiza item no histórico com normalização temporal.
    */
   static async recordHistory(db, profileId, input) {
     const canonicalId = String(input.canonicalId).trim();
@@ -27820,9 +27866,10 @@ var SyncService = class {
     const contentType = String(input.contentType || "movie").trim();
     const season = Number.isInteger(input.season) ? Number(input.season) : 0;
     const episode = Number.isInteger(input.episode) ? Number(input.episode) : 0;
-    const now = Date.now();
-    const watchedAt = Number(input.watchedAt) || now;
-    const updatedAt = Number(input.updatedAt) || watchedAt;
+    const { effectiveEventTime, serverNow } = this.normalizeTimestamp(
+      input.watchedAt || input.updatedAt,
+      input.clientSendTime
+    );
     const existing = await db.db.select().from(profileWatchHistory).where(
       and9(
         eq10(profileWatchHistory.profileId, profileId),
@@ -27833,8 +27880,8 @@ var SyncService = class {
     ).limit(1);
     if (existing.length > 0) {
       const curr = existing[0];
-      const maxWatched = Math.max(curr.watchedAt, watchedAt);
-      const maxUpdated = Math.max(curr.updatedAt, updatedAt);
+      const maxWatched = Math.max(curr.watchedAt, effectiveEventTime);
+      const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
       const nextVersion = (curr.version || 1) + 1;
       await db.db.update(profileWatchHistory).set({
         contentType,
@@ -27842,7 +27889,7 @@ var SyncService = class {
         posterUrl: input.posterUrl ? String(input.posterUrl).slice(0, 500) : curr.posterUrl,
         year: input.year !== void 0 ? Number(input.year) : curr.year,
         watchedAt: maxWatched,
-        updatedAt: maxUpdated,
+        updatedAt: nextUpdatedAt,
         version: nextVersion
       }).where(eq10(profileWatchHistory.id, curr.id));
       return {
@@ -27852,7 +27899,7 @@ var SyncService = class {
         posterUrl: input.posterUrl ? String(input.posterUrl).slice(0, 500) : curr.posterUrl,
         year: input.year !== void 0 ? Number(input.year) : curr.year,
         watchedAt: maxWatched,
-        updatedAt: maxUpdated,
+        updatedAt: nextUpdatedAt,
         version: nextVersion
       };
     }
@@ -27867,8 +27914,8 @@ var SyncService = class {
       title: input.title ? String(input.title).slice(0, 150) : null,
       posterUrl: input.posterUrl ? String(input.posterUrl).slice(0, 500) : null,
       year: input.year !== void 0 ? Number(input.year) : null,
-      watchedAt,
-      updatedAt,
+      watchedAt: effectiveEventTime,
+      updatedAt: serverNow,
       version: 1
     };
     await db.db.insert(profileWatchHistory).values(newRecord);
@@ -27887,19 +27934,19 @@ var SyncService = class {
     return await db.db.select().from(profileWatchHistory).where(and9(...conditions)).orderBy(desc3(profileWatchHistory.watchedAt)).limit(safeLimit).offset(safeOffset);
   }
   // ==========================================================================
-  // MINHA LISTA (profile_my_list com tombstones)
+  // MINHA LISTA (profile_my_list com tombstones e autoridade do servidor)
   // ==========================================================================
   /**
-   * Adiciona ou remove item de Minha Lista usando tombstones.
+   * Adiciona ou remove item de Minha Lista usando tombstones com normalização temporal.
    * Se um dispositivo offline tentar adicionar um item que foi removido
    * mais recentemente no servidor, a remoção é preservada.
    */
-  static async setMyList(db, profileId, canonicalId, isRemoved, timestamp) {
+  static async setMyList(db, profileId, canonicalId, isRemoved, timestamp, clientSendTime) {
     const cleanId = String(canonicalId).trim();
     if (!cleanId) {
       throw new Error("canonicalId \xE9 obrigat\xF3rio para Minha Lista.");
     }
-    const ts = Number(timestamp) || Date.now();
+    const { effectiveEventTime, serverNow } = this.normalizeTimestamp(timestamp, clientSendTime);
     const existing = await db.db.select().from(profileMyList).where(
       and9(
         eq10(profileMyList.profileId, profileId),
@@ -27908,34 +27955,34 @@ var SyncService = class {
     ).limit(1);
     if (existing.length > 0) {
       const curr = existing[0];
+      const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
+      const nextVersion = (curr.version || 1) + 1;
       if (isRemoved) {
-        const nextVersion = (curr.version || 1) + 1;
         await db.db.update(profileMyList).set({
           isRemoved: 1,
-          removedAt: ts,
-          updatedAt: Math.max(ts, curr.updatedAt + 1),
+          removedAt: effectiveEventTime,
+          updatedAt: nextUpdatedAt,
           version: nextVersion
         }).where(eq10(profileMyList.id, curr.id));
         return {
           record: {
             ...curr,
             isRemoved: 1,
-            removedAt: ts,
-            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            removedAt: effectiveEventTime,
+            updatedAt: nextUpdatedAt,
             version: nextVersion
           },
           conflictResolved: false
         };
       } else {
-        if (curr.isRemoved === 1 && curr.removedAt && curr.removedAt > ts) {
+        if (curr.isRemoved === 1 && curr.removedAt && curr.removedAt > effectiveEventTime) {
           return { record: curr, conflictResolved: true };
         }
-        const nextVersion = (curr.version || 1) + 1;
         await db.db.update(profileMyList).set({
           isRemoved: 0,
           removedAt: null,
-          addedAt: ts,
-          updatedAt: Math.max(ts, curr.updatedAt + 1),
+          addedAt: effectiveEventTime,
+          updatedAt: nextUpdatedAt,
           version: nextVersion
         }).where(eq10(profileMyList.id, curr.id));
         return {
@@ -27943,8 +27990,8 @@ var SyncService = class {
             ...curr,
             isRemoved: 0,
             removedAt: null,
-            addedAt: ts,
-            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            addedAt: effectiveEventTime,
+            updatedAt: nextUpdatedAt,
             version: nextVersion
           },
           conflictResolved: false
@@ -27956,10 +28003,10 @@ var SyncService = class {
       id: newId,
       profileId,
       canonicalId: cleanId,
-      addedAt: ts,
+      addedAt: effectiveEventTime,
       isRemoved: isRemoved ? 1 : 0,
-      removedAt: isRemoved ? ts : null,
-      updatedAt: ts,
+      removedAt: isRemoved ? effectiveEventTime : null,
+      updatedAt: serverNow,
       version: 1
     };
     await db.db.insert(profileMyList).values(newRecord);
@@ -27979,17 +28026,17 @@ var SyncService = class {
     return await db.db.select().from(profileMyList).where(and9(...conditions)).orderBy(desc3(profileMyList.addedAt));
   }
   // ==========================================================================
-  // FAVORITOS (profile_favorites com tombstones)
+  // FAVORITOS (profile_favorites com tombstones e autoridade do servidor)
   // ==========================================================================
   /**
-   * Adiciona ou remove favorito usando tombstones com resolução determinística.
+   * Adiciona ou remove favorito usando tombstones com resolução determinística e normalização temporal.
    */
-  static async setFavorite(db, profileId, canonicalId, isRemoved, timestamp) {
+  static async setFavorite(db, profileId, canonicalId, isRemoved, timestamp, clientSendTime) {
     const cleanId = String(canonicalId).trim();
     if (!cleanId) {
       throw new Error("canonicalId \xE9 obrigat\xF3rio para Favoritos.");
     }
-    const ts = Number(timestamp) || Date.now();
+    const { effectiveEventTime, serverNow } = this.normalizeTimestamp(timestamp, clientSendTime);
     const existing = await db.db.select().from(profileFavorites).where(
       and9(
         eq10(profileFavorites.profileId, profileId),
@@ -27998,34 +28045,34 @@ var SyncService = class {
     ).limit(1);
     if (existing.length > 0) {
       const curr = existing[0];
+      const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
+      const nextVersion = (curr.version || 1) + 1;
       if (isRemoved) {
-        const nextVersion = (curr.version || 1) + 1;
         await db.db.update(profileFavorites).set({
           isRemoved: 1,
-          removedAt: ts,
-          updatedAt: Math.max(ts, curr.updatedAt + 1),
+          removedAt: effectiveEventTime,
+          updatedAt: nextUpdatedAt,
           version: nextVersion
         }).where(eq10(profileFavorites.id, curr.id));
         return {
           record: {
             ...curr,
             isRemoved: 1,
-            removedAt: ts,
-            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            removedAt: effectiveEventTime,
+            updatedAt: nextUpdatedAt,
             version: nextVersion
           },
           conflictResolved: false
         };
       } else {
-        if (curr.isRemoved === 1 && curr.removedAt && curr.removedAt > ts) {
+        if (curr.isRemoved === 1 && curr.removedAt && curr.removedAt > effectiveEventTime) {
           return { record: curr, conflictResolved: true };
         }
-        const nextVersion = (curr.version || 1) + 1;
         await db.db.update(profileFavorites).set({
           isRemoved: 0,
           removedAt: null,
-          addedAt: ts,
-          updatedAt: Math.max(ts, curr.updatedAt + 1),
+          addedAt: effectiveEventTime,
+          updatedAt: nextUpdatedAt,
           version: nextVersion
         }).where(eq10(profileFavorites.id, curr.id));
         return {
@@ -28033,8 +28080,8 @@ var SyncService = class {
             ...curr,
             isRemoved: 0,
             removedAt: null,
-            addedAt: ts,
-            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            addedAt: effectiveEventTime,
+            updatedAt: nextUpdatedAt,
             version: nextVersion
           },
           conflictResolved: false
@@ -28045,11 +28092,11 @@ var SyncService = class {
     const newRecord = {
       id: newId,
       profileId,
-      canonicalId: cleanId,
-      addedAt: ts,
+      canonicalId,
+      addedAt: effectiveEventTime,
       isRemoved: isRemoved ? 1 : 0,
-      removedAt: isRemoved ? ts : null,
-      updatedAt: ts,
+      removedAt: isRemoved ? effectiveEventTime : null,
+      updatedAt: serverNow,
       version: 1
     };
     await db.db.insert(profileFavorites).values(newRecord);
@@ -28092,51 +28139,75 @@ var SyncService = class {
     };
   }
   // ==========================================================================
-  // LOTE DE MUTAÇÕES OFFLINE (syncBatch)
+  // LOTE DE MUTAÇÕES OFFLINE COM IDEMPOTÊNCIA PERSISTENTE (syncBatch)
   // ==========================================================================
   /**
-   * Processa lote de mutações da fila outbox com idempotência e resolução de conflitos.
+   * Processa lote de mutações da fila outbox com idempotência persistente no banco
+   * e resolução determinística de conflitos imune a clock skew.
    */
-  static async processBatch(db, profileId, mutations) {
+  static async processBatch(db, profileId, mutations, clientSendTime) {
     const results = [];
     const safeMutations = mutations.slice(0, 100);
     for (const mut of safeMutations) {
+      if (!mut.id || typeof mut.id !== "string") {
+        results.push({ id: mut.id || "invalid", success: false, error: "ID de muta\xE7\xE3o obrigat\xF3rio." });
+        continue;
+      }
       try {
+        const existing = await db.db.select().from(processedSyncMutations).where(eq10(processedSyncMutations.id, mut.id)).limit(1);
+        if (existing.length > 0) {
+          results.push({ id: mut.id, success: true, duplicate: true });
+          continue;
+        }
+        let conflictResolved = false;
         switch (mut.type) {
           case "progress": {
             const res = await this.saveProgress(db, profileId, {
               ...mut.data,
-              updatedAt: mut.timestamp || mut.data?.updatedAt
+              updatedAt: mut.timestamp || mut.data?.updatedAt,
+              clientSendTime
             });
-            results.push({ id: mut.id, success: true, conflictResolved: res.conflictResolved });
+            conflictResolved = Boolean(res.conflictResolved);
             break;
           }
           case "history": {
             await this.recordHistory(db, profileId, {
               ...mut.data,
               watchedAt: mut.timestamp || mut.data?.watchedAt,
-              updatedAt: mut.timestamp || mut.data?.updatedAt
+              updatedAt: mut.timestamp || mut.data?.updatedAt,
+              clientSendTime
             });
-            results.push({ id: mut.id, success: true });
             break;
           }
           case "my_list": {
             const isRemoved = mut.action === "remove" || Boolean(mut.data?.isRemoved);
             const canonicalId = mut.data?.canonicalId || mut.data?.id;
-            const res = await this.setMyList(db, profileId, canonicalId, isRemoved, mut.timestamp);
-            results.push({ id: mut.id, success: true, conflictResolved: res.conflictResolved });
+            const res = await this.setMyList(db, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
+            conflictResolved = Boolean(res.conflictResolved);
             break;
           }
           case "favorites": {
             const isRemoved = mut.action === "remove" || Boolean(mut.data?.isRemoved);
             const canonicalId = mut.data?.canonicalId || mut.data?.id;
-            const res = await this.setFavorite(db, profileId, canonicalId, isRemoved, mut.timestamp);
-            results.push({ id: mut.id, success: true, conflictResolved: res.conflictResolved });
+            const res = await this.setFavorite(db, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
+            conflictResolved = Boolean(res.conflictResolved);
             break;
           }
           default:
             results.push({ id: mut.id, success: false, error: `Tipo de muta\xE7\xE3o desconhecido: ${mut.type}` });
+            continue;
         }
+        const now = Date.now();
+        const sevenDays = 7 * 24 * 60 * 60 * 1e3;
+        await db.db.insert(processedSyncMutations).values({
+          id: mut.id,
+          profileId,
+          mutationType: mut.type,
+          canonicalId: String(mut.data?.canonicalId || mut.data?.id || "unknown").slice(0, 100),
+          processedAt: now,
+          expiresAt: now + sevenDays
+        });
+        results.push({ id: mut.id, success: true, conflictResolved });
       } catch (err) {
         results.push({ id: mut.id, success: false, error: err?.message || "Falha ao aplicar muta\xE7\xE3o" });
       }
@@ -28145,6 +28216,14 @@ var SyncService = class {
       processed: results.length,
       results
     };
+  }
+  /**
+   * Remove registros de mutações processadas expiradas (retenção > 7 dias).
+   */
+  static async purgeExpiredMutations(db) {
+    const now = Date.now();
+    const res = await db.db.delete(processedSyncMutations).where(lt2(processedSyncMutations.expiresAt, now));
+    return Number(res.rowsAffected || 0);
   }
 };
 
@@ -28235,7 +28314,9 @@ syncRouter.post("/progress", async (req, res) => {
       progressPercent: req.body.progressPercent,
       isCompleted: req.body.isCompleted,
       deviceName: req.body.deviceName,
-      updatedAt: req.body.updatedAt
+      updatedAt: req.body.updatedAt,
+      clientSendTime: req.body.clientSendTime ? Number(req.body.clientSendTime) : void 0,
+      clientMutationId: req.body.clientMutationId
     };
     const result = await SyncService.saveProgress(db, profileId, input);
     return res.status(200).json({
@@ -28289,7 +28370,9 @@ syncRouter.post("/history", async (req, res) => {
       posterUrl: req.body.posterUrl,
       year: req.body.year,
       watchedAt: req.body.watchedAt,
-      updatedAt: req.body.updatedAt
+      updatedAt: req.body.updatedAt,
+      clientSendTime: req.body.clientSendTime ? Number(req.body.clientSendTime) : void 0,
+      clientMutationId: req.body.clientMutationId
     };
     const record = await SyncService.recordHistory(db, profileId, input);
     return res.status(200).json({ success: true, history: record });
@@ -28332,7 +28415,8 @@ syncRouter.post("/list", async (req, res) => {
     const canonicalId = req.body.canonicalId;
     const isRemoved = Boolean(req.body.isRemoved);
     const timestamp = req.body.timestamp ? Number(req.body.timestamp) : void 0;
-    const result = await SyncService.setMyList(db, profileId, canonicalId, isRemoved, timestamp);
+    const clientSendTime = req.body.clientSendTime ? Number(req.body.clientSendTime) : void 0;
+    const result = await SyncService.setMyList(db, profileId, canonicalId, isRemoved, timestamp, clientSendTime);
     return res.status(200).json({
       success: true,
       item: result.record,
@@ -28377,7 +28461,8 @@ syncRouter.post("/favorites", async (req, res) => {
     const canonicalId = req.body.canonicalId;
     const isRemoved = Boolean(req.body.isRemoved);
     const timestamp = req.body.timestamp ? Number(req.body.timestamp) : void 0;
-    const result = await SyncService.setFavorite(db, profileId, canonicalId, isRemoved, timestamp);
+    const clientSendTime = req.body.clientSendTime ? Number(req.body.clientSendTime) : void 0;
+    const result = await SyncService.setFavorite(db, profileId, canonicalId, isRemoved, timestamp, clientSendTime);
     return res.status(200).json({
       success: true,
       item: result.record,
@@ -28399,8 +28484,9 @@ syncRouter.post("/batch", async (req, res) => {
       return res.status(400).json({ error: "Nenhum perfil informado ou ativo." });
     }
     await SyncService.verifyProfileOwnership(db, req.user.id, profileId);
+    const clientSendTime = req.body.clientSendTime ? Number(req.body.clientSendTime) : void 0;
     const mutations = Array.isArray(req.body.mutations) ? req.body.mutations : [];
-    const outcome = await SyncService.processBatch(db, profileId, mutations);
+    const outcome = await SyncService.processBatch(db, profileId, mutations, clientSendTime);
     return res.status(200).json({
       success: true,
       processed: outcome.processed,

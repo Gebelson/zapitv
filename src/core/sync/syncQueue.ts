@@ -74,7 +74,7 @@ export class SyncQueueManager {
   }
 
   /**
-   * Enfileira uma nova mutação para o perfil
+   * Enfileira uma nova mutação para o perfil com coalescência inteligente
    */
   public enqueue(
     profileId: string,
@@ -84,13 +84,35 @@ export class SyncQueueManager {
       throw new Error('profileId é obrigatório para enfileirar sincronização.');
     }
 
+    const queue = this.getQueue(profileId);
+
+    // Coalesce para progresso de reprodução: se já existir progresso pendente para o mesmo conteúdo,
+    // atualiza o registro existente em vez de acumular registros obsoletos na fila.
+    if (mutation.type === 'progress') {
+      const idx = queue.findIndex(m =>
+        m.type === 'progress' &&
+        m.data?.canonicalId === mutation.data?.canonicalId &&
+        (m.data?.season || 0) === (mutation.data?.season || 0) &&
+        (m.data?.episode || 0) === (mutation.data?.episode || 0)
+      );
+      if (idx >= 0) {
+        queue[idx].data = { ...queue[idx].data, ...mutation.data };
+        queue[idx].timestamp = Date.now();
+        this.saveQueue(profileId, queue);
+
+        if (typeof navigator === 'undefined' || navigator.onLine) {
+          this.flush(profileId).catch(() => {});
+        }
+        return queue[idx];
+      }
+    }
+
     const item: SyncMutationItem = {
       ...mutation,
       id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `mut_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       timestamp: Date.now(),
     };
 
-    const queue = this.getQueue(profileId);
     queue.push(item);
     this.saveQueue(profileId, queue);
 
@@ -123,6 +145,34 @@ export class SyncQueueManager {
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
         localStorage.removeItem(this.getStorageKey(profileId));
+      } catch {}
+    }
+  }
+
+  /**
+   * Limpa todas as filas em memória e no localStorage (chamado no logout seguro)
+   */
+  public clearAllQueues(): void {
+    for (const [, timer] of this.retryTimeouts.entries()) {
+      clearTimeout(timer);
+    }
+    this.retryTimeouts.clear();
+    this.inMemoryQueues.clear();
+    this.backoffAttempts.clear();
+    this.activeFlush.clear();
+
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('zapitv_outbox_')) {
+            keysToRemove.push(key);
+          }
+        }
+        for (const k of keysToRemove) {
+          localStorage.removeItem(k);
+        }
       } catch {}
     }
   }

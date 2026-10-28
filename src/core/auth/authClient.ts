@@ -6,6 +6,7 @@
  */
 
 import type { ProfileItem } from '../profile/profileClient';
+import { syncQueue } from '../sync/syncQueue';
 
 export interface AuthUser {
   id: string;
@@ -116,6 +117,7 @@ class AuthClient {
    */
   async logout(): Promise<boolean> {
     try {
+      syncQueue.clearAllQueues();
       const res = await fetch('/api/auth/logout', {
         method: 'POST',
         headers: {

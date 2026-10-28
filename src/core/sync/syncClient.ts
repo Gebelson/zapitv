@@ -91,6 +91,8 @@ export interface SyncMutationItem {
 }
 
 class SyncClient {
+  private readonly timeoutMs = 8000;
+
   /**
    * Puxa o estado agregado atualizado do perfil remoto
    */
@@ -107,6 +109,7 @@ class SyncClient {
           'X-Zapi-Client': 'web',
         },
         credentials: 'include',
+        signal: AbortSignal.timeout(this.timeoutMs),
       });
 
       if (!res.ok) return null;
@@ -131,9 +134,11 @@ class SyncClient {
         'X-Zapi-Client': 'web',
       },
       credentials: 'include',
+      signal: AbortSignal.timeout(this.timeoutMs),
       body: JSON.stringify({
         profileId,
         ...payload,
+        clientSendTime: Date.now(),
       }),
     });
 
@@ -160,9 +165,11 @@ class SyncClient {
         'X-Zapi-Client': 'web',
       },
       credentials: 'include',
+      signal: AbortSignal.timeout(this.timeoutMs),
       body: JSON.stringify({
         profileId,
         ...payload,
+        clientSendTime: Date.now(),
       }),
     });
 
@@ -191,11 +198,13 @@ class SyncClient {
         'X-Zapi-Client': 'web',
       },
       credentials: 'include',
+      signal: AbortSignal.timeout(this.timeoutMs),
       body: JSON.stringify({
         profileId,
         canonicalId,
         isRemoved,
         timestamp,
+        clientSendTime: Date.now(),
       }),
     });
 
@@ -224,11 +233,13 @@ class SyncClient {
         'X-Zapi-Client': 'web',
       },
       credentials: 'include',
+      signal: AbortSignal.timeout(this.timeoutMs),
       body: JSON.stringify({
         profileId,
         canonicalId,
         isRemoved,
         timestamp,
+        clientSendTime: Date.now(),
       }),
     });
 
@@ -255,9 +266,11 @@ class SyncClient {
         'X-Zapi-Client': 'web',
       },
       credentials: 'include',
+      signal: AbortSignal.timeout(this.timeoutMs),
       body: JSON.stringify({
         profileId,
         mutations,
+        clientSendTime: Date.now(),
       }),
     });
 

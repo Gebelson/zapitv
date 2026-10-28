@@ -43,6 +43,10 @@ export function formatPlaybackTime(seconds: number): string {
 export class StorageService {
   private itemProgressCache = new Map<string, WatchProgress>();
   private episodeProgressCache = new Map<string, EpisodeWatchProgress>();
+  private lastRemoteProgressSync = new Map<string, number>();
+  private lastRemoteHistorySync = new Map<string, number>();
+  private lastRemotePosition = new Map<string, number>();
+  private completedSynced = new Set<string>();
   private currentScope: StorageScope | null = null;
   private ready: Promise<void>;
 
@@ -554,6 +558,7 @@ export class StorageService {
     }
 
     // 7. Enfileira sincronização de progresso e histórico se perfil autenticado estiver ativo
+    // Aplica debounce e controle de taxa de escrita (8-15 escritas/hora) para proteção da cota do Turso
     if (this.currentScope?.profileId) {
       const canonicalId = normalizedProgress.item?.canonicalId || normalizedProgress.contentId;
       const contentType = normalizedProgress.item?.type || 'movie';
@@ -562,39 +567,67 @@ export class StorageService {
       const positionSec = Math.floor(normalizedProgress.currentTime);
       const durationSec = Math.floor(normalizedProgress.duration);
       const isCompleted = normalizedProgress.percentage >= 92 ? 1 : 0;
-      const updatedAt = Date.parse(normalizedProgress.updatedAt) || Date.now();
+      const eventTime = Date.parse(normalizedProgress.updatedAt) || Date.now();
 
-      syncQueue.enqueue(this.currentScope.profileId, {
-        type: 'progress',
-        action: 'save',
-        data: {
-          canonicalId,
-          contentType,
-          season,
-          episode,
-          positionSec,
-          durationSec,
-          progressPercent: normalizedProgress.percentage,
-          isCompleted,
-          updatedAt,
-        },
-      });
+      const progressKey = `${this.currentScope.profileId}_${canonicalId}_${season}_${episode}`;
+      const lastProgressSync = this.lastRemoteProgressSync.get(progressKey) || 0;
+      const lastRecordedPos = this.lastRemotePosition.get(progressKey) ?? -1;
+      
+      const isInitialStart = lastProgressSync === 0 && positionSec > 0;
+      const isFirstCompleted = isCompleted === 1 && !this.completedSynced.has(progressKey);
+      const steadyCheckpointElapsed = eventTime - lastProgressSync >= 300_000; // checkpoint regular a cada 5 min (~12/h)
 
-      syncQueue.enqueue(this.currentScope.profileId, {
-        type: 'history',
-        action: 'save',
-        data: {
-          canonicalId,
-          contentType,
-          season,
-          episode,
-          title: normalizedProgress.item?.title,
-          posterUrl: normalizedProgress.item?.poster,
-          year: normalizedProgress.item?.year,
-          watchedAt: Date.now(),
-          updatedAt,
-        },
-      });
+      // Detecta seek intencional: salto de posição desproporcional ao tempo decorrido
+      const posDelta = Math.abs(positionSec - lastRecordedPos);
+      const timeDeltaSec = lastProgressSync > 0 ? (eventTime - lastProgressSync) / 1000 : 0;
+      const isSeekJump = lastRecordedPos >= 0 && posDelta > 30 && Math.abs(posDelta - timeDeltaSec) > 15;
+
+      if (isInitialStart || isFirstCompleted || steadyCheckpointElapsed || isSeekJump) {
+        this.lastRemoteProgressSync.set(progressKey, eventTime);
+        this.lastRemotePosition.set(progressKey, positionSec);
+        if (isFirstCompleted) {
+          this.completedSynced.add(progressKey);
+        }
+
+        syncQueue.enqueue(this.currentScope.profileId, {
+          type: 'progress',
+          action: 'save',
+          data: {
+            canonicalId,
+            contentType,
+            season,
+            episode,
+            positionSec,
+            durationSec,
+            progressPercent: normalizedProgress.percentage,
+            isCompleted,
+            updatedAt: eventTime,
+          },
+        });
+      }
+
+      // Histórico é registrado na inicialização, na conclusão ou em intervalos de 60 minutos,
+      // evitando escritas redundantes a cada segundo
+      const lastHistSync = this.lastRemoteHistorySync.get(progressKey) || 0;
+      if (lastHistSync === 0 || isFirstCompleted || eventTime - lastHistSync >= 60 * 60 * 1000) {
+        this.lastRemoteHistorySync.set(progressKey, eventTime);
+
+        syncQueue.enqueue(this.currentScope.profileId, {
+          type: 'history',
+          action: 'save',
+          data: {
+            canonicalId,
+            contentType,
+            season,
+            episode,
+            title: normalizedProgress.item?.title,
+            posterUrl: normalizedProgress.item?.poster,
+            year: normalizedProgress.item?.year,
+            watchedAt: eventTime,
+            updatedAt: eventTime,
+          },
+        });
+      }
     }
   }
 
