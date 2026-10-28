@@ -228,6 +228,76 @@ export const linkedDevices = sqliteTable('linked_devices', {
   index('linked_devices_session_id_idx').on(table.sessionId),
 ]);
 
+// ============================================================================
+// SINCRONIZAÇÃO SEGURA ENTRE DISPOSITIVOS POR PERFIL (P3.D)
+// Progresso, Histórico, Minha Lista e Favoritos
+// ============================================================================
+
+export const profilePlaybackProgress = sqliteTable('profile_playback_progress', {
+  id: text('id').primaryKey(),
+  profileId: text('profile_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  canonicalId: text('canonical_id').notNull(),
+  contentType: text('content_type').notNull(),
+  season: integer('season').notNull().default(0),
+  episode: integer('episode').notNull().default(0),
+  positionSec: integer('position_sec').notNull(),
+  durationSec: integer('duration_sec').notNull(),
+  progressPercent: integer('progress_percent').notNull().default(0),
+  isCompleted: integer('is_completed').notNull().default(0),
+  version: integer('version').notNull().default(1),
+  deviceName: text('device_name'),
+  updatedAt: integer('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('profile_progress_key_idx').on(table.profileId, table.canonicalId, table.season, table.episode),
+  index('profile_progress_profile_updated_idx').on(table.profileId, table.updatedAt),
+]);
+
+export const profileWatchHistory = sqliteTable('profile_watch_history', {
+  id: text('id').primaryKey(),
+  profileId: text('profile_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  canonicalId: text('canonical_id').notNull(),
+  contentType: text('content_type').notNull(),
+  season: integer('season').notNull().default(0),
+  episode: integer('episode').notNull().default(0),
+  title: text('title'),
+  posterUrl: text('poster_url'),
+  year: integer('year'),
+  watchedAt: integer('watched_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+  version: integer('version').notNull().default(1),
+}, (table) => [
+  uniqueIndex('profile_history_key_idx').on(table.profileId, table.canonicalId, table.season, table.episode),
+  index('profile_history_profile_watched_idx').on(table.profileId, table.watchedAt),
+]);
+
+export const profileMyList = sqliteTable('profile_my_list', {
+  id: text('id').primaryKey(),
+  profileId: text('profile_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  canonicalId: text('canonical_id').notNull(),
+  addedAt: integer('added_at').notNull(),
+  isRemoved: integer('is_removed').notNull().default(0),
+  removedAt: integer('removed_at'),
+  updatedAt: integer('updated_at').notNull(),
+  version: integer('version').notNull().default(1),
+}, (table) => [
+  uniqueIndex('profile_mylist_key_idx').on(table.profileId, table.canonicalId),
+  index('profile_mylist_profile_status_idx').on(table.profileId, table.isRemoved, table.updatedAt),
+]);
+
+export const profileFavorites = sqliteTable('profile_favorites', {
+  id: text('id').primaryKey(),
+  profileId: text('profile_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  canonicalId: text('canonical_id').notNull(),
+  addedAt: integer('added_at').notNull(),
+  isRemoved: integer('is_removed').notNull().default(0),
+  removedAt: integer('removed_at'),
+  updatedAt: integer('updated_at').notNull(),
+  version: integer('version').notNull().default(1),
+}, (table) => [
+  uniqueIndex('profile_favorites_key_idx').on(table.profileId, table.canonicalId),
+  index('profile_favorites_profile_status_idx').on(table.profileId, table.isRemoved, table.updatedAt),
+]);
+
 
 
 
