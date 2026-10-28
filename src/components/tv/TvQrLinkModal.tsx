@@ -16,7 +16,7 @@ import { uiSoundService } from '../../core/audio/uiSoundService';
 interface TvQrLinkModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLinked: (userData: { user: { id: string; name: string; email: string }; token?: string }) => void;
+  onLinked: (userData: { user: { id: string; name: string; email: string } }) => void;
 }
 
 export const TvQrLinkModal: React.FC<TvQrLinkModalProps> = ({ isOpen, onClose, onLinked }) => {
@@ -141,7 +141,6 @@ export const TvQrLinkModal: React.FC<TvQrLinkModalProps> = ({ isOpen, onClose, o
           setTimeout(() => {
             onLinked({
               user: res.user || { id: '', name: 'Usuário', email: '' },
-              token: res.token,
             });
           }, 1500);
           return;

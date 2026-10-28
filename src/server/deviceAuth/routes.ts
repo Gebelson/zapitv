@@ -81,27 +81,30 @@ deviceAuthRouter.post('/poll', async (req, res) => {
     });
 
     // Se o desafio foi aprovado com sucesso, emite o cookie HttpOnly na resposta para a TV
-    if (pollResult.status === 'approved' && pollResult.token) {
+    if (pollResult.status === 'approved' && pollResult.cookieToken) {
       const isProduction = process.env.NODE_ENV === 'production';
-      const cookieHeader = formatSetCookie(pollResult.token, {
+      const cookieHeader = formatSetCookie(pollResult.cookieToken, {
         expiresAt: pollResult.expiresAt,
         isProduction,
       });
       res.setHeader('Set-Cookie', cookieHeader);
     }
 
+    // SANITIZAÇÃO ESTRITA DE SEGURANÇA (P3.D): NUNCA expor o token de sessão no corpo JSON
+    const { cookieToken, ...sanitizedResult } = pollResult;
+
     // Mapeamento de status HTTP conforme RFC 8628
-    if (pollResult.status === 'slow_down') {
-      return res.status(400).json(pollResult);
+    if (sanitizedResult.status === 'slow_down') {
+      return res.status(400).json(sanitizedResult);
     }
-    if (pollResult.status === 'expired' || pollResult.status === 'consumed') {
-      return res.status(400).json(pollResult);
+    if (sanitizedResult.status === 'expired' || sanitizedResult.status === 'consumed') {
+      return res.status(400).json(sanitizedResult);
     }
-    if (pollResult.status === 'rejected') {
-      return res.status(403).json(pollResult);
+    if (sanitizedResult.status === 'rejected') {
+      return res.status(403).json(sanitizedResult);
     }
 
-    return res.status(200).json(pollResult);
+    return res.status(200).json(sanitizedResult);
   } catch (err) {
     return res.status(500).json({ error: 'Erro ao consultar status da vinculação.' });
   }

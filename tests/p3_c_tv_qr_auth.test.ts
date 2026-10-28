@@ -421,7 +421,7 @@ async function runTvQrAuthTestSuite() {
     assert.equal(tv1PollSuccessRes.status, 200);
     const tv1PollSuccess = await tv1PollSuccessRes.json();
     assert.equal(tv1PollSuccess.status, 'approved');
-    assert.ok(tv1PollSuccess.token, 'A TV deve receber token de autenticação');
+    assert.equal(tv1PollSuccess.token, undefined, 'Token de sessão NUNCA deve ser retornado no JSON da resposta (HttpOnly estrito)');
     assert.equal(tv1PollSuccess.user.email, 'alice.santos@exemplo.com');
 
     // Confirma que Set-Cookie HttpOnly foi emitido para a TV

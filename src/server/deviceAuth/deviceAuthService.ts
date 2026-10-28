@@ -15,36 +15,28 @@ import { eq, and, isNull, gt, sql } from 'drizzle-orm';
 import { Database } from '../database/client';
 import { deviceLinkChallenges, linkedDevices, sessions, users } from '../database/schema';
 import { createSession } from '../auth/sessionService';
+import { RateLimitService } from '../auth/rateLimitService';
 
 export const CHALLENGE_EXPIRY_MS = 10 * 60 * 1000; // 10 minutos
 export const DEFAULT_POLL_INTERVAL_SEC = 5;
 export const SLOW_DOWN_INTERVAL_SEC = 10;
 export const USER_CODE_ALPHABET = 'BCDFGHJKLMNPQRSTVWXYZ23456789'; // Sem caracteres ambíguos (0, O, 1, I)
 
-// Rate limiting em memória para tentativas de validação de user code (anti-força-bruta)
-const validationAttempts = new Map<string, { count: number; expiresAt: number }>();
-
-export function checkValidationRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = validationAttempts.get(ip);
-  if (!entry || entry.expiresAt < now) {
-    return true; // Permitido
-  }
-  return entry.count < 10;
+// Rate limiting persistido no banco + memória via RateLimitService (anti-força-bruta cross-instance)
+export async function checkValidationRateLimit(db: Database | null, ip: string): Promise<boolean> {
+  const identifier = `code_val:${ip}`;
+  const status = await RateLimitService.isLocked(db, identifier);
+  return !status.locked;
 }
 
-export function recordFailedValidationAttempt(ip: string): void {
-  const now = Date.now();
-  const entry = validationAttempts.get(ip);
-  if (!entry || entry.expiresAt < now) {
-    validationAttempts.set(ip, { count: 1, expiresAt: now + 15 * 60 * 1000 });
-  } else {
-    entry.count += 1;
-  }
+export async function recordFailedValidationAttempt(db: Database | null, ip: string): Promise<void> {
+  const identifier = `code_val:${ip}`;
+  await RateLimitService.recordFailure(db, identifier, ip);
 }
 
-export function clearValidationAttempts(ip: string): void {
-  validationAttempts.delete(ip);
+export async function clearValidationAttempts(db: Database | null, ip: string): Promise<void> {
+  const identifier = `code_val:${ip}`;
+  await RateLimitService.recordSuccess(db, identifier, ip);
 }
 
 export function hashDeviceCode(deviceCode: string): string {
@@ -181,7 +173,7 @@ export interface PollResult {
   status: PollStatus;
   interval?: number;
   error?: string;
-  token?: string;
+  cookieToken?: string; // Utilizado internamente pelo servidor para Set-Cookie HttpOnly; NUNCA no JSON
   expiresAt?: number;
   sessionId?: string;
   user?: {
@@ -335,7 +327,7 @@ export async function pollDeviceLinkChallenge(
 
     return {
       status: 'approved',
-      token: newSession.token,
+      cookieToken: newSession.token,
       expiresAt: newSession.expiresAt,
       sessionId: newSession.sessionId,
       user: {
@@ -364,16 +356,19 @@ export async function validateDeviceUserCode(
     createdAt: number;
   };
 }> {
-  if (clientIp && !checkValidationRateLimit(clientIp)) {
-    return {
-      valid: false,
-      error: 'Muitas tentativas inválidas. Aguarde alguns minutos antes de tentar novamente.',
-    };
+  if (clientIp) {
+    const isAllowed = await checkValidationRateLimit(db, clientIp);
+    if (!isAllowed) {
+      return {
+        valid: false,
+        error: 'Muitas tentativas inválidas. Aguarde alguns minutos antes de tentar novamente.',
+      };
+    }
   }
 
   const cleanCode = normalizeUserCode(rawUserCode);
   if (!cleanCode || cleanCode.length < 6) {
-    if (clientIp) recordFailedValidationAttempt(clientIp);
+    if (clientIp) await recordFailedValidationAttempt(db, clientIp);
     return { valid: false, error: 'Código inválido. Digite os 8 caracteres exibidos na TV.' };
   }
 
@@ -393,12 +388,12 @@ export async function validateDeviceUserCode(
     .limit(1);
 
   if (!found || found.length === 0) {
-    if (clientIp) recordFailedValidationAttempt(clientIp);
+    if (clientIp) await recordFailedValidationAttempt(db, clientIp);
     return { valid: false, error: 'Código não encontrado ou já expirado. Gere um novo código na TV.' };
   }
 
   const challenge = found[0];
-  if (clientIp) clearValidationAttempts(clientIp);
+  if (clientIp) await clearValidationAttempts(db, clientIp);
 
   return {
     valid: true,

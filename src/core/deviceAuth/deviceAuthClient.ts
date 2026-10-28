@@ -18,7 +18,6 @@ export interface DevicePollResponse {
   status: 'pending' | 'slow_down' | 'approved' | 'rejected' | 'expired' | 'consumed';
   interval?: number;
   error?: string;
-  token?: string;
   expiresAt?: number;
   sessionId?: string;
   user?: {
