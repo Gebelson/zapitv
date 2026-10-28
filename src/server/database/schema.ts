@@ -298,6 +298,24 @@ export const profileFavorites = sqliteTable('profile_favorites', {
   index('profile_favorites_profile_status_idx').on(table.profileId, table.isRemoved, table.updatedAt),
 ]);
 
+// ============================================================================
+// IDEMPOTÊNCIA PERSISTENTE DE MUTAÇÕES DE SINCRONIZAÇÃO (P4.A)
+// Prevenção de repetição de mutações por reconexão, retries de rede ou concorrência serverless
+// ============================================================================
+
+export const processedSyncMutations = sqliteTable('processed_sync_mutations', {
+  id: text('id').primaryKey(),
+  profileId: text('profile_id').notNull().references(() => profiles.id, { onDelete: 'cascade' }),
+  mutationType: text('mutation_type').notNull(),
+  canonicalId: text('canonical_id').notNull(),
+  processedAt: integer('processed_at').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+}, (table) => [
+  index('processed_sync_mutations_profile_id_idx').on(table.profileId),
+  index('processed_sync_mutations_expires_at_idx').on(table.expiresAt),
+]);
+
+
 
 
 

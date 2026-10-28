@@ -132,6 +132,8 @@ syncRouter.post('/progress', async (req, res) => {
       isCompleted: req.body.isCompleted,
       deviceName: req.body.deviceName,
       updatedAt: req.body.updatedAt,
+      clientSendTime: req.body.clientSendTime ? Number(req.body.clientSendTime) : undefined,
+      clientMutationId: req.body.clientMutationId,
     };
 
     const result = await SyncService.saveProgress(db, profileId, input);
@@ -201,6 +203,8 @@ syncRouter.post('/history', async (req, res) => {
       year: req.body.year,
       watchedAt: req.body.watchedAt,
       updatedAt: req.body.updatedAt,
+      clientSendTime: req.body.clientSendTime ? Number(req.body.clientSendTime) : undefined,
+      clientMutationId: req.body.clientMutationId,
     };
 
     const record = await SyncService.recordHistory(db, profileId, input);
@@ -258,8 +262,9 @@ syncRouter.post('/list', async (req, res) => {
     const canonicalId = req.body.canonicalId;
     const isRemoved = Boolean(req.body.isRemoved);
     const timestamp = req.body.timestamp ? Number(req.body.timestamp) : undefined;
+    const clientSendTime = req.body.clientSendTime ? Number(req.body.clientSendTime) : undefined;
 
-    const result = await SyncService.setMyList(db, profileId, canonicalId, isRemoved, timestamp);
+    const result = await SyncService.setMyList(db, profileId, canonicalId, isRemoved, timestamp, clientSendTime);
 
     return res.status(200).json({
       success: true,
@@ -318,8 +323,9 @@ syncRouter.post('/favorites', async (req, res) => {
     const canonicalId = req.body.canonicalId;
     const isRemoved = Boolean(req.body.isRemoved);
     const timestamp = req.body.timestamp ? Number(req.body.timestamp) : undefined;
+    const clientSendTime = req.body.clientSendTime ? Number(req.body.clientSendTime) : undefined;
 
-    const result = await SyncService.setFavorite(db, profileId, canonicalId, isRemoved, timestamp);
+    const result = await SyncService.setFavorite(db, profileId, canonicalId, isRemoved, timestamp, clientSendTime);
 
     return res.status(200).json({
       success: true,
@@ -333,7 +339,7 @@ syncRouter.post('/favorites', async (req, res) => {
 });
 
 /**
- * 6. PROCESSAMENTO DE LOTE OFFLINE (BATCH)
+ * 6. PROCESSAMENTO DE LOTE OFFLINE (BATCH) COM IDEMPOTÊNCIA PERSISTENTE
  */
 syncRouter.post('/batch', async (req, res) => {
   try {
@@ -349,8 +355,9 @@ syncRouter.post('/batch', async (req, res) => {
 
     await SyncService.verifyProfileOwnership(db, req.user!.id, profileId);
 
+    const clientSendTime = req.body.clientSendTime ? Number(req.body.clientSendTime) : undefined;
     const mutations: SyncMutation[] = Array.isArray(req.body.mutations) ? req.body.mutations : [];
-    const outcome = await SyncService.processBatch(db, profileId, mutations);
+    const outcome = await SyncService.processBatch(db, profileId, mutations, clientSendTime);
 
     return res.status(200).json({
       success: true,

@@ -11,13 +11,14 @@
  */
 
 import crypto from 'crypto';
-import { eq, and, gt, desc, or, isNull } from 'drizzle-orm';
+import { eq, and, gt, lt, desc, or, isNull } from 'drizzle-orm';
 import { Database } from '../database/client';
 import {
   profilePlaybackProgress,
   profileWatchHistory,
   profileMyList,
   profileFavorites,
+  processedSyncMutations,
 } from '../database/schema';
 import { ProfileService, ProfileRecord } from '../profiles/profileService';
 
@@ -32,6 +33,8 @@ export interface ProgressInput {
   isCompleted?: boolean | number;
   deviceName?: string;
   updatedAt?: number;
+  clientSendTime?: number;
+  clientMutationId?: string;
 }
 
 export interface HistoryInput {
@@ -44,6 +47,8 @@ export interface HistoryInput {
   year?: number;
   watchedAt?: number;
   updatedAt?: number;
+  clientSendTime?: number;
+  clientMutationId?: string;
 }
 
 export interface SyncMutation {
@@ -55,6 +60,38 @@ export interface SyncMutation {
 }
 
 export class SyncService {
+  /**
+   * Normaliza carimbo de tempo considerando autoridade de tempo do servidor e desvio de relógio (clock skew).
+   * Se o cliente fornecer clientSendTime, calcula a idade relativa do evento no cliente (eventAge).
+   * Clampa timestamps no futuro (máximo serverNow).
+   */
+  static normalizeTimestamp(
+    rawTimestamp?: number,
+    clientSendTime?: number,
+    serverNow: number = Date.now()
+  ): { effectiveEventTime: number; serverNow: number } {
+    if (!rawTimestamp || isNaN(rawTimestamp)) {
+      return { effectiveEventTime: serverNow, serverNow };
+    }
+
+    // Se o carimbo de tempo fornecido estiver mais de 30s no futuro em relação ao servidor:
+    // Clampa para serverNow imediatamente (impede poisoning por relógio adiantado).
+    if (rawTimestamp > serverNow + 30_000) {
+      return { effectiveEventTime: serverNow, serverNow };
+    }
+
+    // Se o cliente informou o momento em que enviou a requisição (clientSendTime):
+    if (clientSendTime && !isNaN(clientSendTime) && clientSendTime >= rawTimestamp) {
+      // Idade do evento no dispositivo cliente (ms decorridos entre o evento e o envio)
+      const eventAgeMs = Math.max(0, clientSendTime - rawTimestamp);
+      // Tempo estimado do evento na linha do tempo do servidor
+      const estimatedTime = serverNow - eventAgeMs;
+      return { effectiveEventTime: Math.min(serverNow, estimatedTime), serverNow };
+    }
+
+    return { effectiveEventTime: rawTimestamp, serverNow };
+  }
+
   /**
    * Valida se o perfil existe e pertence ao usuário autenticado.
    * Lança erro com status apropriado se a validação falhar.
@@ -85,9 +122,8 @@ export class SyncService {
   // ==========================================================================
 
   /**
-   * Salva ou atualiza o progresso de reprodução com resolução determinística de conflito.
-   * Se o progresso salvo no servidor possuir timestamp mais recente que o recebido,
-   * o registro do servidor é preservado para impedir retrocessos por dispositivos desatualizados.
+   * Salva ou atualiza o progresso de reprodução com resolução determinística de conflito
+   * e imunidade a relógios descalibrados.
    */
   static async saveProgress(
     db: Database,
@@ -108,7 +144,10 @@ export class SyncService {
       ? Math.min(100, Math.round((positionSec / durationSec) * 100))
       : (Number(input.progressPercent) || 0);
     const isCompleted = input.isCompleted ? 1 : 0;
-    const incomingTime = Number(input.updatedAt) || Date.now();
+    const { effectiveEventTime, serverNow } = this.normalizeTimestamp(
+      input.updatedAt,
+      input.clientSendTime
+    );
     const deviceName = input.deviceName ? String(input.deviceName).slice(0, 80) : null;
 
     // Busca progresso existente
@@ -127,12 +166,15 @@ export class SyncService {
 
     if (existing.length > 0) {
       const curr = existing[0];
-      // Se o servidor possui um estado gravado com timestamp mais recente que o recebido,
-      // preservamos o estado do servidor (LWW)
-      if (curr.updatedAt > incomingTime) {
+      // Se o evento recebido for mais antigo que o estado atual do servidor E a posição recebida não avançou o progresso,
+      // preservamos o estado do servidor para evitar que pacotes obsoletos ou atrasados retrocedam a reprodução.
+      if (curr.updatedAt > effectiveEventTime && positionSec <= curr.positionSec) {
         return { record: curr, conflictResolved: true };
       }
 
+      // O carimbo gravado no servidor é sempre baseado na autoridade de tempo do servidor,
+      // garantindo que nenhum cliente com relógio no futuro trave o banco.
+      const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
       const nextVersion = (curr.version || 1) + 1;
       await db.db
         .update(profilePlaybackProgress)
@@ -144,7 +186,7 @@ export class SyncService {
           isCompleted,
           version: nextVersion,
           deviceName: deviceName ?? curr.deviceName,
-          updatedAt: incomingTime,
+          updatedAt: nextUpdatedAt,
         })
         .where(eq(profilePlaybackProgress.id, curr.id));
 
@@ -157,7 +199,7 @@ export class SyncService {
         isCompleted,
         version: nextVersion,
         deviceName: deviceName ?? curr.deviceName,
-        updatedAt: incomingTime,
+        updatedAt: nextUpdatedAt,
       };
 
       return { record: updated, conflictResolved: false };
@@ -178,7 +220,7 @@ export class SyncService {
       isCompleted,
       version: 1,
       deviceName,
-      updatedAt: incomingTime,
+      updatedAt: serverNow,
     };
 
     await db.db.insert(profilePlaybackProgress).values(newRecord);
@@ -236,7 +278,7 @@ export class SyncService {
   // ==========================================================================
 
   /**
-   * Registra ou atualiza item no histórico.
+   * Registra ou atualiza item no histórico com normalização temporal.
    */
   static async recordHistory(
     db: Database,
@@ -251,9 +293,10 @@ export class SyncService {
     const contentType = String(input.contentType || 'movie').trim();
     const season = Number.isInteger(input.season) ? Number(input.season) : 0;
     const episode = Number.isInteger(input.episode) ? Number(input.episode) : 0;
-    const now = Date.now();
-    const watchedAt = Number(input.watchedAt) || now;
-    const updatedAt = Number(input.updatedAt) || watchedAt;
+    const { effectiveEventTime, serverNow } = this.normalizeTimestamp(
+      input.watchedAt || input.updatedAt,
+      input.clientSendTime
+    );
 
     const existing = await db.db
       .select()
@@ -270,8 +313,8 @@ export class SyncService {
 
     if (existing.length > 0) {
       const curr = existing[0];
-      const maxWatched = Math.max(curr.watchedAt, watchedAt);
-      const maxUpdated = Math.max(curr.updatedAt, updatedAt);
+      const maxWatched = Math.max(curr.watchedAt, effectiveEventTime);
+      const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
       const nextVersion = (curr.version || 1) + 1;
 
       await db.db
@@ -282,7 +325,7 @@ export class SyncService {
           posterUrl: input.posterUrl ? String(input.posterUrl).slice(0, 500) : curr.posterUrl,
           year: input.year !== undefined ? Number(input.year) : curr.year,
           watchedAt: maxWatched,
-          updatedAt: maxUpdated,
+          updatedAt: nextUpdatedAt,
           version: nextVersion,
         })
         .where(eq(profileWatchHistory.id, curr.id));
@@ -294,7 +337,7 @@ export class SyncService {
         posterUrl: input.posterUrl ? String(input.posterUrl).slice(0, 500) : curr.posterUrl,
         year: input.year !== undefined ? Number(input.year) : curr.year,
         watchedAt: maxWatched,
-        updatedAt: maxUpdated,
+        updatedAt: nextUpdatedAt,
         version: nextVersion,
       };
     }
@@ -310,8 +353,8 @@ export class SyncService {
       title: input.title ? String(input.title).slice(0, 150) : null,
       posterUrl: input.posterUrl ? String(input.posterUrl).slice(0, 500) : null,
       year: input.year !== undefined ? Number(input.year) : null,
-      watchedAt,
-      updatedAt,
+      watchedAt: effectiveEventTime,
+      updatedAt: serverNow,
       version: 1,
     };
 
@@ -347,11 +390,11 @@ export class SyncService {
   }
 
   // ==========================================================================
-  // MINHA LISTA (profile_my_list com tombstones)
+  // MINHA LISTA (profile_my_list com tombstones e autoridade do servidor)
   // ==========================================================================
 
   /**
-   * Adiciona ou remove item de Minha Lista usando tombstones.
+   * Adiciona ou remove item de Minha Lista usando tombstones com normalização temporal.
    * Se um dispositivo offline tentar adicionar um item que foi removido
    * mais recentemente no servidor, a remoção é preservada.
    */
@@ -360,14 +403,15 @@ export class SyncService {
     profileId: string,
     canonicalId: string,
     isRemoved: boolean,
-    timestamp?: number
+    timestamp?: number,
+    clientSendTime?: number
   ): Promise<{ record: any; conflictResolved: boolean }> {
     const cleanId = String(canonicalId).trim();
     if (!cleanId) {
       throw new Error('canonicalId é obrigatório para Minha Lista.');
     }
 
-    const ts = Number(timestamp) || Date.now();
+    const { effectiveEventTime, serverNow } = this.normalizeTimestamp(timestamp, clientSendTime);
 
     const existing = await db.db
       .select()
@@ -382,16 +426,17 @@ export class SyncService {
 
     if (existing.length > 0) {
       const curr = existing[0];
+      const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
+      const nextVersion = (curr.version || 1) + 1;
 
       if (isRemoved) {
         // Remoção explícita
-        const nextVersion = (curr.version || 1) + 1;
         await db.db
           .update(profileMyList)
           .set({
             isRemoved: 1,
-            removedAt: ts,
-            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            removedAt: effectiveEventTime,
+            updatedAt: nextUpdatedAt,
             version: nextVersion,
           })
           .where(eq(profileMyList.id, curr.id));
@@ -400,29 +445,27 @@ export class SyncService {
           record: {
             ...curr,
             isRemoved: 1,
-            removedAt: ts,
-            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            removedAt: effectiveEventTime,
+            updatedAt: nextUpdatedAt,
             version: nextVersion,
           },
           conflictResolved: false,
         };
       } else {
         // Tentativa de adicionar
-        // Se já estava removido e a data de remoção no servidor é MAIS RECENTE que o timestamp da adição recebida:
-        // Ex: Celular offline tentou adicionar às 10:00, mas o usuário removeu na TV às 10:30.
+        // Se já estava removido e a data de remoção é posterior ao evento recebido:
         // A remoção mais recente vence!
-        if (curr.isRemoved === 1 && curr.removedAt && curr.removedAt > ts) {
+        if (curr.isRemoved === 1 && curr.removedAt && curr.removedAt > effectiveEventTime) {
           return { record: curr, conflictResolved: true };
         }
 
-        const nextVersion = (curr.version || 1) + 1;
         await db.db
           .update(profileMyList)
           .set({
             isRemoved: 0,
             removedAt: null,
-            addedAt: ts,
-            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            addedAt: effectiveEventTime,
+            updatedAt: nextUpdatedAt,
             version: nextVersion,
           })
           .where(eq(profileMyList.id, curr.id));
@@ -432,8 +475,8 @@ export class SyncService {
             ...curr,
             isRemoved: 0,
             removedAt: null,
-            addedAt: ts,
-            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            addedAt: effectiveEventTime,
+            updatedAt: nextUpdatedAt,
             version: nextVersion,
           },
           conflictResolved: false,
@@ -447,10 +490,10 @@ export class SyncService {
       id: newId,
       profileId,
       canonicalId: cleanId,
-      addedAt: ts,
+      addedAt: effectiveEventTime,
       isRemoved: isRemoved ? 1 : 0,
-      removedAt: isRemoved ? ts : null,
-      updatedAt: ts,
+      removedAt: isRemoved ? effectiveEventTime : null,
+      updatedAt: serverNow,
       version: 1,
     };
 
@@ -483,25 +526,26 @@ export class SyncService {
   }
 
   // ==========================================================================
-  // FAVORITOS (profile_favorites com tombstones)
+  // FAVORITOS (profile_favorites com tombstones e autoridade do servidor)
   // ==========================================================================
 
   /**
-   * Adiciona ou remove favorito usando tombstones com resolução determinística.
+   * Adiciona ou remove favorito usando tombstones com resolução determinística e normalização temporal.
    */
   static async setFavorite(
     db: Database,
     profileId: string,
     canonicalId: string,
     isRemoved: boolean,
-    timestamp?: number
+    timestamp?: number,
+    clientSendTime?: number
   ): Promise<{ record: any; conflictResolved: boolean }> {
     const cleanId = String(canonicalId).trim();
     if (!cleanId) {
       throw new Error('canonicalId é obrigatório para Favoritos.');
     }
 
-    const ts = Number(timestamp) || Date.now();
+    const { effectiveEventTime, serverNow } = this.normalizeTimestamp(timestamp, clientSendTime);
 
     const existing = await db.db
       .select()
@@ -516,15 +560,16 @@ export class SyncService {
 
     if (existing.length > 0) {
       const curr = existing[0];
+      const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
+      const nextVersion = (curr.version || 1) + 1;
 
       if (isRemoved) {
-        const nextVersion = (curr.version || 1) + 1;
         await db.db
           .update(profileFavorites)
           .set({
             isRemoved: 1,
-            removedAt: ts,
-            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            removedAt: effectiveEventTime,
+            updatedAt: nextUpdatedAt,
             version: nextVersion,
           })
           .where(eq(profileFavorites.id, curr.id));
@@ -533,25 +578,24 @@ export class SyncService {
           record: {
             ...curr,
             isRemoved: 1,
-            removedAt: ts,
-            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            removedAt: effectiveEventTime,
+            updatedAt: nextUpdatedAt,
             version: nextVersion,
           },
           conflictResolved: false,
         };
       } else {
-        if (curr.isRemoved === 1 && curr.removedAt && curr.removedAt > ts) {
+        if (curr.isRemoved === 1 && curr.removedAt && curr.removedAt > effectiveEventTime) {
           return { record: curr, conflictResolved: true };
         }
 
-        const nextVersion = (curr.version || 1) + 1;
         await db.db
           .update(profileFavorites)
           .set({
             isRemoved: 0,
             removedAt: null,
-            addedAt: ts,
-            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            addedAt: effectiveEventTime,
+            updatedAt: nextUpdatedAt,
             version: nextVersion,
           })
           .where(eq(profileFavorites.id, curr.id));
@@ -561,8 +605,8 @@ export class SyncService {
             ...curr,
             isRemoved: 0,
             removedAt: null,
-            addedAt: ts,
-            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            addedAt: effectiveEventTime,
+            updatedAt: nextUpdatedAt,
             version: nextVersion,
           },
           conflictResolved: false,
@@ -574,11 +618,11 @@ export class SyncService {
     const newRecord = {
       id: newId,
       profileId,
-      canonicalId: cleanId,
-      addedAt: ts,
+      canonicalId,
+      addedAt: effectiveEventTime,
       isRemoved: isRemoved ? 1 : 0,
-      removedAt: isRemoved ? ts : null,
-      updatedAt: ts,
+      removedAt: isRemoved ? effectiveEventTime : null,
+      updatedAt: serverNow,
       version: 1,
     };
 
@@ -641,31 +685,53 @@ export class SyncService {
   }
 
   // ==========================================================================
-  // LOTE DE MUTAÇÕES OFFLINE (syncBatch)
+  // LOTE DE MUTAÇÕES OFFLINE COM IDEMPOTÊNCIA PERSISTENTE (syncBatch)
   // ==========================================================================
 
   /**
-   * Processa lote de mutações da fila outbox com idempotência e resolução de conflitos.
+   * Processa lote de mutações da fila outbox com idempotência persistente no banco
+   * e resolução determinística de conflitos imune a clock skew.
    */
   static async processBatch(
     db: Database,
     profileId: string,
-    mutations: SyncMutation[]
-  ): Promise<{ processed: number; results: Array<{ id: string; success: boolean; conflictResolved?: boolean; error?: string }> }> {
-    const results: Array<{ id: string; success: boolean; conflictResolved?: boolean; error?: string }> = [];
+    mutations: SyncMutation[],
+    clientSendTime?: number
+  ): Promise<{ processed: number; results: Array<{ id: string; success: boolean; duplicate?: boolean; conflictResolved?: boolean; error?: string }> }> {
+    const results: Array<{ id: string; success: boolean; duplicate?: boolean; conflictResolved?: boolean; error?: string }> = [];
 
     // Limite máximo de 100 mutações por lote para economia de recursos e evitar DoS
     const safeMutations = mutations.slice(0, 100);
 
     for (const mut of safeMutations) {
+      if (!mut.id || typeof mut.id !== 'string') {
+        results.push({ id: mut.id || 'invalid', success: false, error: 'ID de mutação obrigatório.' });
+        continue;
+      }
+
       try {
+        // 1. Verificação de idempotência persistente na tabela processed_sync_mutations
+        const existing = await db.db
+          .select()
+          .from(processedSyncMutations)
+          .where(eq(processedSyncMutations.id, mut.id))
+          .limit(1);
+
+        if (existing.length > 0) {
+          // Mutação já persistida e processada com sucesso anteriormente
+          results.push({ id: mut.id, success: true, duplicate: true });
+          continue;
+        }
+
+        let conflictResolved = false;
         switch (mut.type) {
           case 'progress': {
             const res = await this.saveProgress(db, profileId, {
               ...mut.data,
               updatedAt: mut.timestamp || mut.data?.updatedAt,
+              clientSendTime,
             });
-            results.push({ id: mut.id, success: true, conflictResolved: res.conflictResolved });
+            conflictResolved = Boolean(res.conflictResolved);
             break;
           }
           case 'history': {
@@ -673,27 +739,42 @@ export class SyncService {
               ...mut.data,
               watchedAt: mut.timestamp || mut.data?.watchedAt,
               updatedAt: mut.timestamp || mut.data?.updatedAt,
+              clientSendTime,
             });
-            results.push({ id: mut.id, success: true });
             break;
           }
           case 'my_list': {
             const isRemoved = mut.action === 'remove' || Boolean(mut.data?.isRemoved);
             const canonicalId = mut.data?.canonicalId || mut.data?.id;
-            const res = await this.setMyList(db, profileId, canonicalId, isRemoved, mut.timestamp);
-            results.push({ id: mut.id, success: true, conflictResolved: res.conflictResolved });
+            const res = await this.setMyList(db, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
+            conflictResolved = Boolean(res.conflictResolved);
             break;
           }
           case 'favorites': {
             const isRemoved = mut.action === 'remove' || Boolean(mut.data?.isRemoved);
             const canonicalId = mut.data?.canonicalId || mut.data?.id;
-            const res = await this.setFavorite(db, profileId, canonicalId, isRemoved, mut.timestamp);
-            results.push({ id: mut.id, success: true, conflictResolved: res.conflictResolved });
+            const res = await this.setFavorite(db, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
+            conflictResolved = Boolean(res.conflictResolved);
             break;
           }
           default:
             results.push({ id: mut.id, success: false, error: `Tipo de mutação desconhecido: ${mut.type}` });
+            continue;
         }
+
+        // 2. Registra mutação na tabela persistente para garantia estrita de idempotência
+        const now = Date.now();
+        const sevenDays = 7 * 24 * 60 * 60 * 1000;
+        await db.db.insert(processedSyncMutations).values({
+          id: mut.id,
+          profileId,
+          mutationType: mut.type,
+          canonicalId: String(mut.data?.canonicalId || mut.data?.id || 'unknown').slice(0, 100),
+          processedAt: now,
+          expiresAt: now + sevenDays,
+        });
+
+        results.push({ id: mut.id, success: true, conflictResolved });
       } catch (err: any) {
         results.push({ id: mut.id, success: false, error: err?.message || 'Falha ao aplicar mutação' });
       }
@@ -703,5 +784,16 @@ export class SyncService {
       processed: results.length,
       results,
     };
+  }
+
+  /**
+   * Remove registros de mutações processadas expiradas (retenção > 7 dias).
+   */
+  static async purgeExpiredMutations(db: Database): Promise<number> {
+    const now = Date.now();
+    const res = await db.db
+      .delete(processedSyncMutations)
+      .where(lt(processedSyncMutations.expiresAt, now));
+    return Number(res.rowsAffected || 0);
   }
 }

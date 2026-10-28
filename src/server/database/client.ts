@@ -215,10 +215,23 @@ export async function ensureAuthTables(database: Database): Promise<void> {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS profile_favorites_key_idx ON profile_favorites (profile_id, canonical_id);
     CREATE INDEX IF NOT EXISTS profile_favorites_profile_status_idx ON profile_favorites (profile_id, is_removed, updated_at);
+
+    CREATE TABLE IF NOT EXISTS processed_sync_mutations (
+      id text PRIMARY KEY NOT NULL,
+      profile_id text NOT NULL,
+      mutation_type text NOT NULL,
+      canonical_id text NOT NULL,
+      processed_at integer NOT NULL,
+      expires_at integer NOT NULL,
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE INDEX IF NOT EXISTS processed_sync_mutations_profile_id_idx ON processed_sync_mutations (profile_id);
+    CREATE INDEX IF NOT EXISTS processed_sync_mutations_expires_at_idx ON processed_sync_mutations (expires_at);
   `);
 }
 
 export function resetSharedDatabaseForTesting(): void {
   sharedDatabase = undefined;
+  sharedDatabaseKey = undefined;
 }
 
