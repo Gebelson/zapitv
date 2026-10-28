@@ -88,6 +88,18 @@ export interface SyncMutationItem {
   action: 'save' | 'set' | 'remove';
   data: any;
   timestamp: number;
+  syncState?: 'conflict';
+  syncError?: string;
+  rejectedAt?: number;
+  attempts?: number;
+}
+
+export interface SyncMutationResult {
+  id: string;
+  success: boolean;
+  duplicate?: boolean;
+  conflictResolved?: boolean;
+  error?: string;
 }
 
 class SyncClient {
@@ -258,30 +270,39 @@ class SyncClient {
     profileId: string,
     mutations: SyncMutationItem[],
     signal?: AbortSignal
-  ): Promise<{ success: boolean; processed: number; results: any[] }> {
-    const combinedSignal = signal || AbortSignal.timeout(this.timeoutMs);
-    const res = await fetch('/api/sync/batch', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-Zapi-Client': 'web',
-      },
-      credentials: 'include',
-      signal: combinedSignal,
-      body: JSON.stringify({
-        profileId,
-        mutations,
-        clientSendTime: Date.now(),
-      }),
-    });
+  ): Promise<{ success: boolean; processed: number; results: SyncMutationResult[] }> {
+    const controller = new AbortController();
+    const cancel = () => controller.abort();
+    const timer = setTimeout(cancel, this.timeoutMs);
+    signal?.addEventListener('abort', cancel, { once: true });
+    if (signal?.aborted) cancel();
+    try {
+      const res = await fetch('/api/sync/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Zapi-Client': 'web',
+        },
+        credentials: 'include',
+        signal: controller.signal,
+        body: JSON.stringify({
+          profileId,
+          mutations,
+          clientSendTime: Date.now(),
+        }),
+      });
 
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || 'Erro ao sincronizar lote de mutações.');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Erro ao sincronizar lote de mutações.');
+      }
+
+      return data;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', cancel);
     }
-
-    return data;
   }
 }
 

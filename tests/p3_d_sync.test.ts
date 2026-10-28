@@ -566,7 +566,7 @@ async function runDeviceSyncTestSuite() {
       type: 'favorites' as const,
       action: 'set' as const,
       data: { canonicalId: 'movie:matrix_reloaded', isRemoved: false },
-      timestamp: 1700000200000,
+      timestamp: Date.now(),
     };
 
     // Envia duas vezes o mesmo lote
@@ -575,12 +575,14 @@ async function runDeviceSyncTestSuite() {
       mutations: [mutItem],
     });
     assert.equal(batch1.status, 200);
+    assert.equal(batch1.body.results[0].success, true);
 
     const batch2 = await request(baseUrl, sessionPc, 'POST', '/api/sync/batch', {
       profileId: profileA1.id,
       mutations: [mutItem],
     });
     assert.equal(batch2.status, 200);
+    assert.equal(batch2.body.results[0].duplicate, true);
 
     // Confere se não houve duplicação no banco
     const dbFavs = await db.db

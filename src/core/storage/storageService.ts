@@ -61,7 +61,7 @@ export class StorageService {
 
   public async setScope(scope: StorageScope | null): Promise<void> {
     this.currentScope = scope;
-    syncQueue.setAccountScope(scope?.userId || null);
+    syncQueue.setAccountScope(scope?.userId || null, scope?.profileId || null);
     await this.syncFromDb();
     recommendationEngine.invalidateCache();
     hybridRecommendationEngine.invalidateCache();

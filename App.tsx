@@ -39,6 +39,7 @@ import { AgeVerificationModal } from './components/AgeVerificationModal';
 import { recommendationEngine } from './src/core/recommendations/recommendationEngine';
 import { userPreferenceStore } from './src/core/recommendations/userPreferenceStore';
 import { authClient } from './src/core/auth/authClient';
+import { SyncRecoveryNotice } from './src/components/sync/SyncRecoveryNotice';
 import { profileClient, ProfileItem } from './src/core/profile/profileClient';
 import { resolveAvatarUrl } from './src/core/profile/avatarRegistry';
 import { uiSoundService } from './src/core/audio/uiSoundService';
@@ -3000,6 +3001,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           currentUser={currentUser}
           activeProfile={activeProfile}
         />
+        {isAuthenticated && currentUser?.id && activeProfile?.id && !location.pathname.includes('/assistir/') &&
+          <SyncRecoveryNotice key={`${currentUser.id}:${activeProfile.id}`} accountId={currentUser.id} profileId={activeProfile.id} />}
       </React.Suspense>
     );
   }
@@ -3064,6 +3067,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   return (
     <div className={`min-h-screen relative ${isDarkMode ? 'bg-[#05070a]' : 'bg-[#F8F9FC]'} ${isWatchRoute ? 'zapi-watch-route bg-black' : ''}`}>
       <AnimatedBackground isDarkMode={isDarkMode} />
+      {isAuthenticated && currentUser?.id && activeProfile?.id && !isWatchRoute &&
+        <SyncRecoveryNotice key={`${currentUser.id}:${activeProfile.id}`} accountId={currentUser.id} profileId={activeProfile.id} />}
       
       {isMobileViewport && !isWatchRoute ? (
         <MobileLayout
