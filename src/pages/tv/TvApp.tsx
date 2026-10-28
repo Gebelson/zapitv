@@ -96,8 +96,13 @@ export const TvApp: React.FC<TvAppProps> = ({
   const [isTvAuthenticated, setIsTvAuthenticated] = useState<boolean>(() => Boolean(currentUser));
 
   useEffect(() => {
-    if (activeProfile) setActiveTvProfile(activeProfile);
-  }, [activeProfile]);
+    if (activeProfile) {
+      setActiveTvProfile(activeProfile);
+      if (currentUser?.id) {
+        storageService.setScope({ userId: currentUser.id, profileId: activeProfile.id }).catch(() => {});
+      }
+    }
+  }, [activeProfile, currentUser]);
 
   useEffect(() => {
     if (currentUser) setIsTvAuthenticated(true);
@@ -134,10 +139,20 @@ export const TvApp: React.FC<TvAppProps> = ({
     } catch {}
     setActiveTvProfile(p);
     setIsProfileSelectorOpen(false);
+    if (currentUser?.id) {
+      await storageService.setScope({ userId: currentUser.id, profileId: p.id });
+    } else {
+      try {
+        const sess = await authClient.checkSession();
+        if (sess.user?.id) {
+          await storageService.setScope({ userId: sess.user.id, profileId: p.id });
+        }
+      } catch {}
+    }
     setTimeout(() => {
       try { setFocus('tv-hero-play'); } catch {}
     }, 50);
-  }, []);
+  }, [currentUser]);
 
   const handleTvLogout = useCallback(async () => {
     try {
@@ -146,6 +161,7 @@ export const TvApp: React.FC<TvAppProps> = ({
     setIsTvAuthenticated(false);
     setActiveTvProfile(null);
     setTvProfiles([]);
+    await storageService.setScope(null);
     uiSoundService.play('click');
   }, []);
 

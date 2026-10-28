@@ -104,7 +104,7 @@ export const MobileContentRow: React.FC<MobileContentRowProps> = ({
       {/* Trilho de Cards com Scroll Horizontal Táctil e Bloqueio Direcional */}
       <div
         ref={rowRef}
-        className="flex gap-3 overflow-x-auto overflow-y-hidden no-scrollbar px-4 py-1 will-change-scroll"
+        className="flex gap-3 overflow-x-auto overflow-y-hidden no-scrollbar px-4 py-1 scroll-smooth will-change-scroll"
         style={{
           WebkitOverflowScrolling: 'touch',
           touchAction: 'pan-x pan-y',

@@ -10,6 +10,8 @@ import { searchService } from '../search/searchService';
 import { LocalDataStore, localDataStore } from './localDataStore';
 import { WatchProgress, EpisodeWatchProgress, WatchState, watchStateCodec, contentKey, sameContent, episodeKey, normalizeProgress, normalizeEpisode, normalizeWatchState, mergeWatchStates, listCodec, normalizeIds, StorageScope, getWatchStateCodec, getListCodec } from './watchState';
 export type { WatchProgress, EpisodeWatchProgress, StorageScope } from './watchState';
+import { syncClient } from '../sync/syncClient';
+import { syncQueue } from '../sync/syncQueue';
 
 export interface PlaybackContinuityInfo {
   hasStarted: boolean;
@@ -58,6 +60,112 @@ export class StorageService {
     await this.syncFromDb();
     recommendationEngine.invalidateCache();
     hybridRecommendationEngine.invalidateCache();
+
+    if (scope && scope.userId && scope.profileId) {
+      // Hidratação remota assíncrona do perfil autenticado
+      this.hydrateRemoteProfile(scope.profileId).catch(() => {});
+    }
+  }
+
+  /**
+   * Puxa dados remotos e hidrata o cache local do perfil com resolução de conflitos
+   */
+  public async hydrateRemoteProfile(profileId: string): Promise<void> {
+    if (!profileId || this.currentScope?.profileId !== profileId) return;
+
+    try {
+      const remoteData = await syncClient.pull(profileId);
+      if (!remoteData || this.currentScope?.profileId !== profileId) return;
+
+      // 1. Minha Lista: mescla com base em tombstones
+      if (Array.isArray(remoteData.myList)) {
+        await this.dataStore.update(this.getMyListCodec(), localList => {
+          const removedIds = new Set(
+            remoteData.myList.filter(item => item.isRemoved === 1).map(item => item.canonicalId)
+          );
+          const activeRemoteIds = remoteData.myList
+            .filter(item => item.isRemoved === 0)
+            .map(item => item.canonicalId);
+
+          const filteredLocal = localList.filter(id => !removedIds.has(id));
+          return normalizeIds([...filteredLocal, ...activeRemoteIds]);
+        });
+      }
+
+      // 2. Favoritos: mescla com base em tombstones
+      if (Array.isArray(remoteData.favorites)) {
+        await this.dataStore.update(this.getFavoritesCodec(), localFavs => {
+          const removedIds = new Set(
+            remoteData.favorites.filter(item => item.isRemoved === 1).map(item => item.canonicalId)
+          );
+          const activeRemoteIds = remoteData.favorites
+            .filter(item => item.isRemoved === 0)
+            .map(item => item.canonicalId);
+
+          const filteredLocal = localFavs.filter(id => !removedIds.has(id));
+          return normalizeIds([...filteredLocal, ...activeRemoteIds]);
+        });
+      }
+
+      // 3. Progresso: converte remoteData.progress em WatchState e mescla com mergeWatchStates
+      if (Array.isArray(remoteData.progress) && remoteData.progress.length > 0) {
+        await this.dataStore.update(this.getWatchCodec(), localWatch => {
+          const remoteItems: WatchProgress[] = [];
+          const remoteEpisodes: Record<string, EpisodeWatchProgress> = {};
+
+          for (const rp of remoteData.progress) {
+            const isEpisodic = rp.season > 0 || rp.episode > 0;
+            const item: ContentItem = {
+              id: rp.canonicalId,
+              canonicalId: rp.canonicalId,
+              title: rp.canonicalId,
+              type: (rp.contentType as any) || ContentType.MOVIE,
+              mediaFormat: isEpisodic ? 'series' : 'movie',
+              rating: 0,
+              year: 0,
+              image: '',
+            };
+
+            const wp: WatchProgress = {
+              contentId: rp.canonicalId,
+              item,
+              season: isEpisodic ? rp.season : undefined,
+              episode: isEpisodic ? rp.episode : undefined,
+              currentTime: rp.positionSec,
+              duration: rp.durationSec,
+              percentage: rp.progressPercent,
+              updatedAt: new Date(rp.updatedAt).toISOString(),
+            };
+
+            const normalized = normalizeProgress(wp);
+            if (normalized) {
+              remoteItems.push(normalized);
+              if (isEpisodic) {
+                const epKey = episodeKey(contentKey(item), rp.season, rp.episode);
+                remoteEpisodes[epKey] = {
+                  contentId: rp.canonicalId,
+                  season: rp.season,
+                  episode: rp.episode,
+                  currentTime: rp.positionSec,
+                  duration: rp.durationSec,
+                  percentage: rp.progressPercent,
+                  updatedAt: new Date(rp.updatedAt).toISOString(),
+                  contentKey: contentKey(item),
+                };
+              }
+            }
+          }
+
+          const remoteState: WatchState = { items: remoteItems, episodes: remoteEpisodes };
+          const merged = mergeWatchStates(localWatch, remoteState);
+          this.applyWatchState(merged);
+          return merged;
+        });
+      }
+
+      // 4. Descarrega mutações pendentes na outbox queue
+      await syncQueue.flush(profileId);
+    } catch {}
   }
 
   private getWatchCodec() {
@@ -335,10 +443,22 @@ export class StorageService {
   }
 
   public async toggleFavorite(id: string): Promise<string[]> {
-    const next = await this.dataStore.update(this.getFavoritesCodec(), list =>
-      list.includes(id) ? list.filter(value => value !== id) : [...list, id]);
+    let wasRemoved = false;
+    const next = await this.dataStore.update(this.getFavoritesCodec(), list => {
+      wasRemoved = list.includes(id);
+      return wasRemoved ? list.filter(value => value !== id) : [...list, id];
+    });
     recommendationEngine.invalidateCache();
     hybridRecommendationEngine.invalidateCache();
+
+    if (this.currentScope?.profileId) {
+      syncQueue.enqueue(this.currentScope.profileId, {
+        type: 'favorites',
+        action: wasRemoved ? 'remove' : 'set',
+        data: { canonicalId: id, isRemoved: wasRemoved },
+      });
+    }
+
     return next;
   }
 
@@ -351,8 +471,21 @@ export class StorageService {
   }
 
   public toggleMyList(id: string): Promise<string[]> {
-    return this.dataStore.update(this.getMyListCodec(), list =>
-      list.includes(id) ? list.filter(value => value !== id) : [...list, id]);
+    let wasRemoved = false;
+    return this.dataStore.update(this.getMyListCodec(), list => {
+      wasRemoved = list.includes(id);
+      const nextList = wasRemoved ? list.filter(value => value !== id) : [...list, id];
+
+      if (this.currentScope?.profileId) {
+        syncQueue.enqueue(this.currentScope.profileId, {
+          type: 'my_list',
+          action: wasRemoved ? 'remove' : 'set',
+          data: { canonicalId: id, isRemoved: wasRemoved },
+        });
+      }
+
+      return nextList;
+    });
   }
 
   public async getContinueWatching(): Promise<WatchProgress[]> {
@@ -418,6 +551,50 @@ export class StorageService {
         const weight = normalizedProgress.percentage >= 85 ? 1.0 : normalizedProgress.percentage >= 50 ? 0.7 : 0.4;
         collaborativeEngine.dispatchConsentedEvent(normalizedProgress.item, weight).catch(() => {});
       }).catch(() => {});
+    }
+
+    // 7. Enfileira sincronização de progresso e histórico se perfil autenticado estiver ativo
+    if (this.currentScope?.profileId) {
+      const canonicalId = normalizedProgress.item?.canonicalId || normalizedProgress.contentId;
+      const contentType = normalizedProgress.item?.type || 'movie';
+      const season = normalizedProgress.season || 0;
+      const episode = normalizedProgress.episode || 0;
+      const positionSec = Math.floor(normalizedProgress.currentTime);
+      const durationSec = Math.floor(normalizedProgress.duration);
+      const isCompleted = normalizedProgress.percentage >= 92 ? 1 : 0;
+      const updatedAt = Date.parse(normalizedProgress.updatedAt) || Date.now();
+
+      syncQueue.enqueue(this.currentScope.profileId, {
+        type: 'progress',
+        action: 'save',
+        data: {
+          canonicalId,
+          contentType,
+          season,
+          episode,
+          positionSec,
+          durationSec,
+          progressPercent: normalizedProgress.percentage,
+          isCompleted,
+          updatedAt,
+        },
+      });
+
+      syncQueue.enqueue(this.currentScope.profileId, {
+        type: 'history',
+        action: 'save',
+        data: {
+          canonicalId,
+          contentType,
+          season,
+          episode,
+          title: normalizedProgress.item?.title,
+          posterUrl: normalizedProgress.item?.poster,
+          year: normalizedProgress.item?.year,
+          watchedAt: Date.now(),
+          updatedAt,
+        },
+      });
     }
   }
 
