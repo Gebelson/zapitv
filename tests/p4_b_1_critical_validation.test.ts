@@ -328,7 +328,8 @@ async function runCriticalValidationTestSuite() {
 
   const expiredRes = await SyncService.processBatch(db, profileId, [expiredMut]);
   assert.equal(expiredRes.processed, 1);
-  assert.ok(expiredRes.results[0].conflictResolved, 'Conflito temporal LWW deve ser resolvido');
+  assert.equal(expiredRes.results[0].success, false, 'Pacote fora da retenção deve ser recusado');
+  assert.equal(expiredRes.results[0].error, 'SYNC_MUTATION_EXPIRED_OR_INVALID_TIMESTAMP');
 
   const checkGladiator = await SyncService.getProgressItem(db, profileId, 'movie-gladiator-lww');
   assert.equal(checkGladiator.positionSec, 2500, 'Progresso de 2500s não deve ser rebaixado para 300s');

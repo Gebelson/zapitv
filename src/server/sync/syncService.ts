@@ -715,6 +715,12 @@ export class SyncService {
 
       const now = Date.now();
       const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      // Após a retenção de UUIDs, um replay não pode voltar a ser uma nova escrita.
+      // Verificar o evento original antes de normalizar clock skew/rebase de envio.
+      if (!Number.isFinite(mut.timestamp) || mut.timestamp <= 0 || now - mut.timestamp >= sevenDays) {
+        results.push({ id: mut.id, success: false, error: 'SYNC_MUTATION_EXPIRED_OR_INVALID_TIMESTAMP' });
+        continue;
+      }
       let attempts = 0;
       const maxAttempts = 5;
 

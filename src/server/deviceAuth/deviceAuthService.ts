@@ -98,7 +98,7 @@ export function getPublicBaseUrl(req?: { headers?: Record<string, any>; protocol
   const isProduction = process.env.NODE_ENV === 'production';
 
   // 1. Origem pública oficial configurada explicitamente no servidor (prioridade absoluta sobre VERCEL_URL)
-  const envUrl = process.env.APP_URL || process.env.PUBLIC_URL;
+  const envUrl = process.env.APP_URL;
   if (envUrl && envUrl.trim()) {
     let parsed: URL;
     try {
@@ -110,48 +110,49 @@ export function getPublicBaseUrl(req?: { headers?: Record<string, any>; protocol
     if (isProduction && parsed.protocol !== 'https:') {
       throw new Error('Origem de produção em APP_URL deve utilizar obrigatoriamente HTTPS.');
     }
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password ||
+        parsed.pathname !== '/' || parsed.search || parsed.hash) {
+      throw new Error('APP_URL deve conter somente uma origem HTTP(S), sem credenciais.');
+    }
 
     return parsed.origin;
   }
 
-  // 2. Validação estrita de cabeçalhos Host / X-Forwarded-Host contra injeção e envenenamento
+  // 2. Só o deployment explicitamente configurado pode ser usado sem APP_URL.
+  const deployment = process.env.VERCEL_URL?.trim();
+  if (deployment) {
+    let configured: URL;
+    try { configured = new URL(deployment.includes('://') ? deployment : `https://${deployment}`); }
+    catch { throw new Error('VERCEL_URL inválida.'); }
+    if (configured.protocol !== 'https:' || configured.username || configured.password ||
+        configured.pathname !== '/' || configured.search || configured.hash) {
+      throw new Error('VERCEL_URL deve identificar uma origem HTTPS sem credenciais.');
+    }
+    const supplied = req?.headers?.['x-forwarded-host'] || req?.headers?.host;
+    if (supplied && (typeof supplied !== 'string' || supplied.trim().toLowerCase() !== configured.host.toLowerCase())) {
+      throw new Error('Host não autorizado para geração de QR Code.');
+    }
+    return configured.origin;
+  }
+
+  // 3. Exceção estritamente local para desenvolvimento, nunca para Preview/produção.
   const rawHostHeader = (req?.headers?.['x-forwarded-host'] as string) || req?.headers?.host;
   if (rawHostHeader && typeof rawHostHeader === 'string' && rawHostHeader.trim()) {
-    const cleanHost = rawHostHeader.split(',')[0].trim();
-    const hostname = cleanHost.replace(/:\d+$/, '').toLowerCase();
+    const cleanHost = rawHostHeader.trim();
 
     // Whitelist de validação de domínios permitidos:
-    const isLocalDevHost = !isProduction && (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.local'));
-    const isVercelApp = /^[a-z0-9][a-z0-9-_]*\.vercel\.app$/i.test(hostname);
-    const vercelEnvHost = process.env.VERCEL_URL ? process.env.VERCEL_URL.trim().replace(/:\d+$/, '').toLowerCase() : null;
-    const isVercelEnvMatch = Boolean(vercelEnvHost && hostname === vercelEnvHost);
-    const isOfficialDomain = hostname === 'zapitv.vercel.app';
+    const isLocalDevHost = !isProduction && /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(cleanHost);
 
     if (isLocalDevHost) {
-      const proto = (req?.headers?.['x-forwarded-proto'] as string) || req?.protocol || 'http';
+      const proto = req?.protocol === 'https' ? 'https' : 'http';
       return `${proto}://${cleanHost}`.replace(/\/+$/, '');
     }
 
-    if (isVercelApp || isVercelEnvMatch || isOfficialDomain) {
-      // Fora de desenvolvimento local, exige obrigatoriamente HTTPS
-      return `https://${cleanHost}`.replace(/\/+$/, '');
-    }
-
     // Host arbitrário ou malicioso detectado: bloqueia geração com erro seguro
-    throw new Error(`Origem ou host não autorizado para geração de QR Code: ${hostname}`);
+    throw new Error('Host não autorizado para geração de QR Code.');
   }
 
-  // 3. Fallback para domínio do deployment atual na Vercel (Preview / Branch Deployment)
-  if (process.env.VERCEL_URL && process.env.VERCEL_URL.trim()) {
-    const rawVercel = process.env.VERCEL_URL.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
-    const vHostname = rawVercel.replace(/:\d+$/, '').toLowerCase();
-    if (/^[a-z0-9][a-z0-9-_]*\.vercel\.app$/i.test(vHostname) || vHostname === 'zapitv.vercel.app') {
-      return `https://${rawVercel}`;
-    }
-  }
-
-  // 4. Fallback padrão seguro para o domínio oficial de produção
-  return 'https://zapitv.vercel.app';
+  throw new Error('Configure APP_URL ou VERCEL_URL para gerar o QR Code.');
 }
 
 export interface CreateChallengeResult {

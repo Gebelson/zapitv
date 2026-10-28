@@ -27264,7 +27264,7 @@ function detectDeviceFromUserAgent(userAgent) {
 }
 function getPublicBaseUrl(req) {
   const isProduction3 = process.env.NODE_ENV === "production";
-  const envUrl = process.env.APP_URL || process.env.PUBLIC_URL;
+  const envUrl = process.env.APP_URL;
   if (envUrl && envUrl.trim()) {
     let parsed;
     try {
@@ -27275,34 +27275,39 @@ function getPublicBaseUrl(req) {
     if (isProduction3 && parsed.protocol !== "https:") {
       throw new Error("Origem de produ\xE7\xE3o em APP_URL deve utilizar obrigatoriamente HTTPS.");
     }
+    if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password || parsed.pathname !== "/" || parsed.search || parsed.hash) {
+      throw new Error("APP_URL deve conter somente uma origem HTTP(S), sem credenciais.");
+    }
     return parsed.origin;
+  }
+  const deployment = process.env.VERCEL_URL?.trim();
+  if (deployment) {
+    let configured;
+    try {
+      configured = new URL(deployment.includes("://") ? deployment : `https://${deployment}`);
+    } catch {
+      throw new Error("VERCEL_URL inv\xE1lida.");
+    }
+    if (configured.protocol !== "https:" || configured.username || configured.password || configured.pathname !== "/" || configured.search || configured.hash) {
+      throw new Error("VERCEL_URL deve identificar uma origem HTTPS sem credenciais.");
+    }
+    const supplied = req?.headers?.["x-forwarded-host"] || req?.headers?.host;
+    if (supplied && (typeof supplied !== "string" || supplied.trim().toLowerCase() !== configured.host.toLowerCase())) {
+      throw new Error("Host n\xE3o autorizado para gera\xE7\xE3o de QR Code.");
+    }
+    return configured.origin;
   }
   const rawHostHeader = req?.headers?.["x-forwarded-host"] || req?.headers?.host;
   if (rawHostHeader && typeof rawHostHeader === "string" && rawHostHeader.trim()) {
-    const cleanHost = rawHostHeader.split(",")[0].trim();
-    const hostname = cleanHost.replace(/:\d+$/, "").toLowerCase();
-    const isLocalDevHost = !isProduction3 && (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".local"));
-    const isVercelApp = /^[a-z0-9][a-z0-9-_]*\.vercel\.app$/i.test(hostname);
-    const vercelEnvHost = process.env.VERCEL_URL ? process.env.VERCEL_URL.trim().replace(/:\d+$/, "").toLowerCase() : null;
-    const isVercelEnvMatch = Boolean(vercelEnvHost && hostname === vercelEnvHost);
-    const isOfficialDomain = hostname === "zapitv.vercel.app";
+    const cleanHost = rawHostHeader.trim();
+    const isLocalDevHost = !isProduction3 && /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(cleanHost);
     if (isLocalDevHost) {
-      const proto = req?.headers?.["x-forwarded-proto"] || req?.protocol || "http";
+      const proto = req?.protocol === "https" ? "https" : "http";
       return `${proto}://${cleanHost}`.replace(/\/+$/, "");
     }
-    if (isVercelApp || isVercelEnvMatch || isOfficialDomain) {
-      return `https://${cleanHost}`.replace(/\/+$/, "");
-    }
-    throw new Error(`Origem ou host n\xE3o autorizado para gera\xE7\xE3o de QR Code: ${hostname}`);
+    throw new Error("Host n\xE3o autorizado para gera\xE7\xE3o de QR Code.");
   }
-  if (process.env.VERCEL_URL && process.env.VERCEL_URL.trim()) {
-    const rawVercel = process.env.VERCEL_URL.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
-    const vHostname = rawVercel.replace(/:\d+$/, "").toLowerCase();
-    if (/^[a-z0-9][a-z0-9-_]*\.vercel\.app$/i.test(vHostname) || vHostname === "zapitv.vercel.app") {
-      return `https://${rawVercel}`;
-    }
-  }
-  return "https://zapitv.vercel.app";
+  throw new Error("Configure APP_URL ou VERCEL_URL para gerar o QR Code.");
 }
 async function createDeviceLinkChallenge(db, options) {
   const deviceCode = generateDeviceCode();
@@ -28192,6 +28197,10 @@ var SyncService = class {
       }
       const now = Date.now();
       const sevenDays = 7 * 24 * 60 * 60 * 1e3;
+      if (!Number.isFinite(mut.timestamp) || mut.timestamp <= 0 || now - mut.timestamp >= sevenDays) {
+        results.push({ id: mut.id, success: false, error: "SYNC_MUTATION_EXPIRED_OR_INVALID_TIMESTAMP" });
+        continue;
+      }
       let attempts = 0;
       const maxAttempts = 5;
       while (attempts < maxAttempts) {

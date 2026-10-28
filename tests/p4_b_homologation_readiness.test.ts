@@ -434,7 +434,8 @@ async function runHomologationTestSuite() {
 
   const lateProgResult = await SyncService.processBatch(db, profileA1.id, [lateMutationProg]);
   assert.equal(lateProgResult.processed, 1);
-  assert.ok(lateProgResult.results[0].conflictResolved, 'Conflito temporal LWW deve ser detectado e resolvido');
+  assert.equal(lateProgResult.results[0].success, false);
+  assert.equal(lateProgResult.results[0].error, 'SYNC_MUTATION_EXPIRED_OR_INVALID_TIMESTAMP');
 
   // Confirma que a posição no banco NÃO foi rebaixada para 400s
   const checkInterstellar = await SyncService.getProgressItem(db, profileA1.id, 'movie-interstellar');
@@ -454,7 +455,8 @@ async function runHomologationTestSuite() {
 
   const lateFavResult = await SyncService.processBatch(db, profileA1.id, [lateMutationFav]);
   assert.equal(lateFavResult.processed, 1);
-  assert.ok(lateFavResult.results[0].conflictResolved, 'Tombstone recente deve vencer pacote antigo');
+  assert.equal(lateFavResult.results[0].success, false);
+  assert.equal(lateFavResult.results[0].error, 'SYNC_MUTATION_EXPIRED_OR_INVALID_TIMESTAMP');
 
   const checkGladiator = await db.db.select().from(profileFavorites).where(
     and(
@@ -469,6 +471,10 @@ async function runHomologationTestSuite() {
   // CENÁRIO 6: COMPATIBILIDADE VERCEL PREVIEW E QR CODE DE PAREAMENTO
   // ==========================================================================
   console.log('6. Validando Compatibilidade Vercel Preview e Resolução de Host...');
+  const oldEnvVercel = process.env.VERCEL_URL;
+  const oldAppUrl = process.env.APP_URL;
+  delete process.env.APP_URL;
+  process.env.VERCEL_URL = 'zapitv-git-codex-preview-gebel.vercel.app';
   // 1. Cabeçalhos de proxy reverso da Vercel Preview
   const previewReq = {
     headers: {
@@ -478,15 +484,15 @@ async function runHomologationTestSuite() {
   };
   const resolvedPreviewUrl = getPublicBaseUrl(previewReq);
   assert.equal(resolvedPreviewUrl, 'https://zapitv-git-codex-preview-gebel.vercel.app');
+  assert.throws(() => getPublicBaseUrl({ headers: { host: 'unrelated.vercel.app' } }));
 
   // 2. Fallback via process.env.VERCEL_URL
-  const oldEnvVercel = process.env.VERCEL_URL;
-  const oldAppUrl = process.env.APP_URL;
   delete process.env.APP_URL;
   process.env.VERCEL_URL = 'zapitv-preview-staging.vercel.app';
   const resolvedEnvUrl = getPublicBaseUrl({});
   assert.equal(resolvedEnvUrl, 'https://zapitv-preview-staging.vercel.app');
-  process.env.VERCEL_URL = oldEnvVercel;
+  if (oldEnvVercel === undefined) delete process.env.VERCEL_URL;
+  else process.env.VERCEL_URL = oldEnvVercel;
   if (oldAppUrl) process.env.APP_URL = oldAppUrl;
 
   // 3. Desafio de pareamento de Smart TV gera verificationUrl com domínio de preview
