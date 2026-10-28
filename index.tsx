@@ -83,7 +83,7 @@ async function loadInitialState() {
         content: localContent,
         notifications: [],
         customSections: localCustomSections,
-        auth: true, // ZERO LOGIN - SEM CADASTRO
+        auth: false, // Inicia anônimo por padrão; sessão real é validada via cookie HttpOnly em authClient.checkSession()
         currentUser: defaultUser,
         activeProfile: defaultProfile,
         theme,

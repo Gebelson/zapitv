@@ -28,12 +28,15 @@ interface HeaderProps {
   onOpenDiagnostics?: () => void;
   onSearchSubmit?: (query: string) => void;
   onClearSearch?: () => void;
+  isAuthenticated?: boolean;
+  onOpenLogin?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
   isDarkMode, setIsDarkMode, currentUser, activeProfile, currentView = 'home', setCurrentView, 
   onSwitchProfile, onSelectProfile, searchQuery, setSearchQuery, onSelectContent, allContent = [],
-  notifications = [], onLogout, onToggleMobileMenu, onOpenDiagnostics, onSearchSubmit, onClearSearch
+  notifications = [], onLogout, onToggleMobileMenu, onOpenDiagnostics, onSearchSubmit, onClearSearch,
+  isAuthenticated = false, onOpenLogin
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -785,18 +788,27 @@ const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        <div className="relative" ref={profileRef}>
+        {!isAuthenticated ? (
           <button 
-            onClick={() => setShowDropdown(!showDropdown)} 
-            className={`flex items-center gap-1 sm:gap-1.5 p-0.5 md:p-1 rounded-lg transition-all group ${
-              showDropdown ? 'opacity-100' : 'opacity-90'
-            }`}
+            type="button"
+            onClick={onOpenLogin || (() => setCurrentView('login'))}
+            className="px-4 py-2 bg-[#007df7] hover:bg-[#0069d9] text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 cursor-pointer whitespace-nowrap"
           >
-            <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded overflow-hidden shadow-lg group-hover:scale-105 transition-transform">
-              <img src={activeProfile?.avatar || 'https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png'} className="w-full h-full object-cover" loading="lazy" />
-            </div>
-            <div className={`w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] transition-transform duration-300 ${isDarkMode ? 'border-t-white' : 'border-t-gray-800'} ${showDropdown ? 'rotate-180' : ''}`} />
+            Entrar
           </button>
+        ) : (
+          <div className="relative" ref={profileRef}>
+            <button 
+              onClick={() => setShowDropdown(!showDropdown)} 
+              className={`flex items-center gap-1 sm:gap-1.5 p-0.5 md:p-1 rounded-lg transition-all group ${
+                showDropdown ? 'opacity-100' : 'opacity-90'
+              }`}
+            >
+              <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 rounded overflow-hidden shadow-lg group-hover:scale-105 transition-transform">
+                <img src={activeProfile?.avatar || 'https://upload.wikimedia.org/wikipedia/commons/0/0b/Netflix-avatar.png'} className="w-full h-full object-cover" loading="lazy" />
+              </div>
+              <div className={`w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] transition-transform duration-300 ${isDarkMode ? 'border-t-white' : 'border-t-gray-800'} ${showDropdown ? 'rotate-180' : ''}`} />
+            </button>
 
           {showDropdown && (
             <div 
@@ -901,6 +913,7 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           )}
         </div>
+      )}
       </div>
       
       {/* Renderiza o modal se houver tentativa de troca protegida */}

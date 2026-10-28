@@ -1810,8 +1810,8 @@ var init_tmdbClient = __esm({
       }
       async getDetails(id, type, mediaFormat) {
         const isMovie = mediaFormat === "movie" || mediaFormat !== "series" && type === "FILME" /* MOVIE */;
-        const path6 = isMovie ? `/movie/${id}` : `/tv/${id}`;
-        const data = await this.request(`${path6}?append_to_response=credits,external_ids,recommendations,similar`);
+        const path7 = isMovie ? `/movie/${id}` : `/tv/${id}`;
+        const data = await this.request(`${path7}?append_to_response=credits,external_ids,recommendations,similar`);
         const formatted = formatContentItem(data, type);
         const imdbId = data.external_ids?.imdb_id;
         if (imdbId) {
@@ -2602,21 +2602,21 @@ var init_stremioClient = __esm({
         return this.fetchWithFallback("manifest.json");
       }
       async getCatalog(type, id, extra) {
-        let path6 = `catalog/${type}/${id}`;
+        let path7 = `catalog/${type}/${id}`;
         if (extra && Object.keys(extra).length > 0) {
           const queryParts = Object.entries(extra).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
-          path6 += `/${queryParts}`;
+          path7 += `/${queryParts}`;
         }
-        path6 += ".json";
-        return this.fetchWithFallback(path6);
+        path7 += ".json";
+        return this.fetchWithFallback(path7);
       }
       async getMeta(type, id) {
-        const path6 = `meta/${type}/${encodeURIComponent(id)}.json`;
-        return this.fetchWithFallback(path6);
+        const path7 = `meta/${type}/${encodeURIComponent(id)}.json`;
+        return this.fetchWithFallback(path7);
       }
       async getStreams(type, id) {
-        const path6 = `stream/${type}/${encodeURIComponent(id)}.json`;
-        return this.fetchWithFallback(path6);
+        const path7 = `stream/${type}/${encodeURIComponent(id)}.json`;
+        return this.fetchWithFallback(path7);
       }
     };
   }
@@ -3461,13 +3461,13 @@ var init_streamQuarantineService = __esm({
        */
       evaluateQuarantine(stream, targetTitle) {
         if (!stream) return { isQuarantined: true, reason: "Stream nulo ou inv\xE1lido" };
-        const hash = (stream.infoHash || "").trim().toLowerCase();
+        const hash2 = (stream.infoHash || "").trim().toLowerCase();
         const url = (stream.url || "").trim().toLowerCase();
         const title = (stream.title || "").toLowerCase();
         const name = (stream.name || "").toLowerCase();
-        const combined = `${name} ${title} ${url} ${hash}`;
-        if (hash && this.quarantinedMap.has(hash)) {
-          return { isQuarantined: true, reason: this.quarantinedMap.get(hash)?.reason || "Hash em quarentena" };
+        const combined = `${name} ${title} ${url} ${hash2}`;
+        if (hash2 && this.quarantinedMap.has(hash2)) {
+          return { isQuarantined: true, reason: this.quarantinedMap.get(hash2)?.reason || "Hash em quarentena" };
         }
         if (url && this.quarantinedMap.has(url)) {
           return { isQuarantined: true, reason: this.quarantinedMap.get(url)?.reason || "URL em quarentena" };
@@ -3475,7 +3475,7 @@ var init_streamQuarantineService = __esm({
         for (const adultTerm of ADULT_ACTORS_AND_TERMS) {
           if (combined.includes(adultTerm)) {
             const reason = `Conte\xFAdo adulto/trote detectado: termo "${adultTerm}"`;
-            if (hash) this.quarantine(hash, reason, "adult_troll", targetTitle, stream.providerName);
+            if (hash2) this.quarantine(hash2, reason, "adult_troll", targetTitle, stream.providerName);
             if (url) this.quarantine(url, reason, "adult_troll", targetTitle, stream.providerName);
             return { isQuarantined: true, reason };
           }
@@ -18932,10 +18932,10 @@ var init_rewriteHlsManifest = __esm({
 
 // server.ts
 init_verifiedCatalog();
-import express from "express";
-import path5 from "path";
+import express2 from "express";
+import path6 from "path";
 import { fileURLToPath } from "url";
-import fs5 from "fs";
+import fs6 from "fs";
 
 // src/core/audio/audioDetector.ts
 init_sourceSelectionService();
@@ -22993,10 +22993,13 @@ __export(schema_exports, {
   adminAudit: () => adminAudit,
   episodes: () => episodes,
   globalSettings: () => globalSettings,
+  loginAttempts: () => loginAttempts,
   media: () => media,
   mediaExternalIds: () => mediaExternalIds,
+  sessions: () => sessions,
   sourceEvidenceTickets: () => sourceEvidenceTickets,
   sourceReliability: () => sourceReliability,
+  users: () => users,
   watchpartyRooms: () => watchpartyRooms,
   watchpartySignals: () => watchpartySignals
 });
@@ -23111,19 +23114,117 @@ var watchpartySignals = sqliteTable("watchparty_signals", {
 }, (table) => [
   index("watchparty_signals_room_time_idx").on(table.roomId, table.timestamp)
 ]);
+var users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  status: text("status", { enum: ["active", "suspended", "pending_verification"] }).notNull().default("active"),
+  termsAcceptedAt: integer("terms_accepted_at").notNull(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull()
+}, (table) => [
+  uniqueIndex("users_email_idx").on(table.email),
+  index("users_created_at_idx").on(table.createdAt)
+]);
+var sessions = sqliteTable("sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  expiresAt: integer("expires_at").notNull(),
+  revokedAt: integer("revoked_at"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull()
+}, (table) => [
+  uniqueIndex("sessions_token_hash_idx").on(table.tokenHash),
+  index("sessions_user_id_idx").on(table.userId),
+  index("sessions_expires_at_idx").on(table.expiresAt)
+]);
+var loginAttempts = sqliteTable("login_attempts", {
+  id: text("id").primaryKey(),
+  identifier: text("identifier").notNull(),
+  attemptAt: integer("attempt_at").notNull(),
+  success: integer("success").notNull().default(0),
+  ipAddress: text("ip_address")
+}, (table) => [
+  index("login_attempts_identifier_time_idx").on(table.identifier, table.attemptAt)
+]);
 
 // src/server/database/client.ts
+import fs2 from "fs";
+import path2 from "path";
 function createDatabase(url, authToken) {
+  if (url.startsWith("file:") && !url.includes(":memory:")) {
+    const filePath = url.replace(/^file:/, "");
+    const dir = path2.dirname(filePath);
+    if (dir && dir !== "." && !fs2.existsSync(dir)) {
+      try {
+        fs2.mkdirSync(dir, { recursive: true });
+      } catch {
+      }
+    }
+  }
   const client = createClient({ url, authToken });
   return { client, db: drizzle(client, { schema: schema_exports }) };
 }
 var sharedDatabase;
 function getDatabase() {
-  const url = process.env.TURSO_DATABASE_URL;
+  const url = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL;
   const token = process.env.TURSO_AUTH_TOKEN;
-  if (!url || !token && !url.startsWith("file:")) return null;
+  if (!url || !token && !url.startsWith("file:")) {
+    const isProd = process.env.NODE_ENV === "production";
+    if (process.env.ALLOW_LOCAL_DB === "true" || !isProd || Boolean(process.env.VITEST)) {
+      const localUrl = process.env.LOCAL_DB_URL || "file:data/zapitv_auth.db";
+      sharedDatabase ??= createDatabase(localUrl);
+      return sharedDatabase;
+    }
+    return null;
+  }
   sharedDatabase ??= createDatabase(url, token);
   return sharedDatabase;
+}
+async function ensureAuthTables(database) {
+  await database.client.executeMultiple(`
+    CREATE TABLE IF NOT EXISTS users (
+      id text PRIMARY KEY NOT NULL,
+      name text NOT NULL,
+      email text NOT NULL,
+      password_hash text NOT NULL,
+      status text DEFAULT 'active' NOT NULL,
+      terms_accepted_at integer NOT NULL,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS users_email_idx ON users (email);
+    CREATE INDEX IF NOT EXISTS users_created_at_idx ON users (created_at);
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id text PRIMARY KEY NOT NULL,
+      user_id text NOT NULL,
+      token_hash text NOT NULL,
+      ip_address text,
+      user_agent text,
+      expires_at integer NOT NULL,
+      revoked_at integer,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS sessions_token_hash_idx ON sessions (token_hash);
+    CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions (user_id);
+    CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions (expires_at);
+
+    CREATE TABLE IF NOT EXISTS login_attempts (
+      id text PRIMARY KEY NOT NULL,
+      identifier text NOT NULL,
+      attempt_at integer NOT NULL,
+      success integer DEFAULT 0 NOT NULL,
+      ip_address text
+    );
+    CREATE INDEX IF NOT EXISTS login_attempts_identifier_time_idx ON login_attempts (identifier, attempt_at);
+  `);
 }
 
 // src/server/catalog/releaseRepository.ts
@@ -23271,8 +23372,8 @@ function mergeSnapshots(latest, scanned) {
 }
 
 // src/core/recommendations/CollaborativeTrainer.ts
-import fs2 from "fs";
-import path2 from "path";
+import fs3 from "fs";
+import path3 from "path";
 
 // src/core/recommendations/collaborativeTypes.ts
 var DEFAULT_ACTIVATION_CRITERIA = {
@@ -23286,15 +23387,15 @@ var DEFAULT_ACTIVATION_CRITERIA = {
 var CollaborativeTrainer = class {
   constructor(dataDir, criteria = DEFAULT_ACTIVATION_CRITERIA) {
     this.activeModel = null;
-    const baseDir = dataDir || path2.resolve(process.cwd(), "data");
-    if (!fs2.existsSync(baseDir)) {
+    const baseDir = dataDir || path3.resolve(process.cwd(), "data");
+    if (!fs3.existsSync(baseDir)) {
       try {
-        fs2.mkdirSync(baseDir, { recursive: true });
+        fs3.mkdirSync(baseDir, { recursive: true });
       } catch {
       }
     }
-    this.eventsPath = path2.join(baseDir, "collaborative_events.jsonl");
-    this.modelPath = path2.join(baseDir, "collaborative_model.json");
+    this.eventsPath = path3.join(baseDir, "collaborative_events.jsonl");
+    this.modelPath = path3.join(baseDir, "collaborative_model.json");
     this.criteria = criteria;
     this.loadModelSync();
   }
@@ -23303,8 +23404,8 @@ var CollaborativeTrainer = class {
    */
   loadModelSync() {
     try {
-      if (fs2.existsSync(this.modelPath)) {
-        const raw = fs2.readFileSync(this.modelPath, "utf8");
+      if (fs3.existsSync(this.modelPath)) {
+        const raw = fs3.readFileSync(this.modelPath, "utf8");
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === "object") {
           this.activeModel = parsed;
@@ -23344,7 +23445,7 @@ var CollaborativeTrainer = class {
       timestamp: Number(event.timestamp) || Date.now()
     }) + "\n";
     try {
-      await fs2.promises.appendFile(this.eventsPath, line, "utf8");
+      await fs3.promises.appendFile(this.eventsPath, line, "utf8");
       return true;
     } catch (e) {
       console.error("Falha ao registrar evento colaborativo:", e);
@@ -23357,11 +23458,11 @@ var CollaborativeTrainer = class {
    */
   async loadAllDeduplicatedEvents() {
     const userItemMatrix = /* @__PURE__ */ new Map();
-    if (!fs2.existsSync(this.eventsPath)) {
+    if (!fs3.existsSync(this.eventsPath)) {
       return userItemMatrix;
     }
     try {
-      const content = await fs2.promises.readFile(this.eventsPath, "utf8");
+      const content = await fs3.promises.readFile(this.eventsPath, "utf8");
       const lines = content.split("\n");
       for (const line of lines) {
         const trimmed = line.trim();
@@ -23401,17 +23502,17 @@ var CollaborativeTrainer = class {
     userItemMatrix.forEach((items2, userId) => {
       items2.forEach((rating, itemId) => {
         totalInteractions++;
-        let users = itemUserMatrix.get(itemId);
-        if (!users) {
-          users = /* @__PURE__ */ new Map();
-          itemUserMatrix.set(itemId, users);
+        let users2 = itemUserMatrix.get(itemId);
+        if (!users2) {
+          users2 = /* @__PURE__ */ new Map();
+          itemUserMatrix.set(itemId, users2);
         }
-        users.set(userId, rating);
+        users2.set(userId, rating);
       });
     });
-    itemUserMatrix.forEach((users, itemId) => {
+    itemUserMatrix.forEach((users2, itemId) => {
       let sumSq = 0;
-      users.forEach((r) => {
+      users2.forEach((r) => {
         sumSq += r * r;
       });
       itemNorms.set(itemId, Math.sqrt(sumSq));
@@ -23480,7 +23581,7 @@ var CollaborativeTrainer = class {
     };
     this.activeModel = model;
     try {
-      await fs2.promises.writeFile(this.modelPath, JSON.stringify(model, null, 2), "utf8");
+      await fs3.promises.writeFile(this.modelPath, JSON.stringify(model, null, 2), "utf8");
     } catch (e) {
       console.error("Erro ao persistir modelo colaborativo:", e);
     }
@@ -23491,9 +23592,9 @@ var CollaborativeTrainer = class {
    * (direito ao esquecimento / revogação de consentimento).
    */
   async purgeUserData(anonymousId) {
-    if (!anonymousId || !fs2.existsSync(this.eventsPath)) return false;
+    if (!anonymousId || !fs3.existsSync(this.eventsPath)) return false;
     try {
-      const content = await fs2.promises.readFile(this.eventsPath, "utf8");
+      const content = await fs3.promises.readFile(this.eventsPath, "utf8");
       const lines = content.split("\n");
       const keptLines = [];
       for (const line of lines) {
@@ -23508,7 +23609,7 @@ var CollaborativeTrainer = class {
           keptLines.push(line);
         }
       }
-      await fs2.promises.writeFile(this.eventsPath, keptLines.join("\n") + (keptLines.length > 0 ? "\n" : ""), "utf8");
+      await fs3.promises.writeFile(this.eventsPath, keptLines.join("\n") + (keptLines.length > 0 ? "\n" : ""), "utf8");
       this.train().catch(() => {
       });
       return true;
@@ -23527,8 +23628,8 @@ init_BannedContentRegistry();
 import { and as and2, eq as eq2 } from "drizzle-orm";
 
 // src/core/feedback/FeedbackStore.ts
-import * as fs3 from "fs";
-import path3 from "path";
+import * as fs4 from "fs";
+import path4 from "path";
 
 // src/core/feedback/feedbackTypes.ts
 var FEEDBACK_CATEGORY_LABELS = {
@@ -23961,12 +24062,12 @@ var FeedbackClusteringEngine = class {
     return { updatedCluster, isRegressionDetected: isRegression };
   }
   static hashString(str) {
-    let hash = 5381;
+    let hash2 = 5381;
     for (let i = 0; i < str.length; i++) {
-      hash = (hash << 5) + hash + str.charCodeAt(i);
-      hash = hash & hash;
+      hash2 = (hash2 << 5) + hash2 + str.charCodeAt(i);
+      hash2 = hash2 & hash2;
     }
-    return Math.abs(hash).toString(36);
+    return Math.abs(hash2).toString(36);
   }
 };
 
@@ -24391,7 +24492,7 @@ var FeedbackStore = class _FeedbackStore {
     this.isLoaded = false;
     this.shouldPersist = true;
     this.shouldPersist = shouldPersist;
-    this.storageFilePath = path3.resolve(process.cwd(), "data", "feedback_store.json");
+    this.storageFilePath = path4.resolve(process.cwd(), "data", "feedback_store.json");
     if (this.shouldPersist) {
       this.loadFromStorage();
     } else {
@@ -24422,7 +24523,7 @@ var FeedbackStore = class _FeedbackStore {
   loadFromStorage() {
     if (this.isLoaded) return;
     try {
-      const fsModule = fs3;
+      const fsModule = fs4;
       if (fsModule && typeof fsModule.existsSync === "function") {
         if (fsModule.existsSync(this.storageFilePath)) {
           const raw = fsModule.readFileSync(this.storageFilePath, "utf8");
@@ -24431,7 +24532,7 @@ var FeedbackStore = class _FeedbackStore {
           this.clusters = Array.isArray(data.clusters) ? data.clusters : [];
           this.prompts = Array.isArray(data.prompts) ? data.prompts : [];
         } else {
-          const dataDir = path3.dirname(this.storageFilePath);
+          const dataDir = path4.dirname(this.storageFilePath);
           if (typeof fsModule.mkdirSync === "function" && !fsModule.existsSync(dataDir)) {
             fsModule.mkdirSync(dataDir, { recursive: true });
           }
@@ -24452,9 +24553,9 @@ var FeedbackStore = class _FeedbackStore {
   saveToStorage() {
     if (!this.shouldPersist) return;
     try {
-      const fsModule = fs3;
+      const fsModule = fs4;
       if (!fsModule || typeof fsModule.writeFileSync !== "function") return;
-      const dataDir = path3.dirname(this.storageFilePath);
+      const dataDir = path4.dirname(this.storageFilePath);
       if (typeof fsModule.mkdirSync === "function" && !fsModule.existsSync(dataDir)) {
         fsModule.mkdirSync(dataDir, { recursive: true });
       }
@@ -25867,6 +25968,506 @@ watchPartyRouter.delete("/room/:roomId", async (req, res) => {
   return res.json({ ok: true });
 });
 
+// src/server/auth/routes.ts
+import express from "express";
+import crypto4 from "crypto";
+import { eq as eq7 } from "drizzle-orm";
+
+// src/server/auth/sessionService.ts
+import crypto2 from "crypto";
+import { eq as eq5, and as and5, isNull as isNull2, gt as gt2 } from "drizzle-orm";
+var SESSION_COOKIE_NAME = "zapitv_session";
+var SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1e3;
+function hashSessionToken(token) {
+  return crypto2.createHash("sha256").update(token).digest("hex");
+}
+function generateSessionToken() {
+  return crypto2.randomBytes(32).toString("hex");
+}
+async function createSession(db, userId, meta) {
+  const token = generateSessionToken();
+  const tokenHash = hashSessionToken(token);
+  const now = Date.now();
+  const expiresAt = now + (meta?.durationMs || SESSION_DURATION_MS);
+  const sessionId = crypto2.randomUUID();
+  await db.db.insert(sessions).values({
+    id: sessionId,
+    userId,
+    tokenHash,
+    ipAddress: meta?.ipAddress?.slice(0, 45) || null,
+    userAgent: meta?.userAgent?.slice(0, 255) || null,
+    expiresAt,
+    revokedAt: null,
+    createdAt: now,
+    updatedAt: now
+  });
+  return { token, expiresAt, sessionId };
+}
+async function validateSession(db, token) {
+  if (!token || typeof token !== "string" || token.length < 32) {
+    return null;
+  }
+  const tokenHash = hashSessionToken(token);
+  const now = Date.now();
+  const found = await db.db.select({
+    sessionId: sessions.id,
+    expiresAt: sessions.expiresAt,
+    revokedAt: sessions.revokedAt,
+    userId: users.id,
+    userName: users.name,
+    userEmail: users.email,
+    userStatus: users.status,
+    userCreatedAt: users.createdAt
+  }).from(sessions).innerJoin(users, eq5(sessions.userId, users.id)).where(
+    and5(
+      eq5(sessions.tokenHash, tokenHash),
+      isNull2(sessions.revokedAt),
+      gt2(sessions.expiresAt, now),
+      eq5(users.status, "active")
+    )
+  ).limit(1);
+  if (!found || found.length === 0) {
+    return null;
+  }
+  const row = found[0];
+  return {
+    user: {
+      id: row.userId,
+      name: row.userName,
+      email: row.userEmail,
+      status: row.userStatus,
+      createdAt: row.userCreatedAt
+    },
+    sessionId: row.sessionId,
+    expiresAt: row.expiresAt
+  };
+}
+async function revokeSession(db, token) {
+  if (!token) return false;
+  const tokenHash = hashSessionToken(token);
+  const now = Date.now();
+  const res = await db.db.update(sessions).set({ revokedAt: now, updatedAt: now }).where(and5(eq5(sessions.tokenHash, tokenHash), isNull2(sessions.revokedAt)));
+  return true;
+}
+function extractCookie(cookieHeader, cookieName = SESSION_COOKIE_NAME) {
+  if (!cookieHeader) return null;
+  const cookies = cookieHeader.split(";");
+  for (const c of cookies) {
+    const [name, ...val] = c.trim().split("=");
+    if (name === cookieName) {
+      return decodeURIComponent(val.join("="));
+    }
+  }
+  return null;
+}
+function formatSetCookie(token, options) {
+  if (options.clear) {
+    return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${options.isProduction ? "; Secure" : ""}`;
+  }
+  const maxAge = options.maxAgeSeconds ?? Math.floor(SESSION_DURATION_MS / 1e3);
+  const expires = options.expiresAt ? new Date(options.expiresAt).toUTCString() : void 0;
+  let cookieStr = `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+  if (expires) cookieStr += `; Expires=${expires}`;
+  if (options.isProduction) cookieStr += "; Secure";
+  return cookieStr;
+}
+
+// src/server/auth/authMiddleware.ts
+var authTablesEnsured = false;
+async function getValidDatabase() {
+  const db = getDatabase();
+  if (db && !authTablesEnsured) {
+    try {
+      await ensureAuthTables(db);
+      authTablesEnsured = true;
+    } catch {
+    }
+  }
+  return db;
+}
+function extractSessionToken(req) {
+  const cookieHeader = req.headers.cookie;
+  const fromCookie = extractCookie(cookieHeader, SESSION_COOKIE_NAME);
+  if (fromCookie) return fromCookie;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+    return authHeader.slice(7).trim();
+  }
+  return null;
+}
+async function optionalUser(req, _res, next) {
+  try {
+    const token = extractSessionToken(req);
+    if (!token) {
+      req.user = null;
+      return next();
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      req.user = null;
+      return next();
+    }
+    const sessionData = await validateSession(db, token);
+    req.user = sessionData ? sessionData.user : null;
+    req.sessionId = sessionData?.sessionId;
+    next();
+  } catch (err) {
+    req.user = null;
+    next();
+  }
+}
+async function authenticateUser(req, res, next) {
+  try {
+    const token = extractSessionToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Autentica\xE7\xE3o necess\xE1ria. Fa\xE7a login para continuar." });
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Servi\xE7o de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
+    }
+    const sessionData = await validateSession(db, token);
+    if (!sessionData) {
+      return res.status(401).json({ error: "Sess\xE3o inv\xE1lida ou expirada. Fa\xE7a login novamente." });
+    }
+    req.user = sessionData.user;
+    req.sessionId = sessionData.sessionId;
+    next();
+  } catch (err) {
+    return res.status(500).json({ error: "Erro ao validar autentica\xE7\xE3o." });
+  }
+}
+function requireCsrfProtection(req, res, next) {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    return next();
+  }
+  const origin = req.headers.origin;
+  const referer = req.headers.referer;
+  const host = req.headers.host;
+  const sourceUrl = origin || referer;
+  if (sourceUrl && host) {
+    try {
+      const sourceHost = new URL(sourceUrl).host;
+      if (sourceHost !== host) {
+        return res.status(403).json({ error: "Origem da requisi\xE7\xE3o n\xE3o autorizada (CSRF bloqueado)." });
+      }
+    } catch {
+      return res.status(403).json({ error: "Origem inv\xE1lida detectada." });
+    }
+  }
+  next();
+}
+
+// src/server/auth/passwordService.ts
+import { hash, verify } from "@node-rs/argon2";
+var ARGON2_CONFIG = {
+  algorithm: 2,
+  memoryCost: 19456,
+  // 19 MB
+  timeCost: 2,
+  // 2 iterações
+  outputLen: 32,
+  // 256 bits de saída
+  parallelism: 1
+};
+async function hashPassword(plainPassword) {
+  if (!plainPassword || typeof plainPassword !== "string") {
+    throw new Error("Senha inv\xE1lida para hash.");
+  }
+  return await hash(plainPassword, ARGON2_CONFIG);
+}
+async function verifyPassword(passwordHash, plainPassword) {
+  if (!passwordHash || !plainPassword) return false;
+  try {
+    return await verify(passwordHash, plainPassword);
+  } catch {
+    return false;
+  }
+}
+
+// src/server/auth/rateLimitService.ts
+import crypto3 from "crypto";
+import { eq as eq6, and as and6, gt as gt3, desc as desc2 } from "drizzle-orm";
+var MAX_FAILED_ATTEMPTS = 5;
+var LOCKOUT_WINDOW_MS = 15 * 60 * 1e3;
+var memoryLockouts = /* @__PURE__ */ new Map();
+var RateLimitService = class {
+  /**
+   * Limpa registros expirados da memória
+   */
+  static pruneMemory() {
+    const now = Date.now();
+    for (const [key, val] of memoryLockouts.entries()) {
+      if (val.lockedUntil < now && now - val.lastAttemptAt > LOCKOUT_WINDOW_MS) {
+        memoryLockouts.delete(key);
+      }
+    }
+  }
+  /**
+   * Verifica se o identificador (e-mail ou IP) está temporariamente bloqueado.
+   * Consulta primeiro a memória rápida (L1) e em seguida a tabela persistente
+   * login_attempts no banco de dados para garantir proteção entre réplicas e serverless.
+   */
+  static async isLocked(db, identifier) {
+    this.pruneMemory();
+    const cleanId = identifier.trim().toLowerCase();
+    const record = memoryLockouts.get(cleanId);
+    const now = Date.now();
+    if (record && record.lockedUntil > now) {
+      const remainingSeconds = Math.ceil((record.lockedUntil - now) / 1e3);
+      return { locked: true, remainingSeconds };
+    }
+    if (db) {
+      try {
+        const threshold = now - LOCKOUT_WINDOW_MS;
+        const attempts = await db.db.select({ attemptAt: loginAttempts.attemptAt, success: loginAttempts.success }).from(loginAttempts).where(and6(eq6(loginAttempts.identifier, cleanId), gt3(loginAttempts.attemptAt, threshold))).orderBy(desc2(loginAttempts.attemptAt));
+        let consecutiveFailures = 0;
+        let latestFailureTime = 0;
+        for (const a of attempts) {
+          if (a.success === 1) break;
+          consecutiveFailures++;
+          if (a.attemptAt > latestFailureTime) latestFailureTime = a.attemptAt;
+        }
+        if (consecutiveFailures >= MAX_FAILED_ATTEMPTS) {
+          const lockedUntil = latestFailureTime + LOCKOUT_WINDOW_MS;
+          if (lockedUntil > now) {
+            const remainingSeconds = Math.ceil((lockedUntil - now) / 1e3);
+            memoryLockouts.set(cleanId, { failures: consecutiveFailures, lastAttemptAt: latestFailureTime, lockedUntil });
+            return { locked: true, remainingSeconds };
+          }
+        }
+      } catch {
+      }
+    }
+    return { locked: false, remainingSeconds: 0 };
+  }
+  /**
+   * Registra uma falha de autenticação e calcula eventual bloqueio
+   */
+  static async recordFailure(db, identifier, ipAddress) {
+    const cleanId = identifier.trim().toLowerCase();
+    const now = Date.now();
+    const existing = memoryLockouts.get(cleanId);
+    const failures = existing && now - existing.lastAttemptAt < LOCKOUT_WINDOW_MS ? existing.failures + 1 : 1;
+    const locked = failures >= MAX_FAILED_ATTEMPTS;
+    const lockedUntil = locked ? now + LOCKOUT_WINDOW_MS : 0;
+    memoryLockouts.set(cleanId, {
+      failures,
+      lastAttemptAt: now,
+      lockedUntil
+    });
+    if (db) {
+      try {
+        await db.db.insert(loginAttempts).values({
+          id: crypto3.randomUUID(),
+          identifier: cleanId,
+          attemptAt: now,
+          success: 0,
+          ipAddress: ipAddress?.slice(0, 45) || null
+        });
+      } catch (err) {
+      }
+    }
+    const remainingAttempts = Math.max(0, MAX_FAILED_ATTEMPTS - failures);
+    const remainingSeconds = locked ? Math.ceil(LOCKOUT_WINDOW_MS / 1e3) : 0;
+    return { locked, remainingAttempts, remainingSeconds };
+  }
+  /**
+   * Registra sucesso e limpa o histórico de falhas do identificador
+   */
+  static async recordSuccess(db, identifier, ipAddress) {
+    const cleanId = identifier.trim().toLowerCase();
+    memoryLockouts.delete(cleanId);
+    if (db) {
+      try {
+        await db.db.insert(loginAttempts).values({
+          id: crypto3.randomUUID(),
+          identifier: cleanId,
+          attemptAt: Date.now(),
+          success: 1,
+          ipAddress: ipAddress?.slice(0, 45) || null
+        });
+      } catch {
+      }
+    }
+  }
+  /**
+   * Método de teste para resetar memória de bloqueios
+   */
+  static resetForTesting() {
+    memoryLockouts.clear();
+  }
+};
+
+// src/server/auth/routes.ts
+var authRouter = express.Router();
+var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+var isProduction = process.env.NODE_ENV === "production";
+authRouter.use(requireCsrfProtection);
+authRouter.post("/register", async (req, res) => {
+  try {
+    const { name, email, password, passwordConfirm, termsAccepted } = req.body || {};
+    const cleanName = typeof name === "string" ? name.trim() : "";
+    if (!cleanName || cleanName.length < 2 || cleanName.length > 100) {
+      return res.status(400).json({ error: "O nome deve conter entre 2 e 100 caracteres." });
+    }
+    const cleanEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    if (!cleanEmail || !EMAIL_REGEX.test(cleanEmail) || cleanEmail.length > 255) {
+      return res.status(400).json({ error: "Informe um endere\xE7o de e-mail v\xE1lido." });
+    }
+    if (typeof password !== "string" || password.length < 8 || password.length > 128) {
+      return res.status(400).json({ error: "A senha deve conter no m\xEDnimo 8 caracteres." });
+    }
+    const hasLetter = /[a-zA-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    if (!hasLetter || !hasNumber) {
+      return res.status(400).json({ error: "A senha deve conter pelo menos uma letra e um n\xFAmero." });
+    }
+    if (password !== passwordConfirm) {
+      return res.status(400).json({ error: "A confirma\xE7\xE3o de senha n\xE3o confere." });
+    }
+    if (termsAccepted !== true) {
+      return res.status(400).json({ error: "\xC9 necess\xE1rio concordar com os Termos de Uso e Pol\xEDtica de Privacidade." });
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
+    }
+    const existing = await db.db.select({ id: users.id }).from(users).where(eq7(users.email, cleanEmail)).limit(1);
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "Este e-mail j\xE1 est\xE1 cadastrado na ZapiTV." });
+    }
+    const passwordHash = await hashPassword(password);
+    const userId = crypto4.randomUUID();
+    const now = Date.now();
+    await db.db.insert(users).values({
+      id: userId,
+      name: cleanName,
+      email: cleanEmail,
+      passwordHash,
+      status: "active",
+      termsAcceptedAt: now,
+      createdAt: now,
+      updatedAt: now
+    });
+    const clientIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress;
+    const userAgent = req.headers["user-agent"];
+    const session = await createSession(db, userId, { ipAddress: clientIp, userAgent });
+    res.setHeader("Set-Cookie", formatSetCookie(session.token, { expiresAt: session.expiresAt, isProduction }));
+    return res.status(201).json({
+      message: "Conta criada com sucesso!",
+      user: {
+        id: userId,
+        name: cleanName,
+        email: cleanEmail,
+        status: "active",
+        createdAt: now
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Ocorreu um erro interno ao processar o cadastro." });
+  }
+});
+authRouter.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    const clientIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+    const cleanEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    if (!cleanEmail || typeof password !== "string" || !password) {
+      return res.status(400).json({ error: "E-mail e senha s\xE3o obrigat\xF3rios." });
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
+    }
+    const emailLock = await RateLimitService.isLocked(db, cleanEmail);
+    const ipLock = await RateLimitService.isLocked(db, clientIp);
+    if (emailLock.locked || ipLock.locked) {
+      const waitSeconds = Math.max(emailLock.remainingSeconds, ipLock.remainingSeconds);
+      return res.status(429).json({
+        error: "Muitas tentativas de login com falha. Por seguran\xE7a, tente novamente mais tarde.",
+        retryAfterSeconds: waitSeconds
+      });
+    }
+    const foundUsers = await db.db.select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      passwordHash: users.passwordHash,
+      status: users.status,
+      createdAt: users.createdAt
+    }).from(users).where(eq7(users.email, cleanEmail)).limit(1);
+    if (foundUsers.length === 0) {
+      await RateLimitService.recordFailure(db, cleanEmail, clientIp);
+      await RateLimitService.recordFailure(db, clientIp, clientIp);
+      return res.status(401).json({ error: "E-mail ou senha incorretos." });
+    }
+    const user = foundUsers[0];
+    if (user.status !== "active") {
+      return res.status(403).json({ error: "Esta conta encontra-se suspensa ou desativada." });
+    }
+    const isPasswordValid = await verifyPassword(user.passwordHash, password);
+    if (!isPasswordValid) {
+      await RateLimitService.recordFailure(db, cleanEmail, clientIp);
+      await RateLimitService.recordFailure(db, clientIp, clientIp);
+      return res.status(401).json({ error: "E-mail ou senha incorretos." });
+    }
+    await RateLimitService.recordSuccess(db, cleanEmail, clientIp);
+    await RateLimitService.recordSuccess(db, clientIp, clientIp);
+    const userAgent = req.headers["user-agent"];
+    const session = await createSession(db, user.id, { ipAddress: clientIp, userAgent });
+    res.setHeader("Set-Cookie", formatSetCookie(session.token, { expiresAt: session.expiresAt, isProduction }));
+    return res.status(200).json({
+      message: "Login realizado com sucesso!",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        status: user.status,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Ocorreu um erro interno ao processar o login." });
+  }
+});
+authRouter.post("/logout", async (req, res) => {
+  try {
+    const token = extractSessionToken(req);
+    const db = await getValidDatabase();
+    if (token && db) {
+      await revokeSession(db, token);
+    }
+    res.setHeader("Set-Cookie", formatSetCookie("", { clear: true, isProduction }));
+    return res.status(200).json({
+      success: true,
+      message: "Sess\xE3o encerrada com sucesso."
+    });
+  } catch (err) {
+    res.setHeader("Set-Cookie", formatSetCookie("", { clear: true, isProduction }));
+    return res.status(200).json({ success: true });
+  }
+});
+authRouter.get("/me", optionalUser, (req, res) => {
+  if (req.user) {
+    return res.status(200).json({
+      authenticated: true,
+      user: req.user
+    });
+  }
+  return res.status(200).json({
+    authenticated: false,
+    user: null
+  });
+});
+authRouter.get("/user/:id", authenticateUser, (req, res) => {
+  const requestedId = req.params.id;
+  if (req.user?.id !== requestedId) {
+    return res.status(403).json({ error: "Acesso negado aos dados de outro usu\xE1rio." });
+  }
+  return res.status(200).json({ user: req.user });
+});
+
 // src/server/security/publicHttp.ts
 import { lookup } from "node:dns/promises";
 import http from "node:http";
@@ -25987,8 +26588,8 @@ function normalizeProxyRange(raw) {
 }
 
 // src/server/livetv/epgSyncService.ts
-import fs4 from "fs";
-import path4 from "path";
+import fs5 from "fs";
+import path5 from "path";
 
 // src/core/livetv/epgSeedSnapshot.ts
 var EPG_SEED_SNAPSHOT = {
@@ -76301,7 +76902,7 @@ var EpgSyncService = class _EpgSyncService {
         type: "xmltv"
       }
     ];
-    this.cachePath = path4.resolve(process.cwd(), "data", "epg_cache.json");
+    this.cachePath = path5.resolve(process.cwd(), "data", "epg_cache.json");
     this.loadFromCacheOrSeed();
   }
   static getInstance() {
@@ -76312,8 +76913,8 @@ var EpgSyncService = class _EpgSyncService {
   }
   loadFromCacheOrSeed() {
     try {
-      if (fs4.existsSync(this.cachePath)) {
-        const raw = fs4.readFileSync(this.cachePath, "utf8");
+      if (fs5.existsSync(this.cachePath)) {
+        const raw = fs5.readFileSync(this.cachePath, "utf8");
         const parsed = JSON.parse(raw);
         if (parsed && parsed.schedules && typeof parsed.schedules === "object") {
           this.schedules = parsed.schedules;
@@ -76480,14 +77081,14 @@ var EpgSyncService = class _EpgSyncService {
   }
   persistCache() {
     try {
-      const cacheDir = path4.dirname(this.cachePath);
-      if (!fs4.existsSync(cacheDir)) fs4.mkdirSync(cacheDir, { recursive: true });
+      const cacheDir = path5.dirname(this.cachePath);
+      if (!fs5.existsSync(cacheDir)) fs5.mkdirSync(cacheDir, { recursive: true });
       const payload = {
         generatedAt: this.lastSyncTimestamp,
         channelsCount: Object.keys(this.schedules).length,
         schedules: this.schedules
       };
-      fs4.writeFileSync(this.cachePath, JSON.stringify(payload, null, 2), "utf8");
+      fs5.writeFileSync(this.cachePath, JSON.stringify(payload, null, 2), "utf8");
     } catch (err) {
       console.warn("[EpgSyncService] N\xE3o foi poss\xEDvel salvar data/epg_cache.json:", err.message);
     }
@@ -76548,10 +77149,10 @@ var EpgSyncService = class _EpgSyncService {
       const descMatch = body.match(/<desc[^>]*>([^<]+)<\/desc>/);
       const catMatch = body.match(/<category[^>]*>([^<]+)<\/category>/);
       const title = titleMatch ? titleMatch[1].trim() : "Sem t\xEDtulo";
-      const desc2 = descMatch ? descMatch[1].trim() : "";
+      const desc3 = descMatch ? descMatch[1].trim() : "";
       const category = catMatch ? catMatch[1].trim() : void 0;
       if (!map.has(ch)) map.set(ch, []);
-      map.get(ch).push({ start, stop, title, desc: desc2, category });
+      map.get(ch).push({ start, stop, title, desc: desc3, category });
       count++;
     }
     return { totalProgrammes: count, channels: map };
@@ -76606,8 +77207,8 @@ var EpgSyncService = class _EpgSyncService {
     const s = parseInt(parts.find((p) => p.type === "second")?.value || "0", 10);
     return h * 60 + m + s / 60;
   }
-  parseSportsDetails(title, desc2) {
-    const full = `${title} ${desc2 || ""}`.toLowerCase();
+  parseSportsDetails(title, desc3) {
+    const full = `${title} ${desc3 || ""}`.toLowerCase();
     const isLive = full.includes("ao vivo") || full.includes("ao-vivo") || full.includes("live");
     const isReplay = full.includes("reprise") || full.includes(" vt ") || full.includes("melhores momentos");
     let competition;
@@ -76632,7 +77233,7 @@ var EpgSyncService = class _EpgSyncService {
       }
     }
     const matchPattern = /([A-Za-zÀ-ÖØ-öø-ÿ\s]+)\s+x\s+([A-Za-zÀ-ÖØ-öø-ÿ\s]+)/i;
-    const matchResult = title.match(matchPattern) || desc2 && desc2.match(matchPattern);
+    const matchResult = title.match(matchPattern) || desc3 && desc3.match(matchPattern);
     if (matchResult) {
       teams = `${matchResult[1].trim()} x ${matchResult[2].trim()}`;
     }
@@ -76665,7 +77266,7 @@ var epgSyncService = EpgSyncService.getInstance();
 
 // server.ts
 var __filename = fileURLToPath(import.meta.url);
-var __dirname = path5.dirname(__filename);
+var __dirname = path6.dirname(__filename);
 async function checkStremioEngineStatus() {
   try {
     const probe = await fetch("http://127.0.0.1:11470/stats.json", { signal: AbortSignal.timeout(800) });
@@ -76692,7 +77293,7 @@ async function requireMaintenanceAdmin(req, res, next) {
   }
 }
 function createApp() {
-  const app2 = express();
+  const app2 = express2();
   const activeRequests = /* @__PURE__ */ new Map();
   const validationWindows = /* @__PURE__ */ new Map();
   const allowPublicRequest = (key, limit) => {
@@ -76720,11 +77321,13 @@ function createApp() {
         restQuery.delete("path");
         const restStr = restQuery.toString();
         req.url = `/api/${req.query.path}${restStr ? "?" + restStr : ""}`;
+      } else {
+        req.url = req.url.replace(/^\/api\/index/, "/api");
       }
     }
     next();
   });
-  app2.use(express.json());
+  app2.use(express2.json());
   app2.use("/api/watchparty", (req, res, next) => {
     if (!allowPublicRequest(`watchparty:${req.ip || "unknown"}`, 1800) || req.path === "/room/announce" && !allowPublicRequest(`watchparty-announce:${req.ip || "unknown"}`, 120)) {
       return res.status(429).set("Retry-After", "60").json({ error: "Muitas solicita\xE7\xF5es \xE0 sala." });
@@ -76760,6 +77363,7 @@ function createApp() {
   });
   app2.use("/api/db", databaseRouter);
   app2.use("/api/watchparty", watchPartyRouter);
+  app2.use("/api/auth", authRouter);
   function resolveOpenItemStreams(rawId, seasonNum = 1, episodeNum = 1) {
     let cleanId = rawId.replace(/\.json$/, "");
     if (cleanId.includes(":")) {
@@ -76808,11 +77412,11 @@ function createApp() {
   }
   function isSafeLegitStream(s) {
     if (!s) return false;
-    const hash = String(s.infoHash || "").toLowerCase();
+    const hash2 = String(s.infoHash || "").toLowerCase();
     const title = String(s.title || "").toLowerCase();
     const name = String(s.name || "").toLowerCase();
     const url = String(s.url || "").toLowerCase();
-    const combined = `${name} ${title} ${url} ${hash}`;
+    const combined = `${name} ${title} ${url} ${hash2}`;
     const bannedHashes = [
       "812efbe7d0a75fb31bf9426db566f299d10b3474",
       "6dc48c588dca97da6c610ae730c556a2c7c6718d",
@@ -76820,7 +77424,7 @@ function createApp() {
       "f9a842dfe9f5b2e7fda509f2306e0700b97a4036",
       "d0eacddff07a24173d8f7dc11a18ef3ed32b886a"
     ];
-    if (bannedHashes.some((h) => hash.includes(h) || url.includes(h))) return false;
+    if (bannedHashes.some((h) => hash2.includes(h) || url.includes(h))) return false;
     const adultTerms = [
       "khalifa",
       "mia khalifa",
@@ -77523,13 +78127,13 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       });
     }
   });
-  const FEATURED_CACHE_FILE = path5.resolve(process.cwd(), "data", "featured_weekly_selection.json");
-  const MONTHLY_FEATURED_CACHE_FILE = path5.resolve(process.cwd(), "data", "monthly_featured_rankings.json");
+  const FEATURED_CACHE_FILE = path6.resolve(process.cwd(), "data", "featured_weekly_selection.json");
+  const MONTHLY_FEATURED_CACHE_FILE = path6.resolve(process.cwd(), "data", "monthly_featured_rankings.json");
   monthlyFeaturedRankingService.setStorageAdapter({
     load: () => {
       try {
-        if (fs5.existsSync(MONTHLY_FEATURED_CACHE_FILE)) {
-          const raw = fs5.readFileSync(MONTHLY_FEATURED_CACHE_FILE, "utf-8");
+        if (fs6.existsSync(MONTHLY_FEATURED_CACHE_FILE)) {
+          const raw = fs6.readFileSync(MONTHLY_FEATURED_CACHE_FILE, "utf-8");
           if (raw) return JSON.parse(raw);
         }
       } catch (e) {
@@ -77539,11 +78143,11 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     },
     save: (data) => {
       try {
-        const dir = path5.dirname(MONTHLY_FEATURED_CACHE_FILE);
-        if (!fs5.existsSync(dir)) fs5.mkdirSync(dir, { recursive: true });
+        const dir = path6.dirname(MONTHLY_FEATURED_CACHE_FILE);
+        if (!fs6.existsSync(dir)) fs6.mkdirSync(dir, { recursive: true });
         const tmpFile = `${MONTHLY_FEATURED_CACHE_FILE}.${Date.now()}.tmp`;
-        fs5.writeFileSync(tmpFile, JSON.stringify(data, null, 2), "utf-8");
-        fs5.renameSync(tmpFile, MONTHLY_FEATURED_CACHE_FILE);
+        fs6.writeFileSync(tmpFile, JSON.stringify(data, null, 2), "utf-8");
+        fs6.renameSync(tmpFile, MONTHLY_FEATURED_CACHE_FILE);
       } catch (e) {
         console.warn("[Server] Falha ao persistir cache do ranking mensal no disco:", e);
       }
@@ -77552,8 +78156,8 @@ ${s.name?.split("\n")[1] || "1080p"}`,
   featuredRankingService.setStorageAdapter({
     load: () => {
       try {
-        if (fs5.existsSync(FEATURED_CACHE_FILE)) {
-          const raw = fs5.readFileSync(FEATURED_CACHE_FILE, "utf-8");
+        if (fs6.existsSync(FEATURED_CACHE_FILE)) {
+          const raw = fs6.readFileSync(FEATURED_CACHE_FILE, "utf-8");
           if (raw) {
             const parsed = JSON.parse(raw);
             if (parsed && Array.isArray(parsed.featuredMovies) && parsed.featuredMovies.length === 10 && Array.isArray(parsed.featuredSeries) && parsed.featuredSeries.length === 10 && Array.isArray(parsed.featuredAnimes) && parsed.featuredAnimes.length === 10) {
@@ -77571,11 +78175,11 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     },
     save: (data) => {
       try {
-        const dir = path5.dirname(FEATURED_CACHE_FILE);
-        if (!fs5.existsSync(dir)) fs5.mkdirSync(dir, { recursive: true });
+        const dir = path6.dirname(FEATURED_CACHE_FILE);
+        if (!fs6.existsSync(dir)) fs6.mkdirSync(dir, { recursive: true });
         const tmpFile = `${FEATURED_CACHE_FILE}.${Date.now()}.tmp`;
-        fs5.writeFileSync(tmpFile, JSON.stringify(data, null, 2), "utf-8");
-        fs5.renameSync(tmpFile, FEATURED_CACHE_FILE);
+        fs6.writeFileSync(tmpFile, JSON.stringify(data, null, 2), "utf-8");
+        fs6.renameSync(tmpFile, FEATURED_CACHE_FILE);
       } catch (e) {
         console.warn("[Server] Falha ao persistir cache do Em Destaque no disco:", e);
       }
@@ -77950,7 +78554,7 @@ if (!process.env.VERCEL) {
           return next();
         }
         try {
-          let template = fs5.readFileSync(path5.resolve(__dirname, "index.html"), "utf-8");
+          let template = fs6.readFileSync(path6.resolve(__dirname, "index.html"), "utf-8");
           template = await vite.transformIndexHtml(url, template);
           res.status(200).set({ "Content-Type": "text/html" }).end(template);
         } catch (e) {
@@ -77959,8 +78563,8 @@ if (!process.env.VERCEL) {
         }
       });
     } else {
-      const distPath = path5.resolve(__dirname, "dist");
-      app.use(express.static(distPath));
+      const distPath = path6.resolve(__dirname, "dist");
+      app.use(express2.static(distPath));
       app.get("/{*path}", (_req, res) => {
         res.sendFile("index.html", { root: distPath });
       });

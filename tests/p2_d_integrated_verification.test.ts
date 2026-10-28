@@ -106,7 +106,9 @@ async function runIntegratedVerification() {
     // Abre Modal de Detalhes pelo primeiro card
     console.log('  Abrindo Modal de Detalhes...');
     await desktopPage.waitForSelector('.group\\/card', { timeout: 15000 });
-    await desktopPage.locator('.group\\/card').first().click({ force: true });
+    const firstCard = desktopPage.locator('.group\\/card').first();
+    assert.ok(await firstCard.isVisible(), 'Card do catálogo deve estar comprovadamente visível');
+    await firstCard.click({ force: true });
     await desktopPage.waitForSelector('button[aria-label="Fechar"]', { timeout: 10000 });
 
     // Inicia reprodução a partir do Modal de Detalhes

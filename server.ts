@@ -18,6 +18,7 @@ import { resolveValidationTargetUrl } from "./src/core/providers/validationTarge
 import { databaseRouter } from "./src/server/database/routes.ts";
 import { authenticateAdmin } from "./src/server/database/firebaseAuth.ts";
 import { watchPartyRouter } from "./src/server/watchparty/routes.ts";
+import { authRouter } from "./src/server/auth/routes.ts";
 import { publicHttpGet } from "./src/server/security/publicHttp.ts";
 import { normalizeProxyRange } from "./src/server/proxyRange.ts";
 import { epgSyncService } from "./src/server/livetv/epgSyncService.ts";
@@ -87,6 +88,8 @@ function createApp() {
         restQuery.delete('path');
         const restStr = restQuery.toString();
         req.url = `/api/${req.query.path}${restStr ? '?' + restStr : ''}`;
+      } else {
+        req.url = req.url.replace(/^\/api\/index/, '/api');
       }
     }
     next();
@@ -130,6 +133,7 @@ function createApp() {
   });
   app.use('/api/db', databaseRouter);
   app.use('/api/watchparty', watchPartyRouter);
+  app.use('/api/auth', authRouter);
 
   // Helper function to resolve open items to Stremio streams
   function resolveOpenItemStreams(rawId: string, seasonNum = 1, episodeNum = 1) {

@@ -38,6 +38,7 @@ import { adultContentService } from './src/core/adult/AdultContentService';
 import { AgeVerificationModal } from './components/AgeVerificationModal';
 import { recommendationEngine } from './src/core/recommendations/recommendationEngine';
 import { userPreferenceStore } from './src/core/recommendations/userPreferenceStore';
+import { authClient } from './src/core/auth/authClient';
 import { uiSoundService } from './src/core/audio/uiSoundService';
 import { hybridRecommendationEngine } from './src/core/recommendations/hybridRecommendationEngine';
 import { bannedContentRegistry } from './src/core/catalog/BannedContentRegistry';
@@ -130,6 +131,38 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   });
   const [activeProfile, setActiveProfile] = useState<Profile | null>(() => initialState.activeProfile || currentUser?.profiles?.[0] || null);
 
+  // Verificação de sessão real persistente via cookie HttpOnly no servidor (/api/auth/me)
+  useEffect(() => {
+    let mounted = true;
+    authClient.checkSession().then(({ authenticated, user }) => {
+      if (!mounted) return;
+      if (authenticated && user) {
+        setIsAuthenticated(true);
+        const loggedUser: User = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: 'user',
+          devMode: false,
+          memberSince: new Date(user.createdAt).toLocaleDateString('pt-BR'),
+          plan: 'ZapiTV Premium',
+          status: 'Ativo',
+          profiles: [
+            {
+              id: `p-${user.id}`,
+              name: user.name,
+              avatar: AVATARS[0],
+              isChild: false
+            }
+          ]
+        };
+        setCurrentUser(loggedUser);
+        setActiveProfile(loggedUser.profiles[0]);
+      }
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -182,6 +215,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     if (path.startsWith('/configuracoes')) return 'settings';
     if (path.startsWith('/ajuda')) return 'help';
     if (path.startsWith('/admin')) return 'admin';
+    if (path.startsWith('/cadastro') || path.startsWith('/signup')) return 'signup';
     if (path.startsWith('/login') || path.startsWith('/auth')) return 'login';
     return 'notfound';
   }, [location.pathname, isWatchRoute]);
@@ -1472,26 +1506,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     };
   }, [isAuthenticated, currentUser?.id, activeProfile?.id]);
 
-  // Handle mock auth bypass recovery
-  useEffect(() => {
-    const checkMockAuth = async () => {
-      try {
-        const mockAuth = await db.keyValueStore.get('zapitv_mock_auth');
-        if (mockAuth?.value && !isAuthenticated) {
-          const mockUser = await db.keyValueStore.get('zapitv_mock_user');
-          if (mockUser?.value) {
-            setCurrentUser(mockUser.value);
-            setIsAuthenticated(true);
-          }
-        }
-      } catch (e) {
-        console.warn('Falha ao restaurar mock auth', e);
-      }
-    };
-    if (!isAuthenticated) {
-      checkMockAuth();
-    }
-  }, [isAuthenticated]);
+
 
   const [searchQuery, setSearchQuery] = useState(() => {
     try {
@@ -1887,192 +1902,111 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   const handleLogin = useCallback(async (email: string, pass: string): Promise<string | null> => {
     try {
-      const trimmedEmail = (email || '').trim();
-      const cleanEmail = trimmedEmail.toLowerCase();
-
-      if (!trimmedEmail) {
-        return 'Por favor, informe seu e-mail.';
+      const cleanEmail = (email || '').trim().toLowerCase();
+      if (!cleanEmail || !pass) {
+        return 'Por favor, informe seu e-mail e senha.';
       }
 
-      // 1. Procurar se já existe usuário na lista local ou mock
-      const existingUser = users.find(u => u.email.toLowerCase() === cleanEmail) ||
-                           MOCK_USERS.find(u => u.email.toLowerCase() === cleanEmail);
+      const res = await authClient.login(cleanEmail, pass);
+      const user = res.user;
 
-      let firestoreUserData: User | null = null;
-      let firebaseUid: string | null = null;
-
-      // 2. Tentar autenticação no Firebase em segundo plano sem bloquear em caso de erro
-      try {
-        const { signInWithEmailAndPassword } = await import('firebase/auth');
-        const { auth, db: firestoreDb } = await import('./firebase');
-        const { doc, getDoc } = await import('firebase/firestore');
-
-        const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, pass);
-        firebaseUid = userCredential.user.uid;
-        const userDoc = await getDoc(doc(firestoreDb, 'users', userCredential.user.uid));
-        if (userDoc.exists()) {
-          firestoreUserData = userDoc.data() as User;
-        }
-      } catch (fbErr) {
-        // Firebase não tem este usuário ou senha diferente: permitir login livremente
-        console.info("Firebase Auth ignorado ou não encontrado - permitindo login livre:", fbErr);
-      }
-
-      // 3. Montar usuário autenticado
-      let targetUser: User;
-      const baseName = trimmedEmail.includes('@') ? trimmedEmail.split('@')[0] : trimmedEmail;
-      const formattedName = baseName.charAt(0).toUpperCase() + baseName.slice(1);
-
-      if (firestoreUserData) {
-        targetUser = {
-          ...withoutPlaintextPassword(firestoreUserData),
-          role: firebaseUid && firestoreUserData.role === 'admin' ? 'admin' : 'user',
-          profiles: (firestoreUserData.profiles && firestoreUserData.profiles.length > 0)
-            ? firestoreUserData.profiles
-            : [{ id: `p-${Date.now()}`, name: firestoreUserData.name || formattedName, avatar: AVATARS[0], isChild: false }]
-        };
-      } else if (existingUser) {
-        targetUser = {
-          ...withoutPlaintextPassword(existingUser),
-          role: 'user',
-          profiles: (existingUser.profiles && existingUser.profiles.length > 0)
-            ? existingUser.profiles
-            : [{ id: `p-${Date.now()}`, name: existingUser.name || formattedName, avatar: AVATARS[0], isChild: false }]
-        };
-      } else {
-        // Novo usuário criado dinamicamente com qualquer e-mail/senha digitados
-        targetUser = {
-          id: firebaseUid || `user-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          name: formattedName,
-          email: trimmedEmail,
-          role: 'user',
-          devMode: false,
-          memberSince: new Date().toLocaleDateString('pt-BR'),
-          plan: 'Premium 4K',
-          status: 'Ativo',
-          profiles: [
-            {
-              id: `p-${Date.now()}`,
-              name: formattedName,
-              avatar: AVATARS[0],
-              isChild: false
-            }
-          ]
-        };
-
-        // Salvar no Firestore se possível
-        try {
-          const { db: firestoreDb } = await import('./firebase');
-          const { doc, setDoc } = await import('firebase/firestore');
-          await setDoc(doc(firestoreDb, 'users', targetUser.id), withoutPlaintextPassword(targetUser));
-        } catch (e) {
-          console.warn('Não foi possível persistir no Firestore, continuando local:', e);
-        }
-      }
-
-      // Atualizar lista de usuários
-      setUsers(prev => {
-        const idx = prev.findIndex(u => u.email.toLowerCase() === cleanEmail || u.id === targetUser.id);
-        if (idx !== -1) {
-          const copy = [...prev];
-          copy[idx] = targetUser;
-          return copy;
-        }
-        return [...prev, targetUser];
-      });
-
-      // Gravar persistência local
-      await db.keyValueStore.put({ key: 'zapitv_mock_auth', value: true });
-      await db.keyValueStore.put({ key: 'zapitv_mock_user', value: withoutPlaintextPassword(targetUser) });
-      await db.keyValueStore.put({ key: 'zapitv_last_email', value: trimmedEmail });
+      const targetUser: User = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: 'user',
+        devMode: false,
+        memberSince: new Date(user.createdAt).toLocaleDateString('pt-BR'),
+        plan: 'ZapiTV Premium',
+        status: 'Ativo',
+        profiles: [
+          {
+            id: `p-${user.id}`,
+            name: user.name,
+            avatar: AVATARS[0],
+            isChild: false
+          }
+        ]
+      };
 
       setCurrentUser(targetUser);
+      setActiveProfile(targetUser.profiles[0]);
       setIsAuthenticated(true);
-      setCurrentView('profile-selector');
-      return null; // Sucesso imediato
-    } catch (error: any) {
-      console.error("Login fallback error:", error);
-      const fallbackName = (email || 'Usuário').split('@')[0];
-      const fallbackUser: User = {
-        id: `user-${Date.now()}`,
-        name: fallbackName,
-        email: (email || 'usuario@zapitv.com').trim(),
-        role: 'user',
-        devMode: false,
-        memberSince: new Date().toLocaleDateString('pt-BR'),
-        plan: 'Premium 4K',
-        status: 'Ativo',
-        profiles: [{ id: `p-${Date.now()}`, name: fallbackName, avatar: AVATARS[0], isChild: false }]
-      };
-      setCurrentUser(fallbackUser);
-      setIsAuthenticated(true);
-      setCurrentView('profile-selector');
+      setCurrentView('home');
       return null;
+    } catch (err: any) {
+      return err?.message || 'E-mail ou senha incorretos.';
     }
-  }, [users]);
+  }, []);
 
-  const handleSignup = useCallback(async (name: string, email: string, pass: string, plan: string) => {
-    const trimmedEmail = email.trim();
-    const cleanEmail = trimmedEmail.toLowerCase();
+  const handleSignup = useCallback(async (
+    name: string,
+    email: string,
+    pass: string,
+    passConfirm: string,
+    termsAccepted: boolean
+  ): Promise<string | null> => {
     try {
-      let uid = `user-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-      try {
-        const { createUserWithEmailAndPassword } = await import('firebase/auth');
-        const { auth } = await import('./firebase');
-        const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, pass);
-        uid = userCredential.user.uid;
-      } catch (fbErr) {
-        console.warn("Firebase signup error (permitido):", fbErr);
-      }
+      const res = await authClient.register({
+        name,
+        email,
+        password: pass,
+        passwordConfirm: passConfirm,
+        termsAccepted
+      });
+      const user = res.user;
 
       const newUser: User = {
-        id: uid,
-        name: name || trimmedEmail.split('@')[0] || 'Usuário',
-        email: trimmedEmail,
+        id: user.id,
+        name: user.name,
+        email: user.email,
         role: 'user',
         devMode: false,
-        memberSince: new Date().toLocaleDateString('pt-BR'),
-        plan: plan,
+        memberSince: new Date(user.createdAt).toLocaleDateString('pt-BR'),
+        plan: 'ZapiTV Padrão',
         status: 'Ativo',
-        profiles: [{ id: `p-${Date.now()}`, name: (name || trimmedEmail.split('@')[0] || 'Perfil').split(' ')[0], avatar: AVATARS[0], isChild: false }]
+        profiles: [
+          {
+            id: `p-${user.id}`,
+            name: user.name,
+            avatar: AVATARS[0],
+            isChild: false
+          }
+        ]
       };
-      
-      try {
-        const { db: firestoreDb } = await import('./firebase');
-        const { doc, setDoc } = await import('firebase/firestore');
-        await setDoc(doc(firestoreDb, 'users', uid), withoutPlaintextPassword(newUser));
-      } catch (err) {
-        console.warn("Could not save to firestore:", err);
-      }
-      
-      await db.keyValueStore.put({ key: 'zapitv_mock_auth', value: true });
-      await db.keyValueStore.put({ key: 'zapitv_mock_user', value: withoutPlaintextPassword(newUser) });
-      await db.keyValueStore.put({ key: 'zapitv_last_email', value: trimmedEmail });
 
-      setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), newUser]);
       setCurrentUser(newUser);
+      setActiveProfile(newUser.profiles[0]);
       setIsAuthenticated(true);
-      setCurrentView('profile-selector');
-    } catch (error: any) {
-      console.error("Signup error:", error);
-      throw error;
+      setCurrentView('home');
+      return null;
+    } catch (err: any) {
+      return err?.message || 'Falha ao concluir o cadastro.';
     }
   }, []);
 
   const handleLogout = useCallback(async () => {
     try {
-      const { signOut } = await import('firebase/auth');
-      const { auth } = await import('./firebase');
-      await signOut(auth);
-      await db.keyValueStore.delete('zapitv_mock_auth');
-      await db.keyValueStore.delete('zapitv_mock_user');
+      await authClient.logout();
     } catch (error) {
-      console.error("Logout error:", error);
+      console.warn("Erro ao deslogar no servidor:", error);
     }
     setIsAuthenticated(false);
-    setActiveProfile(null);
+    const defaultUser = initialState?.currentUser || {
+      id: 'zapitv-anon-user',
+      name: 'Usuário Convidado',
+      email: '',
+      role: 'user' as const,
+      devMode: false,
+      memberSince: '2026',
+      plan: 'Gratuito',
+      status: 'Ativo' as const,
+      profiles: [{ id: 'p-anon', name: 'Convidado', avatar: AVATARS[0], isChild: false }]
+    };
+    setCurrentUser(defaultUser);
+    setActiveProfile(defaultUser.profiles?.[0] || null);
     setCurrentView('home');
-  }, []);
+  }, [initialState]);
 
   const toggleMyListById = useCallback(async (id: string) => {
     if (!currentUser) return;
@@ -2984,22 +2918,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     hasMoreMovies, hasMoreSeries, hasMoreAnimes, handlePlayFromHero
   ]);
 
-  if (!isAuthenticated) return <React.Suspense fallback={<ZapiLoader size="xl" />}><AuthView isDarkMode={isDarkMode} onLogin={handleLogin} onSignup={handleSignup} onResetPassword={handleResetPassword} users={users} initialEmail={initialState.lastEmail} /></React.Suspense>;
-
-  if (!activeProfile || currentView === 'profile-selector') {
-    return (
-      <React.Suspense fallback={<ZapiLoader size="xl" />}><ProfileSelectorView
-        user={currentUser} 
-        onSelectProfile={(p) => { 
-          setActiveProfile(p); 
-          setCurrentView('home'); 
-        }} 
-        onUpdateUser={updateUser} 
-        isDarkMode={isDarkMode} 
-      /></React.Suspense>
-    );
-  }
-
   if (location.pathname.startsWith('/tv')) {
     return (
       <React.Suspense fallback={<div className="min-h-screen bg-[#05070a] flex items-center justify-center"><ZapiLoader size="xl" /></div>}>
@@ -3020,6 +2938,35 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           activeProfile={activeProfile}
         />
       </React.Suspense>
+    );
+  }
+
+  if (currentView === 'login' || currentView === 'signup') {
+    return (
+      <React.Suspense fallback={<ZapiLoader size="xl" />}>
+        <AuthView
+          isDarkMode={isDarkMode}
+          onLogin={handleLogin}
+          onSignup={handleSignup}
+          onClose={() => setCurrentView('home')}
+          initialEmail={initialState?.lastEmail}
+          initialMode={currentView === 'signup' ? 'signup' : 'login'}
+        />
+      </React.Suspense>
+    );
+  }
+
+  if (isAuthenticated && (!activeProfile || currentView === 'profile-selector')) {
+    return (
+      <React.Suspense fallback={<ZapiLoader size="xl" />}><ProfileSelectorView
+        user={currentUser} 
+        onSelectProfile={(p) => { 
+          setActiveProfile(p); 
+          setCurrentView('home'); 
+        }} 
+        onUpdateUser={updateUser} 
+        isDarkMode={isDarkMode} 
+      /></React.Suspense>
     );
   }
 
@@ -3051,6 +2998,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           featuredSelection={featuredSelection}
           onOpenDiagnostics={() => setIsDiagnosticModalOpen(true)}
           hasOpenModal={Boolean(selectedContent || isDiagnosticModalOpen)}
+          isAuthenticated={isAuthenticated}
+          onOpenLogin={() => handleNavigateView('login')}
           onCloseModal={() => {
             if (selectedContent) handleCloseDetailModal();
             else if (isDiagnosticModalOpen) setIsDiagnosticModalOpen(false);
@@ -3126,6 +3075,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
               allContent={content}
               notifications={siteNotifications}
               onLogout={handleLogout}
+              isAuthenticated={isAuthenticated}
+              onOpenLogin={() => {
+                searchService.cancelPending();
+                setCurrentView('login');
+              }}
               onToggleMobileMenu={() => {
                 if (!isMobileMenuOpen) uiSoundService.play('sidebarOpen');
                 setIsMobileMenuOpen(true);

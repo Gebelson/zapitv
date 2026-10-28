@@ -45,6 +45,8 @@ interface MobileLayoutProps {
   selectedGenre?: string;
   onSelectGenre?: (genre: string) => void;
   onCategoryChange?: (category: 'movies' | 'series' | 'animes') => void;
+  isAuthenticated?: boolean;
+  onOpenLogin?: () => void;
 }
 
 export const MobileLayout: React.FC<MobileLayoutProps> = ({
@@ -76,7 +78,9 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   isLoadingMore = false,
   selectedGenre,
   onSelectGenre,
-  onCategoryChange
+  onCategoryChange,
+  isAuthenticated = false,
+  onOpenLogin
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -290,6 +294,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             onSwitchProfile={onSwitchProfile}
             onOpenDiagnostics={onOpenDiagnostics}
             onSelectContent={onSelectContent}
+            isAuthenticated={isAuthenticated}
+            onOpenLogin={onOpenLogin}
           />
         )}
       </main>

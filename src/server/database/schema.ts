@@ -122,3 +122,48 @@ export const watchpartySignals = sqliteTable('watchparty_signals', {
   index('watchparty_signals_room_time_idx').on(table.roomId, table.timestamp),
 ]);
 
+// ============================================================================
+// AUTENTICAÇÃO REAL E GESTÃO DE CONTAS (P3.A)
+// ============================================================================
+
+export const users = sqliteTable('users', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull(),
+  passwordHash: text('password_hash').notNull(),
+  status: text('status', { enum: ['active', 'suspended', 'pending_verification'] }).notNull().default('active'),
+  termsAcceptedAt: integer('terms_accepted_at').notNull(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('users_email_idx').on(table.email),
+  index('users_created_at_idx').on(table.createdAt),
+]);
+
+export const sessions = sqliteTable('sessions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  expiresAt: integer('expires_at').notNull(),
+  revokedAt: integer('revoked_at'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('sessions_token_hash_idx').on(table.tokenHash),
+  index('sessions_user_id_idx').on(table.userId),
+  index('sessions_expires_at_idx').on(table.expiresAt),
+]);
+
+export const loginAttempts = sqliteTable('login_attempts', {
+  id: text('id').primaryKey(),
+  identifier: text('identifier').notNull(),
+  attemptAt: integer('attempt_at').notNull(),
+  success: integer('success').notNull().default(0),
+  ipAddress: text('ip_address'),
+}, (table) => [
+  index('login_attempts_identifier_time_idx').on(table.identifier, table.attemptAt),
+]);
+
+

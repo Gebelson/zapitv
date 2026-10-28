@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   UserRound, List, Heart, History, Users, Settings, 
   HelpCircle, Activity, Volume2, VolumeX, Sun, Moon, 
-  LogOut, ChevronRight, MessageSquarePlus 
+  LogOut, LogIn, ChevronRight, MessageSquarePlus 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User, Profile, ContentItem } from '../../../types';
@@ -24,6 +24,8 @@ interface MobileMyZapiViewProps {
   onSwitchProfile: () => void;
   onOpenDiagnostics?: () => void;
   onSelectContent: (item: ContentItem) => void;
+  isAuthenticated?: boolean;
+  onOpenLogin?: () => void;
 }
 
 export const MobileMyZapiView: React.FC<MobileMyZapiViewProps> = ({
@@ -37,7 +39,9 @@ export const MobileMyZapiView: React.FC<MobileMyZapiViewProps> = ({
   onLogout,
   onSwitchProfile,
   onOpenDiagnostics,
-  onSelectContent
+  onSelectContent,
+  isAuthenticated = false,
+  onOpenLogin
 }) => {
   const navigate = useNavigate();
   const [continueWatchingItems, setContinueWatchingItems] = useState<ContentItem[]>([]);
@@ -263,26 +267,49 @@ export const MobileMyZapiView: React.FC<MobileMyZapiViewProps> = ({
           <ChevronRight className="w-4 h-4 text-slate-500" />
         </button>
 
-        {/* Sair da ZapiTV */}
-        <button
-          type="button"
-          onClick={() => {
-            uiSoundService.play('click');
-            onLogout();
-          }}
-          className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 active:bg-rose-500/20 transition-all cursor-pointer text-left mt-4"
-        >
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-rose-500/20 text-rose-400">
-              <LogOut className="w-4 h-4" />
+        {/* Sair ou Entrar na ZapiTV */}
+        {!isAuthenticated ? (
+          <button
+            type="button"
+            onClick={() => {
+              uiSoundService.play('click');
+              if (onOpenLogin) onOpenLogin();
+              else navigate('/login');
+            }}
+            className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-[#007df7]/15 border border-[#007df7]/30 active:bg-[#007df7]/25 transition-all cursor-pointer text-left mt-4"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-[#007df7]/20 text-[#007df7]">
+                <LogIn className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="font-semibold text-xs text-white">Entrar ou Criar Conta</p>
+                <p className="text-[10px] text-slate-400">Acesse sua conta para sessões persistentes</p>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold text-xs text-rose-300">Sair da ZapiTV</p>
-              <p className="text-[10px] text-rose-400/70">Encerrar sessão neste dispositivo</p>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              uiSoundService.play('click');
+              onLogout();
+            }}
+            className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 active:bg-rose-500/20 transition-all cursor-pointer text-left mt-4"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-rose-500/20 text-rose-400">
+                <LogOut className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="font-semibold text-xs text-rose-300">Sair da ZapiTV</p>
+                <p className="text-[10px] text-rose-400/70">Encerrar sessão neste dispositivo</p>
+              </div>
             </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-rose-400/50" />
-        </button>
+            <ChevronRight className="w-4 h-4 text-rose-400/50" />
+          </button>
+        )}
       </div>
     </div>
   );
