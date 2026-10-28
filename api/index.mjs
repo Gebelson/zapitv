@@ -18932,7 +18932,7 @@ var init_rewriteHlsManifest = __esm({
 
 // server.ts
 init_verifiedCatalog();
-import express3 from "express";
+import express4 from "express";
 import path6 from "path";
 import { fileURLToPath } from "url";
 import fs6 from "fs";
@@ -22998,6 +22998,10 @@ __export(schema_exports, {
   loginAttempts: () => loginAttempts,
   media: () => media,
   mediaExternalIds: () => mediaExternalIds,
+  profileFavorites: () => profileFavorites,
+  profileMyList: () => profileMyList,
+  profilePlaybackProgress: () => profilePlaybackProgress,
+  profileWatchHistory: () => profileWatchHistory,
   profiles: () => profiles,
   sessions: () => sessions,
   sourceEvidenceTickets: () => sourceEvidenceTickets,
@@ -23204,6 +23208,67 @@ var linkedDevices = sqliteTable("linked_devices", {
   index("linked_devices_user_id_idx").on(table.userId),
   index("linked_devices_session_id_idx").on(table.sessionId)
 ]);
+var profilePlaybackProgress = sqliteTable("profile_playback_progress", {
+  id: text("id").primaryKey(),
+  profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  canonicalId: text("canonical_id").notNull(),
+  contentType: text("content_type").notNull(),
+  season: integer("season").notNull().default(0),
+  episode: integer("episode").notNull().default(0),
+  positionSec: integer("position_sec").notNull(),
+  durationSec: integer("duration_sec").notNull(),
+  progressPercent: integer("progress_percent").notNull().default(0),
+  isCompleted: integer("is_completed").notNull().default(0),
+  version: integer("version").notNull().default(1),
+  deviceName: text("device_name"),
+  updatedAt: integer("updated_at").notNull()
+}, (table) => [
+  uniqueIndex("profile_progress_key_idx").on(table.profileId, table.canonicalId, table.season, table.episode),
+  index("profile_progress_profile_updated_idx").on(table.profileId, table.updatedAt)
+]);
+var profileWatchHistory = sqliteTable("profile_watch_history", {
+  id: text("id").primaryKey(),
+  profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  canonicalId: text("canonical_id").notNull(),
+  contentType: text("content_type").notNull(),
+  season: integer("season").notNull().default(0),
+  episode: integer("episode").notNull().default(0),
+  title: text("title"),
+  posterUrl: text("poster_url"),
+  year: integer("year"),
+  watchedAt: integer("watched_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  version: integer("version").notNull().default(1)
+}, (table) => [
+  uniqueIndex("profile_history_key_idx").on(table.profileId, table.canonicalId, table.season, table.episode),
+  index("profile_history_profile_watched_idx").on(table.profileId, table.watchedAt)
+]);
+var profileMyList = sqliteTable("profile_my_list", {
+  id: text("id").primaryKey(),
+  profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  canonicalId: text("canonical_id").notNull(),
+  addedAt: integer("added_at").notNull(),
+  isRemoved: integer("is_removed").notNull().default(0),
+  removedAt: integer("removed_at"),
+  updatedAt: integer("updated_at").notNull(),
+  version: integer("version").notNull().default(1)
+}, (table) => [
+  uniqueIndex("profile_mylist_key_idx").on(table.profileId, table.canonicalId),
+  index("profile_mylist_profile_status_idx").on(table.profileId, table.isRemoved, table.updatedAt)
+]);
+var profileFavorites = sqliteTable("profile_favorites", {
+  id: text("id").primaryKey(),
+  profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  canonicalId: text("canonical_id").notNull(),
+  addedAt: integer("added_at").notNull(),
+  isRemoved: integer("is_removed").notNull().default(0),
+  removedAt: integer("removed_at"),
+  updatedAt: integer("updated_at").notNull(),
+  version: integer("version").notNull().default(1)
+}, (table) => [
+  uniqueIndex("profile_favorites_key_idx").on(table.profileId, table.canonicalId),
+  index("profile_favorites_profile_status_idx").on(table.profileId, table.isRemoved, table.updatedAt)
+]);
 
 // src/server/database/client.ts
 import fs2 from "fs";
@@ -23223,19 +23288,33 @@ function createDatabase(url, authToken) {
   return { client, db: drizzle(client, { schema: schema_exports }) };
 }
 var sharedDatabase;
+var sharedDatabaseKey;
 function getDatabase() {
+  if (process.env.VERCEL && !process.env.TURSO_DATABASE_URL) {
+    return null;
+  }
   const url = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL;
   const token = process.env.TURSO_AUTH_TOKEN;
   if (!url || !token && !url.startsWith("file:")) {
+    if (process.env.VERCEL) {
+      return null;
+    }
     const isProd = process.env.NODE_ENV === "production";
     if (process.env.ALLOW_LOCAL_DB === "true" || !isProd || Boolean(process.env.VITEST)) {
       const localUrl = process.env.LOCAL_DB_URL || "file:data/zapitv_auth.db";
-      sharedDatabase ??= createDatabase(localUrl);
+      if (sharedDatabaseKey !== localUrl) {
+        sharedDatabase = createDatabase(localUrl);
+        sharedDatabaseKey = localUrl;
+      }
       return sharedDatabase;
     }
     return null;
   }
-  sharedDatabase ??= createDatabase(url, token);
+  const key = `${url}::${token || ""}`;
+  if (sharedDatabaseKey !== key) {
+    sharedDatabase = createDatabase(url, token);
+    sharedDatabaseKey = key;
+  }
   return sharedDatabase;
 }
 async function ensureAuthTables(database) {
@@ -23331,6 +23410,71 @@ async function ensureAuthTables(database) {
     );
     CREATE INDEX IF NOT EXISTS linked_devices_user_id_idx ON linked_devices (user_id);
     CREATE INDEX IF NOT EXISTS linked_devices_session_id_idx ON linked_devices (session_id);
+
+    CREATE TABLE IF NOT EXISTS profile_playback_progress (
+      id text PRIMARY KEY NOT NULL,
+      profile_id text NOT NULL,
+      canonical_id text NOT NULL,
+      content_type text NOT NULL,
+      season integer DEFAULT 0 NOT NULL,
+      episode integer DEFAULT 0 NOT NULL,
+      position_sec integer NOT NULL,
+      duration_sec integer NOT NULL,
+      progress_percent integer DEFAULT 0 NOT NULL,
+      is_completed integer DEFAULT 0 NOT NULL,
+      version integer DEFAULT 1 NOT NULL,
+      device_name text,
+      updated_at integer NOT NULL,
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS profile_progress_key_idx ON profile_playback_progress (profile_id, canonical_id, season, episode);
+    CREATE INDEX IF NOT EXISTS profile_progress_profile_updated_idx ON profile_playback_progress (profile_id, updated_at);
+
+    CREATE TABLE IF NOT EXISTS profile_watch_history (
+      id text PRIMARY KEY NOT NULL,
+      profile_id text NOT NULL,
+      canonical_id text NOT NULL,
+      content_type text NOT NULL,
+      season integer DEFAULT 0 NOT NULL,
+      episode integer DEFAULT 0 NOT NULL,
+      title text,
+      poster_url text,
+      year integer,
+      watched_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      version integer DEFAULT 1 NOT NULL,
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS profile_history_key_idx ON profile_watch_history (profile_id, canonical_id, season, episode);
+    CREATE INDEX IF NOT EXISTS profile_history_profile_watched_idx ON profile_watch_history (profile_id, watched_at);
+
+    CREATE TABLE IF NOT EXISTS profile_my_list (
+      id text PRIMARY KEY NOT NULL,
+      profile_id text NOT NULL,
+      canonical_id text NOT NULL,
+      added_at integer NOT NULL,
+      is_removed integer DEFAULT 0 NOT NULL,
+      removed_at integer,
+      updated_at integer NOT NULL,
+      version integer DEFAULT 1 NOT NULL,
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS profile_mylist_key_idx ON profile_my_list (profile_id, canonical_id);
+    CREATE INDEX IF NOT EXISTS profile_mylist_profile_status_idx ON profile_my_list (profile_id, is_removed, updated_at);
+
+    CREATE TABLE IF NOT EXISTS profile_favorites (
+      id text PRIMARY KEY NOT NULL,
+      profile_id text NOT NULL,
+      canonical_id text NOT NULL,
+      added_at integer NOT NULL,
+      is_removed integer DEFAULT 0 NOT NULL,
+      removed_at integer,
+      updated_at integer NOT NULL,
+      version integer DEFAULT 1 NOT NULL,
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS profile_favorites_key_idx ON profile_favorites (profile_id, canonical_id);
+    CREATE INDEX IF NOT EXISTS profile_favorites_profile_status_idx ON profile_favorites (profile_id, is_removed, updated_at);
   `);
 }
 
@@ -27037,26 +27181,18 @@ var CHALLENGE_EXPIRY_MS = 10 * 60 * 1e3;
 var DEFAULT_POLL_INTERVAL_SEC = 5;
 var SLOW_DOWN_INTERVAL_SEC = 10;
 var USER_CODE_ALPHABET = "BCDFGHJKLMNPQRSTVWXYZ23456789";
-var validationAttempts = /* @__PURE__ */ new Map();
-function checkValidationRateLimit(ip) {
-  const now = Date.now();
-  const entry = validationAttempts.get(ip);
-  if (!entry || entry.expiresAt < now) {
-    return true;
-  }
-  return entry.count < 10;
+async function checkValidationRateLimit(db, ip) {
+  const identifier = `code_val:${ip}`;
+  const status = await RateLimitService.isLocked(db, identifier);
+  return !status.locked;
 }
-function recordFailedValidationAttempt(ip) {
-  const now = Date.now();
-  const entry = validationAttempts.get(ip);
-  if (!entry || entry.expiresAt < now) {
-    validationAttempts.set(ip, { count: 1, expiresAt: now + 15 * 60 * 1e3 });
-  } else {
-    entry.count += 1;
-  }
+async function recordFailedValidationAttempt(db, ip) {
+  const identifier = `code_val:${ip}`;
+  await RateLimitService.recordFailure(db, identifier, ip);
 }
-function clearValidationAttempts(ip) {
-  validationAttempts.delete(ip);
+async function clearValidationAttempts(db, ip) {
+  const identifier = `code_val:${ip}`;
+  await RateLimitService.recordSuccess(db, identifier, ip);
 }
 function hashDeviceCode(deviceCode) {
   return crypto6.createHash("sha256").update(deviceCode).digest("hex");
@@ -27235,7 +27371,7 @@ async function pollDeviceLinkChallenge(db, deviceCode, options) {
     });
     return {
       status: "approved",
-      token: newSession.token,
+      cookieToken: newSession.token,
       expiresAt: newSession.expiresAt,
       sessionId: newSession.sessionId,
       user: {
@@ -27248,15 +27384,18 @@ async function pollDeviceLinkChallenge(db, deviceCode, options) {
   return { status: "pending", interval: DEFAULT_POLL_INTERVAL_SEC };
 }
 async function validateDeviceUserCode(db, rawUserCode, clientIp) {
-  if (clientIp && !checkValidationRateLimit(clientIp)) {
-    return {
-      valid: false,
-      error: "Muitas tentativas inv\xE1lidas. Aguarde alguns minutos antes de tentar novamente."
-    };
+  if (clientIp) {
+    const isAllowed = await checkValidationRateLimit(db, clientIp);
+    if (!isAllowed) {
+      return {
+        valid: false,
+        error: "Muitas tentativas inv\xE1lidas. Aguarde alguns minutos antes de tentar novamente."
+      };
+    }
   }
   const cleanCode = normalizeUserCode(rawUserCode);
   if (!cleanCode || cleanCode.length < 6) {
-    if (clientIp) recordFailedValidationAttempt(clientIp);
+    if (clientIp) await recordFailedValidationAttempt(db, clientIp);
     return { valid: false, error: "C\xF3digo inv\xE1lido. Digite os 8 caracteres exibidos na TV." };
   }
   const formatted = formatUserCodeDisplay(cleanCode);
@@ -27269,11 +27408,11 @@ async function validateDeviceUserCode(db, rawUserCode, clientIp) {
     )
   ).limit(1);
   if (!found || found.length === 0) {
-    if (clientIp) recordFailedValidationAttempt(clientIp);
+    if (clientIp) await recordFailedValidationAttempt(db, clientIp);
     return { valid: false, error: "C\xF3digo n\xE3o encontrado ou j\xE1 expirado. Gere um novo c\xF3digo na TV." };
   }
   const challenge = found[0];
-  if (clientIp) clearValidationAttempts(clientIp);
+  if (clientIp) await clearValidationAttempts(db, clientIp);
   return {
     valid: true,
     challenge: {
@@ -27420,24 +27559,25 @@ deviceAuthRouter.post("/poll", async (req, res) => {
       clientIp,
       userAgent
     });
-    if (pollResult.status === "approved" && pollResult.token) {
+    if (pollResult.status === "approved" && pollResult.cookieToken) {
       const isProduction3 = process.env.NODE_ENV === "production";
-      const cookieHeader = formatSetCookie(pollResult.token, {
+      const cookieHeader = formatSetCookie(pollResult.cookieToken, {
         expiresAt: pollResult.expiresAt,
         isProduction: isProduction3
       });
       res.setHeader("Set-Cookie", cookieHeader);
     }
-    if (pollResult.status === "slow_down") {
-      return res.status(400).json(pollResult);
+    const { cookieToken, ...sanitizedResult } = pollResult;
+    if (sanitizedResult.status === "slow_down") {
+      return res.status(400).json(sanitizedResult);
     }
-    if (pollResult.status === "expired" || pollResult.status === "consumed") {
-      return res.status(400).json(pollResult);
+    if (sanitizedResult.status === "expired" || sanitizedResult.status === "consumed") {
+      return res.status(400).json(sanitizedResult);
     }
-    if (pollResult.status === "rejected") {
-      return res.status(403).json(pollResult);
+    if (sanitizedResult.status === "rejected") {
+      return res.status(403).json(sanitizedResult);
     }
-    return res.status(200).json(pollResult);
+    return res.status(200).json(sanitizedResult);
   } catch (err) {
     return res.status(500).json({ error: "Erro ao consultar status da vincula\xE7\xE3o." });
   }
@@ -27536,6 +27676,739 @@ linkedDevicesRouter.delete("/:id", requireCsrfProtection, authenticateUser, asyn
     return res.status(200).json({ success: true, message: "Dispositivo desvinculado com sucesso." });
   } catch (err) {
     return res.status(500).json({ error: "Erro ao desvincular dispositivo." });
+  }
+});
+
+// src/server/sync/routes.ts
+import express3 from "express";
+
+// src/server/sync/syncService.ts
+import crypto7 from "crypto";
+import { eq as eq10, and as and9, gt as gt5, desc as desc3 } from "drizzle-orm";
+var SyncService = class {
+  /**
+   * Valida se o perfil existe e pertence ao usuário autenticado.
+   * Lança erro com status apropriado se a validação falhar.
+   */
+  static async verifyProfileOwnership(db, userId, profileId) {
+    if (!profileId || typeof profileId !== "string") {
+      const err = new Error("ID de perfil inv\xE1lido ou n\xE3o informado.");
+      err.statusCode = 400;
+      throw err;
+    }
+    const profile = await ProfileService.getProfileById(db, userId, profileId);
+    if (!profile) {
+      const err = new Error("Perfil n\xE3o encontrado ou n\xE3o pertence \xE0 conta autenticada.");
+      err.statusCode = 403;
+      throw err;
+    }
+    return profile;
+  }
+  // ==========================================================================
+  // PROGRESSO DE REPRODUÇÃO (profile_playback_progress)
+  // ==========================================================================
+  /**
+   * Salva ou atualiza o progresso de reprodução com resolução determinística de conflito.
+   * Se o progresso salvo no servidor possuir timestamp mais recente que o recebido,
+   * o registro do servidor é preservado para impedir retrocessos por dispositivos desatualizados.
+   */
+  static async saveProgress(db, profileId, input) {
+    const canonicalId = String(input.canonicalId).trim();
+    if (!canonicalId) {
+      throw new Error("canonicalId \xE9 obrigat\xF3rio para registrar progresso.");
+    }
+    const contentType = String(input.contentType || "movie").trim();
+    const season = Number.isInteger(input.season) ? Number(input.season) : 0;
+    const episode = Number.isInteger(input.episode) ? Number(input.episode) : 0;
+    const positionSec = Math.max(0, Math.floor(Number(input.positionSec) || 0));
+    const durationSec = Math.max(0, Math.floor(Number(input.durationSec) || 0));
+    const progressPercent = durationSec > 0 ? Math.min(100, Math.round(positionSec / durationSec * 100)) : Number(input.progressPercent) || 0;
+    const isCompleted = input.isCompleted ? 1 : 0;
+    const incomingTime = Number(input.updatedAt) || Date.now();
+    const deviceName = input.deviceName ? String(input.deviceName).slice(0, 80) : null;
+    const existing = await db.db.select().from(profilePlaybackProgress).where(
+      and9(
+        eq10(profilePlaybackProgress.profileId, profileId),
+        eq10(profilePlaybackProgress.canonicalId, canonicalId),
+        eq10(profilePlaybackProgress.season, season),
+        eq10(profilePlaybackProgress.episode, episode)
+      )
+    ).limit(1);
+    if (existing.length > 0) {
+      const curr = existing[0];
+      if (curr.updatedAt > incomingTime) {
+        return { record: curr, conflictResolved: true };
+      }
+      const nextVersion = (curr.version || 1) + 1;
+      await db.db.update(profilePlaybackProgress).set({
+        contentType,
+        positionSec,
+        durationSec,
+        progressPercent,
+        isCompleted,
+        version: nextVersion,
+        deviceName: deviceName ?? curr.deviceName,
+        updatedAt: incomingTime
+      }).where(eq10(profilePlaybackProgress.id, curr.id));
+      const updated = {
+        ...curr,
+        contentType,
+        positionSec,
+        durationSec,
+        progressPercent,
+        isCompleted,
+        version: nextVersion,
+        deviceName: deviceName ?? curr.deviceName,
+        updatedAt: incomingTime
+      };
+      return { record: updated, conflictResolved: false };
+    }
+    const newId = crypto7.randomUUID();
+    const newRecord = {
+      id: newId,
+      profileId,
+      canonicalId,
+      contentType,
+      season,
+      episode,
+      positionSec,
+      durationSec,
+      progressPercent,
+      isCompleted,
+      version: 1,
+      deviceName,
+      updatedAt: incomingTime
+    };
+    await db.db.insert(profilePlaybackProgress).values(newRecord);
+    return { record: newRecord, conflictResolved: false };
+  }
+  /**
+   * Obtém todo o progresso do perfil (para Continuar Assistindo e hidratação).
+   */
+  static async getProgressList(db, profileId, since) {
+    const conditions = [eq10(profilePlaybackProgress.profileId, profileId)];
+    if (since && since > 0) {
+      conditions.push(gt5(profilePlaybackProgress.updatedAt, since));
+    }
+    return await db.db.select().from(profilePlaybackProgress).where(and9(...conditions)).orderBy(desc3(profilePlaybackProgress.updatedAt));
+  }
+  /**
+   * Obtém progresso de um item específico
+   */
+  static async getProgressItem(db, profileId, canonicalId, season = 0, episode = 0) {
+    const found = await db.db.select().from(profilePlaybackProgress).where(
+      and9(
+        eq10(profilePlaybackProgress.profileId, profileId),
+        eq10(profilePlaybackProgress.canonicalId, canonicalId),
+        eq10(profilePlaybackProgress.season, season),
+        eq10(profilePlaybackProgress.episode, episode)
+      )
+    ).limit(1);
+    return found[0] || null;
+  }
+  // ==========================================================================
+  // HISTÓRICO DE REPRODUÇÃO (profile_watch_history)
+  // ==========================================================================
+  /**
+   * Registra ou atualiza item no histórico.
+   */
+  static async recordHistory(db, profileId, input) {
+    const canonicalId = String(input.canonicalId).trim();
+    if (!canonicalId) {
+      throw new Error("canonicalId \xE9 obrigat\xF3rio para registrar hist\xF3rico.");
+    }
+    const contentType = String(input.contentType || "movie").trim();
+    const season = Number.isInteger(input.season) ? Number(input.season) : 0;
+    const episode = Number.isInteger(input.episode) ? Number(input.episode) : 0;
+    const now = Date.now();
+    const watchedAt = Number(input.watchedAt) || now;
+    const updatedAt = Number(input.updatedAt) || watchedAt;
+    const existing = await db.db.select().from(profileWatchHistory).where(
+      and9(
+        eq10(profileWatchHistory.profileId, profileId),
+        eq10(profileWatchHistory.canonicalId, canonicalId),
+        eq10(profileWatchHistory.season, season),
+        eq10(profileWatchHistory.episode, episode)
+      )
+    ).limit(1);
+    if (existing.length > 0) {
+      const curr = existing[0];
+      const maxWatched = Math.max(curr.watchedAt, watchedAt);
+      const maxUpdated = Math.max(curr.updatedAt, updatedAt);
+      const nextVersion = (curr.version || 1) + 1;
+      await db.db.update(profileWatchHistory).set({
+        contentType,
+        title: input.title ? String(input.title).slice(0, 150) : curr.title,
+        posterUrl: input.posterUrl ? String(input.posterUrl).slice(0, 500) : curr.posterUrl,
+        year: input.year !== void 0 ? Number(input.year) : curr.year,
+        watchedAt: maxWatched,
+        updatedAt: maxUpdated,
+        version: nextVersion
+      }).where(eq10(profileWatchHistory.id, curr.id));
+      return {
+        ...curr,
+        contentType,
+        title: input.title ? String(input.title).slice(0, 150) : curr.title,
+        posterUrl: input.posterUrl ? String(input.posterUrl).slice(0, 500) : curr.posterUrl,
+        year: input.year !== void 0 ? Number(input.year) : curr.year,
+        watchedAt: maxWatched,
+        updatedAt: maxUpdated,
+        version: nextVersion
+      };
+    }
+    const newId = crypto7.randomUUID();
+    const newRecord = {
+      id: newId,
+      profileId,
+      canonicalId,
+      contentType,
+      season,
+      episode,
+      title: input.title ? String(input.title).slice(0, 150) : null,
+      posterUrl: input.posterUrl ? String(input.posterUrl).slice(0, 500) : null,
+      year: input.year !== void 0 ? Number(input.year) : null,
+      watchedAt,
+      updatedAt,
+      version: 1
+    };
+    await db.db.insert(profileWatchHistory).values(newRecord);
+    return newRecord;
+  }
+  /**
+   * Obtém histórico recente do perfil.
+   */
+  static async getHistory(db, profileId, limit = 50, offset = 0, since) {
+    const conditions = [eq10(profileWatchHistory.profileId, profileId)];
+    if (since && since > 0) {
+      conditions.push(gt5(profileWatchHistory.updatedAt, since));
+    }
+    const safeLimit = Math.min(100, Math.max(1, limit));
+    const safeOffset = Math.max(0, offset);
+    return await db.db.select().from(profileWatchHistory).where(and9(...conditions)).orderBy(desc3(profileWatchHistory.watchedAt)).limit(safeLimit).offset(safeOffset);
+  }
+  // ==========================================================================
+  // MINHA LISTA (profile_my_list com tombstones)
+  // ==========================================================================
+  /**
+   * Adiciona ou remove item de Minha Lista usando tombstones.
+   * Se um dispositivo offline tentar adicionar um item que foi removido
+   * mais recentemente no servidor, a remoção é preservada.
+   */
+  static async setMyList(db, profileId, canonicalId, isRemoved, timestamp) {
+    const cleanId = String(canonicalId).trim();
+    if (!cleanId) {
+      throw new Error("canonicalId \xE9 obrigat\xF3rio para Minha Lista.");
+    }
+    const ts = Number(timestamp) || Date.now();
+    const existing = await db.db.select().from(profileMyList).where(
+      and9(
+        eq10(profileMyList.profileId, profileId),
+        eq10(profileMyList.canonicalId, cleanId)
+      )
+    ).limit(1);
+    if (existing.length > 0) {
+      const curr = existing[0];
+      if (isRemoved) {
+        const nextVersion = (curr.version || 1) + 1;
+        await db.db.update(profileMyList).set({
+          isRemoved: 1,
+          removedAt: ts,
+          updatedAt: Math.max(ts, curr.updatedAt + 1),
+          version: nextVersion
+        }).where(eq10(profileMyList.id, curr.id));
+        return {
+          record: {
+            ...curr,
+            isRemoved: 1,
+            removedAt: ts,
+            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            version: nextVersion
+          },
+          conflictResolved: false
+        };
+      } else {
+        if (curr.isRemoved === 1 && curr.removedAt && curr.removedAt > ts) {
+          return { record: curr, conflictResolved: true };
+        }
+        const nextVersion = (curr.version || 1) + 1;
+        await db.db.update(profileMyList).set({
+          isRemoved: 0,
+          removedAt: null,
+          addedAt: ts,
+          updatedAt: Math.max(ts, curr.updatedAt + 1),
+          version: nextVersion
+        }).where(eq10(profileMyList.id, curr.id));
+        return {
+          record: {
+            ...curr,
+            isRemoved: 0,
+            removedAt: null,
+            addedAt: ts,
+            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            version: nextVersion
+          },
+          conflictResolved: false
+        };
+      }
+    }
+    const newId = crypto7.randomUUID();
+    const newRecord = {
+      id: newId,
+      profileId,
+      canonicalId: cleanId,
+      addedAt: ts,
+      isRemoved: isRemoved ? 1 : 0,
+      removedAt: isRemoved ? ts : null,
+      updatedAt: ts,
+      version: 1
+    };
+    await db.db.insert(profileMyList).values(newRecord);
+    return { record: newRecord, conflictResolved: false };
+  }
+  /**
+   * Obtém itens de Minha Lista. Por padrão retorna apenas itens ativos (isRemoved = 0).
+   */
+  static async getMyList(db, profileId, includeRemoved = false, since) {
+    const conditions = [eq10(profileMyList.profileId, profileId)];
+    if (!includeRemoved) {
+      conditions.push(eq10(profileMyList.isRemoved, 0));
+    }
+    if (since && since > 0) {
+      conditions.push(gt5(profileMyList.updatedAt, since));
+    }
+    return await db.db.select().from(profileMyList).where(and9(...conditions)).orderBy(desc3(profileMyList.addedAt));
+  }
+  // ==========================================================================
+  // FAVORITOS (profile_favorites com tombstones)
+  // ==========================================================================
+  /**
+   * Adiciona ou remove favorito usando tombstones com resolução determinística.
+   */
+  static async setFavorite(db, profileId, canonicalId, isRemoved, timestamp) {
+    const cleanId = String(canonicalId).trim();
+    if (!cleanId) {
+      throw new Error("canonicalId \xE9 obrigat\xF3rio para Favoritos.");
+    }
+    const ts = Number(timestamp) || Date.now();
+    const existing = await db.db.select().from(profileFavorites).where(
+      and9(
+        eq10(profileFavorites.profileId, profileId),
+        eq10(profileFavorites.canonicalId, cleanId)
+      )
+    ).limit(1);
+    if (existing.length > 0) {
+      const curr = existing[0];
+      if (isRemoved) {
+        const nextVersion = (curr.version || 1) + 1;
+        await db.db.update(profileFavorites).set({
+          isRemoved: 1,
+          removedAt: ts,
+          updatedAt: Math.max(ts, curr.updatedAt + 1),
+          version: nextVersion
+        }).where(eq10(profileFavorites.id, curr.id));
+        return {
+          record: {
+            ...curr,
+            isRemoved: 1,
+            removedAt: ts,
+            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            version: nextVersion
+          },
+          conflictResolved: false
+        };
+      } else {
+        if (curr.isRemoved === 1 && curr.removedAt && curr.removedAt > ts) {
+          return { record: curr, conflictResolved: true };
+        }
+        const nextVersion = (curr.version || 1) + 1;
+        await db.db.update(profileFavorites).set({
+          isRemoved: 0,
+          removedAt: null,
+          addedAt: ts,
+          updatedAt: Math.max(ts, curr.updatedAt + 1),
+          version: nextVersion
+        }).where(eq10(profileFavorites.id, curr.id));
+        return {
+          record: {
+            ...curr,
+            isRemoved: 0,
+            removedAt: null,
+            addedAt: ts,
+            updatedAt: Math.max(ts, curr.updatedAt + 1),
+            version: nextVersion
+          },
+          conflictResolved: false
+        };
+      }
+    }
+    const newId = crypto7.randomUUID();
+    const newRecord = {
+      id: newId,
+      profileId,
+      canonicalId: cleanId,
+      addedAt: ts,
+      isRemoved: isRemoved ? 1 : 0,
+      removedAt: isRemoved ? ts : null,
+      updatedAt: ts,
+      version: 1
+    };
+    await db.db.insert(profileFavorites).values(newRecord);
+    return { record: newRecord, conflictResolved: false };
+  }
+  /**
+   * Obtém favoritos do perfil.
+   */
+  static async getFavorites(db, profileId, includeRemoved = false, since) {
+    const conditions = [eq10(profileFavorites.profileId, profileId)];
+    if (!includeRemoved) {
+      conditions.push(eq10(profileFavorites.isRemoved, 0));
+    }
+    if (since && since > 0) {
+      conditions.push(gt5(profileFavorites.updatedAt, since));
+    }
+    return await db.db.select().from(profileFavorites).where(and9(...conditions)).orderBy(desc3(profileFavorites.addedAt));
+  }
+  // ==========================================================================
+  // PULL COMPLETO DE HIDRATAÇÃO DO PERFIL
+  // ==========================================================================
+  /**
+   * Recupera o estado completo ou incremental sincronizado para o perfil.
+   */
+  static async pullProfileState(db, profileId, since) {
+    const serverTime = Date.now();
+    const [progress, history, myList, favorites] = await Promise.all([
+      this.getProgressList(db, profileId, since),
+      this.getHistory(db, profileId, 50, 0, since),
+      this.getMyList(db, profileId, Boolean(since), since),
+      this.getFavorites(db, profileId, Boolean(since), since)
+    ]);
+    return {
+      profileId,
+      serverTime,
+      progress,
+      history,
+      myList,
+      favorites
+    };
+  }
+  // ==========================================================================
+  // LOTE DE MUTAÇÕES OFFLINE (syncBatch)
+  // ==========================================================================
+  /**
+   * Processa lote de mutações da fila outbox com idempotência e resolução de conflitos.
+   */
+  static async processBatch(db, profileId, mutations) {
+    const results = [];
+    const safeMutations = mutations.slice(0, 100);
+    for (const mut of safeMutations) {
+      try {
+        switch (mut.type) {
+          case "progress": {
+            const res = await this.saveProgress(db, profileId, {
+              ...mut.data,
+              updatedAt: mut.timestamp || mut.data?.updatedAt
+            });
+            results.push({ id: mut.id, success: true, conflictResolved: res.conflictResolved });
+            break;
+          }
+          case "history": {
+            await this.recordHistory(db, profileId, {
+              ...mut.data,
+              watchedAt: mut.timestamp || mut.data?.watchedAt,
+              updatedAt: mut.timestamp || mut.data?.updatedAt
+            });
+            results.push({ id: mut.id, success: true });
+            break;
+          }
+          case "my_list": {
+            const isRemoved = mut.action === "remove" || Boolean(mut.data?.isRemoved);
+            const canonicalId = mut.data?.canonicalId || mut.data?.id;
+            const res = await this.setMyList(db, profileId, canonicalId, isRemoved, mut.timestamp);
+            results.push({ id: mut.id, success: true, conflictResolved: res.conflictResolved });
+            break;
+          }
+          case "favorites": {
+            const isRemoved = mut.action === "remove" || Boolean(mut.data?.isRemoved);
+            const canonicalId = mut.data?.canonicalId || mut.data?.id;
+            const res = await this.setFavorite(db, profileId, canonicalId, isRemoved, mut.timestamp);
+            results.push({ id: mut.id, success: true, conflictResolved: res.conflictResolved });
+            break;
+          }
+          default:
+            results.push({ id: mut.id, success: false, error: `Tipo de muta\xE7\xE3o desconhecido: ${mut.type}` });
+        }
+      } catch (err) {
+        results.push({ id: mut.id, success: false, error: err?.message || "Falha ao aplicar muta\xE7\xE3o" });
+      }
+    }
+    return {
+      processed: results.length,
+      results
+    };
+  }
+};
+
+// src/server/sync/routes.ts
+var syncRouter = express3.Router();
+syncRouter.use(authenticateUser);
+syncRouter.use(requireCsrfProtection);
+function resolveProfileId(req) {
+  if (req.body && typeof req.body.profileId === "string" && req.body.profileId.trim()) {
+    return req.body.profileId.trim();
+  }
+  if (req.query && typeof req.query.profileId === "string" && req.query.profileId.trim()) {
+    return req.query.profileId.trim();
+  }
+  const cookieProfile = extractCookie(req.headers.cookie, "zapitv_active_profile");
+  if (cookieProfile) {
+    try {
+      return decodeURIComponent(cookieProfile).trim();
+    } catch {
+      return cookieProfile.trim();
+    }
+  }
+  return void 0;
+}
+syncRouter.get("/pull", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const profileId = resolveProfileId(req);
+    if (!profileId) {
+      return res.status(400).json({ error: "Nenhum perfil informado ou ativo." });
+    }
+    await SyncService.verifyProfileOwnership(db, req.user.id, profileId);
+    const since = req.query.since ? Number(req.query.since) : void 0;
+    const data = await SyncService.pullProfileState(db, profileId, since);
+    return res.status(200).json(data);
+  } catch (err) {
+    const status = err.statusCode || 500;
+    return res.status(status).json({ error: err?.message || "Erro ao puxar dados de sincroniza\xE7\xE3o." });
+  }
+});
+syncRouter.get("/progress", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const profileId = resolveProfileId(req);
+    if (!profileId) {
+      return res.status(400).json({ error: "Nenhum perfil informado ou ativo." });
+    }
+    await SyncService.verifyProfileOwnership(db, req.user.id, profileId);
+    const canonicalId = typeof req.query.canonicalId === "string" ? req.query.canonicalId.trim() : void 0;
+    if (canonicalId) {
+      const season = req.query.season ? Number(req.query.season) : 0;
+      const episode = req.query.episode ? Number(req.query.episode) : 0;
+      const item = await SyncService.getProgressItem(db, profileId, canonicalId, season, episode);
+      return res.status(200).json({ progress: item });
+    }
+    const since = req.query.since ? Number(req.query.since) : void 0;
+    const list = await SyncService.getProgressList(db, profileId, since);
+    return res.status(200).json({ progress: list });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    return res.status(status).json({ error: err?.message || "Erro ao consultar progresso." });
+  }
+});
+syncRouter.post("/progress", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const profileId = resolveProfileId(req);
+    if (!profileId) {
+      return res.status(400).json({ error: "Nenhum perfil informado ou ativo." });
+    }
+    await SyncService.verifyProfileOwnership(db, req.user.id, profileId);
+    const input = {
+      canonicalId: req.body.canonicalId,
+      contentType: req.body.contentType || "movie",
+      season: req.body.season,
+      episode: req.body.episode,
+      positionSec: req.body.positionSec,
+      durationSec: req.body.durationSec,
+      progressPercent: req.body.progressPercent,
+      isCompleted: req.body.isCompleted,
+      deviceName: req.body.deviceName,
+      updatedAt: req.body.updatedAt
+    };
+    const result = await SyncService.saveProgress(db, profileId, input);
+    return res.status(200).json({
+      success: true,
+      progress: result.record,
+      conflictResolved: result.conflictResolved
+    });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    return res.status(status).json({ error: err?.message || "Erro ao salvar progresso." });
+  }
+});
+syncRouter.get("/history", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const profileId = resolveProfileId(req);
+    if (!profileId) {
+      return res.status(400).json({ error: "Nenhum perfil informado ou ativo." });
+    }
+    await SyncService.verifyProfileOwnership(db, req.user.id, profileId);
+    const limit = req.query.limit ? Number(req.query.limit) : 50;
+    const offset = req.query.offset ? Number(req.query.offset) : 0;
+    const since = req.query.since ? Number(req.query.since) : void 0;
+    const list = await SyncService.getHistory(db, profileId, limit, offset, since);
+    return res.status(200).json({ history: list });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    return res.status(status).json({ error: err?.message || "Erro ao consultar hist\xF3rico." });
+  }
+});
+syncRouter.post("/history", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const profileId = resolveProfileId(req);
+    if (!profileId) {
+      return res.status(400).json({ error: "Nenhum perfil informado ou ativo." });
+    }
+    await SyncService.verifyProfileOwnership(db, req.user.id, profileId);
+    const input = {
+      canonicalId: req.body.canonicalId,
+      contentType: req.body.contentType || "movie",
+      season: req.body.season,
+      episode: req.body.episode,
+      title: req.body.title,
+      posterUrl: req.body.posterUrl,
+      year: req.body.year,
+      watchedAt: req.body.watchedAt,
+      updatedAt: req.body.updatedAt
+    };
+    const record = await SyncService.recordHistory(db, profileId, input);
+    return res.status(200).json({ success: true, history: record });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    return res.status(status).json({ error: err?.message || "Erro ao registrar hist\xF3rico." });
+  }
+});
+syncRouter.get("/list", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const profileId = resolveProfileId(req);
+    if (!profileId) {
+      return res.status(400).json({ error: "Nenhum perfil informado ou ativo." });
+    }
+    await SyncService.verifyProfileOwnership(db, req.user.id, profileId);
+    const includeRemoved = req.query.includeRemoved === "true";
+    const since = req.query.since ? Number(req.query.since) : void 0;
+    const list = await SyncService.getMyList(db, profileId, includeRemoved, since);
+    return res.status(200).json({ myList: list });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    return res.status(status).json({ error: err?.message || "Erro ao consultar Minha Lista." });
+  }
+});
+syncRouter.post("/list", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const profileId = resolveProfileId(req);
+    if (!profileId) {
+      return res.status(400).json({ error: "Nenhum perfil informado ou ativo." });
+    }
+    await SyncService.verifyProfileOwnership(db, req.user.id, profileId);
+    const canonicalId = req.body.canonicalId;
+    const isRemoved = Boolean(req.body.isRemoved);
+    const timestamp = req.body.timestamp ? Number(req.body.timestamp) : void 0;
+    const result = await SyncService.setMyList(db, profileId, canonicalId, isRemoved, timestamp);
+    return res.status(200).json({
+      success: true,
+      item: result.record,
+      conflictResolved: result.conflictResolved
+    });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    return res.status(status).json({ error: err?.message || "Erro ao alterar Minha Lista." });
+  }
+});
+syncRouter.get("/favorites", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const profileId = resolveProfileId(req);
+    if (!profileId) {
+      return res.status(400).json({ error: "Nenhum perfil informado ou ativo." });
+    }
+    await SyncService.verifyProfileOwnership(db, req.user.id, profileId);
+    const includeRemoved = req.query.includeRemoved === "true";
+    const since = req.query.since ? Number(req.query.since) : void 0;
+    const list = await SyncService.getFavorites(db, profileId, includeRemoved, since);
+    return res.status(200).json({ favorites: list });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    return res.status(status).json({ error: err?.message || "Erro ao consultar favoritos." });
+  }
+});
+syncRouter.post("/favorites", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const profileId = resolveProfileId(req);
+    if (!profileId) {
+      return res.status(400).json({ error: "Nenhum perfil informado ou ativo." });
+    }
+    await SyncService.verifyProfileOwnership(db, req.user.id, profileId);
+    const canonicalId = req.body.canonicalId;
+    const isRemoved = Boolean(req.body.isRemoved);
+    const timestamp = req.body.timestamp ? Number(req.body.timestamp) : void 0;
+    const result = await SyncService.setFavorite(db, profileId, canonicalId, isRemoved, timestamp);
+    return res.status(200).json({
+      success: true,
+      item: result.record,
+      conflictResolved: result.conflictResolved
+    });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    return res.status(status).json({ error: err?.message || "Erro ao alterar favoritos." });
+  }
+});
+syncRouter.post("/batch", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados temporariamente indispon\xEDvel." });
+    }
+    const profileId = resolveProfileId(req);
+    if (!profileId) {
+      return res.status(400).json({ error: "Nenhum perfil informado ou ativo." });
+    }
+    await SyncService.verifyProfileOwnership(db, req.user.id, profileId);
+    const mutations = Array.isArray(req.body.mutations) ? req.body.mutations : [];
+    const outcome = await SyncService.processBatch(db, profileId, mutations);
+    return res.status(200).json({
+      success: true,
+      processed: outcome.processed,
+      results: outcome.results
+    });
+  } catch (err) {
+    const status = err.statusCode || 500;
+    return res.status(status).json({ error: err?.message || "Erro ao processar lote de sincroniza\xE7\xE3o." });
   }
 });
 
@@ -78220,10 +79093,10 @@ var EpgSyncService = class _EpgSyncService {
       const descMatch = body.match(/<desc[^>]*>([^<]+)<\/desc>/);
       const catMatch = body.match(/<category[^>]*>([^<]+)<\/category>/);
       const title = titleMatch ? titleMatch[1].trim() : "Sem t\xEDtulo";
-      const desc3 = descMatch ? descMatch[1].trim() : "";
+      const desc4 = descMatch ? descMatch[1].trim() : "";
       const category = catMatch ? catMatch[1].trim() : void 0;
       if (!map.has(ch)) map.set(ch, []);
-      map.get(ch).push({ start, stop, title, desc: desc3, category });
+      map.get(ch).push({ start, stop, title, desc: desc4, category });
       count2++;
     }
     return { totalProgrammes: count2, channels: map };
@@ -78278,8 +79151,8 @@ var EpgSyncService = class _EpgSyncService {
     const s = parseInt(parts.find((p) => p.type === "second")?.value || "0", 10);
     return h * 60 + m + s / 60;
   }
-  parseSportsDetails(title, desc3) {
-    const full = `${title} ${desc3 || ""}`.toLowerCase();
+  parseSportsDetails(title, desc4) {
+    const full = `${title} ${desc4 || ""}`.toLowerCase();
     const isLive = full.includes("ao vivo") || full.includes("ao-vivo") || full.includes("live");
     const isReplay = full.includes("reprise") || full.includes(" vt ") || full.includes("melhores momentos");
     let competition;
@@ -78304,7 +79177,7 @@ var EpgSyncService = class _EpgSyncService {
       }
     }
     const matchPattern = /([A-Za-zÀ-ÖØ-öø-ÿ\s]+)\s+x\s+([A-Za-zÀ-ÖØ-öø-ÿ\s]+)/i;
-    const matchResult = title.match(matchPattern) || desc3 && desc3.match(matchPattern);
+    const matchResult = title.match(matchPattern) || desc4 && desc4.match(matchPattern);
     if (matchResult) {
       teams = `${matchResult[1].trim()} x ${matchResult[2].trim()}`;
     }
@@ -78364,7 +79237,7 @@ async function requireMaintenanceAdmin(req, res, next) {
   }
 }
 function createApp() {
-  const app2 = express3();
+  const app2 = express4();
   const activeRequests = /* @__PURE__ */ new Map();
   const validationWindows = /* @__PURE__ */ new Map();
   const allowPublicRequest = (key, limit) => {
@@ -78398,7 +79271,7 @@ function createApp() {
     }
     next();
   });
-  app2.use(express3.json());
+  app2.use(express4.json());
   app2.use("/api/watchparty", (req, res, next) => {
     if (!allowPublicRequest(`watchparty:${req.ip || "unknown"}`, 1800) || req.path === "/room/announce" && !allowPublicRequest(`watchparty-announce:${req.ip || "unknown"}`, 120)) {
       return res.status(429).set("Retry-After", "60").json({ error: "Muitas solicita\xE7\xF5es \xE0 sala." });
@@ -78438,6 +79311,7 @@ function createApp() {
   app2.use("/api/profiles", profilesRouter);
   app2.use("/api/device-auth", deviceAuthRouter);
   app2.use("/api/devices", linkedDevicesRouter);
+  app2.use("/api/sync", syncRouter);
   function resolveOpenItemStreams(rawId, seasonNum = 1, episodeNum = 1) {
     let cleanId = rawId.replace(/\.json$/, "");
     if (cleanId.includes(":")) {
@@ -79638,7 +80512,7 @@ if (!process.env.VERCEL) {
       });
     } else {
       const distPath = path6.resolve(__dirname, "dist");
-      app.use(express3.static(distPath));
+      app.use(express4.static(distPath));
       app.get("/{*path}", (_req, res) => {
         res.sendFile("index.html", { root: distPath });
       });
