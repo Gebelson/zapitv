@@ -327,7 +327,8 @@ export class SubtitlePreferenceService {
     const combined = `${stream.name || ''} ${stream.title || ''} ${stream.description || ''}`.toLowerCase();
     const url = (stream.url || '').toLowerCase();
 
-    const hasPtBrIndication = /\b(pt[-_]?br|portugu[eê]s|legenda[-_]?pt|legendado)\b/i.test(combined);
+    const hasPtBrIndication = /\b(legenda[-_]?pt|legendado|legendada|leg[-_]?pt|softsub|hardsub)\b/i.test(combined) ||
+      (/\b(pt[-_]?br|portugu[eê]s)\b/i.test(combined) && !/\bdublado\b/i.test(combined));
 
     // 1. Identificar hardsub estrangeiro
     if (HARDSUB_FOREIGN_PATTERNS.some(p => p.test(combined))) {
@@ -408,7 +409,7 @@ export class SubtitlePreferenceService {
       isHardsub: false,
       isClean: false,
       isSoftsub: false,
-      hasPtSubtitle: hasExternalPtSub,
+      hasPtSubtitle: hasPtBrIndication || hasExternalPtSub,
       confidence: 0.5,
       details: 'Formato de legenda não identificado explicitamente nos metadados'
     };

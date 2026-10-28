@@ -85,7 +85,7 @@ export class AudioSelectionManager {
     }
 
     // 6. Coreano
-    if (/^(ko|kor|korean|coreano)$/i.test(raw) || /\b(korean|coreano)\b/i.test(raw)) {
+    if (/^(ko|kor|korean|coreano|kdrama|k[-_]?drama)$/i.test(raw) || /\b(korean|coreano|kdrama|k[-_]?drama)\b/i.test(raw)) {
       return 'ko';
     }
 
@@ -153,7 +153,11 @@ export class AudioSelectionManager {
                     /anime/i.test(item.description || '');
     if (isAnime) return 'ja';
 
-    const isKorean = Boolean(item.genres && (item.genres.includes('Dorama') || item.genres.includes('K-Drama')));
+    const isKorean = Boolean(
+      item.genres && (item.genres.includes('Dorama') || item.genres.includes('K-Drama')) ||
+      (item.type && item.type.toLowerCase() === 'dorama') ||
+      /dorama|k[-_]?drama|coreano/i.test(item.description || '')
+    );
     if (isKorean) return 'ko';
 
     const desc = (item.description || '').toLowerCase();
@@ -181,24 +185,15 @@ export class AudioSelectionManager {
     if (analysis.isPtBr || analysis.language === 'pt-BR' || analysis.language === 'dual') {
       return 'pt-BR';
     }
-    if (analysis.language === 'ja' || analysis.language === 'en' ||
-        analysis.language === 'es' || analysis.language === 'pt-PT') {
+    if (analysis.language && !['unknown', 'original', 'other', 'foreign'].includes(analysis.language)) {
       return analysis.language;
     }
 
-    // 2. Tags explícitas de dublagem ou áudio PT-BR
+    // Se a análise categórica determinou que NÃO é PT-BR:
+    // Nunca retornar 'pt-BR' sem evidência concreta.
     const isSubtitledOnly = /\b(legendado|legendada|softsub|hardsub|sub\b|leg\b)\b/i.test(combined) && !/dublado|dual|áudio|audio/i.test(combined);
-    if (
-      !isSubtitledOnly && (
-        /\b(dublado|dublada|dublados|audio\s*pt[-_]?br|áudio\s*pt[-_]?br|pt[-_]?br\s*dub|fhd[-_]?dub|hd[-_]?dub)\b/i.test(combined) ||
-        /\[dublado\]|\[dub\]/i.test(combined) ||
-        stream.isDubbed === true
-      )
-    ) {
-      return 'pt-BR';
-    }
 
-    // 3. Espanhol / Latino explícito (verificado antes de inglês para não casar 'en espanol')
+    // Espanhol / Latino explícito (verificado antes de inglês para não casar 'en espanol')
     if (
       /\b(audio\s*latino|áudio\s*latino|dublado\s*latino|en\s*español|en\s*espanhol|castellano|español|espanhol|latino)\b/i.test(combined) ||
       /🇲🇽|🇪🇸/i.test(combined)
@@ -206,7 +201,15 @@ export class AudioSelectionManager {
       return 'es';
     }
 
-    // 4. Japonês explícito
+    // Coreano explícito
+    if (
+      /\b(korean|coreano|áudio\s*coreano|audio\s*coreano|kdrama|k[-_]?drama)\b/i.test(combined) ||
+      /🇰🇷/i.test(combined)
+    ) {
+      return 'ko';
+    }
+
+    // Japonês explícito
     if (
       /\b(japanese|japon[eê]s|áudio\s*japon[eê]s|audio\s*japones)\b/i.test(combined) ||
       /🇯🇵/i.test(combined)
@@ -214,27 +217,20 @@ export class AudioSelectionManager {
       return 'ja';
     }
 
-    // 5. Inglês explícito
+    // Inglês explícito
     if (
-      /\b(english\s*audio|áudio\s*ingl[eê]s|audio\s*ingles|dual[-_]?audio.*eng)\b/i.test(combined) ||
+      /\b(english\s*audio|áudio\s*ingl[eê]s|audio\s*ingles|english\s*dub|dual[-_]?audio.*eng)\b/i.test(combined) ||
       /🇬🇧|🇺🇸/i.test(combined)
     ) {
       return 'en';
     }
 
-    // 6. Se o stream indicar Dual Audio sem dizer o segundo idioma:
-    if (/\b(dual[-_]?audio|dual[-_]?áudio|multi[-_]?audio)\b/i.test(combined)) {
-      if (/pt[-_]?br|por|dub/i.test(combined)) {
-        return 'pt-BR';
-      }
-    }
-
-    // 7. Se for expressamente legendado ou análise de áudio indicou original:
+    // Se for expressamente legendado ou análise de áudio indicou original:
     if (isSubtitledOnly || analysis.language === 'original' || /\b(legendado|softsub|hardsub|sub\b|leg\b|original)\b/i.test(combined)) {
       return originalLang !== 'unknown' ? originalLang : 'other';
     }
 
-    // 8. Se originalLang for conhecido e não houver contradição
+    // Se originalLang for conhecido e não houver contradição
     if (originalLang && originalLang !== 'unknown') {
       return originalLang;
     }

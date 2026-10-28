@@ -1,3 +1,4 @@
+import { audioPreferenceService } from '../audio/audioPreferenceService';
 import { StremioStream } from '../stremio/stremioTypes';
 import { sourceSelectionService } from '../selection/sourceSelectionService';
 
@@ -161,12 +162,8 @@ export function analyzeStreamSubtitleFormat(stream: StremioStream): StreamSubtit
   }
 
   // Release expressamente dublado em português sem menção a hardsub
-  const isDubbed = Boolean(
-    stream.isDubbed ||
-    stream.isPtBr ||
-    /\b(dublado|dual[-_]?audio|dual|brazuca|audio\s*pt|áudio\s*pt)\b/i.test(combined) ||
-    /🌎\s*portugu[eê]s/i.test(combined)
-  );
+  const audioEval = audioPreferenceService.analyzeAudio(stream);
+  const isDubbed = audioEval.isDubbed && !audioEval.isDualAudio;
 
   if (isDubbed && !hasHardsubPtBrKeyword) {
     return {

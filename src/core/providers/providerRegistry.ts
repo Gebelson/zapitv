@@ -1,6 +1,7 @@
 import { StremioClient } from '../stremio/stremioClient';
 import { StremioManifest, StremioStream } from '../stremio/stremioTypes';
 import { sortStreamsByPtBrPriority } from '../audio/audioDetector';
+import { audioPreferenceService } from '../audio/audioPreferenceService';
 import { VERIFIED_OPEN_ITEMS } from '../catalog/verifiedCatalog';
 import { streamValidator } from './streamValidator';
 import { tmdbService } from '../tmdb/tmdbClient';
@@ -991,11 +992,10 @@ class ProviderRegistryService {
               const isTorrent = Boolean(s.infoHash) || sUrl.includes('127.0.0.1:11470') || sUrl.includes('localhost:11470') || sUrl.includes('.torrent');
               const isDirectVideo = !isTorrent && (sUrl.includes('.mp4') || sUrl.includes('.webm') || sUrl.includes('.ogv') || sUrl.includes('/api/proxy') || s.sourceType === 'mp4' || Boolean(sUrl && !s.infoHash));
 
-              const streamText = `${s.name || ''} ${s.title || ''} ${s.description || ''}`;
-              const isExplicitlySubOnly = /\b(legendado|softsub|hardsub|sub\b|leg\b)\b/i.test(streamText) && !/dublado|dual|áudio|audio/i.test(streamText);
-              const hasPtAudioIndicator = /dublado|dub\b|dual\b|audio\s*pt|áudio\s*pt|pt[-_]?br|portugu[êe]s|🌎\s*portugu[êe]s/i.test(streamText) || (/🇧🇷/i.test(streamText) && !isExplicitlySubOnly);
-              const isDubbed = Boolean(s.isDubbed) || (!isExplicitlySubOnly && hasPtAudioIndicator) || (addon.isPtBr && !isExplicitlySubOnly && hasPtAudioIndicator);
-              const isPtBr = Boolean(s.isPtBr) || addon.isPtBr || isDubbed || /pt[-_]?br|portugu[êe]s|pob|por\b|🇧🇷/i.test(streamText);
+
+              const audioAnalysis = audioPreferenceService.analyzeAudio(s);
+              const isDubbed = audioAnalysis.isDubbed;
+              const isPtBr = audioAnalysis.isPtBr;
 
               if (isHls || isDash || isDirectVideo) {
                 // Este host entrega o manifesto por HTTPS, mas não permite que

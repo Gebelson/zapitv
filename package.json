@@ -145,7 +145,7 @@
     "test:tv-skip-buttons-remote": "tsx tests/tv_skip_buttons_remote_interaction.test.ts",
     "test:tv-player-contextual-focus": "tsx tests/tv_player_contextual_focus.test.ts",
     "test:desktop-player-pause": "tsx tests/desktop_player_pause_control.test.ts",
-    "test:p1-stability": "tsx tests/p1_source_integrity.test.ts && tsx tests/p1_catalog_recovery.test.ts && tsx tests/p1_audio_track_identity.test.ts && tsx tests/p1_image_abort.test.ts",
+    "test:p1-stability": "tsx tests/p1_source_integrity.test.ts && tsx tests/p1_catalog_recovery.test.ts && tsx tests/p1_audio_track_identity.test.ts && tsx tests/p1_image_abort.test.ts && npm run test:audio-language-id",
     "test:p1-browser": "tsx tests/p1_tv_performance_browser.test.ts --verify && tsx tests/p1_live_lifecycle_browser.test.ts",
     "test:storage-integrity": "tsx tests/storage_integrity.test.ts",
     "test:storage-browser": "tsx tests/storage_integrity_browser.test.ts",
@@ -153,7 +153,8 @@
     "test:catalog-cover-integrity": "tsx tests/catalog_metadata_and_cover_integrity.test.ts",
     "test:mobile-ranked-stability": "tsx tests/mobile_ranked_row_vertical_stability.test.ts",
     "test:tv-live-traditional-controls": "tsx tests/tv_live_traditional_controls_removal.test.ts",
-    "test:tv-live-hud-simplified": "tsx tests/tv_live_hud_simplified.test.ts"
+    "test:tv-live-hud-simplified": "tsx tests/tv_live_hud_simplified.test.ts",
+    "test:audio-language-id": "tsx tests/p1_2_audio_language_identification.test.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

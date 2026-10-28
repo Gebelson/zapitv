@@ -698,7 +698,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     let hasUnknownStream = false;
     for (const s of streams) {
       const cls = classifyStream(s);
-      if (cls.isDubbed || cls.isPtBr || s.isDubbed || s.isPtBr) {
+      if (cls.isDubbed || cls.isPtBr) {
         return 'confirmed';
       }
       if (cls.language === 'unknown' || (!cls.language && !cls.isSubtitled)) {
@@ -1093,12 +1093,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Inicia a reprodução da vinheta institucional ZapiTV com a mídia principal já pré-bufferizada em background
   const startIntroIfReady = useCallback(() => {
     if (!isMountedRef.current) return;
+    const curAudioCls = currentStream ? classifyStream(currentStream) : null;
     const isPtBrAbsent = forcedNonDubbedPrompt || (!hasDynamicallyConfirmedPtBr &&
       !ptBrConfirmedOnceRef.current &&
       item.audioStatus !== 'pt-br-original' &&
       item.audioStatus !== 'pt-br-dubbed' &&
-      !currentStream?.isDubbed &&
-      !currentStream?.isPtBr &&
+      !curAudioCls?.isDubbed &&
+      !curAudioCls?.isPtBr &&
       ptBrAvailabilityState === 'unavailable');
 
     // Nunca toca a vinheta enquanto a busca de fontes estiver pendente, se não houver fontes ou se o aviso de dublagem estiver pendente
@@ -2200,7 +2201,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     // 3. Verifica classificação do stream em reprodução
     if (currentStream) {
       const classification = classifyStream(currentStream);
-      if (classification.isDubbed || classification.isPtBr || currentStream.isDubbed || currentStream.isPtBr) return true;
+      if (classification.isDubbed || classification.isPtBr) return true;
     }
     return ptBrAvailabilityState === 'confirmed';
   }, [item.audioStatus, hasDynamicallyConfirmedPtBr, currentStream, ptBrAvailabilityState, hlsAudioTracks, selectedHlsAudioTrack]);
@@ -3228,7 +3229,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
           setActiveAudioId(confirmedId);
         }
         // Sincronização dinâmica: se a fonte em reprodução for PT-BR
-        if (currentStream && (currentStream.isDubbed || currentStream.isPtBr || classifyStream(currentStream).isDubbed || classifyStream(currentStream).isPtBr)) {
+        const currentCls = currentStream ? classifyStream(currentStream) : null;
+        if (currentCls && (currentCls.isDubbed || currentCls.isPtBr)) {
           setHasDynamicallyConfirmedPtBr(true);
           ptBrConfirmedOnceRef.current = true;
         }
