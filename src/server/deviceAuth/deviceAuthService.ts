@@ -95,24 +95,62 @@ export function detectDeviceFromUserAgent(userAgent?: string): { deviceName: str
 }
 
 export function getPublicBaseUrl(req?: { headers?: Record<string, any>; protocol?: string }): string {
-  // Origem pública oficial configurada no servidor (prioridade absoluta)
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // 1. Origem pública oficial configurada explicitamente no servidor (prioridade absoluta sobre VERCEL_URL)
   const envUrl = process.env.APP_URL || process.env.PUBLIC_URL;
   if (envUrl && envUrl.trim()) {
-    return envUrl.trim().replace(/\/+$/, '');
+    let parsed: URL;
+    try {
+      parsed = new URL(envUrl.trim());
+    } catch {
+      throw new Error('Variável APP_URL contém uma URL inválida.');
+    }
+
+    if (isProduction && parsed.protocol !== 'https:') {
+      throw new Error('Origem de produção em APP_URL deve utilizar obrigatoriamente HTTPS.');
+    }
+
+    return parsed.origin;
   }
 
-  // Se não configurada, deriva de forma segura
-  if (req?.headers?.['x-forwarded-host'] || req?.headers?.host) {
-    const host = (req.headers['x-forwarded-host'] as string) || req.headers.host;
-    const proto = (req.headers['x-forwarded-proto'] as string) || (req.protocol === 'https' ? 'https' : 'http');
-    return `${proto}://${host}`.replace(/\/+$/, '');
+  // 2. Validação estrita de cabeçalhos Host / X-Forwarded-Host contra injeção e envenenamento
+  const rawHostHeader = (req?.headers?.['x-forwarded-host'] as string) || req?.headers?.host;
+  if (rawHostHeader && typeof rawHostHeader === 'string' && rawHostHeader.trim()) {
+    const cleanHost = rawHostHeader.split(',')[0].trim();
+    const hostname = cleanHost.replace(/:\d+$/, '').toLowerCase();
+
+    // Whitelist de validação de domínios permitidos:
+    const isLocalDevHost = !isProduction && (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.local'));
+    const isVercelApp = /^[a-z0-9][a-z0-9-_]*\.vercel\.app$/i.test(hostname);
+    const vercelEnvHost = process.env.VERCEL_URL ? process.env.VERCEL_URL.trim().replace(/:\d+$/, '').toLowerCase() : null;
+    const isVercelEnvMatch = Boolean(vercelEnvHost && hostname === vercelEnvHost);
+    const isOfficialDomain = hostname === 'zapitv.vercel.app';
+
+    if (isLocalDevHost) {
+      const proto = (req?.headers?.['x-forwarded-proto'] as string) || req?.protocol || 'http';
+      return `${proto}://${cleanHost}`.replace(/\/+$/, '');
+    }
+
+    if (isVercelApp || isVercelEnvMatch || isOfficialDomain) {
+      // Fora de desenvolvimento local, exige obrigatoriamente HTTPS
+      return `https://${cleanHost}`.replace(/\/+$/, '');
+    }
+
+    // Host arbitrário ou malicioso detectado: bloqueia geração com erro seguro
+    throw new Error(`Origem ou host não autorizado para geração de QR Code: ${hostname}`);
   }
 
-  // Fallback para domínio do deployment atual na Vercel (Preview / Branch Deployment)
+  // 3. Fallback para domínio do deployment atual na Vercel (Preview / Branch Deployment)
   if (process.env.VERCEL_URL && process.env.VERCEL_URL.trim()) {
-    return `https://${process.env.VERCEL_URL.trim()}`.replace(/\/+$/, '');
+    const rawVercel = process.env.VERCEL_URL.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+    const vHostname = rawVercel.replace(/:\d+$/, '').toLowerCase();
+    if (/^[a-z0-9][a-z0-9-_]*\.vercel\.app$/i.test(vHostname) || vHostname === 'zapitv.vercel.app') {
+      return `https://${rawVercel}`;
+    }
   }
 
+  // 4. Fallback padrão seguro para o domínio oficial de produção
   return 'https://zapitv.vercel.app';
 }
 

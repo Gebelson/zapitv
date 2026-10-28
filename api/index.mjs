@@ -27263,17 +27263,44 @@ function detectDeviceFromUserAgent(userAgent) {
   return { deviceName: "Smart TV", deviceType: "smart_tv" };
 }
 function getPublicBaseUrl(req) {
+  const isProduction3 = process.env.NODE_ENV === "production";
   const envUrl = process.env.APP_URL || process.env.PUBLIC_URL;
   if (envUrl && envUrl.trim()) {
-    return envUrl.trim().replace(/\/+$/, "");
+    let parsed;
+    try {
+      parsed = new URL(envUrl.trim());
+    } catch {
+      throw new Error("Vari\xE1vel APP_URL cont\xE9m uma URL inv\xE1lida.");
+    }
+    if (isProduction3 && parsed.protocol !== "https:") {
+      throw new Error("Origem de produ\xE7\xE3o em APP_URL deve utilizar obrigatoriamente HTTPS.");
+    }
+    return parsed.origin;
   }
-  if (req?.headers?.["x-forwarded-host"] || req?.headers?.host) {
-    const host = req.headers["x-forwarded-host"] || req.headers.host;
-    const proto = req.headers["x-forwarded-proto"] || (req.protocol === "https" ? "https" : "http");
-    return `${proto}://${host}`.replace(/\/+$/, "");
+  const rawHostHeader = req?.headers?.["x-forwarded-host"] || req?.headers?.host;
+  if (rawHostHeader && typeof rawHostHeader === "string" && rawHostHeader.trim()) {
+    const cleanHost = rawHostHeader.split(",")[0].trim();
+    const hostname = cleanHost.replace(/:\d+$/, "").toLowerCase();
+    const isLocalDevHost = !isProduction3 && (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".local"));
+    const isVercelApp = /^[a-z0-9][a-z0-9-_]*\.vercel\.app$/i.test(hostname);
+    const vercelEnvHost = process.env.VERCEL_URL ? process.env.VERCEL_URL.trim().replace(/:\d+$/, "").toLowerCase() : null;
+    const isVercelEnvMatch = Boolean(vercelEnvHost && hostname === vercelEnvHost);
+    const isOfficialDomain = hostname === "zapitv.vercel.app";
+    if (isLocalDevHost) {
+      const proto = req?.headers?.["x-forwarded-proto"] || req?.protocol || "http";
+      return `${proto}://${cleanHost}`.replace(/\/+$/, "");
+    }
+    if (isVercelApp || isVercelEnvMatch || isOfficialDomain) {
+      return `https://${cleanHost}`.replace(/\/+$/, "");
+    }
+    throw new Error(`Origem ou host n\xE3o autorizado para gera\xE7\xE3o de QR Code: ${hostname}`);
   }
   if (process.env.VERCEL_URL && process.env.VERCEL_URL.trim()) {
-    return `https://${process.env.VERCEL_URL.trim()}`.replace(/\/+$/, "");
+    const rawVercel = process.env.VERCEL_URL.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    const vHostname = rawVercel.replace(/:\d+$/, "").toLowerCase();
+    if (/^[a-z0-9][a-z0-9-_]*\.vercel\.app$/i.test(vHostname) || vHostname === "zapitv.vercel.app") {
+      return `https://${rawVercel}`;
+    }
   }
   return "https://zapitv.vercel.app";
 }
@@ -27567,6 +27594,9 @@ deviceAuthRouter.post("/challenge", async (req, res) => {
     });
     return res.status(201).json(challenge);
   } catch (err) {
+    if (err?.message?.includes("n\xE3o autorizada") || err?.message?.includes("n\xE3o autorizado") || err?.message?.includes("HTTPS") || err?.message?.includes("inv\xE1lida")) {
+      return res.status(400).json({ error: err.message });
+    }
     return res.status(500).json({ error: "Erro ao gerar desafio de vincula\xE7\xE3o." });
   }
 });
@@ -27758,6 +27788,7 @@ var SyncService = class {
    * e imunidade a relógios descalibrados.
    */
   static async saveProgress(db, profileId, input) {
+    const orm = db.db || db;
     const canonicalId = String(input.canonicalId).trim();
     if (!canonicalId) {
       throw new Error("canonicalId \xE9 obrigat\xF3rio para registrar progresso.");
@@ -27774,7 +27805,7 @@ var SyncService = class {
       input.clientSendTime
     );
     const deviceName = input.deviceName ? String(input.deviceName).slice(0, 80) : null;
-    const existing = await db.db.select().from(profilePlaybackProgress).where(
+    const existing = await orm.select().from(profilePlaybackProgress).where(
       and9(
         eq10(profilePlaybackProgress.profileId, profileId),
         eq10(profilePlaybackProgress.canonicalId, canonicalId),
@@ -27789,7 +27820,7 @@ var SyncService = class {
       }
       const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
       const nextVersion = (curr.version || 1) + 1;
-      await db.db.update(profilePlaybackProgress).set({
+      await orm.update(profilePlaybackProgress).set({
         contentType,
         positionSec,
         durationSec,
@@ -27828,7 +27859,7 @@ var SyncService = class {
       deviceName,
       updatedAt: serverNow
     };
-    await db.db.insert(profilePlaybackProgress).values(newRecord);
+    await orm.insert(profilePlaybackProgress).values(newRecord);
     return { record: newRecord, conflictResolved: false };
   }
   /**
@@ -27862,6 +27893,7 @@ var SyncService = class {
    * Registra ou atualiza item no histórico com normalização temporal.
    */
   static async recordHistory(db, profileId, input) {
+    const orm = db.db || db;
     const canonicalId = String(input.canonicalId).trim();
     if (!canonicalId) {
       throw new Error("canonicalId \xE9 obrigat\xF3rio para registrar hist\xF3rico.");
@@ -27873,7 +27905,7 @@ var SyncService = class {
       input.watchedAt || input.updatedAt,
       input.clientSendTime
     );
-    const existing = await db.db.select().from(profileWatchHistory).where(
+    const existing = await orm.select().from(profileWatchHistory).where(
       and9(
         eq10(profileWatchHistory.profileId, profileId),
         eq10(profileWatchHistory.canonicalId, canonicalId),
@@ -27886,7 +27918,7 @@ var SyncService = class {
       const maxWatched = Math.max(curr.watchedAt, effectiveEventTime);
       const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
       const nextVersion = (curr.version || 1) + 1;
-      await db.db.update(profileWatchHistory).set({
+      await orm.update(profileWatchHistory).set({
         contentType,
         title: input.title ? String(input.title).slice(0, 150) : curr.title,
         posterUrl: input.posterUrl ? String(input.posterUrl).slice(0, 500) : curr.posterUrl,
@@ -27921,7 +27953,7 @@ var SyncService = class {
       updatedAt: serverNow,
       version: 1
     };
-    await db.db.insert(profileWatchHistory).values(newRecord);
+    await orm.insert(profileWatchHistory).values(newRecord);
     return newRecord;
   }
   /**
@@ -27945,12 +27977,13 @@ var SyncService = class {
    * mais recentemente no servidor, a remoção é preservada.
    */
   static async setMyList(db, profileId, canonicalId, isRemoved, timestamp, clientSendTime) {
+    const orm = db.db || db;
     const cleanId = String(canonicalId).trim();
     if (!cleanId) {
       throw new Error("canonicalId \xE9 obrigat\xF3rio para Minha Lista.");
     }
     const { effectiveEventTime, serverNow } = this.normalizeTimestamp(timestamp, clientSendTime);
-    const existing = await db.db.select().from(profileMyList).where(
+    const existing = await orm.select().from(profileMyList).where(
       and9(
         eq10(profileMyList.profileId, profileId),
         eq10(profileMyList.canonicalId, cleanId)
@@ -27961,7 +27994,7 @@ var SyncService = class {
       const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
       const nextVersion = (curr.version || 1) + 1;
       if (isRemoved) {
-        await db.db.update(profileMyList).set({
+        await orm.update(profileMyList).set({
           isRemoved: 1,
           removedAt: effectiveEventTime,
           updatedAt: nextUpdatedAt,
@@ -27981,7 +28014,7 @@ var SyncService = class {
         if (curr.isRemoved === 1 && curr.removedAt && curr.removedAt > effectiveEventTime) {
           return { record: curr, conflictResolved: true };
         }
-        await db.db.update(profileMyList).set({
+        await orm.update(profileMyList).set({
           isRemoved: 0,
           removedAt: null,
           addedAt: effectiveEventTime,
@@ -28012,7 +28045,7 @@ var SyncService = class {
       updatedAt: serverNow,
       version: 1
     };
-    await db.db.insert(profileMyList).values(newRecord);
+    await orm.insert(profileMyList).values(newRecord);
     return { record: newRecord, conflictResolved: false };
   }
   /**
@@ -28035,12 +28068,13 @@ var SyncService = class {
    * Adiciona ou remove favorito usando tombstones com resolução determinística e normalização temporal.
    */
   static async setFavorite(db, profileId, canonicalId, isRemoved, timestamp, clientSendTime) {
+    const orm = db.db || db;
     const cleanId = String(canonicalId).trim();
     if (!cleanId) {
       throw new Error("canonicalId \xE9 obrigat\xF3rio para Favoritos.");
     }
     const { effectiveEventTime, serverNow } = this.normalizeTimestamp(timestamp, clientSendTime);
-    const existing = await db.db.select().from(profileFavorites).where(
+    const existing = await orm.select().from(profileFavorites).where(
       and9(
         eq10(profileFavorites.profileId, profileId),
         eq10(profileFavorites.canonicalId, cleanId)
@@ -28051,7 +28085,7 @@ var SyncService = class {
       const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
       const nextVersion = (curr.version || 1) + 1;
       if (isRemoved) {
-        await db.db.update(profileFavorites).set({
+        await orm.update(profileFavorites).set({
           isRemoved: 1,
           removedAt: effectiveEventTime,
           updatedAt: nextUpdatedAt,
@@ -28071,7 +28105,7 @@ var SyncService = class {
         if (curr.isRemoved === 1 && curr.removedAt && curr.removedAt > effectiveEventTime) {
           return { record: curr, conflictResolved: true };
         }
-        await db.db.update(profileFavorites).set({
+        await orm.update(profileFavorites).set({
           isRemoved: 0,
           removedAt: null,
           addedAt: effectiveEventTime,
@@ -28102,7 +28136,7 @@ var SyncService = class {
       updatedAt: serverNow,
       version: 1
     };
-    await db.db.insert(profileFavorites).values(newRecord);
+    await orm.insert(profileFavorites).values(newRecord);
     return { record: newRecord, conflictResolved: false };
   }
   /**
@@ -28156,81 +28190,79 @@ var SyncService = class {
         results.push({ id: mut.id || "invalid", success: false, error: "ID de muta\xE7\xE3o obrigat\xF3rio." });
         continue;
       }
-      try {
-        const now = Date.now();
-        const sevenDays = 7 * 24 * 60 * 60 * 1e3;
-        let isClaimed = false;
+      const now = Date.now();
+      const sevenDays = 7 * 24 * 60 * 60 * 1e3;
+      let attempts = 0;
+      const maxAttempts = 5;
+      while (attempts < maxAttempts) {
+        attempts++;
         try {
-          await db.db.insert(processedSyncMutations).values({
-            id: mut.id,
-            profileId,
-            mutationType: mut.type,
-            canonicalId: String(mut.data?.canonicalId || mut.data?.id || "unknown").slice(0, 100),
-            processedAt: now,
-            expiresAt: now + sevenDays
+          const txOutcome = await db.db.transaction(async (tx) => {
+            await tx.insert(processedSyncMutations).values({
+              id: mut.id,
+              profileId,
+              mutationType: mut.type,
+              canonicalId: String(mut.data?.canonicalId || mut.data?.id || "unknown").slice(0, 100),
+              processedAt: now,
+              expiresAt: now + sevenDays
+            });
+            let conflictResolved = false;
+            switch (mut.type) {
+              case "progress": {
+                const res = await this.saveProgress(tx, profileId, {
+                  ...mut.data,
+                  updatedAt: mut.timestamp || mut.data?.updatedAt,
+                  clientSendTime
+                });
+                conflictResolved = Boolean(res.conflictResolved);
+                break;
+              }
+              case "history": {
+                await this.recordHistory(tx, profileId, {
+                  ...mut.data,
+                  watchedAt: mut.timestamp || mut.data?.watchedAt,
+                  updatedAt: mut.timestamp || mut.data?.updatedAt,
+                  clientSendTime
+                });
+                break;
+              }
+              case "my_list": {
+                const isRemoved = mut.action === "remove" || Boolean(mut.data?.isRemoved);
+                const canonicalId = mut.data?.canonicalId || mut.data?.id;
+                const res = await this.setMyList(tx, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
+                conflictResolved = Boolean(res.conflictResolved);
+                break;
+              }
+              case "favorites": {
+                const isRemoved = mut.action === "remove" || Boolean(mut.data?.isRemoved);
+                const canonicalId = mut.data?.canonicalId || mut.data?.id;
+                const res = await this.setFavorite(tx, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
+                conflictResolved = Boolean(res.conflictResolved);
+                break;
+              }
+              default:
+                throw new Error(`Tipo de muta\xE7\xE3o desconhecido: ${mut.type}`);
+            }
+            return { conflictResolved };
           });
-          isClaimed = true;
-        } catch (insertErr) {
-          const rawErr = insertErr?.cause || insertErr;
-          const fullMsg = `${insertErr?.message || ""} ${rawErr?.message || ""} ${insertErr?.code || ""} ${rawErr?.code || ""}`;
-          if (insertErr?.code === "SQLITE_CONSTRAINT" || insertErr?.code === "SQLITE_CONSTRAINT_PRIMARYKEY" || rawErr?.code === "SQLITE_CONSTRAINT" || rawErr?.code === "SQLITE_CONSTRAINT_PRIMARYKEY" || fullMsg.includes("UNIQUE") || fullMsg.includes("constraint") || fullMsg.includes("PRIMARY KEY") || fullMsg.includes("SQLITE_CONSTRAINT")) {
+          results.push({ id: mut.id, success: true, conflictResolved: txOutcome.conflictResolved });
+          break;
+        } catch (err) {
+          const rawErr = err?.cause || err;
+          const fullMsg = `${err?.message || ""} ${rawErr?.message || ""} ${err?.code || ""} ${rawErr?.code || ""} ${rawErr?.extendedCode || ""}`;
+          const isDuplicate = err?.code === "SQLITE_CONSTRAINT" || err?.code === "SQLITE_CONSTRAINT_PRIMARYKEY" || rawErr?.code === "SQLITE_CONSTRAINT" || rawErr?.code === "SQLITE_CONSTRAINT_PRIMARYKEY" || rawErr?.extendedCode === "SQLITE_CONSTRAINT_PRIMARYKEY" || fullMsg.includes("UNIQUE constraint failed: processed_sync_mutations.id") || fullMsg.includes("processed_sync_mutations") && (fullMsg.includes("UNIQUE") || fullMsg.includes("PRIMARY KEY"));
+          if (isDuplicate) {
             results.push({ id: mut.id, success: true, duplicate: true });
+            break;
+          }
+          const isBusy = fullMsg.includes("SQLITE_BUSY") || fullMsg.includes("database is locked") || err?.code === "SQLITE_BUSY" || rawErr?.code === "SQLITE_BUSY";
+          if (isBusy && attempts < maxAttempts) {
+            await new Promise((res) => setTimeout(res, 30 * attempts));
             continue;
           }
-          throw insertErr;
+          results.push({ id: mut.id, success: false, error: err?.message || "Falha ao aplicar muta\xE7\xE3o" });
+          break;
         }
-        let conflictResolved = false;
-        try {
-          switch (mut.type) {
-            case "progress": {
-              const res = await this.saveProgress(db, profileId, {
-                ...mut.data,
-                updatedAt: mut.timestamp || mut.data?.updatedAt,
-                clientSendTime
-              });
-              conflictResolved = Boolean(res.conflictResolved);
-              break;
-            }
-            case "history": {
-              await this.recordHistory(db, profileId, {
-                ...mut.data,
-                watchedAt: mut.timestamp || mut.data?.watchedAt,
-                updatedAt: mut.timestamp || mut.data?.updatedAt,
-                clientSendTime
-              });
-              break;
-            }
-            case "my_list": {
-              const isRemoved = mut.action === "remove" || Boolean(mut.data?.isRemoved);
-              const canonicalId = mut.data?.canonicalId || mut.data?.id;
-              const res = await this.setMyList(db, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
-              conflictResolved = Boolean(res.conflictResolved);
-              break;
-            }
-            case "favorites": {
-              const isRemoved = mut.action === "remove" || Boolean(mut.data?.isRemoved);
-              const canonicalId = mut.data?.canonicalId || mut.data?.id;
-              const res = await this.setFavorite(db, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
-              conflictResolved = Boolean(res.conflictResolved);
-              break;
-            }
-            default:
-              results.push({ id: mut.id, success: false, error: `Tipo de muta\xE7\xE3o desconhecido: ${mut.type}` });
-              await db.db.delete(processedSyncMutations).where(eq10(processedSyncMutations.id, mut.id));
-              continue;
-          }
-          results.push({ id: mut.id, success: true, conflictResolved });
-        } catch (mutationErr) {
-          if (isClaimed) {
-            try {
-              await db.db.delete(processedSyncMutations).where(eq10(processedSyncMutations.id, mut.id));
-            } catch {
-            }
-          }
-          throw mutationErr;
-        }
-      } catch (err) {
-        results.push({ id: mut.id, success: false, error: err?.message || "Falha ao aplicar muta\xE7\xE3o" });
       }
     }
     return {

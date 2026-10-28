@@ -52,7 +52,10 @@ deviceAuthRouter.post('/challenge', async (req, res) => {
     });
 
     return res.status(201).json(challenge);
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.message?.includes('não autorizada') || err?.message?.includes('não autorizado') || err?.message?.includes('HTTPS') || err?.message?.includes('inválida')) {
+      return res.status(400).json({ error: err.message });
+    }
     return res.status(500).json({ error: 'Erro ao gerar desafio de vinculação.' });
   }
 });

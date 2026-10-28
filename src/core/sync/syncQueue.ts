@@ -7,6 +7,14 @@
  * - Idempotência por ID único de mutação (UUID).
  * - Despacho automático ao recuperar conectividade (evento 'online').
  * - Não inclui dados de usuários anônimos e não mistura dados entre perfis.
+ * 
+ * AVISO DE SEGURANÇA E PRIVACIDADE:
+ * O isolamento de filas e estado no cliente utilizando namespaces no localStorage
+ * (ex: zapitv_outbox_${accountId}_${profileId}) constitui isolamento lógico multi-perfil
+ * e multi-conta em nível de aplicação para prevenir contaminação cruzada de histórico,
+ * listas e progresso. Este mecanismo NÃO constitui criptografia de dados em repouso.
+ * O localStorage armazena dados em texto simples legíveis por ferramentas de depuração
+ * do navegador ou por acesso físico desprotegido ao sistema de arquivos do dispositivo.
  */
 
 import { syncClient, SyncMutationItem } from './syncClient';
@@ -16,6 +24,7 @@ export class SyncQueueManager {
   private activeFlush: Set<string> = new Set();
   private retryTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private backoffAttempts: Map<string, number> = new Map();
+  private activeAbortControllers: Map<string, AbortController> = new Map();
   private currentAccountId: string | null = null;
 
   constructor() {
@@ -174,9 +183,18 @@ export class SyncQueueManager {
 
   /**
    * Pausa e descarrega filas em memória no logout, PRESERVANDO dados offline no localStorage
-   * sob a chave da conta/perfil. Impede descarte silencioso de dados ao deslogar.
+   * sob a chave da conta/perfil. Cancela requisições ativas em voo para evitar envio sob outra conta.
    */
   public pauseAndUnloadQueues(): void {
+    // 1. Cancela todas as requisições HTTP em andamento imediatamente
+    for (const [, controller] of this.activeAbortControllers.entries()) {
+      try {
+        controller.abort('Cancelado por encerramento de sessão ou troca de conta.');
+      } catch {}
+    }
+    this.activeAbortControllers.clear();
+
+    // 2. Cancela timers de retry pendentes
     for (const [, timer] of this.retryTimeouts.entries()) {
       clearTimeout(timer);
     }
@@ -231,13 +249,15 @@ export class SyncQueueManager {
     if (queue.length === 0) return;
 
     this.activeFlush.add(storageKey);
+    const controller = new AbortController();
+    this.activeAbortControllers.set(storageKey, controller);
 
     try {
       // Pega até 50 itens para envio em lote
       const batch = queue.slice(0, 50);
       const batchIds = new Set(batch.map(m => m.id));
 
-      const outcome = await syncClient.pushBatch(profileId, batch);
+      const outcome = await syncClient.pushBatch(profileId, batch, controller.signal);
 
       if (outcome && outcome.success) {
         // Remove os itens processados
@@ -251,7 +271,7 @@ export class SyncQueueManager {
         }
       }
     } catch {
-      // Falha de rede: agenda retry com backoff exponencial limitado (2s, 4s, 8s... max 30s)
+      // Falha de rede ou abort: agenda retry com backoff exponencial limitado (2s, 4s, 8s... max 30s)
       const attempts = (this.backoffAttempts.get(storageKey) || 0) + 1;
       this.backoffAttempts.set(storageKey, attempts);
 
@@ -267,6 +287,7 @@ export class SyncQueueManager {
       this.retryTimeouts.set(storageKey, timer);
     } finally {
       this.activeFlush.delete(storageKey);
+      this.activeAbortControllers.delete(storageKey);
     }
   }
 

@@ -126,10 +126,11 @@ export class SyncService {
    * e imunidade a relógios descalibrados.
    */
   static async saveProgress(
-    db: Database,
+    db: Database | any,
     profileId: string,
     input: ProgressInput
   ): Promise<{ record: any; conflictResolved: boolean }> {
+    const orm = (db as any).db || db;
     const canonicalId = String(input.canonicalId).trim();
     if (!canonicalId) {
       throw new Error('canonicalId é obrigatório para registrar progresso.');
@@ -151,7 +152,7 @@ export class SyncService {
     const deviceName = input.deviceName ? String(input.deviceName).slice(0, 80) : null;
 
     // Busca progresso existente
-    const existing = await db.db
+    const existing = await orm
       .select()
       .from(profilePlaybackProgress)
       .where(
@@ -176,7 +177,7 @@ export class SyncService {
       // garantindo que nenhum cliente com relógio no futuro trave o banco.
       const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
       const nextVersion = (curr.version || 1) + 1;
-      await db.db
+      await orm
         .update(profilePlaybackProgress)
         .set({
           contentType,
@@ -223,7 +224,7 @@ export class SyncService {
       updatedAt: serverNow,
     };
 
-    await db.db.insert(profilePlaybackProgress).values(newRecord);
+    await orm.insert(profilePlaybackProgress).values(newRecord);
     return { record: newRecord, conflictResolved: false };
   }
 
@@ -281,10 +282,11 @@ export class SyncService {
    * Registra ou atualiza item no histórico com normalização temporal.
    */
   static async recordHistory(
-    db: Database,
+    db: Database | any,
     profileId: string,
     input: HistoryInput
   ): Promise<any> {
+    const orm = (db as any).db || db;
     const canonicalId = String(input.canonicalId).trim();
     if (!canonicalId) {
       throw new Error('canonicalId é obrigatório para registrar histórico.');
@@ -298,7 +300,7 @@ export class SyncService {
       input.clientSendTime
     );
 
-    const existing = await db.db
+    const existing = await orm
       .select()
       .from(profileWatchHistory)
       .where(
@@ -317,7 +319,7 @@ export class SyncService {
       const nextUpdatedAt = Math.max(serverNow, (curr.updatedAt || 0) + 1);
       const nextVersion = (curr.version || 1) + 1;
 
-      await db.db
+      await orm
         .update(profileWatchHistory)
         .set({
           contentType,
@@ -358,7 +360,7 @@ export class SyncService {
       version: 1,
     };
 
-    await db.db.insert(profileWatchHistory).values(newRecord);
+    await orm.insert(profileWatchHistory).values(newRecord);
     return newRecord;
   }
 
@@ -399,13 +401,14 @@ export class SyncService {
    * mais recentemente no servidor, a remoção é preservada.
    */
   static async setMyList(
-    db: Database,
+    db: Database | any,
     profileId: string,
     canonicalId: string,
     isRemoved: boolean,
     timestamp?: number,
     clientSendTime?: number
   ): Promise<{ record: any; conflictResolved: boolean }> {
+    const orm = (db as any).db || db;
     const cleanId = String(canonicalId).trim();
     if (!cleanId) {
       throw new Error('canonicalId é obrigatório para Minha Lista.');
@@ -413,7 +416,7 @@ export class SyncService {
 
     const { effectiveEventTime, serverNow } = this.normalizeTimestamp(timestamp, clientSendTime);
 
-    const existing = await db.db
+    const existing = await orm
       .select()
       .from(profileMyList)
       .where(
@@ -431,7 +434,7 @@ export class SyncService {
 
       if (isRemoved) {
         // Remoção explícita
-        await db.db
+        await orm
           .update(profileMyList)
           .set({
             isRemoved: 1,
@@ -459,7 +462,7 @@ export class SyncService {
           return { record: curr, conflictResolved: true };
         }
 
-        await db.db
+        await orm
           .update(profileMyList)
           .set({
             isRemoved: 0,
@@ -497,7 +500,7 @@ export class SyncService {
       version: 1,
     };
 
-    await db.db.insert(profileMyList).values(newRecord);
+    await orm.insert(profileMyList).values(newRecord);
     return { record: newRecord, conflictResolved: false };
   }
 
@@ -533,13 +536,14 @@ export class SyncService {
    * Adiciona ou remove favorito usando tombstones com resolução determinística e normalização temporal.
    */
   static async setFavorite(
-    db: Database,
+    db: Database | any,
     profileId: string,
     canonicalId: string,
     isRemoved: boolean,
     timestamp?: number,
     clientSendTime?: number
   ): Promise<{ record: any; conflictResolved: boolean }> {
+    const orm = (db as any).db || db;
     const cleanId = String(canonicalId).trim();
     if (!cleanId) {
       throw new Error('canonicalId é obrigatório para Favoritos.');
@@ -547,7 +551,7 @@ export class SyncService {
 
     const { effectiveEventTime, serverNow } = this.normalizeTimestamp(timestamp, clientSendTime);
 
-    const existing = await db.db
+    const existing = await orm
       .select()
       .from(profileFavorites)
       .where(
@@ -564,7 +568,7 @@ export class SyncService {
       const nextVersion = (curr.version || 1) + 1;
 
       if (isRemoved) {
-        await db.db
+        await orm
           .update(profileFavorites)
           .set({
             isRemoved: 1,
@@ -589,7 +593,7 @@ export class SyncService {
           return { record: curr, conflictResolved: true };
         }
 
-        await db.db
+        await orm
           .update(profileFavorites)
           .set({
             isRemoved: 0,
@@ -626,7 +630,7 @@ export class SyncService {
       version: 1,
     };
 
-    await db.db.insert(profileFavorites).values(newRecord);
+    await orm.insert(profileFavorites).values(newRecord);
     return { record: newRecord, conflictResolved: false };
   }
 
@@ -709,100 +713,108 @@ export class SyncService {
         continue;
       }
 
-      try {
-        const now = Date.now();
-        const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      let attempts = 0;
+      const maxAttempts = 5;
 
-        // 1. Reserva atômica da mutação na tabela processed_sync_mutations via chave primária.
-        // Garante atomicidade concorrente: se duas instâncias serverless receberem a mesma
-        // mutação simultaneamente, apenas uma conseguirá inserir a chave e a outra será
-        // deduplicada imediatamente sem reexecutar os efeitos mutativos.
-        let isClaimed = false;
+      while (attempts < maxAttempts) {
+        attempts++;
         try {
-          await db.db.insert(processedSyncMutations).values({
-            id: mut.id,
-            profileId,
-            mutationType: mut.type,
-            canonicalId: String(mut.data?.canonicalId || mut.data?.id || 'unknown').slice(0, 100),
-            processedAt: now,
-            expiresAt: now + sevenDays,
+          // Executa a reserva de idempotência e a mutação correspondente dentro da mesma
+          // transação atômica do LibSQL/SQLite. Se qualquer etapa falhar ou o processo for
+          // interrompido, a transação inteira sofre rollback automático pelo banco de dados,
+          // garantindo que nenhuma reserva órfã exista sem que os dados tenham sido gravados.
+          const txOutcome = await db.db.transaction(async (tx) => {
+            // 1. Reserva atômica da mutação na tabela processed_sync_mutations via chave primária.
+            await tx.insert(processedSyncMutations).values({
+              id: mut.id,
+              profileId,
+              mutationType: mut.type,
+              canonicalId: String(mut.data?.canonicalId || mut.data?.id || 'unknown').slice(0, 100),
+              processedAt: now,
+              expiresAt: now + sevenDays,
+            });
+
+            // 2. Aplica os efeitos da mutação dentro da mesma transação
+            let conflictResolved = false;
+            switch (mut.type) {
+              case 'progress': {
+                const res = await this.saveProgress(tx, profileId, {
+                  ...mut.data,
+                  updatedAt: mut.timestamp || mut.data?.updatedAt,
+                  clientSendTime,
+                });
+                conflictResolved = Boolean(res.conflictResolved);
+                break;
+              }
+              case 'history': {
+                await this.recordHistory(tx, profileId, {
+                  ...mut.data,
+                  watchedAt: mut.timestamp || mut.data?.watchedAt,
+                  updatedAt: mut.timestamp || mut.data?.updatedAt,
+                  clientSendTime,
+                });
+                break;
+              }
+              case 'my_list': {
+                const isRemoved = mut.action === 'remove' || Boolean(mut.data?.isRemoved);
+                const canonicalId = mut.data?.canonicalId || mut.data?.id;
+                const res = await this.setMyList(tx, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
+                conflictResolved = Boolean(res.conflictResolved);
+                break;
+              }
+              case 'favorites': {
+                const isRemoved = mut.action === 'remove' || Boolean(mut.data?.isRemoved);
+                const canonicalId = mut.data?.canonicalId || mut.data?.id;
+                const res = await this.setFavorite(tx, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
+                conflictResolved = Boolean(res.conflictResolved);
+                break;
+              }
+              default:
+                throw new Error(`Tipo de mutação desconhecido: ${mut.type}`);
+            }
+
+            return { conflictResolved };
           });
-          isClaimed = true;
-        } catch (insertErr: any) {
-          const rawErr = insertErr?.cause || insertErr;
-          const fullMsg = `${insertErr?.message || ''} ${rawErr?.message || ''} ${insertErr?.code || ''} ${rawErr?.code || ''}`;
-          if (
-            insertErr?.code === 'SQLITE_CONSTRAINT' ||
-            insertErr?.code === 'SQLITE_CONSTRAINT_PRIMARYKEY' ||
+
+          results.push({ id: mut.id, success: true, conflictResolved: txOutcome.conflictResolved });
+          break;
+        } catch (err: any) {
+          const rawErr = err?.cause || err;
+          const fullMsg = `${err?.message || ''} ${rawErr?.message || ''} ${err?.code || ''} ${rawErr?.code || ''} ${rawErr?.extendedCode || ''}`;
+          const isDuplicate =
+            err?.code === 'SQLITE_CONSTRAINT' ||
+            err?.code === 'SQLITE_CONSTRAINT_PRIMARYKEY' ||
             rawErr?.code === 'SQLITE_CONSTRAINT' ||
             rawErr?.code === 'SQLITE_CONSTRAINT_PRIMARYKEY' ||
-            fullMsg.includes('UNIQUE') ||
-            fullMsg.includes('constraint') ||
-            fullMsg.includes('PRIMARY KEY') ||
-            fullMsg.includes('SQLITE_CONSTRAINT')
-          ) {
-            // Outra requisição concorrente já inseriu esta chave. Deduplica atomicamente!
+            rawErr?.extendedCode === 'SQLITE_CONSTRAINT_PRIMARYKEY' ||
+            fullMsg.includes('UNIQUE constraint failed: processed_sync_mutations.id') ||
+            (fullMsg.includes('processed_sync_mutations') && (fullMsg.includes('UNIQUE') || fullMsg.includes('PRIMARY KEY')));
+
+          if (isDuplicate) {
+            // A chave primária (UUID) já foi processada anteriormente ou em requisição concorrente.
+            // A transação foi revertida pelo motor do banco; deduplica sem efeitos colaterais.
             results.push({ id: mut.id, success: true, duplicate: true });
+            break;
+          }
+
+          const isBusy =
+            fullMsg.includes('SQLITE_BUSY') ||
+            fullMsg.includes('database is locked') ||
+            err?.code === 'SQLITE_BUSY' ||
+            rawErr?.code === 'SQLITE_BUSY';
+
+          if (isBusy && attempts < maxAttempts) {
+            await new Promise(res => setTimeout(res, 30 * attempts));
             continue;
           }
-          throw insertErr;
-        }
 
-        // 2. Com a reserva atômica garantida, aplica os efeitos da mutação
-        let conflictResolved = false;
-        try {
-          switch (mut.type) {
-            case 'progress': {
-              const res = await this.saveProgress(db, profileId, {
-                ...mut.data,
-                updatedAt: mut.timestamp || mut.data?.updatedAt,
-                clientSendTime,
-              });
-              conflictResolved = Boolean(res.conflictResolved);
-              break;
-            }
-            case 'history': {
-              await this.recordHistory(db, profileId, {
-                ...mut.data,
-                watchedAt: mut.timestamp || mut.data?.watchedAt,
-                updatedAt: mut.timestamp || mut.data?.updatedAt,
-                clientSendTime,
-              });
-              break;
-            }
-            case 'my_list': {
-              const isRemoved = mut.action === 'remove' || Boolean(mut.data?.isRemoved);
-              const canonicalId = mut.data?.canonicalId || mut.data?.id;
-              const res = await this.setMyList(db, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
-              conflictResolved = Boolean(res.conflictResolved);
-              break;
-            }
-            case 'favorites': {
-              const isRemoved = mut.action === 'remove' || Boolean(mut.data?.isRemoved);
-              const canonicalId = mut.data?.canonicalId || mut.data?.id;
-              const res = await this.setFavorite(db, profileId, canonicalId, isRemoved, mut.timestamp, clientSendTime);
-              conflictResolved = Boolean(res.conflictResolved);
-              break;
-            }
-            default:
-              results.push({ id: mut.id, success: false, error: `Tipo de mutação desconhecido: ${mut.type}` });
-              // Libera a reserva se tipo de mutação for desconhecido
-              await db.db.delete(processedSyncMutations).where(eq(processedSyncMutations.id, mut.id));
-              continue;
-          }
-
-          results.push({ id: mut.id, success: true, conflictResolved });
-        } catch (mutationErr: any) {
-          // Se a mutação falhou na execução, remove a reserva para permitir retentativa futura válida
-          if (isClaimed) {
-            try {
-              await db.db.delete(processedSyncMutations).where(eq(processedSyncMutations.id, mut.id));
-            } catch {}
-          }
-          throw mutationErr;
+          // Falha na mutação ou no banco: transação foi revertida automaticamente pelo LibSQL/SQLite!
+          // Nenhuma alteração inconsistente persiste e o UUID fica livre para retentativa legítima.
+          results.push({ id: mut.id, success: false, error: err?.message || 'Falha ao aplicar mutação' });
+          break;
         }
-      } catch (err: any) {
-        results.push({ id: mut.id, success: false, error: err?.message || 'Falha ao aplicar mutação' });
       }
     }
 

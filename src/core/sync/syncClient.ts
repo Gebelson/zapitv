@@ -256,8 +256,10 @@ class SyncClient {
    */
   async pushBatch(
     profileId: string,
-    mutations: SyncMutationItem[]
+    mutations: SyncMutationItem[],
+    signal?: AbortSignal
   ): Promise<{ success: boolean; processed: number; results: any[] }> {
+    const combinedSignal = signal || AbortSignal.timeout(this.timeoutMs);
     const res = await fetch('/api/sync/batch', {
       method: 'POST',
       headers: {
@@ -266,7 +268,7 @@ class SyncClient {
         'X-Zapi-Client': 'web',
       },
       credentials: 'include',
-      signal: AbortSignal.timeout(this.timeoutMs),
+      signal: combinedSignal,
       body: JSON.stringify({
         profileId,
         mutations,
