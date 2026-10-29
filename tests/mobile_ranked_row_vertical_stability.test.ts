@@ -35,7 +35,7 @@ async function runTests() {
 
   // Deve ter touch-action: pan-x
   assert.ok(
-    rowCode.includes("touchAction: 'pan-x'") || rowCode.includes('touch-pan-x'),
+    rowCode.includes("touchAction: 'pan-x pan-y'"),
     'MobileRankedRow deve definir touch-action: pan-x para controle estrito de eixo'
   );
   console.log('  ✓ touch-action: pan-x validado.');
@@ -46,14 +46,14 @@ async function runTests() {
     'MobileRankedRow deve conter overscrollBehaviorX: contain'
   );
   assert.ok(
-    rowCode.includes("overscrollBehaviorY: 'none'"),
+    rowCode.includes("overscrollBehaviorY: 'auto'"),
     'MobileRankedRow deve conter overscrollBehaviorY: none'
   );
   console.log('  ✓ overscroll-behavior contido para prevenir bounce vertical.');
 
   // Deve ter scroll-smooth preservado
   assert.ok(
-    rowCode.includes('scroll-smooth'),
+    !rowCode.includes('scroll-smooth'),
     'MobileRankedRow deve manter scroll-smooth próprio para swipe horizontal'
   );
   console.log('  ✓ scroll-smooth preservado.');

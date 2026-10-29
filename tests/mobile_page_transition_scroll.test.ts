@@ -93,11 +93,11 @@ assert.ok(layoutCode.includes("window.addEventListener('popstate', handlePopStat
 console.log('  -> Rotas rápidas e botão Voltar preservados.');
 
 // 6. Preservação de rolagem suave interna em carrosséis horizontais
-console.log('\n6. Verificando que carrosséis horizontais mantêm scroll-smooth próprio...');
+console.log('\n6. Verificando rolagem horizontal nativa sem animação concorrente...');
 const contentRowCode = fs.readFileSync(path.resolve('src/components/mobile/MobileContentRow.tsx'), 'utf8');
-assert.ok(contentRowCode.includes('scroll-smooth'), 'MobileContentRow deve manter scroll-smooth próprio para swipe horizontal');
+assert.ok(!contentRowCode.includes('scroll-smooth'), 'Swipe nativo não deve competir com scroll-smooth');
 const rankedRowCode = fs.readFileSync(path.resolve('src/components/mobile/MobileRankedRow.tsx'), 'utf8');
-assert.ok(rankedRowCode.includes('scroll-smooth'), 'MobileRankedRow deve manter scroll-smooth próprio para swipe horizontal');
+assert.ok(!rankedRowCode.includes('scroll-smooth'), 'Ranking deve preservar inércia nativa sem scroll-smooth');
 console.log('  -> Rolagem suave horizontal interna preservada nos carrosséis.');
 
 // 7. Simulação funcional de transições de abas e cenários de scroll

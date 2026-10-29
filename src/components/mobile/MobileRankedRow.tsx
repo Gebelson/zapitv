@@ -263,9 +263,6 @@ export const MobileRankedRow: React.FC<MobileRankedRowProps> = ({
     }
     touchStartX.current = null;
     touchStartY.current = null;
-    setTimeout(() => {
-      isDraggingRef.current = false;
-    }, 60);
   };
 
   return (
@@ -287,12 +284,12 @@ export const MobileRankedRow: React.FC<MobileRankedRowProps> = ({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className="flex gap-4 overflow-x-auto overflow-y-hidden no-scrollbar px-4 pt-2 pb-6 scroll-smooth will-change-scroll"
+        className="flex gap-4 overflow-x-auto overflow-y-hidden no-scrollbar px-4 pt-2 pb-6"
         style={{
           WebkitOverflowScrolling: 'touch',
-          touchAction: 'pan-x',
+          touchAction: 'pan-x pan-y',
           overscrollBehaviorX: 'contain',
-          overscrollBehaviorY: 'none',
+          overscrollBehaviorY: 'auto',
           overflowAnchor: 'none'
         }}
       >

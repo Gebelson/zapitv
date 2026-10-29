@@ -38,6 +38,8 @@ import { TvQrLinkModal } from '../../components/tv/TvQrLinkModal';
 import { TvProfileSelector } from '../../components/tv/TvProfileSelector';
 import { profileClient } from '../../core/profile/profileClient';
 import { authClient } from '../../core/auth/authClient';
+import { authSyncService } from '../../core/auth/authSyncService';
+import { TvActivationScreen } from '../../components/tv/TvActivationScreen';
 import { resolveAvatarUrl } from '../../core/profile/avatarRegistry';
 
 // Lazy load do orquestrador de reprodução para máxima performance inicial na TV
@@ -95,29 +97,37 @@ export const TvApp: React.FC<TvAppProps> = ({
   const [isProfileSelectorOpen, setIsProfileSelectorOpen] = useState(false);
   const [tvProfiles, setTvProfiles] = useState<Profile[]>([]);
   const [activeTvProfile, setActiveTvProfile] = useState<Profile | null>(() => activeProfile || null);
-  const [isTvAuthenticated, setIsTvAuthenticated] = useState<boolean>(() => {
-    if (isAuthenticated !== undefined) return isAuthenticated;
-    return Boolean(currentUser && currentUser.id !== 'zapitv-anon-user');
-  });
+  const [isTvAuthenticated, setIsTvAuthenticated] = useState(false);
+  const [isTvSessionChecking, setIsTvSessionChecking] = useState(true);
+  const [tvAuthError, setTvAuthError] = useState<string | null>(null);
+  const sessionRequest = useRef(0);
 
-  useEffect(() => {
-    if (activeProfile) {
-      setActiveTvProfile(activeProfile);
-      if (currentUser?.id) {
-        storageService.setScope({ userId: currentUser.id, profileId: activeProfile.id }).catch(() => {});
-      }
-    }
-  }, [activeProfile, currentUser]);
-
-  useEffect(() => {
-    if (isAuthenticated !== undefined) {
-      setIsTvAuthenticated(isAuthenticated);
-    } else if (currentUser && currentUser.id !== 'zapitv-anon-user') {
-      setIsTvAuthenticated(true);
-    } else {
+  const refreshTvSession = useCallback(async () => {
+    const request = ++sessionRequest.current;
+    const session = await authClient.checkSession();
+    if (request !== sessionRequest.current) throw new Error('Consulta de sessão substituída.');
+    if (!session.authenticated || !session.user?.id) {
       setIsTvAuthenticated(false);
+      setActiveTvProfile(null);
+      throw new Error('Entre na sua conta para conectar esta televisão.');
     }
-  }, [isAuthenticated, currentUser]);
+    const profile = session.activeProfile;
+    if (profile && profile.userId === session.user.id) {
+      await storageService.setScope({ userId: session.user.id, profileId: profile.id });
+      if (request !== sessionRequest.current) throw new Error('Consulta de sessão substituída.');
+      setActiveTvProfile({ ...profile, avatar: resolveAvatarUrl(profile.avatarId), isChild: activeProfile?.id === profile.id && activeProfile.isChild === true });
+    } else {
+      setActiveTvProfile(null);
+    }
+    setIsTvAuthenticated(true);
+    setTvAuthError(null);
+    return session;
+  }, [activeProfile?.id, activeProfile?.isChild]);
+
+  useEffect(() => {
+    void refreshTvSession().catch(() => {}).finally(() => setIsTvSessionChecking(false));
+    return () => { sessionRequest.current += 1; };
+  }, [refreshTvSession, isAuthenticated, currentUser?.id, activeProfile?.id]);
 
   const loadProfilesAndOpenSelector = useCallback(async () => {
     try {
@@ -134,46 +144,51 @@ export const TvApp: React.FC<TvAppProps> = ({
         }));
         setTvProfiles(mapped);
         setIsProfileSelectorOpen(true);
+      } else {
+        setTvAuthError('Não foi possível carregar os perfis. Tente novamente.');
       }
-    } catch {}
+    } catch {
+      setTvAuthError('Não foi possível carregar os perfis. Tente novamente.');
+    }
   }, []);
 
   const prevAuthRef = useRef(isTvAuthenticated);
   useEffect(() => {
-    if (!prevAuthRef.current && isTvAuthenticated) {
+    if (!prevAuthRef.current && isTvAuthenticated && !activeTvProfile) {
       loadProfilesAndOpenSelector();
     }
     prevAuthRef.current = isTvAuthenticated;
-  }, [isTvAuthenticated, loadProfilesAndOpenSelector]);
+  }, [isTvAuthenticated, activeTvProfile, loadProfilesAndOpenSelector]);
 
   const handleTvLinked = useCallback(async (_userData: any) => {
+    await refreshTvSession();
     setIsQrModalOpen(false);
-    setIsTvAuthenticated(true);
     await loadProfilesAndOpenSelector();
-  }, [loadProfilesAndOpenSelector]);
+  }, [refreshTvSession, loadProfilesAndOpenSelector]);
 
   const handleSelectTvProfile = useCallback(async (p: Profile) => {
     try {
-      await profileClient.select(p.id);
-    } catch {}
-    setActiveTvProfile(p);
-    setIsProfileSelectorOpen(false);
-    if (currentUser?.id) {
-      await storageService.setScope({ userId: currentUser.id, profileId: p.id });
-    } else {
-      try {
-        const sess = await authClient.checkSession();
-        if (sess.user?.id) {
-          await storageService.setScope({ userId: sess.user.id, profileId: p.id });
-        }
-      } catch {}
+      const session = await refreshTvSession();
+      const selected = await profileClient.select(p.id);
+      if (!selected || selected.id !== p.id || selected.userId !== session.user!.id) {
+        throw new Error('Não foi possível confirmar o perfil desta conta.');
+      }
+      await storageService.setScope({ userId: selected.userId, profileId: selected.id });
+      setActiveTvProfile({ ...p, ...selected, avatar: resolveAvatarUrl(selected.avatarId) });
+      setIsProfileSelectorOpen(false);
+      setTvAuthError(null);
+      authSyncService.notifyAuthChange('LOGIN');
+    } catch (error) {
+      setTvAuthError(error instanceof Error ? error.message : 'Não foi possível selecionar o perfil.');
+      return;
     }
     setTimeout(() => {
       try { setFocus('tv-hero-play'); } catch {}
     }, 50);
-  }, [currentUser]);
+  }, [refreshTvSession]);
 
   const handleTvLogout = useCallback(async () => {
+    sessionRequest.current += 1;
     try {
       await authClient.logout();
     } catch {}
@@ -181,6 +196,7 @@ export const TvApp: React.FC<TvAppProps> = ({
     setActiveTvProfile(null);
     setTvProfiles([]);
     await storageService.setScope(null);
+    authSyncService.notifyAuthChange('LOGOUT');
     uiSoundService.play('click');
   }, []);
 
@@ -191,23 +207,10 @@ export const TvApp: React.FC<TvAppProps> = ({
     return () => { catalogMounted.current = false; };
   }, []);
   const pagination = useMemo(() => ({
-    movies: new CatalogPaginationSession(page => catalogDiscoveryService.discoverMovies(page), Math.max(0, Math.floor((popularMovies?.length || 0) / 20))),
-    series: new CatalogPaginationSession(page => catalogDiscoveryService.discoverSeries(page), Math.max(0, Math.floor((popularSeries?.length || 0) / 20))),
-    animes: new CatalogPaginationSession(page => catalogDiscoveryService.discoverAnimes(page), Math.max(0, Math.floor((animeItems?.length || 0) / 20)))
+    movies: new CatalogPaginationSession(page => catalogDiscoveryService.discoverMovies(page)),
+    series: new CatalogPaginationSession(page => catalogDiscoveryService.discoverSeries(page)),
+    animes: new CatalogPaginationSession(page => catalogDiscoveryService.discoverAnimes(page))
   }), []);
-
-  // Sincroniza o cursor de paginação da TV caso os catálogos iniciais já estejam carregados
-  useEffect(() => {
-    if (popularMovies && popularMovies.length >= 20 && pagination.movies.getPage() === 0) {
-      pagination.movies.setPage(Math.floor(popularMovies.length / 20));
-    }
-    if (popularSeries && popularSeries.length >= 20 && pagination.series.getPage() === 0) {
-      pagination.series.setPage(Math.floor(popularSeries.length / 20));
-    }
-    if (animeItems && animeItems.length >= 20 && pagination.animes.getPage() === 0) {
-      pagination.animes.setPage(Math.floor(animeItems.length / 20));
-    }
-  }, [popularMovies, popularSeries, animeItems, pagination]);
 
   // Inicializa navegação espacial e define o foco inicial no botão Assistir do Hero
   useEffect(() => {
@@ -447,46 +450,46 @@ export const TvApp: React.FC<TvAppProps> = ({
   const unifiedMovies = useMemo(() => {
     const catalogMovies = fullTvCatalog.filter(i => searchService.isMovieItem(i));
     const combined = [...(popularMovies || []), ...catalogMovies];
-    return deduplicateContentItems(combined);
+    return catalogEligibilityService.filterEligibleItemsSync(deduplicateContentItems(combined)).filter(i => searchService.isMovieItem(i, false));
   }, [popularMovies, fullTvCatalog]);
 
   const unifiedSeries = useMemo(() => {
     const catalogSeries = fullTvCatalog.filter(i => searchService.isSeriesItem(i));
     const combined = [...(popularSeries || []), ...catalogSeries];
-    return deduplicateContentItems(combined);
+    return catalogEligibilityService.filterEligibleItemsSync(deduplicateContentItems(combined)).filter(i => searchService.isSeriesItem(i));
   }, [popularSeries, fullTvCatalog]);
 
   const unifiedAnimes = useMemo(() => {
     const catalogAnimes = fullTvCatalog.filter(i => searchService.isAnimeItem(i));
     const combined = [...(animeItems || []), ...catalogAnimes];
-    return deduplicateContentItems(combined);
+    return catalogEligibilityService.filterEligibleItemsSync(deduplicateContentItems(combined)).filter(i => searchService.isAnimeItem(i));
   }, [animeItems, fullTvCatalog]);
 
   const unifiedTrending = useMemo(() => {
-    if (trendingItems && trendingItems.length > 0) return trendingItems;
+    if (trendingItems && trendingItems.length > 0) return catalogEligibilityService.filterEligibleItemsSync(trendingItems);
     const fallback = deduplicateContentItems([
       ...(featuredItems || []),
       ...unifiedMovies.slice(0, 10),
       ...unifiedSeries.slice(0, 10)
     ]);
-    return fallback.slice(0, 20);
+    return catalogEligibilityService.filterEligibleItemsSync(fallback).slice(0, 20);
   }, [trendingItems, featuredItems, unifiedMovies, unifiedSeries]);
 
   // Itens da Minha Lista reais
   const myListItems = useMemo(() => {
     if (!content || !myList) return [];
     const listSet = new Set(myList);
-    return content.filter(it => listSet.has(it.id));
-  }, [content, myList]);
+    return fullTvCatalog.filter(it => listSet.has(it.id));
+  }, [fullTvCatalog, myList]);
 
   // Itens do Histórico reais
   const historyItems = useMemo(() => {
     if (specialView !== 'history' || !content) return [];
-    return content.filter(it => {
+    return fullTvCatalog.filter(it => {
       const cont = storageService.getPlaybackContinuity(it);
       return cont.hasStarted;
     });
-  }, [content, specialView]);
+  }, [fullTvCatalog, specialView]);
 
   // Recuperação e sincronização de rotas de reprodução na Smart TV (/tv/assistir/...)
   useEffect(() => {
@@ -651,8 +654,27 @@ export const TvApp: React.FC<TvAppProps> = ({
     <div className="zapi-tv-root relative min-h-screen bg-[#05070a] text-white overflow-x-hidden selection:bg-cyan-500 selection:text-black">
       {/* Diagnóstico em tempo real na TV (?tvdiag=1) */}
       <TvRemoteDiagnosticOverlay />
+      {tvAuthError && <div role="alert" className="fixed top-8 left-1/4 right-1/4 z-[10001] bg-red-950 p-4 text-center">{tvAuthError}</div>}
 
-      {playingItem && playingMatchesRoute ? (
+      {isTvSessionChecking ? <ZapiLoader size={viewport.loaderSize || 76} /> : !isTvAuthenticated ? (
+        <TvActivationScreen onTvLinked={handleTvLinked} onLoginWithRemote={async (email, password) => {
+          try {
+            await authClient.login(email, password);
+            await handleTvLinked(null);
+            return null;
+          } catch (error) {
+            return error instanceof Error ? error.message : 'Não foi possível entrar na conta.';
+          }
+        }} />
+      ) : !activeTvProfile ? (
+        <div className="min-h-screen flex items-center justify-center">
+          {tvAuthError ? (
+            <button autoFocus className="rounded-xl border border-white/30 px-8 py-4" onClick={() => void loadProfilesAndOpenSelector()}>
+              Tentar carregar perfis novamente
+            </button>
+          ) : <ZapiLoader size={viewport.loaderSize || 76} />}
+        </div>
+      ) : playingItem && playingMatchesRoute ? (
         /* Player de Reprodução em Tela Cheia 100% isolado (Sem elementos da interface anterior no DOM) */
         <div className="fixed inset-0 z-[5000] bg-black overflow-hidden select-none">
           <Suspense fallback={
@@ -828,16 +850,15 @@ export const TvApp: React.FC<TvAppProps> = ({
             onLinked={handleTvLinked}
           />
 
-          {/* Seletor de Perfis Smart TV */}
-          {isProfileSelectorOpen && tvProfiles.length > 0 && (
-            <TvProfileSelector
-              profiles={tvProfiles}
-              activeProfileId={activeTvProfile?.id}
-              onSelectProfile={handleSelectTvProfile}
-              onClose={() => setIsProfileSelectorOpen(false)}
-            />
-          )}
         </>
+      )}
+      {isTvAuthenticated && isProfileSelectorOpen && tvProfiles.length > 0 && (
+        <TvProfileSelector
+          profiles={tvProfiles}
+          activeProfileId={activeTvProfile?.id}
+          onSelectProfile={handleSelectTvProfile}
+          onClose={() => { if (activeTvProfile) setIsProfileSelectorOpen(false); }}
+        />
       )}
     </div>
   );

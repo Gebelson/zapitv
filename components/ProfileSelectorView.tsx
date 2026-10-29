@@ -122,11 +122,10 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
 
     try {
       setSaving(true);
-      await profileClient.select(profile.id);
-      onSelectProfile(toAppProfile(profile));
+      const selected = await profileClient.select(profile.id);
+      onSelectProfile(toAppProfile(selected));
     } catch {
-      // Fallback para seleção local caso a API falhe
-      onSelectProfile(toAppProfile(profile));
+      setError('Não foi possível confirmar o perfil. Verifique sua conexão e tente novamente.');
     } finally {
       setSaving(false);
     }

@@ -9,6 +9,7 @@ import type { ProfileItem } from '../profile/profileClient';
 import { syncQueue } from '../sync/syncQueue';
 
 export interface SessionCheckResult {
+  unavailable?: boolean;
   authenticated: boolean;
   user: AuthUser | null;
   activeProfile: ProfileItem | null;
@@ -34,6 +35,7 @@ export interface RegisterPayload {
 }
 
 class AuthClient {
+  private sessionEpoch = 0;
   async requestPasswordRecovery(email: string): Promise<{ message: string }> {
     const response = await fetch('/api/auth/forgot-password', {
       method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -57,6 +59,7 @@ class AuthClient {
    * Consulta a sessão ativa no servidor (/api/auth/me)
    */
   async checkSession(): Promise<SessionCheckResult> {
+    const epoch = this.sessionEpoch;
     try {
       const res = await fetch('/api/auth/me', {
         method: 'GET',
@@ -67,13 +70,16 @@ class AuthClient {
         credentials: 'include',
       });
 
+      if (epoch !== this.sessionEpoch) return { unavailable: true, authenticated: false, user: null, activeProfile: null };
       if (!res.ok) {
-        return { authenticated: false, user: null, activeProfile: null, mandatoryAuth: true, policyVersion: 0 };
+        if (res.status === 401 || res.status === 403) syncQueue.setAccountScope(null);
+        return { unavailable: res.status !== 401 && res.status !== 403, authenticated: false, user: null, activeProfile: null, mandatoryAuth: true, policyVersion: 0 };
       }
 
       const data = await res.json();
+      if (epoch !== this.sessionEpoch) return { unavailable: true, authenticated: false, user: null, activeProfile: null };
       if (data.authenticated && data.user?.id) {
-        syncQueue.setAccountScope(data.user.id);
+        syncQueue.setAccountScope(data.user.id, data.activeProfile?.id || null);
       } else {
         syncQueue.setAccountScope(null);
       }
@@ -85,8 +91,8 @@ class AuthClient {
         policyVersion: typeof data.policyVersion === 'number' ? data.policyVersion : 0,
       };
     } catch (err) {
-      // Falha de rede ou offline: assume anônimo sem travar a aplicação
-      return { authenticated: false, user: null, activeProfile: null, mandatoryAuth: true, policyVersion: 0 };
+      // Transport failure is distinct from a confirmed anonymous session.
+      return { unavailable: true, authenticated: false, user: null, activeProfile: null, mandatoryAuth: true, policyVersion: 0 };
     }
   }
 
@@ -131,6 +137,7 @@ class AuthClient {
    * Realiza cadastro de nova conta real (/api/auth/register)
    */
   async register(payload: RegisterPayload): Promise<{ user: AuthUser; message: string }> {
+    this.sessionEpoch++;
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: {
@@ -162,6 +169,7 @@ class AuthClient {
    * Realiza login com e-mail e senha (/api/auth/login)
    */
   async login(email: string, pass: string): Promise<{ user: AuthUser; message: string }> {
+    this.sessionEpoch++;
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: {
@@ -196,6 +204,7 @@ class AuthClient {
    * Encerra a sessão ativa no servidor (/api/auth/logout)
    */
   async logout(): Promise<boolean> {
+    this.sessionEpoch++;
     try {
       syncQueue.pauseAndUnloadQueues();
       const res = await fetch('/api/auth/logout', {

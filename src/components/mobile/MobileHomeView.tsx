@@ -5,6 +5,7 @@ import { MobileContentRow } from './MobileContentRow';
 import { storageService } from '../../core/storage/storageService';
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication';
+import { resolveContinueWatchingItems } from '../../core/storage/watchState';
 
 interface MobileHomeViewProps {
   heroItems: ContentItem[];
@@ -52,25 +53,23 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
   // Carrega e assina atualizações de Continuar Assistindo do storageService
   useEffect(() => {
     let isMounted = true;
+    let request = 0;
+    let visibleScope = storageService.getScope();
 
     const loadProgress = async () => {
+      const currentRequest = ++request;
+      const scope = storageService.getScope();
+      if (scope !== visibleScope) {
+        visibleScope = scope;
+        setContinueWatchingItems([]);
+      }
       try {
         const progressList = await storageService.getContinueWatching();
-        if (!isMounted) return;
+        if (!isMounted || currentRequest !== request || storageService.getScope() !== scope) return;
 
-        const getTimestamp = (p: any): number => {
-          if (p?.updatedAt) {
-            const time = new Date(p.updatedAt).getTime();
-            if (!isNaN(time)) return time;
-          }
-          if (typeof p?.lastWatched === 'number') return p.lastWatched;
-          return 0;
-        };
-
-        const inProgress = (progressList || [])
-          .filter(p => p && p.item && p.item.id && (p.percentage === undefined || p.percentage < 95) && (p.currentTime === undefined || p.currentTime > 5))
-          .sort((a, b) => getTimestamp(b) - getTimestamp(a))
-          .map(p => p.item);
+        // updatedAt replaces legacy lastWatched ordering. Recommendation rows only supply metadata.
+        const catalog = [...allContent, ...(personalizedRows || []).flatMap(row => row.items)];
+        const inProgress = resolveContinueWatchingItems(progressList || [], catalog);
 
         const eligible = catalogEligibilityService.filterEligibleItemsSync(
           deduplicateContentItems(inProgress)
@@ -92,20 +91,13 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
       isMounted = false;
       window.removeEventListener('zapitv_progress_updated', handleProgressUpdate);
     };
-  }, []);
+  }, [allContent, personalizedRows]);
 
-  // Consolidação única dos itens de Continuar Assistindo:
-  // Unifica os itens em andamento do storageService (com ordenação recente por atividade)
-  // com eventuais itens em andamento recebidos via personalizedRows,
-  // eliminando duplicações na origem e preservando o progresso e episódios.
+  // Recomendações antigas não podem inserir itens de outro perfil nesta fileira.
   const consolidatedContinueWatching = useMemo(() => {
-    const dynamicCwRow = (personalizedRows || []).find(isContinueWatchingRow);
-    const dynamicItems = dynamicCwRow?.items || [];
-
-    const combined = [...continueWatchingItems, ...dynamicItems];
-    const deduped = deduplicateContentItems(combined);
+    const deduped = deduplicateContentItems(continueWatchingItems);
     return catalogEligibilityService.filterEligibleItemsSync(deduped);
-  }, [continueWatchingItems, personalizedRows]);
+  }, [continueWatchingItems]);
 
   return (
     <div className="pb-28">

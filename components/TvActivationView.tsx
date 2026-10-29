@@ -78,16 +78,32 @@ export const TvActivationView: React.FC<TvActivationViewProps> = ({
   const [showTermsModal, setShowTermsModal] = useState(false);
 
   // Usuário autenticado ativo
-  const [localUser, setLocalUser] = useState<User | null>(() => {
-    if (currentUser && currentUser.id !== 'zapitv-anon-user') return currentUser;
-    return null;
-  });
+  const [localUser, setLocalUser] = useState<User | null>(null);
 
   useEffect(() => {
-    if (currentUser && currentUser.id !== 'zapitv-anon-user') {
-      setLocalUser(currentUser);
-    }
+    let cancelled = false;
+    void authClient.checkSession().then(session => {
+      if (cancelled) return;
+      if (!session.authenticated || !session.user?.id) {
+        setLocalUser(null);
+        return;
+      }
+      const user = session.user;
+      setLocalUser({ id: user.id, name: user.name, email: user.email, role: user.role || 'user',
+        devMode: false, memberSince: new Date(user.createdAt).toLocaleDateString('pt-BR'),
+        plan: 'ZapiTV Padrão', status: 'Ativo', profiles: [] });
+    });
+    return () => { cancelled = true; };
   }, [currentUser]);
+
+  useEffect(() => {
+    if (queryCode) {
+      setInputCode(formatCodeInput(queryCode));
+      setValidation(null);
+      setApproved(false);
+      setRejected(false);
+    }
+  }, [queryCode]);
 
   const cleanCode = inputCode.toUpperCase().replace(/[^A-Z0-9]/g, '');
 

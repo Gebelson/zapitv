@@ -1,6 +1,7 @@
 import React, { memo, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ContentItem } from '../../../types';
-import { storageService } from '../../core/storage/storageService';
+import { storageService, type WatchProgress } from '../../core/storage/storageService';
+import { resolveContinueWatchingItems } from '../../core/storage/watchState';
 import { heroCarouselStore, HERO_CAROUSEL_STORAGE_KEY } from '../../core/catalog/heroCarouselStore';
 import { TvHeroBanner } from './TvHeroBanner';
 import { TvContentRow } from './TvContentRow';
@@ -32,6 +33,12 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
   onSelectItem,
   onPlayItem
 }) => {
+  const [progressRevision, setProgressRevision] = useState(0);
+  useEffect(() => {
+    const refresh = () => setProgressRevision(value => value + 1);
+    window.addEventListener('zapitv_progress_updated', refresh);
+    return () => window.removeEventListener('zapitv_progress_updated', refresh);
+  }, []);
   // Lista de Destaques configurados no painel administrativo / heroCarouselStore
   const [liveFeatured, setLiveFeatured] = useState<ContentItem[]>(() => {
     // 1. Se houver itens personalizados salvos pelo admin no localStorage, respeita todos eles sem corte
@@ -92,12 +99,10 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
 
   // Continuar Assistindo: extrai itens reais em andamento
   const continueWatchingItems = useMemo(() => {
-    if (!allContent || allContent.length === 0) return [];
-    return allContent.filter(item => {
-      const cont = storageService.getPlaybackContinuity(item);
-      return cont.hasStarted && !cont.isCompleted && cont.percentage > 2 && cont.percentage < 95;
-    }).slice(0, 15);
-  }, [allContent]);
+    const progress = allContent.map(item => storageService.getSyncItemProgressRecord(item.id))
+      .filter((value): value is WatchProgress => value !== null);
+    return resolveContinueWatchingItems(progress, allContent).slice(0, 15);
+  }, [allContent, progressRevision]);
 
   // Carrosséis de Exclusivos das Plataformas de Streaming para a Smart TV
   const platformRows = useMemo(() => {

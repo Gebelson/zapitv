@@ -10,6 +10,7 @@
 import express from 'express';
 import { getDatabase, ensureAuthTables, type Database } from '../database/client';
 import { extractCookie, validateSession, SESSION_COOKIE_NAME } from './sessionService';
+import { accountRole } from './adminAccess';
 
 export interface AuthenticatedUser {
   id: string;
@@ -56,24 +57,7 @@ export async function getValidDatabase() {
  * Validação centralizada e determinística de permissão administrativa
  */
 export function isUserAdmin(user: { id?: string; email?: string } | null | undefined): boolean {
-  if (!user) return false;
-  const adminEmails = new Set(
-    (process.env.ADMIN_EMAILS || 'graficadfuturo@gmail.com')
-      .split(',')
-      .map(e => e.trim().toLowerCase())
-      .filter(Boolean)
-  );
-  const adminUids = new Set(
-    (process.env.ADMIN_FIREBASE_UIDS || '')
-      .split(',')
-      .map(u => u.trim())
-      .filter(Boolean)
-  );
-
-  const email = (user.email || '').trim().toLowerCase();
-  const id = (user.id || '').trim();
-
-  return (email !== '' && adminEmails.has(email)) || (id !== '' && adminUids.has(id));
+  return accountRole(user?.id) === 'admin';
 }
 
 export function extractSessionToken(req: express.Request): string | null {
@@ -110,15 +94,8 @@ export async function optionalUser(
     }
 
     const sessionData = await validateSession(db, token);
-    if (sessionData) {
-      req.user = {
-        ...sessionData.user,
-        role: isUserAdmin(sessionData.user) ? 'admin' : 'user',
-      };
-      req.sessionId = sessionData.sessionId;
-    } else {
-      req.user = null;
-    }
+    req.user = sessionData ? { ...sessionData.user, role: accountRole(sessionData.user.id) } : null;
+    req.sessionId = sessionData?.sessionId;
     next();
   } catch (err) {
     req.user = null;
@@ -147,10 +124,7 @@ export async function authenticateUser(
       return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
     }
 
-    req.user = {
-      ...sessionData.user,
-      role: isUserAdmin(sessionData.user) ? 'admin' : 'user',
-    };
+    req.user = { ...sessionData.user, role: accountRole(sessionData.user.id) };
     req.sessionId = sessionData.sessionId;
     next();
   } catch (err) {

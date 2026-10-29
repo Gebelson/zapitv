@@ -22,6 +22,7 @@ import { syncClient, SyncMutationItem } from './syncClient';
 export class SyncQueueManager {
   private inMemoryQueues: Map<string, SyncMutationItem[]> = new Map();
   private activeFlush: Set<string> = new Set();
+  private flushPromises = new Map<string, Promise<void>>();
   private retryTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private backoffAttempts: Map<string, number> = new Map();
   private activeAbortControllers: Map<string, AbortController> = new Map();
@@ -259,6 +260,7 @@ export class SyncQueueManager {
     this.inMemoryQueues.clear();
     this.backoffAttempts.clear();
     this.activeFlush.clear();
+    this.flushPromises.clear();
     this.currentAccountId = null;
     this.currentProfileId = null;
     this.knownScopes.clear();
@@ -297,6 +299,17 @@ export class SyncQueueManager {
    * Tenta enviar as mutações pendentes para o servidor
    */
   public async flush(profileId: string, accountId?: string | null): Promise<void> {
+    const key = this.getStorageKey(profileId, accountId);
+    const active = this.flushPromises.get(key);
+    if (active) return active;
+    const operation = this.performFlush(profileId, accountId);
+    this.flushPromises.set(key, operation);
+    try { await operation; } finally {
+      if (this.flushPromises.get(key) === operation) this.flushPromises.delete(key);
+    }
+  }
+
+  private async performFlush(profileId: string, accountId?: string | null): Promise<void> {
     const account = accountId ?? this.currentAccountId;
     const storageKey = this.getStorageKey(profileId, accountId);
     if (!profileId || !this.isActive(profileId, account) || this.activeFlush.has(storageKey)) return;

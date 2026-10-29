@@ -17,73 +17,28 @@ export const MobileContentRow: React.FC<MobileContentRowProps> = ({
   showProgress = false
 }) => {
   const rowRef = useRef<HTMLDivElement>(null);
-  const touchStartX = useRef<number | null>(null);
-  const touchStartY = useRef<number | null>(null);
-  const scrollStartX = useRef<number>(0);
-  const lockDirection = useRef<'horizontal' | 'vertical' | null>(null);
-
-  // Gerenciamento táctil com bloqueio direcional estrito (Directional Lock)
-  // - Gestos horizontais: movem exclusivamente o carrossel, bloqueando saltos verticais da página
-  // - Gestos verticais: deixam a rolagem vertical da página fluir normalmente
-  // - Início do gesto sobre capas: nunca bloqueia a rolagem vertical da página
+  const gesture = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   useEffect(() => {
     const el = rowRef.current;
     if (!el) return;
-
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1) return;
-      touchStartX.current = e.touches[0].clientX;
-      touchStartY.current = e.touches[0].clientY;
-      scrollStartX.current = el.scrollLeft;
-      lockDirection.current = null;
+    const start = (event: TouchEvent) => {
+      if (event.touches.length === 1) gesture.current = { x: event.touches[0].clientX, y: event.touches[0].clientY, moved: false };
     };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (touchStartX.current === null || touchStartY.current === null) return;
-      const curX = e.touches[0].clientX;
-      const curY = e.touches[0].clientY;
-      const dx = curX - touchStartX.current;
-      const dy = curY - touchStartY.current;
-
-      // Limiar inicial de 6px para detecção confiável de intenção direcional
-      if (lockDirection.current === null) {
-        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
-          lockDirection.current = Math.abs(dx) >= Math.abs(dy) ? 'horizontal' : 'vertical';
-        }
-      }
-
-      if (lockDirection.current === 'horizontal') {
-        // Bloqueia qualquer salto ou rolagem vertical indesejada durante o gesto horizontal
-        if (e.cancelable) {
-          e.preventDefault();
-        }
-        el.scrollLeft = scrollStartX.current - dx;
-      }
-      // Se lockDirection for 'vertical', deixa o scroll vertical nativo fluir livremente
+    const move = (event: TouchEvent) => {
+      const point = event.touches[0], current = gesture.current;
+      if (point && current && Math.hypot(point.clientX - current.x, point.clientY - current.y) > 8) current.moved = true;
     };
-
-    const handleTouchEnd = (e: TouchEvent) => {
-      if (touchStartX.current !== null && lockDirection.current === 'horizontal') {
-        const diff = Math.abs(e.changedTouches[0].clientX - touchStartX.current);
-        if (diff > 50) {
-          uiSoundService.play('slide');
-        }
-      }
-      touchStartX.current = null;
-      touchStartY.current = null;
-      lockDirection.current = null;
+    const end = (event: TouchEvent) => {
+      const point = event.changedTouches[0], current = gesture.current;
+      if (point && current?.moved && Math.abs(point.clientX - current.x) > 50) uiSoundService.play('slide');
     };
-
-    el.addEventListener('touchstart', handleTouchStart, { passive: true });
-    el.addEventListener('touchmove', handleTouchMove, { passive: false });
-    el.addEventListener('touchend', handleTouchEnd, { passive: true });
-    el.addEventListener('touchcancel', handleTouchEnd, { passive: true });
-
+    el.addEventListener('touchstart', start, { passive: true });
+    el.addEventListener('touchmove', move, { passive: true });
+    el.addEventListener('touchend', end, { passive: true });
     return () => {
-      el.removeEventListener('touchstart', handleTouchStart);
-      el.removeEventListener('touchmove', handleTouchMove);
-      el.removeEventListener('touchend', handleTouchEnd);
-      el.removeEventListener('touchcancel', handleTouchEnd);
+      el.removeEventListener('touchstart', start);
+      el.removeEventListener('touchmove', move);
+      el.removeEventListener('touchend', end);
     };
   }, []);
 
@@ -104,7 +59,12 @@ export const MobileContentRow: React.FC<MobileContentRowProps> = ({
       {/* Trilho de Cards com Scroll Horizontal Táctil e Bloqueio Direcional */}
       <div
         ref={rowRef}
-        className="flex gap-3 overflow-x-auto overflow-y-hidden no-scrollbar px-4 py-1 scroll-smooth will-change-scroll"
+        onClickCapture={event => {
+          if (gesture.current?.moved) {
+            event.preventDefault(); event.stopPropagation(); gesture.current = null;
+          }
+        }}
+        className="flex gap-3 overflow-x-auto overflow-y-hidden no-scrollbar px-4 py-1"
         style={{
           WebkitOverflowScrolling: 'touch',
           touchAction: 'pan-x pan-y',

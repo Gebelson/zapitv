@@ -265,12 +265,44 @@ export const MandatoryAuthModal: React.FC<MandatoryAuthModalProps> = ({
 
   // Bloqueio rigoroso de rolagem no body enquanto o modal obrigatório estiver montado
   useEffect(() => {
+    const modal = modalContainerRef.current;
+    if (!modal) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const siblings: { element: Element; inert: boolean }[] = [];
+    for (let branch: Element = modal; branch.parentElement; branch = branch.parentElement) {
+      for (const element of Array.from(branch.parentElement.children)) {
+        if (element === branch) continue;
+        siblings.push({ element, inert: element.hasAttribute('inert') });
+        element.setAttribute('inert', '');
+      }
+      if (branch.parentElement === document.body) break;
+    }
+    const focusInside = () => {
+      const target = modal.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]');
+      (target || modal).focus();
+    };
+    const guardFocus = (event: FocusEvent) => {
+      if (!modal.contains(event.target as Node)) focusInside();
+    };
+    const pauseBackground = (event: Event) => {
+      if (event.target instanceof HTMLMediaElement && !modal.contains(event.target)) event.target.pause();
+    };
+    document.querySelectorAll<HTMLMediaElement>('video, audio').forEach(media => {
+      if (!modal.contains(media)) media.pause();
+    });
+    document.addEventListener('focusin', guardFocus);
+    document.addEventListener('play', pauseBackground, true);
+    focusInside();
     const originalOverflow = document.body.style.overflow;
     const originalTouchAction = document.body.style.touchAction;
     document.body.style.overflow = 'hidden';
     document.body.style.touchAction = 'none';
 
     return () => {
+      document.removeEventListener('focusin', guardFocus);
+      document.removeEventListener('play', pauseBackground, true);
+      siblings.forEach(({ element, inert }) => { if (!inert) element.removeAttribute('inert'); });
+      if (previousFocus?.isConnected) previousFocus.focus();
       document.body.style.overflow = originalOverflow;
       document.body.style.touchAction = originalTouchAction;
     };
@@ -278,6 +310,17 @@ export const MandatoryAuthModal: React.FC<MandatoryAuthModalProps> = ({
 
   // Bloqueio rigoroso de atalhos de fechamento (Escape, Backspace em campos vazios)
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Tab') {
+      const controls = Array.from(modalContainerRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), a[href], [tabindex="0"]') || [])
+        .filter(element => element.getClientRects().length > 0);
+      const first = controls[0], last = controls[controls.length - 1];
+      if (!first) { e.preventDefault(); return; }
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === modalContainerRef.current)) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    }
     // Escape nunca fecha o modal obrigatório
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -386,6 +429,7 @@ export const MandatoryAuthModal: React.FC<MandatoryAuthModalProps> = ({
         }}
         id="zapitv-mandatory-auth-overlay"
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="mandatory-auth-title"
         onKeyDown={handleKeyDown}

@@ -139,6 +139,7 @@ class AuthSyncService {
 
     try {
       const session = await authClient.checkSession();
+      if (session.unavailable) return this.currentState;
       const mandatoryAuth = typeof session.mandatoryAuth === 'boolean' ? session.mandatoryAuth : true;
       const isAuthenticated = Boolean(session.authenticated && session.user);
 
@@ -155,9 +156,18 @@ class AuthSyncService {
         this.currentState.isAuthenticated !== newState.isAuthenticated ||
         this.currentState.mandatoryAuth !== newState.mandatoryAuth ||
         this.currentState.shouldBlock !== newState.shouldBlock ||
-        this.currentState.user?.id !== newState.user?.id;
+        this.currentState.user?.id !== newState.user?.id ||
+        this.currentState.user?.role !== newState.user?.role ||
+        this.currentState.activeProfile?.id !== newState.activeProfile?.id;
 
       this.currentState = newState;
+      if (newState.isAuthenticated && newState.user && newState.activeProfile) {
+        const { storageService } = await import('../storage/storageService');
+        const scope = storageService.getScope();
+        if (scope?.userId === newState.user.id && scope.profileId === newState.activeProfile.id) {
+          await storageService.hydrateRemoteProfile(scope.profileId);
+        }
+      }
 
       if (hasChanged) {
         this.notifyListeners();

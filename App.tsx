@@ -22,6 +22,7 @@ import { ShieldCheck, Flame, Film, Tv, List, Search, Sparkles, Plus, RefreshCw, 
 import { db } from './db';
 import { tmdbService } from './src/core/tmdb/tmdbClient';
 import { storageService, WatchProgress } from './src/core/storage/storageService';
+import { resolveContinueWatchingItems } from './src/core/storage/watchState';
 import { VERIFIED_OPEN_ITEMS } from './src/core/catalog/verifiedCatalog';
 import { ZapiLoader } from './src/components/common/ZapiLoader';
 import { FeatureErrorBoundary } from './src/components/common/FeatureErrorBoundary';
@@ -56,7 +57,6 @@ import { TvRemoteDiagnosticOverlay } from './src/components/tv/TvRemoteDiagnosti
 import { useIsMobileViewport } from './src/core/mobile/mobileViewportService';
 import { MobileLayout } from './src/components/mobile';
 import { MandatoryAuthModal } from './src/components/auth/MandatoryAuthModal';
-import { TvActivationScreen } from './src/components/tv/TvActivationScreen';
 import { authSyncService } from './src/core/auth/authSyncService';
 
 const ProfileView = React.lazy(() => import('./components/ProfileView'));
@@ -125,7 +125,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     } catch { return MOCK_USERS.map(withoutPlaintextPassword); }
   });
 
-  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(initialState?.auth));
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [mandatoryAuth, setMandatoryAuth] = useState<boolean>(true);
   const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -141,7 +141,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     return user as User;
   });
   const [activeProfile, setActiveProfile] = useState<Profile | null>(() => initialState.activeProfile || currentUser?.profiles?.[0] || null);
-  const isAdmin = Boolean(currentUser && currentUser.role === 'admin');
+  const isAdmin = Boolean(!isCheckingAuth && isAuthenticated && currentUser?.role === 'admin');
 
   // Conversor utilitário de perfis da API para o modelo da aplicação
   const toAppProfile = useCallback((item: ProfileItem): Profile => {
@@ -157,17 +157,24 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   }, []);
 
   // Verificação de sessão real persistente via cookie HttpOnly no servidor (/api/auth/me)
+  const sessionRequest = useRef(0);
+  const sessionVerified = useRef(false);
   const checkCurrentSession = useCallback(async () => {
+    const request = ++sessionRequest.current;
     setIsCheckingAuth(true);
     setAuthError(null);
     try {
-      const { authenticated, user, activeProfile: serverProfile, mandatoryAuth: serverMandatory } = await authClient.checkSession();
+      const { authenticated, user, activeProfile: serverProfile, mandatoryAuth: serverMandatory, unavailable } = await authClient.checkSession();
+      if (request !== sessionRequest.current) return;
+      if (unavailable) throw new Error("SESSION_CHECK_UNAVAILABLE");
+      sessionVerified.current = Boolean(authenticated && user);
       if (typeof serverMandatory === 'boolean') {
         setMandatoryAuth(serverMandatory);
       }
       if (authenticated && user) {
         setIsAuthenticated(true);
         const userProfiles = await profileClient.list().catch(() => []);
+        if (request !== sessionRequest.current) return;
         const mappedProfiles = userProfiles.map(toAppProfile);
         const resolvedActive = serverProfile
           ? toAppProfile(serverProfile)
@@ -178,8 +185,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: userRole,
-          devMode: userRole === 'admin',
+          role: user.role === 'admin' ? 'admin' : 'user',
+          devMode: false,
           memberSince: new Date(user.createdAt).toLocaleDateString('pt-BR'),
           plan: userRole === 'admin' ? 'ZapiTV Admin' : 'ZapiTV Premium',
           status: 'Ativo',
@@ -192,26 +199,34 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             }
           ]
         };
+        const previousScope = storageService.getScope();
+        if (previousScope?.userId !== user.id || previousScope?.profileId !== resolvedActive?.id) {
+          setContinueWatchingList([]); setMyList([]); setFavorites([]); setActiveProfile(null);
+        }
         setCurrentUser(loggedUser);
         if (resolvedActive) {
           setActiveProfile(resolvedActive);
           await storageService.setScope({ userId: user.id, profileId: resolvedActive.id });
+          if (request !== sessionRequest.current) return;
           const [loadedList, loadedFavs] = await Promise.all([
             storageService.getMyList(),
             storageService.getFavorites(),
           ]);
+          if (request !== sessionRequest.current) return;
           setMyList(loadedList);
           setFavorites(loadedFavs);
         }
       } else {
-        setIsAuthenticated(false);
+        setIsAuthenticated(false); setActiveProfile(null); setContinueWatchingList([]); setMyList([]); setFavorites([]);
+        await storageService.setScope(null);
       }
     } catch (err: any) {
-      console.warn('Erro ao validar sessão com servidor:', err);
-      setIsAuthenticated(false);
+      if (request !== sessionRequest.current) return;
+      console.warn('Erro ao validar sessão com servidor.');
+      if (!sessionVerified.current) setIsAuthenticated(false);
       setAuthError('Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.');
     } finally {
-      setIsCheckingAuth(false);
+      if (request === sessionRequest.current) setIsCheckingAuth(false);
     }
   }, [toAppProfile]);
 
@@ -219,12 +234,18 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     checkCurrentSession();
   }, [checkCurrentSession]);
 
+  const sessionIdentity = useRef({ userId: currentUser?.id, role: currentUser?.role, profileId: activeProfile?.id, authenticated: isAuthenticated });
+  sessionIdentity.current = { userId: currentUser?.id, role: currentUser?.role, profileId: activeProfile?.id, authenticated: isAuthenticated };
+
   // Sincronização em tempo real entre abas e dispositivos sem recarregar a página
   useEffect(() => {
     authSyncService.start();
     const unsubscribe = authSyncService.subscribe((syncState) => {
       setMandatoryAuth(syncState.mandatoryAuth);
-      if (syncState.isAuthenticated !== isAuthenticated) {
+      const identity = sessionIdentity.current;
+      if (syncState.lastCheckedAt > 0 && (syncState.isAuthenticated !== identity.authenticated ||
+          (syncState.isAuthenticated && (syncState.user?.id !== identity.userId || syncState.user?.role !== identity.role ||
+          syncState.activeProfile?.id !== identity.profileId)))) {
         checkCurrentSession();
       }
     });
@@ -233,7 +254,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       unsubscribe();
       authSyncService.stop();
     };
-  }, [checkCurrentSession, isAuthenticated]);
+  }, [checkCurrentSession]);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -797,7 +818,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   const discoveryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const safetyTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isTvRoute = location.pathname.startsWith('/tv') || currentView === 'tv';
+  // The QR approval URL belongs to the phone, not to the TV application shell.
+  const isTvRoute = (location.pathname === '/tv' || location.pathname.startsWith('/tv/') || currentView === 'tv') &&
+    !location.pathname.startsWith('/tv/ativar');
   const needsCatalogDiscovery = isTvRoute ||
     currentView === 'home' || currentView === 'featured' ||
     currentView === 'movies' || currentView === 'series' || currentView === 'animes' ||
@@ -819,12 +842,13 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }, 4500);
 
     // 1. Hidratação local imediata de Continuar Assistindo e Favoritos
+    const hydrationScope = storageService.getScope();
     Promise.allSettled([
       storageService.getContinueWatching(),
       storageService.getFavorites(),
       storageService.getMyList()
     ]).then(([progressRes, favsRes, myListRes]) => {
-      if (!isMounted) return;
+      if (!isMounted || !hydrationScope?.userId || storageService.getScope() !== hydrationScope) return;
       if (progressRes.status === 'fulfilled') {
         setContinueWatchingList(progressRes.value);
         const favs = favsRes.status === 'fulfilled' ? favsRes.value : [];
@@ -1423,14 +1447,26 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   // Atualiza a fileira "Continuar Assistindo" em tempo real sempre que o progresso é salvo
   useEffect(() => {
+    let request = 0;
+    let mounted = true;
     const handleProgressUpdated = async () => {
+      const current = ++request;
+      const scope = storageService.getScope();
+      if (!scope?.userId || !scope.profileId) {
+        setContinueWatchingList([]); setMyList([]); setFavorites([]);
+        return;
+      }
       try {
-        const updated = await storageService.getContinueWatching();
+        const [updated, list, favorites] = await Promise.all([
+          storageService.getContinueWatching(), storageService.getMyList(), storageService.getFavorites(),
+        ]);
+        if (!mounted || current !== request || storageService.getScope() !== scope) return;
         setContinueWatchingList(updated);
+        setMyList(list); setFavorites(favorites);
       } catch {}
     };
     window.addEventListener('zapitv_progress_updated', handleProgressUpdated);
-    return () => window.removeEventListener('zapitv_progress_updated', handleProgressUpdated);
+    return () => { mounted = false; window.removeEventListener('zapitv_progress_updated', handleProgressUpdated); };
   }, []);
 
   useEffect(() => {
@@ -1467,37 +1503,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 setUsers(newUsers);
               }
               
-              // Update current user if they are in the new list
-              if (currentUser) {
-                const updatedCurrentUser = newUsers.find(u => u.id === currentUser.id);
-                if (updatedCurrentUser) {
-                  setCurrentUser(updatedCurrentUser);
-                  if (activeProfile) {
-                    const matchingProfile = updatedCurrentUser.profiles.find(p => p.id === activeProfile.id);
-                    if (matchingProfile) setActiveProfile(matchingProfile);
-                  }
-                }
-              }
             }, (error) => {
               if (error.code !== 'permission-denied') {
                 console.error("Error listening to users:", error);
-              }
-            }));
-          } else if (currentUser) {
-            unsubscribes.push(onSnapshot(doc(firestoreDb, 'users', currentUser.id), (snapshot) => {
-              if (snapshot.exists()) {
-                let updatedCurrentUser = snapshot.data() as User;
-                updatedCurrentUser = withoutPlaintextPassword({ ...updatedCurrentUser, profiles: updatedCurrentUser.profiles || [] });
-                setCurrentUser(updatedCurrentUser);
-                setUsers([updatedCurrentUser]);
-                if (activeProfile) {
-                  const matchingProfile = updatedCurrentUser.profiles.find(p => p.id === activeProfile.id);
-                  if (matchingProfile) setActiveProfile(matchingProfile);
-                }
-              }
-            }, (error) => {
-              if (error.code !== 'permission-denied') {
-                console.error("Error listening to current user:", error);
               }
             }));
           }
@@ -1536,43 +1544,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             }
           }));
 
-          // Listen to myList changes
-          if (currentUser) {
-            unsubscribes.push(onSnapshot(doc(firestoreDb, 'keyValueStore', `zapitv_mylist_${currentUser.id}`), (doc) => {
-              if (doc.exists() && Array.isArray(doc.data().value)) {
-                const incoming = doc.data().value as string[];
-                void storageService.saveMyList(incoming);
-                setMyList(prev => {
-                  if (prev.length === incoming.length && prev.every((id, idx) => id === incoming[idx])) {
-                    return prev;
-                  }
-                  return incoming;
-                });
-              }
-            }, (error) => {
-              if (error.code !== 'permission-denied') {
-                console.error("Error listening to myList:", error);
-              }
-            }));
-
-            // Listen to favorites changes
-            unsubscribes.push(onSnapshot(doc(firestoreDb, 'keyValueStore', `zapitv_favorites_${currentUser.id}`), (doc) => {
-              if (doc.exists() && Array.isArray(doc.data().value)) {
-                const incoming = doc.data().value as string[];
-                void storageService.saveFavorites(incoming);
-                setFavorites(prev => {
-                  if (prev.length === incoming.length && prev.every((id, idx) => id === incoming[idx])) {
-                    return prev;
-                  }
-                  return incoming;
-                });
-              }
-            }, (error) => {
-              if (error.code !== 'permission-denied') {
-                console.error("Error listening to favorites:", error);
-              }
-            }));
-          }
         }).catch(error => console.warn('Falha ao iniciar sincronização remota:', error));
       }).catch(error => console.warn('Falha ao carregar cliente de sincronização:', error));
     }, 3500);
@@ -1980,8 +1951,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: userRole,
-        devMode: userRole === 'admin',
+        role: user.role === 'admin' ? 'admin' : 'user',
+        devMode: false,
         memberSince: new Date(user.createdAt).toLocaleDateString('pt-BR'),
         plan: userRole === 'admin' ? 'ZapiTV Admin' : 'ZapiTV Premium',
         status: 'Ativo',
@@ -2031,7 +2002,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: 'user',
+        role: user.role === 'admin' ? 'admin' : 'user',
         devMode: false,
         memberSince: new Date(user.createdAt).toLocaleDateString('pt-BR'),
         plan: 'ZapiTV Padrão',
@@ -2056,20 +2027,26 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   }, [toAppProfile]);
 
   const handleSelectProfile = useCallback(async (p: Profile) => {
+    const request = ++sessionRequest.current;
+    setContinueWatchingList([]); setMyList([]); setFavorites([]);
     setActiveProfile(p);
     if (currentUser?.id) {
       await storageService.setScope({ userId: currentUser.id, profileId: p.id });
+      if (request !== sessionRequest.current) return;
       const [list, favs] = await Promise.all([
         storageService.getMyList(),
         storageService.getFavorites(),
       ]);
       setMyList(list);
+      if (request !== sessionRequest.current) return;
       setFavorites(favs);
     }
     setCurrentView('home');
   }, [currentUser?.id]);
 
   const handleLogout = useCallback(async () => {
+    sessionRequest.current++;
+    sessionVerified.current = false;
     try {
       await authClient.logout();
     } catch (error) {
@@ -2078,7 +2055,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     await storageService.setScope(null);
     setIsAuthenticated(false);
     authSyncService.notifyAuthChange('LOGOUT');
-    const defaultUser = initialState?.currentUser || {
+    const defaultUser: User = {
       id: 'zapitv-anon-user',
       name: 'Usuário Convidado',
       email: '',
@@ -2090,15 +2067,10 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       profiles: [{ id: 'p-anon', name: 'Convidado', avatar: resolveAvatarUrl(null), isChild: false }]
     };
     setCurrentUser(defaultUser);
-    setActiveProfile(defaultUser.profiles?.[0] || null);
-    const [anonList, anonFavs] = await Promise.all([
-      storageService.getMyList(),
-      storageService.getFavorites(),
-    ]);
-    setMyList(anonList);
-    setFavorites(anonFavs);
+    setActiveProfile(null);
+    setContinueWatchingList([]); setMyList([]); setFavorites([]);
     setCurrentView('home');
-  }, [initialState]);
+  }, []);
 
   const toggleMyListById = useCallback(async (id: string) => {
     if (!currentUser) return;
@@ -2114,14 +2086,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       hybridRecommendationEngine.invalidateCache();
     }
 
-    try {
-      const { doc, setDoc } = await import('firebase/firestore');
-      const { db: firestoreDb } = await import('./firebase');
-      await setDoc(doc(firestoreDb, 'keyValueStore', `zapitv_mylist_${currentUser.id}`), { value: newList });
-      uiSoundService.play(isAdding ? 'listAdd' : 'listRemove');
-    } catch (error) {
-      console.error("Error saving myList:", error);
-    }
+    uiSoundService.play(isAdding ? 'listAdd' : 'listRemove');
   }, [myList, currentUser, content, activeProfile?.id]);
 
   const toggleMyList = useCallback((e: React.MouseEvent, id: string) => {
@@ -2142,13 +2107,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       hybridRecommendationEngine.invalidateCache();
     }
 
-    try {
-      const { doc, setDoc } = await import('firebase/firestore');
-      const { db: firestoreDb } = await import('./firebase');
-      await setDoc(doc(firestoreDb, 'keyValueStore', `zapitv_favorites_${currentUser.id}`), { value: newFavorites });
-    } catch (error) {
-      console.error("Error saving favorites:", error);
-    }
   }, [favorites, currentUser, content, activeProfile?.id]);
 
   const toggleFavorite = useCallback((e: React.MouseEvent, id: string) => {
@@ -2300,7 +2258,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       ...animeItems,
       ...content
     ]);
-    const cwItems = continueWatchingList.map(p => p.item);
+    const cwItems = resolveContinueWatchingItems(continueWatchingList, allAvailable);
     return hybridRecommendationEngine.getHybridHomeRows(
       allAvailable,
       activeProfile?.id || 'default',
@@ -2646,7 +2604,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                   isDarkMode={isDarkMode} 
                   onActionClick={handleSelectContent} 
                   onPlayClick={handlePlayFromHero}
-                  isAdmin={currentUser.role === 'admin' || currentUser.devMode}
+                  isAdmin={isAdmin}
                   onUpdateItem={handleUpdateContent}
                   onAddContent={handleAddContent}
                   onSaveCarousel={async (newItems) => {
@@ -2675,7 +2633,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                     favorites={favorites}
                     onToggleFavorite={toggleFavorite}
                     onToggleList={toggleMyList}
-                    isAdmin={currentUser.role === 'admin'}
+                    isAdmin={isAdmin}
                   />
                 ))}
 
@@ -2702,7 +2660,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 })}
 
                 {/* Botão Adicionar Seção (Apenas Admin) */}
-                {currentUser.role === 'admin' && (
+                {isAdmin && (
                   <div className="flex justify-center py-10 px-4 md:px-12">
                     <button 
                       onClick={() => setIsAddSectionModalOpen(true)}
@@ -3034,7 +2992,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     hasMoreMovies, hasMoreSeries, hasMoreAnimes, handlePlayFromHero
   ]);
 
-  if (location.pathname.startsWith('/tv')) {
+  if (isTvRoute) {
     return (
       <React.Suspense fallback={<div className="min-h-screen bg-[#05070a] flex items-center justify-center"><ZapiLoader size="xl" /></div>}>
         <TvApp
@@ -3054,17 +3012,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           activeProfile={activeProfile}
           isAuthenticated={isAuthenticated}
         />
-        {!isCheckingAuth && mandatoryAuth && !isAuthenticated && (
-          <TvActivationScreen
-            onTvLinked={async () => {
-              authSyncService.notifyAuthChange('LOGIN');
-              await checkCurrentSession();
-            }}
-            onLoginWithRemote={handleLogin}
-            authError={authError}
-            onRetryAuth={checkCurrentSession}
-          />
-        )}
         {isAuthenticated && currentUser?.id && activeProfile?.id && !location.pathname.includes('/assistir/') &&
           <SyncRecoveryNotice key={`${currentUser.id}:${activeProfile.id}`} accountId={currentUser.id} profileId={activeProfile.id} />}
       </React.Suspense>

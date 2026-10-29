@@ -13,10 +13,13 @@ console.log('=== TEST SUITE: ZapiTV | TV Incognito Bootstrap & Catalog Resilienc
 console.log('1. Verificando needsCatalogDiscovery cobrindo a rota TV e mobile em App.tsx...');
 const appSource = fs.readFileSync(path.join(process.cwd(), 'App.tsx'), 'utf8');
 
-assert.ok(
-  appSource.includes("const isTvRoute = location.pathname.startsWith('/tv') || currentView === 'tv'"),
-  'App.tsx deve definir isTvRoute cobrindo tanto pathname quanto currentView === "tv"'
-);
+const routeExpression = appSource.match(/const isTvRoute = ([^;]+);/)?.[1];
+assert.ok(routeExpression, 'Classificação de rota TV deve existir');
+const classifyTvRoute = new Function('location', 'currentView', `return ${routeExpression};`);
+assert.equal(classifyTvRoute({pathname:'/tv'},'home'),true);
+assert.equal(classifyTvRoute({pathname:'/tv/assistir/filme/tt123'},'home'),true);
+assert.equal(classifyTvRoute({pathname:'/'},'tv'),true);
+assert.equal(classifyTvRoute({pathname:'/tv/ativar'},'tv-activate'),false,'Aprovação pelo celular não monta o shell TV');
 assert.ok(
   appSource.includes("const needsCatalogDiscovery = isTvRoute ||"),
   'needsCatalogDiscovery deve incluir expressamente isTvRoute para disparar no primeiro acesso a /tv'
@@ -229,7 +232,7 @@ console.log('  -> Cold start sem dados prévios inicializa catálogo imediatamen
 // 10. Isolamento com Desktop e Smart TV preservado rigorosamente
 console.log('\n10. Verificando isolamento entre Desktop e Smart TV...');
 assert.ok(
-  appSource.includes("if (location.pathname.startsWith('/tv')) {"),
+  appSource.includes('if (isTvRoute) {'),
   'App.tsx deve manter o retorno antecipado isolado para TvApp na rota /tv'
 );
 assert.ok(

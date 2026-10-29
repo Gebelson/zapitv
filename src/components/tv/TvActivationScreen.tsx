@@ -36,6 +36,7 @@ import {
   Check
 } from 'lucide-react';
 import { deviceAuthClient, DeviceChallengeData } from '../../core/deviceAuth/deviceAuthClient';
+import { authClient } from '../../core/auth/authClient';
 import { ZapiBrandLogo } from '../common/ZapiBrandLogo';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { tvPerformanceService } from '../../core/tv/tvPerformanceService';
@@ -72,6 +73,10 @@ export const TvActivationScreen: React.FC<TvActivationScreenProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const pollIntervalRef = useRef<number>(5000);
   const isPollingRef = useRef<boolean>(false);
+  const mountedRef = useRef(false);
+  const challengeGenerationRef = useRef(0);
+  const linkedCallbackRef = useRef(onTvLinked);
+  linkedCallbackRef.current = onTvLinked;
 
   // Detecção amigável do modelo de Smart TV
   const deviceName = tvPerformanceService.getDeviceModel() || 'Smart TV';
@@ -120,6 +125,7 @@ export const TvActivationScreen: React.FC<TvActivationScreenProps> = ({
   });
 
   const clearTimers = useCallback(() => {
+    challengeGenerationRef.current += 1;
     if (pollTimerRef.current) {
       clearTimeout(pollTimerRef.current);
       pollTimerRef.current = null;
@@ -137,12 +143,14 @@ export const TvActivationScreen: React.FC<TvActivationScreenProps> = ({
 
   const initChallenge = useCallback(async () => {
     clearTimers();
+    const generation = challengeGenerationRef.current;
     setStatus('loading');
     setErrorMessage('');
     setQrSvg('');
 
     try {
       const data = await deviceAuthClient.createChallenge();
+      if (!mountedRef.current || generation !== challengeGenerationRef.current) return;
       setChallenge(data);
       setSecondsRemaining(data.expiresIn || 600);
       pollIntervalRef.current = (data.interval || 5) * 1000;
@@ -156,6 +164,7 @@ export const TvActivationScreen: React.FC<TvActivationScreenProps> = ({
           light: '#ffffff',
         },
       });
+      if (!mountedRef.current || generation !== challengeGenerationRef.current) return;
 
       setQrSvg(svg);
       setStatus('pending');
@@ -181,6 +190,7 @@ export const TvActivationScreen: React.FC<TvActivationScreenProps> = ({
   const startPolling = useCallback((deviceCode: string) => {
     if (isPollingRef.current) return;
     isPollingRef.current = true;
+    const generation = challengeGenerationRef.current;
 
     const poll = async () => {
       if (!isPollingRef.current) return;
@@ -189,16 +199,29 @@ export const TvActivationScreen: React.FC<TvActivationScreenProps> = ({
 
       try {
         const res = await deviceAuthClient.pollChallenge(deviceCode, abortControllerRef.current.signal);
+        if (!mountedRef.current || generation !== challengeGenerationRef.current) return;
 
         if (res.status === 'approved') {
           clearTimers();
+          const session = await authClient.checkSession();
+          if (!mountedRef.current) return;
+          if (!session.authenticated || !session.user?.id) {
+            setStatus('error');
+            setErrorMessage('A sessão da televisão não foi confirmada. Gere um novo código para tentar novamente.');
+            return;
+          }
           setStatus('approved');
           uiSoundService.play('success');
 
           // Transição automática: aguarda 1.2s para mostrar o check e fecha suavemente
-          setTimeout(async () => {
-            if (onTvLinked) {
-              await onTvLinked(res);
+          pollTimerRef.current = setTimeout(async () => {
+            if (!mountedRef.current) return;
+            try {
+              await linkedCallbackRef.current(res);
+            } catch (error) {
+              if (!mountedRef.current) return;
+              setStatus('error');
+              setErrorMessage(error instanceof Error ? error.message : 'Não foi possível confirmar a sessão da TV.');
             }
           }, 1200);
           return;
@@ -211,7 +234,7 @@ export const TvActivationScreen: React.FC<TvActivationScreenProps> = ({
           return;
         }
 
-        if (res.status === 'expired') {
+        if (res.status === 'expired' || res.status === 'consumed') {
           clearTimers();
           setStatus('expired');
           return;
@@ -233,11 +256,13 @@ export const TvActivationScreen: React.FC<TvActivationScreenProps> = ({
     };
 
     pollTimerRef.current = setTimeout(poll, pollIntervalRef.current);
-  }, [clearTimers, onTvLinked]);
+  }, [clearTimers]);
 
   useEffect(() => {
+    mountedRef.current = true;
     initChallenge();
     return () => {
+      mountedRef.current = false;
       clearTimers();
     };
   }, [initChallenge, clearTimers]);

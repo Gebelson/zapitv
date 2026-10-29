@@ -10,6 +10,8 @@ export interface WatchProgress {
   duration: number;
   percentage: number;
   updatedAt: string;
+  /** Highest server revision observed for this movie/episode, independent of the client clock. */
+  remoteVersion?: number;
 }
 
 export interface EpisodeWatchProgress extends Omit<WatchProgress, 'item'> {
@@ -88,6 +90,15 @@ export function normalizeEpisode(raw: unknown): EpisodeWatchProgress | null {
 export function mergeWatchStates(...states: WatchState[]): WatchState {
   const groups: { progress: WatchProgress; members: WatchProgress[] }[] = [];
   const episodes: Record<string, EpisodeWatchProgress> = {};
+  const choose = <T extends Pick<WatchProgress, 'season' | 'episode' | 'updatedAt' | 'remoteVersion'>>(a: T, b: T): T => {
+    const sameEpisode = a.season === b.season && a.episode === b.episode;
+    const versionA = Number.isSafeInteger(a.remoteVersion) && a.remoteVersion! > 0 ? a.remoteVersion! : 0;
+    const versionB = Number.isSafeInteger(b.remoteVersion) && b.remoteVersion! > 0 ? b.remoteVersion! : 0;
+    const newer = sameEpisode && versionA && versionB && versionA !== versionB
+      ? versionB > versionA : Date.parse(b.updatedAt) > Date.parse(a.updatedAt);
+    const winner = newer ? b : a;
+    return sameEpisode && (versionA || versionB) ? { ...winner, remoteVersion: Math.max(versionA, versionB) } : winner;
+  };
   for (const state of states) {
     for (const raw of state.items) {
       const p = normalizeProgress(raw);
@@ -98,11 +109,11 @@ export function mergeWatchStates(...states: WatchState[]): WatchState {
         const first = matches[0];
         for (const group of matches.slice(1)) {
           first.members.push(...group.members);
-          if (Date.parse(group.progress.updatedAt) > Date.parse(first.progress.updatedAt)) first.progress = group.progress;
+          first.progress = choose(first.progress, group.progress);
           groups.splice(groups.indexOf(group), 1);
         }
         first.members.push(p);
-        if (Date.parse(p.updatedAt) > Date.parse(first.progress.updatedAt)) first.progress = p;
+        first.progress = choose(first.progress, p);
       }
     }
   }
@@ -128,7 +139,7 @@ export function mergeWatchStates(...states: WatchState[]): WatchState {
     if (ep.contentKey) ep.contentKey = keyAliases.get(ep.contentKey) ?? ep.contentKey;
     else if (parents?.size === 1) ep.contentKey = [...parents][0];
     const key = episodeKey(ep.contentKey ?? `legacy:${ep.contentId}`, ep.season, ep.episode);
-    if (!episodes[key] || Date.parse(ep.updatedAt) >= Date.parse(episodes[key].updatedAt)) episodes[key] = ep;
+    episodes[key] = episodes[key] ? choose(episodes[key], ep) : ep;
   };
   for (const state of states) Object.values(state.episodes).forEach(addEpisode);
   // Recover the latest episode even if a legacy write saved the item but failed to save its episode map.
@@ -143,6 +154,13 @@ export function normalizeWatchState(value: unknown): WatchState {
   const state = value as Partial<WatchState> | null;
   return mergeWatchStates({ items: Array.isArray(state?.items) ? state.items : [],
     episodes: state?.episodes && typeof state.episodes === 'object' && !Array.isArray(state.episodes) ? state.episodes : {} });
+}
+
+/** Catalog/recommendations enrich metadata; membership belongs to the active profile's progress. */
+export function resolveContinueWatchingItems(progress: WatchProgress[], catalog: ContentItem[]): ContentItem[] {
+  return progress.filter(p => p.item && p.currentTime > 5 && p.percentage < 95)
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    .map(p => catalog.find(item => sameContent(item, p.item)) ?? p.item);
 }
 
 export interface StorageScope {

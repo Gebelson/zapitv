@@ -48,6 +48,8 @@ export class StorageService {
   private lastRemotePosition = new Map<string, number>();
   private completedSynced = new Set<string>();
   private currentScope: StorageScope | null = null;
+  private scopeEpoch = 0;
+  private hydrationRevision = 0;
   private ready: Promise<void>;
 
   constructor(private dataStore: LocalDataStore = localDataStore) {
@@ -60,15 +62,22 @@ export class StorageService {
   }
 
   public async setScope(scope: StorageScope | null): Promise<void> {
-    this.currentScope = scope;
+    // Each selection owns a distinct lifetime, including A -> B -> A.
+    this.currentScope = scope ? { ...scope } : null;
+    const selectedEpoch = ++this.scopeEpoch;
+    this.applyWatchState({ items: [], episodes: {} });
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("zapitv_progress_updated"));
     syncQueue.setAccountScope(scope?.userId || null, scope?.profileId || null);
-    await this.syncFromDb();
+    this.ready = this.syncFromDb();
+    await this.ready;
+    if (this.scopeEpoch !== selectedEpoch) return;
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zapitv_progress_updated'));
     recommendationEngine.invalidateCache();
     hybridRecommendationEngine.invalidateCache();
 
     if (scope && scope.userId && scope.profileId) {
       // Hidratação remota assíncrona do perfil autenticado
-      this.hydrateRemoteProfile(scope.profileId).catch(() => {});
+      void this.hydrateRemoteProfile(scope.profileId);
     }
   }
 
@@ -78,49 +87,70 @@ export class StorageService {
   public async hydrateRemoteProfile(profileId: string): Promise<void> {
     if (!profileId || this.currentScope?.profileId !== profileId) return;
 
+    const scope = this.currentScope;
+    const epoch = this.scopeEpoch;
+    const revision = ++this.hydrationRevision;
+    const isCurrent = () => this.scopeEpoch === epoch && this.hydrationRevision === revision;
+    const watchCodec = this.getWatchCodec(), listCodec = this.getMyListCodec(), favoritesCodec = this.getFavoritesCodec();
     try {
+      // Confirm queued local edits before reading the authoritative result.
+      await syncQueue.flush(profileId, scope?.userId);
+      if (!isCurrent()) return;
       const remoteData = await syncClient.pull(profileId);
-      if (!remoteData || this.currentScope?.profileId !== profileId) return;
+      if (!remoteData || remoteData.profileId !== profileId || !isCurrent()) return;
+
+      const mergeList = (local: string[], remote: typeof remoteData.myList, type: 'my_list' | 'favorites') => {
+        const ids = new Set(local);
+        for (const item of remote) {
+          if (item.isRemoved === 1) ids.delete(item.canonicalId);
+          else if (item.isRemoved === 0) ids.add(item.canonicalId);
+        }
+        // Offline edits and in-flight batches still belong to this account/profile.
+        // Conflicted edits remain available for review while the remote value wins.
+        for (const pending of syncQueue.getQueue(profileId, scope?.userId)) {
+          if (pending.type !== type || pending.syncState === 'conflict') continue;
+          const id = pending.data?.canonicalId;
+          if (!id) continue;
+          if (pending.action === 'remove' || pending.data?.isRemoved) ids.delete(id);
+          else ids.add(id);
+        }
+        return normalizeIds([...ids]);
+      };
 
       // 1. Minha Lista: mescla com base em tombstones
       if (Array.isArray(remoteData.myList)) {
-        await this.dataStore.update(this.getMyListCodec(), localList => {
-          const removedIds = new Set(
-            remoteData.myList.filter(item => item.isRemoved === 1).map(item => item.canonicalId)
-          );
-          const activeRemoteIds = remoteData.myList
-            .filter(item => item.isRemoved === 0)
-            .map(item => item.canonicalId);
-
-          const filteredLocal = localList.filter(id => !removedIds.has(id));
-          return normalizeIds([...filteredLocal, ...activeRemoteIds]);
+        await this.dataStore.update(listCodec, localList => {
+          if (!isCurrent()) return localList;
+          return mergeList(localList, remoteData.myList, 'my_list');
         });
       }
 
       // 2. Favoritos: mescla com base em tombstones
       if (Array.isArray(remoteData.favorites)) {
-        await this.dataStore.update(this.getFavoritesCodec(), localFavs => {
-          const removedIds = new Set(
-            remoteData.favorites.filter(item => item.isRemoved === 1).map(item => item.canonicalId)
-          );
-          const activeRemoteIds = remoteData.favorites
-            .filter(item => item.isRemoved === 0)
-            .map(item => item.canonicalId);
-
-          const filteredLocal = localFavs.filter(id => !removedIds.has(id));
-          return normalizeIds([...filteredLocal, ...activeRemoteIds]);
+        await this.dataStore.update(favoritesCodec, localFavs => {
+          if (!isCurrent()) return localFavs;
+          return mergeList(localFavs, remoteData.favorites, 'favorites');
         });
       }
 
       // 3. Progresso: converte remoteData.progress em WatchState e mescla com mergeWatchStates
       if (Array.isArray(remoteData.progress) && remoteData.progress.length > 0) {
-        await this.dataStore.update(this.getWatchCodec(), localWatch => {
+        await this.dataStore.update(watchCodec, localWatch => {
+          if (!isCurrent()) return localWatch;
           const remoteItems: WatchProgress[] = [];
           const remoteEpisodes: Record<string, EpisodeWatchProgress> = {};
+          const serverWinners: WatchProgress[] = [];
 
           for (const rp of remoteData.progress) {
+            if (rp.profileId !== profileId || !Number.isFinite(rp.updatedAt) ||
+              !Number.isFinite(new Date(rp.updatedAt).getTime())) continue;
+            const queued = syncQueue.getQueue(profileId, scope?.userId).filter(pending =>
+              pending.type === 'progress' &&
+              pending.data?.canonicalId === rp.canonicalId && pending.data?.contentType === rp.contentType &&
+              (pending.data?.season || 0) === (rp.season || 0) && (pending.data?.episode || 0) === (rp.episode || 0));
+            if (queued.some(pending => pending.syncState !== 'conflict')) continue;
             const isEpisodic = rp.season > 0 || rp.episode > 0;
-            const item: ContentItem = {
+            let item: ContentItem = {
               id: rp.canonicalId,
               canonicalId: rp.canonicalId,
               title: rp.canonicalId,
@@ -129,6 +159,17 @@ export class StorageService {
               rating: 0,
               year: 0,
               image: '',
+            };
+            const localItem = localWatch.items.find(p => sameContent(p.item, item))?.item;
+            const history = Array.isArray(remoteData.history) ? remoteData.history.find(h =>
+              h.profileId === profileId && h.canonicalId === rp.canonicalId && h.contentType === rp.contentType) : undefined;
+            item = {
+              ...item,
+              title: history?.title || item.title,
+              image: history?.posterUrl || '',
+              poster: history?.posterUrl || '',
+              year: history?.year || 0,
+              ...localItem,
             };
 
             const wp: WatchProgress = {
@@ -140,11 +181,13 @@ export class StorageService {
               duration: rp.durationSec,
               percentage: rp.progressPercent,
               updatedAt: new Date(rp.updatedAt).toISOString(),
+              remoteVersion: rp.version,
             };
 
             const normalized = normalizeProgress(wp);
             if (normalized) {
               remoteItems.push(normalized);
+              if (queued.some(pending => pending.syncState === 'conflict')) serverWinners.push(normalized);
               if (isEpisodic) {
                 const epKey = episodeKey(contentKey(item), rp.season, rp.episode);
                 remoteEpisodes[epKey] = {
@@ -155,6 +198,7 @@ export class StorageService {
                   duration: rp.durationSec,
                   percentage: rp.progressPercent,
                   updatedAt: new Date(rp.updatedAt).toISOString(),
+                  remoteVersion: rp.version,
                   contentKey: contentKey(item),
                 };
               }
@@ -162,15 +206,22 @@ export class StorageService {
           }
 
           const remoteState: WatchState = { items: remoteItems, episodes: remoteEpisodes };
-          const merged = mergeWatchStates(localWatch, remoteState);
-          this.applyWatchState(merged);
+          // Rejected payloads remain in the recovery queue; the visible resume point follows the server.
+          const localState: WatchState = {
+            items: localWatch.items.filter(local => !serverWinners.some(remote =>
+              sameContent(local.item, remote.item) && local.season === remote.season && local.episode === remote.episode)),
+            episodes: Object.fromEntries(Object.entries(localWatch.episodes).filter(([, local]) =>
+              !serverWinners.some(remote => local.season === remote.season && local.episode === remote.episode &&
+                (local.contentKey ? local.contentKey === contentKey(remote.item) : local.contentId === remote.contentId)))),
+          };
+          const merged = mergeWatchStates(localState, remoteState);
+          if (isCurrent()) this.applyWatchState(merged);
           return merged;
         });
       }
 
-      // 4. Descarrega mutações pendentes na outbox queue
-      await syncQueue.flush(profileId, this.currentScope?.userId);
-    } catch {}
+      if (isCurrent() && typeof window !== "undefined") window.dispatchEvent(new CustomEvent("zapitv_progress_updated"));
+    } catch { console.warn("Não foi possível atualizar o cache remoto do perfil; dados locais preservados."); }
   }
 
   private getWatchCodec() {
@@ -207,7 +258,9 @@ export class StorageService {
   }
 
   public async syncFromDb(): Promise<void> {
-    this.applyWatchState(await this.dataStore.read(this.getWatchCodec()));
+    const epoch = this.scopeEpoch;
+    const state = await this.dataStore.read(this.getWatchCodec());
+    if (this.scopeEpoch === epoch) this.applyWatchState(state);
   }
 
   public getEpisodeKey(contentId: string, season: number, episode: number): string {
@@ -448,6 +501,7 @@ export class StorageService {
   }
 
   public async toggleFavorite(id: string): Promise<string[]> {
+    const scope = this.currentScope;
     let wasRemoved = false;
     const next = await this.dataStore.update(this.getFavoritesCodec(), list => {
       wasRemoved = list.includes(id);
@@ -456,15 +510,15 @@ export class StorageService {
     recommendationEngine.invalidateCache();
     hybridRecommendationEngine.invalidateCache();
 
-    if (this.currentScope?.profileId) {
+    if (scope?.profileId) {
       syncQueue.enqueue(
-        this.currentScope.profileId,
+        scope.profileId,
         {
           type: 'favorites',
           action: wasRemoved ? 'remove' : 'set',
           data: { canonicalId: id, isRemoved: wasRemoved },
         },
-        this.currentScope.userId
+        scope.userId
       );
     }
 
@@ -480,20 +534,21 @@ export class StorageService {
   }
 
   public toggleMyList(id: string): Promise<string[]> {
+    const scope = this.currentScope;
     let wasRemoved = false;
     return this.dataStore.update(this.getMyListCodec(), list => {
       wasRemoved = list.includes(id);
       const nextList = wasRemoved ? list.filter(value => value !== id) : [...list, id];
 
-      if (this.currentScope?.profileId) {
+      if (scope?.profileId) {
         syncQueue.enqueue(
-          this.currentScope.profileId,
+          scope.profileId,
           {
             type: 'my_list',
             action: wasRemoved ? 'remove' : 'set',
             data: { canonicalId: id, isRemoved: wasRemoved },
           },
-          this.currentScope.userId
+          scope.userId
         );
       }
 
@@ -502,16 +557,22 @@ export class StorageService {
   }
 
   public async getContinueWatching(): Promise<WatchProgress[]> {
+    const epoch = this.scopeEpoch;
     await this.ready;
+    if (this.scopeEpoch !== epoch) return [];
     await this.syncFromDb();
+    if (this.scopeEpoch !== epoch) return [];
     return [...this.itemProgressCache.values()];
   }
 
   public async saveProgress(progress: WatchProgress): Promise<void> {
     const normalizedProgress = normalizeProgress(progress);
     if (!normalizedProgress) return;
+    const scope = this.currentScope;
+    const epoch = this.scopeEpoch;
+    const codec = this.getWatchCodec();
     await this.ready;
-    const state = await this.dataStore.update(this.getWatchCodec(), current => {
+    const state = await this.dataStore.update(codec, current => {
       const existing = current.items.find(p => sameContent(p.item, normalizedProgress.item));
       const episodes = { ...current.episodes };
       let episodeChanged = false;
@@ -534,11 +595,11 @@ export class StorageService {
       else items.unshift(normalizedProgress);
       return mergeWatchStates({ items, episodes }, { items: existing ? [existing] : [], episodes: {} });
     });
-    this.applyWatchState(state);
+    if (this.scopeEpoch === epoch) this.applyWatchState(state);
     const percentage = normalizedProgress.percentage;
 
     // 5. Emite evento global para atualizar miniaturas e cards instantaneamente sem recarregar a tela
-    if (typeof window !== 'undefined') {
+    if (this.scopeEpoch === epoch && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('zapitv_progress_updated', {
         detail: {
           contentId: normalizedProgress.contentId,
@@ -552,7 +613,7 @@ export class StorageService {
     }
 
     // 6. Atualiza o motor de recomendações híbridas com a nova interação do usuário
-    if (normalizedProgress.item) {
+    if (this.scopeEpoch === epoch && normalizedProgress.item) {
       userPreferenceStore.recordPlayback(
         normalizedProgress.item,
         normalizedProgress.currentTime,
@@ -568,7 +629,7 @@ export class StorageService {
 
     // 7. Enfileira sincronização de progresso e histórico se perfil autenticado estiver ativo
     // Aplica debounce e controle de taxa de escrita (8-15 escritas/hora) para proteção da cota do Turso
-    if (this.currentScope?.profileId) {
+    if (scope?.profileId) {
       const canonicalId = normalizedProgress.item?.canonicalId || normalizedProgress.contentId;
       const contentType = normalizedProgress.item?.type || 'movie';
       const season = normalizedProgress.season || 0;
@@ -578,7 +639,7 @@ export class StorageService {
       const isCompleted = normalizedProgress.percentage >= 92 ? 1 : 0;
       const eventTime = Date.parse(normalizedProgress.updatedAt) || Date.now();
 
-      const progressKey = `${this.currentScope.profileId}_${canonicalId}_${season}_${episode}`;
+      const progressKey = JSON.stringify([scope.userId, scope.profileId, contentType, canonicalId, season, episode]);
       const lastProgressSync = this.lastRemoteProgressSync.get(progressKey) || 0;
       const lastRecordedPos = this.lastRemotePosition.get(progressKey) ?? -1;
       
@@ -599,7 +660,7 @@ export class StorageService {
         }
 
         syncQueue.enqueue(
-          this.currentScope.profileId,
+          scope.profileId,
           {
             type: 'progress',
             action: 'save',
@@ -615,7 +676,7 @@ export class StorageService {
               updatedAt: eventTime,
             },
           },
-          this.currentScope.userId
+          scope.userId
         );
       }
 
@@ -626,7 +687,7 @@ export class StorageService {
         this.lastRemoteHistorySync.set(progressKey, eventTime);
 
         syncQueue.enqueue(
-          this.currentScope.profileId,
+          scope.profileId,
           {
             type: 'history',
             action: 'save',
@@ -642,7 +703,7 @@ export class StorageService {
               updatedAt: eventTime,
             },
           },
-          this.currentScope.userId
+          scope.userId
         );
       }
     }
@@ -654,8 +715,10 @@ export class StorageService {
   }
 
   public async deleteProgress(itemOrId: string | ContentItem): Promise<void> {
+    const epoch = this.scopeEpoch;
+    const codec = this.getWatchCodec();
     await this.ready;
-    const state = await this.dataStore.update(this.getWatchCodec(), current => {
+    const state = await this.dataStore.update(codec, current => {
       const matches = current.items.filter(p => typeof itemOrId === 'object' ? sameContent(p.item, itemOrId) : p.contentId === itemOrId);
       if (matches.length !== 1) return current;
       const target = matches[0];
@@ -666,13 +729,22 @@ export class StorageService {
           p.contentKey ? p.contentKey !== contentKey(target.item) : !unambiguousId || p.contentId !== target.contentId))
       };
     });
-    this.applyWatchState(state);
+    if (this.scopeEpoch === epoch) {
+      this.applyWatchState(state);
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zapitv_progress_updated'));
+    }
   }
 
   public async clearAllProgress(): Promise<void> {
+    const epoch = this.scopeEpoch;
+    const codec = this.getWatchCodec();
     await this.ready;
-    this.applyWatchState(await this.dataStore.update(this.getWatchCodec(), () => ({ items: [], episodes: {} })));
-    await this.dataStore.removeLegacy(this.getWatchCodec());
+    const state = await this.dataStore.update(codec, () => ({ items: [], episodes: {} }));
+    if (this.scopeEpoch === epoch) {
+      this.applyWatchState(state);
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zapitv_progress_updated'));
+    }
+    await this.dataStore.removeLegacy(codec);
   }
 
   public async exportDataAsJson(): Promise<string> {
@@ -692,6 +764,8 @@ export class StorageService {
   }
 
   public async importDataFromJson(jsonString: string): Promise<boolean> {
+    const epoch = this.scopeEpoch;
+    const watchCodec = this.getWatchCodec(), favoritesCodec = this.getFavoritesCodec(), myListCodec = this.getMyListCodec();
     try {
       const data = JSON.parse(jsonString);
       if (!data || typeof data !== 'object' || Array.isArray(data) ||
@@ -705,13 +779,15 @@ export class StorageService {
       await this.ready;
       if (data.progress || data.episodeProgress) {
         const imported = normalizeWatchState({ items: data.progress, episodes: data.episodeProgress });
-        this.applyWatchState(await this.dataStore.update(this.getWatchCodec(), current => mergeWatchStates(current, imported)));
+        const state = await this.dataStore.update(watchCodec, current => mergeWatchStates(current, imported));
+        if (this.scopeEpoch === epoch) this.applyWatchState(state);
       }
-      if (data.favorites) await this.dataStore.update(this.getFavoritesCodec(), list => normalizeIds([...list, ...data.favorites]));
-      if (data.myList) await this.dataStore.update(this.getMyListCodec(), list => normalizeIds([...list, ...data.myList]));
+      if (data.favorites) await this.dataStore.update(favoritesCodec, list => normalizeIds([...list, ...data.favorites]));
+      if (data.myList) await this.dataStore.update(myListCodec, list => normalizeIds([...list, ...data.myList]));
       if (Array.isArray(data.providers)) {
         try { localStorage.setItem('zapitv_providers_config', JSON.stringify(data.providers)); } catch { return false; }
       }
+      if (this.scopeEpoch === epoch && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zapitv_progress_updated'));
       return true;
     } catch {
       return false;
