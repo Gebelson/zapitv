@@ -13,7 +13,8 @@ import crypto from 'crypto';
 import { eq, and, asc, count } from 'drizzle-orm';
 import { Database } from '../database/client';
 import { profiles, users } from '../database/schema';
-import { VALID_AVATAR_IDS, DEFAULT_AVATAR_ID } from '../../core/profile/avatarRegistry';
+import { DEFAULT_AVATAR_ID } from '../../core/profile/avatarRegistry';
+import { isValidProfileAvatar } from './avatarValidation';
 
 export const MAX_PROFILES_PER_USER = process.env.MAX_PROFILES_PER_USER
   ? parseInt(process.env.MAX_PROFILES_PER_USER, 10)
@@ -160,9 +161,9 @@ export class ProfileService {
       throw new Error('O nome do perfil contém caracteres inválidos.');
     }
 
-    let avatarId = data.avatarId ? String(data.avatarId).trim() : DEFAULT_AVATAR_ID;
-    if (!VALID_AVATAR_IDS.includes(avatarId)) {
-      avatarId = DEFAULT_AVATAR_ID;
+    const avatarId = data.avatarId ? String(data.avatarId).trim() : DEFAULT_AVATAR_ID;
+    if (!isValidProfileAvatar(avatarId)) {
+      throw new Error('Identificador de avatar inválido.');
     }
 
     // Verifica limite configurável de perfis por conta
@@ -235,7 +236,7 @@ export class ProfileService {
 
     if (data.avatarId !== undefined) {
       const cleanAvatar = String(data.avatarId).trim();
-      if (!VALID_AVATAR_IDS.includes(cleanAvatar)) {
+      if (!isValidProfileAvatar(cleanAvatar)) {
         throw new Error('Identificador de avatar inválido.');
       }
       updates.avatarId = cleanAvatar;

@@ -34,6 +34,7 @@ import { authRouter } from '../src/server/auth/routes';
 import { profilesRouter } from '../src/server/profiles/routes';
 import { ProfileService, MAX_PROFILES_PER_USER } from '../src/server/profiles/profileService';
 import { OFFICIAL_AVATARS, resolveAvatarUrl, VALID_AVATAR_IDS } from '../src/core/profile/avatarRegistry';
+import { AVATARS } from '../src/core/profile/avatarImages';
 import { storageService } from '../src/core/storage/storageService';
 import { eq } from 'drizzle-orm';
 
@@ -428,18 +429,18 @@ async function runProfilesTestSuite() {
     assert.ok(OFFICIAL_AVATARS.length >= 8, 'Biblioteca oficial deve conter ao menos 8 avatares');
     for (const av of OFFICIAL_AVATARS) {
       assert.ok(VALID_AVATAR_IDS.includes(av.id));
-      assert.ok(av.dataUri.startsWith('data:image/svg+xml'));
-      assert.ok(resolveAvatarUrl(av.id).startsWith('data:image/svg+xml'));
+      assert.ok(AVATARS.includes(av.dataUri));
+      assert.equal(resolveAvatarUrl(av.id), av.dataUri);
     }
-    console.log(`  ✓ ${OFFICIAL_AVATARS.length} avatares oficiais originais validados com renderização SVG.`);
+    console.log(`  ✓ ${OFFICIAL_AVATARS.length} imagens originais de perfil preservadas.`);
 
     // -------------------------------------------------------------------------
     // 19. INTERFACE MOBILE E SAFE AREAS
     // -------------------------------------------------------------------------
     console.log('\n[Cenário 19] Validação mobile e Minha ZapiTV...');
     const avatarUrl = resolveAvatarUrl('zapi-avatar-cyan');
-    assert.ok(avatarUrl.length > 50, 'Avatar deve ser resolvido para dataUri sem dependência externa');
-    console.log('  ✓ Integração mobile com avatar SVG local aprovada.');
+    assert.equal(avatarUrl, AVATARS[0], 'Avatar deve preservar a imagem original configurada');
+    console.log('  ✓ Integração mobile com a imagem original aprovada.');
 
     // -------------------------------------------------------------------------
     // 20. NAVEGAÇÃO D-PAD DOS COMPONENTES DE TV

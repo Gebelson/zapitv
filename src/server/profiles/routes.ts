@@ -117,7 +117,7 @@ profilesRouter.post('/', async (req, res) => {
       profile: created,
     });
   } catch (err: any) {
-    const status = err?.message?.includes('Limite máximo') || err?.message?.includes('caracteres') ? 400 : 500;
+    const status = err?.message?.includes('Limite máximo') || err?.message?.includes('caracteres') || err?.message?.includes('inválido') ? 400 : 500;
     return res.status(status).json({ error: err?.message || 'Erro ao criar perfil.' });
   }
 });

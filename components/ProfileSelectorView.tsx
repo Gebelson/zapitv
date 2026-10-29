@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Edit3, Trash2, Check, X, Loader2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Edit3, Trash2, Check, X, Loader2, AlertCircle, Upload } from 'lucide-react';
 import { User, Profile } from '../types';
 import AnimatedBackground from './AnimatedBackground';
 import { profileClient, ProfileItem } from '../src/core/profile/profileClient';
 import { OFFICIAL_AVATARS, DEFAULT_AVATAR_ID, resolveAvatarUrl } from '../src/core/profile/avatarRegistry';
+import { MAX_PROFILE_AVATAR_LENGTH } from '../src/core/profile/avatarImages';
 
 interface ProfileSelectorViewProps {
   user: User;
@@ -62,6 +63,44 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
   // Campos do formulário de criação/edição
   const [formName, setFormName] = useState('');
   const [formAvatarId, setFormAvatarId] = useState(DEFAULT_AVATAR_ID);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+      setError('Escolha uma imagem de até 5 MB.');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const imageUrl = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error('Não foi possível abrir essa imagem.'));
+        image.src = imageUrl;
+      });
+      const size = Math.min(image.naturalWidth, image.naturalHeight);
+      if (!size) throw new Error('Imagem inválida.');
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 256;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Não foi possível preparar a imagem.');
+      context.drawImage(image, (image.naturalWidth - size) / 2, (image.naturalHeight - size) / 2, size, size, 0, 0, 256, 256);
+      let data = canvas.toDataURL('image/jpeg', 0.85);
+      if (data.length > MAX_PROFILE_AVATAR_LENGTH) data = canvas.toDataURL('image/jpeg', 0.65);
+      if (data.length > MAX_PROFILE_AVATAR_LENGTH) throw new Error('A imagem é muito grande. Escolha outra foto.');
+      setFormAvatarId(data);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Falha ao carregar a imagem.');
+    } finally {
+      URL.revokeObjectURL(imageUrl);
+      setSaving(false);
+    }
+  };
 
   const fetchProfiles = async () => {
     try {
@@ -384,6 +423,14 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
                     </button>
                   ))}
                 </div>
+                <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" aria-label="Enviar imagem de perfil" />
+                <button type="button" disabled={saving} onClick={() => avatarInputRef.current?.click()}
+                  className="mt-3 w-full py-3 rounded-2xl border border-white/10 text-white/70 hover:text-white hover:bg-white/5 font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  <Upload className="w-4 h-4" /> Enviar imagem
+                </button>
+                {formAvatarId.startsWith('data:image/') && (
+                  <img src={formAvatarId} alt="Prévia da imagem enviada" className="mt-3 w-20 h-20 rounded-2xl object-cover border border-[#007df7]" />
+                )}
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-white/10">
