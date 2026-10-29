@@ -19,6 +19,7 @@ import { createSession, revokeSession, formatSetCookie, extractCookie } from './
 import { RateLimitService } from './rateLimitService';
 import { ProfileService } from '../profiles/profileService';
 import { requestRecovery, completeRecovery } from './passwordRecovery';
+import { accountRole } from './adminAccess';
 
 export const authRouter = express.Router();
 
@@ -140,6 +141,7 @@ authRouter.post('/register', async (req, res) => {
         name: cleanName,
         email: cleanEmail,
         status: 'active',
+        role: accountRole(userId),
         createdAt: now,
       },
     });
@@ -231,6 +233,7 @@ authRouter.post('/login', async (req, res) => {
         name: user.name,
         email: user.email,
         status: user.status,
+        role: accountRole(user.id),
         createdAt: user.createdAt,
       },
     });

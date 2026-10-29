@@ -17,12 +17,12 @@ export async function fetchHeroCarousel(signal?: AbortSignal): Promise<HeroCarou
 
 export async function saveHeroCarousel(items: ContentItem[], expectedVersion: number): Promise<HeroCarouselResponse> {
   const { auth } = await import('../../../firebase');
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error('Entre com sua conta administrativa para salvar para todos.');
+  const token = await auth.currentUser?.getIdToken().catch(() => undefined);
 
   const response = await fetch('/api/db/global-settings/hero-carousel', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    credentials: 'include',
     body: JSON.stringify({ items, expectedVersion }),
     signal: AbortSignal.timeout(10000),
     cache: 'no-store',
@@ -49,11 +49,11 @@ export async function fetchSectionTitles(signal?: AbortSignal): Promise<SectionT
 
 export async function saveSectionTitles(titles: Record<string, string>, expectedVersion: number): Promise<SectionTitlesResponse> {
   const { auth } = await import('../../../firebase');
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error('Entre com sua conta administrativa para salvar para todos.');
+  const token = await auth.currentUser?.getIdToken().catch(() => undefined);
   const response = await fetch('/api/db/global-settings/section-titles', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    credentials: 'include',
     body: JSON.stringify({ titles, expectedVersion }),
     signal: AbortSignal.timeout(10000),
     cache: 'no-store',

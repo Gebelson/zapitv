@@ -9,12 +9,14 @@
 import express from 'express';
 import { getDatabase, ensureAuthTables } from '../database/client';
 import { extractCookie, validateSession, SESSION_COOKIE_NAME } from './sessionService';
+import { accountRole } from './adminAccess';
 
 export interface AuthenticatedUser {
   id: string;
   name: string;
   email: string;
   status: string;
+  role: 'admin' | 'user';
   createdAt: number;
 }
 
@@ -76,7 +78,7 @@ export async function optionalUser(
     }
 
     const sessionData = await validateSession(db, token);
-    req.user = sessionData ? sessionData.user : null;
+    req.user = sessionData ? { ...sessionData.user, role: accountRole(sessionData.user.id) } : null;
     req.sessionId = sessionData?.sessionId;
     next();
   } catch (err) {
@@ -106,7 +108,7 @@ export async function authenticateUser(
       return res.status(401).json({ error: 'Sessão inválida ou expirada. Faça login novamente.' });
     }
 
-    req.user = sessionData.user;
+    req.user = { ...sessionData.user, role: accountRole(sessionData.user.id) };
     req.sessionId = sessionData.sessionId;
     next();
   } catch (err) {

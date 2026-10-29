@@ -75,7 +75,7 @@ databaseRouter.put('/global-settings/hero-carousel', async (req, res) => {
 
   let actorUid: string | null;
   try {
-    actorUid = await authenticateAdmin(req.header('authorization'));
+    actorUid = await authenticateAdmin(req.header('authorization'), req);
   } catch {
     return res.status(503).json({ error: 'Verificação de autenticação temporariamente indisponível.' });
   }
@@ -120,7 +120,7 @@ databaseRouter.put('/global-settings/section-titles', async (req, res) => {
   if (!connection) return res.status(503).json({ error: 'Banco de dados não configurado.' });
   let actorUid: string | null;
   try {
-    actorUid = await authenticateAdmin(req.header('authorization'));
+    actorUid = await authenticateAdmin(req.header('authorization'), req);
   } catch {
     return res.status(503).json({ error: 'Verificação de autenticação temporariamente indisponível.' });
   }

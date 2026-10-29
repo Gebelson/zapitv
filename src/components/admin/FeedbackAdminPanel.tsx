@@ -67,11 +67,11 @@ const CATEGORY_ICONS: Record<FeedbackCategory, React.ReactNode> = {
 
 async function adminFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const { auth } = await import('../../../firebase');
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error('Entre com sua conta administrativa para consultar os relatos.');
+  const token = await auth.currentUser?.getIdToken().catch(() => undefined);
   return fetch(input, {
     ...init,
-    headers: { ...init.headers, Authorization: `Bearer ${token}` },
+    headers: { ...init.headers, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    credentials: 'include',
     cache: 'no-store',
     signal: AbortSignal.timeout(10000)
   });

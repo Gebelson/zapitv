@@ -50,7 +50,7 @@ function requireCronSecret(req: express.Request, res: express.Response, next: ex
 
 async function requireMaintenanceAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
   try {
-    const actorUid = await authenticateAdmin(req.header("authorization"));
+    const actorUid = await authenticateAdmin(req.header("authorization"), req);
     if (!actorUid) return res.status(403).json({ error: "Autenticação administrativa necessária." });
     res.locals.actorUid = actorUid;
     next();
@@ -1338,7 +1338,7 @@ function createApp() {
   app.use("/api/feedback", async (req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
     try {
-      const actorUid = await authenticateAdmin(req.header("authorization"));
+      const actorUid = await authenticateAdmin(req.header("authorization"), req);
       if (!actorUid) return res.status(403).json({ error: "Autenticação administrativa necessária." });
       res.locals.actorUid = actorUid;
       next();

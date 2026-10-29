@@ -13,6 +13,7 @@ export interface AuthUser {
   name: string;
   email: string;
   status: string;
+  role?: 'admin' | 'user';
   createdAt: number;
 }
 
