@@ -11,7 +11,7 @@
 
 import express from 'express';
 import crypto from 'crypto';
-import { eq } from 'drizzle-orm';
+import { asc, eq, gt } from 'drizzle-orm';
 import { getValidDatabase, authenticateUser, optionalUser, requireCsrfProtection, extractSessionToken } from './authMiddleware';
 import { users } from '../database/schema';
 import { hashPassword, verifyPassword } from './passwordService';
@@ -303,6 +303,25 @@ authRouter.get('/me', optionalUser, async (req, res) => {
 /**
  * 5. CONSULTA DE DADOS DE USUÁRIO COM ISOLAMENTO DE ACESSO
  */
+authRouter.get('/admin/users', authenticateUser, async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Autorização administrativa necessária.' });
+  const cursor = req.query.cursor;
+  if (cursor !== undefined && (typeof cursor !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(cursor))) {
+    return res.status(400).json({ error: 'Cursor inválido.' });
+  }
+  try {
+    const db = await getValidDatabase();
+    if (!db) return res.status(503).json({ error: 'Banco de dados indisponível.' });
+    const rows = await db.db.select({ id: users.id, name: users.name, email: users.email,
+      status: users.status, createdAt: users.createdAt }).from(users)
+      .where(typeof cursor === 'string' ? gt(users.id, cursor) : undefined).orderBy(asc(users.id)).limit(101);
+    const page = rows.slice(0, 100);
+    return res.json({ users: page.map(user => ({ ...user, role: accountRole(user.id) })),
+      nextCursor: rows.length > 100 ? page[page.length - 1].id : null });
+  } catch { return res.status(503).json({ error: 'Não foi possível consultar as contas.' }); }
+});
+
 authRouter.get('/user/:id', authenticateUser, (req, res) => {
   const requestedId = req.params.id;
 

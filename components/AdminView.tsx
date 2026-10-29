@@ -1,5 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { fetchAdminAccounts, mergeAdminAccounts, type AdminAccount } from '../src/core/admin/adminAccountsClient';
 import { createPortal } from 'react-dom';
 import { 
   Shield, Trash2, Search, Filter, Users, DollarSign, 
@@ -47,6 +48,26 @@ const AdminView: React.FC<AdminViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'providers' | 'eligibility' | 'video_ads' | 'rankings' | 'skip_intervals' | 'users' | 'catalog' | 'notifications' | 'feedbacks' | 'database' | 'livetv'>('providers');
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [currentAccounts, setCurrentAccounts] = useState<AdminAccount[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+  const [accountsError, setAccountsError] = useState('');
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    const controller = new AbortController();
+    let active = true;
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    setAccountsLoading(true); setAccountsError('');
+    fetchAdminAccounts(controller.signal).then(accounts => {
+      if (active) setCurrentAccounts(accounts);
+    }).catch(() => {
+      if (active) setAccountsError('Não foi possível carregar as contas atuais. Reabra esta aba para tentar novamente.');
+    }).finally(() => {
+      clearTimeout(timeout);
+      if (active) setAccountsLoading(false);
+    });
+    return () => { active = false; clearTimeout(timeout); controller.abort(); };
+  }, [activeTab]);
+  const listedUsers = useMemo(() => mergeAdminAccounts(users, currentAccounts), [users, currentAccounts]);
   const [editingMedia, setEditingMedia] = useState<ContentItem | null>(null);
   const [showAddMedia, setShowAddMedia] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -312,14 +333,14 @@ const AdminView: React.FC<AdminViewProps> = ({
   });
 
   const filteredUsers = useMemo(() => {
-    return users.filter(u => {
+    return listedUsers.filter(u => {
       const matchesSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                            u.email.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || u.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || (!u.readOnlyAccount && u.status === statusFilter);
       const matchesPlan = planFilter === 'all' || u.plan === planFilter;
       return matchesSearch && matchesStatus && matchesPlan;
     });
-  }, [users, searchTerm, statusFilter, planFilter]);
+  }, [listedUsers, searchTerm, statusFilter, planFilter]);
 
   const filteredCatalog = useMemo(() => {
     return content.filter(c => c.title.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -2294,6 +2315,8 @@ const AdminView: React.FC<AdminViewProps> = ({
           </div>
         ) : activeTab === 'users' ? (
           <div className={`rounded-3xl border overflow-hidden ${isDarkMode ? 'bg-[#151C26]/40 border-gray-800' : 'bg-white shadow-xl'}`}>
+            {accountsLoading && <p role="status" className="px-8 py-3 text-xs opacity-60">Carregando contas atuais...</p>}
+            {accountsError && <p role="alert" className="px-8 py-3 text-xs text-amber-400">{accountsError}</p>}
             <table className="w-full text-left">
               <thead>
                 <tr className={`text-[9px] uppercase font-black tracking-widest border-b ${isDarkMode ? 'bg-gray-900/50 border-gray-800 text-gray-500' : 'bg-gray-50 text-gray-400'}`}>
@@ -2317,18 +2340,18 @@ const AdminView: React.FC<AdminViewProps> = ({
                     </td>
                     <td className="px-8 py-4 text-center font-bold text-xs">{user.plan}</td>
                     <td className="px-8 py-4 text-center">
-                      <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${
+                      {user.readOnlyAccount ? <span className="text-xs opacity-50">Não informado</span> : <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${
                         user.status === 'Ativo' ? 'bg-green-500/10 text-green-500' : 
                         user.status === 'Atrasado' ? 'bg-[#007df7]/10 text-[#007df7]' : 'bg-[#007df7]/10 text-[#007df7]'
                       }`}>
                         {user.status === 'Ativo' ? <CheckCircle className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
                         {user.status === 'Ativo' ? 'PAGO' : user.status === 'Atrasado' ? 'ATRASADO' : 'PENDENTE'}
-                      </div>
+                      </div>}
                     </td>
                     <td className="px-8 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => setEditingUser(user)} className="p-2 rounded-xl bg-blue-600/10 text-blue-600 hover:bg-blue-600 hover:text-white transition-all"><Edit3 className="w-4 h-4" /></button>
-                        <button onClick={() => onDeleteUser(user.id)} className="p-2 rounded-xl bg-[#007df7]/10 text-[#007df7] hover:bg-[#007df7] hover:text-white transition-all"><Trash2 className="w-4 h-4" /></button>
+                        <button disabled={user.readOnlyAccount} title={user.readOnlyAccount ? 'Conta do sistema atual: a edição legada não se aplica a este cadastro.' : 'Editar'} onClick={() => setEditingUser(user)} className="p-2 rounded-xl bg-blue-600/10 text-blue-600 hover:bg-blue-600 hover:text-white transition-all disabled:opacity-30"><Edit3 className="w-4 h-4" /></button>
+                        <button disabled={user.readOnlyAccount} title={user.readOnlyAccount ? 'Conta do sistema atual: a exclusão legada não se aplica a este cadastro.' : 'Excluir'} onClick={() => onDeleteUser(user.id)} className="p-2 rounded-xl bg-[#007df7]/10 text-[#007df7] hover:bg-[#007df7] hover:text-white transition-all disabled:opacity-30"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </td>
                   </tr>
