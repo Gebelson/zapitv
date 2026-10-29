@@ -5,6 +5,7 @@ import { canonicalIdentityService } from '../src/core/identity/canonicalIdentity
 import { animeSeasonMappingService } from '../src/core/anime/animeSeasonMappingService';
 import { episodeAvailabilityService } from '../src/core/episodes/episodeAvailabilityService';
 import { FEATURED_CATALOG_ITEMS } from '../src/core/catalog/featuredCatalogItems';
+import { canonicalCatalogMaster } from '../src/core/catalog/CanonicalCatalogMaster';
 import { ContentType } from '../types';
 
 function assert(condition: boolean, message: string) {
@@ -321,5 +322,5 @@ async function runOnePieceAccuracySuite() {
 
 runOnePieceAccuracySuite().catch(err => {
   console.error('\n❌ Falha na suíte de testes de One Piece:', err);
-  process.exit(1);
-});
+  process.exitCode = 1;
+}).finally(() => canonicalCatalogMaster.dispose());
