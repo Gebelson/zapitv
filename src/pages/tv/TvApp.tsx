@@ -58,6 +58,7 @@ interface TvAppProps {
   onToggleFavoriteById: (id: string) => void;
   currentUser?: User;
   activeProfile?: Profile | null;
+  isAuthenticated?: boolean;
 }
 
 const tabFocusKeys: Record<TvTab, string> = {
@@ -82,7 +83,8 @@ export const TvApp: React.FC<TvAppProps> = ({
   onToggleListById,
   onToggleFavoriteById,
   currentUser,
-  activeProfile
+  activeProfile,
+  isAuthenticated
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -93,7 +95,10 @@ export const TvApp: React.FC<TvAppProps> = ({
   const [isProfileSelectorOpen, setIsProfileSelectorOpen] = useState(false);
   const [tvProfiles, setTvProfiles] = useState<Profile[]>([]);
   const [activeTvProfile, setActiveTvProfile] = useState<Profile | null>(() => activeProfile || null);
-  const [isTvAuthenticated, setIsTvAuthenticated] = useState<boolean>(() => Boolean(currentUser));
+  const [isTvAuthenticated, setIsTvAuthenticated] = useState<boolean>(() => {
+    if (isAuthenticated !== undefined) return isAuthenticated;
+    return Boolean(currentUser && currentUser.id !== 'zapitv-anon-user');
+  });
 
   useEffect(() => {
     if (activeProfile) {
@@ -105,8 +110,14 @@ export const TvApp: React.FC<TvAppProps> = ({
   }, [activeProfile, currentUser]);
 
   useEffect(() => {
-    if (currentUser) setIsTvAuthenticated(true);
-  }, [currentUser]);
+    if (isAuthenticated !== undefined) {
+      setIsTvAuthenticated(isAuthenticated);
+    } else if (currentUser && currentUser.id !== 'zapitv-anon-user') {
+      setIsTvAuthenticated(true);
+    } else {
+      setIsTvAuthenticated(false);
+    }
+  }, [isAuthenticated, currentUser]);
 
   const loadProfilesAndOpenSelector = useCallback(async () => {
     try {
@@ -126,6 +137,14 @@ export const TvApp: React.FC<TvAppProps> = ({
       }
     } catch {}
   }, []);
+
+  const prevAuthRef = useRef(isTvAuthenticated);
+  useEffect(() => {
+    if (!prevAuthRef.current && isTvAuthenticated) {
+      loadProfilesAndOpenSelector();
+    }
+    prevAuthRef.current = isTvAuthenticated;
+  }, [isTvAuthenticated, loadProfilesAndOpenSelector]);
 
   const handleTvLinked = useCallback(async (_userData: any) => {
     setIsQrModalOpen(false);
@@ -200,7 +219,7 @@ export const TvApp: React.FC<TvAppProps> = ({
 
     const timer = setTimeout(() => {
       try {
-        if (!parseWatchRoute(window.location.pathname).isWatch) setFocus('tv-hero-play');
+        if (isTvAuthenticated && !parseWatchRoute(window.location.pathname).isWatch) setFocus('tv-hero-play');
       } catch {}
     }, 150);
 
@@ -475,6 +494,9 @@ export const TvApp: React.FC<TvAppProps> = ({
     if (!parsed.isWatch || !parsed.isTv) {
       return;
     }
+    if (!isTvAuthenticated) {
+      return;
+    }
     if (!parsed.id) {
       setTvWatchNotFound(true);
       return;
@@ -542,6 +564,7 @@ export const TvApp: React.FC<TvAppProps> = ({
 
   // Execução de reprodução com rota persistente
   const handleStartPlay = useCallback((item: ContentItem, season?: number, episode?: number) => {
+    if (!isTvAuthenticated) return;
     if (!catalogEligibilityService.isItemPubliclyPlayableSync(item)) {
       setTvWatchNotFound(true);
       return;
@@ -595,7 +618,7 @@ export const TvApp: React.FC<TvAppProps> = ({
 
   const currentWatchRoute = parseWatchRoute(location.pathname);
   const isTvWatchRoute = currentWatchRoute.isWatch && currentWatchRoute.isTv;
-  const screensaverActive = useTvIdle(!playingItem && !isTvWatchRoute && !partyActive);
+  const screensaverActive = useTvIdle(!playingItem && !isTvWatchRoute && !partyActive && isTvAuthenticated);
   const preSaverFocusRef = React.useRef<string | null>(null);
   const wasSaverActiveRef = React.useRef(false);
 

@@ -47,6 +47,7 @@ export const MobileMyZapiView: React.FC<MobileMyZapiViewProps> = ({
   const navigate = useNavigate();
   const [continueWatchingItems, setContinueWatchingItems] = useState<ContentItem[]>([]);
   const [soundsEnabled, setSoundsEnabled] = useState(() => uiSoundService.getPreferences().enabled);
+  const isAdmin = Boolean(currentUser && currentUser.role === 'admin');
 
   useEffect(() => {
     return uiSoundService.subscribe(() => {
@@ -224,25 +225,27 @@ export const MobileMyZapiView: React.FC<MobileMyZapiViewProps> = ({
         </div>
 
         {/* Diagnóstico do Catálogo */}
-        <button
-          type="button"
-          onClick={() => {
-            uiSoundService.play('click');
-            if (onOpenDiagnostics) onOpenDiagnostics();
-          }}
-          className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 active:scale-[0.99] transition-all cursor-pointer text-left"
-        >
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-white/5 text-slate-300">
-              <Activity className="w-4 h-4 text-emerald-400" />
+        {isAdmin && onOpenDiagnostics && (
+          <button
+            type="button"
+            onClick={() => {
+              uiSoundService.play('click');
+              if (onOpenDiagnostics) onOpenDiagnostics();
+            }}
+            className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 active:scale-[0.99] transition-all cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-white/5 text-slate-300">
+                <Activity className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-xs text-white">Diagnóstico do Catálogo</p>
+                <p className="text-[10px] text-slate-400">Verificar integridade e fontes ativas</p>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold text-xs text-white">Diagnóstico do Catálogo</p>
-              <p className="text-[10px] text-slate-400">Verificar integridade e fontes ativas</p>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-slate-500" />
-        </button>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+          </button>
+        )}
 
         {/* Central de Ajuda */}
         <button

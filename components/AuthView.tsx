@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, Check, AlertCircle, ArrowLeft, Loader2, ShieldCheck, FileText } from 'lucide-react';
+import { ZapiBrandLogo } from '../src/components/common/ZapiBrandLogo';
 
 interface AuthViewProps {
   isDarkMode: boolean;
@@ -11,24 +12,6 @@ interface AuthViewProps {
   initialMode?: 'login' | 'signup';
 }
 
-const BrandLogo = () => (
-  <svg viewBox="0 0 374.87 315.93" className="w-full h-full">
-    <defs>
-      <linearGradient id="Gradiente_Auth_Brand" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#b273d8">
-          <animate attributeName="stopColor" values="#b273d8;#00baa3;#007df7;#b273d8" dur="4s" repeatCount="indefinite" />
-        </stop>
-        <stop offset="100%" stopColor="#00baa3">
-          <animate attributeName="stopColor" values="#00baa3;#007df7;#b273d8;#00baa3" dur="4s" repeatCount="indefinite" />
-        </stop>
-      </linearGradient>
-    </defs>
-    <path 
-      fill="url(#Gradiente_Auth_Brand)" 
-      d="M217.84,315.93c-20.71-.34-41.38-.68-62-1.01-25.86.33-51.86.66-78,1l-58.67-.27c-8.71-.05-16.27-6.38-17.35-14.45-.89-6.67.79-11.65,4.8-16.59l42.96-52.9,34.5-41.58,46.93-57.01c4.73-5.74,8.53-12.04,14.93-16.09,4.47-2.83,11.02-1.13,15.32,1.5l29.66,18.14c5.5,3.37,12.16,1.15,15.73-4l16.82-24.22,47.74-74.06c.21-.33.37-.67.48-1.02,1.14-3.55-2.09-6.98-5.78-6.4-2.82.44-5.47,1.54-8.49,2.82l-128.58,54.14L9.09,134.06c-2.46,1.03-5.17.89-6.68-.21C1.28,133.02,0,130.3,0,128.19L.2,21.58C.23,9.78,8.11,0,20.12,0l335.27.02c5.38,0,11.72,3.13,14.46,6.66,6.08,7.82,3.13,17.81-2.26,24.85-5.81,7.6-11.51,14.36-17.53,21.64l-24.48,29.57-56.42,68.45-33.94,42.01c-5,6.19-12.76,9.24-19.74,5.04l-28.69-17.27c-3.83-2.31-10.24-5.82-14.33-3.45-5.92,3.43-8.84,10.15-12.43,15.62l-33.7,51.33-27.21,42.72c-.76,1.19-.35,3.03.15,3.78,1.9,2.87,9.6-.54,12.85-1.93l116.86-49.98,138.78-59.06c1.63-.7,3.99-.15,4.9.39s2.21,2,2.21,3.81l-.4,109.09c-.04,12.22-8.55,22.45-20.82,22.46l-135.81.19Z"
-    />
-  </svg>
-);
 
 const AuthView: React.FC<AuthViewProps> = ({
   isDarkMode: _isDarkMode,
@@ -140,14 +123,7 @@ const AuthView: React.FC<AuthViewProps> = ({
     <div className="min-h-screen bg-[#05070a] text-white flex flex-col font-sans selection:bg-[#007df7] selection:text-white relative overflow-x-hidden">
       {/* Header com Logo e Voltar */}
       <header className="w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between z-20">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 md:w-11 md:h-11">
-            <BrandLogo />
-          </div>
-          <span className="text-xl md:text-2xl font-black tracking-tight" style={{ fontFamily: "'Sora', sans-serif" }}>
-            ZAPI<span className="text-blue-500">TV</span>
-          </span>
-        </div>
+        <ZapiBrandLogo size="md" />
 
         {onClose && (
           <button

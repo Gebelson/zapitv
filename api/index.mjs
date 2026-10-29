@@ -1314,9 +1314,9 @@ var init_tmdbClient = __esm({
       async searchCinemeta(url, signal) {
         const timeout = AbortSignal.timeout(8e3);
         const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
-        const response = await fetch(url, { signal: requestSignal });
-        if (!response.ok) throw new Error(`Cinemeta ${response.status}`);
-        return response.json();
+        const response2 = await fetch(url, { signal: requestSignal });
+        if (!response2.ok) throw new Error(`Cinemeta ${response2.status}`);
+        return response2.json();
       }
       async getImdbId(id, type) {
         const rawStr = String(id).trim();
@@ -3741,6 +3741,38 @@ var init_streamValidator = __esm({
           }
           return false;
         }
+      },
+      // 8. One Piece (Anime canônico 1999 / tt0388629 / 37854)
+      // Rejeita streams com episódios trocados, especialmente o desvio upstream da pasta 1268 (OP-93..OP-130 Alabasta servidos na T1 no Arthur)
+      {
+        targetPattern: /\b(?:one\s*piece|tt0388629|37854|anime-one-piece)\b/i,
+        rejectStream: (s, rawCandidates = [], episodeParams) => {
+          if (!episodeParams) return false;
+          const streamUrl = (s.url || "").trim();
+          let urlPath = "";
+          try {
+            const parsed = new URL(streamUrl);
+            urlPath = decodeURIComponent(parsed.pathname);
+          } catch {
+            urlPath = decodeURIComponent(streamUrl);
+          }
+          const pathSegments = urlPath.split("/").filter(Boolean);
+          let filename = pathSegments.pop() || "";
+          if (filename.toLowerCase().endsWith(".m3u8") && pathSegments.length > 0) {
+            filename = pathSegments.pop() || "";
+          }
+          const opEpMatch = filename.match(/\b(?:op|one[-_ ]?piece)[-_ ]*0*(\d{1,4})\b/i);
+          if (opEpMatch) {
+            const epInFile = parseInt(opEpMatch[1], 10);
+            if (epInFile !== episodeParams.episode) {
+              return true;
+            }
+          }
+          if (episodeParams.season === 1 && /streams\/1268\//i.test(urlPath)) {
+            return true;
+          }
+          return false;
+        }
       }
     ];
     StreamValidator = class {
@@ -3892,12 +3924,12 @@ var init_streamValidator = __esm({
         const absMatch = text2.match(/\((?:ep|episode)\.?\s*(\d+)\)/i);
         if (absMatch && season > 1) {
           const absEp = parseInt(absMatch[1], 10);
-          if (absEp <= episode) {
+          if (absEp < episode || episode === 1 && absEp === 1) {
             console.warn(`[StreamValidator] Stream rejeitado por epis\xF3dio absoluto da T1 em requisi\xE7\xE3o da T${season}: ${streamTitle}`);
             return false;
           }
         }
-        const seMatches = Array.from(text2.matchAll(/\b(?:s|t)0*(\d{1,2})\s*(?:e|ep)0*(\d{1,3})\b/gi));
+        const seMatches = Array.from(text2.matchAll(/\b(?:s|t)0*(\d{1,2})[\s·._-]*ep?0*(\d{1,4})\b/gi));
         const hasExactMatch = seMatches.length > 0 && seMatches.some((m) => parseInt(m[1], 10) === season && parseInt(m[2], 10) === episode);
         if (seMatches.length > 0 && !hasExactMatch) {
           const m = seMatches[0];
@@ -3925,6 +3957,39 @@ var init_streamValidator = __esm({
         if (season === 1 && /\b(?:clevatess\s+ii|mushoku\s+tensei\s+ii|2nd\s+season|2ª\s*temporada)\b/i.test(text2)) {
           console.warn(`[StreamValidator] Stream da Temporada 2 rejeitado para requisi\xE7\xE3o da Temporada 1: ${streamTitle}`);
           return false;
+        }
+        const pathSegments = urlPath.split("/").filter(Boolean);
+        let filename = pathSegments.pop() || "";
+        if (filename.toLowerCase().endsWith(".m3u8") && pathSegments.length > 0) {
+          filename = pathSegments.pop() || "";
+        }
+        if (filename) {
+          let fileEp = null;
+          const opMatch = filename.match(/\b(?:op|one[-_ ]?piece)[-_ ]*0*(\d{1,4})\b/i);
+          const seMatch = filename.match(/\b(?:s|t)0*(\d{1,2})[-_ ]*(?:e|ep)0*(\d{1,4})\b/i);
+          const epPrefixMatch = filename.match(/\b(?:ep|episode)[-_ ]*0*(\d{1,4})\b/i);
+          const standaloneMatch = filename.match(/^(?:.*[._ -])?0*(\d{1,4})(?:_\d+p)?\.(?:mp4|mkv|avi|webm|ts|m3u8)(?:\?.*)?$/i);
+          if (opMatch) {
+            fileEp = parseInt(opMatch[1], 10);
+          } else if (seMatch) {
+            const fileSeason = parseInt(seMatch[1], 10);
+            fileEp = parseInt(seMatch[2], 10);
+            if (fileSeason !== season) {
+              console.warn(`[StreamValidator] Arquivo com temporada divergente no nome [T${fileSeason} vs T${season}]: ${filename}`);
+              return false;
+            }
+          } else if (epPrefixMatch) {
+            fileEp = parseInt(epPrefixMatch[1], 10);
+          } else if (standaloneMatch) {
+            const num = parseInt(standaloneMatch[1], 10);
+            if (num !== 1080 && num !== 720 && num !== 480 && num !== 2160 && num !== 360 && num !== 4320 && num !== 1440) {
+              fileEp = num;
+            }
+          }
+          if (fileEp !== null && fileEp !== episode) {
+            console.warn(`[StreamValidator] Stream rejeitado por epis\xF3dio divergente no arquivo [Arq: Ep ${fileEp} vs Requisitado: Ep ${episode}]: ${filename}`);
+            return false;
+          }
         }
         return true;
       }
@@ -4003,7 +4068,7 @@ var init_streamValidator = __esm({
         }
         for (const rule of KNOWN_UPSTREAM_MISMATCHES) {
           if (rawCandidates.some((cand) => rule.targetPattern.test(cand))) {
-            if (rule.rejectStream(stream, rawCandidates)) {
+            if (rule.rejectStream(stream, rawCandidates, episodeParams)) {
               console.warn(`[StreamValidator] Stream rejeitado por desvio conhecido para '[${rawCandidates.join(", ")}]': ${sTitle || sUrl}`);
               return false;
             }
@@ -6029,6 +6094,28 @@ var init_mediaSourceValidationService = __esm({
   }
 });
 
+// src/core/profile/avatarImages.ts
+var AVATARS, MAX_PROFILE_AVATAR_LENGTH;
+var init_avatarImages = __esm({
+  "src/core/profile/avatarImages.ts"() {
+    AVATARS = [
+      "https://i.imgur.com/0KzQwwX.png",
+      "https://i.imgur.com/Spw0Cos.png",
+      "https://i.imgur.com/6IEApDt.png",
+      "https://i.imgur.com/FyLB4ca.png",
+      "https://i.imgur.com/bA8ltkk.png",
+      "https://i.imgur.com/kimAW6g.png",
+      "https://i.imgur.com/sTbJUBM.png",
+      "https://i.imgur.com/amtR2VN.png",
+      "https://i.imgur.com/10zcAOY.png",
+      "https://i.imgur.com/7yXXxXT.png",
+      "https://i.imgur.com/XK8zLav.png",
+      "https://i.imgur.com/6IYczXJ.png"
+    ];
+    MAX_PROFILE_AVATAR_LENGTH = 8e4;
+  }
+});
+
 // src/core/catalog/featuredCatalogItems.ts
 var FEATURED_CATALOG_ITEMS, FEATURED_ANIME_ITEMS;
 var init_featuredCatalogItems = __esm({
@@ -7711,8 +7798,9 @@ var init_featuredCatalogItems = __esm({
         genres: ["Anime", "A\xE7\xE3o", "Aventura", "Com\xE9dia"],
         aniListId: 21,
         tmdbId: "37854",
+        imdbId: "tt0388629",
         malId: 21,
-        seasonsCount: 21,
+        seasonsCount: 23,
         isFeatured: true,
         availabilityStatus: "verified",
         audioStatus: "pt-br-dubbed",
@@ -7892,25 +7980,12 @@ var init_featuredCatalogItems = __esm({
 });
 
 // constants.tsx
-var AVATARS, createDefaultProfiles, MOCK_USERS, filmesData;
+var createDefaultProfiles, MOCK_USERS, filmesData;
 var init_constants = __esm({
   "constants.tsx"() {
+    init_avatarImages();
     init_types();
     init_featuredCatalogItems();
-    AVATARS = [
-      "https://i.imgur.com/0KzQwwX.png",
-      "https://i.imgur.com/Spw0Cos.png",
-      "https://i.imgur.com/6IEApDt.png",
-      "https://i.imgur.com/FyLB4ca.png",
-      "https://i.imgur.com/bA8ltkk.png",
-      "https://i.imgur.com/kimAW6g.png",
-      "https://i.imgur.com/sTbJUBM.png",
-      "https://i.imgur.com/amtR2VN.png",
-      "https://i.imgur.com/10zcAOY.png",
-      "https://i.imgur.com/7yXXxXT.png",
-      "https://i.imgur.com/XK8zLav.png",
-      "https://i.imgur.com/6IYczXJ.png"
-    ];
     createDefaultProfiles = (name) => [
       { id: "p1", name: name.split(" ")[0], avatar: AVATARS[0], isChild: false }
     ];
@@ -11450,7 +11525,7 @@ function getRememberedSources(identity) {
     season: String(identity.season),
     episode: String(identity.episode)
   });
-  const promise = fetch(`/api/db/source-memory?${params}`, { signal: AbortSignal.timeout(1200) }).then(async (response) => response.ok ? (await response.json()).sources : []).catch(() => []);
+  const promise = fetch(`/api/db/source-memory?${params}`, { signal: AbortSignal.timeout(1200) }).then(async (response2) => response2.ok ? (await response2.json()).sources : []).catch(() => []);
   memoryCache.set(key, { expires: Date.now() + 3e4, promise });
   return promise;
 }
@@ -14509,7 +14584,7 @@ var init_aniListClient = __esm({
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 6e3);
         try {
-          const response = await fetch(GRAPHQL_ENDPOINT, {
+          const response2 = await fetch(GRAPHQL_ENDPOINT, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -14518,15 +14593,15 @@ var init_aniListClient = __esm({
             body: JSON.stringify({ query, variables }),
             signal: controller.signal
           });
-          if (!response.ok) {
-            if (response.status === 429) {
+          if (!response2.ok) {
+            if (response2.status === 429) {
               console.warn("[AniListClient] Rate limit atingido no AniList. Usando fallback silencioso.");
             } else {
-              console.warn(`[AniListClient] Erro HTTP ${response.status} da API AniList`);
+              console.warn(`[AniListClient] Erro HTTP ${response2.status} da API AniList`);
             }
             return null;
           }
-          const json = await response.json();
+          const json = await response2.json();
           if (json.errors && json.errors.length > 0) {
             console.warn("[AniListClient] Erros GraphQL retornados:", json.errors[0]?.message);
             return null;
@@ -16904,7 +16979,7 @@ var init_sourceConfidenceEngine = __esm({
           this.recordDiagnostic(stream, identity, evalResult2);
           return evalResult2;
         }
-        const episodeTag = `${streamTitle} ${streamName}`.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b|(\d{1,2})[ªa]?\s*temporada\s*(?:epis[oó]dio|ep)\s*(\d{1,3})\b|(?:temporada|season)\s*(\d{1,2})\s*(?:epis[oó]dio|ep|episode)\s*(\d{1,3})\b|\b(\d{1,2})x(\d{1,3})\b)/i);
+        const episodeTag = `${streamTitle} ${streamName}`.match(/(?:\b[st]0*(\d{1,2})[\s·._-]*ep?0*(\d{1,4})\b|(\d{1,2})[ªa]?\s*temporada\s*(?:epis[oó]dio|ep)\s*(\d{1,3})\b|(?:temporada|season)\s*(\d{1,2})\s*(?:epis[oó]dio|ep|episode)\s*(\d{1,3})\b|\b(\d{1,2})x(\d{1,3})\b)/i);
         const parsedSeason = episodeTag ? Number(episodeTag[1] || episodeTag[3] || episodeTag[5] || episodeTag[7] || episodeTag[9]) : void 0;
         const parsedEpisode = episodeTag ? Number(episodeTag[2] || episodeTag[4] || episodeTag[6] || episodeTag[8] || episodeTag[10]) : void 0;
         if (episodeTag && identity.type === "FILME" /* MOVIE */) {
@@ -16922,11 +16997,53 @@ var init_sourceConfidenceEngine = __esm({
         const absEpMatch = streamTitle.match(/\((?:ep|episode)\.?\s*(\d+)\)/i);
         if (absEpMatch && identity.season && identity.season > 1 && identity.episode) {
           const absEp = parseInt(absEpMatch[1], 10);
-          if (absEp <= identity.episode) {
+          if (absEp < identity.episode || identity.episode === 1 && absEp === 1) {
             reasons.push(`Epis\xF3dio absoluto (${absEp}) pertence \xE0 primeira temporada e n\xE3o \xE0 temporada ${identity.season}`);
             const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
             this.recordDiagnostic(stream, identity, evalResult2);
             return evalResult2;
+          }
+        }
+        if (identity.episode !== void 0 && streamUrl) {
+          let filename = "";
+          try {
+            const parsed = new URL(streamUrl);
+            const pathSegments = decodeURIComponent(parsed.pathname).split("/").filter(Boolean);
+            filename = pathSegments.pop() || "";
+            if (filename.toLowerCase().endsWith(".m3u8") && pathSegments.length > 0) {
+              filename = pathSegments.pop() || "";
+            }
+          } catch {
+            const pathSegments = decodeURIComponent(streamUrl).split("/").filter(Boolean);
+            filename = pathSegments.pop() || "";
+            if (filename.toLowerCase().endsWith(".m3u8") && pathSegments.length > 0) {
+              filename = pathSegments.pop() || "";
+            }
+          }
+          if (filename) {
+            let fileEp = null;
+            const opMatch = filename.match(/\b(?:op|one[-_ ]?piece)[-_ ]*0*(\d{1,4})\b/i);
+            const seMatch = filename.match(/\b(?:s|t)0*(\d{1,2})[-_ ]*(?:e|ep)0*(\d{1,4})\b/i);
+            const epPrefixMatch = filename.match(/\b(?:ep|episode)[-_ ]*0*(\d{1,4})\b/i);
+            const standaloneMatch = filename.match(/^(?:.*[._ -])?0*(\d{1,4})(?:_\d+p)?\.(?:mp4|mkv|avi|webm|ts|m3u8)(?:\?.*)?$/i);
+            if (opMatch) {
+              fileEp = parseInt(opMatch[1], 10);
+            } else if (seMatch) {
+              fileEp = parseInt(seMatch[2], 10);
+            } else if (epPrefixMatch) {
+              fileEp = parseInt(epPrefixMatch[1], 10);
+            } else if (standaloneMatch) {
+              const num = parseInt(standaloneMatch[1], 10);
+              if (num !== 1080 && num !== 720 && num !== 480 && num !== 2160 && num !== 360 && num !== 4320 && num !== 1440) {
+                fileEp = num;
+              }
+            }
+            if (fileEp !== null && fileEp !== identity.episode) {
+              reasons.push(`Nome do arquivo de m\xEDdia (${filename}) aponta para o epis\xF3dio ${fileEp}, divergindo do epis\xF3dio solicitado (${identity.episode})`);
+              const evalResult2 = { stream, confidence: "REJECTED", isMatch: false, reasons, canonicalTitle: identity.title };
+              this.recordDiagnostic(stream, identity, evalResult2);
+              return evalResult2;
+            }
           }
         }
         if ((identity.type === "S\xC9RIE" /* SERIES */ || identity.type === "ANIME" /* ANIME */) && identity.season) {
@@ -18134,15 +18251,15 @@ var init_searchService = __esm({
           }
           const remoteItems = remoteItemsRes.status === "fulfilled" ? remoteItemsRes.value : [];
           const actors = actorsRes.status === "fulfilled" ? actorsRes.value : [];
-          const existingIds = new Set(localItems.map((it) => it.id));
+          const existingIds2 = new Set(localItems.map((it) => it.id));
           const existingTitles = new Set(localItems.map((it) => it.title.toLowerCase().trim()));
           const combined = [...localItems];
           for (const rItem of remoteItems) {
             if (combined.length >= limit) break;
             const normT = rItem.title.toLowerCase().trim();
-            if (!existingIds.has(rItem.id) && !existingTitles.has(normT)) {
+            if (!existingIds2.has(rItem.id) && !existingTitles.has(normT)) {
               combined.push(rItem);
-              existingIds.add(rItem.id);
+              existingIds2.add(rItem.id);
               existingTitles.add(normT);
             }
           }
@@ -18294,14 +18411,14 @@ var init_searchService = __esm({
         return list;
       }
       mergeResults(primary, secondary) {
-        const existingIds = new Set(primary.map((it) => it.id));
+        const existingIds2 = new Set(primary.map((it) => it.id));
         const existingTitles = new Set(primary.map((it) => it.title.toLowerCase().trim()));
         const result = [...primary];
         for (const item of secondary) {
           const normT = item.title.toLowerCase().trim();
-          if (!existingIds.has(item.id) && !existingTitles.has(normT)) {
+          if (!existingIds2.has(item.id) && !existingTitles.has(normT)) {
             result.push(item);
-            existingIds.add(item.id);
+            existingIds2.add(item.id);
             existingTitles.add(normT);
           }
         }
@@ -18894,6 +19011,900 @@ var init_CatalogReleaseScheduler = __esm({
       }
     };
     catalogReleaseScheduler = CatalogReleaseScheduler.getInstance();
+  }
+});
+
+// src/server/database/schema.ts
+var schema_exports = {};
+__export(schema_exports, {
+  adminAudit: () => adminAudit,
+  deviceLinkChallenges: () => deviceLinkChallenges,
+  episodes: () => episodes,
+  globalSettings: () => globalSettings,
+  linkedDevices: () => linkedDevices,
+  loginAttempts: () => loginAttempts,
+  media: () => media,
+  mediaExternalIds: () => mediaExternalIds,
+  passwordResetTokens: () => passwordResetTokens,
+  processedSyncMutations: () => processedSyncMutations,
+  profileFavorites: () => profileFavorites,
+  profileMyList: () => profileMyList,
+  profilePlaybackProgress: () => profilePlaybackProgress,
+  profileWatchHistory: () => profileWatchHistory,
+  profiles: () => profiles,
+  sessions: () => sessions,
+  sourceEvidenceTickets: () => sourceEvidenceTickets,
+  sourceReliability: () => sourceReliability,
+  users: () => users,
+  watchpartyRooms: () => watchpartyRooms,
+  watchpartySignals: () => watchpartySignals
+});
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+var media, mediaExternalIds, episodes, globalSettings, adminAudit, sourceReliability, sourceEvidenceTickets, watchpartyRooms, watchpartySignals, users, sessions, loginAttempts, profiles, deviceLinkChallenges, linkedDevices, profilePlaybackProgress, profileWatchHistory, profileMyList, profileFavorites, processedSyncMutations, passwordResetTokens;
+var init_schema = __esm({
+  "src/server/database/schema.ts"() {
+    media = sqliteTable("media", {
+      id: text("id").primaryKey(),
+      type: text("type", { enum: ["FILME", "S\xC9RIE", "ANIME"] }).notNull(),
+      title: text("title").notNull(),
+      originalTitle: text("original_title"),
+      year: integer("year"),
+      description: text("description"),
+      posterUrl: text("poster_url"),
+      backdropUrl: text("backdrop_url"),
+      updatedAt: integer("updated_at").notNull()
+    }, (table) => [
+      index("media_type_title_idx").on(table.type, table.title),
+      index("media_type_year_idx").on(table.type, table.year)
+    ]);
+    mediaExternalIds = sqliteTable("media_external_ids", {
+      mediaId: text("media_id").notNull().references(() => media.id, { onDelete: "cascade" }),
+      provider: text("provider", { enum: ["imdb", "tmdb", "anilist", "mal"] }).notNull(),
+      externalId: text("external_id").notNull()
+    }, (table) => [
+      primaryKey({ columns: [table.mediaId, table.provider] }),
+      uniqueIndex("media_external_provider_id_idx").on(table.provider, table.externalId)
+    ]);
+    episodes = sqliteTable("episodes", {
+      id: text("id").primaryKey(),
+      mediaId: text("media_id").notNull().references(() => media.id, { onDelete: "cascade" }),
+      seasonNumber: integer("season_number").notNull(),
+      episodeNumber: integer("episode_number").notNull(),
+      title: text("title"),
+      airDate: text("air_date"),
+      updatedAt: integer("updated_at").notNull()
+    }, (table) => [
+      uniqueIndex("episodes_media_season_number_idx").on(table.mediaId, table.seasonNumber, table.episodeNumber)
+    ]);
+    globalSettings = sqliteTable("global_settings", {
+      key: text("key").primaryKey(),
+      valueJson: text("value_json").notNull(),
+      version: integer("version").notNull().default(1),
+      updatedAt: integer("updated_at").notNull(),
+      updatedBy: text("updated_by").notNull()
+    });
+    adminAudit = sqliteTable("admin_audit", {
+      id: text("id").primaryKey(),
+      settingKey: text("setting_key").notNull(),
+      previousVersion: integer("previous_version").notNull(),
+      nextVersion: integer("next_version").notNull(),
+      actorUid: text("actor_uid").notNull(),
+      createdAt: integer("created_at").notNull()
+    }, (table) => [index("admin_audit_setting_time_idx").on(table.settingKey, table.createdAt)]);
+    sourceReliability = sqliteTable("source_reliability", {
+      canonicalId: text("canonical_id").notNull(),
+      mediaType: text("media_type").notNull(),
+      season: integer("season").notNull().default(0),
+      episode: integer("episode").notNull().default(0),
+      providerId: text("provider_id").notNull(),
+      sourceRef: text("source_ref").notNull(),
+      format: text("format").notNull(),
+      audioLanguage: text("audio_language"),
+      quality: text("quality"),
+      successes: integer("successes").notNull().default(0),
+      startupFailures: integer("startup_failures").notNull().default(0),
+      playbackFailures: integer("playback_failures").notNull().default(0),
+      lastSuccessAt: integer("last_success_at"),
+      lastFailureAt: integer("last_failure_at"),
+      averageStartupMs: integer("average_startup_ms"),
+      status: text("status").notNull().default("provisional"),
+      expiresAt: integer("expires_at").notNull(),
+      updatedAt: integer("updated_at").notNull()
+    }, (table) => [
+      primaryKey({ columns: [table.canonicalId, table.mediaType, table.season, table.episode, table.providerId, table.sourceRef] }),
+      index("source_reliability_lookup_idx").on(table.canonicalId, table.mediaType, table.season, table.episode, table.expiresAt)
+    ]);
+    sourceEvidenceTickets = sqliteTable("source_evidence_tickets", {
+      id: text("id").primaryKey(),
+      canonicalId: text("canonical_id").notNull(),
+      mediaType: text("media_type").notNull(),
+      season: integer("season").notNull(),
+      episode: integer("episode").notNull(),
+      providerId: text("provider_id").notNull(),
+      sourceRef: text("source_ref").notNull(),
+      format: text("format").notNull(),
+      issuedAt: integer("issued_at").notNull(),
+      outcome: text("outcome")
+    }, (table) => [index("source_evidence_tickets_issued_idx").on(table.issuedAt)]);
+    watchpartyRooms = sqliteTable("watchparty_rooms", {
+      roomId: text("room_id").primaryKey(),
+      hostPeerId: text("host_peer_id").notNull(),
+      hostNickname: text("host_nickname").notNull(),
+      mediaJson: text("media_json"),
+      transmissionMode: text("transmission_mode").notNull().default("host_broadcast"),
+      lifecycleState: text("lifecycle_state").notNull().default("LOBBY"),
+      introStartTimestamp: integer("intro_start_timestamp"),
+      introDuration: integer("intro_duration"),
+      createdAt: integer("created_at").notNull(),
+      updatedAt: integer("updated_at").notNull(),
+      isClosed: integer("is_closed").notNull().default(0),
+      participantsJson: text("participants_json").notNull().default("[]")
+    }, (table) => [
+      index("watchparty_rooms_updated_idx").on(table.updatedAt)
+    ]);
+    watchpartySignals = sqliteTable("watchparty_signals", {
+      id: text("id").primaryKey(),
+      roomId: text("room_id").notNull(),
+      senderPeerId: text("sender_peer_id").notNull(),
+      targetPeerId: text("target_peer_id"),
+      type: text("type").notNull(),
+      dataJson: text("data_json"),
+      timestamp: integer("timestamp").notNull()
+    }, (table) => [
+      index("watchparty_signals_room_time_idx").on(table.roomId, table.timestamp)
+    ]);
+    users = sqliteTable("users", {
+      id: text("id").primaryKey(),
+      name: text("name").notNull(),
+      email: text("email").notNull(),
+      passwordHash: text("password_hash").notNull(),
+      status: text("status", { enum: ["active", "suspended", "pending_verification"] }).notNull().default("active"),
+      termsAcceptedAt: integer("terms_accepted_at").notNull(),
+      createdAt: integer("created_at").notNull(),
+      updatedAt: integer("updated_at").notNull()
+    }, (table) => [
+      uniqueIndex("users_email_idx").on(table.email),
+      index("users_created_at_idx").on(table.createdAt)
+    ]);
+    sessions = sqliteTable("sessions", {
+      id: text("id").primaryKey(),
+      userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      tokenHash: text("token_hash").notNull(),
+      ipAddress: text("ip_address"),
+      userAgent: text("user_agent"),
+      expiresAt: integer("expires_at").notNull(),
+      revokedAt: integer("revoked_at"),
+      createdAt: integer("created_at").notNull(),
+      updatedAt: integer("updated_at").notNull()
+    }, (table) => [
+      uniqueIndex("sessions_token_hash_idx").on(table.tokenHash),
+      index("sessions_user_id_idx").on(table.userId),
+      index("sessions_expires_at_idx").on(table.expiresAt)
+    ]);
+    loginAttempts = sqliteTable("login_attempts", {
+      id: text("id").primaryKey(),
+      identifier: text("identifier").notNull(),
+      attemptAt: integer("attempt_at").notNull(),
+      success: integer("success").notNull().default(0),
+      ipAddress: text("ip_address")
+    }, (table) => [
+      index("login_attempts_identifier_time_idx").on(table.identifier, table.attemptAt)
+    ]);
+    profiles = sqliteTable("profiles", {
+      id: text("id").primaryKey(),
+      userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      name: text("name").notNull(),
+      avatarId: text("avatar_id").notNull(),
+      isDefault: integer("is_default").notNull().default(0),
+      displayOrder: integer("display_order").notNull().default(0),
+      createdAt: integer("created_at").notNull(),
+      updatedAt: integer("updated_at").notNull()
+    }, (table) => [
+      index("profiles_user_id_idx").on(table.userId),
+      index("profiles_user_id_order_idx").on(table.userId, table.displayOrder)
+    ]);
+    deviceLinkChallenges = sqliteTable("device_link_challenges", {
+      id: text("id").primaryKey(),
+      deviceCodeHash: text("device_code_hash").notNull(),
+      userCode: text("user_code").notNull(),
+      status: text("status", { enum: ["pending", "approved", "rejected", "consumed", "expired"] }).notNull().default("pending"),
+      userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+      deviceName: text("device_name").notNull().default("Smart TV"),
+      deviceType: text("device_type").notNull().default("smart_tv"),
+      clientIp: text("client_ip"),
+      userAgent: text("user_agent"),
+      pollCount: integer("poll_count").notNull().default(0),
+      lastPolledAt: integer("last_polled_at"),
+      expiresAt: integer("expires_at").notNull(),
+      createdAt: integer("created_at").notNull(),
+      updatedAt: integer("updated_at").notNull(),
+      approvedAt: integer("approved_at"),
+      consumedAt: integer("consumed_at")
+    }, (table) => [
+      uniqueIndex("device_link_challenges_device_code_hash_idx").on(table.deviceCodeHash),
+      uniqueIndex("device_link_challenges_user_code_idx").on(table.userCode),
+      index("device_link_challenges_status_expires_idx").on(table.status, table.expiresAt)
+    ]);
+    linkedDevices = sqliteTable("linked_devices", {
+      id: text("id").primaryKey(),
+      userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      sessionId: text("session_id").notNull().references(() => sessions.id, { onDelete: "cascade" }),
+      deviceName: text("device_name").notNull(),
+      deviceType: text("device_type").notNull(),
+      clientIp: text("client_ip"),
+      userAgent: text("user_agent"),
+      lastActiveAt: integer("last_active_at").notNull(),
+      createdAt: integer("created_at").notNull(),
+      revokedAt: integer("revoked_at")
+    }, (table) => [
+      index("linked_devices_user_id_idx").on(table.userId),
+      index("linked_devices_session_id_idx").on(table.sessionId)
+    ]);
+    profilePlaybackProgress = sqliteTable("profile_playback_progress", {
+      id: text("id").primaryKey(),
+      profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+      canonicalId: text("canonical_id").notNull(),
+      contentType: text("content_type").notNull(),
+      season: integer("season").notNull().default(0),
+      episode: integer("episode").notNull().default(0),
+      positionSec: integer("position_sec").notNull(),
+      durationSec: integer("duration_sec").notNull(),
+      progressPercent: integer("progress_percent").notNull().default(0),
+      isCompleted: integer("is_completed").notNull().default(0),
+      version: integer("version").notNull().default(1),
+      deviceName: text("device_name"),
+      updatedAt: integer("updated_at").notNull()
+    }, (table) => [
+      uniqueIndex("profile_progress_key_idx").on(table.profileId, table.canonicalId, table.season, table.episode),
+      index("profile_progress_profile_updated_idx").on(table.profileId, table.updatedAt)
+    ]);
+    profileWatchHistory = sqliteTable("profile_watch_history", {
+      id: text("id").primaryKey(),
+      profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+      canonicalId: text("canonical_id").notNull(),
+      contentType: text("content_type").notNull(),
+      season: integer("season").notNull().default(0),
+      episode: integer("episode").notNull().default(0),
+      title: text("title"),
+      posterUrl: text("poster_url"),
+      year: integer("year"),
+      watchedAt: integer("watched_at").notNull(),
+      updatedAt: integer("updated_at").notNull(),
+      version: integer("version").notNull().default(1)
+    }, (table) => [
+      uniqueIndex("profile_history_key_idx").on(table.profileId, table.canonicalId, table.season, table.episode),
+      index("profile_history_profile_watched_idx").on(table.profileId, table.watchedAt)
+    ]);
+    profileMyList = sqliteTable("profile_my_list", {
+      id: text("id").primaryKey(),
+      profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+      canonicalId: text("canonical_id").notNull(),
+      addedAt: integer("added_at").notNull(),
+      isRemoved: integer("is_removed").notNull().default(0),
+      removedAt: integer("removed_at"),
+      updatedAt: integer("updated_at").notNull(),
+      version: integer("version").notNull().default(1)
+    }, (table) => [
+      uniqueIndex("profile_mylist_key_idx").on(table.profileId, table.canonicalId),
+      index("profile_mylist_profile_status_idx").on(table.profileId, table.isRemoved, table.updatedAt)
+    ]);
+    profileFavorites = sqliteTable("profile_favorites", {
+      id: text("id").primaryKey(),
+      profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+      canonicalId: text("canonical_id").notNull(),
+      addedAt: integer("added_at").notNull(),
+      isRemoved: integer("is_removed").notNull().default(0),
+      removedAt: integer("removed_at"),
+      updatedAt: integer("updated_at").notNull(),
+      version: integer("version").notNull().default(1)
+    }, (table) => [
+      uniqueIndex("profile_favorites_key_idx").on(table.profileId, table.canonicalId),
+      index("profile_favorites_profile_status_idx").on(table.profileId, table.isRemoved, table.updatedAt)
+    ]);
+    processedSyncMutations = sqliteTable("processed_sync_mutations", {
+      id: text("id").primaryKey(),
+      profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+      mutationType: text("mutation_type").notNull(),
+      canonicalId: text("canonical_id").notNull(),
+      processedAt: integer("processed_at").notNull(),
+      expiresAt: integer("expires_at").notNull()
+    }, (table) => [
+      index("processed_sync_mutations_profile_id_idx").on(table.profileId),
+      index("processed_sync_mutations_expires_at_idx").on(table.expiresAt)
+    ]);
+    passwordResetTokens = sqliteTable("password_reset_tokens", {
+      id: text("id").primaryKey(),
+      userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+      tokenHash: text("token_hash").notNull(),
+      createdAt: integer("created_at").notNull(),
+      expiresAt: integer("expires_at").notNull(),
+      usedAt: integer("used_at")
+    }, (table) => [
+      uniqueIndex("password_reset_tokens_hash_idx").on(table.tokenHash),
+      index("password_reset_tokens_user_idx").on(table.userId),
+      index("password_reset_tokens_expiry_idx").on(table.expiresAt)
+    ]);
+  }
+});
+
+// src/server/database/client.ts
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
+import fs2 from "fs";
+import path2 from "path";
+function createDatabase(url, authToken) {
+  if (url.startsWith("file:") && !url.includes(":memory:")) {
+    const filePath = url.replace(/^file:/, "");
+    const dir = path2.dirname(filePath);
+    if (dir && dir !== "." && !fs2.existsSync(dir)) {
+      try {
+        fs2.mkdirSync(dir, { recursive: true });
+      } catch {
+      }
+    }
+  }
+  const client = createClient({ url, authToken });
+  return { client, db: drizzle(client, { schema: schema_exports }) };
+}
+function getDatabase() {
+  if (process.env.VERCEL && !process.env.TURSO_DATABASE_URL) {
+    return null;
+  }
+  const url = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL;
+  const token = process.env.TURSO_AUTH_TOKEN;
+  if (!url || !token && !url.startsWith("file:")) {
+    if (process.env.VERCEL) {
+      return null;
+    }
+    const isProd = process.env.NODE_ENV === "production";
+    if (process.env.ALLOW_LOCAL_DB === "true" || !isProd || Boolean(process.env.VITEST)) {
+      const localUrl = process.env.LOCAL_DB_URL || "file:data/zapitv_auth.db";
+      if (sharedDatabaseKey !== localUrl) {
+        sharedDatabase = createDatabase(localUrl);
+        sharedDatabaseKey = localUrl;
+      }
+      return sharedDatabase;
+    }
+    return null;
+  }
+  const key = `${url}::${token || ""}`;
+  if (sharedDatabaseKey !== key) {
+    sharedDatabase = createDatabase(url, token);
+    sharedDatabaseKey = key;
+  }
+  return sharedDatabase;
+}
+async function ensureAuthTables(database) {
+  await database.client.executeMultiple(`
+    CREATE TABLE IF NOT EXISTS users (
+      id text PRIMARY KEY NOT NULL,
+      name text NOT NULL,
+      email text NOT NULL,
+      password_hash text NOT NULL,
+      status text DEFAULT 'active' NOT NULL,
+      terms_accepted_at integer NOT NULL,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS users_email_idx ON users (email);
+    CREATE INDEX IF NOT EXISTS users_created_at_idx ON users (created_at);
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id text PRIMARY KEY NOT NULL,
+      user_id text NOT NULL,
+      token_hash text NOT NULL,
+      ip_address text,
+      user_agent text,
+      expires_at integer NOT NULL,
+      revoked_at integer,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS sessions_token_hash_idx ON sessions (token_hash);
+    CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions (user_id);
+    CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions (expires_at);
+
+    CREATE TABLE IF NOT EXISTS login_attempts (
+      id text PRIMARY KEY NOT NULL,
+      identifier text NOT NULL,
+      attempt_at integer NOT NULL,
+      success integer DEFAULT 0 NOT NULL,
+      ip_address text
+    );
+    CREATE INDEX IF NOT EXISTS login_attempts_identifier_time_idx ON login_attempts (identifier, attempt_at);
+
+    CREATE TABLE IF NOT EXISTS profiles (
+      id text PRIMARY KEY NOT NULL,
+      user_id text NOT NULL,
+      name text NOT NULL,
+      avatar_id text NOT NULL,
+      is_default integer DEFAULT 0 NOT NULL,
+      display_order integer DEFAULT 0 NOT NULL,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE INDEX IF NOT EXISTS profiles_user_id_idx ON profiles (user_id);
+    CREATE INDEX IF NOT EXISTS profiles_user_id_order_idx ON profiles (user_id, display_order);
+
+    CREATE TABLE IF NOT EXISTS device_link_challenges (
+      id text PRIMARY KEY NOT NULL,
+      device_code_hash text NOT NULL,
+      user_code text NOT NULL,
+      status text DEFAULT 'pending' NOT NULL,
+      user_id text,
+      device_name text DEFAULT 'Smart TV' NOT NULL,
+      device_type text DEFAULT 'smart_tv' NOT NULL,
+      client_ip text,
+      user_agent text,
+      poll_count integer DEFAULT 0 NOT NULL,
+      last_polled_at integer,
+      expires_at integer NOT NULL,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      approved_at integer,
+      consumed_at integer,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS device_link_challenges_device_code_hash_idx ON device_link_challenges (device_code_hash);
+    CREATE UNIQUE INDEX IF NOT EXISTS device_link_challenges_user_code_idx ON device_link_challenges (user_code);
+    CREATE INDEX IF NOT EXISTS device_link_challenges_status_expires_idx ON device_link_challenges (status, expires_at);
+
+    CREATE TABLE IF NOT EXISTS linked_devices (
+      id text PRIMARY KEY NOT NULL,
+      user_id text NOT NULL,
+      session_id text NOT NULL,
+      device_name text NOT NULL,
+      device_type text NOT NULL,
+      client_ip text,
+      user_agent text,
+      last_active_at integer NOT NULL,
+      created_at integer NOT NULL,
+      revoked_at integer,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade,
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE INDEX IF NOT EXISTS linked_devices_user_id_idx ON linked_devices (user_id);
+    CREATE INDEX IF NOT EXISTS linked_devices_session_id_idx ON linked_devices (session_id);
+
+    CREATE TABLE IF NOT EXISTS profile_playback_progress (
+      id text PRIMARY KEY NOT NULL,
+      profile_id text NOT NULL,
+      canonical_id text NOT NULL,
+      content_type text NOT NULL,
+      season integer DEFAULT 0 NOT NULL,
+      episode integer DEFAULT 0 NOT NULL,
+      position_sec integer NOT NULL,
+      duration_sec integer NOT NULL,
+      progress_percent integer DEFAULT 0 NOT NULL,
+      is_completed integer DEFAULT 0 NOT NULL,
+      version integer DEFAULT 1 NOT NULL,
+      device_name text,
+      updated_at integer NOT NULL,
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS profile_progress_key_idx ON profile_playback_progress (profile_id, canonical_id, season, episode);
+    CREATE INDEX IF NOT EXISTS profile_progress_profile_updated_idx ON profile_playback_progress (profile_id, updated_at);
+
+    CREATE TABLE IF NOT EXISTS profile_watch_history (
+      id text PRIMARY KEY NOT NULL,
+      profile_id text NOT NULL,
+      canonical_id text NOT NULL,
+      content_type text NOT NULL,
+      season integer DEFAULT 0 NOT NULL,
+      episode integer DEFAULT 0 NOT NULL,
+      title text,
+      poster_url text,
+      year integer,
+      watched_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      version integer DEFAULT 1 NOT NULL,
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS profile_history_key_idx ON profile_watch_history (profile_id, canonical_id, season, episode);
+    CREATE INDEX IF NOT EXISTS profile_history_profile_watched_idx ON profile_watch_history (profile_id, watched_at);
+
+    CREATE TABLE IF NOT EXISTS profile_my_list (
+      id text PRIMARY KEY NOT NULL,
+      profile_id text NOT NULL,
+      canonical_id text NOT NULL,
+      added_at integer NOT NULL,
+      is_removed integer DEFAULT 0 NOT NULL,
+      removed_at integer,
+      updated_at integer NOT NULL,
+      version integer DEFAULT 1 NOT NULL,
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS profile_mylist_key_idx ON profile_my_list (profile_id, canonical_id);
+    CREATE INDEX IF NOT EXISTS profile_mylist_profile_status_idx ON profile_my_list (profile_id, is_removed, updated_at);
+
+    CREATE TABLE IF NOT EXISTS profile_favorites (
+      id text PRIMARY KEY NOT NULL,
+      profile_id text NOT NULL,
+      canonical_id text NOT NULL,
+      added_at integer NOT NULL,
+      is_removed integer DEFAULT 0 NOT NULL,
+      removed_at integer,
+      updated_at integer NOT NULL,
+      version integer DEFAULT 1 NOT NULL,
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS profile_favorites_key_idx ON profile_favorites (profile_id, canonical_id);
+    CREATE INDEX IF NOT EXISTS profile_favorites_profile_status_idx ON profile_favorites (profile_id, is_removed, updated_at);
+
+    CREATE TABLE IF NOT EXISTS processed_sync_mutations (
+      id text PRIMARY KEY NOT NULL,
+      profile_id text NOT NULL,
+      mutation_type text NOT NULL,
+      canonical_id text NOT NULL,
+      processed_at integer NOT NULL,
+      expires_at integer NOT NULL,
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
+    );
+    CREATE INDEX IF NOT EXISTS processed_sync_mutations_profile_id_idx ON processed_sync_mutations (profile_id);
+    CREATE INDEX IF NOT EXISTS processed_sync_mutations_expires_at_idx ON processed_sync_mutations (expires_at);
+
+    CREATE TABLE IF NOT EXISTS global_settings (
+      key text PRIMARY KEY NOT NULL,
+      value_json text NOT NULL,
+      version integer DEFAULT 1 NOT NULL,
+      updated_at integer NOT NULL,
+      updated_by text NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS admin_audit (
+      id text PRIMARY KEY NOT NULL,
+      setting_key text NOT NULL,
+      previous_version integer NOT NULL,
+      next_version integer NOT NULL,
+      actor_uid text NOT NULL,
+      created_at integer NOT NULL
+    );
+  `);
+}
+var sharedDatabase, sharedDatabaseKey;
+var init_client = __esm({
+  "src/server/database/client.ts"() {
+    init_schema();
+  }
+});
+
+// src/server/database/firebaseAuth.ts
+var firebaseAuth_exports = {};
+__export(firebaseAuth_exports, {
+  InvalidFirebaseToken: () => InvalidFirebaseToken,
+  authenticateAdmin: () => authenticateAdmin,
+  verifyFirebaseIdToken: () => verifyFirebaseIdToken
+});
+import { createRemoteJWKSet, errors, jwtVerify } from "jose";
+async function verifyFirebaseIdToken(token, projectId, keys = publicKeys) {
+  let verified;
+  try {
+    verified = await jwtVerify(token, keys, {
+      algorithms: ["RS256"],
+      audience: projectId,
+      issuer: `https://securetoken.google.com/${projectId}`
+    });
+  } catch (error) {
+    if (error instanceof errors.JWKSTimeout) throw error;
+    if (error instanceof errors.JOSEError) throw new InvalidFirebaseToken("Token Firebase inv\xE1lido.");
+    throw error;
+  }
+  const { payload, protectedHeader } = verified;
+  const now = Math.floor(Date.now() / 1e3);
+  if (!protectedHeader.kid || typeof payload.sub !== "string" || !payload.sub || !Number.isSafeInteger(payload.iat) || payload.iat > now || !Number.isSafeInteger(payload.auth_time) || payload.auth_time > now) {
+    throw new InvalidFirebaseToken("Token Firebase inv\xE1lido.");
+  }
+  return payload.sub;
+}
+async function authenticateAdmin(authorization) {
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const allowedUids = new Set((process.env.ADMIN_FIREBASE_UIDS || "").split(",").map((uid) => uid.trim()).filter(Boolean));
+  const match = /^Bearer (\S+)$/i.exec(authorization || "");
+  if (!projectId || allowedUids.size === 0 || !match) return null;
+  try {
+    const uid = await verifyFirebaseIdToken(match[1], projectId);
+    return allowedUids.has(uid) ? uid : null;
+  } catch (error) {
+    if (error instanceof InvalidFirebaseToken) return null;
+    throw error;
+  }
+}
+var publicKeys, InvalidFirebaseToken;
+var init_firebaseAuth = __esm({
+  "src/server/database/firebaseAuth.ts"() {
+    publicKeys = createRemoteJWKSet(
+      new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"),
+      { timeoutDuration: 5e3 }
+    );
+    InvalidFirebaseToken = class extends Error {
+    };
+  }
+});
+
+// src/server/auth/sessionService.ts
+import crypto2 from "crypto";
+import { eq as eq5, and as and5, isNull as isNull2, gt as gt2 } from "drizzle-orm";
+function hashSessionToken(token) {
+  return crypto2.createHash("sha256").update(token).digest("hex");
+}
+function generateSessionToken() {
+  return crypto2.randomBytes(32).toString("hex");
+}
+async function createSession(db, userId, meta) {
+  const token = generateSessionToken();
+  const tokenHash = hashSessionToken(token);
+  const now = Date.now();
+  const expiresAt = now + (meta?.durationMs || SESSION_DURATION_MS);
+  const sessionId = crypto2.randomUUID();
+  await db.db.insert(sessions).values({
+    id: sessionId,
+    userId,
+    tokenHash,
+    ipAddress: meta?.ipAddress?.slice(0, 45) || null,
+    userAgent: meta?.userAgent?.slice(0, 255) || null,
+    expiresAt,
+    revokedAt: null,
+    createdAt: now,
+    updatedAt: now
+  });
+  return { token, expiresAt, sessionId };
+}
+async function validateSession(db, token) {
+  if (!token || typeof token !== "string" || token.length < 32) {
+    return null;
+  }
+  const tokenHash = hashSessionToken(token);
+  const now = Date.now();
+  const found = await db.db.select({
+    sessionId: sessions.id,
+    expiresAt: sessions.expiresAt,
+    revokedAt: sessions.revokedAt,
+    userId: users.id,
+    userName: users.name,
+    userEmail: users.email,
+    userStatus: users.status,
+    userCreatedAt: users.createdAt
+  }).from(sessions).innerJoin(users, eq5(sessions.userId, users.id)).where(
+    and5(
+      eq5(sessions.tokenHash, tokenHash),
+      isNull2(sessions.revokedAt),
+      gt2(sessions.expiresAt, now),
+      eq5(users.status, "active")
+    )
+  ).limit(1);
+  if (!found || found.length === 0) {
+    return null;
+  }
+  const row = found[0];
+  return {
+    user: {
+      id: row.userId,
+      name: row.userName,
+      email: row.userEmail,
+      status: row.userStatus,
+      createdAt: row.userCreatedAt
+    },
+    sessionId: row.sessionId,
+    expiresAt: row.expiresAt
+  };
+}
+async function revokeSession(db, token) {
+  if (!token) return false;
+  const tokenHash = hashSessionToken(token);
+  const now = Date.now();
+  const res = await db.db.update(sessions).set({ revokedAt: now, updatedAt: now }).where(and5(eq5(sessions.tokenHash, tokenHash), isNull2(sessions.revokedAt)));
+  return true;
+}
+function extractCookie(cookieHeader, cookieName = SESSION_COOKIE_NAME) {
+  if (!cookieHeader) return null;
+  const cookies = cookieHeader.split(";");
+  for (const c of cookies) {
+    const [name, ...val] = c.trim().split("=");
+    if (name === cookieName) {
+      return decodeURIComponent(val.join("="));
+    }
+  }
+  return null;
+}
+function formatSetCookie(token, options) {
+  if (options.clear) {
+    return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${options.isProduction ? "; Secure" : ""}`;
+  }
+  const maxAge = options.maxAgeSeconds ?? Math.floor(SESSION_DURATION_MS / 1e3);
+  const expires = options.expiresAt ? new Date(options.expiresAt).toUTCString() : void 0;
+  let cookieStr = `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+  if (expires) cookieStr += `; Expires=${expires}`;
+  if (options.isProduction) cookieStr += "; Secure";
+  return cookieStr;
+}
+var SESSION_COOKIE_NAME, SESSION_DURATION_MS;
+var init_sessionService = __esm({
+  "src/server/auth/sessionService.ts"() {
+    init_schema();
+    SESSION_COOKIE_NAME = "zapitv_session";
+    SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1e3;
+  }
+});
+
+// src/server/auth/authMiddleware.ts
+var authMiddleware_exports = {};
+__export(authMiddleware_exports, {
+  authenticateUser: () => authenticateUser,
+  extractSessionToken: () => extractSessionToken,
+  getValidDatabase: () => getValidDatabase,
+  isUserAdmin: () => isUserAdmin,
+  optionalUser: () => optionalUser,
+  requireAdmin: () => requireAdmin,
+  requireCsrfProtection: () => requireCsrfProtection,
+  setTestDatabase: () => setTestDatabase
+});
+function setTestDatabase(db) {
+  testDatabaseInstance = db;
+}
+async function getValidDatabase() {
+  if (testDatabaseInstance) {
+    return testDatabaseInstance;
+  }
+  const db = getDatabase();
+  if (db && !authTablesEnsured) {
+    try {
+      await ensureAuthTables(db);
+      authTablesEnsured = true;
+    } catch {
+    }
+  }
+  return db;
+}
+function isUserAdmin(user) {
+  if (!user) return false;
+  const adminEmails = new Set(
+    (process.env.ADMIN_EMAILS || "graficadfuturo@gmail.com").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)
+  );
+  const adminUids = new Set(
+    (process.env.ADMIN_FIREBASE_UIDS || "").split(",").map((u) => u.trim()).filter(Boolean)
+  );
+  const email = (user.email || "").trim().toLowerCase();
+  const id = (user.id || "").trim();
+  return email !== "" && adminEmails.has(email) || id !== "" && adminUids.has(id);
+}
+function extractSessionToken(req) {
+  const cookieHeader = req.headers.cookie;
+  const fromCookie = extractCookie(cookieHeader, SESSION_COOKIE_NAME);
+  if (fromCookie) return fromCookie;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+    return authHeader.slice(7).trim();
+  }
+  return null;
+}
+async function optionalUser(req, _res, next) {
+  try {
+    const token = extractSessionToken(req);
+    if (!token) {
+      req.user = null;
+      return next();
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      req.user = null;
+      return next();
+    }
+    const sessionData = await validateSession(db, token);
+    if (sessionData) {
+      req.user = {
+        ...sessionData.user,
+        role: isUserAdmin(sessionData.user) ? "admin" : "user"
+      };
+      req.sessionId = sessionData.sessionId;
+    } else {
+      req.user = null;
+    }
+    next();
+  } catch (err) {
+    req.user = null;
+    next();
+  }
+}
+async function authenticateUser(req, res, next) {
+  try {
+    const token = extractSessionToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Autentica\xE7\xE3o necess\xE1ria. Fa\xE7a login para continuar." });
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Servi\xE7o de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
+    }
+    const sessionData = await validateSession(db, token);
+    if (!sessionData) {
+      return res.status(401).json({ error: "Sess\xE3o inv\xE1lida ou expirada. Fa\xE7a login novamente." });
+    }
+    req.user = {
+      ...sessionData.user,
+      role: isUserAdmin(sessionData.user) ? "admin" : "user"
+    };
+    req.sessionId = sessionData.sessionId;
+    next();
+  } catch (err) {
+    return res.status(500).json({ error: "Erro ao validar autentica\xE7\xE3o." });
+  }
+}
+async function requireAdmin(req, res, next) {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const token = extractSessionToken(req);
+    if (token) {
+      const db = await getValidDatabase();
+      if (db) {
+        const sessionData = await validateSession(db, token);
+        if (sessionData && isUserAdmin(sessionData.user)) {
+          req.user = {
+            ...sessionData.user,
+            role: "admin"
+          };
+          req.sessionId = sessionData.sessionId;
+          res.locals.actorUid = sessionData.user.email || sessionData.user.id || "admin";
+          return next();
+        }
+      }
+    }
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      try {
+        const { authenticateAdmin: authenticateAdmin2 } = await Promise.resolve().then(() => (init_firebaseAuth(), firebaseAuth_exports));
+        const actorUid = await authenticateAdmin2(authHeader);
+        if (actorUid) {
+          req.user = {
+            id: actorUid,
+            name: "Admin Firebase",
+            email: "",
+            status: "active",
+            role: "admin",
+            createdAt: Date.now()
+          };
+          res.locals.actorUid = actorUid;
+          return next();
+        }
+      } catch {
+      }
+    }
+    return res.status(403).json({ error: "Acesso negado. Apenas administradores autorizados." });
+  } catch {
+    return res.status(403).json({ error: "Acesso negado. Apenas administradores autorizados." });
+  }
+}
+function requireCsrfProtection(req, res, next) {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    return next();
+  }
+  const origin = req.headers.origin;
+  const referer = req.headers.referer;
+  const host = req.headers.host;
+  const hasCookie = Boolean(req.headers.cookie);
+  const sourceUrl = origin || referer;
+  if (sourceUrl && host) {
+    try {
+      const sourceHost = new URL(sourceUrl).host;
+      if (sourceHost !== host) {
+        return res.status(403).json({ error: "Origem da requisi\xE7\xE3o n\xE3o autorizada (CSRF bloqueado)." });
+      }
+    } catch {
+      return res.status(403).json({ error: "Origem inv\xE1lida detectada." });
+    }
+  } else if (!sourceUrl && hasCookie && process.env.NODE_ENV === "production") {
+    return res.status(403).json({ error: "Origem da requisi\xE7\xE3o n\xE3o confi\xE1vel (CSRF bloqueado)." });
+  }
+  next();
+}
+var authTablesEnsured, testDatabaseInstance;
+var init_authMiddleware = __esm({
+  "src/server/auth/authMiddleware.ts"() {
+    init_client();
+    init_sessionService();
+    authTablesEnsured = false;
+    testDatabaseInstance = null;
   }
 });
 
@@ -22981,528 +23992,9 @@ init_CatalogReleaseScheduler();
 init_types();
 init_CatalogReleaseStore();
 init_catalogDeduplication();
+init_client();
+init_schema();
 import { and, eq } from "drizzle-orm";
-
-// src/server/database/client.ts
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-
-// src/server/database/schema.ts
-var schema_exports = {};
-__export(schema_exports, {
-  adminAudit: () => adminAudit,
-  deviceLinkChallenges: () => deviceLinkChallenges,
-  episodes: () => episodes,
-  globalSettings: () => globalSettings,
-  linkedDevices: () => linkedDevices,
-  loginAttempts: () => loginAttempts,
-  media: () => media,
-  mediaExternalIds: () => mediaExternalIds,
-  processedSyncMutations: () => processedSyncMutations,
-  profileFavorites: () => profileFavorites,
-  profileMyList: () => profileMyList,
-  profilePlaybackProgress: () => profilePlaybackProgress,
-  profileWatchHistory: () => profileWatchHistory,
-  profiles: () => profiles,
-  sessions: () => sessions,
-  sourceEvidenceTickets: () => sourceEvidenceTickets,
-  sourceReliability: () => sourceReliability,
-  users: () => users,
-  watchpartyRooms: () => watchpartyRooms,
-  watchpartySignals: () => watchpartySignals
-});
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-var media = sqliteTable("media", {
-  id: text("id").primaryKey(),
-  type: text("type", { enum: ["FILME", "S\xC9RIE", "ANIME"] }).notNull(),
-  title: text("title").notNull(),
-  originalTitle: text("original_title"),
-  year: integer("year"),
-  description: text("description"),
-  posterUrl: text("poster_url"),
-  backdropUrl: text("backdrop_url"),
-  updatedAt: integer("updated_at").notNull()
-}, (table) => [
-  index("media_type_title_idx").on(table.type, table.title),
-  index("media_type_year_idx").on(table.type, table.year)
-]);
-var mediaExternalIds = sqliteTable("media_external_ids", {
-  mediaId: text("media_id").notNull().references(() => media.id, { onDelete: "cascade" }),
-  provider: text("provider", { enum: ["imdb", "tmdb", "anilist", "mal"] }).notNull(),
-  externalId: text("external_id").notNull()
-}, (table) => [
-  primaryKey({ columns: [table.mediaId, table.provider] }),
-  uniqueIndex("media_external_provider_id_idx").on(table.provider, table.externalId)
-]);
-var episodes = sqliteTable("episodes", {
-  id: text("id").primaryKey(),
-  mediaId: text("media_id").notNull().references(() => media.id, { onDelete: "cascade" }),
-  seasonNumber: integer("season_number").notNull(),
-  episodeNumber: integer("episode_number").notNull(),
-  title: text("title"),
-  airDate: text("air_date"),
-  updatedAt: integer("updated_at").notNull()
-}, (table) => [
-  uniqueIndex("episodes_media_season_number_idx").on(table.mediaId, table.seasonNumber, table.episodeNumber)
-]);
-var globalSettings = sqliteTable("global_settings", {
-  key: text("key").primaryKey(),
-  valueJson: text("value_json").notNull(),
-  version: integer("version").notNull().default(1),
-  updatedAt: integer("updated_at").notNull(),
-  updatedBy: text("updated_by").notNull()
-});
-var adminAudit = sqliteTable("admin_audit", {
-  id: text("id").primaryKey(),
-  settingKey: text("setting_key").notNull(),
-  previousVersion: integer("previous_version").notNull(),
-  nextVersion: integer("next_version").notNull(),
-  actorUid: text("actor_uid").notNull(),
-  createdAt: integer("created_at").notNull()
-}, (table) => [index("admin_audit_setting_time_idx").on(table.settingKey, table.createdAt)]);
-var sourceReliability = sqliteTable("source_reliability", {
-  canonicalId: text("canonical_id").notNull(),
-  mediaType: text("media_type").notNull(),
-  season: integer("season").notNull().default(0),
-  episode: integer("episode").notNull().default(0),
-  providerId: text("provider_id").notNull(),
-  sourceRef: text("source_ref").notNull(),
-  format: text("format").notNull(),
-  audioLanguage: text("audio_language"),
-  quality: text("quality"),
-  successes: integer("successes").notNull().default(0),
-  startupFailures: integer("startup_failures").notNull().default(0),
-  playbackFailures: integer("playback_failures").notNull().default(0),
-  lastSuccessAt: integer("last_success_at"),
-  lastFailureAt: integer("last_failure_at"),
-  averageStartupMs: integer("average_startup_ms"),
-  status: text("status").notNull().default("provisional"),
-  expiresAt: integer("expires_at").notNull(),
-  updatedAt: integer("updated_at").notNull()
-}, (table) => [
-  primaryKey({ columns: [table.canonicalId, table.mediaType, table.season, table.episode, table.providerId, table.sourceRef] }),
-  index("source_reliability_lookup_idx").on(table.canonicalId, table.mediaType, table.season, table.episode, table.expiresAt)
-]);
-var sourceEvidenceTickets = sqliteTable("source_evidence_tickets", {
-  id: text("id").primaryKey(),
-  canonicalId: text("canonical_id").notNull(),
-  mediaType: text("media_type").notNull(),
-  season: integer("season").notNull(),
-  episode: integer("episode").notNull(),
-  providerId: text("provider_id").notNull(),
-  sourceRef: text("source_ref").notNull(),
-  format: text("format").notNull(),
-  issuedAt: integer("issued_at").notNull(),
-  outcome: text("outcome")
-}, (table) => [index("source_evidence_tickets_issued_idx").on(table.issuedAt)]);
-var watchpartyRooms = sqliteTable("watchparty_rooms", {
-  roomId: text("room_id").primaryKey(),
-  hostPeerId: text("host_peer_id").notNull(),
-  hostNickname: text("host_nickname").notNull(),
-  mediaJson: text("media_json"),
-  transmissionMode: text("transmission_mode").notNull().default("host_broadcast"),
-  lifecycleState: text("lifecycle_state").notNull().default("LOBBY"),
-  introStartTimestamp: integer("intro_start_timestamp"),
-  introDuration: integer("intro_duration"),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull(),
-  isClosed: integer("is_closed").notNull().default(0),
-  participantsJson: text("participants_json").notNull().default("[]")
-}, (table) => [
-  index("watchparty_rooms_updated_idx").on(table.updatedAt)
-]);
-var watchpartySignals = sqliteTable("watchparty_signals", {
-  id: text("id").primaryKey(),
-  roomId: text("room_id").notNull(),
-  senderPeerId: text("sender_peer_id").notNull(),
-  targetPeerId: text("target_peer_id"),
-  type: text("type").notNull(),
-  dataJson: text("data_json"),
-  timestamp: integer("timestamp").notNull()
-}, (table) => [
-  index("watchparty_signals_room_time_idx").on(table.roomId, table.timestamp)
-]);
-var users = sqliteTable("users", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull(),
-  passwordHash: text("password_hash").notNull(),
-  status: text("status", { enum: ["active", "suspended", "pending_verification"] }).notNull().default("active"),
-  termsAcceptedAt: integer("terms_accepted_at").notNull(),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull()
-}, (table) => [
-  uniqueIndex("users_email_idx").on(table.email),
-  index("users_created_at_idx").on(table.createdAt)
-]);
-var sessions = sqliteTable("sessions", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  tokenHash: text("token_hash").notNull(),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  expiresAt: integer("expires_at").notNull(),
-  revokedAt: integer("revoked_at"),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull()
-}, (table) => [
-  uniqueIndex("sessions_token_hash_idx").on(table.tokenHash),
-  index("sessions_user_id_idx").on(table.userId),
-  index("sessions_expires_at_idx").on(table.expiresAt)
-]);
-var loginAttempts = sqliteTable("login_attempts", {
-  id: text("id").primaryKey(),
-  identifier: text("identifier").notNull(),
-  attemptAt: integer("attempt_at").notNull(),
-  success: integer("success").notNull().default(0),
-  ipAddress: text("ip_address")
-}, (table) => [
-  index("login_attempts_identifier_time_idx").on(table.identifier, table.attemptAt)
-]);
-var profiles = sqliteTable("profiles", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  avatarId: text("avatar_id").notNull(),
-  isDefault: integer("is_default").notNull().default(0),
-  displayOrder: integer("display_order").notNull().default(0),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull()
-}, (table) => [
-  index("profiles_user_id_idx").on(table.userId),
-  index("profiles_user_id_order_idx").on(table.userId, table.displayOrder)
-]);
-var deviceLinkChallenges = sqliteTable("device_link_challenges", {
-  id: text("id").primaryKey(),
-  deviceCodeHash: text("device_code_hash").notNull(),
-  userCode: text("user_code").notNull(),
-  status: text("status", { enum: ["pending", "approved", "rejected", "consumed", "expired"] }).notNull().default("pending"),
-  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
-  deviceName: text("device_name").notNull().default("Smart TV"),
-  deviceType: text("device_type").notNull().default("smart_tv"),
-  clientIp: text("client_ip"),
-  userAgent: text("user_agent"),
-  pollCount: integer("poll_count").notNull().default(0),
-  lastPolledAt: integer("last_polled_at"),
-  expiresAt: integer("expires_at").notNull(),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull(),
-  approvedAt: integer("approved_at"),
-  consumedAt: integer("consumed_at")
-}, (table) => [
-  uniqueIndex("device_link_challenges_device_code_hash_idx").on(table.deviceCodeHash),
-  uniqueIndex("device_link_challenges_user_code_idx").on(table.userCode),
-  index("device_link_challenges_status_expires_idx").on(table.status, table.expiresAt)
-]);
-var linkedDevices = sqliteTable("linked_devices", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  sessionId: text("session_id").notNull().references(() => sessions.id, { onDelete: "cascade" }),
-  deviceName: text("device_name").notNull(),
-  deviceType: text("device_type").notNull(),
-  clientIp: text("client_ip"),
-  userAgent: text("user_agent"),
-  lastActiveAt: integer("last_active_at").notNull(),
-  createdAt: integer("created_at").notNull(),
-  revokedAt: integer("revoked_at")
-}, (table) => [
-  index("linked_devices_user_id_idx").on(table.userId),
-  index("linked_devices_session_id_idx").on(table.sessionId)
-]);
-var profilePlaybackProgress = sqliteTable("profile_playback_progress", {
-  id: text("id").primaryKey(),
-  profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
-  canonicalId: text("canonical_id").notNull(),
-  contentType: text("content_type").notNull(),
-  season: integer("season").notNull().default(0),
-  episode: integer("episode").notNull().default(0),
-  positionSec: integer("position_sec").notNull(),
-  durationSec: integer("duration_sec").notNull(),
-  progressPercent: integer("progress_percent").notNull().default(0),
-  isCompleted: integer("is_completed").notNull().default(0),
-  version: integer("version").notNull().default(1),
-  deviceName: text("device_name"),
-  updatedAt: integer("updated_at").notNull()
-}, (table) => [
-  uniqueIndex("profile_progress_key_idx").on(table.profileId, table.canonicalId, table.season, table.episode),
-  index("profile_progress_profile_updated_idx").on(table.profileId, table.updatedAt)
-]);
-var profileWatchHistory = sqliteTable("profile_watch_history", {
-  id: text("id").primaryKey(),
-  profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
-  canonicalId: text("canonical_id").notNull(),
-  contentType: text("content_type").notNull(),
-  season: integer("season").notNull().default(0),
-  episode: integer("episode").notNull().default(0),
-  title: text("title"),
-  posterUrl: text("poster_url"),
-  year: integer("year"),
-  watchedAt: integer("watched_at").notNull(),
-  updatedAt: integer("updated_at").notNull(),
-  version: integer("version").notNull().default(1)
-}, (table) => [
-  uniqueIndex("profile_history_key_idx").on(table.profileId, table.canonicalId, table.season, table.episode),
-  index("profile_history_profile_watched_idx").on(table.profileId, table.watchedAt)
-]);
-var profileMyList = sqliteTable("profile_my_list", {
-  id: text("id").primaryKey(),
-  profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
-  canonicalId: text("canonical_id").notNull(),
-  addedAt: integer("added_at").notNull(),
-  isRemoved: integer("is_removed").notNull().default(0),
-  removedAt: integer("removed_at"),
-  updatedAt: integer("updated_at").notNull(),
-  version: integer("version").notNull().default(1)
-}, (table) => [
-  uniqueIndex("profile_mylist_key_idx").on(table.profileId, table.canonicalId),
-  index("profile_mylist_profile_status_idx").on(table.profileId, table.isRemoved, table.updatedAt)
-]);
-var profileFavorites = sqliteTable("profile_favorites", {
-  id: text("id").primaryKey(),
-  profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
-  canonicalId: text("canonical_id").notNull(),
-  addedAt: integer("added_at").notNull(),
-  isRemoved: integer("is_removed").notNull().default(0),
-  removedAt: integer("removed_at"),
-  updatedAt: integer("updated_at").notNull(),
-  version: integer("version").notNull().default(1)
-}, (table) => [
-  uniqueIndex("profile_favorites_key_idx").on(table.profileId, table.canonicalId),
-  index("profile_favorites_profile_status_idx").on(table.profileId, table.isRemoved, table.updatedAt)
-]);
-var processedSyncMutations = sqliteTable("processed_sync_mutations", {
-  id: text("id").primaryKey(),
-  profileId: text("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
-  mutationType: text("mutation_type").notNull(),
-  canonicalId: text("canonical_id").notNull(),
-  processedAt: integer("processed_at").notNull(),
-  expiresAt: integer("expires_at").notNull()
-}, (table) => [
-  index("processed_sync_mutations_profile_id_idx").on(table.profileId),
-  index("processed_sync_mutations_expires_at_idx").on(table.expiresAt)
-]);
-
-// src/server/database/client.ts
-import fs2 from "fs";
-import path2 from "path";
-function createDatabase(url, authToken) {
-  if (url.startsWith("file:") && !url.includes(":memory:")) {
-    const filePath = url.replace(/^file:/, "");
-    const dir = path2.dirname(filePath);
-    if (dir && dir !== "." && !fs2.existsSync(dir)) {
-      try {
-        fs2.mkdirSync(dir, { recursive: true });
-      } catch {
-      }
-    }
-  }
-  const client = createClient({ url, authToken });
-  return { client, db: drizzle(client, { schema: schema_exports }) };
-}
-var sharedDatabase;
-var sharedDatabaseKey;
-function getDatabase() {
-  if (process.env.VERCEL && !process.env.TURSO_DATABASE_URL) {
-    return null;
-  }
-  const url = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL;
-  const token = process.env.TURSO_AUTH_TOKEN;
-  if (!url || !token && !url.startsWith("file:")) {
-    if (process.env.VERCEL) {
-      return null;
-    }
-    const isProd = process.env.NODE_ENV === "production";
-    if (process.env.ALLOW_LOCAL_DB === "true" || !isProd || Boolean(process.env.VITEST)) {
-      const localUrl = process.env.LOCAL_DB_URL || "file:data/zapitv_auth.db";
-      if (sharedDatabaseKey !== localUrl) {
-        sharedDatabase = createDatabase(localUrl);
-        sharedDatabaseKey = localUrl;
-      }
-      return sharedDatabase;
-    }
-    return null;
-  }
-  const key = `${url}::${token || ""}`;
-  if (sharedDatabaseKey !== key) {
-    sharedDatabase = createDatabase(url, token);
-    sharedDatabaseKey = key;
-  }
-  return sharedDatabase;
-}
-async function ensureAuthTables(database) {
-  await database.client.executeMultiple(`
-    CREATE TABLE IF NOT EXISTS users (
-      id text PRIMARY KEY NOT NULL,
-      name text NOT NULL,
-      email text NOT NULL,
-      password_hash text NOT NULL,
-      status text DEFAULT 'active' NOT NULL,
-      terms_accepted_at integer NOT NULL,
-      created_at integer NOT NULL,
-      updated_at integer NOT NULL
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS users_email_idx ON users (email);
-    CREATE INDEX IF NOT EXISTS users_created_at_idx ON users (created_at);
-
-    CREATE TABLE IF NOT EXISTS sessions (
-      id text PRIMARY KEY NOT NULL,
-      user_id text NOT NULL,
-      token_hash text NOT NULL,
-      ip_address text,
-      user_agent text,
-      expires_at integer NOT NULL,
-      revoked_at integer,
-      created_at integer NOT NULL,
-      updated_at integer NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS sessions_token_hash_idx ON sessions (token_hash);
-    CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions (user_id);
-    CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions (expires_at);
-
-    CREATE TABLE IF NOT EXISTS login_attempts (
-      id text PRIMARY KEY NOT NULL,
-      identifier text NOT NULL,
-      attempt_at integer NOT NULL,
-      success integer DEFAULT 0 NOT NULL,
-      ip_address text
-    );
-    CREATE INDEX IF NOT EXISTS login_attempts_identifier_time_idx ON login_attempts (identifier, attempt_at);
-
-    CREATE TABLE IF NOT EXISTS profiles (
-      id text PRIMARY KEY NOT NULL,
-      user_id text NOT NULL,
-      name text NOT NULL,
-      avatar_id text NOT NULL,
-      is_default integer DEFAULT 0 NOT NULL,
-      display_order integer DEFAULT 0 NOT NULL,
-      created_at integer NOT NULL,
-      updated_at integer NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
-    );
-    CREATE INDEX IF NOT EXISTS profiles_user_id_idx ON profiles (user_id);
-    CREATE INDEX IF NOT EXISTS profiles_user_id_order_idx ON profiles (user_id, display_order);
-
-    CREATE TABLE IF NOT EXISTS device_link_challenges (
-      id text PRIMARY KEY NOT NULL,
-      device_code_hash text NOT NULL,
-      user_code text NOT NULL,
-      status text DEFAULT 'pending' NOT NULL,
-      user_id text,
-      device_name text DEFAULT 'Smart TV' NOT NULL,
-      device_type text DEFAULT 'smart_tv' NOT NULL,
-      client_ip text,
-      user_agent text,
-      poll_count integer DEFAULT 0 NOT NULL,
-      last_polled_at integer,
-      expires_at integer NOT NULL,
-      created_at integer NOT NULL,
-      updated_at integer NOT NULL,
-      approved_at integer,
-      consumed_at integer,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS device_link_challenges_device_code_hash_idx ON device_link_challenges (device_code_hash);
-    CREATE UNIQUE INDEX IF NOT EXISTS device_link_challenges_user_code_idx ON device_link_challenges (user_code);
-    CREATE INDEX IF NOT EXISTS device_link_challenges_status_expires_idx ON device_link_challenges (status, expires_at);
-
-    CREATE TABLE IF NOT EXISTS linked_devices (
-      id text PRIMARY KEY NOT NULL,
-      user_id text NOT NULL,
-      session_id text NOT NULL,
-      device_name text NOT NULL,
-      device_type text NOT NULL,
-      client_ip text,
-      user_agent text,
-      last_active_at integer NOT NULL,
-      created_at integer NOT NULL,
-      revoked_at integer,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade,
-      FOREIGN KEY (session_id) REFERENCES sessions(id) ON UPDATE no action ON DELETE cascade
-    );
-    CREATE INDEX IF NOT EXISTS linked_devices_user_id_idx ON linked_devices (user_id);
-    CREATE INDEX IF NOT EXISTS linked_devices_session_id_idx ON linked_devices (session_id);
-
-    CREATE TABLE IF NOT EXISTS profile_playback_progress (
-      id text PRIMARY KEY NOT NULL,
-      profile_id text NOT NULL,
-      canonical_id text NOT NULL,
-      content_type text NOT NULL,
-      season integer DEFAULT 0 NOT NULL,
-      episode integer DEFAULT 0 NOT NULL,
-      position_sec integer NOT NULL,
-      duration_sec integer NOT NULL,
-      progress_percent integer DEFAULT 0 NOT NULL,
-      is_completed integer DEFAULT 0 NOT NULL,
-      version integer DEFAULT 1 NOT NULL,
-      device_name text,
-      updated_at integer NOT NULL,
-      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS profile_progress_key_idx ON profile_playback_progress (profile_id, canonical_id, season, episode);
-    CREATE INDEX IF NOT EXISTS profile_progress_profile_updated_idx ON profile_playback_progress (profile_id, updated_at);
-
-    CREATE TABLE IF NOT EXISTS profile_watch_history (
-      id text PRIMARY KEY NOT NULL,
-      profile_id text NOT NULL,
-      canonical_id text NOT NULL,
-      content_type text NOT NULL,
-      season integer DEFAULT 0 NOT NULL,
-      episode integer DEFAULT 0 NOT NULL,
-      title text,
-      poster_url text,
-      year integer,
-      watched_at integer NOT NULL,
-      updated_at integer NOT NULL,
-      version integer DEFAULT 1 NOT NULL,
-      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS profile_history_key_idx ON profile_watch_history (profile_id, canonical_id, season, episode);
-    CREATE INDEX IF NOT EXISTS profile_history_profile_watched_idx ON profile_watch_history (profile_id, watched_at);
-
-    CREATE TABLE IF NOT EXISTS profile_my_list (
-      id text PRIMARY KEY NOT NULL,
-      profile_id text NOT NULL,
-      canonical_id text NOT NULL,
-      added_at integer NOT NULL,
-      is_removed integer DEFAULT 0 NOT NULL,
-      removed_at integer,
-      updated_at integer NOT NULL,
-      version integer DEFAULT 1 NOT NULL,
-      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS profile_mylist_key_idx ON profile_my_list (profile_id, canonical_id);
-    CREATE INDEX IF NOT EXISTS profile_mylist_profile_status_idx ON profile_my_list (profile_id, is_removed, updated_at);
-
-    CREATE TABLE IF NOT EXISTS profile_favorites (
-      id text PRIMARY KEY NOT NULL,
-      profile_id text NOT NULL,
-      canonical_id text NOT NULL,
-      added_at integer NOT NULL,
-      is_removed integer DEFAULT 0 NOT NULL,
-      removed_at integer,
-      updated_at integer NOT NULL,
-      version integer DEFAULT 1 NOT NULL,
-      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
-    );
-    CREATE UNIQUE INDEX IF NOT EXISTS profile_favorites_key_idx ON profile_favorites (profile_id, canonical_id);
-    CREATE INDEX IF NOT EXISTS profile_favorites_profile_status_idx ON profile_favorites (profile_id, is_removed, updated_at);
-
-    CREATE TABLE IF NOT EXISTS processed_sync_mutations (
-      id text PRIMARY KEY NOT NULL,
-      profile_id text NOT NULL,
-      mutation_type text NOT NULL,
-      canonical_id text NOT NULL,
-      processed_at integer NOT NULL,
-      expires_at integer NOT NULL,
-      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON UPDATE no action ON DELETE cascade
-    );
-    CREATE INDEX IF NOT EXISTS processed_sync_mutations_profile_id_idx ON processed_sync_mutations (profile_id);
-    CREATE INDEX IF NOT EXISTS processed_sync_mutations_expires_at_idx ON processed_sync_mutations (expires_at);
-  `);
-}
-
-// src/server/catalog/releaseRepository.ts
 var RELEASE_KEY = "catalog_releases_v1";
 var MAX_SNAPSHOT_BYTES = 2e6;
 var EMPTY_SNAPSHOT = { releases: [], pending: [] };
@@ -24126,14 +24618,22 @@ var FeedbackClusteringEngine = class {
   /**
    * Verifica se a submissão é uma duplicação rápida acidental ou abusiva do mesmo navegador
    */
-  static isDuplicateSubmission(recentReports, newToken, newFingerprint, windowSeconds = 60) {
+  static isDuplicateSubmission(recentReports, newToken, newFingerprint, windowSeconds = 30, userDescription) {
     const now = Date.now();
     const threshold = now - windowSeconds * 1e3;
+    const cleanNewDesc = (userDescription || "").trim().toLowerCase();
     return recentReports.some((r) => {
       if (r.submissionTimestamp < threshold) return false;
       const isSameToken = r.clientSubmissionToken === newToken;
       const isSameFingerprint = r.fingerprint === newFingerprint;
-      return isSameToken && isSameFingerprint;
+      if (isSameToken && isSameFingerprint) {
+        const cleanOldDesc = (r.userDescription || "").trim().toLowerCase();
+        if (cleanNewDesc !== cleanOldDesc && cleanNewDesc.length > 0) {
+          return false;
+        }
+        return true;
+      }
+      return false;
     });
   }
   /**
@@ -24846,6 +25346,44 @@ var FeedbackStore = class _FeedbackStore {
     }
   }
   /**
+   * Compactação segura do snapshot para garantir que o tamanho permaneça bem abaixo de 2MB
+   * sem perda de dados históricos, clusters ou estatísticas consolidadas.
+   */
+  compactSnapshot() {
+    const activePromptIds = /* @__PURE__ */ new Set();
+    for (const cluster of this.clusters) {
+      if (cluster.activePromptId) {
+        activePromptIds.add(cluster.activePromptId);
+      }
+    }
+    this.prompts = this.prompts.filter(
+      (p) => activePromptIds.has(p.id) || p.isManuallyEdited
+    );
+    if (this.reports.length > 500) {
+      const recentReports = this.reports.slice(0, 500);
+      const olderReports = this.reports.slice(500).map((r) => ({
+        ...r,
+        technicalContext: {
+          canonicalMediaId: r.technicalContext?.canonicalMediaId,
+          mediaTitle: r.technicalContext?.mediaTitle,
+          mediaType: r.technicalContext?.mediaType,
+          season: r.technicalContext?.season,
+          episode: r.technicalContext?.episode,
+          errorCode: r.technicalContext?.errorCode,
+          failureStage: r.technicalContext?.failureStage,
+          browser: r.technicalContext?.browser,
+          os: r.technicalContext?.os,
+          deviceType: r.technicalContext?.deviceType,
+          currentRoute: r.technicalContext?.currentRoute,
+          timestamp: r.technicalContext?.timestamp || r.submissionTimestamp,
+          appVersion: r.technicalContext?.appVersion || "1.0.0"
+        }
+      }));
+      this.reports = [...recentReports, ...olderReports];
+    }
+    return this.getSnapshot();
+  }
+  /**
    * Submete um feedback anônimo com contexto técnico, deduplicação e agrupamento automático
    */
   async submitFeedback(request) {
@@ -24870,7 +25408,8 @@ var FeedbackStore = class _FeedbackStore {
       this.reports,
       token,
       fingerprint,
-      60
+      30,
+      userDescription
     );
     if (isDupe) {
       const existingCluster = this.clusters.find((c) => c.fingerprint === fingerprint);
@@ -25247,6 +25786,8 @@ var FeedbackStore = class _FeedbackStore {
 };
 
 // src/server/feedback/repository.ts
+init_client();
+init_schema();
 var FEEDBACK_KEY = "feedback_store_v1";
 var MAX_SNAPSHOT_BYTES2 = 2e6;
 var FeedbackStorageUnavailable = class extends Error {
@@ -25258,6 +25799,9 @@ async function withFeedbackStore(operation, options = {}) {
     return operation(FeedbackStore.getInstance());
   }
   for (let attempt = 0; attempt < 8; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(250, 15 * Math.pow(1.5, attempt) + Math.random() * 20)));
+    }
     let row;
     try {
       [row] = await connection.db.select().from(globalSettings).where(eq2(globalSettings.key, FEEDBACK_KEY)).limit(1);
@@ -25273,7 +25817,7 @@ async function withFeedbackStore(operation, options = {}) {
     const result = await operation(store);
     if (!options.write || options.shouldPersist && !options.shouldPersist(result)) return result;
     try {
-      const saved = await saveSnapshot2(connection, store.getSnapshot(), row?.version ?? 0, options.actor || "feedback");
+      const saved = await saveSnapshot2(connection, store.getSnapshot(), row?.version ?? 0, options.actor || "feedback", store);
       if (saved) return result;
     } catch (error) {
       if (error instanceof FeedbackStorageUnavailable) throw error;
@@ -25282,10 +25826,16 @@ async function withFeedbackStore(operation, options = {}) {
   }
   throw new FeedbackStorageUnavailable("O feedback foi alterado simultaneamente. Tente novamente.");
 }
-async function saveSnapshot2(connection, snapshot, version, actor) {
-  const valueJson = JSON.stringify(snapshot);
+async function saveSnapshot2(connection, snapshot, version, actor, store) {
+  let valueJson = JSON.stringify(snapshot);
   if (Buffer.byteLength(valueJson, "utf8") > MAX_SNAPSHOT_BYTES2) {
-    throw new FeedbackStorageUnavailable("Capacidade atual de feedback atingida.");
+    if (store) {
+      store.compactSnapshot();
+      valueJson = JSON.stringify(store.getSnapshot());
+    }
+    if (Buffer.byteLength(valueJson, "utf8") > MAX_SNAPSHOT_BYTES2) {
+      throw new FeedbackStorageUnavailable("Capacidade atual de feedback atingida.");
+    }
   }
   const updatedAt = Date.now();
   if (version === 0) {
@@ -25311,51 +25861,12 @@ async function saveSnapshot2(connection, snapshot, version, actor) {
 init_validationTargetUrl();
 
 // src/server/database/routes.ts
+init_client();
+init_firebaseAuth();
 import { Router } from "express";
 
-// src/server/database/firebaseAuth.ts
-import { createRemoteJWKSet, errors, jwtVerify } from "jose";
-var publicKeys = createRemoteJWKSet(
-  new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"),
-  { timeoutDuration: 5e3 }
-);
-var InvalidFirebaseToken = class extends Error {
-};
-async function verifyFirebaseIdToken(token, projectId, keys = publicKeys) {
-  let verified;
-  try {
-    verified = await jwtVerify(token, keys, {
-      algorithms: ["RS256"],
-      audience: projectId,
-      issuer: `https://securetoken.google.com/${projectId}`
-    });
-  } catch (error) {
-    if (error instanceof errors.JWKSTimeout) throw error;
-    if (error instanceof errors.JOSEError) throw new InvalidFirebaseToken("Token Firebase inv\xE1lido.");
-    throw error;
-  }
-  const { payload, protectedHeader } = verified;
-  const now = Math.floor(Date.now() / 1e3);
-  if (!protectedHeader.kid || typeof payload.sub !== "string" || !payload.sub || !Number.isSafeInteger(payload.iat) || payload.iat > now || !Number.isSafeInteger(payload.auth_time) || payload.auth_time > now) {
-    throw new InvalidFirebaseToken("Token Firebase inv\xE1lido.");
-  }
-  return payload.sub;
-}
-async function authenticateAdmin(authorization) {
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const allowedUids = new Set((process.env.ADMIN_FIREBASE_UIDS || "").split(",").map((uid) => uid.trim()).filter(Boolean));
-  const match = /^Bearer (\S+)$/i.exec(authorization || "");
-  if (!projectId || allowedUids.size === 0 || !match) return null;
-  try {
-    const uid = await verifyFirebaseIdToken(match[1], projectId);
-    return allowedUids.has(uid) ? uid : null;
-  } catch (error) {
-    if (error instanceof InvalidFirebaseToken) return null;
-    throw error;
-  }
-}
-
 // src/server/database/settings.ts
+init_schema();
 import { and as and3, eq as eq3 } from "drizzle-orm";
 var SettingVersionConflict = class extends Error {
 };
@@ -25398,6 +25909,7 @@ async function writeSetting(connection, key, value, expectedVersion, actorUid) {
 }
 
 // src/server/database/sourceMemory.ts
+init_schema();
 import { randomUUID } from "node:crypto";
 import { and as and4, desc, eq as eq4, gt, isNull, lt, sql } from "drizzle-orm";
 var permittedProviders = /* @__PURE__ */ new Set([
@@ -25670,7 +26182,11 @@ databaseRouter.put("/global-settings/section-titles", async (req, res) => {
   }
 });
 
+// server.ts
+init_firebaseAuth();
+
 // src/server/watchparty/routes.ts
+init_client();
 import { Router as Router2 } from "express";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 var hashToken = (token) => createHash("sha256").update(token).digest("hex");
@@ -26244,197 +26760,11 @@ watchPartyRouter.delete("/room/:roomId", async (req, res) => {
 });
 
 // src/server/auth/routes.ts
+init_authMiddleware();
+init_schema();
 import express from "express";
-import crypto5 from "crypto";
-import { eq as eq8 } from "drizzle-orm";
-
-// src/server/auth/sessionService.ts
-import crypto2 from "crypto";
-import { eq as eq5, and as and5, isNull as isNull2, gt as gt2 } from "drizzle-orm";
-var SESSION_COOKIE_NAME = "zapitv_session";
-var SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1e3;
-function hashSessionToken(token) {
-  return crypto2.createHash("sha256").update(token).digest("hex");
-}
-function generateSessionToken() {
-  return crypto2.randomBytes(32).toString("hex");
-}
-async function createSession(db, userId, meta) {
-  const token = generateSessionToken();
-  const tokenHash = hashSessionToken(token);
-  const now = Date.now();
-  const expiresAt = now + (meta?.durationMs || SESSION_DURATION_MS);
-  const sessionId = crypto2.randomUUID();
-  await db.db.insert(sessions).values({
-    id: sessionId,
-    userId,
-    tokenHash,
-    ipAddress: meta?.ipAddress?.slice(0, 45) || null,
-    userAgent: meta?.userAgent?.slice(0, 255) || null,
-    expiresAt,
-    revokedAt: null,
-    createdAt: now,
-    updatedAt: now
-  });
-  return { token, expiresAt, sessionId };
-}
-async function validateSession(db, token) {
-  if (!token || typeof token !== "string" || token.length < 32) {
-    return null;
-  }
-  const tokenHash = hashSessionToken(token);
-  const now = Date.now();
-  const found = await db.db.select({
-    sessionId: sessions.id,
-    expiresAt: sessions.expiresAt,
-    revokedAt: sessions.revokedAt,
-    userId: users.id,
-    userName: users.name,
-    userEmail: users.email,
-    userStatus: users.status,
-    userCreatedAt: users.createdAt
-  }).from(sessions).innerJoin(users, eq5(sessions.userId, users.id)).where(
-    and5(
-      eq5(sessions.tokenHash, tokenHash),
-      isNull2(sessions.revokedAt),
-      gt2(sessions.expiresAt, now),
-      eq5(users.status, "active")
-    )
-  ).limit(1);
-  if (!found || found.length === 0) {
-    return null;
-  }
-  const row = found[0];
-  return {
-    user: {
-      id: row.userId,
-      name: row.userName,
-      email: row.userEmail,
-      status: row.userStatus,
-      createdAt: row.userCreatedAt
-    },
-    sessionId: row.sessionId,
-    expiresAt: row.expiresAt
-  };
-}
-async function revokeSession(db, token) {
-  if (!token) return false;
-  const tokenHash = hashSessionToken(token);
-  const now = Date.now();
-  const res = await db.db.update(sessions).set({ revokedAt: now, updatedAt: now }).where(and5(eq5(sessions.tokenHash, tokenHash), isNull2(sessions.revokedAt)));
-  return true;
-}
-function extractCookie(cookieHeader, cookieName = SESSION_COOKIE_NAME) {
-  if (!cookieHeader) return null;
-  const cookies = cookieHeader.split(";");
-  for (const c of cookies) {
-    const [name, ...val] = c.trim().split("=");
-    if (name === cookieName) {
-      return decodeURIComponent(val.join("="));
-    }
-  }
-  return null;
-}
-function formatSetCookie(token, options) {
-  if (options.clear) {
-    return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${options.isProduction ? "; Secure" : ""}`;
-  }
-  const maxAge = options.maxAgeSeconds ?? Math.floor(SESSION_DURATION_MS / 1e3);
-  const expires = options.expiresAt ? new Date(options.expiresAt).toUTCString() : void 0;
-  let cookieStr = `${SESSION_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
-  if (expires) cookieStr += `; Expires=${expires}`;
-  if (options.isProduction) cookieStr += "; Secure";
-  return cookieStr;
-}
-
-// src/server/auth/authMiddleware.ts
-var authTablesEnsured = false;
-async function getValidDatabase() {
-  const db = getDatabase();
-  if (db && !authTablesEnsured) {
-    try {
-      await ensureAuthTables(db);
-      authTablesEnsured = true;
-    } catch {
-    }
-  }
-  return db;
-}
-function extractSessionToken(req) {
-  const cookieHeader = req.headers.cookie;
-  const fromCookie = extractCookie(cookieHeader, SESSION_COOKIE_NAME);
-  if (fromCookie) return fromCookie;
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
-    return authHeader.slice(7).trim();
-  }
-  return null;
-}
-async function optionalUser(req, _res, next) {
-  try {
-    const token = extractSessionToken(req);
-    if (!token) {
-      req.user = null;
-      return next();
-    }
-    const db = await getValidDatabase();
-    if (!db) {
-      req.user = null;
-      return next();
-    }
-    const sessionData = await validateSession(db, token);
-    req.user = sessionData ? sessionData.user : null;
-    req.sessionId = sessionData?.sessionId;
-    next();
-  } catch (err) {
-    req.user = null;
-    next();
-  }
-}
-async function authenticateUser(req, res, next) {
-  try {
-    const token = extractSessionToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Autentica\xE7\xE3o necess\xE1ria. Fa\xE7a login para continuar." });
-    }
-    const db = await getValidDatabase();
-    if (!db) {
-      return res.status(503).json({ error: "Servi\xE7o de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
-    }
-    const sessionData = await validateSession(db, token);
-    if (!sessionData) {
-      return res.status(401).json({ error: "Sess\xE3o inv\xE1lida ou expirada. Fa\xE7a login novamente." });
-    }
-    req.user = sessionData.user;
-    req.sessionId = sessionData.sessionId;
-    next();
-  } catch (err) {
-    return res.status(500).json({ error: "Erro ao validar autentica\xE7\xE3o." });
-  }
-}
-function requireCsrfProtection(req, res, next) {
-  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
-    return next();
-  }
-  const origin = req.headers.origin;
-  const referer = req.headers.referer;
-  const host = req.headers.host;
-  const hasCookie = Boolean(req.headers.cookie);
-  const sourceUrl = origin || referer;
-  if (sourceUrl && host) {
-    try {
-      const sourceHost = new URL(sourceUrl).host;
-      if (sourceHost !== host) {
-        return res.status(403).json({ error: "Origem da requisi\xE7\xE3o n\xE3o autorizada (CSRF bloqueado)." });
-      }
-    } catch {
-      return res.status(403).json({ error: "Origem inv\xE1lida detectada." });
-    }
-  } else if (!sourceUrl && hasCookie && process.env.NODE_ENV === "production") {
-    return res.status(403).json({ error: "Origem da requisi\xE7\xE3o n\xE3o confi\xE1vel (CSRF bloqueado)." });
-  }
-  next();
-}
+import crypto6 from "crypto";
+import { eq as eq9 } from "drizzle-orm";
 
 // src/server/auth/passwordService.ts
 import { hash, verify } from "@node-rs/argon2";
@@ -26463,7 +26793,11 @@ async function verifyPassword(passwordHash, plainPassword) {
   }
 }
 
+// src/server/auth/routes.ts
+init_sessionService();
+
 // src/server/auth/rateLimitService.ts
+init_schema();
 import crypto3 from "crypto";
 import { eq as eq6, and as and6, gt as gt3, desc as desc2 } from "drizzle-orm";
 var MAX_FAILED_ATTEMPTS = 5;
@@ -26578,109 +26912,37 @@ var RateLimitService = class {
 };
 
 // src/server/profiles/profileService.ts
+init_schema();
 import crypto4 from "crypto";
 import { eq as eq7, and as and7, asc } from "drizzle-orm";
 
 // src/core/profile/avatarRegistry.ts
-function buildAvatarSvg(primary, secondary, shapePath) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
-    <defs>
-      <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="${primary}" />
-        <stop offset="100%" stop-color="${secondary}" />
-      </linearGradient>
-      <linearGradient id="inner" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25" />
-        <stop offset="100%" stop-color="#000000" stop-opacity="0.35" />
-      </linearGradient>
-    </defs>
-    <rect width="120" height="120" rx="28" fill="url(#g)" />
-    <rect width="120" height="120" rx="28" fill="url(#inner)" />
-    <g fill="#ffffff" opacity="0.95">
-      ${shapePath}
-    </g>
-  </svg>`.replace(/\s+/g, " ").trim();
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-var OFFICIAL_AVATARS = [
-  {
-    id: "zapi-avatar-cyan",
-    name: "Ciano Neon",
-    primaryColor: "#00baa3",
-    secondaryColor: "#007df7",
-    gradient: "linear-gradient(135deg, #00baa3 0%, #007df7 100%)",
-    svgShape: '<path d="M60 26 L86 52 L60 78 L34 52 Z M60 42 L70 52 L60 62 L50 52 Z M54 84 L66 84 L66 94 L54 94 Z" />',
-    dataUri: ""
-  },
-  {
-    id: "zapi-avatar-blue",
-    name: "Azul C\xF3smico",
-    primaryColor: "#007df7",
-    secondaryColor: "#4f46e5",
-    gradient: "linear-gradient(135deg, #007df7 0%, #4f46e5 100%)",
-    svgShape: '<path d="M60 28 C76.5 28 90 41.5 90 58 C90 74.5 76.5 88 60 88 C43.5 88 30 74.5 30 58 C30 41.5 43.5 28 60 28 Z M60 40 C50 40 42 48 42 58 C42 68 50 76 60 76 C70 76 78 68 78 58 C78 48 70 40 60 40 Z" />',
-    dataUri: ""
-  },
-  {
-    id: "zapi-avatar-purple",
-    name: "Cyber Violeta",
-    primaryColor: "#b273d8",
-    secondaryColor: "#7c3aed",
-    gradient: "linear-gradient(135deg, #b273d8 0%, #7c3aed 100%)",
-    svgShape: '<polygon points="60,25 72,48 95,52 78,69 82,93 60,81 38,93 42,69 25,52 48,48" />',
-    dataUri: ""
-  },
-  {
-    id: "zapi-avatar-emerald",
-    name: "Esmeralda",
-    primaryColor: "#10b981",
-    secondaryColor: "#047857",
-    gradient: "linear-gradient(135deg, #10b981 0%, #047857 100%)",
-    svgShape: '<path d="M60 25 L88 45 L88 75 L60 95 L32 75 L32 45 Z M60 38 L44 50 L44 70 L60 82 L76 70 L76 50 Z" />',
-    dataUri: ""
-  },
-  {
-    id: "zapi-avatar-amber",
-    name: "\xC2mbar Solar",
-    primaryColor: "#f59e0b",
-    secondaryColor: "#d97706",
-    gradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-    svgShape: '<circle cx="60" cy="60" r="18" /><path d="M60 25 L60 35 M60 85 L60 95 M25 60 L35 60 M85 60 L95 60 M35 35 L42 42 M78 78 L85 85 M35 85 L42 78 M78 42 L85 35" stroke="#ffffff" stroke-width="4" stroke-linecap="round" fill="none" />',
-    dataUri: ""
-  },
-  {
-    id: "zapi-avatar-ruby",
-    name: "Rubi Intenso",
-    primaryColor: "#ef4444",
-    secondaryColor: "#b91c1c",
-    gradient: "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)",
-    svgShape: '<path d="M42 32 L78 32 L92 48 L60 92 L28 48 Z M45 44 L75 44 L60 76 Z" />',
-    dataUri: ""
-  },
-  {
-    id: "zapi-avatar-magenta",
-    name: "Magenta Neon",
-    primaryColor: "#ec4899",
-    secondaryColor: "#9333ea",
-    gradient: "linear-gradient(135deg, #ec4899 0%, #9333ea 100%)",
-    svgShape: '<path d="M48 35 L72 35 C80 35 86 41 86 49 C86 55 82 60 76 62 C83 64 88 70 88 77 C88 86 80 92 71 92 L48 92 Z M58 45 L58 56 L69 56 C72 56 75 53 75 50.5 C75 48 72 45 69 45 Z M58 66 L58 81 L71 81 C74 81 77 78 77 73.5 C77 69 74 66 71 66 Z" />',
-    dataUri: ""
-  },
-  {
-    id: "zapi-avatar-teal",
-    name: "Turquesa Glacial",
-    primaryColor: "#06b6d4",
-    secondaryColor: "#0e7490",
-    gradient: "linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)",
-    svgShape: '<path d="M60 25 L85 50 L60 95 L35 50 Z M60 40 L72 52 L60 78 L48 52 Z" />',
-    dataUri: ""
-  }
-];
-OFFICIAL_AVATARS.forEach((av) => {
-  av.dataUri = buildAvatarSvg(av.primaryColor, av.secondaryColor, av.svgShape);
-});
+init_avatarImages();
+var existingIds = ["cyan", "blue", "purple", "emerald", "amber", "ruby", "magenta", "teal"];
+var OFFICIAL_AVATARS = AVATARS.map((image, index2) => ({
+  id: `zapi-avatar-${existingIds[index2] || index2 + 1}`,
+  name: `Avatar ${index2 + 1}`,
+  primaryColor: "#007df7",
+  secondaryColor: "#00baa3",
+  gradient: "linear-gradient(135deg, #007df7, #00baa3)",
+  dataUri: image
+}));
 var DEFAULT_AVATAR_ID = "zapi-avatar-cyan";
-var VALID_AVATAR_IDS = OFFICIAL_AVATARS.map((a) => a.id);
+var VALID_AVATAR_IDS = OFFICIAL_AVATARS.map((avatar) => avatar.id);
+
+// src/server/profiles/avatarValidation.ts
+init_avatarImages();
+function isValidProfileAvatar(value) {
+  if (VALID_AVATAR_IDS.includes(value) || AVATARS.includes(value)) return true;
+  if (value.length > MAX_PROFILE_AVATAR_LENGTH) return false;
+  const match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
+  if (!match) return false;
+  const bytes = Buffer.from(match[2], "base64");
+  if (bytes.toString("base64") !== match[2]) return false;
+  if (match[1] === "png") return bytes.length >= 24 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  if (match[1] === "jpeg") return bytes.length >= 4 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 && bytes.at(-2) === 255 && bytes.at(-1) === 217;
+  return bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP";
+}
 
 // src/server/profiles/profileService.ts
 var MAX_PROFILES_PER_USER = process.env.MAX_PROFILES_PER_USER ? parseInt(process.env.MAX_PROFILES_PER_USER, 10) : 5;
@@ -26760,9 +27022,9 @@ var ProfileService = class {
     if (/[\u0000-\u001F\u007F]/.test(cleanName)) {
       throw new Error("O nome do perfil cont\xE9m caracteres inv\xE1lidos.");
     }
-    let avatarId = data.avatarId ? String(data.avatarId).trim() : DEFAULT_AVATAR_ID;
-    if (!VALID_AVATAR_IDS.includes(avatarId)) {
-      avatarId = DEFAULT_AVATAR_ID;
+    const avatarId = data.avatarId ? String(data.avatarId).trim() : DEFAULT_AVATAR_ID;
+    if (!isValidProfileAvatar(avatarId)) {
+      throw new Error("Identificador de avatar inv\xE1lido.");
     }
     const existing = await db.db.select().from(profiles).where(eq7(profiles.userId, userId)).orderBy(asc(profiles.displayOrder), asc(profiles.createdAt));
     if (existing.length >= MAX_PROFILES_PER_USER) {
@@ -26816,7 +27078,7 @@ var ProfileService = class {
     }
     if (data.avatarId !== void 0) {
       const cleanAvatar = String(data.avatarId).trim();
-      if (!VALID_AVATAR_IDS.includes(cleanAvatar)) {
+      if (!isValidProfileAvatar(cleanAvatar)) {
         throw new Error("Identificador de avatar inv\xE1lido.");
       }
       updates.avatarId = cleanAvatar;
@@ -26870,11 +27132,193 @@ var ProfileService = class {
   }
 };
 
+// src/server/auth/passwordRecovery.ts
+init_schema();
+import crypto5 from "node:crypto";
+import { and as and8, eq as eq8, gt as gt4, isNull as isNull3, sql as sql2 } from "drizzle-orm";
+
+// src/server/auth/recoveryEmail.ts
+var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function recoveryConfiguration() {
+  const apiKey = process.env.BREVO_API_KEY;
+  const sender = process.env.BREVO_SENDER_EMAIL;
+  let origin;
+  try {
+    origin = new URL(process.env.APP_URL || "");
+  } catch {
+    throw new Error("RECOVERY_NOT_CONFIGURED");
+  }
+  if (!apiKey || /[\r\n]/.test(apiKey) || !sender || !emailPattern.test(sender) || origin.protocol !== "https:" || origin.username || origin.password || origin.pathname !== "/" || origin.search || origin.hash) {
+    throw new Error("RECOVERY_NOT_CONFIGURED");
+  }
+  return { apiKey, sender, origin: origin.origin };
+}
+async function sendRecoveryEmail(email, link) {
+  const { apiKey, sender } = recoveryConfiguration();
+  const response2 = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    redirect: "error",
+    signal: AbortSignal.timeout(8e3),
+    headers: { accept: "application/json", "content-type": "application/json", "api-key": apiKey },
+    body: JSON.stringify({
+      sender: { name: "ZapiTV", email: sender },
+      to: [{ email }],
+      subject: "Redefina sua senha da ZapiTV",
+      textContent: `Recebemos um pedido para redefinir sua senha da ZapiTV.
+
+Acesse este link em at\xE9 15 minutos:
+${link}
+
+O link s\xF3 pode ser usado uma vez. Se voc\xEA n\xE3o fez este pedido, ignore esta mensagem. Sua senha permanece igual.`
+    })
+  });
+  if (!response2.ok) throw new Error("RECOVERY_EMAIL_DELIVERY_FAILED");
+}
+
+// src/server/auth/passwordRecovery.ts
+var digest = (value) => crypto5.createHash("sha256").update(value).digest("hex");
+var response = () => ({ message: "Se existir uma conta com esse e-mail, voc\xEA receber\xE1 as instru\xE7\xF5es de recupera\xE7\xE3o." });
+var fifteenMinutes = 15 * 6e4;
+async function requestRecovery(db, email, ip, deliver = sendRecoveryEmail) {
+  const { origin } = recoveryConfiguration();
+  const cleanEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) || cleanEmail.length > 255) throw new Error("INVALID_RECOVERY_EMAIL");
+  const now = Date.now();
+  const token = crypto5.randomBytes(32).toString("hex");
+  const id = crypto5.randomUUID();
+  const target = await db.db.transaction(async (tx) => {
+    const emailKey = `recovery:email:${digest(cleanEmail)}`;
+    const ipKey = `recovery:ip:${digest(ip)}`;
+    const count2 = async (identifier, since) => Number((await tx.select({ n: sql2`count(*)` }).from(loginAttempts).where(and8(eq8(loginAttempts.identifier, identifier), gt4(loginAttempts.attemptAt, since))))[0].n);
+    if (await count2(emailKey, now - fifteenMinutes) >= 3 || await count2(ipKey, now - fifteenMinutes) >= 30 || await count2("recovery:delivery", now - 864e5) >= 250) return null;
+    for (const identifier of [emailKey, ipKey]) {
+      await tx.insert(loginAttempts).values({ id: crypto5.randomUUID(), identifier, attemptAt: now, success: 0 });
+    }
+    const user = (await tx.select({ id: users.id, email: users.email }).from(users).where(and8(eq8(users.email, cleanEmail), eq8(users.status, "active"))).limit(1))[0];
+    if (!user) return null;
+    await tx.insert(loginAttempts).values({ id: crypto5.randomUUID(), identifier: "recovery:delivery", attemptAt: now, success: 0 });
+    await tx.insert(passwordResetTokens).values({ id, userId: user.id, tokenHash: digest(token), createdAt: now, expiresAt: now + fifteenMinutes });
+    return user;
+  });
+  if (!target) return response();
+  try {
+    await deliver(target.email, `${origin}/redefinir-senha#token=${token}`);
+  } catch {
+    await db.db.delete(passwordResetTokens).where(eq8(passwordResetTokens.id, id));
+    console.error(JSON.stringify({ event: "password_recovery_delivery_failed", code: "EMAIL_PROVIDER_FAILED" }));
+  }
+  return response();
+}
+async function completeRecovery(db, token, password, confirmation) {
+  if (typeof token !== "string" || !/^[a-f0-9]{64}$/.test(token)) throw new Error("RESET_TOKEN_INVALID");
+  if (typeof password !== "string" || password.length < 8 || password.length > 128 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password) || password !== confirmation) throw new Error("RESET_PASSWORD_INVALID");
+  const passwordHash = await hashPassword(password);
+  const now = Date.now();
+  await db.db.transaction(async (tx) => {
+    const claim = await tx.update(passwordResetTokens).set({ usedAt: now }).where(and8(eq8(passwordResetTokens.tokenHash, digest(token)), isNull3(passwordResetTokens.usedAt), gt4(passwordResetTokens.expiresAt, now))).returning({ userId: passwordResetTokens.userId });
+    if (claim.length !== 1) throw new Error("RESET_TOKEN_INVALID");
+    const userId = claim[0].userId;
+    const changed = await tx.update(users).set({ passwordHash, updatedAt: now }).where(and8(eq8(users.id, userId), eq8(users.status, "active"))).returning({ id: users.id });
+    if (!changed.length) throw new Error("RESET_TOKEN_INVALID");
+    await tx.update(sessions).set({ revokedAt: now, updatedAt: now }).where(and8(eq8(sessions.userId, userId), isNull3(sessions.revokedAt)));
+    await tx.update(passwordResetTokens).set({ usedAt: now }).where(and8(eq8(passwordResetTokens.userId, userId), isNull3(passwordResetTokens.usedAt)));
+  });
+  return { success: true, message: "Senha atualizada. Entre novamente na sua conta." };
+}
+
+// src/server/auth/authPolicyService.ts
+var AUTH_POLICY_KEY = "auth_policy";
+var cachedPolicy = null;
+var cachedPolicyExpiresAt = 0;
+async function getAuthPolicy(db) {
+  const now = Date.now();
+  if (cachedPolicy && now < cachedPolicyExpiresAt) {
+    return cachedPolicy;
+  }
+  const defaultPolicy = {
+    mandatoryAuth: process.env.MANDATORY_AUTH !== "false",
+    version: 0,
+    updatedAt: now
+  };
+  if (!db) {
+    try {
+      const { getValidDatabase: getValidDatabase2 } = await Promise.resolve().then(() => (init_authMiddleware(), authMiddleware_exports));
+      db = await getValidDatabase2();
+    } catch {
+    }
+  }
+  if (!db) {
+    return defaultPolicy;
+  }
+  try {
+    const setting = await readSetting(db, AUTH_POLICY_KEY);
+    if (setting && typeof setting.value === "object" && setting.value !== null) {
+      const val = setting.value;
+      cachedPolicy = {
+        mandatoryAuth: typeof val.mandatoryAuth === "boolean" ? val.mandatoryAuth : defaultPolicy.mandatoryAuth,
+        version: setting.version,
+        updatedAt: setting.updatedAt
+      };
+      cachedPolicyExpiresAt = now + 3e3;
+      return cachedPolicy;
+    }
+  } catch {
+  }
+  cachedPolicy = defaultPolicy;
+  cachedPolicyExpiresAt = now + 3e3;
+  return defaultPolicy;
+}
+async function setAuthPolicy(db, mandatoryAuth, actorUid = "admin", expectedVersion) {
+  let versionToUse = expectedVersion;
+  if (versionToUse === void 0) {
+    const currentSetting = await readSetting(db, AUTH_POLICY_KEY);
+    versionToUse = currentSetting ? currentSetting.version : 0;
+  }
+  const result = await writeSetting(
+    db,
+    AUTH_POLICY_KEY,
+    { mandatoryAuth },
+    versionToUse,
+    actorUid
+  );
+  cachedPolicy = {
+    mandatoryAuth,
+    version: result.version,
+    updatedAt: result.updatedAt
+  };
+  cachedPolicyExpiresAt = Date.now() + 3e3;
+  return cachedPolicy;
+}
+
 // src/server/auth/routes.ts
 var authRouter = express.Router();
 var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 var isProduction = process.env.NODE_ENV === "production";
 authRouter.use(requireCsrfProtection);
+authRouter.post("/forgot-password", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) return res.status(503).json({ error: "Servi\xE7o temporariamente indispon\xEDvel." });
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+    return res.status(202).json(await requestRecovery(db, req.body?.email, ip));
+  } catch (error) {
+    if (error.message === "INVALID_RECOVERY_EMAIL") return res.status(400).json({ error: "Informe um e-mail v\xE1lido." });
+    return res.status(503).json({ error: "A recupera\xE7\xE3o de senha est\xE1 temporariamente indispon\xEDvel. Tente novamente mais tarde." });
+  }
+});
+authRouter.post("/reset-password", async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) return res.status(503).json({ error: "Servi\xE7o temporariamente indispon\xEDvel." });
+    const result = await completeRecovery(db, req.body?.token, req.body?.password, req.body?.passwordConfirm);
+    res.setHeader("Set-Cookie", formatSetCookie("", { clear: true, isProduction }));
+    return res.status(200).json(result);
+  } catch (error) {
+    if (error.message === "RESET_TOKEN_INVALID") return res.status(400).json({ error: "Este link \xE9 inv\xE1lido, expirou ou j\xE1 foi usado. Solicite outro." });
+    if (error.message === "RESET_PASSWORD_INVALID") return res.status(400).json({ error: "Use de 8 a 128 caracteres, com letra e n\xFAmero, e confirme a mesma senha." });
+    return res.status(503).json({ error: "N\xE3o foi poss\xEDvel atualizar sua senha agora. Tente novamente." });
+  }
+});
 authRouter.post("/register", async (req, res) => {
   try {
     const { name, email, password, passwordConfirm, termsAccepted } = req.body || {};
@@ -26904,12 +27348,12 @@ authRouter.post("/register", async (req, res) => {
     if (!db) {
       return res.status(503).json({ error: "Banco de dados de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
     }
-    const existing = await db.db.select({ id: users.id }).from(users).where(eq8(users.email, cleanEmail)).limit(1);
+    const existing = await db.db.select({ id: users.id }).from(users).where(eq9(users.email, cleanEmail)).limit(1);
     if (existing.length > 0) {
       return res.status(409).json({ error: "Este e-mail j\xE1 est\xE1 cadastrado na ZapiTV." });
     }
     const passwordHash = await hashPassword(password);
-    const userId = crypto5.randomUUID();
+    const userId = crypto6.randomUUID();
     const now = Date.now();
     await db.db.insert(users).values({
       id: userId,
@@ -26932,6 +27376,7 @@ authRouter.post("/register", async (req, res) => {
         name: cleanName,
         email: cleanEmail,
         status: "active",
+        role: isUserAdmin({ id: userId, email: cleanEmail }) ? "admin" : "user",
         createdAt: now
       }
     });
@@ -26967,7 +27412,7 @@ authRouter.post("/login", async (req, res) => {
       passwordHash: users.passwordHash,
       status: users.status,
       createdAt: users.createdAt
-    }).from(users).where(eq8(users.email, cleanEmail)).limit(1);
+    }).from(users).where(eq9(users.email, cleanEmail)).limit(1);
     if (foundUsers.length === 0) {
       await RateLimitService.recordFailure(db, cleanEmail, clientIp);
       await RateLimitService.recordFailure(db, clientIp, clientIp);
@@ -26995,6 +27440,7 @@ authRouter.post("/login", async (req, res) => {
         name: user.name,
         email: user.email,
         status: user.status,
+        role: isUserAdmin({ id: user.id, email: user.email }) ? "admin" : "user",
         createdAt: user.createdAt
       }
     });
@@ -27024,6 +27470,7 @@ authRouter.post("/logout", async (req, res) => {
   }
 });
 authRouter.get("/me", optionalUser, async (req, res) => {
+  const policy = await getAuthPolicy();
   if (req.user) {
     let activeProfile = null;
     try {
@@ -27037,14 +27484,42 @@ authRouter.get("/me", optionalUser, async (req, res) => {
     return res.status(200).json({
       authenticated: true,
       user: req.user,
-      activeProfile
+      activeProfile,
+      mandatoryAuth: policy.mandatoryAuth,
+      policyVersion: policy.version
     });
   }
   return res.status(200).json({
     authenticated: false,
     user: null,
-    activeProfile: null
+    activeProfile: null,
+    mandatoryAuth: policy.mandatoryAuth,
+    policyVersion: policy.version
   });
+});
+authRouter.get("/policy", async (_req, res) => {
+  const policy = await getAuthPolicy();
+  return res.status(200).json(policy);
+});
+authRouter.put("/policy", optionalUser, async (req, res) => {
+  try {
+    const { mandatoryAuth, expectedVersion } = req.body || {};
+    if (typeof mandatoryAuth !== "boolean") {
+      return res.status(400).json({ error: "O campo mandatoryAuth \xE9 obrigat\xF3rio e deve ser booleano." });
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
+    }
+    const actorUid = req.user?.id || "admin";
+    const updated = await setAuthPolicy(db, mandatoryAuth, actorUid, expectedVersion);
+    return res.status(200).json(updated);
+  } catch (err) {
+    if (err && (err.name === "SettingVersionConflict" || err.message && err.message.includes("modificada em outra sess\xE3o"))) {
+      return res.status(409).json({ error: "Conflito de vers\xE3o na pol\xEDtica global de autentica\xE7\xE3o." });
+    }
+    return res.status(500).json({ error: "Erro interno ao atualizar a pol\xEDtica global." });
+  }
 });
 authRouter.get("/user/:id", authenticateUser, (req, res) => {
   const requestedId = req.params.id;
@@ -27055,6 +27530,8 @@ authRouter.get("/user/:id", authenticateUser, (req, res) => {
 });
 
 // src/server/profiles/routes.ts
+init_authMiddleware();
+init_sessionService();
 import express2 from "express";
 var profilesRouter = express2.Router();
 var ACTIVE_PROFILE_COOKIE = "zapitv_active_profile";
@@ -27125,7 +27602,7 @@ profilesRouter.post("/", async (req, res) => {
       profile: created
     });
   } catch (err) {
-    const status = err?.message?.includes("Limite m\xE1ximo") || err?.message?.includes("caracteres") ? 400 : 500;
+    const status = err?.message?.includes("Limite m\xE1ximo") || err?.message?.includes("caracteres") || err?.message?.includes("inv\xE1lido") ? 400 : 500;
     return res.status(status).json({ error: err?.message || "Erro ao criar perfil." });
   }
 });
@@ -27196,11 +27673,15 @@ profilesRouter.delete("/:id", async (req, res) => {
 });
 
 // src/server/deviceAuth/routes.ts
+init_authMiddleware();
+init_sessionService();
 import { Router as Router3 } from "express";
 
 // src/server/deviceAuth/deviceAuthService.ts
-import crypto6 from "crypto";
-import { eq as eq9, and as and8, isNull as isNull3, gt as gt4, sql as sql2 } from "drizzle-orm";
+init_schema();
+init_sessionService();
+import crypto7 from "crypto";
+import { eq as eq10, and as and9, isNull as isNull4, gt as gt5, sql as sql3 } from "drizzle-orm";
 var CHALLENGE_EXPIRY_MS = 10 * 60 * 1e3;
 var DEFAULT_POLL_INTERVAL_SEC = 5;
 var SLOW_DOWN_INTERVAL_SEC = 10;
@@ -27219,13 +27700,13 @@ async function clearValidationAttempts(db, ip) {
   await RateLimitService.recordSuccess(db, identifier, ip);
 }
 function hashDeviceCode(deviceCode) {
-  return crypto6.createHash("sha256").update(deviceCode).digest("hex");
+  return crypto7.createHash("sha256").update(deviceCode).digest("hex");
 }
 function generateDeviceCode() {
-  return crypto6.randomBytes(32).toString("hex");
+  return crypto7.randomBytes(32).toString("hex");
 }
 function generateUserCode() {
-  const bytes = crypto6.randomBytes(8);
+  const bytes = crypto7.randomBytes(8);
   let code = "";
   for (let i = 0; i < 8; i++) {
     code += USER_CODE_ALPHABET[bytes[i] % USER_CODE_ALPHABET.length];
@@ -27316,7 +27797,7 @@ async function createDeviceLinkChallenge(db, options) {
   const { deviceName, deviceType } = detectDeviceFromUserAgent(options.userAgent);
   const now = Date.now();
   const expiresAt = now + CHALLENGE_EXPIRY_MS;
-  const challengeId = crypto6.randomUUID();
+  const challengeId = crypto7.randomUUID();
   await db.db.insert(deviceLinkChallenges).values({
     id: challengeId,
     deviceCodeHash,
@@ -27353,7 +27834,7 @@ async function pollDeviceLinkChallenge(db, deviceCode, options) {
   }
   const deviceCodeHash = hashDeviceCode(deviceCode);
   const now = Date.now();
-  const found = await db.db.select().from(deviceLinkChallenges).where(eq9(deviceLinkChallenges.deviceCodeHash, deviceCodeHash)).limit(1);
+  const found = await db.db.select().from(deviceLinkChallenges).where(eq10(deviceLinkChallenges.deviceCodeHash, deviceCodeHash)).limit(1);
   if (!found || found.length === 0) {
     return { status: "expired", error: "invalid_grant" };
   }
@@ -27363,7 +27844,7 @@ async function pollDeviceLinkChallenge(db, deviceCode, options) {
   }
   if (challenge.status === "expired" || challenge.expiresAt < now) {
     if (challenge.status !== "expired") {
-      await db.db.update(deviceLinkChallenges).set({ status: "expired", updatedAt: now }).where(eq9(deviceLinkChallenges.id, challenge.id));
+      await db.db.update(deviceLinkChallenges).set({ status: "expired", updatedAt: now }).where(eq10(deviceLinkChallenges.id, challenge.id));
     }
     return { status: "expired", error: "expired_token" };
   }
@@ -27375,14 +27856,14 @@ async function pollDeviceLinkChallenge(db, deviceCode, options) {
       pollCount: challenge.pollCount + 1,
       lastPolledAt: now,
       updatedAt: now
-    }).where(eq9(deviceLinkChallenges.id, challenge.id));
+    }).where(eq10(deviceLinkChallenges.id, challenge.id));
     return { status: "slow_down", error: "slow_down", interval: SLOW_DOWN_INTERVAL_SEC };
   }
   await db.db.update(deviceLinkChallenges).set({
     pollCount: challenge.pollCount + 1,
     lastPolledAt: now,
     updatedAt: now
-  }).where(eq9(deviceLinkChallenges.id, challenge.id));
+  }).where(eq10(deviceLinkChallenges.id, challenge.id));
   if (challenge.status === "pending") {
     return { status: "pending", interval: DEFAULT_POLL_INTERVAL_SEC };
   }
@@ -27392,12 +27873,12 @@ async function pollDeviceLinkChallenge(db, deviceCode, options) {
       consumedAt: now,
       updatedAt: now
     }).where(
-      and8(
-        eq9(deviceLinkChallenges.id, challenge.id),
-        eq9(deviceLinkChallenges.status, "approved")
+      and9(
+        eq10(deviceLinkChallenges.id, challenge.id),
+        eq10(deviceLinkChallenges.status, "approved")
       )
     );
-    const refreshed = await db.db.select().from(deviceLinkChallenges).where(eq9(deviceLinkChallenges.id, challenge.id)).limit(1);
+    const refreshed = await db.db.select().from(deviceLinkChallenges).where(eq10(deviceLinkChallenges.id, challenge.id)).limit(1);
     if (!refreshed || refreshed[0].status !== "consumed" || refreshed[0].consumedAt !== now) {
       return { status: "consumed", error: "invalid_grant" };
     }
@@ -27406,7 +27887,7 @@ async function pollDeviceLinkChallenge(db, deviceCode, options) {
       name: users.name,
       email: users.email,
       status: users.status
-    }).from(users).where(eq9(users.id, challenge.userId)).limit(1);
+    }).from(users).where(eq10(users.id, challenge.userId)).limit(1);
     if (!userRows || userRows.length === 0 || userRows[0].status !== "active") {
       return { status: "rejected", error: "access_denied" };
     }
@@ -27415,7 +27896,7 @@ async function pollDeviceLinkChallenge(db, deviceCode, options) {
       ipAddress: options?.clientIp || challenge.clientIp || void 0,
       userAgent: options?.userAgent || challenge.userAgent || void 0
     });
-    const linkedDeviceId = crypto6.randomUUID();
+    const linkedDeviceId = crypto7.randomUUID();
     await db.db.insert(linkedDevices).values({
       id: linkedDeviceId,
       userId: linkedUser.id,
@@ -27460,10 +27941,10 @@ async function validateDeviceUserCode(db, rawUserCode, clientIp) {
   const formatted = formatUserCodeDisplay(cleanCode);
   const now = Date.now();
   const found = await db.db.select().from(deviceLinkChallenges).where(
-    and8(
-      sql2`REPLACE(${deviceLinkChallenges.userCode}, '-', '') = ${cleanCode}`,
-      gt4(deviceLinkChallenges.expiresAt, now),
-      eq9(deviceLinkChallenges.status, "pending")
+    and9(
+      sql3`REPLACE(${deviceLinkChallenges.userCode}, '-', '') = ${cleanCode}`,
+      gt5(deviceLinkChallenges.expiresAt, now),
+      eq10(deviceLinkChallenges.status, "pending")
     )
   ).limit(1);
   if (!found || found.length === 0) {
@@ -27493,10 +27974,10 @@ async function approveDeviceLink(db, rawUserCode, userId) {
   }
   const now = Date.now();
   const found = await db.db.select().from(deviceLinkChallenges).where(
-    and8(
-      sql2`REPLACE(${deviceLinkChallenges.userCode}, '-', '') = ${cleanCode}`,
-      gt4(deviceLinkChallenges.expiresAt, now),
-      eq9(deviceLinkChallenges.status, "pending")
+    and9(
+      sql3`REPLACE(${deviceLinkChallenges.userCode}, '-', '') = ${cleanCode}`,
+      gt5(deviceLinkChallenges.expiresAt, now),
+      eq10(deviceLinkChallenges.status, "pending")
     )
   ).limit(1);
   if (!found || found.length === 0) {
@@ -27509,9 +27990,9 @@ async function approveDeviceLink(db, rawUserCode, userId) {
     approvedAt: now,
     updatedAt: now
   }).where(
-    and8(
-      eq9(deviceLinkChallenges.id, challenge.id),
-      eq9(deviceLinkChallenges.status, "pending")
+    and9(
+      eq10(deviceLinkChallenges.id, challenge.id),
+      eq10(deviceLinkChallenges.status, "pending")
     )
   );
   return { success: true, message: "Dispositivo autorizado com sucesso!" };
@@ -27523,16 +28004,16 @@ async function rejectDeviceLink(db, rawUserCode) {
   }
   const now = Date.now();
   const found = await db.db.select().from(deviceLinkChallenges).where(
-    and8(
-      sql2`REPLACE(${deviceLinkChallenges.userCode}, '-', '') = ${cleanCode}`,
-      eq9(deviceLinkChallenges.status, "pending")
+    and9(
+      sql3`REPLACE(${deviceLinkChallenges.userCode}, '-', '') = ${cleanCode}`,
+      eq10(deviceLinkChallenges.status, "pending")
     )
   ).limit(1);
   if (found && found.length > 0) {
     await db.db.update(deviceLinkChallenges).set({
       status: "rejected",
       updatedAt: now
-    }).where(eq9(deviceLinkChallenges.id, found[0].id));
+    }).where(eq10(deviceLinkChallenges.id, found[0].id));
   }
   return { success: true, message: "Vincula\xE7\xE3o recusada." };
 }
@@ -27547,11 +28028,11 @@ async function listUserLinkedDevices(db, userId, currentSessionId) {
     lastActiveAt: linkedDevices.lastActiveAt,
     createdAt: linkedDevices.createdAt
   }).from(linkedDevices).where(
-    and8(
-      eq9(linkedDevices.userId, userId),
-      isNull3(linkedDevices.revokedAt)
+    and9(
+      eq10(linkedDevices.userId, userId),
+      isNull4(linkedDevices.revokedAt)
     )
-  ).orderBy(sql2`${linkedDevices.lastActiveAt} DESC`);
+  ).orderBy(sql3`${linkedDevices.lastActiveAt} DESC`);
   return rows.map((r) => ({
     id: r.id,
     deviceName: r.deviceName,
@@ -27565,10 +28046,10 @@ async function listUserLinkedDevices(db, userId, currentSessionId) {
 }
 async function revokeUserLinkedDevice(db, userId, deviceId) {
   const found = await db.db.select().from(linkedDevices).where(
-    and8(
-      eq9(linkedDevices.id, deviceId),
-      eq9(linkedDevices.userId, userId),
-      isNull3(linkedDevices.revokedAt)
+    and9(
+      eq10(linkedDevices.id, deviceId),
+      eq10(linkedDevices.userId, userId),
+      isNull4(linkedDevices.revokedAt)
     )
   ).limit(1);
   if (!found || found.length === 0) {
@@ -27576,8 +28057,8 @@ async function revokeUserLinkedDevice(db, userId, deviceId) {
   }
   const device = found[0];
   const now = Date.now();
-  await db.db.update(linkedDevices).set({ revokedAt: now }).where(eq9(linkedDevices.id, device.id));
-  await db.db.update(sessions).set({ revokedAt: now, updatedAt: now }).where(and8(eq9(sessions.id, device.sessionId), isNull3(sessions.revokedAt)));
+  await db.db.update(linkedDevices).set({ revokedAt: now }).where(eq10(linkedDevices.id, device.id));
+  await db.db.update(sessions).set({ revokedAt: now, updatedAt: now }).where(and9(eq10(sessions.id, device.sessionId), isNull4(sessions.revokedAt)));
   return { success: true };
 }
 
@@ -27742,11 +28223,14 @@ linkedDevicesRouter.delete("/:id", requireCsrfProtection, authenticateUser, asyn
 });
 
 // src/server/sync/routes.ts
+init_authMiddleware();
+init_sessionService();
 import express3 from "express";
 
 // src/server/sync/syncService.ts
-import crypto7 from "crypto";
-import { eq as eq10, and as and9, gt as gt5, lt as lt2, desc as desc3 } from "drizzle-orm";
+init_schema();
+import crypto8 from "crypto";
+import { eq as eq11, and as and10, gt as gt6, lt as lt2, desc as desc3 } from "drizzle-orm";
 var SyncService = class {
   /**
    * Normaliza carimbo de tempo considerando autoridade de tempo do servidor e desvio de relógio (clock skew).
@@ -27811,11 +28295,11 @@ var SyncService = class {
     );
     const deviceName = input.deviceName ? String(input.deviceName).slice(0, 80) : null;
     const existing = await orm.select().from(profilePlaybackProgress).where(
-      and9(
-        eq10(profilePlaybackProgress.profileId, profileId),
-        eq10(profilePlaybackProgress.canonicalId, canonicalId),
-        eq10(profilePlaybackProgress.season, season),
-        eq10(profilePlaybackProgress.episode, episode)
+      and10(
+        eq11(profilePlaybackProgress.profileId, profileId),
+        eq11(profilePlaybackProgress.canonicalId, canonicalId),
+        eq11(profilePlaybackProgress.season, season),
+        eq11(profilePlaybackProgress.episode, episode)
       )
     ).limit(1);
     if (existing.length > 0) {
@@ -27834,7 +28318,7 @@ var SyncService = class {
         version: nextVersion,
         deviceName: deviceName ?? curr.deviceName,
         updatedAt: nextUpdatedAt
-      }).where(eq10(profilePlaybackProgress.id, curr.id));
+      }).where(eq11(profilePlaybackProgress.id, curr.id));
       const updated = {
         ...curr,
         contentType,
@@ -27848,7 +28332,7 @@ var SyncService = class {
       };
       return { record: updated, conflictResolved: false };
     }
-    const newId = crypto7.randomUUID();
+    const newId = crypto8.randomUUID();
     const newRecord = {
       id: newId,
       profileId,
@@ -27871,22 +28355,22 @@ var SyncService = class {
    * Obtém todo o progresso do perfil (para Continuar Assistindo e hidratação).
    */
   static async getProgressList(db, profileId, since) {
-    const conditions = [eq10(profilePlaybackProgress.profileId, profileId)];
+    const conditions = [eq11(profilePlaybackProgress.profileId, profileId)];
     if (since && since > 0) {
-      conditions.push(gt5(profilePlaybackProgress.updatedAt, since));
+      conditions.push(gt6(profilePlaybackProgress.updatedAt, since));
     }
-    return await db.db.select().from(profilePlaybackProgress).where(and9(...conditions)).orderBy(desc3(profilePlaybackProgress.updatedAt));
+    return await db.db.select().from(profilePlaybackProgress).where(and10(...conditions)).orderBy(desc3(profilePlaybackProgress.updatedAt));
   }
   /**
    * Obtém progresso de um item específico
    */
   static async getProgressItem(db, profileId, canonicalId, season = 0, episode = 0) {
     const found = await db.db.select().from(profilePlaybackProgress).where(
-      and9(
-        eq10(profilePlaybackProgress.profileId, profileId),
-        eq10(profilePlaybackProgress.canonicalId, canonicalId),
-        eq10(profilePlaybackProgress.season, season),
-        eq10(profilePlaybackProgress.episode, episode)
+      and10(
+        eq11(profilePlaybackProgress.profileId, profileId),
+        eq11(profilePlaybackProgress.canonicalId, canonicalId),
+        eq11(profilePlaybackProgress.season, season),
+        eq11(profilePlaybackProgress.episode, episode)
       )
     ).limit(1);
     return found[0] || null;
@@ -27911,11 +28395,11 @@ var SyncService = class {
       input.clientSendTime
     );
     const existing = await orm.select().from(profileWatchHistory).where(
-      and9(
-        eq10(profileWatchHistory.profileId, profileId),
-        eq10(profileWatchHistory.canonicalId, canonicalId),
-        eq10(profileWatchHistory.season, season),
-        eq10(profileWatchHistory.episode, episode)
+      and10(
+        eq11(profileWatchHistory.profileId, profileId),
+        eq11(profileWatchHistory.canonicalId, canonicalId),
+        eq11(profileWatchHistory.season, season),
+        eq11(profileWatchHistory.episode, episode)
       )
     ).limit(1);
     if (existing.length > 0) {
@@ -27931,7 +28415,7 @@ var SyncService = class {
         watchedAt: maxWatched,
         updatedAt: nextUpdatedAt,
         version: nextVersion
-      }).where(eq10(profileWatchHistory.id, curr.id));
+      }).where(eq11(profileWatchHistory.id, curr.id));
       return {
         ...curr,
         contentType,
@@ -27943,7 +28427,7 @@ var SyncService = class {
         version: nextVersion
       };
     }
-    const newId = crypto7.randomUUID();
+    const newId = crypto8.randomUUID();
     const newRecord = {
       id: newId,
       profileId,
@@ -27965,13 +28449,13 @@ var SyncService = class {
    * Obtém histórico recente do perfil.
    */
   static async getHistory(db, profileId, limit = 50, offset = 0, since) {
-    const conditions = [eq10(profileWatchHistory.profileId, profileId)];
+    const conditions = [eq11(profileWatchHistory.profileId, profileId)];
     if (since && since > 0) {
-      conditions.push(gt5(profileWatchHistory.updatedAt, since));
+      conditions.push(gt6(profileWatchHistory.updatedAt, since));
     }
     const safeLimit = Math.min(100, Math.max(1, limit));
     const safeOffset = Math.max(0, offset);
-    return await db.db.select().from(profileWatchHistory).where(and9(...conditions)).orderBy(desc3(profileWatchHistory.watchedAt)).limit(safeLimit).offset(safeOffset);
+    return await db.db.select().from(profileWatchHistory).where(and10(...conditions)).orderBy(desc3(profileWatchHistory.watchedAt)).limit(safeLimit).offset(safeOffset);
   }
   // ==========================================================================
   // MINHA LISTA (profile_my_list com tombstones e autoridade do servidor)
@@ -27989,9 +28473,9 @@ var SyncService = class {
     }
     const { effectiveEventTime, serverNow } = this.normalizeTimestamp(timestamp, clientSendTime);
     const existing = await orm.select().from(profileMyList).where(
-      and9(
-        eq10(profileMyList.profileId, profileId),
-        eq10(profileMyList.canonicalId, cleanId)
+      and10(
+        eq11(profileMyList.profileId, profileId),
+        eq11(profileMyList.canonicalId, cleanId)
       )
     ).limit(1);
     if (existing.length > 0) {
@@ -28004,7 +28488,7 @@ var SyncService = class {
           removedAt: effectiveEventTime,
           updatedAt: nextUpdatedAt,
           version: nextVersion
-        }).where(eq10(profileMyList.id, curr.id));
+        }).where(eq11(profileMyList.id, curr.id));
         return {
           record: {
             ...curr,
@@ -28025,7 +28509,7 @@ var SyncService = class {
           addedAt: effectiveEventTime,
           updatedAt: nextUpdatedAt,
           version: nextVersion
-        }).where(eq10(profileMyList.id, curr.id));
+        }).where(eq11(profileMyList.id, curr.id));
         return {
           record: {
             ...curr,
@@ -28039,7 +28523,7 @@ var SyncService = class {
         };
       }
     }
-    const newId = crypto7.randomUUID();
+    const newId = crypto8.randomUUID();
     const newRecord = {
       id: newId,
       profileId,
@@ -28057,14 +28541,14 @@ var SyncService = class {
    * Obtém itens de Minha Lista. Por padrão retorna apenas itens ativos (isRemoved = 0).
    */
   static async getMyList(db, profileId, includeRemoved = false, since) {
-    const conditions = [eq10(profileMyList.profileId, profileId)];
+    const conditions = [eq11(profileMyList.profileId, profileId)];
     if (!includeRemoved) {
-      conditions.push(eq10(profileMyList.isRemoved, 0));
+      conditions.push(eq11(profileMyList.isRemoved, 0));
     }
     if (since && since > 0) {
-      conditions.push(gt5(profileMyList.updatedAt, since));
+      conditions.push(gt6(profileMyList.updatedAt, since));
     }
-    return await db.db.select().from(profileMyList).where(and9(...conditions)).orderBy(desc3(profileMyList.addedAt));
+    return await db.db.select().from(profileMyList).where(and10(...conditions)).orderBy(desc3(profileMyList.addedAt));
   }
   // ==========================================================================
   // FAVORITOS (profile_favorites com tombstones e autoridade do servidor)
@@ -28080,9 +28564,9 @@ var SyncService = class {
     }
     const { effectiveEventTime, serverNow } = this.normalizeTimestamp(timestamp, clientSendTime);
     const existing = await orm.select().from(profileFavorites).where(
-      and9(
-        eq10(profileFavorites.profileId, profileId),
-        eq10(profileFavorites.canonicalId, cleanId)
+      and10(
+        eq11(profileFavorites.profileId, profileId),
+        eq11(profileFavorites.canonicalId, cleanId)
       )
     ).limit(1);
     if (existing.length > 0) {
@@ -28095,7 +28579,7 @@ var SyncService = class {
           removedAt: effectiveEventTime,
           updatedAt: nextUpdatedAt,
           version: nextVersion
-        }).where(eq10(profileFavorites.id, curr.id));
+        }).where(eq11(profileFavorites.id, curr.id));
         return {
           record: {
             ...curr,
@@ -28116,7 +28600,7 @@ var SyncService = class {
           addedAt: effectiveEventTime,
           updatedAt: nextUpdatedAt,
           version: nextVersion
-        }).where(eq10(profileFavorites.id, curr.id));
+        }).where(eq11(profileFavorites.id, curr.id));
         return {
           record: {
             ...curr,
@@ -28130,7 +28614,7 @@ var SyncService = class {
         };
       }
     }
-    const newId = crypto7.randomUUID();
+    const newId = crypto8.randomUUID();
     const newRecord = {
       id: newId,
       profileId,
@@ -28148,14 +28632,14 @@ var SyncService = class {
    * Obtém favoritos do perfil.
    */
   static async getFavorites(db, profileId, includeRemoved = false, since) {
-    const conditions = [eq10(profileFavorites.profileId, profileId)];
+    const conditions = [eq11(profileFavorites.profileId, profileId)];
     if (!includeRemoved) {
-      conditions.push(eq10(profileFavorites.isRemoved, 0));
+      conditions.push(eq11(profileFavorites.isRemoved, 0));
     }
     if (since && since > 0) {
-      conditions.push(gt5(profileFavorites.updatedAt, since));
+      conditions.push(gt6(profileFavorites.updatedAt, since));
     }
-    return await db.db.select().from(profileFavorites).where(and9(...conditions)).orderBy(desc3(profileFavorites.addedAt));
+    return await db.db.select().from(profileFavorites).where(and10(...conditions)).orderBy(desc3(profileFavorites.addedAt));
   }
   // ==========================================================================
   // PULL COMPLETO DE HIDRATAÇÃO DO PERFIL
@@ -28596,7 +29080,7 @@ async function publicHttpGet(raw, options = {}) {
   let current = raw;
   for (let redirects = 0; redirects <= 3; redirects++) {
     const { url, address, family } = await resolvePublicTarget(current);
-    const response = await new Promise((resolve, reject) => {
+    const response2 = await new Promise((resolve, reject) => {
       const request = (url.protocol === "https:" ? https : http).request(url, {
         method: "GET",
         headers: options.headers,
@@ -28608,27 +29092,27 @@ async function publicHttpGet(raw, options = {}) {
       request.on("error", reject);
       request.end();
     });
-    if ([301, 302, 303, 307, 308].includes(response.statusCode || 0) && response.headers.location) {
-      response.destroy();
+    if ([301, 302, 303, 307, 308].includes(response2.statusCode || 0) && response2.headers.location) {
+      response2.destroy();
       if (redirects === 3) throw new Error("Redirecionamentos em excesso");
-      current = new URL(response.headers.location, url).href;
+      current = new URL(response2.headers.location, url).href;
       continue;
     }
     const headers = new Headers();
-    for (const [name, value] of Object.entries(response.headers)) {
+    for (const [name, value] of Object.entries(response2.headers)) {
       if (typeof value === "string") headers.set(name, value);
     }
     const readLimited = async (limit, truncate = false) => {
       const chunks = [];
       let size = 0;
-      for await (const chunk of response) {
+      for await (const chunk of response2) {
         if (size + chunk.length > limit) {
           if (truncate) {
             chunks.push(chunk.subarray(0, limit - size));
-            response.destroy();
+            response2.destroy();
             return Buffer.concat(chunks);
           }
-          response.destroy();
+          response2.destroy();
           throw new Error("Resposta excede o limite permitido");
         }
         size += chunk.length;
@@ -28637,17 +29121,21 @@ async function publicHttpGet(raw, options = {}) {
       return Buffer.concat(chunks);
     };
     return {
-      status: response.statusCode || 502,
-      ok: (response.statusCode || 502) >= 200 && (response.statusCode || 502) < 300,
+      status: response2.statusCode || 502,
+      ok: (response2.statusCode || 502) >= 200 && (response2.statusCode || 502) < 300,
       headers,
       url: url.href,
-      body: response,
+      body: response2,
       text: async () => (await readLimited(1024 * 1024)).toString("utf8"),
       arrayBuffer: async () => readLimited(64 * 1024, true)
     };
   }
   throw new Error("Redirecionamentos em excesso");
 }
+
+// server.ts
+init_authMiddleware();
+init_sessionService();
 
 // src/server/proxyRange.ts
 var MAX_PROXY_RANGE_BYTES = 4 * 1024 * 1024;
@@ -79460,6 +79948,13 @@ function createApp() {
   app2.use("/api/device-auth", deviceAuthRouter);
   app2.use("/api/devices", linkedDevicesRouter);
   app2.use("/api/sync", syncRouter);
+  app2.use("/api/stremio/:addon/stream", async (req, res, next) => {
+    const policy = await getAuthPolicy();
+    if (!policy.mandatoryAuth) {
+      return next();
+    }
+    return authenticateUser(req, res, next);
+  });
   function resolveOpenItemStreams(rawId, seasonNum = 1, episodeNum = 1) {
     let cleanId = rawId.replace(/\.json$/, "");
     if (cleanId.includes(":")) {
@@ -79664,9 +80159,9 @@ function createApp() {
     if (rawId.startsWith("tt")) {
       try {
         const tUrl = `https://torrentio.strem.fun/brazuca/stream/${String(req.params.type)}/${rawId}.json`;
-        const response = await fetch(tUrl, { signal: AbortSignal.timeout(4e3) });
-        if (response.ok) {
-          const data = await response.json();
+        const response2 = await fetch(tUrl, { signal: AbortSignal.timeout(4e3) });
+        if (response2.ok) {
+          const data = await response2.json();
           if (data && Array.isArray(data.streams)) {
             upstreamStreams = data.streams.filter((s) => {
               const text2 = `${s.name || ""} ${s.title || ""}`.toLowerCase();
@@ -79922,6 +80417,26 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       if (!["http:", "https:"].includes(parsed.protocol)) {
         return res.status(400).json({ error: "Protocolo inv\xE1lido" });
       }
+      try {
+        await resolvePublicTarget(targetUrl);
+      } catch {
+        return res.status(502).json({ error: "Destino n\xE3o permitido" });
+      }
+      const policy = await getAuthPolicy();
+      if (policy.mandatoryAuth) {
+        const token = extractSessionToken(req);
+        if (!token) {
+          return res.status(401).json({ error: "Autentica\xE7\xE3o necess\xE1ria para reproduzir conte\xFAdo." });
+        }
+        const db = await getValidDatabase();
+        if (!db) {
+          return res.status(503).json({ error: "Servi\xE7o de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
+        }
+        const sessionData = await validateSession(db, token);
+        if (!sessionData) {
+          return res.status(401).json({ error: "Sess\xE3o inv\xE1lida ou expirada. Fa\xE7a login novamente." });
+        }
+      }
       const incomingUa = req.headers["user-agent"] || "";
       const isCustomBotUa = !incomingUa || incomingUa.includes("ZapiTV") || incomingUa.includes("node-fetch");
       const userAgent = isCustomBotUa ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" : incomingUa;
@@ -79958,18 +80473,18 @@ ${s.name?.split("\n")[1] || "1080p"}`,
           }
         }
       });
-      const response = await publicHttpGet(targetUrl, {
+      const response2 = await publicHttpGet(targetUrl, {
         headers,
         signal: controller.signal,
         timeoutMs: 25e3
       });
       clearTimeout(connectTimer);
-      const responseType = response.headers.get("content-type") || "";
-      const isHlsManifest = /\.m3u8(?:$|[?#])/i.test(new URL(response.url).pathname) || /(?:mpegurl|vnd\.apple\.mpegurl)/i.test(responseType);
-      if (response.ok && isHlsManifest) {
+      const responseType = response2.headers.get("content-type") || "";
+      const isHlsManifest = /\.m3u8(?:$|[?#])/i.test(new URL(response2.url).pathname) || /(?:mpegurl|vnd\.apple\.mpegurl)/i.test(responseType);
+      if (response2.ok && isHlsManifest) {
         const { rewriteHlsManifest: rewriteHlsManifest2 } = await Promise.resolve().then(() => (init_rewriteHlsManifest(), rewriteHlsManifest_exports));
-        const original = await response.text();
-        const rewritten = rewriteHlsManifest2(original, response.url);
+        const original = await response2.text();
+        const rewritten = rewriteHlsManifest2(original, response2.url);
         if (!rewritten) return res.status(502).json({ error: "Manifesto HLS inv\xE1lido" });
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Content-Type", "application/vnd.apple.mpegurl; charset=utf-8");
@@ -79980,17 +80495,17 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "*");
       res.setHeader("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges");
-      const contentType = response.headers.get("content-type");
+      const contentType = response2.headers.get("content-type");
       if (contentType) res.setHeader("Content-Type", contentType);
-      const contentRange = response.headers.get("content-range");
+      const contentRange = response2.headers.get("content-range");
       if (contentRange) res.setHeader("Content-Range", contentRange);
-      const acceptRanges = response.headers.get("accept-ranges");
+      const acceptRanges = response2.headers.get("accept-ranges");
       if (acceptRanges) res.setHeader("Accept-Ranges", acceptRanges);
-      const contentLength = response.headers.get("content-length");
+      const contentLength = response2.headers.get("content-length");
       if (contentLength) res.setHeader("Content-Length", contentLength);
-      res.status(response.status);
-      if (response.body) {
-        const nodeStream = response.body;
+      res.status(response2.status);
+      if (response2.body) {
+        const nodeStream = response2.body;
         res.once("close", () => nodeStream.destroy());
         nodeStream.on("error", (streamErr) => {
           try {
@@ -80026,6 +80541,21 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     const expectedType = req.query.type || "auto";
     if (typeof targetUrl !== "string" || !targetUrl || targetUrl.length > 4096 || typeof targetTitle !== "string" || targetTitle.length > 256) {
       return res.status(400).json({ valid: false, reason: "Par\xE2metro 'url' \xE9 obrigat\xF3rio" });
+    }
+    const valPolicy = await getAuthPolicy();
+    if (valPolicy.mandatoryAuth) {
+      const valToken = extractSessionToken(req);
+      if (!valToken) {
+        return res.status(401).json({ valid: false, error: "Autentica\xE7\xE3o necess\xE1ria para validar fluxos." });
+      }
+      const valDb = await getValidDatabase();
+      if (!valDb) {
+        return res.status(503).json({ valid: false, error: "Servi\xE7o de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
+      }
+      const valSession = await validateSession(valDb, valToken);
+      if (!valSession) {
+        return res.status(401).json({ valid: false, error: "Sess\xE3o inv\xE1lida ou expirada." });
+      }
     }
     const cacheKey = `${targetUrl}_${expectedType}_${targetTitle}`;
     const cached = streamValidationServerCache.get(cacheKey);
@@ -80086,7 +80616,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       }
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 6e3);
-      const response = await publicHttpGet(probeUrl, {
+      const response2 = await publicHttpGet(probeUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
           "Accept": "*/*",
@@ -80096,10 +80626,10 @@ ${s.name?.split("\n")[1] || "1080p"}`,
         timeoutMs: 6e3
       });
       clearTimeout(timeout);
-      const finalUrl = response.url || targetUrl;
+      const finalUrl = response2.url || targetUrl;
       const finalHost = new URL(finalUrl).hostname.toLowerCase();
-      const status = response.status;
-      const contentType = (response.headers.get("content-type") || "").toLowerCase();
+      const status = response2.status;
+      const contentType = (response2.headers.get("content-type") || "").toLowerCase();
       if (PARKED_DOMAINS.some((d) => finalHost === d || finalHost.endsWith(`.${d}`))) {
         return res.json({
           valid: false,
@@ -80133,7 +80663,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
         cacheStreamValidation(cacheKey, result2);
         return res.json(result2);
       }
-      const buffer = await response.arrayBuffer();
+      const buffer = await response2.arrayBuffer();
       const text2 = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
       const lowerText = text2.toLowerCase();
       const PARKING_SIGNATURES = [
@@ -80379,6 +80909,34 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       res.status(err instanceof CatalogReleaseStorageUnavailable ? 503 : 500).json({ error: "Lan\xE7amentos temporariamente indispon\xEDveis" });
     }
   });
+  app2.get("/api/catalog/diagnostic", requireAdmin, (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).json({
+      status: "ok",
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      message: "Painel de Diagn\xF3stico do Cat\xE1logo operacional.",
+      authorizedAdmin: res.locals.actorUid || _req.user?.email || "admin"
+    });
+  });
+  app2.post("/api/catalog/diagnostic/clean-cache", requireAdmin, (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).json({
+      success: true,
+      message: "Caches negativos resetados com sucesso.",
+      timestamp: Date.now()
+    });
+  });
+  app2.post("/api/catalog/diagnostic/resume-queue", requireAdmin, (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).json({
+      success: true,
+      message: "Fila de disponibilidade acelerada com sucesso.",
+      timestamp: Date.now()
+    });
+  });
   app2.get("/api/featured/verify-correspondence", (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
@@ -80462,28 +81020,18 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     try {
-      const response = await withFeedbackStore((store) => store.submitFeedback(req.body), {
+      const response2 = await withFeedbackStore((store) => store.submitFeedback(req.body), {
         write: true,
         actor: "anonymous-feedback",
         shouldPersist: (result) => !result.isDuplicateIgnored
       });
-      return res.status(200).json(response);
+      return res.status(200).json(response2);
     } catch (err) {
       console.error("[API Feedback] Erro ao submeter feedback:", err);
       return res.status(err instanceof FeedbackStorageUnavailable ? 503 : 400).json({ error: "Falha ao processar feedback", details: err?.message });
     }
   });
-  app2.use("/api/feedback", async (req, res, next) => {
-    res.setHeader("Cache-Control", "no-store");
-    try {
-      const actorUid = await authenticateAdmin(req.header("authorization"));
-      if (!actorUid) return res.status(403).json({ error: "Autentica\xE7\xE3o administrativa necess\xE1ria." });
-      res.locals.actorUid = actorUid;
-      next();
-    } catch {
-      return res.status(503).json({ error: "Verifica\xE7\xE3o de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
-    }
-  });
+  app2.use("/api/feedback", requireAdmin);
   app2.get("/api/feedback/stats", async (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {

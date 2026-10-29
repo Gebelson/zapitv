@@ -12,13 +12,14 @@
 import express from 'express';
 import crypto from 'crypto';
 import { eq } from 'drizzle-orm';
-import { getValidDatabase, authenticateUser, optionalUser, requireCsrfProtection, extractSessionToken } from './authMiddleware';
+import { getValidDatabase, authenticateUser, optionalUser, requireCsrfProtection, extractSessionToken, isUserAdmin } from './authMiddleware';
 import { users } from '../database/schema';
 import { hashPassword, verifyPassword } from './passwordService';
 import { createSession, revokeSession, formatSetCookie, extractCookie } from './sessionService';
 import { RateLimitService } from './rateLimitService';
 import { ProfileService } from '../profiles/profileService';
 import { requestRecovery, completeRecovery } from './passwordRecovery';
+import { getAuthPolicy, setAuthPolicy } from './authPolicyService';
 
 export const authRouter = express.Router();
 
@@ -140,6 +141,7 @@ authRouter.post('/register', async (req, res) => {
         name: cleanName,
         email: cleanEmail,
         status: 'active',
+        role: isUserAdmin({ id: userId, email: cleanEmail }) ? 'admin' : 'user',
         createdAt: now,
       },
     });
@@ -231,6 +233,7 @@ authRouter.post('/login', async (req, res) => {
         name: user.name,
         email: user.email,
         status: user.status,
+        role: isUserAdmin({ id: user.id, email: user.email }) ? 'admin' : 'user',
         createdAt: user.createdAt,
       },
     });
@@ -273,6 +276,7 @@ authRouter.post('/logout', async (req, res) => {
  * 4. CONSULTA DO ESTADO DA SESSÃO ATUAL (/me)
  */
 authRouter.get('/me', optionalUser, async (req, res) => {
+  const policy = await getAuthPolicy();
   if (req.user) {
     let activeProfile = null;
     try {
@@ -287,6 +291,8 @@ authRouter.get('/me', optionalUser, async (req, res) => {
       authenticated: true,
       user: req.user,
       activeProfile,
+      mandatoryAuth: policy.mandatoryAuth,
+      policyVersion: policy.version,
     });
   }
 
@@ -294,7 +300,38 @@ authRouter.get('/me', optionalUser, async (req, res) => {
     authenticated: false,
     user: null,
     activeProfile: null,
+    mandatoryAuth: policy.mandatoryAuth,
+    policyVersion: policy.version,
   });
+});
+
+/**
+ * 6. POLÍTICA GLOBAL DE AUTENTICAÇÃO (MANDATORY AUTH POLICY)
+ */
+authRouter.get('/policy', async (_req, res) => {
+  const policy = await getAuthPolicy();
+  return res.status(200).json(policy);
+});
+
+authRouter.put('/policy', optionalUser, async (req, res) => {
+  try {
+    const { mandatoryAuth, expectedVersion } = req.body || {};
+    if (typeof mandatoryAuth !== 'boolean') {
+      return res.status(400).json({ error: 'O campo mandatoryAuth é obrigatório e deve ser booleano.' });
+    }
+    const db = await getValidDatabase();
+    if (!db) {
+      return res.status(503).json({ error: 'Banco de dados de autenticação temporariamente indisponível.' });
+    }
+    const actorUid = req.user?.id || 'admin';
+    const updated = await setAuthPolicy(db, mandatoryAuth, actorUid, expectedVersion);
+    return res.status(200).json(updated);
+  } catch (err) {
+    if (err && (err.name === 'SettingVersionConflict' || (err.message && err.message.includes('modificada em outra sessão')))) {
+      return res.status(409).json({ error: 'Conflito de versão na política global de autenticação.' });
+    }
+    return res.status(500).json({ error: 'Erro interno ao atualizar a política global.' });
+  }
 });
 
 /**

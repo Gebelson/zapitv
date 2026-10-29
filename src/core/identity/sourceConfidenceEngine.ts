@@ -204,7 +204,7 @@ export class SourceConfidenceEngine {
       return evalResult;
     }
 
-    const episodeTag = `${streamTitle} ${streamName}`.match(/(?:\bS(\d{1,2})\s*E(\d{1,3})\b|\bT(\d{1,2})\s*EP?(\d{1,3})\b|(\d{1,2})[ªa]?\s*temporada\s*(?:epis[oó]dio|ep)\s*(\d{1,3})\b|(?:temporada|season)\s*(\d{1,2})\s*(?:epis[oó]dio|ep|episode)\s*(\d{1,3})\b|\b(\d{1,2})x(\d{1,3})\b)/i);
+    const episodeTag = `${streamTitle} ${streamName}`.match(/(?:\b[st]0*(\d{1,2})[\s·._-]*ep?0*(\d{1,4})\b|(\d{1,2})[ªa]?\s*temporada\s*(?:epis[oó]dio|ep)\s*(\d{1,3})\b|(?:temporada|season)\s*(\d{1,2})\s*(?:epis[oó]dio|ep|episode)\s*(\d{1,3})\b|\b(\d{1,2})x(\d{1,3})\b)/i);
     const parsedSeason = episodeTag ? Number(episodeTag[1] || episodeTag[3] || episodeTag[5] || episodeTag[7] || episodeTag[9]) : undefined;
     const parsedEpisode = episodeTag ? Number(episodeTag[2] || episodeTag[4] || episodeTag[6] || episodeTag[8] || episodeTag[10]) : undefined;
 
@@ -226,11 +226,58 @@ export class SourceConfidenceEngine {
     const absEpMatch = streamTitle.match(/\((?:ep|episode)\.?\s*(\d+)\)/i);
     if (absEpMatch && identity.season && identity.season > 1 && identity.episode) {
       const absEp = parseInt(absEpMatch[1], 10);
-      if (absEp <= identity.episode) {
+      if (absEp < identity.episode || (identity.episode === 1 && absEp === 1)) {
         reasons.push(`Episódio absoluto (${absEp}) pertence à primeira temporada e não à temporada ${identity.season}`);
         const evalResult: StreamConfidenceEvaluation = { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
         this.recordDiagnostic(stream, identity, evalResult);
         return evalResult;
+      }
+    }
+
+        // Detecção de divergência explícita de episódio no nome do arquivo / URL
+    if (identity.episode !== undefined && streamUrl) {
+      let filename = '';
+      try {
+        const parsed = new URL(streamUrl);
+        const pathSegments = decodeURIComponent(parsed.pathname).split('/').filter(Boolean);
+        filename = pathSegments.pop() || '';
+        if (filename.toLowerCase().endsWith('.m3u8') && pathSegments.length > 0) {
+          filename = pathSegments.pop() || '';
+        }
+      } catch {
+        const pathSegments = decodeURIComponent(streamUrl).split('/').filter(Boolean);
+        filename = pathSegments.pop() || '';
+        if (filename.toLowerCase().endsWith('.m3u8') && pathSegments.length > 0) {
+          filename = pathSegments.pop() || '';
+        }
+      }
+
+      if (filename) {
+        let fileEp: number | null = null;
+        const opMatch = filename.match(/\b(?:op|one[-_ ]?piece)[-_ ]*0*(\d{1,4})\b/i);
+        const seMatch = filename.match(/\b(?:s|t)0*(\d{1,2})[-_ ]*(?:e|ep)0*(\d{1,4})\b/i);
+        const epPrefixMatch = filename.match(/\b(?:ep|episode)[-_ ]*0*(\d{1,4})\b/i);
+        const standaloneMatch = filename.match(/^(?:.*[._ -])?0*(\d{1,4})(?:_\d+p)?\.(?:mp4|mkv|avi|webm|ts|m3u8)(?:\?.*)?$/i);
+
+        if (opMatch) {
+          fileEp = parseInt(opMatch[1], 10);
+        } else if (seMatch) {
+          fileEp = parseInt(seMatch[2], 10);
+        } else if (epPrefixMatch) {
+          fileEp = parseInt(epPrefixMatch[1], 10);
+        } else if (standaloneMatch) {
+          const num = parseInt(standaloneMatch[1], 10);
+          if (num !== 1080 && num !== 720 && num !== 480 && num !== 2160 && num !== 360 && num !== 4320 && num !== 1440) {
+            fileEp = num;
+          }
+        }
+
+        if (fileEp !== null && fileEp !== identity.episode) {
+          reasons.push(`Nome do arquivo de mídia (${filename}) aponta para o episódio ${fileEp}, divergindo do episódio solicitado (${identity.episode})`);
+          const evalResult: StreamConfidenceEvaluation = { stream, confidence: 'REJECTED', isMatch: false, reasons, canonicalTitle: identity.title };
+          this.recordDiagnostic(stream, identity, evalResult);
+          return evalResult;
+        }
       }
     }
 

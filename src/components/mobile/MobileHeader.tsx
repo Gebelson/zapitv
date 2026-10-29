@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, X, Info, AlertTriangle, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Profile, SiteNotification, User } from '../../../types';
-import { ZapiAnimatedLogo } from '../common/ZapiAnimatedLogo';
+import { ZapiBrandLogo } from '../common/ZapiBrandLogo';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 
 interface MobileHeaderProps {
@@ -87,17 +87,9 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
             tabIndex={0}
             onClick={handleLogoClick}
             aria-label="Ir para a página inicial"
-            className="flex items-center gap-2 cursor-pointer active:scale-95 transition-transform focus:outline-none"
+            className="flex items-center cursor-pointer active:scale-95 transition-transform focus:outline-none"
           >
-            <div className="w-8 h-8 flex items-center justify-center shrink-0">
-              <ZapiAnimatedLogo />
-            </div>
-            <span
-              className="text-lg font-black tracking-tight text-white sidebar-text-glow"
-              style={{ fontFamily: "'Sora', sans-serif" }}
-            >
-              Zapi<span className="text-[#007df7]">TV</span>
-            </span>
+            <ZapiBrandLogo size="sm" />
           </div>
 
           {/* Ações da direita: Notificações & Perfil */}

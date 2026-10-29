@@ -77,7 +77,10 @@ const VERIFIED_ANIME_MAPS: Record<number, AnimeSeasonMapEntry> = {
   158870: { canonicalSeriesId: 'anime-spy-family', tmdbId: '120089', imdbId: 'tt13706018', defaultSeason: 2, canonicalTitle: 'Spy x Family Season 2', seasonsCount: 2, aniListId: 158870 },
 
   // Kaiju No. 8
-  153288: { canonicalSeriesId: 'anime-kaiju-no-8', tmdbId: '206586', imdbId: 'tt21614728', defaultSeason: 1, canonicalTitle: 'Kaiju No. 8', seasonsCount: 1, aniListId: 153288 }
+  153288: { canonicalSeriesId: 'anime-kaiju-no-8', tmdbId: '206586', imdbId: 'tt21614728', defaultSeason: 1, canonicalTitle: 'Kaiju No. 8', seasonsCount: 1, aniListId: 153288 },
+
+  // One Piece (1999)
+  21: { canonicalSeriesId: 'anime-one-piece', tmdbId: '37854', imdbId: 'tt0388629', defaultSeason: 1, canonicalTitle: 'One Piece', seasonsCount: 23, aniListId: 21, malId: 21 },
 };
 
 export class AnimeSeasonMappingService {
@@ -101,6 +104,10 @@ export class AnimeSeasonMappingService {
     if (!item) return null;
 
     // 1. Resolução direta por AniList ID numérico
+    if (item.id === 'anime-one-piece') {
+      return VERIFIED_ANIME_MAPS[21];
+    }
+
     if (item.aniListId && VERIFIED_ANIME_MAPS[item.aniListId]) {
       return VERIFIED_ANIME_MAPS[item.aniListId];
     }
@@ -184,6 +191,11 @@ export class AnimeSeasonMappingService {
         return VERIFIED_ANIME_MAPS[145064];
       }
       return VERIFIED_ANIME_MAPS[113415];
+    }
+
+    // One Piece
+    if (/^one\s*piece\b/i.test(title)) {
+      return VERIFIED_ANIME_MAPS[21];
     }
 
     return null;

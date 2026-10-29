@@ -294,16 +294,26 @@ export class FeedbackClusteringEngine {
     recentReports: FeedbackReport[],
     newToken: string,
     newFingerprint: string,
-    windowSeconds: number = 60
+    windowSeconds: number = 30,
+    userDescription?: string
   ): boolean {
     const now = Date.now();
     const threshold = now - windowSeconds * 1000;
+    const cleanNewDesc = (userDescription || '').trim().toLowerCase();
 
     return recentReports.some(r => {
       if (r.submissionTimestamp < threshold) return false;
       const isSameToken = r.clientSubmissionToken === newToken;
       const isSameFingerprint = r.fingerprint === newFingerprint;
-      return isSameToken && isSameFingerprint;
+      if (isSameToken && isSameFingerprint) {
+        // Se a descrição for diferente e preenchida, não é duplicado (usuário está detalhando o problema)
+        const cleanOldDesc = (r.userDescription || '').trim().toLowerCase();
+        if (cleanNewDesc !== cleanOldDesc && cleanNewDesc.length > 0) {
+          return false;
+        }
+        return true;
+      }
+      return false;
     });
   }
 

@@ -228,6 +228,9 @@ export interface FeedbackSubmissionResponse {
   message: string;
   isNewCluster: boolean;
   isDuplicateIgnored?: boolean;
+  isOfflineQueued?: boolean;
+  status?: 'delivered' | 'queued_offline';
+  error?: string;
 }
 
 export interface FeedbackDashboardStats {

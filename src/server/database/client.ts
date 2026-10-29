@@ -227,6 +227,23 @@ export async function ensureAuthTables(database: Database): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS processed_sync_mutations_profile_id_idx ON processed_sync_mutations (profile_id);
     CREATE INDEX IF NOT EXISTS processed_sync_mutations_expires_at_idx ON processed_sync_mutations (expires_at);
+
+    CREATE TABLE IF NOT EXISTS global_settings (
+      key text PRIMARY KEY NOT NULL,
+      value_json text NOT NULL,
+      version integer DEFAULT 1 NOT NULL,
+      updated_at integer NOT NULL,
+      updated_by text NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS admin_audit (
+      id text PRIMARY KEY NOT NULL,
+      setting_key text NOT NULL,
+      previous_version integer NOT NULL,
+      next_version integer NOT NULL,
+      actor_uid text NOT NULL,
+      created_at integer NOT NULL
+    );
   `);
 }
 

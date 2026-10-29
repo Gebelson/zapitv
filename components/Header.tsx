@@ -31,14 +31,16 @@ interface HeaderProps {
   onClearSearch?: () => void;
   isAuthenticated?: boolean;
   onOpenLogin?: () => void;
+  isAdmin?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
   isDarkMode, setIsDarkMode, currentUser, activeProfile, currentView = 'home', setCurrentView, 
   onSwitchProfile, onSelectProfile, searchQuery, setSearchQuery, onSelectContent, allContent = [],
   notifications = [], onLogout, onToggleMobileMenu, onOpenDiagnostics, onSearchSubmit, onClearSearch,
-  isAuthenticated = false, onOpenLogin
+  isAuthenticated = false, onOpenLogin, isAdmin: propIsAdmin
 }) => {
+  const isAdmin = propIsAdmin !== undefined ? propIsAdmin : Boolean(currentUser && currentUser.role === 'admin');
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -713,7 +715,7 @@ const Header: React.FC<HeaderProps> = ({
           {isDarkMode ? <Sun className="w-4 h-4 sm:w-5 sm:h-5" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5" />}
         </button>
 
-        {onOpenDiagnostics && (
+        {isAdmin && onOpenDiagnostics && (
           <button
             onClick={onOpenDiagnostics}
             title="Diagnóstico do Catálogo"
@@ -856,7 +858,7 @@ const Header: React.FC<HeaderProps> = ({
                   <HelpCircle className="w-4 h-4 shrink-0" />
                   Central de Ajuda
                 </button>
-                {onOpenDiagnostics && (
+                {isAdmin && onOpenDiagnostics && (
                   <button onClick={() => { onOpenDiagnostics(); setShowDropdown(false); }} className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold hover:underline opacity-80 hover:opacity-100 transition-all text-orange-400">
                     <Activity className="w-4 h-4 shrink-0" />
                     Diagnóstico do Catálogo

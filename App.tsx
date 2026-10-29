@@ -55,6 +55,9 @@ import { canonicalCatalogMaster } from './src/core/catalog/CanonicalCatalogMaste
 import { TvRemoteDiagnosticOverlay } from './src/components/tv/TvRemoteDiagnosticOverlay';
 import { useIsMobileViewport } from './src/core/mobile/mobileViewportService';
 import { MobileLayout } from './src/components/mobile';
+import { MandatoryAuthModal } from './src/components/auth/MandatoryAuthModal';
+import { TvActivationScreen } from './src/components/tv/TvActivationScreen';
+import { authSyncService } from './src/core/auth/authSyncService';
 
 const ProfileView = React.lazy(() => import('./components/ProfileView'));
 const AdminView = React.lazy(() => import('./components/AdminView'));
@@ -122,7 +125,10 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     } catch { return MOCK_USERS.map(withoutPlaintextPassword); }
   });
 
-  const [isAuthenticated, setIsAuthenticated] = useState(() => initialState.auth);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(initialState?.auth));
+  const [mandatoryAuth, setMandatoryAuth] = useState<boolean>(true);
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User>(() => {
     const user = initialState.currentUser;
     if (user) {
@@ -135,6 +141,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     return user as User;
   });
   const [activeProfile, setActiveProfile] = useState<Profile | null>(() => initialState.activeProfile || currentUser?.profiles?.[0] || null);
+  const isAdmin = Boolean(currentUser && currentUser.role === 'admin');
 
   // Conversor utilitário de perfis da API para o modelo da aplicação
   const toAppProfile = useCallback((item: ProfileItem): Profile => {
@@ -150,26 +157,31 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   }, []);
 
   // Verificação de sessão real persistente via cookie HttpOnly no servidor (/api/auth/me)
-  useEffect(() => {
-    let mounted = true;
-    authClient.checkSession().then(async ({ authenticated, user, activeProfile: serverProfile }) => {
-      if (!mounted) return;
+  const checkCurrentSession = useCallback(async () => {
+    setIsCheckingAuth(true);
+    setAuthError(null);
+    try {
+      const { authenticated, user, activeProfile: serverProfile, mandatoryAuth: serverMandatory } = await authClient.checkSession();
+      if (typeof serverMandatory === 'boolean') {
+        setMandatoryAuth(serverMandatory);
+      }
       if (authenticated && user) {
         setIsAuthenticated(true);
-        const userProfiles = await profileClient.list();
+        const userProfiles = await profileClient.list().catch(() => []);
         const mappedProfiles = userProfiles.map(toAppProfile);
         const resolvedActive = serverProfile
           ? toAppProfile(serverProfile)
           : mappedProfiles.find(p => p.isDefault === 1) || mappedProfiles[0] || null;
 
+        const userRole = (user as any).role === 'admin' ? 'admin' : 'user';
         const loggedUser: User = {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: 'user',
-          devMode: false,
+          role: userRole,
+          devMode: userRole === 'admin',
           memberSince: new Date(user.createdAt).toLocaleDateString('pt-BR'),
-          plan: 'ZapiTV Premium',
+          plan: userRole === 'admin' ? 'ZapiTV Admin' : 'ZapiTV Premium',
           status: 'Ativo',
           profiles: mappedProfiles.length > 0 ? mappedProfiles : [
             {
@@ -188,15 +200,40 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
             storageService.getMyList(),
             storageService.getFavorites(),
           ]);
-          if (mounted) {
-            setMyList(loadedList);
-            setFavorites(loadedFavs);
-          }
+          setMyList(loadedList);
+          setFavorites(loadedFavs);
         }
+      } else {
+        setIsAuthenticated(false);
       }
-    }).catch(() => {});
-    return () => { mounted = false; };
+    } catch (err: any) {
+      console.warn('Erro ao validar sessão com servidor:', err);
+      setIsAuthenticated(false);
+      setAuthError('Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.');
+    } finally {
+      setIsCheckingAuth(false);
+    }
   }, [toAppProfile]);
+
+  useEffect(() => {
+    checkCurrentSession();
+  }, [checkCurrentSession]);
+
+  // Sincronização em tempo real entre abas e dispositivos sem recarregar a página
+  useEffect(() => {
+    authSyncService.start();
+    const unsubscribe = authSyncService.subscribe((syncState) => {
+      setMandatoryAuth(syncState.mandatoryAuth);
+      if (syncState.isAuthenticated !== isAuthenticated) {
+        checkCurrentSession();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      authSyncService.stop();
+    };
+  }, [checkCurrentSession, isAuthenticated]);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -302,7 +339,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   const effectiveSeasonNum = directPartyEpisode?.season !== undefined ? directPartyEpisode.season : initialSeasonNum;
   const effectiveEpisodeNum = directPartyEpisode?.episode !== undefined ? directPartyEpisode.episode : initialEpisodeNum;
-  const effectiveAutoPlay = Boolean(isWatchRoute || directPartyEpisode || hasDeepLinkEpisode);
+  const effectiveAutoPlay = Boolean((isWatchRoute || directPartyEpisode || hasDeepLinkEpisode) && isAuthenticated);
 
   const handleNavigateView = useCallback((view: AppView) => {
     setSelectedContent(null);
@@ -1598,6 +1635,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   // Abertura in-loco de detalhes: abre o modal preservando a rota, página atual, scroll e contexto
   const handleSelectContent = useCallback((item: ContentItem) => {
+    if (!isAuthenticated) return false;
     if (!catalogEligibilityService.isItemPubliclyPlayableSync(item)) {
       return false;
     }
@@ -1624,6 +1662,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   }, [activeProfile, location.pathname, location.search]);
 
   const handlePlayFromHero = useCallback((item: ContentItem) => {
+    if (!isAuthenticated) return;
     if (!handleSelectContent(item)) return;
     setIsPlayerOnlyPlayback(true);
     const continuity = storageService.getPlaybackContinuity(item);
@@ -1930,18 +1969,21 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       const res = await authClient.login(cleanEmail, pass);
       const user = res.user;
       setIsAuthenticated(true);
+      setAuthError(null);
+      authSyncService.notifyAuthChange('LOGIN', { userId: user.id });
 
       const userProfiles = await profileClient.list();
       const mappedProfiles = userProfiles.map(toAppProfile);
 
+      const userRole = (user as any).role === 'admin' ? 'admin' : 'user';
       const targetUser: User = {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: 'user',
-        devMode: false,
+        role: userRole,
+        devMode: userRole === 'admin',
         memberSince: new Date(user.createdAt).toLocaleDateString('pt-BR'),
-        plan: 'ZapiTV Premium',
+        plan: userRole === 'admin' ? 'ZapiTV Admin' : 'ZapiTV Premium',
         status: 'Ativo',
         profiles: mappedProfiles.length > 0 ? mappedProfiles : [
           {
@@ -1980,6 +2022,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       });
       const user = res.user;
       setIsAuthenticated(true);
+      setAuthError(null);
 
       const userProfiles = await profileClient.list();
       const mappedProfiles = userProfiles.map(toAppProfile);
@@ -2034,6 +2077,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
     await storageService.setScope(null);
     setIsAuthenticated(false);
+    authSyncService.notifyAuthChange('LOGOUT');
     const defaultUser = initialState?.currentUser || {
       id: 'zapitv-anon-user',
       name: 'Usuário Convidado',
@@ -2859,6 +2903,30 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           </ViewWrapper>
         );
       case 'admin':
+        if (!isAdmin) {
+          return (
+            <ViewWrapper>
+              <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center select-none">
+                <div className="w-16 h-16 rounded-3xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-4">
+                  <ShieldCheck className="w-8 h-8 text-red-400" />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Acesso Restrito</h2>
+                <p className="text-sm text-gray-400 max-w-md mb-6">
+                  Esta área é exclusiva para administradores da ZapiTV. O acesso foi bloqueado.
+                </p>
+                <button
+                  onClick={() => {
+                    navigate('/');
+                    handleNavigateView('home');
+                  }}
+                  className="px-6 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold transition-all cursor-pointer"
+                >
+                  Voltar para o Início
+                </button>
+              </div>
+            </ViewWrapper>
+          );
+        }
         return <ViewWrapper><AdminView isDarkMode={isDarkMode} users={users} onDeleteUser={async (id) => {
           try {
             const { doc, deleteDoc } = await import('firebase/firestore');
@@ -2984,7 +3052,19 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           onToggleFavoriteById={toggleFavoriteById}
           currentUser={currentUser}
           activeProfile={activeProfile}
+          isAuthenticated={isAuthenticated}
         />
+        {!isCheckingAuth && mandatoryAuth && !isAuthenticated && (
+          <TvActivationScreen
+            onTvLinked={async () => {
+              authSyncService.notifyAuthChange('LOGIN');
+              await checkCurrentSession();
+            }}
+            onLoginWithRemote={handleLogin}
+            authError={authError}
+            onRetryAuth={checkCurrentSession}
+          />
+        )}
         {isAuthenticated && currentUser?.id && activeProfile?.id && !location.pathname.includes('/assistir/') &&
           <SyncRecoveryNotice key={`${currentUser.id}:${activeProfile.id}`} accountId={currentUser.id} profileId={activeProfile.id} />}
       </React.Suspense>
@@ -3000,21 +3080,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     </React.Suspense>;
   }
 
-  if (currentView === 'login' || currentView === 'signup') {
-    return (
-      <React.Suspense fallback={<ZapiLoader size="xl" />}>
-        <AuthView
-          isDarkMode={isDarkMode}
-          onLogin={handleLogin}
-          onSignup={handleSignup}
-          onForgotPassword={() => setCurrentView('recover-password')}
-          onClose={() => setCurrentView('home')}
-          initialEmail={initialState?.lastEmail}
-          initialMode={currentView === 'signup' ? 'signup' : 'login'}
-        />
-      </React.Suspense>
-    );
-  }
+  
 
   if (currentView === 'tv-activate') {
     return (
@@ -3038,6 +3104,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           <TvActivationView
             currentUser={currentUser}
             onNavigate={setCurrentView}
+            onUserAuthenticated={async () => {
+              await checkCurrentSession();
+            }}
           />
         </div>
       </React.Suspense>
@@ -3086,8 +3155,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           trendingItems={trendingItems}
           personalizedRows={personalizedHomeRows}
           featuredSelection={featuredSelection}
-          onOpenDiagnostics={() => setIsDiagnosticModalOpen(true)}
-          hasOpenModal={Boolean(selectedContent || isDiagnosticModalOpen)}
+          onOpenDiagnostics={isAdmin ? () => setIsDiagnosticModalOpen(true) : undefined}
+          hasOpenModal={Boolean(selectedContent || (isAdmin && isDiagnosticModalOpen))}
           isAuthenticated={isAuthenticated}
           onOpenLogin={() => handleNavigateView('login')}
           onCloseModal={() => {
@@ -3174,7 +3243,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 if (!isMobileMenuOpen) uiSoundService.play('sidebarOpen');
                 setIsMobileMenuOpen(true);
               }}
-              onOpenDiagnostics={() => setIsDiagnosticModalOpen(true)}
+              onOpenDiagnostics={isAdmin ? () => setIsDiagnosticModalOpen(true) : undefined}
+              isAdmin={isAdmin}
             />
             
             <ScrollToTop 
@@ -3253,7 +3323,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       /></React.Suspense>}
 
       {/* Modal de Diagnóstico e Saúde do Catálogo */}
-      {isDiagnosticModalOpen && <React.Suspense fallback={null}><CatalogDiagnosticModal
+      {isAdmin && isDiagnosticModalOpen && <React.Suspense fallback={null}><CatalogDiagnosticModal
         isOpen={isDiagnosticModalOpen}
         onClose={() => setIsDiagnosticModalOpen(false)}
         isDarkMode={isDarkMode}
@@ -3342,6 +3412,19 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       )}
 
       <TvRemoteDiagnosticOverlay />
+
+      {!isCheckingAuth && mandatoryAuth && !isAuthenticated && (
+        <MandatoryAuthModal
+          isTvMode={false}
+          isDarkMode={isDarkMode}
+          initialMode={currentView === 'signup' ? 'signup' : currentView === 'login' ? 'login' : 'welcome'}
+          onLogin={handleLogin}
+          onSignup={handleSignup}
+          onForgotPassword={() => setCurrentView('recover-password')}
+          authError={authError}
+          onRetryAuth={checkCurrentSession}
+        />
+      )}
     </div>
   );
 };

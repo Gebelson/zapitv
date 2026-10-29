@@ -19,6 +19,11 @@ export async function withFeedbackStore<T>(
   }
 
   for (let attempt = 0; attempt < 8; attempt++) {
+    if (attempt > 0) {
+      // Backoff exponencial com jitter para mitigar contenção em concorrência
+      await new Promise(resolve => setTimeout(resolve, Math.min(250, 15 * Math.pow(1.5, attempt) + Math.random() * 20)));
+    }
+
     let row: typeof globalSettings.$inferSelect | undefined;
     try {
       [row] = await connection.db.select().from(globalSettings)
@@ -35,7 +40,7 @@ export async function withFeedbackStore<T>(
     const result = await operation(store);
     if (!options.write || (options.shouldPersist && !options.shouldPersist(result))) return result;
     try {
-      const saved = await saveSnapshot(connection, store.getSnapshot(), row?.version ?? 0, options.actor || 'feedback');
+      const saved = await saveSnapshot(connection, store.getSnapshot(), row?.version ?? 0, options.actor || 'feedback', store);
       if (saved) return result;
     } catch (error) {
       if (error instanceof FeedbackStorageUnavailable) throw error;
@@ -45,10 +50,16 @@ export async function withFeedbackStore<T>(
   throw new FeedbackStorageUnavailable('O feedback foi alterado simultaneamente. Tente novamente.');
 }
 
-async function saveSnapshot(connection: Database, snapshot: FeedbackSnapshot, version: number, actor: string): Promise<boolean> {
-  const valueJson = JSON.stringify(snapshot);
+async function saveSnapshot(connection: Database, snapshot: FeedbackSnapshot, version: number, actor: string, store?: FeedbackStore): Promise<boolean> {
+  let valueJson = JSON.stringify(snapshot);
   if (Buffer.byteLength(valueJson, 'utf8') > MAX_SNAPSHOT_BYTES) {
-    throw new FeedbackStorageUnavailable('Capacidade atual de feedback atingida.');
+    if (store) {
+      store.compactSnapshot();
+      valueJson = JSON.stringify(store.getSnapshot());
+    }
+    if (Buffer.byteLength(valueJson, 'utf8') > MAX_SNAPSHOT_BYTES) {
+      throw new FeedbackStorageUnavailable('Capacidade atual de feedback atingida.');
+    }
   }
   const updatedAt = Date.now();
   if (version === 0) {

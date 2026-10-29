@@ -23,11 +23,21 @@ export const CatalogDiagnosticModal: React.FC<CatalogDiagnosticModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
+
+    // Validação estrita de autorização administrativa no backend
+    fetch('/api/catalog/diagnostic', { credentials: 'include' })
+      .then(res => {
+        if (res.status === 403 || res.status === 401) {
+          onClose();
+        }
+      })
+      .catch(() => {});
+
     const interval = setInterval(() => {
       setReport(diagnosticService.getFullReport());
     }, 2000);
     return () => clearInterval(interval);
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -45,6 +55,7 @@ export const CatalogDiagnosticModal: React.FC<CatalogDiagnosticModalProps> = ({
   };
 
   const handleCleanNegativeCaches = () => {
+    fetch('/api/catalog/diagnostic/clean-cache', { method: 'POST', credentials: 'include' }).catch(() => {});
     const cleaned = mediaAvailabilityIndex.cleanOldNegativeCaches();
     setNotification(`Limpeza concluída: ${cleaned} itens temporários ou expirados resetados para re-verificação.`);
     setReport(diagnosticService.getFullReport());
@@ -52,6 +63,7 @@ export const CatalogDiagnosticModal: React.FC<CatalogDiagnosticModalProps> = ({
   };
 
   const handleResumeQueue = () => {
+    fetch('/api/catalog/diagnostic/resume-queue', { method: 'POST', credentials: 'include' }).catch(() => {});
     catalogAvailabilityQueue.resume();
     setNotification('Fila de disponibilidade em segundo plano acelerada com sucesso.');
     setReport(diagnosticService.getFullReport());

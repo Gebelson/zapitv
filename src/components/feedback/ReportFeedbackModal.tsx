@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   AlertCircle, 
-  CheckCircle2, 
+  CheckCircle2,
+  Clock, 
   X, 
   Send, 
   Loader2, 
@@ -66,6 +67,7 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [isQueuedOffline, setIsQueuedOffline] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -75,6 +77,7 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
       setComment('');
       setSubmitting(false);
       setSuccess(false);
+      setIsQueuedOffline(false);
       setErrorMessage(null);
     }
   }, [isOpen, defaultCategory]);
@@ -114,6 +117,7 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
 
       if (response && response.success) {
         setSuccess(true);
+        setIsQueuedOffline(false);
         if (onSubmitted) {
           onSubmitted();
         }
@@ -121,11 +125,19 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
         setTimeout(() => {
           onClose();
         }, 2400);
+      } else if (response && response.isOfflineQueued) {
+        setIsQueuedOffline(true);
+        if (onSubmitted) {
+          onSubmitted();
+        }
+        setTimeout(() => {
+          onClose();
+        }, 3500);
       } else {
         setErrorMessage(response?.message || 'Falha ao registrar feedback. Tente novamente.');
       }
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Ocorreu um erro ao enviar o feedback.');
+      setErrorMessage(err?.message || 'Ocorreu um erro ao enviar o feedback. Tente novamente.');
     } finally {
       setSubmitting(false);
     }
@@ -203,6 +215,9 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
               <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 animate-bounce">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
+              <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                Recebido
+              </span>
               <h4 className="text-lg font-bold text-white">Obrigado pelo seu relato!</h4>
               <p className="text-sm text-white/70 max-w-sm">
                 Seu feedback foi recebido e nosso sistema automático já adicionou o diagnóstico técnico à fila de correções do ZapiTV.
@@ -218,6 +233,31 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
                 className="mt-4 px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors cursor-pointer"
               >
                 Concluir
+              </button>
+            </div>
+          ) : isQueuedOffline ? (
+            <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
+              <div className="w-16 h-16 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                <Clock className="w-8 h-8" />
+              </div>
+              <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                Aguardando envio
+              </span>
+              <h4 className="text-lg font-bold text-white">Relato guardado no dispositivo</h4>
+              <p className="text-sm text-white/70 max-w-sm">
+                Sem conexão com o servidor no momento. Seu relato foi salvo com segurança neste dispositivo (Aguardando envio) e será transmitido automaticamente quando sua conexão for restabelecida.
+              </p>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onClose();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="mt-4 px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors cursor-pointer"
+              >
+                Entendido
               </button>
             </div>
           ) : (

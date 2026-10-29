@@ -43,10 +43,15 @@ export class FeedbackCollector {
   /**
    * Obtém ou gera um token anônimo de sessão para idempotência e prevenção de spam
    */
-  public static getClientSubmissionToken(): string {
+  private static offlineQueueKey = 'zapitv_feedback_offline_queue';
+
+  /**
+   * Obtém ou gera um token anônimo para idempotência
+   */
+  public static getClientSubmissionToken(forceNew: boolean = false): string {
     if (typeof window === 'undefined') return 'server_render';
     try {
-      let token = sessionStorage.getItem(this.clientTokenKey);
+      let token = forceNew ? null : sessionStorage.getItem(this.clientTokenKey);
       if (!token) {
         token = `tok_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
         sessionStorage.setItem(this.clientTokenKey, token);
@@ -55,6 +60,74 @@ export class FeedbackCollector {
     } catch {
       return `tok_fallback_${Date.now()}`;
     }
+  }
+
+  public static getOfflineQueue(): FeedbackSubmissionRequest[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(this.offlineQueueKey);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  public static enqueueOfflineSubmission(request: FeedbackSubmissionRequest): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const queue = this.getOfflineQueue();
+      const isAlreadyInQueue = queue.some(q => 
+        q.clientSubmissionToken === request.clientSubmissionToken &&
+        q.category === request.category
+      );
+      if (!isAlreadyInQueue) {
+        queue.push(request);
+        const trimmed = queue.slice(-25);
+        localStorage.setItem(this.offlineQueueKey, JSON.stringify(trimmed));
+      }
+    } catch (e) {
+      console.warn('[FeedbackCollector] Erro ao enfileirar feedback offline:', e);
+    }
+  }
+
+  public static async flushOfflineQueue(): Promise<{ sent: number; failed: number }> {
+    if (typeof window === 'undefined') return { sent: 0, failed: 0 };
+    const queue = this.getOfflineQueue();
+    if (!queue.length) return { sent: 0, failed: 0 };
+
+    let sent = 0;
+    let failed = 0;
+    const remaining: FeedbackSubmissionRequest[] = [];
+
+    for (const item of queue) {
+      try {
+        const response = await fetch('/api/feedback/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item)
+        });
+        if (response.ok || response.status === 400) {
+          sent++;
+        } else {
+          remaining.push(item);
+          failed++;
+        }
+      } catch {
+        remaining.push(item);
+        failed++;
+        break;
+      }
+    }
+
+    try {
+      if (remaining.length) {
+        localStorage.setItem(this.offlineQueueKey, JSON.stringify(remaining));
+      } else {
+        localStorage.removeItem(this.offlineQueueKey);
+      }
+    } catch {}
+
+    return { sent, failed };
   }
 
   /**
@@ -191,22 +264,55 @@ export class FeedbackCollector {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Servidor respondeu com código ${response.status}: ${errorText}`);
+        let serverErrorMsg = `Servidor respondeu com código ${response.status}`;
+        try {
+          const errJson = await response.json();
+          serverErrorMsg = errJson.error || errJson.details || serverErrorMsg;
+        } catch {
+          try {
+            const errorText = await response.text();
+            if (errorText) serverErrorMsg = errorText;
+          } catch {}
+        }
+
+        return {
+          success: false,
+          reportId: '',
+          clusterId: '',
+          message: serverErrorMsg,
+          error: serverErrorMsg,
+          isNewCluster: false,
+          isOfflineQueued: false,
+          status: 'delivered'
+        };
       }
 
       const data: FeedbackSubmissionResponse = await response.json();
-      return data;
-    } catch (err: any) {
-      console.warn('[FeedbackCollector] Falha ao enviar para API do servidor, usando fallback local:', err);
 
-      // Fallback local se o servidor estiver temporariamente inacessível
+      // Rotação do token para que envios subsequentes independentes não sejam bloqueados
+      this.getClientSubmissionToken(true);
+
+      // Tenta descarregar a fila offline em segundo plano
+      this.flushOfflineQueue().catch(() => {});
+
       return {
-        success: true,
+        ...data,
+        status: 'delivered'
+      };
+    } catch (err: any) {
+      console.warn('[FeedbackCollector] Falha ao enviar para API do servidor, usando fallback local persistente:', err);
+
+      this.enqueueOfflineSubmission(requestPayload);
+
+      return {
+        success: false,
         reportId: `fb_offline_${Date.now()}`,
         clusterId: 'pending_sync',
-        message: 'Obrigado! Seu relato foi registrado com sucesso.',
-        isNewCluster: false
+        message: 'Sem conexão com o servidor no momento. Seu relato foi salvo neste dispositivo (Aguardando envio) e será transmitido automaticamente quando a conexão retornar.',
+        error: err?.message || 'Falha de conexão',
+        isNewCluster: false,
+        isOfflineQueued: true,
+        status: 'queued_offline'
       };
     }
   }
@@ -223,3 +329,10 @@ export class FeedbackCollector {
   }
 }
 
+
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('online', () => {
+    FeedbackCollector.flushOfflineQueue().catch(() => {});
+  });
+}

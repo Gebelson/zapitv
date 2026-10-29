@@ -8,11 +8,20 @@
 import type { ProfileItem } from '../profile/profileClient';
 import { syncQueue } from '../sync/syncQueue';
 
+export interface SessionCheckResult {
+  authenticated: boolean;
+  user: AuthUser | null;
+  activeProfile: ProfileItem | null;
+  mandatoryAuth?: boolean;
+  policyVersion?: number;
+}
+
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
   status: string;
+  role?: 'admin' | 'user';
   createdAt: number;
 }
 
@@ -47,7 +56,7 @@ class AuthClient {
   /**
    * Consulta a sessão ativa no servidor (/api/auth/me)
    */
-  async checkSession(): Promise<{ authenticated: boolean; user: AuthUser | null; activeProfile: ProfileItem | null }> {
+  async checkSession(): Promise<SessionCheckResult> {
     try {
       const res = await fetch('/api/auth/me', {
         method: 'GET',
@@ -59,7 +68,7 @@ class AuthClient {
       });
 
       if (!res.ok) {
-        return { authenticated: false, user: null, activeProfile: null };
+        return { authenticated: false, user: null, activeProfile: null, mandatoryAuth: true, policyVersion: 0 };
       }
 
       const data = await res.json();
@@ -72,11 +81,50 @@ class AuthClient {
         authenticated: Boolean(data.authenticated),
         user: data.user || null,
         activeProfile: data.activeProfile || null,
+        mandatoryAuth: typeof data.mandatoryAuth === 'boolean' ? data.mandatoryAuth : true,
+        policyVersion: typeof data.policyVersion === 'number' ? data.policyVersion : 0,
       };
     } catch (err) {
       // Falha de rede ou offline: assume anônimo sem travar a aplicação
-      return { authenticated: false, user: null, activeProfile: null };
+      return { authenticated: false, user: null, activeProfile: null, mandatoryAuth: true, policyVersion: 0 };
     }
+  }
+
+  /**
+   * Consulta a política global de autenticação (/api/auth/policy)
+   */
+  async getPolicy(): Promise<{ mandatoryAuth: boolean; version: number; updatedAt: number }> {
+    try {
+      const res = await fetch('/api/auth/policy', {
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) {
+        return { mandatoryAuth: true, version: 0, updatedAt: Date.now() };
+      }
+      return await res.json();
+    } catch {
+      return { mandatoryAuth: true, version: 0, updatedAt: Date.now() };
+    }
+  }
+
+  /**
+   * Altera a política global de autenticação (/api/auth/policy)
+   */
+  async setPolicy(mandatoryAuth: boolean): Promise<{ mandatoryAuth: boolean; version: number }> {
+    const res = await fetch('/api/auth/policy', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ mandatoryAuth }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || 'Não foi possível alterar a política de autenticação.');
+    }
+    return data;
   }
 
   /**

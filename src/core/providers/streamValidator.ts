@@ -49,7 +49,7 @@ export const PARKING_SIGNATURES = [
 // Regras específicas de bloqueio para conteúdos trocados / corrompidos em provedores upstream
 export const KNOWN_UPSTREAM_MISMATCHES: Array<{
   targetPattern: RegExp;
-  rejectStream: (stream: StremioStream, rawCandidates?: string[]) => boolean;
+  rejectStream: (stream: StremioStream, rawCandidates?: string[], episodeParams?: { season: number; episode: number }) => boolean;
 }> = [
   // 1. Doraemon: provedores upstream mapeiam erroneamente para Sparks of Tomorrow (/1684/), kurage.live proxy ou ER Plantão Médico ou Ultraman
   {
@@ -195,7 +195,42 @@ export const KNOWN_UPSTREAM_MISMATCHES: Array<{
       }
       return false;
     }
-  }
+  },
+  // 8. One Piece (Anime canônico 1999 / tt0388629 / 37854)
+  // Rejeita streams com episódios trocados, especialmente o desvio upstream da pasta 1268 (OP-93..OP-130 Alabasta servidos na T1 no Arthur)
+  {
+    targetPattern: /\b(?:one\s*piece|tt0388629|37854|anime-one-piece)\b/i,
+    rejectStream: (s, rawCandidates = [], episodeParams) => {
+      if (!episodeParams) return false;
+      const streamUrl = (s.url || '').trim();
+      let urlPath = '';
+      try {
+        const parsed = new URL(streamUrl);
+        urlPath = decodeURIComponent(parsed.pathname);
+      } catch {
+        urlPath = decodeURIComponent(streamUrl);
+      }
+      const pathSegments = urlPath.split('/').filter(Boolean);
+      let filename = pathSegments.pop() || '';
+      if (filename.toLowerCase().endsWith('.m3u8') && pathSegments.length > 0) {
+        filename = pathSegments.pop() || '';
+      }
+
+      const opEpMatch = filename.match(/\b(?:op|one[-_ ]?piece)[-_ ]*0*(\d{1,4})\b/i);
+      if (opEpMatch) {
+        const epInFile = parseInt(opEpMatch[1], 10);
+        if (epInFile !== episodeParams.episode) {
+          return true;
+        }
+      }
+
+      if (episodeParams.season === 1 && /streams\/1268\//i.test(urlPath)) {
+        return true;
+      }
+
+      return false;
+    }
+  },
 ];
 
 class StreamValidator {
@@ -375,14 +410,14 @@ class StreamValidator {
       const absEp = parseInt(absMatch[1], 10);
       // Se temporada > 1 e o episódio absoluto é menor ou igual ao número do episódio relativo
       // (ex: na T2 E1, um stream com '(Ep. 1)' é comprovadamente da Temporada 1)
-      if (absEp <= episode) {
+      if (absEp < episode || (episode === 1 && absEp === 1)) {
         console.warn(`[StreamValidator] Stream rejeitado por episódio absoluto da T1 em requisição da T${season}: ${streamTitle}`);
         return false;
       }
     }
 
     // 2. Tag combinada S01E01, T01EP01, S1E1, T02 EP01
-    const seMatches = Array.from(text.matchAll(/\b(?:s|t)0*(\d{1,2})\s*(?:e|ep)0*(\d{1,3})\b/gi));
+    const seMatches = Array.from(text.matchAll(/\b(?:s|t)0*(\d{1,2})[\s·._-]*ep?0*(\d{1,4})\b/gi));
     const hasExactMatch = seMatches.length > 0 && seMatches.some(m => parseInt(m[1], 10) === season && parseInt(m[2], 10) === episode);
     if (seMatches.length > 0 && !hasExactMatch) {
       const m = seMatches[0];
@@ -417,6 +452,44 @@ class StreamValidator {
     if (season === 1 && /\b(?:clevatess\s+ii|mushoku\s+tensei\s+ii|2nd\s+season|2ª\s*temporada)\b/i.test(text)) {
       console.warn(`[StreamValidator] Stream da Temporada 2 rejeitado para requisição da Temporada 1: ${streamTitle}`);
       return false;
+    }
+
+        // 5. Validação de divergência explícita no nome do arquivo na URL
+    const pathSegments = urlPath.split('/').filter(Boolean);
+    let filename = pathSegments.pop() || '';
+    if (filename.toLowerCase().endsWith('.m3u8') && pathSegments.length > 0) {
+      filename = pathSegments.pop() || '';
+    }
+
+    if (filename) {
+      let fileEp: number | null = null;
+      const opMatch = filename.match(/\b(?:op|one[-_ ]?piece)[-_ ]*0*(\d{1,4})\b/i);
+      const seMatch = filename.match(/\b(?:s|t)0*(\d{1,2})[-_ ]*(?:e|ep)0*(\d{1,4})\b/i);
+      const epPrefixMatch = filename.match(/\b(?:ep|episode)[-_ ]*0*(\d{1,4})\b/i);
+      const standaloneMatch = filename.match(/^(?:.*[._ -])?0*(\d{1,4})(?:_\d+p)?\.(?:mp4|mkv|avi|webm|ts|m3u8)(?:\?.*)?$/i);
+
+      if (opMatch) {
+        fileEp = parseInt(opMatch[1], 10);
+      } else if (seMatch) {
+        const fileSeason = parseInt(seMatch[1], 10);
+        fileEp = parseInt(seMatch[2], 10);
+        if (fileSeason !== season) {
+          console.warn(`[StreamValidator] Arquivo com temporada divergente no nome [T${fileSeason} vs T${season}]: ${filename}`);
+          return false;
+        }
+      } else if (epPrefixMatch) {
+        fileEp = parseInt(epPrefixMatch[1], 10);
+      } else if (standaloneMatch) {
+        const num = parseInt(standaloneMatch[1], 10);
+        if (num !== 1080 && num !== 720 && num !== 480 && num !== 2160 && num !== 360 && num !== 4320 && num !== 1440) {
+          fileEp = num;
+        }
+      }
+
+      if (fileEp !== null && fileEp !== episode) {
+        console.warn(`[StreamValidator] Stream rejeitado por episódio divergente no arquivo [Arq: Ep ${fileEp} vs Requisitado: Ep ${episode}]: ${filename}`);
+        return false;
+      }
     }
 
     return true;
@@ -543,7 +616,7 @@ class StreamValidator {
     // 2. Aplica regras de bloqueio de desvios conhecidos (ex: Doraemon -> Sparks of Tomorrow)
     for (const rule of KNOWN_UPSTREAM_MISMATCHES) {
       if (rawCandidates.some(cand => rule.targetPattern.test(cand))) {
-        if (rule.rejectStream(stream, rawCandidates)) {
+        if (rule.rejectStream(stream, rawCandidates, episodeParams)) {
           console.warn(`[StreamValidator] Stream rejeitado por desvio conhecido para '[${rawCandidates.join(', ')}]': ${sTitle || sUrl}`);
           return false;
         }

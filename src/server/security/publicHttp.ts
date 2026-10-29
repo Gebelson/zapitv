@@ -22,7 +22,7 @@ export function isPublicIp(raw: string): boolean {
   return false;
 }
 
-async function resolvePublicTarget(raw: string): Promise<{ url: URL; address: string; family: number }> {
+export async function resolvePublicTarget(raw: string): Promise<{ url: URL; address: string; family: number }> {
   if (raw.length > 4096) throw new Error('URL inválida');
   const url = new URL(raw);
   const host = url.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();

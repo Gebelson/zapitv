@@ -66,15 +66,35 @@ const CATEGORY_ICONS: Record<FeedbackCategory, React.ReactNode> = {
 };
 
 async function adminFetch(input: string, init: RequestInit = {}): Promise<Response> {
-  const { auth } = await import('../../../firebase');
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error('Entre com sua conta administrativa para consultar os relatos.');
-  return fetch(input, {
+  let token: string | undefined;
+  try {
+    const { auth } = await import('../../../firebase');
+    token = await auth.currentUser?.getIdToken();
+  } catch {
+    // Firebase é opcional quando autenticado via sessão da ZapiTV
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init.headers as Record<string, string> || {}),
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(input, {
     ...init,
-    headers: { ...init.headers, Authorization: `Bearer ${token}` },
+    headers,
+    credentials: 'include', // Envia o cookie de sessão ZapiTV (HttpOnly)
     cache: 'no-store',
     signal: AbortSignal.timeout(10000)
   });
+
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('Acesso restrito. Faça login com uma conta de administrador para consultar os relatos.');
+  }
+
+  return response;
 }
 
 export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMode = true }) => {
@@ -590,7 +610,23 @@ export const FeedbackAdminPanel: React.FC<FeedbackAdminPanelProps> = ({ isDarkMo
           <span className="text-xs text-white/50">Clique em qualquer linha para abrir a central de diagnóstico</span>
         </div>
 
-        {loading ? (
+        {error ? (
+          <div className="p-12 text-center text-rose-400 flex flex-col items-center justify-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h4 className="text-base font-bold text-white">Não foi possível carregar os relatos</h4>
+            <p className="text-xs text-white/60 max-w-sm">
+              {error}
+            </p>
+            <button
+              onClick={() => fetchData(false)}
+              className="mt-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        ) : loading ? (
           <div className="p-12 text-center text-white/60 flex flex-col items-center justify-center gap-3">
             <RefreshCw className="w-6 h-6 animate-spin text-[#007df7]" />
             <span className="text-sm font-semibold">Carregando relatos e clusters...</span>

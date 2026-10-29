@@ -665,7 +665,7 @@ async function runTvQrAuthTestSuite() {
     const addProfRes = await fetch(`${baseUrl}/api/profiles`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Cookie': cleanCookie, 'Origin': baseUrl },
-      body: JSON.stringify({ name: 'Filmes e Séries', avatarId: 'avatar_cinematic' })
+      body: JSON.stringify({ name: 'Filmes e Séries', avatarId: 'zapi-avatar-blue' })
     });
     assert.equal(addProfRes.status, 201);
     const newProfData = await addProfRes.json();

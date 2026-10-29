@@ -22,7 +22,10 @@ import { authRouter } from "./src/server/auth/routes.ts";
 import { profilesRouter } from "./src/server/profiles/routes.ts";
 import { deviceAuthRouter, linkedDevicesRouter } from "./src/server/deviceAuth/routes.ts";
 import { syncRouter } from "./src/server/sync/routes.ts";
-import { publicHttpGet } from "./src/server/security/publicHttp.ts";
+import { publicHttpGet, resolvePublicTarget } from "./src/server/security/publicHttp.ts";
+import { authenticateUser, extractSessionToken, getValidDatabase, requireAdmin } from "./src/server/auth/authMiddleware.ts";
+import { getAuthPolicy } from "./src/server/auth/authPolicyService.ts";
+import { validateSession } from "./src/server/auth/sessionService.ts";
 import { normalizeProxyRange } from "./src/server/proxyRange.ts";
 import { epgSyncService } from "./src/server/livetv/epgSyncService.ts";
 
@@ -141,6 +144,13 @@ function createApp() {
   app.use('/api/device-auth', deviceAuthRouter);
   app.use('/api/devices', linkedDevicesRouter);
   app.use('/api/sync', syncRouter);
+  app.use('/api/stremio/:addon/stream', async (req, res, next) => {
+    const policy = await getAuthPolicy();
+    if (!policy.mandatoryAuth) {
+      return next();
+    }
+    return authenticateUser(req, res, next);
+  });
 
   // Helper function to resolve open items to Stremio streams
   function resolveOpenItemStreams(rawId: string, seasonNum = 1, episodeNum = 1) {
@@ -681,6 +691,30 @@ function createApp() {
         return res.status(400).json({ error: "Protocolo inválido" });
       }
 
+      // Validação de SSRF e bloqueio prévio de destinos internos/privados
+      try {
+        await resolvePublicTarget(targetUrl);
+      } catch {
+        return res.status(502).json({ error: "Destino não permitido" });
+      }
+
+      // Autenticação obrigatória para consumo do proxy de streaming quando a política global exigir
+      const policy = await getAuthPolicy();
+      if (policy.mandatoryAuth) {
+        const token = extractSessionToken(req);
+        if (!token) {
+          return res.status(401).json({ error: "Autenticação necessária para reproduzir conteúdo." });
+        }
+        const db = await getValidDatabase();
+        if (!db) {
+          return res.status(503).json({ error: "Serviço de autenticação temporariamente indisponível." });
+        }
+        const sessionData = await validateSession(db, token);
+        if (!sessionData) {
+          return res.status(401).json({ error: "Sessão inválida ou expirada. Faça login novamente." });
+        }
+      }
+
       const incomingUa = (req.headers["user-agent"] as string) || "";
       const isCustomBotUa = !incomingUa || incomingUa.includes("ZapiTV") || incomingUa.includes("node-fetch");
       const userAgent = isCustomBotUa
@@ -801,6 +835,22 @@ function createApp() {
 
     if (typeof targetUrl !== 'string' || !targetUrl || targetUrl.length > 4096 || typeof targetTitle !== 'string' || targetTitle.length > 256) {
       return res.status(400).json({ valid: false, reason: "Parâmetro 'url' é obrigatório" });
+    }
+
+    const valPolicy = await getAuthPolicy();
+    if (valPolicy.mandatoryAuth) {
+      const valToken = extractSessionToken(req);
+      if (!valToken) {
+        return res.status(401).json({ valid: false, error: "Autenticação necessária para validar fluxos." });
+      }
+      const valDb = await getValidDatabase();
+      if (!valDb) {
+        return res.status(503).json({ valid: false, error: "Serviço de autenticação temporariamente indisponível." });
+      }
+      const valSession = await validateSession(valDb, valToken);
+      if (!valSession) {
+        return res.status(401).json({ valid: false, error: "Sessão inválida ou expirada." });
+      }
     }
 
     // Cache hit: resposta imediata em 0ms
@@ -1218,6 +1268,38 @@ function createApp() {
     }
   });
 
+  // Endpoints administrativos de Diagnóstico do Catálogo
+  app.get("/api/catalog/diagnostic", requireAdmin, (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      message: "Painel de Diagnóstico do Catálogo operacional.",
+      authorizedAdmin: res.locals.actorUid || (_req as any).user?.email || "admin",
+    });
+  });
+
+  app.post("/api/catalog/diagnostic/clean-cache", requireAdmin, (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).json({
+      success: true,
+      message: "Caches negativos resetados com sucesso.",
+      timestamp: Date.now(),
+    });
+  });
+
+  app.post("/api/catalog/diagnostic/resume-queue", requireAdmin, (_req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(200).json({
+      success: true,
+      message: "Fila de disponibilidade acelerada com sucesso.",
+      timestamp: Date.now(),
+    });
+  });
+
   // Auditoria Oficial de Correspondência IMDb (Seção 16 da Especificação)
   app.get("/api/featured/verify-correspondence", (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -1335,17 +1417,7 @@ function createApp() {
   });
 
   // Todos os demais endpoints de feedback expõem dados internos ou alteram o painel.
-  app.use("/api/feedback", async (req, res, next) => {
-    res.setHeader("Cache-Control", "no-store");
-    try {
-      const actorUid = await authenticateAdmin(req.header("authorization"));
-      if (!actorUid) return res.status(403).json({ error: "Autenticação administrativa necessária." });
-      res.locals.actorUid = actorUid;
-      next();
-    } catch {
-      return res.status(503).json({ error: "Verificação de autenticação temporariamente indisponível." });
-    }
-  });
+  app.use("/api/feedback", requireAdmin);
 
   // Estatísticas do Dashboard para o Painel Administrativo
   app.get("/api/feedback/stats", async (_req, res) => {

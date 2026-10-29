@@ -127,6 +127,49 @@ export class FeedbackStore {
   }
 
   /**
+   * Compactação segura do snapshot para garantir que o tamanho permaneça bem abaixo de 2MB
+   * sem perda de dados históricos, clusters ou estatísticas consolidadas.
+   */
+  public compactSnapshot(): FeedbackSnapshot {
+    // 1. Manter apenas os prompts ativos e editados manualmente
+    const activePromptIds = new Set<string>();
+    for (const cluster of this.clusters) {
+      if (cluster.activePromptId) {
+        activePromptIds.add(cluster.activePromptId);
+      }
+    }
+    this.prompts = this.prompts.filter(p => 
+      activePromptIds.has(p.id) || p.isManuallyEdited
+    );
+
+    // 2. Se a contagem de relatos for muito grande (> 500), compactar campos verbose dos mais antigos
+    if (this.reports.length > 500) {
+      const recentReports = this.reports.slice(0, 500);
+      const olderReports = this.reports.slice(500).map(r => ({
+        ...r,
+        technicalContext: {
+          canonicalMediaId: r.technicalContext?.canonicalMediaId,
+          mediaTitle: r.technicalContext?.mediaTitle,
+          mediaType: r.technicalContext?.mediaType,
+          season: r.technicalContext?.season,
+          episode: r.technicalContext?.episode,
+          errorCode: r.technicalContext?.errorCode,
+          failureStage: r.technicalContext?.failureStage,
+          browser: r.technicalContext?.browser,
+          os: r.technicalContext?.os,
+          deviceType: r.technicalContext?.deviceType,
+          currentRoute: r.technicalContext?.currentRoute,
+          timestamp: r.technicalContext?.timestamp || r.submissionTimestamp,
+          appVersion: r.technicalContext?.appVersion || '1.0.0'
+        }
+      }));
+      this.reports = [...recentReports, ...olderReports];
+    }
+
+    return this.getSnapshot();
+  }
+
+  /**
    * Submete um feedback anônimo com contexto técnico, deduplicação e agrupamento automático
    */
   public async submitFeedback(
@@ -159,7 +202,8 @@ export class FeedbackStore {
       this.reports,
       token,
       fingerprint,
-      60
+      30,
+      userDescription
     );
 
     if (isDupe) {

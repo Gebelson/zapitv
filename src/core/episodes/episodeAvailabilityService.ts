@@ -342,7 +342,7 @@ export class EpisodeAvailabilityService {
           new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_EP_CHECK')), 12000))
         ]);
 
-        const cleanStreams = streamValidator.filterCleanStreams(streams, item.title, item.originalTitle);
+        const cleanStreams = streamValidator.filterCleanStreams(streams, item.title, item.originalTitle, undefined, { season, episode });
         const hasValidSource = cleanStreams.length > 0;
 
         const isRecent = this.isAiredRecently(airDate);
@@ -480,10 +480,17 @@ export class EpisodeAvailabilityService {
       }
 
       // Se a próxima temporada é conhecida como disponível, aponta para o primeiro episódio
+      // Para séries/animes com numeração absoluta contínua (ex: One Piece, onde curEpNum > 25 e não reinicia em 1):
+      const lastCurEpNum = Array.isArray(currentSeasonEpisodes) && currentSeasonEpisodes.length > 0
+        ? Math.max(...currentSeasonEpisodes.map(getEpNum))
+        : curEpNum;
+      const isContinuousNumbering = lastCurEpNum > 25 && curEpNum >= lastCurEpNum;
+      const fallbackEp = isContinuousNumbering ? curEpNum + 1 : 1;
+
       return {
         season: nextSeason,
-        episode: 1,
-        title: `Temporada ${nextSeason} • Episódio 1`
+        episode: fallbackEp,
+        title: `Temporada ${nextSeason} • Episódio ${fallbackEp}`
       };
     }
 
