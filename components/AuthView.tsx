@@ -6,6 +6,7 @@ interface AuthViewProps {
   onLogin: (email: string, pass: string) => Promise<string | null>;
   onSignup: (name: string, email: string, pass: string, passConfirm: string, termsAccepted: boolean) => Promise<string | null>;
   onClose?: () => void;
+  onForgotPassword?: () => void;
   initialEmail?: string;
   initialMode?: 'login' | 'signup';
 }
@@ -34,6 +35,7 @@ const AuthView: React.FC<AuthViewProps> = ({
   onLogin,
   onSignup,
   onClose,
+  onForgotPassword,
   initialEmail = '',
   initialMode = 'login',
 }) => {
@@ -270,6 +272,7 @@ const AuthView: React.FC<AuthViewProps> = ({
                   'Entrar na conta'
                 )}
               </button>
+              {onForgotPassword && <button type="button" onClick={onForgotPassword} className="w-full text-sm text-white/60 hover:text-[#007df7] py-2 transition-colors">Esqueci minha senha</button>}
             </form>
           )}
 

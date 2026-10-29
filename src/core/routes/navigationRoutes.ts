@@ -23,6 +23,8 @@ export const ROUTES = {
   HELP: '/ajuda',
   ACTOR_DETAIL: '/atores/:id',
   AUTH: '/login',
+  RECOVER_PASSWORD: '/recuperar-senha',
+  RESET_PASSWORD: '/redefinir-senha',
   ADMIN: '/admin',
   ADMIN_WILDCARD: '/admin/*',
   DEV_LAB: '/dev/video-enhancement-lab',

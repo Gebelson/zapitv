@@ -31,10 +31,10 @@ async function legacy(connection: ReturnType<typeof createDatabase>, incompatibl
   await connection.client.execute("INSERT INTO watchparty_signals(id,room_id,sender_peer_id,type,timestamp) VALUES ('fixture-signal','fixture-room','host','fixture',1)");
 }
 
-test('fresh database applies the existing seven migrations and stays idempotent', () => fixture(async connection => {
+test('fresh database applies the existing migrations and stays idempotent', () => fixture(async connection => {
   await migrateDatabase(connection);
   await migrateDatabase(connection);
-  assert.equal((await connection.client.execute('SELECT count(*) n FROM __drizzle_migrations')).rows[0].n, 7);
+  assert.equal((await connection.client.execute('SELECT count(*) n FROM __drizzle_migrations')).rows[0].n, readMigrationFiles({ migrationsFolder: folder }).length);
   assert.equal((await connection.client.execute('PRAGMA foreign_key_check')).rows.length, 0);
 }));
 
@@ -42,7 +42,7 @@ test('legacy Watch Party tables survive account migrations without losing rows',
   await legacy(connection);
   await migrateDatabase(connection);
   await migrateDatabase(connection);
-  assert.equal((await connection.client.execute('SELECT count(*) n FROM __drizzle_migrations')).rows[0].n, 7);
+  assert.equal((await connection.client.execute('SELECT count(*) n FROM __drizzle_migrations')).rows[0].n, readMigrationFiles({ migrationsFolder: folder }).length);
   assert.equal((await connection.client.execute('SELECT room_id FROM watchparty_rooms')).rows[0].room_id, 'fixture-room');
   assert.equal((await connection.client.execute('SELECT id FROM watchparty_signals')).rows[0].id, 'fixture-signal');
   assert.equal((await connection.client.execute('SELECT count(*) n FROM users')).rows[0].n, 0);

@@ -18,6 +18,7 @@ import { hashPassword, verifyPassword } from './passwordService';
 import { createSession, revokeSession, formatSetCookie, extractCookie } from './sessionService';
 import { RateLimitService } from './rateLimitService';
 import { ProfileService } from '../profiles/profileService';
+import { requestRecovery, completeRecovery } from './passwordRecovery';
 
 export const authRouter = express.Router();
 
@@ -26,6 +27,32 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Aplica proteção CSRF nas mutações de autenticação
 authRouter.use(requireCsrfProtection);
+
+authRouter.post('/forgot-password', async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) return res.status(503).json({ error: 'Serviço temporariamente indisponível.' });
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    return res.status(202).json(await requestRecovery(db, req.body?.email, ip));
+  } catch (error) {
+    if ((error as Error).message === 'INVALID_RECOVERY_EMAIL') return res.status(400).json({ error: 'Informe um e-mail válido.' });
+    return res.status(503).json({ error: 'A recuperação de senha está temporariamente indisponível. Tente novamente mais tarde.' });
+  }
+});
+
+authRouter.post('/reset-password', async (req, res) => {
+  try {
+    const db = await getValidDatabase();
+    if (!db) return res.status(503).json({ error: 'Serviço temporariamente indisponível.' });
+    const result = await completeRecovery(db, req.body?.token, req.body?.password, req.body?.passwordConfirm);
+    res.setHeader('Set-Cookie', formatSetCookie('', { clear: true, isProduction }));
+    return res.status(200).json(result);
+  } catch (error) {
+    if ((error as Error).message === 'RESET_TOKEN_INVALID') return res.status(400).json({ error: 'Este link é inválido, expirou ou já foi usado. Solicite outro.' });
+    if ((error as Error).message === 'RESET_PASSWORD_INVALID') return res.status(400).json({ error: 'Use de 8 a 128 caracteres, com letra e número, e confirme a mesma senha.' });
+    return res.status(503).json({ error: 'Não foi possível atualizar sua senha agora. Tente novamente.' });
+  }
+});
 
 /**
  * 1. CADASTRO DE NOVO USUÁRIO

@@ -16,6 +16,7 @@
  */
 
 import assert from 'node:assert';
+import { mock } from 'node:test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { epgAggregator } from '../src/core/livetv/EPGAggregator';
@@ -199,6 +200,14 @@ console.log('✓ Teste 5 aprovado: Sinais regionais não herdam grades nacionais
 // -----------------------------------------------------------------------------------------
 console.log('[Teste 6] Seleção de datas e programação dos próximos dias...');
 
+// The XMLTV snapshot is historical. Test its navigation against its own date,
+// rather than incorrectly requiring an expired snapshot to be labelled "Hoje".
+const fixtureDates = Object.keys(EPG_SEED_SNAPSHOT['tv-cultura'].dates).sort();
+const fixtureDate = fixtureDates.find((date, index) => EPG_SEED_SNAPSHOT['tv-cultura'].dates[date].length > 5 &&
+  (EPG_SEED_SNAPSHOT['tv-cultura'].dates[fixtureDates[index + 1]]?.length || 0) > 5);
+assert.ok(fixtureDate, 'Snapshot da TV Cultura deve conter uma data real');
+const dateClock = mock.method(epgAggregator, 'getBrasiliaDateString', () => fixtureDate);
+try {
 const datesCultura = epgService.getAvailableDates(tvCultura);
 assert.ok(datesCultura.length >= 2, `TV Cultura deve ter pelo menos 2 datas disponíveis no XMLTV (atual: ${datesCultura.length})`);
 assert.strictEqual(datesCultura[0].label, 'Hoje', 'Primeira data deve ser "Hoje"');
@@ -210,6 +219,7 @@ const scheduleTomorrow = epgService.getDailySchedule(tvCultura, 1);
 assert.ok(scheduleTomorrow.length > 5, 'Amanhã deve conter lista de programas');
 
 console.log(`✓ Teste 6 aprovado: ${datesCultura.length} datas disponíveis no guia da TV Cultura.\n`);
+} finally { dateClock.mock.restore(); }
 
 // -----------------------------------------------------------------------------------------
 // TESTE 7: Detecção de Metadados Esportivos (Competição, Equipes, Ao Vivo vs Reprise)

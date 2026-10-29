@@ -25,6 +25,25 @@ export interface RegisterPayload {
 }
 
 class AuthClient {
+  async requestPasswordRecovery(email: string): Promise<{ message: string }> {
+    const response = await fetch('/api/auth/forgot-password', {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Não foi possível solicitar a recuperação.');
+    return data;
+  }
+
+  async completePasswordRecovery(token: string, password: string, passwordConfirm: string): Promise<{ message: string }> {
+    const response = await fetch('/api/auth/reset-password', {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ token, password, passwordConfirm }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Não foi possível atualizar a senha.');
+    return data;
+  }
   /**
    * Consulta a sessão ativa no servidor (/api/auth/me)
    */

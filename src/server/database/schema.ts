@@ -315,6 +315,19 @@ export const processedSyncMutations = sqliteTable('processed_sync_mutations', {
   index('processed_sync_mutations_expires_at_idx').on(table.expiresAt),
 ]);
 
+export const passwordResetTokens = sqliteTable('password_reset_tokens', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull(),
+  createdAt: integer('created_at').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+  usedAt: integer('used_at'),
+}, table => [
+  uniqueIndex('password_reset_tokens_hash_idx').on(table.tokenHash),
+  index('password_reset_tokens_user_idx').on(table.userId),
+  index('password_reset_tokens_expiry_idx').on(table.expiresAt),
+]);
+
 
 
 

@@ -62,6 +62,7 @@ const SettingsView = React.lazy(() => import('./components/SettingsView'));
 const HelpView = React.lazy(() => import('./components/HelpView'));
 const ContentDetailModal = React.lazy(() => import('./components/ContentDetailModal'));
 const AuthView = React.lazy(() => import('./components/AuthView'));
+const PasswordRecoveryView = React.lazy(() => import('./components/PasswordRecoveryView'));
 const ProfileSelectorView = React.lazy(() => import('./components/ProfileSelectorView'));
 const AddSectionModal = React.lazy(() => import('./components/AddSectionModal'));
 const ProgramasView = React.lazy(() => import('./components/ProgramasView'));
@@ -250,6 +251,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     if (path.startsWith('/configuracoes')) return 'settings';
     if (path.startsWith('/ajuda')) return 'help';
     if (path.startsWith('/admin')) return 'admin';
+    if (path === ROUTES.RECOVER_PASSWORD) return 'recover-password';
+    if (path === ROUTES.RESET_PASSWORD) return 'reset-password';
     if (path.startsWith('/cadastro') || path.startsWith('/signup')) return 'signup';
     if (path.startsWith('/login') || path.startsWith('/auth')) return 'login';
     return 'notfound';
@@ -336,6 +339,8 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       case 'admin': routeTo('/admin'); break;
       case 'login':
       case 'signup': routeTo('/login'); break;
+      case 'recover-password': routeTo(ROUTES.RECOVER_PASSWORD); break;
+      case 'reset-password': routeTo(ROUTES.RESET_PASSWORD); break;
       case 'profile-selector': routeTo('/perfil-selector'); break;
       case 'tv-activate': routeTo('/tv/ativar'); break;
       default: routeTo('/'); break;
@@ -1915,27 +1920,6 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   // SINCRONIZAÇÃO ENTRE ABAS (REMOVIDO PARA DEXIE)
   // ==================================================================================
 
-  const handleResetPassword = useCallback(async (email: string): Promise<void> => {
-    console.log("App: Attempting password reset for:", email);
-    try {
-      const { sendPasswordResetEmail } = await import('firebase/auth');
-      const { auth } = await import('./firebase');
-      await sendPasswordResetEmail(auth, email);
-      console.log("App: Password reset email sent successfully to:", email);
-    } catch (error: any) {
-      console.error("App: Password reset error:", error);
-      if (error.code === 'auth/user-not-found') {
-        throw new Error('E-mail não encontrado. Verifique se digitou corretamente ou crie uma nova conta.');
-      } else if (error.code === 'auth/invalid-email') {
-        throw new Error('E-mail inválido. Verifique o formato digitado.');
-      } else if (error.code === 'auth/too-many-requests') {
-        throw new Error('Muitas solicitações. Tente novamente mais tarde.');
-      } else {
-        throw new Error(error.message || 'Erro ao enviar e-mail de redefinição.');
-      }
-    }
-  }, []);
-
   const handleLogin = useCallback(async (email: string, pass: string): Promise<string | null> => {
     try {
       const cleanEmail = (email || '').trim().toLowerCase();
@@ -3007,6 +2991,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     );
   }
 
+  if (currentView === 'recover-password' || currentView === 'reset-password') {
+    return <React.Suspense fallback={<ZapiLoader size="xl" />}>
+      <PasswordRecoveryView key={currentView} reset={currentView === 'reset-password'} onBack={async resetCompleted => {
+        if (resetCompleted) await handleLogout();
+        setCurrentView('login');
+      }} />
+    </React.Suspense>;
+  }
+
   if (currentView === 'login' || currentView === 'signup') {
     return (
       <React.Suspense fallback={<ZapiLoader size="xl" />}>
@@ -3014,6 +3007,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           isDarkMode={isDarkMode}
           onLogin={handleLogin}
           onSignup={handleSignup}
+          onForgotPassword={() => setCurrentView('recover-password')}
           onClose={() => setCurrentView('home')}
           initialEmail={initialState?.lastEmail}
           initialMode={currentView === 'signup' ? 'signup' : 'login'}
