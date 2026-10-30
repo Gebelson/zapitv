@@ -1,3 +1,4 @@
+import { seriesSeasonMappingService, DOCTOR_WHO_CANONICAL } from '../series/seriesSeasonMappingService';
 import { StremioClient } from '../stremio/stremioClient';
 import { StremioManifest, StremioStream } from '../stremio/stremioTypes';
 import { sortStreamsByPtBrPriority } from '../audio/audioDetector';
@@ -867,10 +868,27 @@ class ProviderRegistryService {
     const stremioAddons = activeProviders.filter(p => p.type === 'stremio-addon' &&
       !['stremio-cinemeta', 'stremio-opensubtitles'].includes(p.id));
     const stremioType = type === 'movie' ? 'movie' : 'series';
-    const primaryId = imdbStr || tmdbNum || rawTargetId;
-    const stremioId = episode && (type === 'series' || type === 'anime')
+
+    // Suporte canônico a Doctor Who Modern Continuity (Temporadas 14 e 15)
+    const isDoctorWhoItem = seriesSeasonMappingService.isDoctorWho(itemTarget);
+    let primaryId = imdbStr || tmdbNum || rawTargetId;
+    let stremioId = episode && (type === 'series' || type === 'anime')
       ? `${primaryId}:${episode.season}:${episode.episode}`
       : primaryId;
+
+    if (isDoctorWhoItem && episode && episode.season >= 14) {
+      const prodSpecs = seriesSeasonMappingService.getProviderQuerySpecs(episode.season, episode.episode);
+      if (prodSpecs.length > 0) {
+        // Consulta primária com a identidade canônica da era 2024 (ex: tt30842880:1:1)
+        stremioId = prodSpecs[0].stremioId;
+        // Adiciona as demais especificações aos candidatos secundários
+        for (let i = 1; i < prodSpecs.length; i++) {
+          if (!altIds.includes(prodSpecs[i].stremioId)) {
+            altIds.push(prodSpecs[i].stremioId);
+          }
+        }
+      }
+    }
 
     if (stremioId) {
       // Ordenação inteligente de provedores: prioridade oficial, PT-BR e score histórico de latência/estabilidade

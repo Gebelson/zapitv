@@ -1,3 +1,4 @@
+import { seriesSeasonMappingService } from '../series/seriesSeasonMappingService';
 import { StremioStream } from '../stremio/stremioTypes';
 import { videoAdBlocker } from '../security/videoAdBlocker';
 import { streamQuarantineService } from '../security/streamQuarantineService';
@@ -231,6 +232,22 @@ export const KNOWN_UPSTREAM_MISMATCHES: Array<{
       return false;
     }
   },
+  // 9. Doctor Who (Preservação Canônica de Eras: 1963 vs 2005 vs 2024)
+  {
+    targetPattern: /\b(?:doctor\s*who|dr\s*who|tt0056751|tt0436992|tt30842880|121|57243|239770)\b/i,
+    rejectStream: (s, rawCandidates = [], episodeParams) => {
+      const candText = (Array.isArray(rawCandidates) ? rawCandidates.join(' ') : String(rawCandidates || '')).toLowerCase();
+      const integrity = seriesSeasonMappingService.validateStreamEpisodeIntegrity(
+        {
+          title: candText,
+          season: episodeParams?.season,
+          episode: episodeParams?.episode
+        },
+        s
+      );
+      return !integrity.valid;
+    }
+  },
 ];
 
 class StreamValidator {
@@ -403,6 +420,11 @@ class StreamValidator {
       urlPath = streamUrl;
     }
     const text = `${streamName} ${streamTitle} ${streamDesc} ${urlPath}`.toLowerCase();
+    const isDoctorWho = seriesSeasonMappingService.isDoctorWho({ title: text });
+    let mappedProdSeason = season;
+    if (isDoctorWho && season >= 14) {
+      mappedProdSeason = seriesSeasonMappingService.mapPresentationToProductionSeason(season).targetSeason;
+    }
 
     // 1. Tag de episódio absoluto em parênteses: ex: '(Ep. 1)', '(Ep. 13)'
     const absMatch = text.match(/\((?:ep|episode)\.?\s*(\d+)\)/i);
@@ -418,7 +440,19 @@ class StreamValidator {
 
     // 2. Tag combinada S01E01, T01EP01, S1E1, T02 EP01
     const seMatches = Array.from(text.matchAll(/\b(?:s|t)0*(\d{1,2})[\s·._-]*ep?0*(\d{1,4})\b/gi));
-    const hasExactMatch = seMatches.length > 0 && seMatches.some(m => parseInt(m[1], 10) === season && parseInt(m[2], 10) === episode);
+    const hasExactMatch = seMatches.length > 0 && seMatches.some(m => {
+      const sFound = parseInt(m[1], 10);
+      const eFound = parseInt(m[2], 10);
+      if (sFound === season && eFound === episode) return true;
+      if (isDoctorWho && season >= 14 && sFound === mappedProdSeason && eFound === episode) {
+        const integrity = seriesSeasonMappingService.validateStreamEpisodeIntegrity(
+          { title: 'doctor who', season, episode },
+          stream
+        );
+        return integrity.valid;
+      }
+      return false;
+    });
     if (seMatches.length > 0 && !hasExactMatch) {
       const m = seMatches[0];
       const sFound = parseInt(m[1], 10);
@@ -437,6 +471,9 @@ class StreamValidator {
           // Se o stream já possui a tag exata SxxExx para o episódio requisitado (ex: S01E01 em animes com dupla numeração de franquia como S17),
           // não o rejeitamos por anotações secundárias de temporada em parênteses.
           if (hasExactMatch) {
+            continue;
+          }
+          if (isDoctorWho && season >= 14 && sFound === mappedProdSeason) {
             continue;
           }
           const fullMatch = m[0].toLowerCase();

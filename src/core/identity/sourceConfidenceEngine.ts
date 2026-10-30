@@ -1,3 +1,4 @@
+import { seriesSeasonMappingService } from '../series/seriesSeasonMappingService';
 /**
  * ZapiTV — SourceConfidenceEngine
  * Motor de Validação e Classificação de Confiabilidade das Fontes de Streaming.
@@ -493,23 +494,56 @@ export class SourceConfidenceEngine {
       return evalResult;
     }
 
-    // 6. VALIDAÇÃO DE ANO PARA SÉRIES E ANIMES
-    // Impede que filmes antigos com mesmo nome passem como episódios de uma série
-    if ((identity.type === ContentType.SERIES || identity.type === ContentType.ANIME) && identity.year) {
-      const releaseYearMatch = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
-      if (releaseYearMatch) {
-        const foundYear = Number(releaseYearMatch[1]);
-        if (Math.abs(foundYear - identity.year) > 1 && !episodeTag) {
-          reasons.push(`Ano da fonte (${foundYear}) diverge da série (${identity.year}) sem identificador de episódio`);
-          const evalResult: StreamConfidenceEvaluation = {
-            stream,
-            confidence: 'REJECTED',
-            isMatch: false,
-            reasons,
-            canonicalTitle: identity.title
-          };
-          this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
-          return evalResult;
+    // 6. VALIDAÇÃO DE ANO E ERA PARA SÉRIES E ANIMES
+    if ((identity.type === ContentType.SERIES || identity.type === ContentType.ANIME)) {
+      // 6.1. Validação estrutural de integridade de era e franquia (ex: Doctor Who 1963 vs 2005 vs 2024)
+      const seriesIntegrity = seriesSeasonMappingService.validateStreamEpisodeIntegrity(
+        {
+          tmdbId: identity.tmdbId,
+          imdbId: identity.imdbId,
+          title: identity.title,
+          year: identity.year,
+          season: identity.season,
+          episode: identity.episode
+        },
+        stream
+      );
+
+      if (!seriesIntegrity.valid) {
+        reasons.push(seriesIntegrity.reason || 'Stream pertence a era/produção incompatível da franquia');
+        const evalResult: StreamConfidenceEvaluation = {
+          stream,
+          confidence: 'REJECTED',
+          isMatch: false,
+          reasons,
+          canonicalTitle: identity.title
+        };
+        this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
+        return evalResult;
+      }
+
+      // 6.2. Validação de ano para séries e animes (estrita na Temporada 1)
+      if (identity.year) {
+        const releaseYearMatch = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
+        if (releaseYearMatch) {
+          const foundYear = Number(releaseYearMatch[1]);
+          const isSeason1 = !identity.season || identity.season === 1;
+          const isYearMismatch = isSeason1
+            ? Math.abs(foundYear - identity.year) > 1
+            : (Math.abs(foundYear - identity.year) > 1 && !episodeTag);
+
+          if (isYearMismatch) {
+            reasons.push(`Ano da fonte (${foundYear}) diverge da série (${identity.year})${isSeason1 ? ' na Temporada 1' : ' sem identificador de episódio'}`);
+            const evalResult: StreamConfidenceEvaluation = {
+              stream,
+              confidence: 'REJECTED',
+              isMatch: false,
+              reasons,
+              canonicalTitle: identity.title
+            };
+            this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
+            return evalResult;
+          }
         }
       }
     }

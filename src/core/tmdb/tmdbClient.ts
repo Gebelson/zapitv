@@ -1,4 +1,5 @@
 import { ContentItem, ContentType, ActorPerson } from '../../../types';
+import { seriesSeasonMappingService, DOCTOR_WHO_CANONICAL } from '../series/seriesSeasonMappingService';
 
 export const TMDB_API_KEY = '468925ac3759d7adeb05b540cfd71cb8';
 export const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
@@ -905,8 +906,25 @@ class TMDBClientService {
       if (creators) formatted.director = creators;
     }
 
-    const seasonsCount = data.number_of_seasons || data.seasons?.length || 1;
-    const seasons = Array.isArray(data.seasons) ? data.seasons : undefined;
+    let seasonsCount = data.number_of_seasons || data.seasons?.length || 1;
+    let seasons = Array.isArray(data.seasons) ? [...data.seasons] : undefined;
+
+    // Resolução Canônica para Séries de Múltiplas Eras (Doctor Who Moderno)
+    const cleanIdForEra = String(id).trim().replace(/^tmdb-?/i, '');
+    if (cleanIdForEra === DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId || formatted.imdbId === DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId) {
+      seasonsCount = Math.max(seasonsCount, DOCTOR_WHO_CANONICAL.MODERN_2005.presentationSeasonsCount);
+      formatted.seasonsCount = seasonsCount;
+      if (seasons) {
+        if (!seasons.some((s: any) => s.season_number === 14)) {
+          seasons.push({ season_number: 14, episode_count: 8, name: 'Temporada 14 (2024)', air_date: '2024-05-11' } as any);
+        }
+        if (!seasons.some((s: any) => s.season_number === 15)) {
+          seasons.push({ season_number: 15, episode_count: 8, name: 'Temporada 15 (2025)', air_date: '2025-05-01' } as any);
+        }
+      } else {
+        seasons = Array.from({ length: seasonsCount }, (_, i) => ({ season_number: i + 1, episode_count: 8 }));
+      }
+    }
     const similarRaw = data.recommendations?.results || data.similar?.results || [];
     const similar = similarRaw.slice(0, 9).map((r: TMDBRawItem) => formatContentItem(r, type));
 
@@ -1008,6 +1026,44 @@ class TMDBClientService {
 
     const fetchPromise = (async () => {
       try {
+        // Interceptação canônica para Doctor Who: Modern Continuity Temporadas 14 e 15 (TMDB 239770)
+        if (cleanId === DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId && seasonNumber >= 14) {
+          const prodMapping = seriesSeasonMappingService.mapPresentationToProductionSeason(seasonNumber);
+          try {
+            const prodData = await this.request(`/tv/${prodMapping.targetTmdbId}/season/${prodMapping.targetSeason}`, 9000);
+            if (prodData && Array.isArray(prodData.episodes) && prodData.episodes.length > 0) {
+              const mapped = prodData.episodes.map((ep: any) => ({
+                id: `ep-${cleanId}-${seasonNumber}-${ep.episode_number}`,
+                number: ep.episode_number,
+                title: ep.name || `Episódio ${ep.episode_number}`,
+                description: ep.overview || 'Sinopse oficial deste episódio não informada.',
+                image: ep.still_path ? `${TMDB_IMAGE_BASE}${ep.still_path}` : '',
+                stillPath: ep.still_path,
+                airDate: ep.air_date,
+                releaseDate: ep.air_date
+              }));
+              this.seasonEpisodesCache.set(cacheKey, { eps: mapped, timestamp: Date.now() });
+              return mapped;
+            }
+          } catch (e) {
+            console.warn(`[TMDB] Erro ao carregar temporada ${seasonNumber} mapeada de Doctor Who:`, e);
+          }
+
+          const fallbackEps = seriesSeasonMappingService.getVerifiedSeasonEpisodes(seasonNumber);
+          if (fallbackEps.length > 0) {
+            const mapped = fallbackEps.map(ep => ({
+              id: ep.id,
+              number: ep.number,
+              title: ep.title,
+              description: ep.description,
+              image: ep.image,
+              airDate: ep.airDate,
+              releaseDate: ep.releaseDate
+            }));
+            this.seasonEpisodesCache.set(cacheKey, { eps: mapped, timestamp: Date.now() });
+            return mapped;
+          }
+        }
         const data = await this.request(`/tv/${cleanId}/season/${seasonNumber}`, 9000);
         const mapped = (data.episodes || []).map((ep: any) => ({
           id: `ep-${cleanId}-${seasonNumber}-${ep.episode_number}`,
@@ -1027,6 +1083,22 @@ class TMDBClientService {
         return [];
       } catch (err) {
         console.warn(`Erro ao carregar episódios da T${seasonNumber} (TMDB ID ${cleanId}):`, err);
+        if (cleanId === DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId && seasonNumber >= 14) {
+          const fallbackEps = seriesSeasonMappingService.getVerifiedSeasonEpisodes(seasonNumber);
+          if (fallbackEps.length > 0) {
+            const mapped = fallbackEps.map(ep => ({
+              id: ep.id,
+              number: ep.number,
+              title: ep.title,
+              description: ep.description,
+              image: ep.image,
+              airDate: ep.airDate,
+              releaseDate: ep.releaseDate
+            }));
+            this.seasonEpisodesCache.set(cacheKey, { eps: mapped, timestamp: Date.now() });
+            return mapped;
+          }
+        }
         // Se houver cache prévio (mesmo antigo), preserva para não deixar o usuário sem episódios
         if (cached && cached.eps.length > 0) {
           return cached.eps;

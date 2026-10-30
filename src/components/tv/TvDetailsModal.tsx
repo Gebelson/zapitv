@@ -11,6 +11,7 @@ import { catalogEligibilityService } from '../../core/catalog/CatalogEligibility
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { useExpandableSynopsis } from '../common/useExpandableSynopsis';
 import { animeSeasonMappingService } from '../../core/anime/animeSeasonMappingService';
+import { seriesSeasonMappingService } from '../../core/series/seriesSeasonMappingService';
 import { episodeAvailabilityService } from '../../core/episodes/episodeAvailabilityService';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
@@ -192,7 +193,13 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
   }, [initialItem]);
   const defaultInitialSeason = initialSeason || initialAnimeMapping?.defaultSeason || 1;
   const [currentSeason, setCurrentSeason] = useState(defaultInitialSeason);
+  const initialPresentationSeasons = useMemo(() => {
+    return seriesSeasonMappingService.getPresentationSeasonsCount(initialItem);
+  }, [initialItem]);
   const [availableSeasons, setAvailableSeasons] = useState<number[]>(() => {
+    if (initialPresentationSeasons > 1) {
+      return Array.from({ length: initialPresentationSeasons }, (_, i) => i + 1);
+    }
     if (initialItem.episodes && initialItem.episodes.length > 0) {
       const sSet = new Set(initialItem.episodes.map((e: any) => Number(e.season ?? 1)).filter((s: number) => s > 0));
       if (sSet.size > 0) return Array.from(sSet).sort((a: number, b: number) => a - b);
