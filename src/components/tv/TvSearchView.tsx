@@ -3,7 +3,7 @@ import { Search, X, ArrowLeft, Delete, Sparkles, Trash2 } from 'lucide-react';
 import { ContentItem } from '../../../types';
 import { TvCard16x9 } from './TvCard16x9';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
-import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
+import { tvNavigationManager, isRemoteConfirmEvent } from '../../core/tv/tvNavigationManager';
 import { searchService, SearchCategory } from '../../core/search/searchService';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { useTvViewport } from '../../core/tv/tvViewportService';
@@ -78,9 +78,19 @@ const TvVirtualKey: React.FC<TvVirtualKeyProps> = ({
   onArrowRightFromEdge,
   ariaLabel
 }) => {
+  const lastPressTimeRef = useRef<number>(0);
+
+  const handlePress = useCallback(() => {
+    const now = performance.now();
+    // Previne duplo acionamento acidental (onEnterPress + click do botão no mesmo instante)
+    if (now - lastPressTimeRef.current < 150) return;
+    lastPressTimeRef.current = now;
+    onPress(char);
+  }, [char, onPress]);
+
   const { ref, focused } = useTvFocusable({
     focusKey,
-    onEnterPress: () => onPress(char),
+    onEnterPress: handlePress,
     onArrowPress: (direction) => {
       if (direction === 'right' && onArrowRightFromEdge) {
         onArrowRightFromEdge();
@@ -97,7 +107,7 @@ const TvVirtualKey: React.FC<TvVirtualKeyProps> = ({
       data-focus-key={focusKey}
       data-tv-focused={focused ? "true" : undefined}
       aria-label={ariaLabel}
-      onClick={() => onPress(char)}
+      onClick={handlePress}
       style={{ ...style, minHeight: style?.height }}
       className={`select-none ${isFireTv ? 'rounded-lg' : 'rounded-xl'} font-bold flex items-center justify-center transition-all duration-150 outline-none cursor-pointer ${
         focused
@@ -283,6 +293,9 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
+      // Eventos reais de confirmação do controle remoto (Enter/OK) não inserem texto
+      if (isRemoteConfirmEvent(e)) return;
+
       if (e.key === 'Backspace') {
         e.preventDefault();
         uiSoundService.play('click');
@@ -308,7 +321,12 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
   }, [onClose]);
 
   // Teclado virtual: manipulação de teclas
+  const lastVirtualKeyPressRef = useRef<number>(0);
   const handleVirtualKeyPress = useCallback((char: string) => {
+    const now = performance.now();
+    if (now - lastVirtualKeyPressRef.current < 100) return;
+    lastVirtualKeyPressRef.current = now;
+
     if (char === 'BACKSPACE') {
       uiSoundService.play('click');
       setQuery(prev => prev.slice(0, -1));
