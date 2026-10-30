@@ -15,6 +15,7 @@ import { ContentItem, ContentType, CustomSection } from '../../../types';
 import { UserPreferenceProfile, PersonalizedRow } from './recommendationTypes';
 import { userPreferenceStore } from './userPreferenceStore';
 import { collaborativeEngine } from './CollaborativeEngine';
+import { adultContentService } from '../adult/AdultContentService';
 import { catalogEligibilityService } from '../catalog/CatalogEligibilityService';
 import { deduplicateContentItems, getCanonicalKeysForItem, normalizeCatalogText } from '../catalog/catalogDeduplication';
 import { bannedContentRegistry } from '../catalog/BannedContentRegistry';
@@ -113,7 +114,7 @@ export class EditorialCuratorService {
       profile.isChild = true;
     }
 
-    const profileFingerprint = `${profileId}_${isChild ? 'child' : 'adult'}_int${profile.interactionCount}_cw${continueWatchingItems.length}_cs${customSections.length}`;
+    const profileFingerprint = `${profileId}_${isChild ? 'child' : 'adult'}_int${profile.interactionCount}_cw${JSON.stringify(continueWatchingItems.map(item=>[item.id,item.type,item.title,item.image,item.year]))}_cs${customSections.length}`;
     const cacheKey = `editorial_home_${profileFingerprint}_${catalogFingerprint}`;
 
     const cached = this.sessionCache.get(cacheKey);
@@ -149,7 +150,7 @@ export class EditorialCuratorService {
     // 2. EXCEÇÃO ABSOLUTA: CONTINUAR ASSISTINDO (PRESERVAÇÃO INTACTA NO TOPO)
     // -------------------------------------------------------------------------
     if (continueWatchingItems && continueWatchingItems.length > 0) {
-      const validContinuity = catalogEligibilityService.filterEligibleItemsSync(continueWatchingItems);
+      const validContinuity = bannedContentRegistry.filterCleanItems(continueWatchingItems).filter(item=>!adultContentService.isAdultContent(item));
       if (validContinuity.length > 0) {
         const dedupedCw = deduplicateContentItems(validContinuity);
         rows.push({

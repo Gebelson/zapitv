@@ -1,6 +1,7 @@
+import { sameContent } from '../../core/storage/watchState';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Search, X, ArrowLeft, Delete, Sparkles, Trash2 } from 'lucide-react';
-import { ContentItem } from '../../../types';
+import { ContentItem, Profile } from '../../../types';
 import { TvCard16x9 } from './TvCard16x9';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
@@ -11,6 +12,7 @@ import { tvPerformanceService } from '../../core/tv/tvPerformanceService';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvSearchViewProps {
+  activeProfile?: Profile | null;
   allContent: ContentItem[];
   onSelectItem: (item: ContentItem) => void;
   onClose: () => void;
@@ -224,6 +226,7 @@ let cachedContentRef: ContentItem[] | null = null;
 let cachedSearchableIndex: any[] = [];
 
 export const TvSearchView: React.FC<TvSearchViewProps> = ({
+  activeProfile,
   allContent,
   onSelectItem,
   onClose
@@ -351,7 +354,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
   }, [allContent]);
 
   // Filtragem multi-campo, sem acento, case-insensitive, múltiplas palavras e por categoria
-  const searchResults = useMemo(() => {
+  const localResults = useMemo(() => {
     const normQuery = normalizeSearchTerm(query);
     const tokens = normQuery.split(' ').filter(Boolean);
 
@@ -424,6 +427,21 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
     scored.sort((a, b) => b.score - a.score);
     return scored.map(s => s.item);
   }, [query, selectedCategory, allContent, searchableIndex]);
+
+  const [remoteResults, setRemoteResults] = useState<{ query: string; category: SearchCategory; profileId?: string; items: ContentItem[] } | null>(null);
+  useEffect(() => {
+    let active = true;
+    const timer = setTimeout(() => {
+      if (query.trim().length < 2) return;
+      const publish = (items: ContentItem[]) => { if (active) setRemoteResults({ query, category: selectedCategory, profileId: activeProfile?.id, items }); };
+      void searchService.search(query, selectedCategory, allContent, activeProfile, publish).then(publish);
+    }, 300);
+    return () => { active = false; clearTimeout(timer); searchService.cancelPageSearch(); };
+  }, [query, selectedCategory, allContent, activeProfile]);
+  const searchResults = useMemo(() => {
+    if (!remoteResults || remoteResults.query !== query || remoteResults.category !== selectedCategory || remoteResults.profileId !== activeProfile?.id) return localResults;
+    return [...localResults, ...remoteResults.items].filter((item,index,items)=>!items.slice(0,index).some(previous=>sameContent(previous,item)));
+  }, [localResults, remoteResults, query, selectedCategory, activeProfile?.id]);
 
   useEffect(() => {
     setVisibleCount(initialBatch);

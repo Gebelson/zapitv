@@ -10,6 +10,9 @@ import { searchService } from '../search/searchService';
 import { LocalDataStore, localDataStore } from './localDataStore';
 import { WatchProgress, EpisodeWatchProgress, WatchState, watchStateCodec, contentKey, sameContent, episodeKey, normalizeProgress, normalizeEpisode, normalizeWatchState, mergeWatchStates, listCodec, normalizeIds, StorageScope, getWatchStateCodec, getListCodec } from './watchState';
 export type { WatchProgress, EpisodeWatchProgress, StorageScope } from './watchState';
+import { contentPoster, mergeContinuityMetadata, continuityContentType } from './continuityMetadata';
+import { scopedKey } from './watchState';
+import type { DataCodec } from './localDataStore';
 import { syncClient } from '../sync/syncClient';
 import { syncQueue } from '../sync/syncQueue';
 
@@ -57,6 +60,9 @@ export class StorageService {
     this.ready = this.syncFromDb();
   }
 
+  private continuitySyncState: 'idle' | 'loading' | 'synced' | 'offline' = 'idle';
+  public getContinuitySyncState() { return this.continuitySyncState; }
+
   public getScope(): StorageScope | null {
     return this.currentScope;
   }
@@ -64,6 +70,7 @@ export class StorageService {
   public async setScope(scope: StorageScope | null): Promise<void> {
     // Each selection owns a distinct lifetime, including A -> B -> A.
     this.currentScope = scope ? { ...scope } : null;
+    this.continuitySyncState = 'idle';
     const selectedEpoch = ++this.scopeEpoch;
     this.applyWatchState({ items: [], episodes: {} });
     if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("zapitv_progress_updated"));
@@ -90,14 +97,20 @@ export class StorageService {
     const scope = this.currentScope;
     const epoch = this.scopeEpoch;
     const revision = ++this.hydrationRevision;
+    this.continuitySyncState = 'loading';
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zapitv_progress_updated'));
     const isCurrent = () => this.scopeEpoch === epoch && this.hydrationRevision === revision;
     const watchCodec = this.getWatchCodec(), listCodec = this.getMyListCodec(), favoritesCodec = this.getFavoritesCodec();
+    const historyCodec = this.getContinuityMetadataCodec();
     try {
       // Confirm queued local edits before reading the authoritative result.
       await syncQueue.flush(profileId, scope?.userId);
       if (!isCurrent()) return;
       const remoteData = await syncClient.pull(profileId);
-      if (!remoteData || remoteData.profileId !== profileId || !isCurrent()) return;
+      if (!remoteData || remoteData.profileId !== profileId || !isCurrent()) {
+        if (isCurrent()) this.continuitySyncState = 'offline';
+        return;
+      }
 
       const mergeList = (local: string[], remote: typeof remoteData.myList, type: 'my_list' | 'favorites') => {
         const ids = new Set(local);
@@ -133,20 +146,40 @@ export class StorageService {
         });
       }
 
+      if (Array.isArray(remoteData.history)) await this.dataStore.update(historyCodec, previous => {
+        if (!isCurrent()) return previous;
+        const result = [...previous];
+        for (const row of remoteData.history) {
+          if (row.profileId !== profileId || !continuityContentType(row.contentType)) continue;
+          const item: ContentItem = { id: row.canonicalId, canonicalId: row.canonicalId, type: continuityContentType(row.contentType)!,
+            mediaFormat: continuityContentType(row.contentType) === ContentType.MOVIE ? 'movie' : 'series', title: row.title || row.canonicalId,
+            image: row.posterUrl || '', year: row.year || 0, rating: 0 };
+          const index = result.findIndex(existing => sameContent(existing, item));
+          if (index < 0) result.push(item); else result[index] = mergeContinuityMetadata(result[index], item);
+        }
+        return result;
+      });
+
       // 3. Progresso: converte remoteData.progress em WatchState e mescla com mergeWatchStates
       if (Array.isArray(remoteData.progress) && remoteData.progress.length > 0) {
         await this.dataStore.update(watchCodec, localWatch => {
           if (!isCurrent()) return localWatch;
+          // Pending offline positions still benefit from history metadata; never acknowledge or replace their mutation.
+          localWatch = { ...localWatch, items: localWatch.items.map(progress => {
+            const history = remoteData.history?.find(row => row.profileId === profileId && continuityContentType(row.contentType) === progress.item.type &&
+              [progress.contentId, progress.item.canonicalId, progress.item.id].includes(row.canonicalId));
+            return history ? { ...progress, item: mergeContinuityMetadata(mergeContinuityMetadata(progress.item, { title: history.title, image: history.posterUrl, year: history.year }), progress.item) } : progress;
+          }) };
           const remoteItems: WatchProgress[] = [];
           const remoteEpisodes: Record<string, EpisodeWatchProgress> = {};
           const serverWinners: WatchProgress[] = [];
 
           for (const rp of remoteData.progress) {
-            if (rp.profileId !== profileId || !Number.isFinite(rp.updatedAt) ||
+            if (rp.profileId !== profileId || !continuityContentType(rp.contentType) || !Number.isFinite(rp.updatedAt) ||
               !Number.isFinite(new Date(rp.updatedAt).getTime())) continue;
             const queued = syncQueue.getQueue(profileId, scope?.userId).filter(pending =>
               pending.type === 'progress' &&
-              pending.data?.canonicalId === rp.canonicalId && pending.data?.contentType === rp.contentType &&
+              pending.data?.canonicalId === rp.canonicalId && continuityContentType(pending.data?.contentType) === continuityContentType(rp.contentType) &&
               (pending.data?.season || 0) === (rp.season || 0) && (pending.data?.episode || 0) === (rp.episode || 0));
             if (queued.some(pending => pending.syncState !== 'conflict')) continue;
             const isEpisodic = rp.season > 0 || rp.episode > 0;
@@ -154,23 +187,18 @@ export class StorageService {
               id: rp.canonicalId,
               canonicalId: rp.canonicalId,
               title: rp.canonicalId,
-              type: (rp.contentType as any) || ContentType.MOVIE,
-              mediaFormat: isEpisodic ? 'series' : 'movie',
+              type: continuityContentType(rp.contentType)!,
+              mediaFormat: continuityContentType(rp.contentType) === ContentType.SERIES || isEpisodic ? 'series' : 'movie',
               rating: 0,
               year: 0,
               image: '',
             };
             const localItem = localWatch.items.find(p => sameContent(p.item, item))?.item;
             const history = Array.isArray(remoteData.history) ? remoteData.history.find(h =>
-              h.profileId === profileId && h.canonicalId === rp.canonicalId && h.contentType === rp.contentType) : undefined;
-            item = {
-              ...item,
-              title: history?.title || item.title,
-              image: history?.posterUrl || '',
-              poster: history?.posterUrl || '',
-              year: history?.year || 0,
-              ...localItem,
-            };
+              h.profileId === profileId && h.canonicalId === rp.canonicalId && continuityContentType(h.contentType) === continuityContentType(rp.contentType)) : undefined;
+            item = mergeContinuityMetadata(item, localItem);
+            item = mergeContinuityMetadata(item, { title: history?.title, image: history?.posterUrl, year: history?.year });
+            item = mergeContinuityMetadata(item, localItem);
 
             const wp: WatchProgress = {
               contentId: rp.canonicalId,
@@ -220,8 +248,13 @@ export class StorageService {
         });
       }
 
-      if (isCurrent() && typeof window !== "undefined") window.dispatchEvent(new CustomEvent("zapitv_progress_updated"));
-    } catch { console.warn("Não foi possível atualizar o cache remoto do perfil; dados locais preservados."); }
+      if (isCurrent()) this.continuitySyncState = 'synced';
+    } catch {
+      if (isCurrent()) this.continuitySyncState = 'offline';
+      console.warn("Não foi possível atualizar o cache remoto do perfil; dados locais preservados.");
+    } finally {
+      if (isCurrent() && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zapitv_progress_updated'));
+    }
   }
 
   private getWatchCodec() {
@@ -556,6 +589,14 @@ export class StorageService {
     });
   }
 
+  private getContinuityMetadataCodec(): DataCodec<ContentItem[]> {
+    return { key: scopedKey('zapitv_continuity_metadata_v1', this.currentScope), legacyKeys: [],
+      isValid: Array.isArray, normalize: value => Array.isArray(value) ? value.filter(item => item && typeof item.id === 'string' && Object.values(ContentType).includes(item.type)) : [],
+      migrate: () => [] };
+  }
+
+  public getContinuityMetadata(): Promise<ContentItem[]> { return this.dataStore.read(this.getContinuityMetadataCodec()); }
+
   public async getContinueWatching(): Promise<WatchProgress[]> {
     const epoch = this.scopeEpoch;
     await this.ready;
@@ -697,7 +738,7 @@ export class StorageService {
               season,
               episode,
               title: normalizedProgress.item?.title,
-              posterUrl: normalizedProgress.item?.poster,
+              posterUrl: contentPoster(normalizedProgress.item),
               year: normalizedProgress.item?.year,
               watchedAt: eventTime,
               updatedAt: eventTime,

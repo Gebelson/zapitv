@@ -182,6 +182,31 @@ async function worker(local: boolean) {
     await request(other, 'GET', `/api/auth/user/${accountA.id}`, undefined, 403);
     passed.push('profiles create/edit/select, PC to TV progress, account and profile isolation');
 
+    phase = 'cross-device-continuity';
+    // The QR isolation test intentionally logged this session out; authenticate it anew.
+    await request(mobile,'POST','/api/auth/login',{email:emails[0],password});
+    await request(mobile,'POST',`/api/profiles/${profileA.id}/select`,{});
+    const continuityCases = [
+      ['tt0388629','One Piece',1999,'series'],['tt5753856','Dark',2017,'series'],
+      ['tmdb-121','Doctor Who',1963,'series'],['tt2531336','Lupin',2021,'series'],
+      [`anime:${runUUID}`,'Controlled anime fixture',2021,'anime'],
+    ] as const;
+    const mutations = continuityCases.flatMap(([id,title,year,type],index)=>[
+      {id:randomUUID(),type:'progress',action:'save',timestamp:Date.now(),data:{canonicalId:id,contentType:type,season:1,episode:index+1,positionSec:120+index,durationSec:1200}},
+      {id:randomUUID(),type:'history',action:'save',timestamp:Date.now(),data:{canonicalId:id,contentType:type,season:1,episode:index+1,title,year,posterUrl:'https://image.example.test/controlled.jpg'}},
+      {id:randomUUID(),type:'my_list',action:'set',timestamp:Date.now(),data:{canonicalId:id}},
+    ]);
+    for (let offset=0;offset<mutations.length;offset+=3) {
+      const chunk=mutations.slice(offset,offset+3);
+      const batch=(await request(pc,'POST','/api/sync/batch',{profileId:profileA.id,mutations:chunk,clientSendTime:Date.now()})).data;
+      check(batch.results?.length===chunk.length && batch.results.every((result:any)=>result.success===true),'CONTINUITY_BATCH_NOT_CONFIRMED');
+    }
+    const states = await Promise.all([pc,mobile,tv].map(async jar=>(await request(jar,'GET',`/api/sync/pull?profileId=${profileA.id}`)).data));
+    const normalized = states.map(state=>state.progress.filter((row:any)=>continuityCases.some(([id])=>id===row.canonicalId)).map((row:any)=>[row.canonicalId,row.contentType,row.season,row.episode,row.positionSec,row.version]).sort());
+    check(JSON.stringify(normalized[0])===JSON.stringify(normalized[1]) && JSON.stringify(normalized[1])===JSON.stringify(normalized[2]) && normalized[0].length===5,'CONTINUITY_THREE_SESSION_PARITY');
+    check(states.every(state=>state.history.some((row:any)=>row.canonicalId==='tmdb-121'&&row.title==='Doctor Who'&&row.year===1963)),'CONTINUITY_HISTORY_METADATA');
+    passed.push('five real remote progress/history/list records identical across three independent HTTP sessions');
+
     phase = 'admin-uid';
     process.env.ADMIN_EMAILS = emails[1];
     process.env.ADMIN_USER_IDS = accountA.id;
@@ -207,6 +232,9 @@ async function worker(local: boolean) {
     check((await client.execute({ sql: 'SELECT count(*) AS n FROM processed_sync_mutations WHERE id = ?', args: [mutation.id] })).rows[0].n === 0, 'DENIED_MUTATION_RESERVED_ID');
     passed.push('unauthenticated/cross-account queued mutation refused without persistence');
     phase = 'complete';
+  } catch(error) {
+    console.error(JSON.stringify({phase,elapsedMs:Date.now()-startedAt,errorName:error instanceof Error ? error.name : 'UnknownError',deadlineExceeded:deadline.aborted,databaseDeadlineExceeded:databaseDeadline.aborted}));
+    throw error;
   } finally {
     // Stop accepting requests before cleanup. On HTTP timeout the DB fetch timeout
     // is shorter, so the handler settles before the request deadline.
@@ -238,7 +266,7 @@ async function worker(local: boolean) {
       disposeCatalog();
       client.close(); process.chdir(originalCwd); removeOwnedTempDirectory(fixture, 'zapitv-p0-');
       console.log(JSON.stringify({ mode: local ? 'local-sqlite-selftest' : 'remote-staging-http', runUUID,
-        phase, passed, cleanupCompleted, fullSchemaCompatibilityApproved: false,
+        phase, elapsedMs: Date.now()-startedAt, passed, cleanupCompleted, fullSchemaCompatibilityApproved: false,
         limits: ['No browser UI/device hardware assertion', 'No physical network-offline assertion', 'No global policy writes or migrations in remote mode'] }));
     }
   }
@@ -292,7 +320,7 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
   main().catch(error => {
     // Suppress SQL text, endpoint URLs, cookies and assertion actual/expected values.
     const message = error instanceof Error ? error.message : '';
-    console.error(JSON.stringify({ status: 'failed', code: /^[A-Z0-9_/.-]+$/.test(message) ? message : 'ACCEPTANCE_FAILED' }));
+    console.error(JSON.stringify({ status: 'failed', code: /^[A-Z0-9_/.-]+$/i.test(message) ? message.toUpperCase() : 'ACCEPTANCE_FAILED' }));
     process.exitCode = 1;
   });
 }

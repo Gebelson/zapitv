@@ -1,4 +1,5 @@
 import { ContentItem, ContentType } from '../../../types';
+import { mergeContinuityMetadata } from './continuityMetadata';
 import type { DataCodec } from './localDataStore';
 
 export interface WatchProgress {
@@ -33,6 +34,12 @@ export function contentAliases(item: ContentItem): string[] {
     if (/^tmdb-\d+$/.test(item.id)) ids.add(`tmdb:${item.id.slice(5)}`);
   }
   if (item.canonicalId) ids.add(`canonical:${item.canonicalId}`);
+  for (const value of [item.id, item.canonicalId]) {
+    const match = value?.match(/^(?:movie|series|anime):(tmdb|imdb|anilist):(.+)$/);
+    if (match) ids.add(`${match[1]}:${match[2]}`);
+    const anilist = value?.match(/^anilist[-:](\d+)$/);
+    if (anilist) ids.add(`anilist:${anilist[1]}`);
+  }
   if (item.imdbId) ids.add(`imdb:${item.imdbId.trim()}`);
   if (item.tmdbId) ids.add(`tmdb:${String(item.tmdbId).trim()}`);
   if (item.aniListId) ids.add(`anilist:${item.aniListId}`);
@@ -158,9 +165,18 @@ export function normalizeWatchState(value: unknown): WatchState {
 
 /** Catalog/recommendations enrich metadata; membership belongs to the active profile's progress. */
 export function resolveContinueWatchingItems(progress: WatchProgress[], catalog: ContentItem[]): ContentItem[] {
-  return progress.filter(p => p.item && p.currentTime > 5 && p.percentage < 95)
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-    .map(p => catalog.find(item => sameContent(item, p.item)) ?? p.item);
+  return selectContinuityHistory(progress, catalog)
+    .filter(p => p.currentTime > 5 && p.percentage < 95).map(p => p.item);
+}
+
+export function selectContinuityHistory(progress: WatchProgress[], catalog: ContentItem[]): WatchProgress[] {
+  const unique = mergeWatchStates({ items: progress, episodes: {} }).items;
+  return unique.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt) || contentKey(a.item).localeCompare(contentKey(b.item)))
+    .map(p => {
+      const versions = progress.filter(record=>sameContent(record.item,p.item)).sort((a,b)=>Date.parse(a.updatedAt)-Date.parse(b.updatedAt));
+      const metadata = versions.reduce((item,record)=>mergeContinuityMetadata(item,record.item),p.item);
+      return { ...p, item: mergeContinuityMetadata(metadata, catalog.find(item => sameContent(item, p.item))) };
+    });
 }
 
 export interface StorageScope {

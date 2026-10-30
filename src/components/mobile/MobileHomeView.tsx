@@ -1,11 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { ContentItem } from '../../../types';
 import { MobileHero } from './MobileHero';
 import { MobileContentRow } from './MobileContentRow';
-import { storageService } from '../../core/storage/storageService';
-import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
-import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication';
-import { resolveContinueWatchingItems } from '../../core/storage/watchState';
+import { useProfileContinuity } from '../../core/storage/useProfileContinuity';
 
 interface MobileHomeViewProps {
   heroItems: ContentItem[];
@@ -48,59 +45,11 @@ export const MobileHomeView: React.FC<MobileHomeViewProps> = ({
   onToggleList,
   onSelectCategoryFilter
 }) => {
-  const [continueWatchingItems, setContinueWatchingItems] = useState<ContentItem[]>([]);
-
-  // Carrega e assina atualizações de Continuar Assistindo do storageService
-  useEffect(() => {
-    let isMounted = true;
-    let request = 0;
-    let visibleScope = storageService.getScope();
-
-    const loadProgress = async () => {
-      const currentRequest = ++request;
-      const scope = storageService.getScope();
-      if (scope !== visibleScope) {
-        visibleScope = scope;
-        setContinueWatchingItems([]);
-      }
-      try {
-        const progressList = await storageService.getContinueWatching();
-        if (!isMounted || currentRequest !== request || storageService.getScope() !== scope) return;
-
-        // updatedAt replaces legacy lastWatched ordering. Recommendation rows only supply metadata.
-        const catalog = [...allContent, ...(personalizedRows || []).flatMap(row => row.items)];
-        const inProgress = resolveContinueWatchingItems(progressList || [], catalog);
-
-        const eligible = catalogEligibilityService.filterEligibleItemsSync(
-          deduplicateContentItems(inProgress)
-        );
-
-        setContinueWatchingItems(eligible);
-      } catch {}
-    };
-
-    loadProgress();
-
-    // Event listener para atualizações assíncronas de progresso
-    const handleProgressUpdate = () => {
-      loadProgress();
-    };
-
-    window.addEventListener('zapitv_progress_updated', handleProgressUpdate);
-    return () => {
-      isMounted = false;
-      window.removeEventListener('zapitv_progress_updated', handleProgressUpdate);
-    };
-  }, [allContent, personalizedRows]);
-
-  // Recomendações antigas não podem inserir itens de outro perfil nesta fileira.
-  const consolidatedContinueWatching = useMemo(() => {
-    const deduped = deduplicateContentItems(continueWatchingItems);
-    return catalogEligibilityService.filterEligibleItemsSync(deduped);
-  }, [continueWatchingItems]);
+  const continuity = useProfileContinuity(allContent);
+  const consolidatedContinueWatching = continuity.continueWatching;
 
   return (
-    <div className="pb-28">
+    <div className="pb-28" aria-busy={continuity.loading}>
       {/* 1. Banner Principal Mobile (Começa no topo absoluto da viewport sob o header) */}
       <MobileHero
         featuredItems={heroItems}

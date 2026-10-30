@@ -1,3 +1,4 @@
+import { useProfileContinuity } from './src/core/storage/useProfileContinuity';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate, useSearchParams, matchPath } from 'react-router-dom';
@@ -22,7 +23,6 @@ import { ShieldCheck, Flame, Film, Tv, List, Search, Sparkles, Plus, RefreshCw, 
 import { db } from './db';
 import { tmdbService } from './src/core/tmdb/tmdbClient';
 import { storageService, WatchProgress } from './src/core/storage/storageService';
-import { resolveContinueWatchingItems } from './src/core/storage/watchState';
 import { VERIFIED_OPEN_ITEMS } from './src/core/catalog/verifiedCatalog';
 import { ZapiLoader } from './src/components/common/ZapiLoader';
 import { FeatureErrorBoundary } from './src/components/common/FeatureErrorBoundary';
@@ -2250,6 +2250,9 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     }
   };
 
+  const continuityCatalog = useMemo(() => [...content, ...trendingItems, ...popularMovies, ...popularSeries, ...animeItems], [content, trendingItems, popularMovies, popularSeries, animeItems]);
+  const profileContinuity = useProfileContinuity(continuityCatalog, !isTvRoute && !isMobileViewport);
+
   const personalizedHomeRows = useMemo(() => {
     const allAvailable = deduplicateContentItems([
       ...trendingItems,
@@ -2258,7 +2261,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       ...animeItems,
       ...content
     ]);
-    const cwItems = resolveContinueWatchingItems(continueWatchingList, allAvailable);
+    const cwItems = profileContinuity.continueWatching;
     return hybridRecommendationEngine.getHybridHomeRows(
       allAvailable,
       activeProfile?.id || 'default',
@@ -2266,7 +2269,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
       activeProfile?.isChild === true,
       customSections
     );
-  }, [trendingItems, popularMovies, popularSeries, animeItems, content, continueWatchingList, activeProfile?.id, activeProfile?.isChild, customSections, catalogEligibilityVersion]);
+  }, [trendingItems, popularMovies, popularSeries, animeItems, content, continueWatchingList, activeProfile?.id, activeProfile?.isChild, customSections, catalogEligibilityVersion, profileContinuity.continueWatching]);
 
   const filteredContent = useMemo(() => {
     let baseFiltered = content;
@@ -2844,7 +2847,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-                {catalogEligibilityService.filterEligibleItemsSync(content.filter(i => myList.includes(i.id))).map(item => (
+                {profileContinuity.myList.map(item => (
                   <ContentCard 
                     key={item.id}
                     item={item}
@@ -2989,7 +2992,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     currentUser, activeProfile, users, content, sectionTitles, customSections,
     filteredContent, visibleGridCount, trendingItems, popularMovies, popularSeries, animeItems,
     topRatedItems, featuredSelection, continueWatchingList, isLoadingMore,
-    hasMoreMovies, hasMoreSeries, hasMoreAnimes, handlePlayFromHero
+    hasMoreMovies, hasMoreSeries, hasMoreAnimes, handlePlayFromHero, personalizedHomeRows, profileContinuity.myList
   ]);
 
   if (isTvRoute) {

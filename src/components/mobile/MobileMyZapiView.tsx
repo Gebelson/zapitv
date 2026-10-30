@@ -7,10 +7,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { User, Profile, ContentItem } from '../../../types';
 import { MobileContentRow } from './MobileContentRow';
-import { storageService } from '../../core/storage/storageService';
+import { useProfileContinuity } from '../../core/storage/useProfileContinuity';
 import { uiSoundService } from '../../core/audio/uiSoundService';
-import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
-import { deduplicateContentItems } from '../../core/catalog/catalogDeduplication';
 import { resolveAvatarUrl } from '../../core/profile/avatarRegistry';
 
 interface MobileMyZapiViewProps {
@@ -45,7 +43,8 @@ export const MobileMyZapiView: React.FC<MobileMyZapiViewProps> = ({
   onOpenLogin
 }) => {
   const navigate = useNavigate();
-  const [continueWatchingItems, setContinueWatchingItems] = useState<ContentItem[]>([]);
+  const continuity = useProfileContinuity(allContent);
+  const continueWatchingItems = continuity.continueWatching;
   const [soundsEnabled, setSoundsEnabled] = useState(() => uiSoundService.getPreferences().enabled);
   const isAdmin = Boolean(currentUser && currentUser.role === 'admin');
 
@@ -55,20 +54,6 @@ export const MobileMyZapiView: React.FC<MobileMyZapiViewProps> = ({
     });
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
-    storageService.getContinueWatching().then(progressList => {
-      if (!isMounted) return;
-      const inProgress = progressList
-        .filter(p => p.percentage < 95 && p.currentTime > 5)
-        .map(p => p.item)
-        .filter(item => item && item.id);
-      setContinueWatchingItems(deduplicateContentItems(catalogEligibilityService.filterEligibleItemsSync(inProgress)));
-    }).catch(() => {});
-
-    return () => { isMounted = false; };
-  }, []);
-
   const handleToggleSound = () => {
     const next = !soundsEnabled;
     uiSoundService.updatePreferences({ enabled: next });
@@ -76,9 +61,9 @@ export const MobileMyZapiView: React.FC<MobileMyZapiViewProps> = ({
   };
 
   // Itens da Minha Lista
-  const myListItems = allContent.filter(item => myList.includes(item.id));
+  const myListItems = continuity.myList;
   // Itens Favoritos
-  const favoriteItems = allContent.filter(item => favorites.includes(item.id));
+  const favoriteItems = continuity.favorites;
 
   return (
     <div data-testid="mobile-my-zapitv" className="pt-16 pb-28 px-4 max-w-lg mx-auto select-none">

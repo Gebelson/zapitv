@@ -263,3 +263,37 @@ test('a late pull in the same scope cannot undo a newer list tombstone', async (
     assert.deepEqual(await f.service.getMyList(), [], 'later tombstone survives an out-of-order pull response');
   } finally { f.restore(); }
 });
+
+test('remote history enriches incomplete local metadata, survives reload, and remains account scoped', async()=> {
+  const f=await fixture();
+  try {
+    await selectScope(f.service,A);
+    const raw = {...item,id:'tmdb-121',canonicalId:'tmdb-121',type:ContentType.SERIES,mediaFormat:'series' as const,title:'tmdb-121',image:'',year:0};
+    await f.service.saveProgress({...progress(120),item:raw,contentId:raw.id,season:1,episode:1});
+    globalThis.fetch=async()=>Response.json({profileId:A.profileId,serverTime:Date.now(),progress:[{id:'r',profileId:A.profileId,canonicalId:raw.id,contentType:'series',season:1,episode:1,positionSec:120,durationSec:1000,progressPercent:12,version:1,updatedAt:Date.now()}],history:[{profileId:A.profileId,canonicalId:raw.id,contentType:'series',title:'Doctor Who',year:1963,posterUrl:'https://image.tmdb.org/t/p/w500/doctor.jpg'}],myList:[],favorites:[]});
+    syncQueue.pauseAndUnloadQueues();
+    await f.service.hydrateRemoteProfile(A.profileId!);
+    const saved=(await f.service.getContinueWatching())[0];
+    assert.equal(saved.item.title,'Doctor Who'); assert.equal(saved.item.year,1963); assert.ok(saved.item.image.endsWith('/doctor.jpg'));
+    const restored=new StorageService(f.store); await restored.setScope(A);
+    assert.equal((await restored.getContinueWatching())[0].item.title,'Doctor Who');
+    globalThis.fetch=async()=>new Response('{}',{status:503});
+    await restored.setScope(B); assert.deepEqual(await restored.getContinuityMetadata(),[]);
+  } finally {f.restore();}
+});
+
+test('history sync writes a valid image fallback and retains history-only records',async()=> {
+  const f=await fixture();
+  try {
+    await selectScope(f.service,A);
+    await f.service.saveProgress({...progress(130),item:{...item,poster:'',image:'https://image.example.test/poster.jpg'}});
+    const queued=syncQueue.getQueue(A.profileId!,A.userId).find(mutation=>mutation.type==='history');
+    assert.equal(queued?.data.posterUrl,'https://image.example.test/poster.jpg');
+    globalThis.fetch=async()=>Response.json({profileId:A.profileId,serverTime:Date.now(),progress:[],history:[{profileId:A.profileId,canonicalId:'tmdb-121',contentType:'series',title:'Doctor Who',year:1963,posterUrl:'https://image.example.test/doctor.jpg'}],myList:[],favorites:[]});
+    await f.service.hydrateRemoteProfile(A.profileId!);
+    assert.equal(f.service.getContinuitySyncState(),'synced');
+    const metadata=await f.service.getContinuityMetadata();assert.equal(metadata[0].title,'Doctor Who');
+    globalThis.fetch=async()=>new Response('{}',{status:503});
+    await selectScope(f.service,B);assert.deepEqual(await f.service.getContinuityMetadata(),[]);
+  }finally{f.restore();}
+});

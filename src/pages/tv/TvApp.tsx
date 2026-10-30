@@ -1,3 +1,4 @@
+import { useProfileContinuity } from '../../core/storage/useProfileContinuity';
 import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense, lazy } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ContentItem, ContentType, User, Profile } from '../../../types';
@@ -475,21 +476,9 @@ export const TvApp: React.FC<TvAppProps> = ({
     return catalogEligibilityService.filterEligibleItemsSync(fallback).slice(0, 20);
   }, [trendingItems, featuredItems, unifiedMovies, unifiedSeries]);
 
-  // Itens da Minha Lista reais
-  const myListItems = useMemo(() => {
-    if (!content || !myList) return [];
-    const listSet = new Set(myList);
-    return fullTvCatalog.filter(it => listSet.has(it.id));
-  }, [fullTvCatalog, myList]);
-
-  // Itens do Histórico reais
-  const historyItems = useMemo(() => {
-    if (specialView !== 'history' || !content) return [];
-    return fullTvCatalog.filter(it => {
-      const cont = storageService.getPlaybackContinuity(it);
-      return cont.hasStarted;
-    });
-  }, [fullTvCatalog, specialView]);
+  const continuity = useProfileContinuity(fullTvCatalog);
+  const myListItems = continuity.myList;
+  const historyItems = continuity.history;
 
   // Recuperação e sincronização de rotas de reprodução na Smart TV (/tv/assistir/...)
   useEffect(() => {
@@ -741,6 +730,7 @@ export const TvApp: React.FC<TvAppProps> = ({
           <main className={`relative z-10 w-full min-h-screen ${specialView && specialView !== 'search' ? 'pt-24' : 'pt-0'}`}>
             {specialView === 'search' ? (
               <TvSearchView
+                activeProfile={activeTvProfile}
                 allContent={fullTvCatalog}
                 onSelectItem={handleOpenDetailModal}
                 onClose={() => {
@@ -773,6 +763,7 @@ export const TvApp: React.FC<TvAppProps> = ({
               <TvSettingsView onBack={() => setSpecialView(null)} />
             ) : currentTab === 'home' ? (
               <TvHomeView
+                continuitySnapshot={continuity}
                 suspended={screensaverActive}
                 featuredItems={featuredItems}
                 trendingItems={unifiedTrending}

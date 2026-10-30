@@ -30,7 +30,7 @@ function callback(path: string, name: string, context: Record<string, unknown>, 
 async function run() {
   const early = { item: { id:'tt1234567', canonicalId:'tt1234567', title:'Resume fixture', type:ContentType.MOVIE, year:2020, rating:8, image:'' }, contentId:'tt1234567', currentTime:8, duration:1000, percentage:0.8, updatedAt:new Date().toISOString() };
   const earlyTv = callback('src/components/tv/TvHomeView.tsx','continueWatchingItems',{
-    allContent:[early.item],storageService:{getSyncItemProgressRecord:()=>early},resolveContinueWatchingItems,
+    continuity: { continueWatching: resolveContinueWatchingItems([early], []) },
   })();
   assert.equal(earlyTv[0]?.id,early.item.id,'TV must show the same early resume point as PC/mobile, without a private 2% threshold');
   const tv = 'src/pages/tv/TvApp.tsx';

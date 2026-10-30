@@ -49,11 +49,10 @@ assert.ok(
   'MobileHomeView.tsx deve passar showProgress={true} para o carrossel de Continuar Assistindo'
 );
 
-// E. Deve preservar a ordenação por atividade recente (lastWatched)
-assert.ok(
-  homeCode.includes('lastWatched'),
-  'MobileHomeView.tsx deve ordenar itens por lastWatched (atividade mais recente)'
-);
+// E. A ordenação pertence ao seletor compartilhado, não a uma implementação visual duplicada.
+assert.ok(homeCode.includes('useProfileContinuity(allContent)'), 'Mobile deve consumir continuidade compartilhada');
+const watchStateCode = fs.readFileSync(path.join(projectRoot,'src/core/storage/watchState.ts'),'utf8');
+assert.ok(watchStateCode.includes('Date.parse(b.updatedAt) - Date.parse(a.updatedAt)') && watchStateCode.includes('contentKey(a.item).localeCompare'), 'Ordenação recente com desempate determinístico deve ser preservada');
 
 // F. Deve consolidar as duas fontes de dados em consolidatedContinueWatching
 assert.ok(

@@ -1,7 +1,7 @@
+import type { ContinuitySnapshot } from '../../core/storage/ProfileContinuityService';
 import React, { memo, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ContentItem } from '../../../types';
-import { storageService, type WatchProgress } from '../../core/storage/storageService';
-import { resolveContinueWatchingItems } from '../../core/storage/watchState';
+import { useProfileContinuity } from '../../core/storage/useProfileContinuity';
 import { heroCarouselStore, HERO_CAROUSEL_STORAGE_KEY } from '../../core/catalog/heroCarouselStore';
 import { TvHeroBanner } from './TvHeroBanner';
 import { TvContentRow } from './TvContentRow';
@@ -11,6 +11,7 @@ import { tvScrollService } from '../../core/tv/tvScrollService';
 import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvHomeViewProps {
+  continuitySnapshot?: ContinuitySnapshot;
   suspended?: boolean;
   featuredItems: ContentItem[];
   trendingItems: ContentItem[];
@@ -23,6 +24,7 @@ interface TvHomeViewProps {
 }
 
 export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
+  continuitySnapshot,
   suspended = false,
   featuredItems,
   trendingItems,
@@ -33,12 +35,6 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
   onSelectItem,
   onPlayItem
 }) => {
-  const [progressRevision, setProgressRevision] = useState(0);
-  useEffect(() => {
-    const refresh = () => setProgressRevision(value => value + 1);
-    window.addEventListener('zapitv_progress_updated', refresh);
-    return () => window.removeEventListener('zapitv_progress_updated', refresh);
-  }, []);
   // Lista de Destaques configurados no painel administrativo / heroCarouselStore
   const [liveFeatured, setLiveFeatured] = useState<ContentItem[]>(() => {
     // 1. Se houver itens personalizados salvos pelo admin no localStorage, respeita todos eles sem corte
@@ -98,11 +94,9 @@ export const TvHomeView: React.FC<TvHomeViewProps> = memo(({
   }, [liveFeatured, featuredItems, trendingItems, allContent]);
 
   // Continuar Assistindo: extrai itens reais em andamento
-  const continueWatchingItems = useMemo(() => {
-    const progress = allContent.map(item => storageService.getSyncItemProgressRecord(item.id))
-      .filter((value): value is WatchProgress => value !== null);
-    return resolveContinueWatchingItems(progress, allContent).slice(0, 15);
-  }, [allContent, progressRevision]);
+  const localContinuity = useProfileContinuity(allContent, !continuitySnapshot);
+  const continuity = continuitySnapshot ?? localContinuity;
+  const continueWatchingItems = useMemo(() => continuity.continueWatching.slice(0, 15), [continuity.continueWatching]);
 
   // Carrosséis de Exclusivos das Plataformas de Streaming para a Smart TV
   const platformRows = useMemo(() => {
