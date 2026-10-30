@@ -745,13 +745,6 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
                   <span>Títulos em Alta e Recomendados</span>
                 )}
               </h1>
-              <p className={`text-gray-400 mt-0.5 ${
-                isFireTv
-                  ? (viewport.scaleCategory === 'compact' ? 'text-[10px]' : 'text-xs')
-                  : (viewport.scaleCategory === 'compact' ? 'text-xs' : 'text-sm')
-              }`}>
-                {searchResults.length} {searchResults.length === 1 ? 'título disponível' : 'títulos disponíveis'}
-              </p>
             </div>
 
             {/* Filtros de Categoria: Todos | Filmes | Séries | Animes */}
