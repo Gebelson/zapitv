@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import Hls from 'hls.js';
 import { ReportFeedbackModal } from '../feedback/ReportFeedbackModal';
+import { TvPlaybackErrorScreen } from './TvPlaybackErrorScreen';
 import { FeedbackCategory } from '../../core/feedback/feedbackTypes';
 import { StremioStream } from '../../core/stremio/stremioTypes';
 import { storageService } from '../../core/storage/storageService';
@@ -410,6 +411,34 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const [isMediaReady, setIsMediaReady] = useState(false);
   const [allSourcesFailed, setAllSourcesFailed] = useState(false);
   const [failureCategory, setFailureCategory] = useState<'NO_SOURCES_FOUND' | 'VERIFICATION_ERROR' | 'PLAYBACK_FAILURE' | 'UNAVAILABLE'>('UNAVAILABLE');
+  const [isRetryingSources, setIsRetryingSources] = useState(false);
+
+  useEffect(() => {
+    if (!isLoadingStreams) {
+      setIsRetryingSources(false);
+    }
+  }, [isLoadingStreams]);
+
+  useEffect(() => {
+    setIsRetryingSources(false);
+  }, [streams]);
+
+  const handleRetrySources = useCallback(() => {
+    if (isRetryingSources || !onRetrySources) return;
+    setIsRetryingSources(true);
+    setHasError(false);
+    setIsLoading(true);
+    onRetrySources();
+  }, [isRetryingSources, onRetrySources]);
+
+  const handleCloseFeedbackModal = useCallback(() => {
+    setShowFeedbackModal(false);
+    if (allSourcesFailed) {
+      setTimeout(() => {
+        setFocus('tv-player-error-report');
+      }, 60);
+    }
+  }, [allSourcesFailed]);
   const [userSkippedIntro, setUserSkippedIntro] = useState(false);
   const [isIntroAutoplayBlocked, setIsIntroAutoplayBlocked] = useState(false);
 
@@ -3537,6 +3566,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     return tvNavigationManager.registerBackHandler('zapi-player', 200, () => {
       if (showFeedbackModal) {
         setShowFeedbackModal(false);
+        if (allSourcesFailed) {
+          setTimeout(() => setFocus('tv-player-error-report'), 60);
+        }
+        return true;
+      }
+      if (allSourcesFailed) {
+        handlePlayerClose();
         return true;
       }
       if (showAutoPlayCountdown) {
@@ -3574,6 +3610,23 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (isTvPlayback) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (allSourcesFailed) {
+        const isBack = e.keyCode === 10009 || e.key === 'GoBack' || e.key === 'Return' || e.key === 'Escape' || (e.key === 'Backspace' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement));
+        if (isBack) {
+          if (showFeedbackModal) {
+            e.preventDefault();
+            setShowFeedbackModal(false);
+            setTimeout(() => setFocus('tv-player-error-report'), 60);
+            return;
+          }
+          e.preventDefault();
+          handlePlayerClose();
+          return;
+        }
+        // Quando allSourcesFailed está ativo, não intercepta setas, enter ou atalhos de reprodução
+        return;
+      }
 
       const isBackKey = e.keyCode === 10009 || e.key === 'GoBack' || e.key === 'Return' || e.key === 'Escape';
       if (isBackKey) {
@@ -4373,61 +4426,20 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
       {/* Screen when all sources have failed */}
       {allSourcesFailed && (
-        <div
-          key="player-all-sources-failed"
-          className="absolute inset-0 z-[3600] bg-[#05070a] flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200"
-        >
-          <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(239,68,68,0.2)]">
-            <AlertCircle className="w-10 h-10 text-red-500" />
-          </div>
-          {failureCategory === 'PLAYBACK_FAILURE' || (streams.length > 0 && allSourcesFailed) ? (
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Não foi possível reproduzir este conteúdo agora</h2>
-          ) : failureCategory === 'VERIFICATION_ERROR' || verificationState === 'INCONCLUSIVE' ? (
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Não foi possível verificar a disponibilidade</h2>
-          ) : failureCategory === 'NO_SOURCES_FOUND' || streams.length === 0 ? (
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Conteúdo indisponível no momento</h2>
-          ) : (
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Conteúdo indisponível</h2>
-          )}
-          <p className="text-gray-300 text-sm max-w-lg mb-6 leading-relaxed">
-            {errorMessage || (
-              failureCategory === 'PLAYBACK_FAILURE'
-                ? 'Não foi possível reproduzir este conteúdo agora. Tente novamente mais tarde.'
-                : verificationState === 'INCONCLUSIVE'
-                  ? 'Não foi possível verificar a disponibilidade agora. Tente novamente.'
-                  : 'Conteúdo indisponível no momento. Não foi possível encontrar uma fonte verificada agora. Tente novamente.'
-            )}
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <button
-              onClick={() => {
-                setHasError(false);
-                setIsLoading(true);
-                onRetrySources?.();
-              }}
-              disabled={!onRetrySources}
-              className="px-6 py-3 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-full font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
-            >
-              Tentar novamente
-            </button>
-            <button
-              onClick={() => {
-                setFeedbackDefaultCategory('video_not_loading');
-                setShowFeedbackModal(true);
-              }}
-              className="px-6 py-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 active:scale-95 rounded-full font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2"
-            >
-              <AlertCircle className="w-4 h-4" />
-              <span>Reportar erro</span>
-            </button>
-            <button
-              onClick={handlePlayerClose}
-              className="px-6 py-3 bg-[#007df7] hover:bg-[#0069d9] active:scale-95 text-white rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-[#007df7]/30 cursor-pointer"
-            >
-              Voltar aos detalhes
-            </button>
-          </div>
-        </div>
+        <TvPlaybackErrorScreen
+          failureCategory={failureCategory}
+          verificationState={verificationState}
+          hasStreams={streams.length > 0}
+          errorMessage={errorMessage}
+          canRetry={Boolean(onRetrySources)}
+          isRetrying={isRetryingSources}
+          onRetry={handleRetrySources}
+          onReportError={() => {
+            setFeedbackDefaultCategory('video_not_loading');
+            setShowFeedbackModal(true);
+          }}
+          onClose={handlePlayerClose}
+        />
       )}
 
       <div
@@ -6063,7 +6075,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       {/* Modal Inteligente de Feedback do Usuário */}
       <ReportFeedbackModal
         isOpen={showFeedbackModal}
-        onClose={() => setShowFeedbackModal(false)}
+        onClose={handleCloseFeedbackModal}
         defaultCategory={feedbackDefaultCategory}
         playbackContext={{
           item,

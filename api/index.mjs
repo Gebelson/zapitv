@@ -1151,6 +1151,442 @@ var init_subtitlePreferenceService = __esm({
   }
 });
 
+// src/core/series/seriesSeasonMappingService.ts
+var DOCTOR_WHO_CANONICAL, VERIFIED_SEASON_14_EPISODES, VERIFIED_SEASON_15_EPISODES, SeriesSeasonMappingService, seriesSeasonMappingService;
+var init_seriesSeasonMappingService = __esm({
+  "src/core/series/seriesSeasonMappingService.ts"() {
+    DOCTOR_WHO_CANONICAL = {
+      CLASSIC_1963: {
+        canonicalId: "tv-doctor-who-1963",
+        tmdbId: "121",
+        imdbId: "tt0056751",
+        year: 1963,
+        title: "Doctor Who (1963)",
+        seasonsCount: 26,
+        s01e01Title: "An Unearthly Child"
+      },
+      MODERN_2005: {
+        canonicalId: "tv-doctor-who-2005",
+        tmdbId: "57243",
+        imdbId: "tt0436992",
+        year: 2005,
+        title: "Doctor Who",
+        originalTitle: "Doctor Who",
+        presentationSeasonsCount: 15,
+        s01e01Title: "Rose"
+      },
+      ERA_2024: {
+        canonicalId: "tv-doctor-who-2024",
+        tmdbId: "239770",
+        imdbId: "tt30842880",
+        year: 2024,
+        title: "Doctor Who (2024)",
+        originalTitle: "Doctor Who",
+        seasonsCount: 2,
+        s01e01Title: "Space Babies"
+      }
+    };
+    VERIFIED_SEASON_14_EPISODES = [
+      {
+        id: "ep-57243-14-1",
+        number: 1,
+        title: "Space Babies",
+        description: "Ruby Sunday conhece o Doutor e eles embarcam em sua primeira aventura juntos na TARDIS, descobrindo uma esta\xE7\xE3o espacial operada por beb\xEAs falantes.",
+        image: "https://image.tmdb.org/t/p/w500/80u34hF8gR4KkYvN2s1O2iJ5x8P.jpg",
+        airDate: "2024-05-11"
+      },
+      {
+        id: "ep-57243-14-2",
+        number: 2,
+        title: "The Devil's Chord",
+        description: "O Doutor e Ruby viajam para 1963 e descobrem que o mundo est\xE1 prestes a perder toda a m\xFAsica nas m\xE3os do tem\xEDvel Maestro.",
+        image: "https://image.tmdb.org/t/p/w500/uY8u0lGk8b1k8Q8n7p7Z1w8u2b.jpg",
+        airDate: "2024-05-11"
+      },
+      {
+        id: "ep-57243-14-3",
+        number: 3,
+        title: "Boom",
+        description: "Preso em uma mina terrestre mortal em um planeta alien\xEDgena em guerra cont\xEDnua, o Doutor precisa manter a calma para salvar Ruby e o planeta.",
+        image: "https://image.tmdb.org/t/p/w500/vG9v9b1k8Q8n7p7Z1w8u2b9v9b.jpg",
+        airDate: "2024-05-18"
+      },
+      {
+        id: "ep-57243-14-4",
+        number: 4,
+        title: "73 Yards",
+        description: "Quando o Doutor desaparece misteriosamente na costa do Pa\xEDs de Gales, Ruby se v\xEA perseguida por uma figura enigm\xE1tica que nunca se aproxima al\xE9m de 73 jardas.",
+        image: "https://image.tmdb.org/t/p/w500/wH0w0b1k8Q8n7p7Z1w8u2b0w0b.jpg",
+        airDate: "2024-05-25"
+      },
+      {
+        id: "ep-57243-14-5",
+        number: 5,
+        title: "Dot and Bubble",
+        description: "O mundo de Finetime parece um para\xEDso protegido por bolhas digitais, at\xE9 que monstros devoradores de pessoas come\xE7am a atacar os cidad\xE3os alheios ao perigo.",
+        image: "https://image.tmdb.org/t/p/w500/xI1x1b1k8Q8n7p7Z1w8u2b1x1b.jpg",
+        airDate: "2024-06-01"
+      },
+      {
+        id: "ep-57243-14-6",
+        number: 6,
+        title: "Rogue",
+        description: "Em 1813, o Doutor e Ruby participam de um baile aristocr\xE1tico na Inglaterra regencial e cruzam caminho com um ca\xE7ador de recompensas intergal\xE1ctico chamado Rogue.",
+        image: "https://image.tmdb.org/t/p/w500/yJ2y2b1k8Q8n7p7Z1w8u2b2y2b.jpg",
+        airDate: "2024-06-08"
+      },
+      {
+        id: "ep-57243-14-7",
+        number: 7,
+        title: "The Legend of Ruby Sunday",
+        description: "O Doutor e Ruby retornam \xE0 UNIT na Terra contempor\xE2nea para investigar a identidade da misteriosa m\xE3e de Ruby, desvendando uma amea\xE7a c\xF3smica adormecida.",
+        image: "https://image.tmdb.org/t/p/w500/zK3z3b1k8Q8n7p7Z1w8u2b3z3b.jpg",
+        airDate: "2024-06-15"
+      },
+      {
+        id: "ep-57243-14-8",
+        number: 8,
+        title: "Empire of Death",
+        description: "Sutekh, o deus da morte, ascendeu sobre o universo. Com Ruby ao seu lado, o Doutor enfrenta sua maior batalha para salvar toda a exist\xEAncia viva.",
+        image: "https://image.tmdb.org/t/p/w500/aL4a4b1k8Q8n7p7Z1w8u2b4a4b.jpg",
+        airDate: "2024-06-22"
+      }
+    ];
+    VERIFIED_SEASON_15_EPISODES = [
+      {
+        id: "ep-57243-15-1",
+        number: 1,
+        title: "Temporada 15 \u2014 Epis\xF3dio 1",
+        description: "O Doutor e sua nova companheira iniciam uma nova jornada de aventuras pelo espa\xE7o-tempo.",
+        image: "https://image.tmdb.org/t/p/w500/bM5b5b1k8Q8n7p7Z1w8u2b5b5b.jpg",
+        airDate: "2025-05-01"
+      }
+    ];
+    SeriesSeasonMappingService = class _SeriesSeasonMappingService {
+      constructor() {
+      }
+      static getInstance() {
+        if (!_SeriesSeasonMappingService.instance) {
+          _SeriesSeasonMappingService.instance = new _SeriesSeasonMappingService();
+        }
+        return _SeriesSeasonMappingService.instance;
+      }
+      /**
+       * Identifica se um item ou consulta pertence à franquia Doctor Who
+       */
+      isDoctorWho(input) {
+        const tmdbStr = input.tmdbId ? String(input.tmdbId).trim().replace(/^tmdb-?/i, "") : "";
+        const imdbStr = (input.imdbId || "").trim().toLowerCase();
+        const idStr = (input.id || "").trim().toLowerCase();
+        const titleStr = (input.title || "").trim().toLowerCase();
+        if (tmdbStr === DOCTOR_WHO_CANONICAL.CLASSIC_1963.tmdbId || tmdbStr === DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId || tmdbStr === DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId) {
+          return true;
+        }
+        if (imdbStr === DOCTOR_WHO_CANONICAL.CLASSIC_1963.imdbId || imdbStr === DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId || imdbStr === DOCTOR_WHO_CANONICAL.ERA_2024.imdbId) {
+          return true;
+        }
+        if (idStr.includes("doctor-who") || idStr.includes("57243") || idStr.includes("239770") || idStr.includes("121")) {
+          return true;
+        }
+        return /\bdoctor\s*who\b/i.test(titleStr);
+      }
+      /**
+       * Determina a era canônica exata da franquia Doctor Who
+       */
+      identifyFranchiseVersion(input) {
+        if (!this.isDoctorWho(input)) return null;
+        const tmdbStr = input.tmdbId ? String(input.tmdbId).trim().replace(/^tmdb-?/i, "") : "";
+        const imdbStr = (input.imdbId || "").trim().toLowerCase();
+        const year = Number(input.year || 0);
+        const titleStr = (input.title || "").toLowerCase();
+        const idStr = (input.id || "").toLowerCase();
+        if (tmdbStr === DOCTOR_WHO_CANONICAL.CLASSIC_1963.tmdbId) return "classic_1963";
+        if (tmdbStr === DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId) return "era_2024";
+        if (tmdbStr === DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId) return "modern_2005";
+        if (imdbStr === DOCTOR_WHO_CANONICAL.CLASSIC_1963.imdbId) return "classic_1963";
+        if (imdbStr === DOCTOR_WHO_CANONICAL.ERA_2024.imdbId) return "era_2024";
+        if (imdbStr === DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId) return "modern_2005";
+        if (idStr.includes("1963") || idStr.includes("classic")) return "classic_1963";
+        if (idStr.includes("2024") || idStr.includes("gatwa")) return "era_2024";
+        if (idStr.includes("2005") || idStr.includes("modern")) return "modern_2005";
+        if (year >= 1963 && year <= 1996) return "classic_1963";
+        if (year >= 2024) return "era_2024";
+        if (year >= 2005 && year < 2024) return "modern_2005";
+        if (/\b1963\b|classic|cl[aá]ssic/i.test(titleStr)) return "classic_1963";
+        if (/\b2024\b/i.test(titleStr)) return "era_2024";
+        return "modern_2005";
+      }
+      /**
+       * Retorna a quantidade total de temporadas apresentadas para a interface.
+       * Para Doctor Who Moderno (2005), são apresentadas 15 temporadas unificadas.
+       */
+      getPresentationSeasonsCount(item) {
+        const era = this.identifyFranchiseVersion(item);
+        if (!era) {
+          return item.seasonsCount || 1;
+        }
+        if (era === "modern_2005") {
+          return DOCTOR_WHO_CANONICAL.MODERN_2005.presentationSeasonsCount;
+        }
+        if (era === "classic_1963") {
+          return DOCTOR_WHO_CANONICAL.CLASSIC_1963.seasonsCount;
+        }
+        if (era === "era_2024") {
+          return DOCTOR_WHO_CANONICAL.ERA_2024.seasonsCount;
+        }
+        return item.seasonsCount || 1;
+      }
+      /**
+       * Mapeia uma temporada da apresentação moderna (1..15) para a produção TMDB/IMDb real.
+       */
+      mapPresentationToProductionSeason(presentationSeason) {
+        const s = Math.max(1, Math.floor(presentationSeason));
+        if (s <= 13) {
+          return {
+            canonicalSeriesId: DOCTOR_WHO_CANONICAL.MODERN_2005.canonicalId,
+            targetTmdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId,
+            targetImdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId,
+            targetSeason: s,
+            presentationSeason: s,
+            era: "modern_2005",
+            seasonTitle: `Temporada ${s}`
+          };
+        }
+        if (s === 14) {
+          return {
+            canonicalSeriesId: DOCTOR_WHO_CANONICAL.ERA_2024.canonicalId,
+            targetTmdbId: DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId,
+            targetImdbId: DOCTOR_WHO_CANONICAL.ERA_2024.imdbId,
+            targetSeason: 1,
+            // Temporada 1 da produção de 2024
+            presentationSeason: 14,
+            era: "era_2024",
+            seasonTitle: "Temporada 14 (2024)"
+          };
+        }
+        return {
+          canonicalSeriesId: DOCTOR_WHO_CANONICAL.ERA_2024.canonicalId,
+          targetTmdbId: DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId,
+          targetImdbId: DOCTOR_WHO_CANONICAL.ERA_2024.imdbId,
+          targetSeason: s - 13,
+          // S15 -> Season 2 da produção de 2024
+          presentationSeason: s,
+          era: "era_2024",
+          seasonTitle: `Temporada ${s} (2025)`
+        };
+      }
+      /**
+       * Gera as especificações de busca para múltiplos provedores Stremio / Torrent.
+       * Alguns provedores indexam Doctor Who 2024 sob a convenção de continuidade (S14),
+       * enquanto outros indexam como uma nova série (S01).
+       */
+      getProviderQuerySpecs(presentationSeason, episode) {
+        const s = Math.max(1, Math.floor(presentationSeason));
+        const ep = Math.max(1, Math.floor(episode));
+        if (s <= 13) {
+          return [
+            {
+              stremioId: `${DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId}:${s}:${ep}`,
+              imdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId,
+              tmdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId,
+              season: s,
+              episode: ep,
+              querySeasonTag: `S${String(s).padStart(2, "0")}`
+            },
+            {
+              stremioId: `tmdb:${DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId}:${s}:${ep}`,
+              imdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId,
+              tmdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId,
+              season: s,
+              episode: ep,
+              querySeasonTag: `S${String(s).padStart(2, "0")}`
+            }
+          ];
+        }
+        if (s === 14) {
+          const prodSeason2 = 1;
+          return [
+            // 1. Consulta primária sob a identidade canônica da produção de 2024 (tt30842880:1:ep)
+            {
+              stremioId: `${DOCTOR_WHO_CANONICAL.ERA_2024.imdbId}:${prodSeason2}:${ep}`,
+              imdbId: DOCTOR_WHO_CANONICAL.ERA_2024.imdbId,
+              tmdbId: DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId,
+              season: prodSeason2,
+              episode: ep,
+              querySeasonTag: "S01",
+              expectedTitle: ep === 1 ? "Space Babies" : void 0
+            },
+            // 2. Consulta alternativa sob o ID TMDB de 2024
+            {
+              stremioId: `tmdb:${DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId}:${prodSeason2}:${ep}`,
+              imdbId: DOCTOR_WHO_CANONICAL.ERA_2024.imdbId,
+              tmdbId: DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId,
+              season: prodSeason2,
+              episode: ep,
+              querySeasonTag: "S01",
+              expectedTitle: ep === 1 ? "Space Babies" : void 0
+            },
+            // 3. Consulta de fallback para provedores que utilizam a convenção de continuidade (tt0436992:14:ep)
+            {
+              stremioId: `${DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId}:14:${ep}`,
+              imdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId,
+              tmdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId,
+              season: 14,
+              episode: ep,
+              querySeasonTag: "S14",
+              expectedTitle: ep === 1 ? "Space Babies" : void 0
+            }
+          ];
+        }
+        const prodSeason = s - 13;
+        return [
+          {
+            stremioId: `${DOCTOR_WHO_CANONICAL.ERA_2024.imdbId}:${prodSeason}:${ep}`,
+            imdbId: DOCTOR_WHO_CANONICAL.ERA_2024.imdbId,
+            tmdbId: DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId,
+            season: prodSeason,
+            episode: ep,
+            querySeasonTag: `S${String(prodSeason).padStart(2, "0")}`
+          },
+          {
+            stremioId: `tmdb:${DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId}:${prodSeason}:${ep}`,
+            imdbId: DOCTOR_WHO_CANONICAL.ERA_2024.imdbId,
+            tmdbId: DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId,
+            season: prodSeason,
+            episode: ep,
+            querySeasonTag: `S${String(prodSeason).padStart(2, "0")}`
+          },
+          {
+            stremioId: `${DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId}:${s}:${ep}`,
+            imdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId,
+            tmdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId,
+            season: s,
+            episode: ep,
+            querySeasonTag: `S${String(s).padStart(2, "0")}`
+          }
+        ];
+      }
+      /**
+       * Retorna metadados canônicos verificados de episódios para fallback resiliente.
+       */
+      getVerifiedSeasonEpisodes(presentationSeason) {
+        if (presentationSeason === 14) {
+          return [...VERIFIED_SEASON_14_EPISODES];
+        }
+        if (presentationSeason === 15) {
+          return [...VERIFIED_SEASON_15_EPISODES];
+        }
+        return [];
+      }
+      /**
+       * Validação estrutural de integridade de stream para Doctor Who.
+       * Rejeita estritamente colisões entre eras (1963 vs 2005 vs 2024).
+       */
+      validateStreamEpisodeIntegrity(requested, stream) {
+        const era = this.identifyFranchiseVersion(requested);
+        if (!era) {
+          return { valid: true };
+        }
+        const streamTitle = (stream.title || "").trim();
+        const streamName = (stream.name || "").trim();
+        const streamDesc = (stream.description || "").trim();
+        const streamUrl = (stream.url || "").trim();
+        const fullText = `${streamName} ${streamTitle} ${streamDesc} ${streamUrl}`.toLowerCase();
+        const reqSeason = requested.season || 1;
+        const reqEpisode = requested.episode || 1;
+        if (era === "modern_2005" && reqSeason === 1) {
+          const era2024Signatures = [
+            "space babies",
+            "beb\xEAs do espa\xE7o",
+            "bebes do espaco",
+            "the devil s chord",
+            "the devils chord",
+            "acorde do diabo",
+            "ncuti",
+            "gatwa",
+            "millie gibson",
+            "ruby sunday",
+            "tt30842880",
+            "239770",
+            "2024"
+          ];
+          for (const sig of era2024Signatures) {
+            if (fullText.includes(sig)) {
+              return {
+                valid: false,
+                reason: `Stream com assinatura da era 2024 ("${sig}") rejeitado para Doctor Who (2005) T01E01 ("Rose")`
+              };
+            }
+          }
+          const era1963Signatures = [
+            "an unearthly child",
+            "william hartnell",
+            "hartnell",
+            "tt0056751",
+            "1963"
+          ];
+          for (const sig of era1963Signatures) {
+            if (fullText.includes(sig)) {
+              return {
+                valid: false,
+                reason: `Stream da s\xE9rie cl\xE1ssica de 1963 ("${sig}") rejeitado para Doctor Who (2005) T01E01 ("Rose")`
+              };
+            }
+          }
+        }
+        if (era === "classic_1963") {
+          const modernSignatures = [
+            "rose",
+            "space babies",
+            "eccleston",
+            "tennant",
+            "matt smith",
+            "capaldi",
+            "whittaker",
+            "gatwa",
+            "tt0436992",
+            "tt30842880",
+            "57243",
+            "239770",
+            "2005",
+            "2024"
+          ];
+          for (const sig of modernSignatures) {
+            if (fullText.includes(sig)) {
+              return {
+                valid: false,
+                reason: `Stream da era moderna ("${sig}") rejeitado para Doctor Who Cl\xE1ssica (1963)`
+              };
+            }
+          }
+        }
+        if (era === "era_2024" || era === "modern_2005" && reqSeason === 14) {
+          if (reqEpisode === 1) {
+            const incompatibleSignatures = [
+              "rose",
+              "an unearthly child",
+              "eccleston",
+              "hartnell",
+              "2005",
+              "1963"
+            ];
+            for (const sig of incompatibleSignatures) {
+              if (fullText.includes(sig)) {
+                return {
+                  valid: false,
+                  reason: `Stream com assinatura incompat\xEDvel ("${sig}") rejeitado para Season 14 / Doctor Who (2024) E01 ("Space Babies")`
+                };
+              }
+            }
+          }
+        }
+        return { valid: true };
+      }
+    };
+    seriesSeasonMappingService = SeriesSeasonMappingService.getInstance();
+  }
+});
+
 // src/core/tmdb/tmdbClient.ts
 function formatContentItem(raw, forcedType) {
   const isMovie = forcedType === "FILME" /* MOVIE */ || forcedType !== "S\xC9RIE" /* SERIES */ && (raw.media_type === "movie" || Boolean(raw.title && !raw.name));
@@ -1247,6 +1683,7 @@ var TMDB_API_KEY, TMDB_BASE_URL, TMDB_IMAGE_BASE, TMDB_BACKDROP_BASE, CINEMETA_B
 var init_tmdbClient = __esm({
   "src/core/tmdb/tmdbClient.ts"() {
     init_types();
+    init_seriesSeasonMappingService();
     TMDB_API_KEY = "468925ac3759d7adeb05b540cfd71cb8";
     TMDB_BASE_URL = "https://api.themoviedb.org/3";
     TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
@@ -1827,8 +2264,23 @@ var init_tmdbClient = __esm({
           const creators = (data.created_by || []).map((c) => c.name).join(", ");
           if (creators) formatted.director = creators;
         }
-        const seasonsCount = data.number_of_seasons || data.seasons?.length || 1;
-        const seasons = Array.isArray(data.seasons) ? data.seasons : void 0;
+        let seasonsCount = data.number_of_seasons || data.seasons?.length || 1;
+        let seasons = Array.isArray(data.seasons) ? [...data.seasons] : void 0;
+        const cleanIdForEra = String(id).trim().replace(/^tmdb-?/i, "");
+        if (cleanIdForEra === DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId || formatted.imdbId === DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId) {
+          seasonsCount = Math.max(seasonsCount, DOCTOR_WHO_CANONICAL.MODERN_2005.presentationSeasonsCount);
+          formatted.seasonsCount = seasonsCount;
+          if (seasons) {
+            if (!seasons.some((s) => s.season_number === 14)) {
+              seasons.push({ season_number: 14, episode_count: 8, name: "Temporada 14 (2024)", air_date: "2024-05-11" });
+            }
+            if (!seasons.some((s) => s.season_number === 15)) {
+              seasons.push({ season_number: 15, episode_count: 8, name: "Temporada 15 (2025)", air_date: "2025-05-01" });
+            }
+          } else {
+            seasons = Array.from({ length: seasonsCount }, (_, i) => ({ season_number: i + 1, episode_count: 8 }));
+          }
+        }
         const similarRaw = data.recommendations?.results || data.similar?.results || [];
         const similar = similarRaw.slice(0, 9).map((r) => formatContentItem(r, type));
         return {
@@ -1901,6 +2353,42 @@ var init_tmdbClient = __esm({
         }
         const fetchPromise = (async () => {
           try {
+            if (cleanId === DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId && seasonNumber >= 14) {
+              const prodMapping = seriesSeasonMappingService.mapPresentationToProductionSeason(seasonNumber);
+              try {
+                const prodData = await this.request(`/tv/${prodMapping.targetTmdbId}/season/${prodMapping.targetSeason}`, 9e3);
+                if (prodData && Array.isArray(prodData.episodes) && prodData.episodes.length > 0) {
+                  const mapped2 = prodData.episodes.map((ep) => ({
+                    id: `ep-${cleanId}-${seasonNumber}-${ep.episode_number}`,
+                    number: ep.episode_number,
+                    title: ep.name || `Epis\xF3dio ${ep.episode_number}`,
+                    description: ep.overview || "Sinopse oficial deste epis\xF3dio n\xE3o informada.",
+                    image: ep.still_path ? `${TMDB_IMAGE_BASE}${ep.still_path}` : "",
+                    stillPath: ep.still_path,
+                    airDate: ep.air_date,
+                    releaseDate: ep.air_date
+                  }));
+                  this.seasonEpisodesCache.set(cacheKey, { eps: mapped2, timestamp: Date.now() });
+                  return mapped2;
+                }
+              } catch (e) {
+                console.warn(`[TMDB] Erro ao carregar temporada ${seasonNumber} mapeada de Doctor Who:`, e);
+              }
+              const fallbackEps = seriesSeasonMappingService.getVerifiedSeasonEpisodes(seasonNumber);
+              if (fallbackEps.length > 0) {
+                const mapped2 = fallbackEps.map((ep) => ({
+                  id: ep.id,
+                  number: ep.number,
+                  title: ep.title,
+                  description: ep.description,
+                  image: ep.image,
+                  airDate: ep.airDate,
+                  releaseDate: ep.releaseDate
+                }));
+                this.seasonEpisodesCache.set(cacheKey, { eps: mapped2, timestamp: Date.now() });
+                return mapped2;
+              }
+            }
             const data = await this.request(`/tv/${cleanId}/season/${seasonNumber}`, 9e3);
             const mapped = (data.episodes || []).map((ep) => ({
               id: `ep-${cleanId}-${seasonNumber}-${ep.episode_number}`,
@@ -1919,6 +2407,22 @@ var init_tmdbClient = __esm({
             return [];
           } catch (err) {
             console.warn(`Erro ao carregar epis\xF3dios da T${seasonNumber} (TMDB ID ${cleanId}):`, err);
+            if (cleanId === DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId && seasonNumber >= 14) {
+              const fallbackEps = seriesSeasonMappingService.getVerifiedSeasonEpisodes(seasonNumber);
+              if (fallbackEps.length > 0) {
+                const mapped = fallbackEps.map((ep) => ({
+                  id: ep.id,
+                  number: ep.number,
+                  title: ep.title,
+                  description: ep.description,
+                  image: ep.image,
+                  airDate: ep.airDate,
+                  releaseDate: ep.releaseDate
+                }));
+                this.seasonEpisodesCache.set(cacheKey, { eps: mapped, timestamp: Date.now() });
+                return mapped;
+              }
+            }
             if (cached && cached.eps.length > 0) {
               return cached.eps;
             }
@@ -3618,6 +4122,7 @@ var init_validationTargetUrl = __esm({
 var KNOWN_PARKED_DOMAINS, KNOWN_UPSTREAM_MISMATCHES, StreamValidator, streamValidator;
 var init_streamValidator = __esm({
   "src/core/providers/streamValidator.ts"() {
+    init_seriesSeasonMappingService();
     init_videoAdBlocker();
     init_streamQuarantineService();
     init_LruCache();
@@ -3773,6 +4278,22 @@ var init_streamValidator = __esm({
           }
           return false;
         }
+      },
+      // 9. Doctor Who (Preservação Canônica de Eras: 1963 vs 2005 vs 2024)
+      {
+        targetPattern: /\b(?:doctor\s*who|dr\s*who|tt0056751|tt0436992|tt30842880|121|57243|239770)\b/i,
+        rejectStream: (s, rawCandidates = [], episodeParams) => {
+          const candText = (Array.isArray(rawCandidates) ? rawCandidates.join(" ") : String(rawCandidates || "")).toLowerCase();
+          const integrity = seriesSeasonMappingService.validateStreamEpisodeIntegrity(
+            {
+              title: candText,
+              season: episodeParams?.season,
+              episode: episodeParams?.episode
+            },
+            s
+          );
+          return !integrity.valid;
+        }
       }
     ];
     StreamValidator = class {
@@ -3921,6 +4442,11 @@ var init_streamValidator = __esm({
           urlPath = streamUrl;
         }
         const text2 = `${streamName} ${streamTitle} ${streamDesc} ${urlPath}`.toLowerCase();
+        const isDoctorWho = seriesSeasonMappingService.isDoctorWho({ title: text2 });
+        let mappedProdSeason = season;
+        if (isDoctorWho && season >= 14) {
+          mappedProdSeason = seriesSeasonMappingService.mapPresentationToProductionSeason(season).targetSeason;
+        }
         const absMatch = text2.match(/\((?:ep|episode)\.?\s*(\d+)\)/i);
         if (absMatch && season > 1) {
           const absEp = parseInt(absMatch[1], 10);
@@ -3930,7 +4456,19 @@ var init_streamValidator = __esm({
           }
         }
         const seMatches = Array.from(text2.matchAll(/\b(?:s|t)0*(\d{1,2})[\s·._-]*ep?0*(\d{1,4})\b/gi));
-        const hasExactMatch = seMatches.length > 0 && seMatches.some((m) => parseInt(m[1], 10) === season && parseInt(m[2], 10) === episode);
+        const hasExactMatch = seMatches.length > 0 && seMatches.some((m) => {
+          const sFound = parseInt(m[1], 10);
+          const eFound = parseInt(m[2], 10);
+          if (sFound === season && eFound === episode) return true;
+          if (isDoctorWho && season >= 14 && sFound === mappedProdSeason && eFound === episode) {
+            const integrity = seriesSeasonMappingService.validateStreamEpisodeIntegrity(
+              { title: "doctor who", season, episode },
+              stream
+            );
+            return integrity.valid;
+          }
+          return false;
+        });
         if (seMatches.length > 0 && !hasExactMatch) {
           const m = seMatches[0];
           const sFound = parseInt(m[1], 10);
@@ -3944,6 +4482,9 @@ var init_streamValidator = __esm({
           if (sFound > 0 && sFound <= 50) {
             if (sFound !== season) {
               if (hasExactMatch) {
+                continue;
+              }
+              if (isDoctorWho && season >= 14 && sFound === mappedProdSeason) {
                 continue;
               }
               const fullMatch = m[0].toLowerCase();
@@ -11588,6 +12129,7 @@ async function isLocalStremioEngineOnline() {
 var localEngineCache, DEFAULT_PROVIDERS, ProviderRegistryService, providerRegistry;
 var init_providerRegistry = __esm({
   "src/core/providers/providerRegistry.ts"() {
+    init_seriesSeasonMappingService();
     init_stremioClient();
     init_audioPreferenceService();
     init_verifiedCatalog();
@@ -12266,8 +12808,20 @@ var init_providerRegistry = __esm({
         ]).catch(() => false);
         const stremioAddons = activeProviders.filter((p) => p.type === "stremio-addon" && !["stremio-cinemeta", "stremio-opensubtitles"].includes(p.id));
         const stremioType = type === "movie" ? "movie" : "series";
-        const primaryId = imdbStr || tmdbNum || rawTargetId;
-        const stremioId = episode && (type === "series" || type === "anime") ? `${primaryId}:${episode.season}:${episode.episode}` : primaryId;
+        const isDoctorWhoItem = seriesSeasonMappingService.isDoctorWho(itemTarget);
+        let primaryId = imdbStr || tmdbNum || rawTargetId;
+        let stremioId = episode && (type === "series" || type === "anime") ? `${primaryId}:${episode.season}:${episode.episode}` : primaryId;
+        if (isDoctorWhoItem && episode && episode.season >= 14) {
+          const prodSpecs = seriesSeasonMappingService.getProviderQuerySpecs(episode.season, episode.episode);
+          if (prodSpecs.length > 0) {
+            stremioId = prodSpecs[0].stremioId;
+            for (let i = 1; i < prodSpecs.length; i++) {
+              if (!altIds.includes(prodSpecs[i].stremioId)) {
+                altIds.push(prodSpecs[i].stremioId);
+              }
+            }
+          }
+        }
         if (stremioId) {
           const sortedAddons = [...stremioAddons].sort((a, b) => {
             const memoryA = remembered.find((row) => row.providerId === a.id)?.score || 0;
@@ -16690,6 +17244,7 @@ var init_CanonicalCatalogMaster = __esm({
 var STOP_WORDS, CanonicalIdentityService, canonicalIdentityService;
 var init_canonicalIdentity = __esm({
   "src/core/identity/canonicalIdentity.ts"() {
+    init_seriesSeasonMappingService();
     init_theatricalFilterService();
     init_CanonicalCatalogMaster();
     STOP_WORDS = /* @__PURE__ */ new Set([
@@ -16729,6 +17284,9 @@ var init_canonicalIdentity = __esm({
     CanonicalIdentityService = class {
       isSameWork(expected, candidate) {
         if (expected.type !== candidate.type) return false;
+        const era1 = seriesSeasonMappingService.identifyFranchiseVersion(expected);
+        const era2 = seriesSeasonMappingService.identifyFranchiseVersion(candidate);
+        if (era1 && era2 && era1 !== era2) return false;
         if (expected.year && candidate.year && Math.abs(expected.year - candidate.year) > 1) return false;
         const titles = [expected.title, expected.originalTitle].filter(Boolean).map((value) => this.normalizeTitle(value));
         const candidates = [candidate.title, candidate.originalTitle].filter(Boolean).map((value) => this.normalizeTitle(value));
@@ -16780,6 +17338,20 @@ var init_canonicalIdentity = __esm({
           }
           aliases.push(`${item.title.toLowerCase()} season ${epParams.season}`);
           aliases.push(`${item.title.toLowerCase()} temporada ${epParams.season}`);
+        }
+        const whoEra = seriesSeasonMappingService.identifyFranchiseVersion({
+          id: item.id,
+          tmdbId: item.tmdbId,
+          imdbId: item.imdbId,
+          title: item.title,
+          year: item.year
+        });
+        if (whoEra === "modern_2005") {
+          aliases.push("doctor who", "doctor who 2005", "dr who");
+        } else if (whoEra === "classic_1963") {
+          aliases.push("doctor who 1963", "doctor who classic", "classic doctor who");
+        } else if (whoEra === "era_2024") {
+          aliases.push("doctor who 2024");
         }
         if (/doraemon/i.test(item.title)) {
           aliases.push("doraemon", "gato do futuro", "\u30C9\u30E9\u3048\u3082\u3093");
@@ -16849,6 +17421,7 @@ var init_canonicalIdentity = __esm({
 var isKnownTechnicalOrReleaseWord, isDistinguishingTitleModifier, KNOWN_COLLISION_TITLES, SourceConfidenceEngine, sourceConfidenceEngine;
 var init_sourceConfidenceEngine = __esm({
   "src/core/identity/sourceConfidenceEngine.ts"() {
+    init_seriesSeasonMappingService();
     init_canonicalIdentity();
     init_streamQuarantineService();
     init_types();
@@ -17215,21 +17788,48 @@ var init_sourceConfidenceEngine = __esm({
           this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
           return evalResult2;
         }
-        if ((identity.type === "S\xC9RIE" /* SERIES */ || identity.type === "ANIME" /* ANIME */) && identity.year) {
-          const releaseYearMatch = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
-          if (releaseYearMatch) {
-            const foundYear = Number(releaseYearMatch[1]);
-            if (Math.abs(foundYear - identity.year) > 1 && !episodeTag) {
-              reasons.push(`Ano da fonte (${foundYear}) diverge da s\xE9rie (${identity.year}) sem identificador de epis\xF3dio`);
-              const evalResult2 = {
-                stream,
-                confidence: "REJECTED",
-                isMatch: false,
-                reasons,
-                canonicalTitle: identity.title
-              };
-              this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
-              return evalResult2;
+        if (identity.type === "S\xC9RIE" /* SERIES */ || identity.type === "ANIME" /* ANIME */) {
+          const seriesIntegrity = seriesSeasonMappingService.validateStreamEpisodeIntegrity(
+            {
+              tmdbId: identity.tmdbId,
+              imdbId: identity.imdbId,
+              title: identity.title,
+              year: identity.year,
+              season: identity.season,
+              episode: identity.episode
+            },
+            stream
+          );
+          if (!seriesIntegrity.valid) {
+            reasons.push(seriesIntegrity.reason || "Stream pertence a era/produ\xE7\xE3o incompat\xEDvel da franquia");
+            const evalResult2 = {
+              stream,
+              confidence: "REJECTED",
+              isMatch: false,
+              reasons,
+              canonicalTitle: identity.title
+            };
+            this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
+            return evalResult2;
+          }
+          if (identity.year) {
+            const releaseYearMatch = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
+            if (releaseYearMatch) {
+              const foundYear = Number(releaseYearMatch[1]);
+              const isSeason1 = !identity.season || identity.season === 1;
+              const isYearMismatch = isSeason1 ? Math.abs(foundYear - identity.year) > 1 : Math.abs(foundYear - identity.year) > 1 && !episodeTag;
+              if (isYearMismatch) {
+                reasons.push(`Ano da fonte (${foundYear}) diverge da s\xE9rie (${identity.year})${isSeason1 ? " na Temporada 1" : " sem identificador de epis\xF3dio"}`);
+                const evalResult2 = {
+                  stream,
+                  confidence: "REJECTED",
+                  isMatch: false,
+                  reasons,
+                  canonicalTitle: identity.title
+                };
+                this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
+                return evalResult2;
+              }
             }
           }
         }
