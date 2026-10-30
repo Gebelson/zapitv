@@ -508,7 +508,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const handleClose = useCallback(() => {
     if (isClosingRef.current) return;
     isClosingRef.current = true;
-    mobileFullscreenService.exitMobileFullscreen().catch(() => {});
+    mobileFullscreenService.exitMobileFullscreen({ force: true }).catch(() => {});
     uiSoundService.play('detailClose');
     playbackRequestIdRef.current++;
     cancelAllPendingRequests();
@@ -558,7 +558,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   }, [originRoute]);
 
   const handleClosePlayer = useCallback(() => {
-    mobileFullscreenService.exitMobileFullscreen().catch(() => {});
+    mobileFullscreenService.exitMobileFullscreen({ force: true }).catch(() => {});
     playbackRequestIdRef.current++;
     cancelAllPendingRequests();
     if (loadingTraceIdRef.current) mediaLoadingTracker.endTrace(loadingTraceIdRef.current, 'CANCELLED');
@@ -844,6 +844,11 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     navType: NavigationType = 'manual_start',
     isAutoRetry = false
   ) => {
+    // Se já estiver reproduzindo ou em reprodução contínua, marca transição de episódio para preservar fullscreen e landscape
+    if (isPlaying || navType === 'continuous_playback') {
+      mobileFullscreenService.beginEpisodeTransition();
+    }
+
     // Solicitação imediata de Fullscreen e Orientação no gesto de toque antes de operações assíncronas
     if (navType === 'manual_start' || navType === 'continuous_playback') {
       mobileFullscreenService.requestAutoFullscreenAndLandscape().catch(() => {});

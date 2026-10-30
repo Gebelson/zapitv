@@ -215,11 +215,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   useEffect(() => {
     isMountedRef.current = true;
+    mobileFullscreenService.endEpisodeTransition();
     return () => {
       isMountedRef.current = false;
       mobileFullscreenService.exitMobileFullscreen().catch(() => {});
       try {
         if (
+          !mobileFullscreenService.isPlaying() &&
           document.fullscreenElement &&
           containerRef.current &&
           (document.fullscreenElement === containerRef.current || containerRef.current.contains(document.fullscreenElement))
@@ -2092,7 +2094,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       clearInterval(autoPlayTimerRef.current);
       autoPlayTimerRef.current = null;
     }
-    mobileFullscreenService.exitMobileFullscreen().catch(() => {});
+    mobileFullscreenService.exitMobileFullscreen({ force: true }).catch(() => {});
     onClose();
   }, [flushProgress, playbackSessionId, onClose]);
 

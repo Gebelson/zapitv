@@ -3,7 +3,7 @@
   "short_name": "ZapiTV",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "any",
+  "orientation": "portrait-primary",
   "background_color": "#05070a",
   "theme_color": "#05070a",
   "description": "Plataforma de streaming personalizada com Stremio Core, catálogo TMDB em português brasileiro e fontes dubladas.",

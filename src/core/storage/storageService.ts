@@ -40,6 +40,16 @@ export function formatPlaybackTime(seconds: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
+export function toContentType(raw: unknown, isEpisodic = false): ContentType {
+  if (!raw) return isEpisodic ? ContentType.SERIES : ContentType.MOVIE;
+  const lower = String(raw).toLowerCase().trim();
+  if (lower === 'anime') return ContentType.ANIME;
+  if (lower === 'series' || lower === 'série' || lower === 'serie' || lower === 'show' || lower === 'tv') return ContentType.SERIES;
+  if (lower === 'movie' || lower === 'filme') return ContentType.MOVIE;
+  if (Object.values(ContentType).includes(raw as any)) return raw as ContentType;
+  return isEpisodic ? ContentType.SERIES : ContentType.MOVIE;
+}
+
 export class StorageService {
   private itemProgressCache = new Map<string, WatchProgress>();
   private episodeProgressCache = new Map<string, EpisodeWatchProgress>();
@@ -49,10 +59,13 @@ export class StorageService {
   private completedSynced = new Set<string>();
   private currentScope: StorageScope | null = null;
   private ready: Promise<void>;
+  private lastPeriodicRefresh = 0;
+  private lifecycleSyncCleanup: (() => void) | null = null;
 
   constructor(private dataStore: LocalDataStore = localDataStore) {
     this.applyWatchState(this.dataStore.readSync(watchStateCodec));
     this.ready = this.syncFromDb();
+    this.initLifecycleSync();
   }
 
   public getScope(): StorageScope | null {
@@ -62,14 +75,51 @@ export class StorageService {
   public async setScope(scope: StorageScope | null): Promise<void> {
     this.currentScope = scope;
     syncQueue.setAccountScope(scope?.userId || null, scope?.profileId || null);
+
+    // 1. Limpa imediatamente caches voláteis em memória para impedir contaminação cruzada
+    this.itemProgressCache.clear();
+    this.episodeProgressCache.clear();
+    this.lastRemoteProgressSync.clear();
+    this.lastRemoteHistorySync.clear();
+    this.lastRemotePosition.clear();
+    this.completedSynced.clear();
+
     await this.syncFromDb();
     recommendationEngine.invalidateCache();
     hybridRecommendationEngine.invalidateCache();
 
     if (scope && scope.userId && scope.profileId) {
-      // Hidratação remota assíncrona do perfil autenticado
-      this.hydrateRemoteProfile(scope.profileId).catch(() => {});
+      // 2. Hidratação remota do perfil autenticado
+      await this.hydrateRemoteProfile(scope.profileId).catch(() => {});
+    } else {
+      // 3. Notifica componentes de UI para limpar linhas de continuidade de usuários deslogados
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('zapitv_progress_updated', {
+          detail: { source: 'scope_reset', profileId: null }
+        }));
+      }
     }
+  }
+
+  /**
+   * Resolve metadados canônicos ricos a partir dos catálogos em cache
+   */
+  public resolveCatalogItem(canonicalOrId: string): ContentItem | null {
+    if (!canonicalOrId) return null;
+    const cleanId = canonicalOrId.trim();
+    const categories = ['movies', 'series', 'animes', 'top_rated'];
+    for (const cat of categories) {
+      const items = this.getCachedCatalog(cat);
+      const found = items.find(i => 
+        i.canonicalId === cleanId || 
+        i.id === cleanId || 
+        i.imdbId === cleanId || 
+        (i.tmdbId && String(i.tmdbId) === cleanId) ||
+        (cleanId.startsWith('tmdb-') && String(i.tmdbId) === cleanId.slice(5))
+      );
+      if (found) return found;
+    }
+    return null;
   }
 
   /**
@@ -114,21 +164,44 @@ export class StorageService {
 
       // 3. Progresso: converte remoteData.progress em WatchState e mescla com mergeWatchStates
       if (Array.isArray(remoteData.progress) && remoteData.progress.length > 0) {
+        // Mapeia histórico remoto para reconstrução canônica de metadados
+        const historyMap = new Map<string, any>();
+        if (Array.isArray(remoteData.history)) {
+          for (const hist of remoteData.history) {
+            if (hist && hist.canonicalId) {
+              historyMap.set(hist.canonicalId, hist);
+            }
+          }
+        }
+
         await this.dataStore.update(this.getWatchCodec(), localWatch => {
           const remoteItems: WatchProgress[] = [];
           const remoteEpisodes: Record<string, EpisodeWatchProgress> = {};
 
           for (const rp of remoteData.progress) {
             const isEpisodic = rp.season > 0 || rp.episode > 0;
+            const hist = historyMap.get(rp.canonicalId);
+            const catalogItem = this.resolveCatalogItem(rp.canonicalId);
+            const existingLocal = localWatch.items.find(p => p.contentId === rp.canonicalId || (p.item && (p.item.canonicalId === rp.canonicalId || p.item.id === rp.canonicalId)));
+
+            // Reconstrução canônica de metadados: nunca exibir raw technical IDs ou pôster em branco
+            const canonicalTitle = hist?.title || catalogItem?.title || (existingLocal?.item?.title && existingLocal.item.title !== rp.canonicalId ? existingLocal.item.title : rp.canonicalId);
+            const canonicalImage = hist?.posterUrl || catalogItem?.image || catalogItem?.poster || existingLocal?.item?.image || existingLocal?.item?.poster || '';
+            const canonicalYear = hist?.year || catalogItem?.year || existingLocal?.item?.year || 0;
+            const rawType = toContentType(rp.contentType || hist?.contentType || catalogItem?.type || existingLocal?.item?.type, isEpisodic);
+
             const item: ContentItem = {
-              id: rp.canonicalId,
+              id: catalogItem?.id || existingLocal?.item?.id || rp.canonicalId,
               canonicalId: rp.canonicalId,
-              title: rp.canonicalId,
-              type: (rp.contentType as any) || ContentType.MOVIE,
+              title: canonicalTitle,
+              type: rawType,
               mediaFormat: isEpisodic ? 'series' : 'movie',
-              rating: 0,
-              year: 0,
-              image: '',
+              rating: catalogItem?.rating || existingLocal?.item?.rating || 0,
+              year: canonicalYear,
+              image: canonicalImage,
+              poster: canonicalImage,
+              backdrop: catalogItem?.backdrop || existingLocal?.item?.backdrop,
+              seasonsCount: catalogItem?.seasonsCount || existingLocal?.item?.seasonsCount,
             };
 
             const wp: WatchProgress = {
@@ -168,9 +241,82 @@ export class StorageService {
         });
       }
 
-      // 4. Descarrega mutações pendentes na outbox queue
+      // 4. Emite eventos reativos para atualizar interfaces (PC, TV e Mobile) instantaneamente sem recarregar
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('zapitv_progress_updated', {
+          detail: {
+            source: 'remote_hydration',
+            profileId,
+          }
+        }));
+        window.dispatchEvent(new CustomEvent('zapitv_sync_completed', {
+          detail: {
+            profileId,
+          }
+        }));
+      }
+
+      // 5. Descarrega mutações pendentes na outbox queue
       await syncQueue.flush(profileId, this.currentScope?.userId);
     } catch {}
+  }
+
+  /**
+   * Atualização leve em segundo plano disparada por eventos de ciclo de vida
+   * (focus, visibilitychange, online, reconexão de rede ou intervalo).
+   * Protegido com throttle de no mínimo 30 segundos para não estourar a cota do Turso.
+   */
+  public async refreshProgressFromRemote(force = false): Promise<void> {
+    if (!this.currentScope?.profileId) return;
+    const now = Date.now();
+    if (!force && now - this.lastPeriodicRefresh < 30_000) return;
+    this.lastPeriodicRefresh = now;
+    await this.hydrateRemoteProfile(this.currentScope.profileId);
+  }
+
+  /**
+   * Registra observadores automáticos de foco, visibilidade e conectividade online
+   */
+  public initLifecycleSync(): () => void {
+    if (typeof window === 'undefined') return () => {};
+    if (this.lifecycleSyncCleanup) {
+      this.lifecycleSyncCleanup();
+      this.lifecycleSyncCleanup = null;
+    }
+
+    const handleResume = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        this.refreshProgressFromRemote().catch(() => {});
+      }
+    };
+
+    const handleOnline = () => {
+      this.refreshProgressFromRemote(true).catch(() => {});
+    };
+
+    const handleFocus = () => {
+      this.refreshProgressFromRemote().catch(() => {});
+    };
+
+    window.addEventListener('visibilitychange', handleResume);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('focus', handleFocus);
+
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        this.refreshProgressFromRemote().catch(() => {});
+      }
+    }, 45_000);
+
+    const cleanup = () => {
+      window.removeEventListener('visibilitychange', handleResume);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
+
+    this.lifecycleSyncCleanup = cleanup;
+    return cleanup;
   }
 
   private getWatchCodec() {
