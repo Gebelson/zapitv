@@ -8,6 +8,7 @@ import {
 import Hls from 'hls.js';
 import { ReportFeedbackModal } from '../feedback/ReportFeedbackModal';
 import { TvPlaybackErrorScreen } from './TvPlaybackErrorScreen';
+import { smartAudioService } from '../../core/audio/smartAudioService';
 import { FeedbackCategory } from '../../core/feedback/feedbackTypes';
 import { StremioStream } from '../../core/stremio/stremioTypes';
 import { storageService } from '../../core/storage/storageService';
@@ -219,6 +220,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     mobileFullscreenService.endEpisodeTransition();
     return () => {
       isMountedRef.current = false;
+      if (videoRef.current) smartAudioService.detach(videoRef.current);
       mobileFullscreenService.exitMobileFullscreen().catch(() => {});
       try {
         if (
@@ -2934,6 +2936,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }, isTvPlayback ? 30000 : 20000);
 
     const onMetadataReceived = () => {
+      smartAudioService.attach(video, videoUrl);
       if (initTimer) {
         clearTimeout(initTimer);
         initTimer = null;
@@ -3333,6 +3336,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      smartAudioService.detach(video);
     };
   }, [currentStream?.url, isLoadingStreams]);
 

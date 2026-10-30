@@ -14,6 +14,7 @@ import { tvModeService } from '../../core/tv/tvModeService';
 import { ZapiLoader } from '../common/ZapiLoader';
 import { pipService } from '../../core/pip/pipService';
 import { mobileFullscreenService } from '../../core/mobile/mobileFullscreenService';
+import { smartAudioService } from '../../core/audio/smartAudioService';
 
 export type LiveTvPlaybackStatus = 'loading' | 'recovering' | 'playing' | 'waiting_interaction' | 'unavailable';
 
@@ -224,6 +225,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       hlsRef.current = null;
     }
     if (videoRef.current) {
+      smartAudioService.detach(videoRef.current);
       try {
         videoRef.current.pause();
         videoRef.current.removeAttribute('src');
@@ -403,6 +405,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
 
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         if (playbackGenerationRef.current !== currentGeneration || activeChannelIdRef.current !== channel.id) return;
+        smartAudioService.attach(video, streamUrl);
         // Não marcar isLoading(false) aqui — aguardar sinal real de vídeo/áudio reproduzível
         const heights = data.levels.map(l => `${l.height}p`).filter(Boolean);
         const unique = Array.from(new Set(heights));
