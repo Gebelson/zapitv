@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'fs';
 import path from 'path';
-import { createServer } from 'vite';
+import { createServer, transformWithEsbuild } from 'vite';
 import { chromium } from 'playwright';
 
 async function runTests() {
@@ -33,12 +33,12 @@ async function runTests() {
   );
   console.log('  ✓ overflow-y: hidden e overflow-x: auto validados.');
 
-  // Deve ter touch-action: pan-x
+  // Deve preservar gestos nativos nos dois eixos
   assert.ok(
     rowCode.includes("touchAction: 'pan-x pan-y'"),
-    'MobileRankedRow deve definir touch-action: pan-x para controle estrito de eixo'
+    'MobileRankedRow deve permitir pan-x e pan-y nativos'
   );
-  console.log('  ✓ touch-action: pan-x validado.');
+  console.log('  ✓ gestos nativos pan-x/pan-y validados.');
 
   // Deve ter overscroll-behavior
   assert.ok(
@@ -47,16 +47,16 @@ async function runTests() {
   );
   assert.ok(
     rowCode.includes("overscrollBehaviorY: 'auto'"),
-    'MobileRankedRow deve conter overscrollBehaviorY: none'
+    'MobileRankedRow deve permitir a rolagem vertical da página'
   );
   console.log('  ✓ overscroll-behavior contido para prevenir bounce vertical.');
 
-  // Deve ter scroll-smooth preservado
+  // Inércia nativa não pode competir com animação de scroll
   assert.ok(
     !rowCode.includes('scroll-smooth'),
-    'MobileRankedRow deve manter scroll-smooth próprio para swipe horizontal'
+    'MobileRankedRow não deve interferir na inércia nativa com scroll-smooth'
   );
-  console.log('  ✓ scroll-smooth preservado.');
+  console.log('  ✓ inércia nativa sem scroll-smooth concorrente.');
 
   // Não deve ter active:scale-95 no card container (evita salto vertical ao tocar)
   assert.strictEqual(
@@ -75,13 +75,39 @@ async function runTests() {
 
   // --- 2. Validação Funcional em Navegador Mobile Real via Playwright ---
   console.log('\n2. Inicializando servidor Vite e navegador mobile real (Playwright)...');
+  // Component contract, not Home composition: the approved mobile Home may
+  // omit this row and anonymous visitors must still see the auth gate.
+  const entry = `import React from 'react';
+    import {createRoot} from 'react-dom/client';
+    import {MobileRankedRow} from '/src/components/mobile/MobileRankedRow.tsx';
+    import {ContentType} from '/types.ts';
+    import '/index.css';
+    const items=Array.from({length:12},(_,i)=>({id:'ci-ranked-'+i,title:'Ranking fixture '+i,type:ContentType.MOVIE,year:2020,rating:8,image:location.origin+'/pwa-192x192.png'}));
+    createRoot(document.getElementById('root')).render(<><MobileRankedRow title="Top 10 do Mês" items={items} onItemClick={()=>{}}/><div style={{height:2000}}/></>);`;
   const viteServer = await createServer({
-    server: { port: 5195 }
+    server: { port: 0, host: '127.0.0.1' },
+    logLevel: 'error',
+    plugins: [{
+      name: 'ranked-row-regression-fixture',
+      configureServer(server) {
+        server.middlewares.use('/__ranked-test', async (_req, res, next) => {
+          try {
+            res.setHeader('Content-Type', 'text/html');
+            res.end(await server.transformIndexHtml('/__ranked-test', '<html><head><meta name="viewport" content="width=device-width,initial-scale=1"/></head><body><div id="root"></div><script type="module" src="/ranked-fixture.tsx"></script></body></html>'));
+          } catch (error) { next(error); }
+        });
+      },
+      resolveId(id) { if (id === '/ranked-fixture.tsx') return '\0ranked-fixture.tsx'; },
+      async load(id) { if (id === '\0ranked-fixture.tsx') return (await transformWithEsbuild(entry, 'ranked-fixture.tsx', { loader: 'tsx', jsx: 'automatic' })).code; },
+    }],
   });
   await viteServer.listen();
-
-  const browser = await chromium.launch({
+  const address = viteServer.httpServer!.address() as { port: number };
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+  browser = await chromium.launch({
     headless: true,
+    executablePath: ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'].find(fs.existsSync),
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
@@ -93,8 +119,14 @@ async function runTests() {
   });
 
   const page = await context.newPage();
-  await page.goto('http://localhost:5195/', { waitUntil: 'domcontentloaded', timeout: 25000 });
-  await page.waitForTimeout(2000);
+  await page.goto(`http://127.0.0.1:${address.port}/__ranked-test`, { waitUntil: 'domcontentloaded', timeout: 25000 });
+  const rankedCards = page.locator('section[aria-label="Top 10 do Mês"] [role="button"]');
+  await rankedCards.first().waitFor({ timeout: 15000 });
+  assert.equal(await rankedCards.count(), 10, 'Fixture deve montar os dez cards reais antes das medições');
+  await page.waitForFunction(() => {
+    const row = document.querySelector<HTMLElement>('section[aria-label="Top 10 do Mês"] .overflow-x-auto');
+    return row && row.clientHeight > 0 && getComputedStyle(row).overflowX === 'auto';
+  });
 
   // 2.1 Validação de scrollHeight vs clientHeight (Zero Vertical Overflow)
   console.log('\n2.1 Verificando métricas de dimensões internas do contêiner...');
@@ -107,6 +139,7 @@ async function runTests() {
 
     const numRect = num?.getBoundingClientRect();
     const postRect = post?.getBoundingClientRect();
+    if (!row || !numRect || !postRect) throw new Error('Fixture do ranking incompleta; não medir elementos ausentes.');
 
     return {
       scrollHeight: row?.scrollHeight || 0,
@@ -274,13 +307,14 @@ async function runTests() {
   assert.strictEqual(afterOuterScroll, initial.windowScrollY + 150, 'A rolagem vertical normal fora do carrossel deve funcionar');
   console.log(`  ✓ Rolagem vertical livre na página confirmada: ${afterOuterScroll}px.`);
 
-  await browser.close();
-  await viteServer.close();
+  } finally {
+    try { await browser?.close(); } finally { await viteServer.close(); }
+  }
 
   console.log('\n🎉 TODOS OS TESTES DE ESTABILIDADE VERTICAL DO TOP 10 PASSARAM COM SUCESSO!\n');
 }
 
 runTests().catch(err => {
   console.error('Falha nos testes de estabilidade vertical do Top 10:', err);
-  process.exit(1);
+  process.exitCode = 1;
 });
