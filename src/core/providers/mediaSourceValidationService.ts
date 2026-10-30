@@ -437,9 +437,7 @@ export class MediaSourceValidationService {
       probeReason = 'Stream via Stremio Streaming Server / Torrent';
     } else if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
       try {
-        const probeUrl = rawUrl.startsWith('http://localhost') || rawUrl.startsWith('/api/')
-          ? rawUrl
-          : `/api/proxy?url=${encodeURIComponent(rawUrl)}`;
+        const probeUrl = rawUrl;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -461,6 +459,8 @@ export class MediaSourceValidationService {
           isAccessible = false;
           probeReason = `Servidor respondeu com código de erro HTTP ${resp.status}`;
         }
+        // A Range request may be ignored by the origin. Never prefetch the movie.
+        await resp.body?.cancel();
       } catch (err: any) {
         // Se a rota falhar por CORS direto no frontend, não rejeita imediatamente se for stream HLS conhecido
         if (err?.name === 'AbortError') {

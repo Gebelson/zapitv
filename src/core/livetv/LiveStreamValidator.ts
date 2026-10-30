@@ -1,5 +1,6 @@
 import { ChannelHealthStatus } from './types';
 import { VERIFIED_STREAMS_SNAPSHOT } from './verifiedStreamsSnapshot';
+import { directMediaUrl } from '../playback/directMediaUrl';
 
 export interface StreamHealthMetrics {
   status: ChannelHealthStatus;
@@ -148,19 +149,7 @@ export class LiveStreamValidator {
    * Converte a URL do stream para rota proxy do ZapiTV caso necessário para evitar bloqueio CORS ou mixed content
    */
   public getPlayableUrl(rawUrl: string): string {
-    if (!rawUrl) return '';
-
-    if (typeof window !== 'undefined') {
-      const isHttpsPage = window.location.protocol === 'https:';
-      const isHttpStream = rawUrl.startsWith('http://');
-
-      // Se for página HTTPS com stream HTTP (mixed content) ou porta não-padrão com restrição de CORS
-      if ((isHttpsPage && isHttpStream) || rawUrl.includes(':8000') || rawUrl.includes(':8083') || rawUrl.includes(':1935') || rawUrl.includes(':8080')) {
-        return `/api/proxy?url=${encodeURIComponent(rawUrl)}`;
-      }
-    }
-
-    return rawUrl;
+    return directMediaUrl(rawUrl) || '';
   }
 
   /**
@@ -217,9 +206,8 @@ export class LiveStreamValidator {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-        const fetchTarget = (typeof window !== 'undefined' && url.startsWith('http://'))
-          ? `/api/proxy?url=${encodeURIComponent(url)}`
-          : url;
+        const fetchTarget = directMediaUrl(url);
+        if (!fetchTarget) return 'UNAVAILABLE';
 
         const reqHeaders: Record<string, string> = {
           'Range': 'bytes=0-8192'
@@ -286,6 +274,14 @@ export class LiveStreamValidator {
           return 'UNAVAILABLE';
         }
 
+        // Binary media is not a playlist. Some origins ignore Range and would
+        // otherwise download the entire video during response.text().
+        if (/^(?:video|audio)\//i.test(contentType) && !/mpegurl/i.test(contentType) || /\.(?:mp4|webm|mkv)(?:[?#]|$)/i.test(url)) {
+          await response.body?.cancel();
+          this.updateMetrics(url, { status: 'INCONCLUSIVE', httpStatus, contentType, latencyMs,
+            lastFailureReason: 'Origem direta respondeu; confirmação de reprodução depende do player.' });
+          return 'INCONCLUSIVE';
+        }
         // ETAPA B: VALIDAÇÃO DE MANIFESTO
         const text = await response.text();
 
@@ -376,6 +372,7 @@ export class LiveStreamValidator {
                       headers: { 'Range': 'bytes=0-1024' },
                       signal: AbortSignal.timeout(3000)
                     });
+                    await segRes.body?.cancel();
                     if (segRes.ok || segRes.status === 206) {
                       segmentAccessible = true;
                     } else if (segRes.status === 401 || segRes.status === 403) {
@@ -429,6 +426,7 @@ export class LiveStreamValidator {
                   headers: { 'Range': 'bytes=0-1024' },
                   signal: AbortSignal.timeout(3000)
                 });
+                await segRes.body?.cancel();
                 if (segRes.ok || segRes.status === 206) {
                   segmentAccessible = true;
                 } else if (segRes.status === 401 || segRes.status === 403) {

@@ -27,16 +27,6 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     audioStatus: 'other', // Áudio original inglês
     verifiedStreams: [
       {
-        name: 'Proxy Local ZapiTV',
-        title: '[STREAM DIRETO] A Noite dos Mortos-Vivos - Servidor Local ZapiTV',
-        url: '/api/proxy?url=' + encodeURIComponent('https://upload.wikimedia.org/wikipedia/commons/2/24/Night_of_the_Living_Dead_%281968%29.webm'),
-        sourceType: 'mp4',
-        isPtBr: false,
-        isDubbed: false,
-        quality: '1080p',
-        providerName: 'ZapiTV Stream Core'
-      },
-      {
         name: 'Cinema Aberto FHD',
         title: '[ÁUDIO ORIGINAL] A Noite dos Mortos-Vivos (1968) - 1080p WebM Direto',
         url: 'https://upload.wikimedia.org/wikipedia/commons/2/24/Night_of_the_Living_Dead_%281968%29.webm',
@@ -69,16 +59,6 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     audioStatus: 'pt-br-original', // Áudio original PT-BR
     verifiedStreams: [
       {
-        name: 'ZapiTV Proxy PT-BR',
-        title: '[ÁUDIO ORIGINAL PT-BR] Histórias da Fome no Brasil - Servidor Otimizado',
-        url: '/api/proxy?url=' + encodeURIComponent('https://upload.wikimedia.org/wikipedia/commons/8/89/Document%C3%A1rio-_Hist%C3%B3rias_da_Fome_no_Brasil.webm'),
-        sourceType: 'mp4',
-        isPtBr: true,
-        isDubbed: false,
-        quality: '1080p',
-        providerName: 'ZapiTV Stream Core'
-      },
-      {
         name: 'Acervo Cultural Nacional',
         title: '[ÁUDIO ORIGINAL PT-BR] Histórias da Fome no Brasil - WebM Direto',
         url: 'https://upload.wikimedia.org/wikipedia/commons/8/89/Document%C3%A1rio-_Hist%C3%B3rias_da_Fome_no_Brasil.webm',
@@ -106,16 +86,6 @@ export const VERIFIED_OPEN_ITEMS: ContentItem[] = [
     availabilityStatus: 'verified',
     audioStatus: 'pt-br-original',
     verifiedStreams: [
-      {
-        name: 'ZapiTV Proxy PT-BR',
-        title: '[ÁUDIO ORIGINAL PT-BR] Brasil Hoje: Salvador - Servidor Otimizado',
-        url: '/api/proxy?url=' + encodeURIComponent('https://upload.wikimedia.org/wikipedia/commons/4/47/Brasil_Hoje_n._56_%281974%29_-_Document%C3%A1rio_da_Ag%C3%AAncia_Nacional_sobre_a_cidade_de_Salvador%2C_Bahia.webm'),
-        sourceType: 'mp4',
-        isPtBr: true,
-        isDubbed: false,
-        quality: '1080p',
-        providerName: 'ZapiTV Stream Core'
-      },
       {
         name: 'Arquivo Nacional BR',
         title: '[ÁUDIO ORIGINAL PT-BR] Brasil Hoje: Salvador - 1080p WebM Direto',

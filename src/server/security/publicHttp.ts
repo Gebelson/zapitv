@@ -96,7 +96,7 @@ export async function publicHttpGet(raw: string, options: { headers?: Record<str
       headers,
       url: url.href,
       body: response,
-      text: async () => (await readLimited(1024 * 1024)).toString('utf8'),
+      text: async (limit = 1024 * 1024) => (await readLimited(limit)).toString('utf8'),
       arrayBuffer: async () => readLimited(64 * 1024, true)
     };
   }

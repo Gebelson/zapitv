@@ -52,6 +52,7 @@ import { FeatureErrorBoundary } from '../common/FeatureErrorBoundary';
 import { RoomLifecycleState, TransmissionMode } from '../../core/watchparty/watchPartyTypes';
 import { VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../../core/providers/sourceVerificationService';
 import { tvModeService } from '../../core/tv/tvModeService';
+import { directMediaUrl } from '../../core/playback/directMediaUrl';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { TvPlayerControls } from './TvPlayerControls';
 import { mobileFullscreenService, MobileFullscreenState } from '../../core/mobile/mobileFullscreenService';
@@ -2853,7 +2854,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       hlsRef.current = null;
     }
 
-    const videoUrl = currentStream.url;
+    const videoUrl = directMediaUrl(currentStream.url);
+    if (!videoUrl) {
+      setIsLoading(false); setHasError(true);
+      setErrorMessage('Esta fonte não permite reprodução direta segura neste navegador. O proxy de vídeo da Vercel está desativado.');
+      return;
+    }
     const isTvPlayback = window.location.pathname.startsWith('/tv');
     const sourceLoadStartedAt = performance.now();
     // FrostStream publishes direct media URLs for clients without a Referer.

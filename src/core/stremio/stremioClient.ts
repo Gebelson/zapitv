@@ -16,6 +16,7 @@ function resolveStremioUrl(url: string): string {
 }
 
 export class StremioClient {
+  private static pending = new Map<string, Promise<any>>();
   private baseUrl: string;
 
   constructor(url: string) {
@@ -33,6 +34,21 @@ export class StremioClient {
     return this.baseUrl;
   }
 
+  private async fetchPublicMetadata(url: string, timeoutMs: number): Promise<any> {
+    const key = `${url}:${timeoutMs}`;
+    const active = StremioClient.pending.get(key);
+    if (active) return active;
+    const request = (async () => {
+      const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      if (!response.ok) { await response.body?.cancel(); throw new Error(`HTTP ${response.status}`); }
+      return response.json();
+    })();
+    if (StremioClient.pending.size < 64) StremioClient.pending.set(key, request);
+    try { return await request; } finally {
+      if (StremioClient.pending.get(key) === request) StremioClient.pending.delete(key);
+    }
+  }
+
   private async fetchWithFallback(endpoint: string, timeoutMs = 8000): Promise<any> {
     const isRelative = this.baseUrl.startsWith('/');
     const rawPath = `${this.baseUrl}/${endpoint.replace(/^\/+/, '')}`;
@@ -47,18 +63,12 @@ export class StremioClient {
 
     // Provedores externos: tentar direto com timeout completo antes do fallback
     try {
-      const res = await fetch(directUrl, { signal: AbortSignal.timeout(timeoutMs) });
-      if (res.ok) {
-        const text = await res.text();
-        if (text.startsWith('{') || text.startsWith('[')) {
-          return JSON.parse(text);
-        }
-      }
+      return await this.fetchPublicMetadata(directUrl, timeoutMs);
     } catch (err) {
       // Direct fetch failed, fallback to local CORS proxy
     }
 
-    // Fallback: proxy via server.ts
+    // This authenticated JSON fallback is never deduplicated across sessions.
     const proxyUrl = resolveStremioUrl(`/api/proxy?url=${encodeURIComponent(directUrl)}`);
     try {
       const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeoutMs) });
@@ -71,7 +81,7 @@ export class StremioClient {
       }
       return JSON.parse(text);
     } catch (err: any) {
-      throw new Error(`Falha ao consultar Stremio Addon [${directUrl}]: ${err.message}`);
+      throw new Error('Falha ao consultar metadados do Stremio Addon.');
     }
   }
 

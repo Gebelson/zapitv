@@ -1,3 +1,4 @@
+import { directMediaUrl } from '../playback/directMediaUrl';
 import { StremioClient } from '../stremio/stremioClient';
 import { StremioManifest, StremioStream } from '../stremio/stremioTypes';
 import { sortStreamsByPtBrPriority } from '../audio/audioDetector';
@@ -391,8 +392,9 @@ class ProviderRegistryService {
         });
       } else {
         // Direct ping via proxy or fetch
-        const pingUrl = `/api/proxy?url=${encodeURIComponent(provider.url)}`;
+        const pingUrl = provider.url;
         const res = await fetch(pingUrl, { signal: AbortSignal.timeout(6000) });
+        await res.body?.cancel();
         const latency = Date.now() - startTime;
         this.updateProvider(id, {
           status: res.ok ? 'online' : 'error',
@@ -620,7 +622,7 @@ class ProviderRegistryService {
         const epObj = findCatalogEpisode(openItem.episodes, episode);
         if (epObj?.videoUrl) {
           const directUrl = epObj.videoUrl;
-          const proxyUrl = directUrl.startsWith('http') ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
+          const proxyUrl = directUrl;
           const isPtBr = openItem.audioStatus === 'pt-br-original' || openItem.audioStatus === 'pt-br-dubbed';
           const isDubbed = openItem.audioStatus === 'pt-br-dubbed';
           streams.push({
@@ -632,17 +634,6 @@ class ProviderRegistryService {
             isDubbed,
             quality: epObj.quality || '1080p',
             providerName: 'Acervo ZapiTV Verificado',
-            providerId: 'zapitv-verified'
-          });
-          streams.push({
-            name: `${openItem.title} - Ep ${epObj.number} (CDN)`,
-            title: `[EPISÓDIO ${epObj.number}] ${epObj.title} (${isDubbed ? 'Dublado PT-BR' : 'CDN Direto'})`,
-            url: directUrl,
-            sourceType: epObj.videoUrl.includes('.m3u8') ? 'hls' : 'mp4',
-            isPtBr,
-            isDubbed,
-            quality: epObj.quality || '1080p',
-            providerName: 'Acervo ZapiTV CDN',
             providerId: 'zapitv-verified'
           });
         }
@@ -658,7 +649,7 @@ class ProviderRegistryService {
         const epObj = findCatalogEpisode(catalogItem.episodes, episode);
         if (epObj?.videoUrl && !epObj.videoUrl.includes('Caminandes') && !epObj.videoUrl.includes('Night_of_the_Living_Dead')) {
           const directUrl = epObj.videoUrl;
-          const proxyUrl = directUrl.startsWith('http') ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
+          const proxyUrl = directUrl;
           const isDubbed = catalogItem.audioStatus === 'pt-br-dubbed';
           streams.push({
             name: `${catalogItem.title} - T${episode?.season ?? 1}E${epObj.number}`,
@@ -684,7 +675,7 @@ class ProviderRegistryService {
         const isHls = directUrl.includes('.m3u8');
         const isMp4 = directUrl.includes('.mp4');
         if (isHls || isMp4) {
-          const proxyUrl = directUrl.startsWith('http') ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
+          const proxyUrl = directUrl;
           streams.push({
             name: `${catalogItem.title} - Stream Oficial`,
             title: `${catalogItem.title} (Stream Oficial)`,
@@ -998,89 +989,18 @@ class ProviderRegistryService {
               const isPtBr = audioAnalysis.isPtBr;
 
               if (isHls || isDash || isDirectVideo) {
-                // Este host entrega o manifesto por HTTPS, mas não permite que
-                // o HLS.js carregue suas variantes diretamente do navegador.
-                // A rota de mídia mantém manifesto, variantes e segmentos na
-                // mesma origem da página, preservando os caminhos do provedor.
-                if (isHls && /^https:\/\/(?:[^/]+\.)?embedplayer2\.xyz\//i.test(sUrl)) {
-                  parsedStreams.push({
-                    ...s,
-                    url: `/api/proxy?url=${encodeURIComponent(sUrl)}`,
-                    providerName: `${addon.name} (HLS Proxy)`,
-                    providerId: addon.id,
-                    sourceType: 'hls',
-                    ...(isDubbed ? { isDubbed: true } : {}),
-                    ...(isPtBr ? { isPtBr: true } : {})
-                  });
-                  continue;
-                }
-                if (sUrl.startsWith('http://') && !sUrl.includes('/api/proxy')) {
-                  // O proxy de arquivos FenixFlix é bloqueado na Vercel. A rota
-                  // HTTPS do próprio provedor funciona para fontes compatíveis.
-                  if (addon.id === 'fenixflix-animes' && typeof window !== 'undefined' && window.location.protocol === 'https:') {
-                    parsedStreams.push({
-                      ...s,
-                      url: sUrl.replace(/^http:/, 'https:'),
-                      providerName: `${addon.name} (HTTPS Direto)`,
-                      providerId: addon.id,
-                      sourceType: isHls ? 'hls' : 'mp4',
-                      ...(isDubbed ? { isDubbed: true } : {}),
-                      ...(isPtBr ? { isPtBr: true } : {})
-                    });
-                    continue;
-                  }
-                  parsedStreams.push({
-                    ...s,
-                    url: `/api/proxy?url=${encodeURIComponent(sUrl)}`,
-                    providerName: `${addon.name} (Proxy)`,
-                    providerId: addon.id,
-                    sourceType: isHls ? 'hls' : 'mp4',
-                    ...(isDubbed ? { isDubbed: true } : {}),
-                    ...(isPtBr ? { isPtBr: true } : {})
-                  });
-                  if (typeof window === 'undefined' || window.location.protocol !== 'https:') {
-                    parsedStreams.push({
-                      ...s,
-                      providerName: addon.name,
-                      providerId: addon.id,
-                      sourceType: isHls ? 'hls' : 'mp4',
-                      ...(isDubbed ? { isDubbed: true } : {}),
-                      ...(isPtBr ? { isPtBr: true } : {}),
-                      behaviorHints: {
-                        ...(s.behaviorHints || {}),
-                        notWebReady: false
-                      }
-                    });
-                  }
-                } else {
-                  parsedStreams.push({
-                    ...s,
-                    providerName: addon.name,
-                    providerId: addon.id,
-                    sourceType: isHls ? 'hls' : 'mp4',
-                    ...(isDubbed ? { isDubbed: true } : {}),
-                    ...(isPtBr ? { isPtBr: true } : {}),
-                    behaviorHints: {
-                      ...(s.behaviorHints || {}),
-                      notWebReady: false
-                    }
-                  });
-                }
-                if (addon.id === 'froststream-http' || sUrl.includes('cloutteam.com')) {
-                  parsedStreams.push({
-                    ...s,
-                    url: `/api/proxy?url=${encodeURIComponent(sUrl)}`,
-                    providerName: `${addon.name} (Proxy)`,
-                    providerId: addon.id,
-                    sourceType: isHls ? 'hls' : 'mp4',
-                    ...(isDubbed ? { isDubbed: true } : {}),
-                    ...(isPtBr ? { isPtBr: true } : {}),
-                    behaviorHints: {
-                      ...(s.behaviorHints || {}),
-                      notWebReady: false
-                    }
-                  });
-                }
+                // Retain the existing, provider-specific HTTPS route; never relay media.
+                const candidate = addon.id === 'fenixflix-animes' && typeof window !== 'undefined' && window.location.protocol === 'https:'
+                  ? sUrl.replace(/^http:/, 'https:') : sUrl;
+                const url = directMediaUrl(candidate);
+                if (!url) continue;
+                parsedStreams.push({
+                  ...s, url, providerName: addon.name, providerId: addon.id,
+                  sourceType: isHls ? 'hls' : isDash ? 'dash' : 'mp4',
+                  ...(isDubbed ? { isDubbed: true } : {}),
+                  ...(isPtBr ? { isPtBr: true } : {}),
+                  behaviorHints: { ...(s.behaviorHints || {}), notWebReady: false }
+                });
               } else if (isTorrent) {
                 const engineOnline = await isLocalStremioEngineOnline();
                 let streamQuality = s.quality;

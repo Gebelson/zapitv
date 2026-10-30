@@ -26,7 +26,7 @@ import { publicHttpGet, resolvePublicTarget } from "./src/server/security/public
 import { authenticateUser, extractSessionToken, getValidDatabase, requireAdmin } from "./src/server/auth/authMiddleware.ts";
 import { getAuthPolicy } from "./src/server/auth/authPolicyService.ts";
 import { validateSession } from "./src/server/auth/sessionService.ts";
-import { normalizeProxyRange } from "./src/server/proxyRange.ts";
+import { createMetadataProxy } from "./src/server/metadataProxy.ts";
 import { epgSyncService } from "./src/server/livetv/epgSyncService.ts";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -103,6 +103,8 @@ function createApp() {
 
   // Enable JSON parsing
   app.use(express.json());
+  // Private/authenticated APIs are never CDN-cached. Public read endpoints opt in explicitly.
+  app.use("/api", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); });
   app.use('/api/watchparty', (req, res, next) => {
     if (!allowPublicRequest(`watchparty:${req.ip || 'unknown'}`, 1800) ||
         (req.path === '/room/announce' && !allowPublicRequest(`watchparty-announce:${req.ip || 'unknown'}`, 120))) {
@@ -117,8 +119,8 @@ function createApp() {
     next();
   });
   app.use(['/api/proxy', '/api/validate-stream'], (req, res, next) => {
-    const endpoint = req.path;
-    const limit = endpoint === '/api/proxy' ? 128 : 24;
+    const endpoint = req.baseUrl;
+    const limit = endpoint === '/api/proxy' ? 16 : 24;
     const active = activeRequests.get(endpoint) || 0;
     if (active >= limit) return res.status(503).set('Retry-After', '2').json({ error: 'Capacidade temporariamente ocupada.' });
     if (endpoint === '/api/validate-stream') {
@@ -179,22 +181,12 @@ function createApp() {
       const ep = item.episodes.find(e => e.number === episodeNum);
       if (ep?.videoUrl) {
         const directUrl = ep.videoUrl;
-        const proxyUrl = directUrl.startsWith('http') ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
+        const proxyUrl = directUrl;
         return [
           {
             name: 'ZapiTV Stream Core',
             title: `[EPISÓDIO ${ep.number}] ${ep.title} - Servidor Local ZapiTV`,
             url: proxyUrl,
-            sourceType: ep.videoUrl.includes('.m3u8') ? 'hls' : 'mp4',
-            isPtBr: item.audioStatus === 'pt-br-original' || item.audioStatus === 'pt-br-dubbed',
-            isDubbed: false,
-            quality: '720p',
-            behaviorHints: { notWebReady: false }
-          },
-          {
-            name: 'Acervo Aberto CDN',
-            title: `[EPISÓDIO ${ep.number}] ${ep.title} - CDN Direto`,
-            url: directUrl,
             sourceType: ep.videoUrl.includes('.m3u8') ? 'hls' : 'mp4',
             isPtBr: item.audioStatus === 'pt-br-original' || item.audioStatus === 'pt-br-dubbed',
             isDubbed: false,
@@ -577,20 +569,13 @@ function createApp() {
     if (!ch || !ch.url) {
       return res.json({ streams: [] });
     }
-    const streamUrl = ch.url.startsWith("http") ? `/api/proxy?url=${encodeURIComponent(ch.url)}` : ch.url;
+    const streamUrl = ch.url;
     res.json({
       streams: [
         {
           name: ch.name,
           title: `${ch.name} - Transmissão Direta Oficial (${ch.quality || "HD"})`,
           url: streamUrl,
-          sourceType: "hls",
-          behaviorHints: { notWebReady: false }
-        },
-        {
-          name: `${ch.name} (CDN Direto)`,
-          title: `${ch.name} - CDN Direto Original`,
-          url: ch.url,
           sourceType: "hls",
           behaviorHints: { notWebReady: false }
         }
@@ -678,7 +663,8 @@ function createApp() {
     res.json(result);
   });
 
-  // CORS Proxy for Stremio Addons and media streams
+  // JSON-only addon gateway. Media bytes must go directly to the authorized origin.
+  const metadataProxy = createMetadataProxy();
   app.get("/api/proxy", async (req, res) => {
     const targetUrl = req.query.url;
     if (typeof targetUrl !== 'string' || !targetUrl || targetUrl.length > 4096) {
@@ -715,99 +701,12 @@ function createApp() {
         }
       }
 
-      const incomingUa = (req.headers["user-agent"] as string) || "";
-      const isCustomBotUa = !incomingUa || incomingUa.includes("ZapiTV") || incomingUa.includes("node-fetch");
-      const userAgent = isCustomBotUa
-        ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-        : incomingUa;
-
-      const headers: Record<string, string> = {
-        "User-Agent": userAgent,
-        "Accept": (req.headers["accept"] as string) || "*/*",
-        "Accept-Language": (req.headers["accept-language"] as string) || "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-      };
-
-      // Suporte a referer explícito (ex: streams do MagnetFlix / CDN que exigem domínio de origem)
-      const customReferer = (req.query.referer as string) || (req.headers["x-target-referer"] as string);
-      if (customReferer && customReferer.length <= 1024 && /^https?:\/\//i.test(customReferer)) {
-        headers["Referer"] = customReferer;
-      } else if (!targetUrl.includes('cloutteam.com')) {
-        headers["Referer"] = parsed.origin;
+      if (!allowPublicRequest(`metadata:${req.ip || 'unknown'}`, 600)) {
+        return res.status(429).set('Retry-After', '60').json({ error: 'Limite temporário de metadados excedido.' });
       }
-
-      if (req.headers.range) {
-        const safeRange = typeof req.headers.range === 'string' ? normalizeProxyRange(req.headers.range) : null;
-        if (!safeRange) {
-          return res.status(416).json({ error: 'Range inválido' });
-        }
-        headers["Range"] = safeRange;
-      }
-
-      const controller = new AbortController();
-      const connectTimer = setTimeout(() => {
-        try { controller.abort(new Error("Timeout de conexão com servidor de origem")); } catch {}
-      }, 25000);
-      // `req.close` also fires after an ordinary GET request has been read.
-      // Only cancel the upstream stream when the response/client actually closes.
-      res.on("close", () => {
-        if (!res.writableEnded) {
-          try { controller.abort(); } catch {}
-        }
-      });
-
-      const response = await publicHttpGet(targetUrl, {
-        headers,
-        signal: controller.signal,
-        timeoutMs: 25000
-      });
-      clearTimeout(connectTimer);
-
-      const responseType = response.headers.get("content-type") || "";
-      const isHlsManifest = /\.m3u8(?:$|[?#])/i.test(new URL(response.url).pathname) ||
-        /(?:mpegurl|vnd\.apple\.mpegurl)/i.test(responseType);
-      if (response.ok && isHlsManifest) {
-        const { rewriteHlsManifest } = await import("./src/server/rewriteHlsManifest");
-        const original = await response.text();
-        const rewritten = rewriteHlsManifest(original, response.url);
-        if (!rewritten) return res.status(502).json({ error: "Manifesto HLS inválido" });
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Content-Type", "application/vnd.apple.mpegurl; charset=utf-8");
-        res.setHeader("Cache-Control", "no-store");
-        return res.status(200).send(rewritten);
-      }
-
-      // Set CORS and forward media headers
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "*");
-      res.setHeader("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges");
-      
-      const contentType = response.headers.get("content-type");
-      if (contentType) res.setHeader("Content-Type", contentType);
-      const contentRange = response.headers.get("content-range");
-      if (contentRange) res.setHeader("Content-Range", contentRange);
-      const acceptRanges = response.headers.get("accept-ranges");
-      if (acceptRanges) res.setHeader("Accept-Ranges", acceptRanges);
-      const contentLength = response.headers.get("content-length");
-      if (contentLength) res.setHeader("Content-Length", contentLength);
-
-      res.status(response.status);
-      if (response.body) {
-        const nodeStream = response.body;
-        res.once('close', () => nodeStream.destroy());
-        nodeStream.on("error", (streamErr: any) => {
-          // Client closed connection or timeout reached - close cleanly without crashing
-          try {
-            if (!res.writableEnded) res.end();
-          } catch {}
-        });
-        nodeStream.pipe(res);
-      } else {
-        res.end();
-      }
-    } catch (err: any) {
-      if (!res.headersSent) res.status(502).json({ error: "Falha ao consultar recurso via proxy" });
-      else res.end();
+      return metadataProxy(req, res);
+    } catch {
+      if (!res.headersSent) return res.status(502).json({ error: 'Falha ao consultar metadados.' });
     }
   });
 
@@ -1157,6 +1056,7 @@ function createApp() {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const selection = featuredRankingService.getFeaturedSelectionSync();
+      res.setHeader("Cache-Control", "public, max-age=0, s-maxage=30, stale-while-revalidate=30");
       res.json(selection);
     } catch (err: any) {
       res.status(500).json({ error: "Falha ao obter rankings em destaque", details: err?.message });
@@ -1168,6 +1068,7 @@ function createApp() {
     try {
       const monthQuery = typeof req.query.month === "string" ? req.query.month : undefined;
       const snapshot = monthlyFeaturedRankingService.getMonthlyRankingSync(monthQuery);
+      res.setHeader("Cache-Control", "public, max-age=0, s-maxage=30, stale-while-revalidate=30");
       res.json(snapshot);
     } catch (err: any) {
       res.status(500).json({ error: "Falha ao obter rankings mensais", details: err?.message });
@@ -1262,7 +1163,9 @@ function createApp() {
   app.get("/api/catalog/new-releases", async (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
-      res.json(await getPersistedReleases());
+      const releases = await getPersistedReleases();
+      res.setHeader("Cache-Control", "public, max-age=0, s-maxage=30, stale-while-revalidate=30");
+      res.json(releases);
     } catch (err) {
       res.status(err instanceof CatalogReleaseStorageUnavailable ? 503 : 500).json({ error: "Lançamentos temporariamente indisponíveis" });
     }
