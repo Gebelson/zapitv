@@ -53,6 +53,12 @@ import { WatchPartyOverlay } from '../watchparty/WatchPartyOverlay';
 import { FeatureErrorBoundary } from '../common/FeatureErrorBoundary';
 import { RoomLifecycleState, TransmissionMode } from '../../core/watchparty/watchPartyTypes';
 import { VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../../core/providers/sourceVerificationService';
+import {
+  isSourceTechnicallyPlayable,
+  isSourceTemporarilyProblematic,
+  markSourceTemporarilyProblematic
+} from '../../core/providers/sourceReadiness';
+import { classifyCanonicalPlaybackCause } from '../../core/tracking/mediaLoadingTracker';
 import { tvModeService } from '../../core/tv/tvModeService';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { TvPlayerControls } from './TvPlayerControls';
@@ -1120,6 +1126,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Instant Fallback & Failure Tracking
   const triedIndicesRef = useRef<Set<number>>(new Set());
   const isSwitchingStreamRef = useRef(false);
+  const consecutiveFallbackCountRef = useRef<number>(0);
+  const isDynamicRecoveryTriggeredRef = useRef<boolean>(false);
   const startupTimedOutRef = useRef(false);
   const attemptIdRef = useRef<number>(0);
 
@@ -2505,8 +2513,32 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     // Capture the exact position before removing src: video.load() resets currentTime.
     const positionBeforeCleanup = videoRef.current?.currentTime || latestProgressRef.current.currentTime || 0;
     playbackConfirmationRef.current = createPlaybackConfirmationState();
+    const classifiedCause = classifyCanonicalPlaybackCause(reason);
     if (loadingTraceId) mediaLoadingTracker.recordEvent(loadingTraceId, 'SOURCE_VALIDATION',
-      'ZapiPlayer', 'FAILED', undefined, classifyPlaybackError(reason), reason);
+      'ZapiPlayer', 'FAILED', undefined, classifiedCause, sanitizePlaybackReason(reason));
+    
+    // Marca a fonte como temporariamente problemática (quarentena transitória com TTL de 15m)
+    if (currentStream?.url) {
+      markSourceTemporarilyProblematic(currentStream.url, reason);
+    }
+    if (currentStream?.providerId) {
+      playbackOptimizerService.recordPlaybackFailureForDevice(currentStream.providerId, reason);
+    }
+
+    // Trava de segurança para impedir loops infinitos de fallback (> 5 tentativas consecutivas)
+    consecutiveFallbackCountRef.current++;
+    if (consecutiveFallbackCountRef.current > 5) {
+      console.warn('[ZapiPlayer] Limite máximo de 5 tentativas consecutivas de fallback atingido. Interrompendo.');
+      if (videoRef.current && !videoRef.current.paused) {
+        videoRef.current.pause();
+      }
+      setAllSourcesFailed(true);
+      setHasError(true);
+      setIsLoading(false);
+      setErrorMessage('Não foi possível reproduzir este conteúdo após múltiplas tentativas. Tente novamente mais tarde.');
+      isSwitchingStreamRef.current = false;
+      return;
+    }
     const evidence = sourceEvidenceRef.current;
     if (evidence && !evidence.reported && navigator.onLine &&
         /decodific|não corresponde à obra|fonte isolada|domínio na lista|propaganda embutida|arquivo de vídeo inválido|HTTP 40[34]/i.test(reason)) {
@@ -2537,10 +2569,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     const requiredLanguage = activeAudioId?.startsWith('stream-')
       ? activeAudioId.slice('stream-'.length) : currentLanguage;
 
-    // Garante que o fallback considere APENAS fontes cuja identidade corresponda comprovadamente à obra solicitada
+    // Garante que o fallback considere APENAS fontes tecnicamente reproduzíveis e sem quarentena
     const remaining = streams
       .map((s, idx) => ({ s, idx }))
       .filter(({ s, idx }) => !triedIndicesRef.current.has(idx) &&
+        !isSourceTemporarilyProblematic(s.url || '') &&
+        isSourceTechnicallyPlayable(s) &&
         sourceConfidenceEngine.evaluate(s, canonicalIdentity).isMatch &&
         (requiredLanguage !== 'unknown'
           ? audioSelectionManager.inspectStreamAudioLanguage(s, originalLanguage) === requiredLanguage
@@ -2551,15 +2585,27 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     let isLanguageFallback = false;
     if (!nextCandidate) {
       // REGRA FUNDAMENTAL: O fallback entre fontes deve ser silencioso até que uma fonte funcione ou todas falhem.
-      // NUNCA disparar aviso de dublagem antes de confirmar que a próxima fonte é reproduzível!
       const anyRemaining = streams
         .map((s, idx) => ({ s, idx }))
         .filter(({ s, idx }) => !triedIndicesRef.current.has(idx) &&
+          !isSourceTemporarilyProblematic(s.url || '') &&
+          isSourceTechnicallyPlayable(s) &&
           sourceConfidenceEngine.evaluate(s, canonicalIdentity).isMatch);
       if (anyRemaining.length > 0) {
         nextCandidate = anyRemaining[0];
         isLanguageFallback = true;
       }
+    }
+
+    // Se as opções iniciais acabaram, tenta uma recuperação dinâmica em segundo plano antes de desistir
+    if (!nextCandidate && onRetrySources && !isDynamicRecoveryTriggeredRef.current && consecutiveFallbackCountRef.current <= 5) {
+      isDynamicRecoveryTriggeredRef.current = true;
+      console.log('[ZapiPlayer] Fontes locais esgotadas. Acionando recuperação dinâmica de fontes adicionais...');
+      setIsLoading(true);
+      setHasError(false);
+      onRetrySources();
+      isSwitchingStreamRef.current = false;
+      return;
     }
 
     // Limpeza profunda dos recursos da tentativa atual
@@ -4547,6 +4593,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                   mediaLoadingTracker.transition(loadingTraceId, 'PLAYING');
                 }
                 if (loadingTraceId && nextConfirmation.confirmed && !priorConfirmation.confirmed) {
+                  consecutiveFallbackCountRef.current = 0;
+                  isDynamicRecoveryTriggeredRef.current = false;
+                  if (currentStream?.providerId) {
+                    playbackOptimizerService.recordPlaybackConfirmedForDevice(currentStream.providerId);
+                  }
                   mediaLoadingTracker.recordEvent(loadingTraceId, 'PLAYBACK_CONFIRMED', 'ZapiPlayer', 'OK', {
                     mediaSeconds: cur - (nextConfirmation.startedAtSeconds || 0),
                     frames: presentedFrames === null || nextConfirmation.framesAtStart === null

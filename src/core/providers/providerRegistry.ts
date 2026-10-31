@@ -21,6 +21,7 @@ import { playbackOptimizerService } from '../playback/PlaybackOptimizerService';
 import { tvPerformanceService } from '../tv/tvPerformanceService';
 import { LruCache } from '../cache/LruCache';
 import { getRememberedSources, prioritizeRememberedSources } from './sourceMemory';
+import { isSourceTechnicallyPlayable, isSourceTemporarilyProblematic } from './sourceReadiness';
 
 export interface ProviderConfig {
   id: string;
@@ -152,9 +153,9 @@ export const DEFAULT_PROVIDERS: ProviderConfig[] = [
     status: 'online'
   },
   {
-    id: 'magnetflix-animes',
-    name: 'Magnetflix (Animes e Séries PT-BR Backup)',
-    url: 'https://magnetflix.flixbr.online/qualities=4k,1080p,720p,sd|audio=dublado,legendado|catalogs=populares_movie,populares_series,recentes_servidor_movie,recentes_servidor_series,emalta_movie,emalta_series',
+    id: 'zapitv-cinema-aberto',
+    name: 'Cinema Aberto & Acervo Nacional PT-BR (Stremio Oficial)',
+    url: '/api/stremio/cinema-aberto',
     enabled: true,
     type: 'stremio-addon',
     priority: 7,
@@ -162,12 +163,42 @@ export const DEFAULT_PROVIDERS: ProviderConfig[] = [
     status: 'online'
   },
   {
-    id: 'zapitv-cinema-aberto',
-    name: 'Cinema Aberto & Acervo Nacional PT-BR (Stremio Oficial)',
-    url: '/api/stremio/cinema-aberto',
+    id: 'zapitv-archive-org',
+    name: 'Internet Archive Cinema Aberto (Domínio Público HD)',
+    url: '/api/stremio/archive-org-movies',
     enabled: true,
     type: 'stremio-addon',
     priority: 8,
+    isPtBr: false,
+    status: 'online'
+  },
+  {
+    id: 'zapitv-wikimedia-commons',
+    name: 'Wikimedia Commons Vídeos & Documentários (CC-BY)',
+    url: '/api/stremio/wikimedia-commons',
+    enabled: true,
+    type: 'stremio-addon',
+    priority: 9,
+    isPtBr: false,
+    status: 'online'
+  },
+  {
+    id: 'zapitv-open-culture',
+    name: 'Open Culture Cinema Clássico Restaurado',
+    url: '/api/stremio/open-culture',
+    enabled: true,
+    type: 'stremio-addon',
+    priority: 10,
+    isPtBr: false,
+    status: 'online'
+  },
+  {
+    id: 'magnetflix-animes',
+    name: 'Magnetflix (Animes e Séries PT-BR Backup)',
+    url: 'https://magnetflix.flixbr.online/qualities=4k,1080p,720p,sd|audio=dublado,legendado|catalogs=populares_movie,populares_series,recentes_servidor_movie,recentes_servidor_series,emalta_movie,emalta_series',
+    enabled: true,
+    type: 'stremio-addon',
+    priority: 11,
     isPtBr: true,
     status: 'online'
   },
@@ -1197,14 +1228,14 @@ class ProviderRegistryService {
                 notifyProgressive(prioritizeRememberedSources(rankedInterim, remembered));
               }
             }
-            // Na 1ª verificação: interrompe se já encontrou fontes limpas e comprovadamente reproduzíveis na Web com PT-BR
-            // Na 2ª verificação (isRetryAttempt): NUNCA interrompe prematuramente, busca exaustiva (Requisito 4)
+            // Descoberta progressiva real (P0):
+            // O primeiro stream reproduzível já foi emitido acima para início imediato do vídeo.
+            // Os workers em segundo plano continuam ativos para formar uma fila de contingência segura.
+            // Só interrompe novas requisições se já atingimos pelo menos 6 fontes tecnicamente prontas da mesma obra.
             if (!options?.isRetryAttempt) {
               const engineOnline = localEngineCache.active;
-              const hasFrostStreamFinished = !sortedAddons.some(a => a.id.includes('froststream')) || collectedFromAddons.some(s => s.providerId?.includes('froststream'));
-              const culprits = cleanInterim.filter(s => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
-              const hasWebReadyPtBr = culprits.length > 0;
-              if (((cleanInterim.length >= 1 && hasWebReadyPtBr) || cleanInterim.length >= 2) && hasFrostStreamFinished) {
+              const readySources = cleanInterim.filter(s => isSourceTechnicallyPlayable(s) && (!s.isTorrent || engineOnline));
+              if (readySources.length >= 6) {
                 stopSpawning = true;
               }
             }
@@ -1240,12 +1271,11 @@ class ProviderRegistryService {
               const engineOnline = localEngineCache.active;
               const cleanInterim = streamValidator.filterCleanStreams([...streams, ...collectedFromAddons], targetTitle, originalTitle, alternateTitles, episode)
                 .filter(s => sourceConfidenceEngine.evaluate(s, identity).isMatch);
-              const hasFrostStreamFinished = !sortedAddons.some(a => a.id.includes('froststream')) || collectedFromAddons.some(s => s.providerId?.includes('froststream'));
-              const culprits = cleanInterim.filter(s => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
-              const hasWebReadyPtBr = culprits.length > 0;
-              if (((cleanInterim.length >= 1 && hasWebReadyPtBr) || cleanInterim.length >= 2) && hasFrostStreamFinished) {
+              const readySources = cleanInterim.filter(s => isSourceTechnicallyPlayable(s) && (!s.isTorrent || engineOnline));
+              // Só encerra a espera antecipadamente se atingimos uma reserva robusta de pelo menos 6 fontes
+              if (readySources.length >= 6) {
                 if (interval) clearInterval(interval);
-                timer = setTimeout(resolve, 250);
+                timer = setTimeout(resolve, 300);
               }
             }
           }, 60);
@@ -1393,6 +1423,29 @@ class ProviderRegistryService {
   /**
    * Limpa todos os caches de provedores e ranqueamento inteligente.
    */
+  /**
+   * Descoberta dinâmica sob demanda quando fontes falham durante a reprodução.
+   * Executa busca limpa em todos os provedores elegíveis descartando URLs problemáticas.
+   */
+  public async discoverMoreSources(
+    type: 'movie' | 'series' | 'anime',
+    id: { tmdbId?: string | number; imdbId?: string; id?: string; title?: string; originalTitle?: string; year?: number },
+    episode?: { season: number; episode: number },
+    excludeUrls: string[] = []
+  ): Promise<StremioStream[]> {
+    const rawStreams = await this.resolveStreamsFresh(type, id, episode, undefined, undefined, {
+      forceRefresh: true,
+      bypassNegativeCache: true,
+      isRetryAttempt: true
+    });
+
+    const excludeSet = new Set(excludeUrls.map(u => (u || '').toLowerCase().trim()));
+    return rawStreams.filter(s => {
+      const u = (s.url || '').toLowerCase().trim();
+      return !excludeSet.has(u) && !isSourceTemporarilyProblematic(u);
+    });
+  }
+
   public clearCache(): void {
     this.cacheGeneration++;
     this.cache.clear();

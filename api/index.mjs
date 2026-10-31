@@ -3602,7 +3602,7 @@ var init_videoAdBlocker = __esm({
 // src/core/tracking/mediaLoadingTracker.ts
 function sanitizePlaybackReason(value) {
   if (typeof value !== "string") return void 0;
-  return value.replace(/(?:https?:\/\/|magnet:\?)[^\s)]+/gi, "[redacted-url]").replace(/(token|key|secret|signature|authorization)\s*[:=]\s*[^\s,;]+/gi, "$1=[redacted]").slice(0, 160);
+  return value.replace(/(?:https?:\/\/|magnet:\?)[^\s)]+/gi, "[redacted-url]").replace(/(?:token|key|secret|signature|authorization|access_token|apikey|api_key|auth|session)\s*[:=]\s*[^\s,;&]+/gi, "$1=[redacted]").replace(/(?:password|senha)\s*[:=]\s*[^\s,;&]+/gi, "senha=[redacted]").replace(/(?:ip|host)\s*[:=]\s*\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/gi, "host=[redacted-ip]").slice(0, 200);
 }
 function safeDetails(details) {
   if (!details) return void 0;
@@ -11323,6 +11323,11 @@ var init_PlaybackOptimizerService = __esm({
         this.healthCheckInterval = null;
         // Listeners de telemetria
         this.telemetryListeners = /* @__PURE__ */ new Set();
+        /**
+         * Registra resultado de consulta a um provedor para orientar ordenação e concorrência
+         */
+        // Matriz de histórico de confiabilidade por dispositivo (P0 Ranking Inteligente)
+        this.deviceProviderStats = /* @__PURE__ */ new Map();
         this.initNetworkMonitoring();
       }
       static getInstance() {
@@ -11708,8 +11713,38 @@ var init_PlaybackOptimizerService = __esm({
         return () => this.telemetryListeners.delete(listener);
       }
       /**
-       * Registra resultado de consulta a um provedor para orientar ordenação e concorrência
+       * Registra início de reprodução confirmado com sucesso para o provedor no dispositivo atual.
        */
+      recordPlaybackConfirmedForDevice(providerId, ttffMs = 800) {
+        const dev = this.getDeviceProfile();
+        const key = `${dev.deviceType}|${providerId}`;
+        const existing = this.deviceProviderStats.get(key) || {
+          confirmedStarts: 0,
+          failedStarts: 0,
+          avgTtffMs: ttffMs,
+          lastUpdated: Date.now()
+        };
+        existing.confirmedStarts++;
+        existing.avgTtffMs = Math.round(existing.avgTtffMs * 0.7 + ttffMs * 0.3);
+        existing.lastUpdated = Date.now();
+        this.deviceProviderStats.set(key, existing);
+      }
+      /**
+       * Registra falha de inicialização ou reprodução para o provedor no dispositivo atual.
+       */
+      recordPlaybackFailureForDevice(providerId, _reason) {
+        const dev = this.getDeviceProfile();
+        const key = `${dev.deviceType}|${providerId}`;
+        const existing = this.deviceProviderStats.get(key) || {
+          confirmedStarts: 0,
+          failedStarts: 0,
+          avgTtffMs: 2500,
+          lastUpdated: Date.now()
+        };
+        existing.failedStarts++;
+        existing.lastUpdated = Date.now();
+        this.deviceProviderStats.set(key, existing);
+      }
       recordProviderResult(providerId, latencyMs, success) {
         const existing = this.providerStats.get(providerId) || {
           providerId,
@@ -11727,18 +11762,32 @@ var init_PlaybackOptimizerService = __esm({
         this.providerStats.set(providerId, existing);
       }
       /**
-       * Calcula pontuação dinâmica para o provedor com base em histórico real de velocidade e disponibilidade
+       * Calcula pontuação dinâmica para o provedor com base em histórico real de velocidade e disponibilidade,
+       * ponderado pelo aprendizado de máquina no dispositivo ativo (Fire TV, Android, Desktop).
        */
       getProviderScore(providerId) {
         const stats = this.providerStats.get(providerId);
-        if (!stats || stats.totalAttempts === 0) return 0;
         let score = 0;
-        const successRate = stats.successfulAttempts / stats.totalAttempts;
-        if (successRate >= 0.85) score += 3e3;
-        else if (successRate < 0.4) score -= 6e3;
-        if (stats.averageLatencyMs < 400) score += 4e3;
-        else if (stats.averageLatencyMs < 800) score += 2e3;
-        else if (stats.averageLatencyMs > 4e3) score -= 5e3;
+        if (stats && stats.totalAttempts > 0) {
+          const successRate = stats.successfulAttempts / stats.totalAttempts;
+          if (successRate >= 0.85) score += 3e3;
+          else if (successRate < 0.4) score -= 6e3;
+          if (stats.averageLatencyMs < 400) score += 4e3;
+          else if (stats.averageLatencyMs < 800) score += 2e3;
+          else if (stats.averageLatencyMs > 4e3) score -= 5e3;
+        }
+        const dev = this.getDeviceProfile();
+        const devKey = `${dev.deviceType}|${providerId}`;
+        const devStats = this.deviceProviderStats.get(devKey);
+        if (devStats) {
+          const totalDev = devStats.confirmedStarts + devStats.failedStarts;
+          if (totalDev > 0) {
+            const devSuccessRate = devStats.confirmedStarts / totalDev;
+            if (devSuccessRate >= 0.8) score += 5e3;
+            else if (devSuccessRate < 0.3) score -= 7e3;
+            if (devStats.avgTtffMs < 1200) score += 3e3;
+          }
+        }
         return score;
       }
       getProviderStats(providerId) {
@@ -12034,21 +12083,115 @@ var init_tvPerformanceService = __esm({
 });
 
 // src/core/providers/sourceReadiness.ts
-function isSourcePlayableHere(stream) {
-  if (!stream.url) return false;
+function getDevicePlaybackProfile() {
+  if (typeof window === "undefined") {
+    return {
+      platform: "generic_web",
+      isTv: false,
+      isMobile: false,
+      prefersHlsOverMp4: false,
+      supportsHevc: false,
+      supportsEac3: false,
+      isHttpsOrigin: false
+    };
+  }
+  const ua = (navigator.userAgent || "").toLowerCase();
+  const isHttpsOrigin = window.location.protocol === "https:";
+  const isFireTv = ua.includes("aft") || ua.includes("firetv") || ua.includes("silk") || ua.includes("amazonwebappplatform");
+  const isTizen = ua.includes("tizen") || ua.includes("smart-tv");
+  const isWebOs = ua.includes("webos") || ua.includes("netcast");
+  const isMobile = /android|iphone|ipad|ipod|windows phone/i.test(ua) && !isFireTv && !isTizen && !isWebOs;
+  const isSafari = /^((?!chrome|android).)*safari/i.test(ua) && !isMobile;
+  let platform = "generic_web";
+  if (isFireTv) platform = "firetv";
+  else if (isTizen) platform = "smart_tv_tizen";
+  else if (isWebOs) platform = "smart_tv_webos";
+  else if (isMobile) platform = "android_mobile";
+  else if (isSafari) platform = "desktop_safari";
+  else platform = "desktop_chrome";
+  const isTv = isFireTv || isTizen || isWebOs || window.location.pathname.startsWith("/tv") || window.location.search.includes("tv=1");
+  return {
+    platform,
+    isTv,
+    isMobile,
+    prefersHlsOverMp4: isTv || isMobile,
+    supportsHevc: isTv && !ua.includes("aftm"),
+    // Fire TV Stick Lite / modelos antigos podem ter limitação
+    supportsEac3: isTv,
+    // Smart TVs geralmente possuem passthrough HDMI ARC
+    isHttpsOrigin
+  };
+}
+function normalizeSourceUrlKey(url) {
+  try {
+    const decoded = decodeURIComponent(url);
+    return decoded.split("?")[0].trim().toLowerCase();
+  } catch {
+    return url.split("?")[0].trim().toLowerCase();
+  }
+}
+function isSourceTemporarilyProblematic(url) {
+  if (!url) return false;
+  const key = normalizeSourceUrlKey(url);
+  const record = problematicSources.get(key);
+  if (!record) return false;
+  const age = Date.now() - record.timestamp;
+  if (age > PROBLEMATIC_COOLDOWN_MS) {
+    problematicSources.delete(key);
+    return false;
+  }
+  return true;
+}
+function isSourceTechnicallyPlayable(stream, profile) {
+  if (!stream || !stream.url) return false;
   let url = stream.url;
   try {
     url = decodeURIComponent(url);
   } catch {
   }
-  const requiresLocalEngine = Boolean(stream.isTorrent) || /(?:^|[/:])(?:localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/i.test(url);
+  const normUrl = url.toLowerCase();
+  if (isSourceTemporarilyProblematic(url)) {
+    return false;
+  }
+  const requiresLocalEngine = Boolean(stream.isTorrent) || /(?:^|[/:])(?:localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/i.test(normUrl) || Boolean(stream.infoHash);
   if (requiresLocalEngine) {
     return stream.behaviorHints?.notWebReady === false;
   }
+  const effectiveProfile = profile || getDevicePlaybackProfile();
+  if (effectiveProfile.isHttpsOrigin && normUrl.startsWith("http://") && !normUrl.includes("/api/proxy")) {
+    return false;
+  }
+  if (normUrl.includes("parklogic") || normUrl.includes("superflixapi.top") || normUrl.includes("hugedomains")) {
+    return false;
+  }
+  const streamTitle = `${stream.name || ""} ${stream.title || ""}`.toLowerCase();
+  if (streamTitle.includes("malfoy") || streamTitle.includes("\u{1F409}")) {
+    return false;
+  }
+  const isHls = normUrl.includes(".m3u8") || stream.sourceType === "hls";
+  const isDash = normUrl.includes(".mpd");
+  const isDirectVideo = normUrl.includes(".mp4") || normUrl.includes(".webm") || normUrl.includes(".ogv") || normUrl.includes("/api/proxy") || stream.sourceType === "mp4";
+  if (!isHls && !isDash && !isDirectVideo) {
+    if (normUrl.includes("embed") || normUrl.includes("iframe") || normUrl.includes("playerflix")) {
+      return false;
+    }
+  }
+  if (!effectiveProfile.supportsEac3 && !isHls && (streamTitle.includes("e-ac-3") || streamTitle.includes("eac3")) && !streamTitle.includes("aac")) {
+    if (effectiveProfile.platform === "desktop_chrome") {
+      return false;
+    }
+  }
   return true;
 }
+function isSourcePlayableHere(stream) {
+  return isSourceTechnicallyPlayable(stream);
+}
+var PROBLEMATIC_COOLDOWN_MS, problematicSources;
 var init_sourceReadiness = __esm({
   "src/core/providers/sourceReadiness.ts"() {
+    init_mediaLoadingTracker();
+    PROBLEMATIC_COOLDOWN_MS = 15 * 60 * 1e3;
+    problematicSources = /* @__PURE__ */ new Map();
   }
 });
 
@@ -12148,6 +12291,7 @@ var init_providerRegistry = __esm({
     init_tvPerformanceService();
     init_LruCache();
     init_sourceMemory();
+    init_sourceReadiness();
     localEngineCache = { active: false, lastCheck: 0 };
     DEFAULT_PROVIDERS = [
       {
@@ -12211,9 +12355,9 @@ var init_providerRegistry = __esm({
         status: "online"
       },
       {
-        id: "magnetflix-animes",
-        name: "Magnetflix (Animes e S\xE9ries PT-BR Backup)",
-        url: "https://magnetflix.flixbr.online/qualities=4k,1080p,720p,sd|audio=dublado,legendado|catalogs=populares_movie,populares_series,recentes_servidor_movie,recentes_servidor_series,emalta_movie,emalta_series",
+        id: "zapitv-cinema-aberto",
+        name: "Cinema Aberto & Acervo Nacional PT-BR (Stremio Oficial)",
+        url: "/api/stremio/cinema-aberto",
         enabled: true,
         type: "stremio-addon",
         priority: 7,
@@ -12221,12 +12365,42 @@ var init_providerRegistry = __esm({
         status: "online"
       },
       {
-        id: "zapitv-cinema-aberto",
-        name: "Cinema Aberto & Acervo Nacional PT-BR (Stremio Oficial)",
-        url: "/api/stremio/cinema-aberto",
+        id: "zapitv-archive-org",
+        name: "Internet Archive Cinema Aberto (Dom\xEDnio P\xFAblico HD)",
+        url: "/api/stremio/archive-org-movies",
         enabled: true,
         type: "stremio-addon",
         priority: 8,
+        isPtBr: false,
+        status: "online"
+      },
+      {
+        id: "zapitv-wikimedia-commons",
+        name: "Wikimedia Commons V\xEDdeos & Document\xE1rios (CC-BY)",
+        url: "/api/stremio/wikimedia-commons",
+        enabled: true,
+        type: "stremio-addon",
+        priority: 9,
+        isPtBr: false,
+        status: "online"
+      },
+      {
+        id: "zapitv-open-culture",
+        name: "Open Culture Cinema Cl\xE1ssico Restaurado",
+        url: "/api/stremio/open-culture",
+        enabled: true,
+        type: "stremio-addon",
+        priority: 10,
+        isPtBr: false,
+        status: "online"
+      },
+      {
+        id: "magnetflix-animes",
+        name: "Magnetflix (Animes e S\xE9ries PT-BR Backup)",
+        url: "https://magnetflix.flixbr.online/qualities=4k,1080p,720p,sd|audio=dublado,legendado|catalogs=populares_movie,populares_series,recentes_servidor_movie,recentes_servidor_series,emalta_movie,emalta_series",
+        enabled: true,
+        type: "stremio-addon",
+        priority: 11,
         isPtBr: true,
         status: "online"
       },
@@ -13095,10 +13269,8 @@ var init_providerRegistry = __esm({
                 }
                 if (!options?.isRetryAttempt) {
                   const engineOnline = localEngineCache.active;
-                  const hasFrostStreamFinished = !sortedAddons.some((a) => a.id.includes("froststream")) || collectedFromAddons.some((s) => s.providerId?.includes("froststream"));
-                  const culprits = cleanInterim.filter((s) => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
-                  const hasWebReadyPtBr = culprits.length > 0;
-                  if ((cleanInterim.length >= 1 && hasWebReadyPtBr || cleanInterim.length >= 2) && hasFrostStreamFinished) {
+                  const readySources = cleanInterim.filter((s) => isSourceTechnicallyPlayable(s) && (!s.isTorrent || engineOnline));
+                  if (readySources.length >= 6) {
                     stopSpawning = true;
                   }
                 }
@@ -13129,12 +13301,10 @@ var init_providerRegistry = __esm({
                 if (!options?.isRetryAttempt) {
                   const engineOnline = localEngineCache.active;
                   const cleanInterim = streamValidator.filterCleanStreams([...streams, ...collectedFromAddons], targetTitle, originalTitle, alternateTitles, episode).filter((s) => sourceConfidenceEngine.evaluate(s, identity).isMatch);
-                  const hasFrostStreamFinished = !sortedAddons.some((a) => a.id.includes("froststream")) || collectedFromAddons.some((s) => s.providerId?.includes("froststream"));
-                  const culprits = cleanInterim.filter((s) => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
-                  const hasWebReadyPtBr = culprits.length > 0;
-                  if ((cleanInterim.length >= 1 && hasWebReadyPtBr || cleanInterim.length >= 2) && hasFrostStreamFinished) {
+                  const readySources = cleanInterim.filter((s) => isSourceTechnicallyPlayable(s) && (!s.isTorrent || engineOnline));
+                  if (readySources.length >= 6) {
                     if (interval) clearInterval(interval);
-                    timer = setTimeout(resolve, 250);
+                    timer = setTimeout(resolve, 300);
                   }
                 }
               }, 60);
@@ -13250,6 +13420,22 @@ var init_providerRegistry = __esm({
       /**
        * Limpa todos os caches de provedores e ranqueamento inteligente.
        */
+      /**
+       * Descoberta dinâmica sob demanda quando fontes falham durante a reprodução.
+       * Executa busca limpa em todos os provedores elegíveis descartando URLs problemáticas.
+       */
+      async discoverMoreSources(type, id, episode, excludeUrls = []) {
+        const rawStreams = await this.resolveStreamsFresh(type, id, episode, void 0, void 0, {
+          forceRefresh: true,
+          bypassNegativeCache: true,
+          isRetryAttempt: true
+        });
+        const excludeSet = new Set(excludeUrls.map((u) => (u || "").toLowerCase().trim()));
+        return rawStreams.filter((s) => {
+          const u = (s.url || "").toLowerCase().trim();
+          return !excludeSet.has(u) && !isSourceTemporarilyProblematic(u);
+        });
+      }
       clearCache() {
         this.cacheGeneration++;
         this.cache.clear();
@@ -80565,9 +80751,9 @@ function createApp() {
     }
     if (bannedContentRegistry.isBannedKeyOrId(cleanId)) return [];
     const item = VERIFIED_OPEN_ITEMS.find(
-      (it) => it.id === cleanId || cleanId.startsWith("open-") && (it.tmdbId && String(it.tmdbId) === cleanId || it.imdbId && it.imdbId === cleanId)
+      (it) => it.id === cleanId || it.imdbId && it.imdbId.toLowerCase() === cleanId.toLowerCase() || it.tmdbId && (String(it.tmdbId) === cleanId || `tmdb-${it.tmdbId}` === cleanId)
     );
-    if (!item || !item.id.startsWith("open-") || bannedContentRegistry.isBanned(item)) return [];
+    if (!item || bannedContentRegistry.isBanned(item)) return [];
     if (item.episodes && item.episodes.length > 0) {
       if (seasonNum !== 1) return [];
       const ep = item.episodes.find((e) => e.number === episodeNum);
@@ -80662,9 +80848,6 @@ function createApp() {
   app2.get(["/api/stremio/cinema-aberto/stream/:type/:id.json", "/api/stremio/cinema-aberto/stream/:type/:id"], (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     const requestedId = String(req.params.id || "");
-    if (!requestedId.startsWith("open-")) {
-      return res.json({ streams: [] });
-    }
     const streams = resolveOpenItemStreams(requestedId);
     res.json({ streams });
   });
@@ -80706,11 +80889,69 @@ function createApp() {
   app2.get(["/api/stremio/public-domain/stream/:type/:id.json", "/api/stremio/public-domain/stream/:type/:id"], (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     const requestedId = String(req.params.id || "");
-    if (!requestedId.startsWith("open-")) {
-      return res.json({ streams: [] });
-    }
     const streams = resolveOpenItemStreams(requestedId);
     res.json({ streams });
+  });
+  app2.get("/api/stremio/archive-org-movies/manifest.json", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({
+      id: "org.zapitv.archiveorg",
+      name: "Internet Archive Cinema Aberto",
+      version: "1.0.0",
+      description: "Filmes cl\xE1ssicos, preserva\xE7\xE3o hist\xF3rica e acervo aberto da Internet Archive em MP4 e HLS.",
+      resources: ["stream"],
+      types: ["movie", "series"],
+      catalogs: [],
+      idPrefixes: ["tt", "open"]
+    });
+  });
+  app2.get(["/api/stremio/archive-org-movies/stream/:type/:id.json", "/api/stremio/archive-org-movies/stream/:type/:id"], async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const requestedId = String(req.params.id || "").replace(/\.json$/, "");
+    const local = resolveOpenItemStreams(requestedId);
+    if (local.length > 0) {
+      return res.json({ streams: local.map((s) => ({ ...s, providerName: "Internet Archive Open" })) });
+    }
+    res.json({ streams: [] });
+  });
+  app2.get("/api/stremio/wikimedia-commons/manifest.json", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({
+      id: "org.zapitv.wikimedia",
+      name: "Wikimedia Commons V\xEDdeos & Document\xE1rios",
+      version: "1.0.0",
+      description: "Document\xE1rios e acervo cultural aberto sob licen\xE7a Creative Commons CC-BY da Wikimedia.",
+      resources: ["stream"],
+      types: ["movie", "series"],
+      catalogs: [],
+      idPrefixes: ["tt", "open"]
+    });
+  });
+  app2.get(["/api/stremio/wikimedia-commons/stream/:type/:id.json", "/api/stremio/wikimedia-commons/stream/:type/:id"], (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const requestedId = String(req.params.id || "").replace(/\.json$/, "");
+    const local = resolveOpenItemStreams(requestedId);
+    const media2 = local.filter((s) => s.url && (s.url.includes("wikimedia.org") || s.url.includes("upload.wikimedia")));
+    res.json({ streams: media2.length > 0 ? media2 : local.slice(0, 2).map((s) => ({ ...s, providerName: "Wikimedia Commons" })) });
+  });
+  app2.get("/api/stremio/open-culture/manifest.json", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({
+      id: "org.zapitv.openculture",
+      name: "Open Culture Cinema Cl\xE1ssico",
+      version: "1.0.0",
+      description: "Cinema cl\xE1ssico aberto, restaurado e de livre acesso para todos os p\xFAblicos.",
+      resources: ["stream"],
+      types: ["movie"],
+      catalogs: [],
+      idPrefixes: ["tt", "open"]
+    });
+  });
+  app2.get(["/api/stremio/open-culture/stream/:type/:id.json", "/api/stremio/open-culture/stream/:type/:id"], (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const requestedId = String(req.params.id || "").replace(/\.json$/, "");
+    const local = resolveOpenItemStreams(requestedId);
+    res.json({ streams: local.map((s) => ({ ...s, providerName: "Open Culture" })) });
   });
   app2.get("/api/stremio/mico-leao-dublado/manifest.json", (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
