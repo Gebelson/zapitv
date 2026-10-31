@@ -13,6 +13,7 @@ import { FeedbackAdminPanel } from '../src/components/admin/FeedbackAdminPanel';
 import { LiveTvAdminPanel } from '../src/components/admin/LiveTvAdminPanel';
 import { User, ContentItem, ContentType, SiteNotification } from '../types';
 import { providerRegistry, ProviderConfig } from '../src/core/providers/providerRegistry';
+import { playbackOptimizerService } from '../src/core/playback/PlaybackOptimizerService';
 import { StremioStream } from '../src/core/stremio/stremioTypes';
 import { videoAdBlocker, AdAuditRecord, AdAuditStatus } from '../src/core/security/videoAdBlocker';
 import { catalogEligibilityService, MediaEligibilityRecord } from '../src/core/catalog/CatalogEligibilityService';
@@ -133,6 +134,21 @@ const AdminView: React.FC<AdminViewProps> = ({
   
   // Stremio Providers State
   const [providers, setProviders] = useState<ProviderConfig[]>(() => providerRegistry.getProviders());
+  const [configuringProvider, setConfiguringProvider] = useState<ProviderConfig | null>(null);
+  const [providerConfigInput, setProviderConfigInput] = useState('');
+
+  const handleOpenConfigModal = (p: ProviderConfig) => {
+    setConfiguringProvider(p);
+    setProviderConfigInput(p.configKey || '');
+  };
+
+  const handleSaveProviderConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!configuringProvider) return;
+    providerRegistry.setProviderConfigValue(configuringProvider.id, providerConfigInput);
+    setProviders(providerRegistry.getProviders());
+    setConfiguringProvider(null);
+  };
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testStreamInput, setTestStreamInput] = useState('550');
   const [resolvedTestStreams, setResolvedTestStreams] = useState<StremioStream[]>([]);
@@ -853,96 +869,179 @@ const AdminView: React.FC<AdminViewProps> = ({
                   <thead>
                     <tr className="border-b border-white/10 text-[9px] uppercase font-black tracking-widest text-gray-400 bg-white/5">
                       <th className="px-6 py-3.5">Nome / Identificador</th>
-                      <th className="px-6 py-3.5">Tipo</th>
-                      <th className="px-6 py-3.5">Status</th>
-                      <th className="px-6 py-3.5">Latência</th>
+                      <th className="px-6 py-3.5">Mídia Suportada</th>
+                      <th className="px-6 py-3.5">Status & Config</th>
+                      <th className="px-6 py-3.5">Métricas & Confiabilidade</th>
                       <th className="px-6 py-3.5">Prioridade</th>
                       <th className="px-6 py-3.5 text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {providers.map((p) => (
-                      <tr key={p.id} className="hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-sm text-white flex items-center gap-2">
-                              {p.name}
-                              {p.isPtBr && (
-                                <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-green-500/20 text-green-400 border border-green-500/30">
-                                  PT-BR
+                    {providers.map((p) => {
+                      const successRate = playbackOptimizerService.getProviderSuccessRate(p.id);
+                      const recentErrors = playbackOptimizerService.getProviderRecentErrors(p.id);
+                      const isConfigurable = p.requiresConfig || p.id === 'orion-addon' || p.id === 'aiostreams';
+
+                      return (
+                        <tr key={p.id} className="hover:bg-white/5 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-sm text-white flex items-center gap-2">
+                                {p.name}
+                                {p.isPtBr && (
+                                  <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-green-500/20 text-green-400 border border-green-500/30">
+                                    PT-BR
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-[11px] text-gray-500 font-mono mt-0.5 truncate max-w-sm">
+                                {p.url}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap items-center gap-1">
+                              {(p.supportedMediaTypes || ['movie', 'series', 'anime']).map((m) => (
+                                <span key={m} className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-white/5 text-gray-400 border border-white/5">
+                                  {m === 'movie' ? '🎬 Filmes' : m === 'series' ? '📺 Séries' : '🍙 Animes'}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                                p.status === 'online' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${p.status === 'online' ? 'bg-green-400' : 'bg-red-400'}`} />
+                                {p.status}
+                              </span>
+                              {p.requiresConfig && (
+                                <span className={`text-[9px] font-bold ${p.configKey ? 'text-green-400' : 'text-yellow-400'}`}>
+                                  {p.configKey ? '✓ Configurado' : '⚠️ Requer Config'}
                                 </span>
                               )}
-                            </span>
-                            <span className="text-[11px] text-gray-500 font-mono mt-0.5 truncate max-w-sm">
-                              {p.url}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase bg-white/10 text-gray-300">
-                            {p.type}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
-                            p.status === 'online' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${p.status === 'online' ? 'bg-green-400' : 'bg-red-400'}`} />
-                            {p.status}
-                          </span>
-                          {p.errorMessage && (
-                            <span className="text-[10px] text-red-400 block max-w-xs truncate mt-1" title={p.errorMessage}>
-                              {p.errorMessage}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 font-mono font-bold text-gray-300">
-                          {p.latencyMs ? `${p.latencyMs}ms` : '—'}
-                        </td>
-                        <td className="px-6 py-4 font-bold text-gray-400">
-                          <div className="flex items-center gap-1">
-                            <span className="text-gray-500 text-xs font-mono">#</span>
-                            <input
-                              type="number"
-                              min={1}
-                              max={99}
-                              value={p.priority}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value, 10);
-                                if (!isNaN(val)) {
-                                  handleUpdatePriority(p.id, val);
-                                }
-                              }}
-                              className="w-12 px-1.5 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white font-mono text-xs font-bold text-center focus:border-orange-500 outline-none"
-                              title="Alterar prioridade de resolução do provedor"
-                            />
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => handleCheckHealth(p.id)}
-                              disabled={testingId === p.id}
-                              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50"
-                            >
-                              {testingId === p.id ? 'Testando...' : 'Testar Ping'}
-                            </button>
-                            <button
-                              onClick={() => handleToggleProvider(p.id)}
-                              className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
-                                p.enabled ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-gray-800 text-gray-400'
-                              }`}
-                            >
-                              {p.enabled ? 'Ativo' : 'Inativo'}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {p.errorMessage && (
+                                <span className="text-[10px] text-red-400 block max-w-xs truncate" title={p.errorMessage}>
+                                  {p.errorMessage}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 font-mono text-gray-300">
+                            <div className="flex flex-col text-[11px]">
+                              <span>Latência: <strong className="text-white">{p.latencyMs ? `${p.latencyMs}ms` : '—'}</strong></span>
+                              <span>Taxa Sucesso: <strong className={successRate !== null && successRate >= 80 ? 'text-green-400' : 'text-gray-300'}>{successRate !== null ? `${successRate}%` : '—'}</strong></span>
+                              {recentErrors > 0 && <span className="text-red-400 font-bold">Erros: {recentErrors}</span>}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 font-bold text-gray-400">
+                            <div className="flex items-center gap-1">
+                              <span className="text-gray-500 text-xs font-mono">#</span>
+                              <input
+                                type="number"
+                                min={1}
+                                max={99}
+                                value={p.priority}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  if (!isNaN(val)) {
+                                    handleUpdatePriority(p.id, val);
+                                  }
+                                }}
+                                className="w-12 px-1.5 py-0.5 rounded-lg bg-black/40 border border-white/10 text-white font-mono text-xs font-bold text-center focus:border-orange-500 outline-none"
+                                title="Alterar prioridade de resolução do provedor"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {isConfigurable && (
+                                <button
+                                  onClick={() => handleOpenConfigModal(p)}
+                                  className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/30 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
+                                  title="Configurar credenciais ou URL personalizada"
+                                >
+                                  Configurar
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleCheckHealth(p.id)}
+                                disabled={testingId === p.id}
+                                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-50"
+                              >
+                                {testingId === p.id ? 'Testando...' : 'Testar Ping'}
+                              </button>
+                              <button
+                                onClick={() => handleToggleProvider(p.id)}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+                                  p.enabled ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-gray-800 text-gray-400'
+                                }`}
+                              >
+                                {p.enabled ? 'Ativo' : 'Inativo'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             </div>
+
+            {/* Modal de Configuração de Provedor (Orion / AIOStreams) */}
+            {configuringProvider && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                <div className="bg-[#151C26] border border-white/10 rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
+                  <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+                    <h3 className="font-black text-white text-base flex items-center gap-2">
+                      <Key className="w-5 h-5 text-orange-400" />
+                      Configurar {configuringProvider.name}
+                    </h3>
+                    <button
+                      onClick={() => setConfiguringProvider(null)}
+                      className="p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <form onSubmit={handleSaveProviderConfig} className="space-y-4">
+                    <p className="text-xs text-gray-400">
+                      {configuringProvider.configDescription || 'Insira a chave de autenticação ou URL da instância do add-on.'}
+                    </p>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
+                        {configuringProvider.id === 'orion-addon' ? 'Chave de API (Orionoid API Key)' : 'URL do Manifesto Personalizado'}
+                      </label>
+                      <input
+                        type="text"
+                        value={providerConfigInput}
+                        onChange={(e) => setProviderConfigInput(e.target.value)}
+                        placeholder={configuringProvider.id === 'orion-addon' ? 'Ex: abc123def456...' : 'Ex: https://minha-instancia/stremio/uuid/manifest.json'}
+                        className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-white font-mono text-xs focus:border-orange-500 outline-none"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfiguringProvider(null)}
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl text-xs font-bold transition-all"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-black font-black rounded-xl text-xs uppercase tracking-wider transition-all hover:scale-105"
+                      >
+                        Salvar Configuração
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
 
             {/* Grid: Adicionar Provedor & Testador de Resolução */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

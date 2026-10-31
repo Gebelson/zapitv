@@ -692,6 +692,18 @@ export class PlaybackOptimizerService {
     return Array.from(this.providerStats.values());
   }
 
+  public getProviderSuccessRate(providerId: string): number | null {
+    const stats = this.providerStats.get(providerId);
+    if (!stats || stats.totalAttempts === 0) return null;
+    return Math.round((stats.successfulAttempts / stats.totalAttempts) * 100);
+  }
+
+  public getProviderRecentErrors(providerId: string): number {
+    const stats = this.providerStats.get(providerId);
+    if (!stats) return 0;
+    return Math.max(0, stats.totalAttempts - stats.successfulAttempts);
+  }
+
   private notifyTelemetry(): void {
     const data = this.getTelemetry();
     this.telemetryListeners.forEach(fn => fn(data));

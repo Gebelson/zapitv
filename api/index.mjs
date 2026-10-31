@@ -404,9 +404,13 @@ var init_audioPreferenceService = __esm({
       /\b(dual[-_\s]?audio|dual[-_\s]?áudio|multi[-_\s]?audio|multi[-_\s]?áudio)\b/i,
       /\[dual[-_\s]?audio\]/i,
       /\[dual\]/i,
-      /\bdual\b(?!\s*[-_]?sub)/i
+      /\bdual\b(?!\s*[-_]?sub)/i,
+      /\b(?:en|eng|jap|ja)[,\/+](?:pt|por|pob|pt[-_]?br)\b/i,
+      /\b(?:pt|por|pob|pt[-_]?br)[,\/+](?:en|eng|jap|ja)\b/i
     ];
     DUAL_PT_PATTERNS = [
+      /\b(?:en|eng|jap|ja)[,\/+](?:pt|por|pob|pt[-_]?br)\b/i,
+      /\b(?:pt|por|pob|pt[-_]?br)[,\/+](?:en|eng|jap|ja)\b/i,
       /\[(?:jap|jpn|eng|ita|fre|ger|esp|en|ja)[/+](?:por|pob|pt[-_]?br)\]/i,
       /\[(?:por|pob|pt[-_]?br)[/+](?:jap|jpn|eng|ita|fre|ger|esp|en|ja)\]/i,
       /\b(?:jap|jpn|eng|ita|fre|ger|esp|en|ja)[/+](?:por|pob|pt[-_]?br)\b/i,
@@ -11819,6 +11823,16 @@ var init_PlaybackOptimizerService = __esm({
       getAllProviderStats() {
         return Array.from(this.providerStats.values());
       }
+      getProviderSuccessRate(providerId) {
+        const stats = this.providerStats.get(providerId);
+        if (!stats || stats.totalAttempts === 0) return null;
+        return Math.round(stats.successfulAttempts / stats.totalAttempts * 100);
+      }
+      getProviderRecentErrors(providerId) {
+        const stats = this.providerStats.get(providerId);
+        if (!stats) return 0;
+        return Math.max(0, stats.totalAttempts - stats.successfulAttempts);
+      }
       notifyTelemetry() {
         const data = this.getTelemetry();
         this.telemetryListeners.forEach((fn) => fn(data));
@@ -12477,6 +12491,91 @@ var init_providerRegistry = __esm({
         priority: 13,
         isPtBr: true,
         status: "online"
+      },
+      {
+        id: "cinetorrent-pt",
+        name: "CineTorrent (Multi-Idioma & PT-BR)",
+        url: "https://150203dd784e-cinetorrent-addon.baby-beamup.club",
+        enabled: true,
+        type: "stremio-addon",
+        priority: 14,
+        isPtBr: true,
+        status: "online",
+        supportedMediaTypes: ["movie"],
+        requiresConfig: false,
+        configDescription: "Suporte a filmes com tags de \xE1udio PT-BR e multi-idioma"
+      },
+      {
+        id: "thepiratebay-plus",
+        name: "ThePirateBay+",
+        url: "https://thepiratebay-plus.strem.fun",
+        enabled: false,
+        type: "stremio-addon",
+        priority: 15,
+        isPtBr: false,
+        status: "offline",
+        errorMessage: "Dom\xEDnio strem.fun offline (DNS unresolvable)",
+        supportedMediaTypes: ["movie", "series"],
+        requiresConfig: false,
+        configDescription: "Provedor comunit\xE1rio ThePirateBay+. Ativar quando o host estiver operacional"
+      },
+      {
+        id: "brazuca-torrents",
+        name: "Brazuca Torrents (PT-BR)",
+        url: "https://94c8cb9f702d-brazuca-torrents.baby-beamup.club",
+        enabled: false,
+        type: "stremio-addon",
+        priority: 16,
+        isPtBr: true,
+        status: "offline",
+        errorMessage: "Inst\xE2ncia Beamup temporariamente inativa (timeout)",
+        supportedMediaTypes: ["movie", "series"],
+        requiresConfig: false,
+        configDescription: "Addon independente de torrents brasileiros (distinto do Torrentio Brazuca)"
+      },
+      {
+        id: "orion-addon",
+        name: "Orion (Orionoid Indexer & Debrid)",
+        url: "https://5a0d1888fa64-orion.baby-beamup.club",
+        enabled: false,
+        type: "stremio-addon",
+        priority: 17,
+        isPtBr: false,
+        status: "offline",
+        errorMessage: "Requer chave de API gerada em panel.orionoid.com",
+        supportedMediaTypes: ["movie", "series", "anime"],
+        requiresConfig: true,
+        configKey: "",
+        configDescription: "Requer chave de API gerada em panel.orionoid.com"
+      },
+      {
+        id: "my-cine",
+        name: "MY CINE (Debrid Streams)",
+        url: "https://mycine.alwaysdata.net",
+        enabled: false,
+        type: "stremio-addon",
+        priority: 18,
+        isPtBr: true,
+        status: "offline",
+        errorMessage: "Servi\xE7o temporariamente indispon\xEDvel no host AlwaysData",
+        supportedMediaTypes: ["movie", "series"],
+        requiresConfig: false,
+        configDescription: "Addon proxy com links diretos/debrid"
+      },
+      {
+        id: "aiostreams",
+        name: "AIOStreams (Agregador Multi-Provedor)",
+        url: "https://aiostreams.elfhosted.com/stremio",
+        enabled: false,
+        type: "stremio-addon",
+        priority: 19,
+        isPtBr: false,
+        status: "offline",
+        errorMessage: "Requer URL de manifesto personalizada (https://host/stremio/UUID/manifest.json)",
+        supportedMediaTypes: ["movie", "series", "anime"],
+        requiresConfig: true,
+        configKey: "",
+        configDescription: "Requer URL de manifesto da sua inst\xE2ncia AIOStreams"
       }
     ];
     ProviderRegistryService = class {
@@ -12535,7 +12634,13 @@ var init_providerRegistry = __esm({
         );
       }
       getEligibleProviders(type) {
-        return this.providers.filter((p) => p.enabled);
+        return this.providers.filter((p) => {
+          if (!p.enabled) return false;
+          if (type && p.supportedMediaTypes && p.supportedMediaTypes.length > 0) {
+            if (!p.supportedMediaTypes.includes(type)) return false;
+          }
+          return true;
+        });
       }
       setProviderPriority(id, priority) {
         const provider = this.getProvider(id);
@@ -12589,9 +12694,51 @@ var init_providerRegistry = __esm({
         this.providers.sort((a, b) => a.priority - b.priority);
         this.saveProviders();
       }
+      setProviderConfigValue(id, configValue) {
+        const provider = this.getProvider(id);
+        if (!provider) return;
+        provider.configKey = configValue.trim();
+        if (provider.id === "orion-addon") {
+          const apiKey = configValue.trim();
+          if (apiKey) {
+            provider.url = `https://5a0d1888fa64-orion.baby-beamup.club/${encodeURIComponent(apiKey)}`;
+            provider.requiresConfig = false;
+            provider.errorMessage = void 0;
+          } else {
+            provider.url = "https://5a0d1888fa64-orion.baby-beamup.club";
+            provider.requiresConfig = true;
+            provider.enabled = false;
+            provider.status = "offline";
+            provider.errorMessage = "Requer chave de API gerada em panel.orionoid.com";
+          }
+        } else if (provider.id === "aiostreams") {
+          const customUrl = configValue.trim();
+          if (customUrl) {
+            provider.url = customUrl.replace(/\/manifest\.json$/, "");
+            provider.requiresConfig = false;
+            provider.errorMessage = void 0;
+          } else {
+            provider.url = "https://aiostreams.elfhosted.com/stremio";
+            provider.requiresConfig = true;
+            provider.enabled = false;
+            provider.status = "offline";
+            provider.errorMessage = "Requer URL de manifesto personalizada (https://host/stremio/UUID/manifest.json)";
+          }
+        }
+        this.saveProviders();
+      }
       async checkProviderHealth(id) {
         const provider = this.providers.find((p) => p.id === id);
         if (!provider) throw new Error("Provedor n\xE3o encontrado");
+        if (provider.requiresConfig && !provider.configKey) {
+          this.updateProvider(id, {
+            status: "offline",
+            latencyMs: void 0,
+            lastChecked: (/* @__PURE__ */ new Date()).toISOString(),
+            errorMessage: provider.configDescription || "Configura\xE7\xE3o obrigat\xF3ria pendente"
+          });
+          return this.providers.find((p) => p.id === id);
+        }
         const startTime = Date.now();
         try {
           if (provider.type === "stremio-addon") {
@@ -12753,7 +12900,7 @@ var init_providerRegistry = __esm({
           return [];
         }
         const streams = [];
-        const activeProviders = this.providers.filter((p) => p.enabled);
+        const activeProviders = this.getEligibleProviders(type);
         const rawTargetId = id.id || "";
         const cleanId = rawTargetId.replace(/^tmdb-?/i, "");
         let tmdbNum = id.tmdbId && /^\d+$/.test(String(id.tmdbId).replace(/^tmdb-?/i, "")) ? String(id.tmdbId).replace(/^tmdb-?/i, "") : /^(?:tmdb-?)?\d+$/i.test(rawTargetId) ? cleanId : "";
@@ -13296,11 +13443,25 @@ var init_providerRegistry = __esm({
         } catch {
           hasExternalPtSub = false;
         }
+        const seenStreamKeys = /* @__PURE__ */ new Set();
+        const deduplicatedStreams = [];
+        for (const s of cleanStreams) {
+          const hashKey = s.infoHash ? `hash:${s.infoHash.toLowerCase()}:${s.fileIdx || 0}` : "";
+          const urlKey = s.url ? `url:${s.url.trim().toLowerCase().split("?")[0]}` : "";
+          const primaryKey2 = hashKey || urlKey;
+          if (primaryKey2) {
+            if (seenStreamKeys.has(primaryKey2)) {
+              continue;
+            }
+            seenStreamKeys.add(primaryKey2);
+          }
+          deduplicatedStreams.push(s);
+        }
         mediaLoadingTracker.transition(rawTargetId, "SELECTING_AUDIO", {
-          cleanStreamsCount: cleanStreams.length,
+          cleanStreamsCount: deduplicatedStreams.length,
           hasExternalPtSub
         });
-        const sorted = prioritizeRememberedSources(sourceSelectionService.rankStreams(cleanStreams, {
+        const sorted = prioritizeRememberedSources(sourceSelectionService.rankStreams(deduplicatedStreams, {
           hasExternalPtSub,
           preferDubbed: true,
           identity,

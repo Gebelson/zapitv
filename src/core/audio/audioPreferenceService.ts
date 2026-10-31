@@ -20,10 +20,14 @@ const DUAL_PATTERNS = [
   /\b(dual[-_\s]?audio|dual[-_\s]?áudio|multi[-_\s]?audio|multi[-_\s]?áudio)\b/i,
   /\[dual[-_\s]?audio\]/i,
   /\[dual\]/i,
-  /\bdual\b(?!\s*[-_]?sub)/i
+  /\bdual\b(?!\s*[-_]?sub)/i,
+  /\b(?:en|eng|jap|ja)[,\/+](?:pt|por|pob|pt[-_]?br)\b/i,
+  /\b(?:pt|por|pob|pt[-_]?br)[,\/+](?:en|eng|jap|ja)\b/i
 ];
 
 const DUAL_PT_PATTERNS = [
+  /\b(?:en|eng|jap|ja)[,\/+](?:pt|por|pob|pt[-_]?br)\b/i,
+  /\b(?:pt|por|pob|pt[-_]?br)[,\/+](?:en|eng|jap|ja)\b/i,
   /\[(?:jap|jpn|eng|ita|fre|ger|esp|en|ja)[/+](?:por|pob|pt[-_]?br)\]/i,
   /\[(?:por|pob|pt[-_]?br)[/+](?:jap|jpn|eng|ita|fre|ger|esp|en|ja)\]/i,
   /\b(?:jap|jpn|eng|ita|fre|ger|esp|en|ja)[/+](?:por|pob|pt[-_]?br)\b/i,
