@@ -17,6 +17,7 @@
  */
 
 import assert from 'node:assert';
+import { canonicalCatalogMaster } from '../src/core/catalog/CanonicalCatalogMaster';
 import { providerRegistry, DEFAULT_PROVIDERS, ProviderConfig } from '../src/core/providers/providerRegistry';
 import { StremioStream } from '../src/core/stremio/stremioTypes';
 import { audioPreferenceService } from '../src/core/audio/audioPreferenceService';
@@ -357,5 +358,5 @@ async function runAddonsSixSuite() {
 
 runAddonsSixSuite().catch(err => {
   console.error('\n❌ Falha na suíte de testes dos 6 add-ons:', err);
-  process.exit(1);
-});
+  process.exitCode = 1;
+}).finally(() => canonicalCatalogMaster.dispose());
