@@ -43,6 +43,16 @@ export function formatPlaybackTime(seconds: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
+export function toContentType(raw: unknown, isEpisodic = false): ContentType {
+  if (!raw) return isEpisodic ? ContentType.SERIES : ContentType.MOVIE;
+  const lower = String(raw).toLowerCase().trim();
+  if (lower === 'anime') return ContentType.ANIME;
+  if (lower === 'series' || lower === 'série' || lower === 'serie' || lower === 'show' || lower === 'tv') return ContentType.SERIES;
+  if (lower === 'movie' || lower === 'filme') return ContentType.MOVIE;
+  if (Object.values(ContentType).includes(raw as any)) return raw as ContentType;
+  return isEpisodic ? ContentType.SERIES : ContentType.MOVIE;
+}
+
 export class StorageService {
   private itemProgressCache = new Map<string, WatchProgress>();
   private episodeProgressCache = new Map<string, EpisodeWatchProgress>();
@@ -54,10 +64,13 @@ export class StorageService {
   private scopeEpoch = 0;
   private hydrationRevision = 0;
   private ready: Promise<void>;
+  private lastPeriodicRefresh = 0;
+  private lifecycleSyncCleanup: (() => void) | null = null;
 
   constructor(private dataStore: LocalDataStore = localDataStore) {
     this.applyWatchState(this.dataStore.readSync(watchStateCodec));
     this.ready = this.syncFromDb();
+    // authSyncService already owns application focus/online/periodic refresh.
   }
 
   private continuitySyncState: 'idle' | 'loading' | 'synced' | 'offline' = 'idle';
@@ -86,6 +99,27 @@ export class StorageService {
       // Hidratação remota assíncrona do perfil autenticado
       void this.hydrateRemoteProfile(scope.profileId);
     }
+  }
+
+  /**
+   * Resolve metadados canônicos ricos a partir dos catálogos em cache
+   */
+  public resolveCatalogItem(canonicalOrId: string): ContentItem | null {
+    if (!canonicalOrId) return null;
+    const cleanId = canonicalOrId.trim();
+    const categories = ['movies', 'series', 'animes', 'top_rated'];
+    for (const cat of categories) {
+      const items = this.getCachedCatalog(cat);
+      const found = items.find(i => 
+        i.canonicalId === cleanId || 
+        i.id === cleanId || 
+        i.imdbId === cleanId || 
+        (i.tmdbId && String(i.tmdbId) === cleanId) ||
+        (cleanId.startsWith('tmdb-') && String(i.tmdbId) === cleanId.slice(5))
+      );
+      if (found) return found;
+    }
+    return null;
   }
 
   /**
@@ -255,6 +289,64 @@ export class StorageService {
     } finally {
       if (isCurrent() && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zapitv_progress_updated'));
     }
+  }
+
+  /**
+   * Atualização leve em segundo plano disparada por eventos de ciclo de vida
+   * (focus, visibilitychange, online, reconexão de rede ou intervalo).
+   * Protegido com throttle de no mínimo 30 segundos para não estourar a cota do Turso.
+   */
+  public async refreshProgressFromRemote(force = false): Promise<void> {
+    if (!this.currentScope?.profileId) return;
+    const now = Date.now();
+    if (!force && now - this.lastPeriodicRefresh < 30_000) return;
+    this.lastPeriodicRefresh = now;
+    await this.hydrateRemoteProfile(this.currentScope.profileId);
+  }
+
+  /**
+   * Registra observadores automáticos de foco, visibilidade e conectividade online
+   */
+  public initLifecycleSync(): () => void {
+    if (typeof window === 'undefined') return () => {};
+    if (this.lifecycleSyncCleanup) {
+      this.lifecycleSyncCleanup();
+      this.lifecycleSyncCleanup = null;
+    }
+
+    const handleResume = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        this.refreshProgressFromRemote().catch(() => {});
+      }
+    };
+
+    const handleOnline = () => {
+      this.refreshProgressFromRemote(true).catch(() => {});
+    };
+
+    const handleFocus = () => {
+      this.refreshProgressFromRemote().catch(() => {});
+    };
+
+    window.addEventListener('visibilitychange', handleResume);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('focus', handleFocus);
+
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        this.refreshProgressFromRemote().catch(() => {});
+      }
+    }, 45_000);
+
+    const cleanup = () => {
+      window.removeEventListener('visibilitychange', handleResume);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
+
+    this.lifecycleSyncCleanup = cleanup;
+    return cleanup;
   }
 
   private getWatchCodec() {

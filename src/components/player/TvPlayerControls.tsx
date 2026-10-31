@@ -28,6 +28,7 @@ import {
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { uiSoundService } from '../../core/audio/uiSoundService';
+import { smartAudioService, SmartAudioDiagnostics } from '../../core/audio/smartAudioService';
 import type { AudioOption } from '../../core/audio/audioSelectionManager';
 import type { SubtitleTrack } from '../../core/subtitles/subtitleService';
 import type { SubtitleStyle } from '../../core/subtitles/subtitleStyleService';
@@ -346,14 +347,16 @@ const DrawerPillChip: React.FC<{
   focusKey: string;
   label: string;
   active?: boolean;
+  disabled?: boolean;
   badge?: string;
   icon?: React.ReactNode;
   colorSwatch?: string;
   onClick: () => void;
-}> = ({ focusKey, label, active, badge, icon, colorSwatch, onClick }) => {
+}> = ({ focusKey, label, active, disabled, badge, icon, colorSwatch, onClick }) => {
   const { ref, focused } = useTvFocusable({
     focusKey,
-    onEnterPress: onClick,
+    focusable: !disabled,
+    onEnterPress: () => { if (!disabled) onClick(); },
     soundType: 'hover',
     enterSound: 'toggle',
     isPlayerControl: true
@@ -363,9 +366,10 @@ const DrawerPillChip: React.FC<{
     <button
       ref={ref}
       type="button"
+      disabled={disabled}
       data-focus-key={focusKey}
       data-tv-focused={focused ? 'true' : undefined}
-      onClick={onClick}
+      onClick={() => { if (!disabled) onClick(); }}
       className={`relative inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-semibold text-xs sm:text-sm outline-none transition-all duration-150 select-none cursor-pointer ${
         focused
           ? 'bg-cyan-400 text-black ring-2 ring-cyan-300 shadow-[0_0_15px_rgba(0,229,255,0.5)] scale-105 z-10 font-bold'
@@ -855,6 +859,11 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
   const [selectedSeason, setSelectedSeason] = useState<number>(() => props.season ?? 1);
   const [preview, setPreview] = useState<number | null>(null);
   const [menuOrigin, setMenuOrigin] = useState('tv-player-play');
+  const [smartAudioDiag, setSmartAudioDiag] = useState<SmartAudioDiagnostics>(() => smartAudioService.getDiagnostics());
+
+  useEffect(() => {
+    return smartAudioService.subscribe(setSmartAudioDiag);
+  }, []);
   const [activeLabel, setActiveLabel] = useState<string>('Reproduzir / Pausar');
 
   // Refs para controle contextual refinado de foco na TV (evita Play/Pause universal)
@@ -1828,6 +1837,38 @@ export const TvPlayerControls: React.FC<TvPlayerControlsProps> = (props) => {
                               uiSoundService.play('toggle', { playerControl: true });
                               props.onQuality(q);
                               closeMenu(true);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="h-px w-full bg-white/10" />
+
+                    {/* Melhoria Automática de Som */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-200 tracking-tight">Melhoria de som (Smart Audio)</h4>
+                          <p className="text-xs text-gray-400">Nivelamento dinâmico e clareza de diálogos</p>
+                        </div>
+                        {smartAudioDiag.status === 'unavailable' && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            Indisponível nesta fonte
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {(['balanced', 'night', 'off'] as const).map(mode => (
+                          <DrawerPillChip
+                            key={`smart-audio-${mode}`}
+                            focusKey={`tv-player-drawer-smart-audio-${mode}`}
+                            label={mode === 'balanced' ? 'EQUILIBRADO' : mode === 'night' ? 'NOTURNO' : 'DESATIVADO'}
+                            active={smartAudioDiag.enabled && smartAudioDiag.mode === mode && smartAudioDiag.status !== 'unavailable'}
+                            disabled={smartAudioDiag.status === 'unavailable'}
+                            onClick={() => {
+                              uiSoundService.play('toggle', { playerControl: true });
+                              smartAudioService.setMode(mode);
                             }}
                           />
                         ))}

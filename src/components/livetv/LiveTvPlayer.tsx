@@ -13,6 +13,8 @@ import { liveTvPreferences } from '../../core/livetv/liveTvPreferences';
 import { tvModeService } from '../../core/tv/tvModeService';
 import { ZapiLoader } from '../common/ZapiLoader';
 import { pipService } from '../../core/pip/pipService';
+import { mobileFullscreenService } from '../../core/mobile/mobileFullscreenService';
+import { smartAudioService } from '../../core/audio/smartAudioService';
 
 export type LiveTvPlaybackStatus = 'loading' | 'recovering' | 'playing' | 'waiting_interaction' | 'unavailable';
 
@@ -161,12 +163,23 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   // Alterna Tela Cheia
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
+    if (mobileFullscreenService.isMobile()) {
+      if (mobileFullscreenService.isFullscreenActive() || isFullscreen) {
+        mobileFullscreenService.exitMobileFullscreen({ force: true }).then(() => setIsFullscreen(false)).catch(() => {});
+      } else {
+        mobileFullscreenService.requestAutoFullscreenAndLandscape(containerRef.current).then((res) => {
+          setIsFullscreen(res.fullscreenGranted || mobileFullscreenService.isFullscreenActive());
+        }).catch(() => {});
+      }
+      return;
     }
-  }, []);
+
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+    }
+  }, [isFullscreen]);
 
   // Monitora mudanças de tela cheia
   useEffect(() => {
@@ -174,7 +187,12 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       setIsFullscreen(Boolean(document.fullscreenElement));
     };
     document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      if (mobileFullscreenService.isMobile() && mobileFullscreenService.isFullscreenActive()) {
+        mobileFullscreenService.exitMobileFullscreen({ force: true }).catch(() => {});
+      }
+    };
   }, []);
 
   // Limpa completamente instâncias do player
@@ -207,6 +225,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
       hlsRef.current = null;
     }
     if (videoRef.current) {
+      smartAudioService.detach(videoRef.current);
       try {
         videoRef.current.pause();
         videoRef.current.removeAttribute('src');
@@ -386,6 +405,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
 
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         if (playbackGenerationRef.current !== currentGeneration || activeChannelIdRef.current !== channel.id) return;
+        smartAudioService.attach(video, streamUrl);
         // Não marcar isLoading(false) aqui — aguardar sinal real de vídeo/áudio reproduzível
         const heights = data.levels.map(l => `${l.height}p`).filter(Boolean);
         const unique = Array.from(new Set(heights));

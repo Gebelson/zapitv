@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import Hls from 'hls.js';
 import { ReportFeedbackModal } from '../feedback/ReportFeedbackModal';
+import { TvPlaybackErrorScreen } from './TvPlaybackErrorScreen';
+import { smartAudioService } from '../../core/audio/smartAudioService';
 import { FeedbackCategory } from '../../core/feedback/feedbackTypes';
 import { StremioStream } from '../../core/stremio/stremioTypes';
 import { storageService } from '../../core/storage/storageService';
@@ -51,6 +53,12 @@ import { WatchPartyOverlay } from '../watchparty/WatchPartyOverlay';
 import { FeatureErrorBoundary } from '../common/FeatureErrorBoundary';
 import { RoomLifecycleState, TransmissionMode } from '../../core/watchparty/watchPartyTypes';
 import { VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../../core/providers/sourceVerificationService';
+import {
+  isSourceTechnicallyPlayable,
+  isSourceTemporarilyProblematic,
+  markSourceTemporarilyProblematic
+} from '../../core/providers/sourceReadiness';
+import { classifyCanonicalPlaybackCause } from '../../core/tracking/mediaLoadingTracker';
 import { tvModeService } from '../../core/tv/tvModeService';
 import { directMediaUrl } from '../../core/playback/directMediaUrl';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
@@ -216,11 +224,14 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
   useEffect(() => {
     isMountedRef.current = true;
+    mobileFullscreenService.endEpisodeTransition();
     return () => {
       isMountedRef.current = false;
+      if (videoRef.current) smartAudioService.detach(videoRef.current);
       mobileFullscreenService.exitMobileFullscreen().catch(() => {});
       try {
         if (
+          !mobileFullscreenService.isPlaying() &&
           document.fullscreenElement &&
           containerRef.current &&
           (document.fullscreenElement === containerRef.current || containerRef.current.contains(document.fullscreenElement))
@@ -409,6 +420,34 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   const [isMediaReady, setIsMediaReady] = useState(false);
   const [allSourcesFailed, setAllSourcesFailed] = useState(false);
   const [failureCategory, setFailureCategory] = useState<'NO_SOURCES_FOUND' | 'VERIFICATION_ERROR' | 'PLAYBACK_FAILURE' | 'UNAVAILABLE'>('UNAVAILABLE');
+  const [isRetryingSources, setIsRetryingSources] = useState(false);
+
+  useEffect(() => {
+    if (!isLoadingStreams) {
+      setIsRetryingSources(false);
+    }
+  }, [isLoadingStreams]);
+
+  useEffect(() => {
+    setIsRetryingSources(false);
+  }, [streams]);
+
+  const handleRetrySources = useCallback(() => {
+    if (isRetryingSources || !onRetrySources) return;
+    setIsRetryingSources(true);
+    setHasError(false);
+    setIsLoading(true);
+    onRetrySources();
+  }, [isRetryingSources, onRetrySources]);
+
+  const handleCloseFeedbackModal = useCallback(() => {
+    setShowFeedbackModal(false);
+    if (allSourcesFailed) {
+      setTimeout(() => {
+        setFocus('tv-player-error-report');
+      }, 60);
+    }
+  }, [allSourcesFailed]);
   const [userSkippedIntro, setUserSkippedIntro] = useState(false);
   const [isIntroAutoplayBlocked, setIsIntroAutoplayBlocked] = useState(false);
 
@@ -1088,6 +1127,8 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
   // Instant Fallback & Failure Tracking
   const triedIndicesRef = useRef<Set<number>>(new Set());
   const isSwitchingStreamRef = useRef(false);
+  const consecutiveFallbackCountRef = useRef<number>(0);
+  const isDynamicRecoveryTriggeredRef = useRef<boolean>(false);
   const startupTimedOutRef = useRef(false);
   const attemptIdRef = useRef<number>(0);
 
@@ -2093,7 +2134,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       clearInterval(autoPlayTimerRef.current);
       autoPlayTimerRef.current = null;
     }
-    mobileFullscreenService.exitMobileFullscreen().catch(() => {});
+    mobileFullscreenService.exitMobileFullscreen({ force: true }).catch(() => {});
     onClose();
   }, [flushProgress, playbackSessionId, onClose]);
 
@@ -2473,8 +2514,32 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     // Capture the exact position before removing src: video.load() resets currentTime.
     const positionBeforeCleanup = videoRef.current?.currentTime || latestProgressRef.current.currentTime || 0;
     playbackConfirmationRef.current = createPlaybackConfirmationState();
+    const classifiedCause = classifyCanonicalPlaybackCause(reason);
     if (loadingTraceId) mediaLoadingTracker.recordEvent(loadingTraceId, 'SOURCE_VALIDATION',
-      'ZapiPlayer', 'FAILED', undefined, classifyPlaybackError(reason), reason);
+      'ZapiPlayer', 'FAILED', undefined, classifiedCause, sanitizePlaybackReason(reason));
+    
+    // Marca a fonte como temporariamente problemática (quarentena transitória com TTL de 15m)
+    if (currentStream?.url) {
+      markSourceTemporarilyProblematic(currentStream.url, reason);
+    }
+    if (currentStream?.providerId) {
+      playbackOptimizerService.recordPlaybackFailureForDevice(currentStream.providerId, reason);
+    }
+
+    // Trava de segurança para impedir loops infinitos de fallback (> 5 tentativas consecutivas)
+    consecutiveFallbackCountRef.current++;
+    if (consecutiveFallbackCountRef.current > 5) {
+      console.warn('[ZapiPlayer] Limite máximo de 5 tentativas consecutivas de fallback atingido. Interrompendo.');
+      if (videoRef.current && !videoRef.current.paused) {
+        videoRef.current.pause();
+      }
+      setAllSourcesFailed(true);
+      setHasError(true);
+      setIsLoading(false);
+      setErrorMessage('Não foi possível reproduzir este conteúdo após múltiplas tentativas. Tente novamente mais tarde.');
+      isSwitchingStreamRef.current = false;
+      return;
+    }
     const evidence = sourceEvidenceRef.current;
     if (evidence && !evidence.reported && navigator.onLine &&
         /decodific|não corresponde à obra|fonte isolada|domínio na lista|propaganda embutida|arquivo de vídeo inválido|HTTP 40[34]/i.test(reason)) {
@@ -2505,10 +2570,12 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     const requiredLanguage = activeAudioId?.startsWith('stream-')
       ? activeAudioId.slice('stream-'.length) : currentLanguage;
 
-    // Garante que o fallback considere APENAS fontes cuja identidade corresponda comprovadamente à obra solicitada
+    // Garante que o fallback considere APENAS fontes tecnicamente reproduzíveis e sem quarentena
     const remaining = streams
       .map((s, idx) => ({ s, idx }))
       .filter(({ s, idx }) => !triedIndicesRef.current.has(idx) &&
+        !isSourceTemporarilyProblematic(s.url || '') &&
+        isSourceTechnicallyPlayable(s) &&
         sourceConfidenceEngine.evaluate(s, canonicalIdentity).isMatch &&
         (requiredLanguage !== 'unknown'
           ? audioSelectionManager.inspectStreamAudioLanguage(s, originalLanguage) === requiredLanguage
@@ -2519,15 +2586,27 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     let isLanguageFallback = false;
     if (!nextCandidate) {
       // REGRA FUNDAMENTAL: O fallback entre fontes deve ser silencioso até que uma fonte funcione ou todas falhem.
-      // NUNCA disparar aviso de dublagem antes de confirmar que a próxima fonte é reproduzível!
       const anyRemaining = streams
         .map((s, idx) => ({ s, idx }))
         .filter(({ s, idx }) => !triedIndicesRef.current.has(idx) &&
+          !isSourceTemporarilyProblematic(s.url || '') &&
+          isSourceTechnicallyPlayable(s) &&
           sourceConfidenceEngine.evaluate(s, canonicalIdentity).isMatch);
       if (anyRemaining.length > 0) {
         nextCandidate = anyRemaining[0];
         isLanguageFallback = true;
       }
+    }
+
+    // Se as opções iniciais acabaram, tenta uma recuperação dinâmica em segundo plano antes de desistir
+    if (!nextCandidate && onRetrySources && !isDynamicRecoveryTriggeredRef.current && consecutiveFallbackCountRef.current <= 5) {
+      isDynamicRecoveryTriggeredRef.current = true;
+      console.log('[ZapiPlayer] Fontes locais esgotadas. Acionando recuperação dinâmica de fontes adicionais...');
+      setIsLoading(true);
+      setHasError(false);
+      onRetrySources();
+      isSwitchingStreamRef.current = false;
+      return;
     }
 
     // Limpeza profunda dos recursos da tentativa atual
@@ -2909,6 +2988,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     }, isTvPlayback ? 30000 : 20000);
 
     const onMetadataReceived = () => {
+      smartAudioService.attach(video, videoUrl);
       if (initTimer) {
         clearTimeout(initTimer);
         initTimer = null;
@@ -3308,6 +3388,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      smartAudioService.detach(video);
     };
   }, [currentStream?.url, isLoadingStreams]);
 
@@ -3541,6 +3622,13 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     return tvNavigationManager.registerBackHandler('zapi-player', 200, () => {
       if (showFeedbackModal) {
         setShowFeedbackModal(false);
+        if (allSourcesFailed) {
+          setTimeout(() => setFocus('tv-player-error-report'), 60);
+        }
+        return true;
+      }
+      if (allSourcesFailed) {
+        handlePlayerClose();
         return true;
       }
       if (showAutoPlayCountdown) {
@@ -3578,6 +3666,23 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
     if (isTvPlayback) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (allSourcesFailed) {
+        const isBack = e.keyCode === 10009 || e.key === 'GoBack' || e.key === 'Return' || e.key === 'Escape' || (e.key === 'Backspace' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement));
+        if (isBack) {
+          if (showFeedbackModal) {
+            e.preventDefault();
+            setShowFeedbackModal(false);
+            setTimeout(() => setFocus('tv-player-error-report'), 60);
+            return;
+          }
+          e.preventDefault();
+          handlePlayerClose();
+          return;
+        }
+        // Quando allSourcesFailed está ativo, não intercepta setas, enter ou atalhos de reprodução
+        return;
+      }
 
       const isBackKey = e.keyCode === 10009 || e.key === 'GoBack' || e.key === 'Return' || e.key === 'Escape';
       if (isBackKey) {
@@ -4377,61 +4482,20 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
 
       {/* Screen when all sources have failed */}
       {allSourcesFailed && (
-        <div
-          key="player-all-sources-failed"
-          className="absolute inset-0 z-[3600] bg-[#05070a] flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200"
-        >
-          <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(239,68,68,0.2)]">
-            <AlertCircle className="w-10 h-10 text-red-500" />
-          </div>
-          {failureCategory === 'PLAYBACK_FAILURE' || (streams.length > 0 && allSourcesFailed) ? (
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Não foi possível reproduzir este conteúdo agora</h2>
-          ) : failureCategory === 'VERIFICATION_ERROR' || verificationState === 'INCONCLUSIVE' ? (
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Não foi possível verificar a disponibilidade</h2>
-          ) : failureCategory === 'NO_SOURCES_FOUND' || streams.length === 0 ? (
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Conteúdo indisponível no momento</h2>
-          ) : (
-            <h2 className="text-2xl md:text-3xl font-black text-white mb-2">Conteúdo indisponível</h2>
-          )}
-          <p className="text-gray-300 text-sm max-w-lg mb-6 leading-relaxed">
-            {errorMessage || (
-              failureCategory === 'PLAYBACK_FAILURE'
-                ? 'Não foi possível reproduzir este conteúdo agora. Tente novamente mais tarde.'
-                : verificationState === 'INCONCLUSIVE'
-                  ? 'Não foi possível verificar a disponibilidade agora. Tente novamente.'
-                  : 'Conteúdo indisponível no momento. Não foi possível encontrar uma fonte verificada agora. Tente novamente.'
-            )}
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <button
-              onClick={() => {
-                setHasError(false);
-                setIsLoading(true);
-                onRetrySources?.();
-              }}
-              disabled={!onRetrySources}
-              className="px-6 py-3 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-full font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
-            >
-              Tentar novamente
-            </button>
-            <button
-              onClick={() => {
-                setFeedbackDefaultCategory('video_not_loading');
-                setShowFeedbackModal(true);
-              }}
-              className="px-6 py-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 active:scale-95 rounded-full font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2"
-            >
-              <AlertCircle className="w-4 h-4" />
-              <span>Reportar erro</span>
-            </button>
-            <button
-              onClick={handlePlayerClose}
-              className="px-6 py-3 bg-[#007df7] hover:bg-[#0069d9] active:scale-95 text-white rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-[#007df7]/30 cursor-pointer"
-            >
-              Voltar aos detalhes
-            </button>
-          </div>
-        </div>
+        <TvPlaybackErrorScreen
+          failureCategory={failureCategory}
+          verificationState={verificationState}
+          hasStreams={streams.length > 0}
+          errorMessage={errorMessage}
+          canRetry={Boolean(onRetrySources)}
+          isRetrying={isRetryingSources}
+          onRetry={handleRetrySources}
+          onReportError={() => {
+            setFeedbackDefaultCategory('video_not_loading');
+            setShowFeedbackModal(true);
+          }}
+          onClose={handlePlayerClose}
+        />
       )}
 
       <div
@@ -4535,6 +4599,11 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
                   mediaLoadingTracker.transition(loadingTraceId, 'PLAYING');
                 }
                 if (loadingTraceId && nextConfirmation.confirmed && !priorConfirmation.confirmed) {
+                  consecutiveFallbackCountRef.current = 0;
+                  isDynamicRecoveryTriggeredRef.current = false;
+                  if (currentStream?.providerId) {
+                    playbackOptimizerService.recordPlaybackConfirmedForDevice(currentStream.providerId);
+                  }
                   mediaLoadingTracker.recordEvent(loadingTraceId, 'PLAYBACK_CONFIRMED', 'ZapiPlayer', 'OK', {
                     mediaSeconds: cur - (nextConfirmation.startedAtSeconds || 0),
                     frames: presentedFrames === null || nextConfirmation.framesAtStart === null
@@ -6067,7 +6136,7 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
       {/* Modal Inteligente de Feedback do Usuário */}
       <ReportFeedbackModal
         isOpen={showFeedbackModal}
-        onClose={() => setShowFeedbackModal(false)}
+        onClose={handleCloseFeedbackModal}
         defaultCategory={feedbackDefaultCategory}
         playbackContext={{
           item,

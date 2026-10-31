@@ -5,6 +5,7 @@ import { uiSoundService } from '../../core/audio/uiSoundService';
 import { heroCarouselStore, MAX_HERO_DISPLAY_COUNT } from '../../core/catalog/heroCarouselStore';
 import { catalogEligibilityService } from '../../core/catalog/CatalogEligibilityService';
 import { heroImageService, ZAPITV_HERO_FALLBACK_IMAGE } from '../../core/catalog/heroImageService';
+import { mobileFullscreenService } from '../../core/mobile/mobileFullscreenService';
 
 interface MobileHeroProps {
   featuredItems: ContentItem[];
@@ -283,6 +284,7 @@ export const MobileHero: React.FC<MobileHeroProps> = ({
               type="button"
               onClick={() => {
                 uiSoundService.play('watch');
+                mobileFullscreenService.requestAutoFullscreenAndLandscape().catch(() => {});
                 if (onPlayClick) onPlayClick(slideItem);
                 else if (onActionClick) onActionClick(slideItem);
               }}

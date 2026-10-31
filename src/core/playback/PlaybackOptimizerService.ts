@@ -582,6 +582,49 @@ export class PlaybackOptimizerService {
   /**
    * Registra resultado de consulta a um provedor para orientar ordenação e concorrência
    */
+  // Matriz de histórico de confiabilidade por dispositivo (P0 Ranking Inteligente)
+  private deviceProviderStats = new Map<string, {
+    confirmedStarts: number;
+    failedStarts: number;
+    avgTtffMs: number;
+    lastUpdated: number;
+  }>();
+
+  /**
+   * Registra início de reprodução confirmado com sucesso para o provedor no dispositivo atual.
+   */
+  public recordPlaybackConfirmedForDevice(providerId: string, ttffMs = 800): void {
+    const dev = this.getDeviceProfile();
+    const key = `${dev.deviceType}|${providerId}`;
+    const existing = this.deviceProviderStats.get(key) || {
+      confirmedStarts: 0,
+      failedStarts: 0,
+      avgTtffMs: ttffMs,
+      lastUpdated: Date.now(),
+    };
+    existing.confirmedStarts++;
+    existing.avgTtffMs = Math.round(existing.avgTtffMs * 0.7 + ttffMs * 0.3);
+    existing.lastUpdated = Date.now();
+    this.deviceProviderStats.set(key, existing);
+  }
+
+  /**
+   * Registra falha de inicialização ou reprodução para o provedor no dispositivo atual.
+   */
+  public recordPlaybackFailureForDevice(providerId: string, _reason?: string): void {
+    const dev = this.getDeviceProfile();
+    const key = `${dev.deviceType}|${providerId}`;
+    const existing = this.deviceProviderStats.get(key) || {
+      confirmedStarts: 0,
+      failedStarts: 0,
+      avgTtffMs: 2500,
+      lastUpdated: Date.now(),
+    };
+    existing.failedStarts++;
+    existing.lastUpdated = Date.now();
+    this.deviceProviderStats.set(key, existing);
+  }
+
   public recordProviderResult(providerId: string, latencyMs: number, success: boolean): void {
     const existing = this.providerStats.get(providerId) || {
       providerId,
@@ -602,23 +645,41 @@ export class PlaybackOptimizerService {
   }
 
   /**
-   * Calcula pontuação dinâmica para o provedor com base em histórico real de velocidade e disponibilidade
+   * Calcula pontuação dinâmica para o provedor com base em histórico real de velocidade e disponibilidade,
+   * ponderado pelo aprendizado de máquina no dispositivo ativo (Fire TV, Android, Desktop).
    */
   public getProviderScore(providerId: string): number {
     const stats = this.providerStats.get(providerId);
-    if (!stats || stats.totalAttempts === 0) return 0;
-
     let score = 0;
-    const successRate = stats.successfulAttempts / stats.totalAttempts;
 
-    // Confiabilidade histórica
-    if (successRate >= 0.85) score += 3000;
-    else if (successRate < 0.40) score -= 6000;
+    if (stats && stats.totalAttempts > 0) {
+      const successRate = stats.successfulAttempts / stats.totalAttempts;
 
-    // Latência e velocidade média de resposta
-    if (stats.averageLatencyMs < 400) score += 4000;
-    else if (stats.averageLatencyMs < 800) score += 2000;
-    else if (stats.averageLatencyMs > 4000) score -= 5000;
+      // Confiabilidade histórica
+      if (successRate >= 0.85) score += 3000;
+      else if (successRate < 0.40) score -= 6000;
+
+      // Latência e velocidade média de resposta
+      if (stats.averageLatencyMs < 400) score += 4000;
+      else if (stats.averageLatencyMs < 800) score += 2000;
+      else if (stats.averageLatencyMs > 4000) score -= 5000;
+    }
+
+    // Ponderação específica por tipo de dispositivo (Smart TV / Mobile / Desktop)
+    const dev = this.getDeviceProfile();
+    const devKey = `${dev.deviceType}|${providerId}`;
+    const devStats = this.deviceProviderStats.get(devKey);
+    if (devStats) {
+      const totalDev = devStats.confirmedStarts + devStats.failedStarts;
+      if (totalDev > 0) {
+        const devSuccessRate = devStats.confirmedStarts / totalDev;
+        if (devSuccessRate >= 0.80) score += 5000;
+        else if (devSuccessRate < 0.30) score -= 7000;
+
+        // Bonificação para provedores com início ultra-rápido no dispositivo
+        if (devStats.avgTtffMs < 1200) score += 3000;
+      }
+    }
 
     return score;
   }

@@ -1,3 +1,4 @@
+import { seriesSeasonMappingService } from '../series/seriesSeasonMappingService';
 /**
  * ZapiTV — CanonicalMediaIdentity
  * Estabelece a identidade canônica obrigatória para qualquer mídia (filme, série ou anime)
@@ -44,6 +45,9 @@ export class CanonicalIdentityService {
     candidate: Pick<ContentItem, 'title' | 'originalTitle' | 'year' | 'type'>
   ): boolean {
     if (expected.type !== candidate.type) return false;
+    const era1 = seriesSeasonMappingService.identifyFranchiseVersion(expected);
+    const era2 = seriesSeasonMappingService.identifyFranchiseVersion(candidate);
+    if (era1 && era2 && era1 !== era2) return false;
     if (expected.year && candidate.year && Math.abs(expected.year - candidate.year) > 1) return false;
     const titles = [expected.title, expected.originalTitle].filter(Boolean).map(value => this.normalizeTitle(value!));
     const candidates = [candidate.title, candidate.originalTitle].filter(Boolean).map(value => this.normalizeTitle(value!));
@@ -120,6 +124,21 @@ export class CanonicalIdentityService {
     }
 
     // Aliases específicos conhecidos
+    const whoEra = seriesSeasonMappingService.identifyFranchiseVersion({
+      id: item.id,
+      tmdbId: item.tmdbId,
+      imdbId: item.imdbId,
+      title: item.title,
+      year: item.year
+    });
+    if (whoEra === 'modern_2005') {
+      aliases.push('doctor who', 'doctor who 2005', 'dr who');
+    } else if (whoEra === 'classic_1963') {
+      aliases.push('doctor who 1963', 'doctor who classic', 'classic doctor who');
+    } else if (whoEra === 'era_2024') {
+      aliases.push('doctor who 2024');
+    }
+
     if (/doraemon/i.test(item.title)) {
       aliases.push('doraemon', 'gato do futuro', 'ドラえもん');
     }

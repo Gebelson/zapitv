@@ -168,13 +168,11 @@ function createApp() {
 
     const item = VERIFIED_OPEN_ITEMS.find(it => 
       it.id === cleanId || 
-      (cleanId.startsWith('open-') && (
-        (it.tmdbId && String(it.tmdbId) === cleanId) || 
-        (it.imdbId && it.imdbId === cleanId)
-      ))
+      (it.imdbId && it.imdbId.toLowerCase() === cleanId.toLowerCase()) ||
+      (it.tmdbId && (String(it.tmdbId) === cleanId || `tmdb-${it.tmdbId}` === cleanId))
     );
 
-    if (!item || !item.id.startsWith('open-') || bannedContentRegistry.isBanned(item)) return [];
+    if (!item || bannedContentRegistry.isBanned(item)) return [];
 
     if (item.episodes && item.episodes.length > 0) {
       if (seasonNum !== 1) return [];
@@ -261,9 +259,6 @@ function createApp() {
   app.get(["/api/stremio/cinema-aberto/stream/:type/:id.json", "/api/stremio/cinema-aberto/stream/:type/:id"], (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     const requestedId = String(req.params.id || '');
-    if (!requestedId.startsWith('open-')) {
-      return res.json({ streams: [] });
-    }
     const streams = resolveOpenItemStreams(requestedId);
     res.json({ streams });
   });
@@ -313,11 +308,84 @@ function createApp() {
   app.get(["/api/stremio/public-domain/stream/:type/:id.json", "/api/stremio/public-domain/stream/:type/:id"], (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     const requestedId = String(req.params.id || '');
-    if (!requestedId.startsWith('open-')) {
-      return res.json({ streams: [] });
-    }
     const streams = resolveOpenItemStreams(requestedId);
     res.json({ streams });
+  });
+
+  // =========================================================================
+  // 3.1 Provedor Internet Archive Cinema Aberto (Domínio Público HD)
+  // =========================================================================
+  app.get("/api/stremio/archive-org-movies/manifest.json", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({
+      id: "org.zapitv.archiveorg",
+      name: "Internet Archive Cinema Aberto",
+      version: "1.0.0",
+      description: "Filmes clássicos, preservação histórica e acervo aberto da Internet Archive em MP4 e HLS.",
+      resources: ["stream"],
+      types: ["movie", "series"],
+      catalogs: [],
+      idPrefixes: ["tt", "open"]
+    });
+  });
+
+  app.get(["/api/stremio/archive-org-movies/stream/:type/:id.json", "/api/stremio/archive-org-movies/stream/:type/:id"], async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const requestedId = String(req.params.id || '').replace(/\.json$/, '');
+    const local = resolveOpenItemStreams(requestedId);
+    if (local.length > 0) {
+      return res.json({ streams: local.map(s => ({ ...s, providerName: 'Internet Archive Open' })) });
+    }
+    res.json({ streams: [] });
+  });
+
+  // =========================================================================
+  // 3.2 Provedor Wikimedia Commons (Creative Commons CC-BY)
+  // =========================================================================
+  app.get("/api/stremio/wikimedia-commons/manifest.json", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({
+      id: "org.zapitv.wikimedia",
+      name: "Wikimedia Commons Vídeos & Documentários",
+      version: "1.0.0",
+      description: "Documentários e acervo cultural aberto sob licença Creative Commons CC-BY da Wikimedia.",
+      resources: ["stream"],
+      types: ["movie", "series"],
+      catalogs: [],
+      idPrefixes: ["tt", "open"]
+    });
+  });
+
+  app.get(["/api/stremio/wikimedia-commons/stream/:type/:id.json", "/api/stremio/wikimedia-commons/stream/:type/:id"], (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const requestedId = String(req.params.id || '').replace(/\.json$/, '');
+    const local = resolveOpenItemStreams(requestedId);
+    const media = local.filter(s => s.url && (s.url.includes('wikimedia.org') || s.url.includes('upload.wikimedia')));
+    res.json({ streams: media.length > 0 ? media : local.slice(0, 2).map(s => ({ ...s, providerName: 'Wikimedia Commons' })) });
+  });
+
+  // =========================================================================
+  // 3.3 Provedor Open Culture Cinema Clássico
+  // =========================================================================
+  app.get("/api/stremio/open-culture/manifest.json", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({
+      id: "org.zapitv.openculture",
+      name: "Open Culture Cinema Clássico",
+      version: "1.0.0",
+      description: "Cinema clássico aberto, restaurado e de livre acesso para todos os públicos.",
+      resources: ["stream"],
+      types: ["movie"],
+      catalogs: [],
+      idPrefixes: ["tt", "open"]
+    });
+  });
+
+  app.get(["/api/stremio/open-culture/stream/:type/:id.json", "/api/stremio/open-culture/stream/:type/:id"], (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const requestedId = String(req.params.id || '').replace(/\.json$/, '');
+    const local = resolveOpenItemStreams(requestedId);
+    res.json({ streams: local.map(s => ({ ...s, providerName: 'Open Culture' })) });
   });
 
   // =========================================================================

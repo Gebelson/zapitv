@@ -63,21 +63,33 @@ export const episodeKey = (key: string, season: number, episode: number): string
 const validPart = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 1;
 const validSeason = (n: unknown): n is number => n === 0 || validPart(n);
 
+export function normalizeContentType(raw: unknown, isEpisodic = false): ContentType {
+  if (!raw) return isEpisodic ? ContentType.SERIES : ContentType.MOVIE;
+  const lower = String(raw).toLowerCase().trim();
+  if (lower === 'anime') return ContentType.ANIME;
+  if (lower === 'series' || lower === 'série' || lower === 'serie' || lower === 'show' || lower === 'tv') return ContentType.SERIES;
+  if (lower === 'movie' || lower === 'filme') return ContentType.MOVIE;
+  if (Object.values(ContentType).includes(raw as any)) return raw as ContentType;
+  return isEpisodic ? ContentType.SERIES : ContentType.MOVIE;
+}
+
 export function normalizeProgress(value: unknown): WatchProgress | null {
   if (!value || typeof value !== 'object') return null;
   const p = value as WatchProgress;
   if (typeof p.contentId !== 'string' || !p.contentId.trim() || !p.item || typeof p.item.id !== 'string' ||
-    !p.item.id.trim() || typeof p.item.title !== 'string' || !Object.values(ContentType).includes(p.item.type) ||
+    !p.item.id.trim() || typeof p.item.title !== 'string' ||
     !Number.isFinite(p.currentTime) || p.currentTime < 0 || !Number.isFinite(p.duration) || p.duration <= 0) return null;
+  const itemType = normalizeContentType(p.item.type, (p.season !== undefined || p.episode !== undefined));
   const ids = [p.item.id, p.item.imdbId, p.item.tmdbId && String(p.item.tmdbId), p.item.tmdbId && `tmdb-${p.item.tmdbId}`, p.item.canonicalId];
   if (!ids.includes(p.contentId)) return null;
-  const episodic = p.item.type !== ContentType.MOVIE && p.item.mediaFormat !== 'movie';
+  const episodic = itemType !== ContentType.MOVIE && p.item.mediaFormat !== 'movie';
   if (episodic && (p.season !== undefined || p.episode !== undefined) && (!validSeason(p.season) || !validPart(p.episode))) return null;
   const currentTime = Math.min(p.currentTime, p.duration);
   const percent = currentTime / p.duration * 100;
   const updatedAt = p.updatedAt === undefined ? new Date(0).toISOString() : p.updatedAt;
   if (!Number.isFinite(Date.parse(updatedAt))) return null;
-  return { ...p, contentId: p.contentId.trim(), currentTime,
+  const item = { ...p.item, type: itemType };
+  return { ...p, item, contentId: p.contentId.trim(), currentTime,
     season: episodic ? p.season : undefined, episode: episodic ? p.episode : undefined,
     percentage: percent >= 92 ? 100 : Math.round(percent), updatedAt };
 }

@@ -20,11 +20,32 @@ export type PlaybackEvent =
   | 'MANIFEST_OR_METADATA_LOADED' | 'INTRO_COMPLETED' | 'CONTENT_PLAYING'
   | 'PLAYBACK_CONFIRMED' | 'PLAYBACK_FAILED';
 
+export type CanonicalPlaybackCause =
+  | 'NO_CANDIDATES_RETURNED'          // 1. Nenhuma fonte retornada
+  | 'INCORRECT_CONTENT_ID'            // 2. ID de conteúdo incorreto
+  | 'SEASON_EPISODE_MISMATCH'         // 3. Temporada ou episódio divergente
+  | 'PROVIDER_UNREACHABLE_OR_TIMEOUT' // 4. Provedor inacessível ou timeout
+  | 'HTTP_OR_CORS_ERROR'              // 5. Erro HTTP/CORS
+  | 'INCOMPATIBLE_CODEC'              // 6. Codec incompatível
+  | 'INVALID_MANIFEST'                // 7. Manifesto HLS/DASH inválido
+  | 'EXPIRED_SOURCE'                  // 8. Fonte expirada
+  | 'DECODE_OR_RENDER_FAILURE'        // 9. Falha de decodificação
+  | 'LOCAL_ENGINE_REQUIRED';          // 10. Fonte dependente de motor local inexistente
+
 export type PlaybackErrorCode =
-  | 'SOURCE_DISCOVERY_FAILED' | 'NO_CANDIDATES' | 'SOURCE_VALIDATION_INCONCLUSIVE'
-  | 'AUTH_REQUIRED' | 'SOURCE_UNSUPPORTED' | 'MEDIA_NETWORK_ERROR'
-  | 'MEDIA_DECODE_ERROR' | 'MANIFEST_ERROR' | 'PLAYBACK_START_FAILED'
-  | 'PLAYBACK_TIMEOUT' | 'SOURCE_EXPIRED' | 'PLAYER_RUNTIME_ERROR';
+  | CanonicalPlaybackCause
+  | 'SOURCE_DISCOVERY_FAILED'
+  | 'NO_CANDIDATES'
+  | 'SOURCE_VALIDATION_INCONCLUSIVE'
+  | 'AUTH_REQUIRED'
+  | 'SOURCE_UNSUPPORTED'
+  | 'MEDIA_NETWORK_ERROR'
+  | 'MEDIA_DECODE_ERROR'
+  | 'MANIFEST_ERROR'
+  | 'PLAYBACK_START_FAILED'
+  | 'PLAYBACK_TIMEOUT'
+  | 'SOURCE_EXPIRED'
+  | 'PLAYER_RUNTIME_ERROR';
 
 export interface PlaybackEventTrace {
   event: PlaybackEvent;
@@ -45,23 +66,96 @@ const SAFE_DETAIL_KEYS = new Set([
   'durationMs', 'season', 'episode', 'quality', 'navType', 'prefetched',
   'progressive', 'stremioType', 'hasExternalPtSub', 'mediaSeconds', 'frames',
 ]);
+
+/**
+ * Sanitiza rigorosamente mensagens técnicas e motivos de erro,
+ * mascarando tokens, chaves, senhas e URLs diretas para prevenir vazamento de dados privados.
+ */
 export function sanitizePlaybackReason(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
-  return value.replace(/(?:https?:\/\/|magnet:\?)[^\s)]+/gi, '[redacted-url]')
-    .replace(/(token|key|secret|signature|authorization)\s*[:=]\s*[^\s,;]+/gi, '$1=[redacted]')
-    .slice(0, 160);
+  return value
+    .replace(/(?:https?:\/\/|magnet:\?)[^\s)]+/gi, '[redacted-url]')
+    .replace(/(?:token|key|secret|signature|authorization|access_token|apikey|api_key|auth|session)\s*[:=]\s*[^\s,;&]+/gi, '$1=[redacted]')
+    .replace(/(?:password|senha)\s*[:=]\s*[^\s,;&]+/gi, 'senha=[redacted]')
+    .replace(/(?:ip|host)\s*[:=]\s*\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/gi, 'host=[redacted-ip]')
+    .slice(0, 200);
 }
+
+/**
+ * Classifica a falha de reprodução em uma das 10 causas canônicas estabelecidas na especificação P0.
+ */
+export function classifyCanonicalPlaybackCause(reason: string, nativeMediaCode?: number): CanonicalPlaybackCause {
+  const norm = (reason || '').toLowerCase();
+
+  // 10. Fonte dependente de motor local inexistente
+  if (norm.includes('11470') || norm.includes('stremio engine') || norm.includes('motor local') ||
+      norm.includes('infohash') || norm.includes('dependem do aplicativo de streaming local') ||
+      norm.includes('torrent')) {
+    return 'LOCAL_ENGINE_REQUIRED';
+  }
+
+  // 3. Temporada ou episódio divergente
+  if (norm.includes('temporada divergente') || norm.includes('episódio divergente') ||
+      norm.includes('season mismatch') || norm.includes('desvio conhecido') ||
+      norm.includes('episódio trocado')) {
+    return 'SEASON_EPISODE_MISMATCH';
+  }
+
+  // 2. ID de conteúdo incorreto
+  if (norm.includes('não corresponde à obra') || norm.includes('divergência de identidade') ||
+      norm.includes('título incompatível') || norm.includes('incorrect content id') ||
+      norm.includes('era 2024') || norm.includes('era moderna')) {
+    return 'INCORRECT_CONTENT_ID';
+  }
+
+  // 1. Nenhuma fonte retornada
+  if (norm.includes('nenhuma fonte') || norm.includes('no candidates') || norm.includes('sem fontes') ||
+      norm.includes('0 fontes')) {
+    return 'NO_CANDIDATES_RETURNED';
+  }
+
+  // 8. Fonte expirada
+  if (norm.includes('expir') || norm.includes('expired')) {
+    return 'EXPIRED_SOURCE';
+  }
+
+  // 7. Manifesto HLS/DASH inválido
+  if (norm.includes('manifest') || norm.includes('m3u8') || norm.includes('mpd') ||
+      norm.includes('playlist') || norm.includes('manifesto')) {
+    return 'INVALID_MANIFEST';
+  }
+
+  // 6. Codec incompatível
+  if (norm.includes('codec') || norm.includes('e-ac-3') || norm.includes('hevc') ||
+      norm.includes('formato não suportado') || norm.includes('codec incompatível') ||
+      norm.includes('sem faixa de áudio funcional')) {
+    return 'INCOMPATIBLE_CODEC';
+  }
+
+  // 9. Falha de decodificação
+  if (nativeMediaCode === 3 || norm.includes('decodific') || norm.includes('decode error') ||
+      norm.includes('decoding')) {
+    return 'DECODE_OR_RENDER_FAILURE';
+  }
+
+  // 4. Provedor inacessível ou timeout
+  if (norm.includes('timeout') || norm.includes('tempo limite') || norm.includes('timeout_addon') ||
+      norm.includes('inacessível') || norm.includes('unreachable') || norm.includes('stagn') ||
+      norm.includes('sem progresso')) {
+    return 'PROVIDER_UNREACHABLE_OR_TIMEOUT';
+  }
+
+  // 5. Erro HTTP/CORS
+  if (nativeMediaCode === 2 || norm.includes('cors') || norm.includes('mixed content') ||
+      norm.includes('rede') || norm.includes('network') || /http\s*(?:40[0-9]|50[0-9])/i.test(norm)) {
+    return 'HTTP_OR_CORS_ERROR';
+  }
+
+  return 'HTTP_OR_CORS_ERROR';
+}
+
 export function classifyPlaybackError(reason: string, nativeMediaCode?: number): PlaybackErrorCode {
-  if (nativeMediaCode === 2) return 'MEDIA_NETWORK_ERROR';
-  if (nativeMediaCode === 3) return 'MEDIA_DECODE_ERROR';
-  if (nativeMediaCode === 4) return 'SOURCE_UNSUPPORTED';
-  if (/HTTP\s*40[13]|autentica|acesso negado/i.test(reason)) return 'AUTH_REQUIRED';
-  if (/manifest|m3u8|playlist/i.test(reason)) return 'MANIFEST_ERROR';
-  if (/tempo limite|timeout/i.test(reason)) return 'PLAYBACK_TIMEOUT';
-  if (/decodific|codec/i.test(reason)) return 'MEDIA_DECODE_ERROR';
-  if (/rede|network|fetch|cors/i.test(reason)) return 'MEDIA_NETWORK_ERROR';
-  if (/incompatível|não corresponde|bloquead|isolada|blacklist/i.test(reason)) return 'SOURCE_UNSUPPORTED';
-  return 'PLAYER_RUNTIME_ERROR';
+  return classifyCanonicalPlaybackCause(reason, nativeMediaCode);
 }
 function safeDetails(details?: Record<string, unknown>): Record<string, string | number | boolean> | undefined {
   if (!details) return undefined;

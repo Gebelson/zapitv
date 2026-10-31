@@ -21,6 +21,7 @@ import { similarTitlesService } from '../src/core/recommendations/similarTitlesS
 import { userPreferenceStore } from '../src/core/recommendations/userPreferenceStore';
 import { episodeAvailabilityService } from '../src/core/episodes/episodeAvailabilityService';
 import { animeSeasonMappingService } from '../src/core/anime/animeSeasonMappingService';
+import { seriesSeasonMappingService } from '../src/core/series/seriesSeasonMappingService';
 import { sourceVerificationService, VerificationState, MSG_INCONCLUSIVE, MSG_UNAVAILABLE } from '../src/core/providers/sourceVerificationService';
 import { watchPartyService } from '../src/core/watchparty/WatchPartyService';
 import { uiSoundService } from '../src/core/audio/uiSoundService';
@@ -206,12 +207,19 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     if (initialAnimeMapping?.defaultSeason) return initialAnimeMapping.defaultSeason;
     return 1;
   });
+  const initialPresentationSeasons = useMemo(() => {
+    return seriesSeasonMappingService.getPresentationSeasonsCount(initialItem);
+  }, [initialItem]);
   const [totalSeasons, setTotalSeasons] = useState(() => {
+    if (initialPresentationSeasons > 1) return initialPresentationSeasons;
     if (initialItem.seasonsCount && initialItem.seasonsCount > 0) return initialItem.seasonsCount;
     if (initialAnimeMapping) return 3;
     return 1;
   });
   const [availableSeasons, setAvailableSeasons] = useState<number[]>(() => {
+    if (initialPresentationSeasons > 1) {
+      return Array.from({ length: initialPresentationSeasons }, (_, i) => i + 1);
+    }
     if (initialItem.episodes && initialItem.episodes.length > 0) {
       const sSet = new Set(initialItem.episodes.map((e: any) => Number(e.season ?? 1)).filter((s: number) => s > 0));
       if (sSet.size > 0) return Array.from(sSet).sort((a: number, b: number) => a - b);
@@ -508,7 +516,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   const handleClose = useCallback(() => {
     if (isClosingRef.current) return;
     isClosingRef.current = true;
-    mobileFullscreenService.exitMobileFullscreen().catch(() => {});
+    mobileFullscreenService.exitMobileFullscreen({ force: true }).catch(() => {});
     uiSoundService.play('detailClose');
     playbackRequestIdRef.current++;
     cancelAllPendingRequests();
@@ -558,7 +566,7 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
   }, [originRoute]);
 
   const handleClosePlayer = useCallback(() => {
-    mobileFullscreenService.exitMobileFullscreen().catch(() => {});
+    mobileFullscreenService.exitMobileFullscreen({ force: true }).catch(() => {});
     playbackRequestIdRef.current++;
     cancelAllPendingRequests();
     if (loadingTraceIdRef.current) mediaLoadingTracker.endTrace(loadingTraceIdRef.current, 'CANCELLED');
@@ -844,6 +852,11 @@ export const ContentDetailModal: React.FC<ContentDetailModalProps> = ({
     navType: NavigationType = 'manual_start',
     isAutoRetry = false
   ) => {
+    // Se já estiver reproduzindo ou em reprodução contínua, marca transição de episódio para preservar fullscreen e landscape
+    if (isPlaying || navType === 'continuous_playback') {
+      mobileFullscreenService.beginEpisodeTransition();
+    }
+
     // Solicitação imediata de Fullscreen e Orientação no gesto de toque antes de operações assíncronas
     if (navType === 'manual_start' || navType === 'continuous_playback') {
       mobileFullscreenService.requestAutoFullscreenAndLandscape().catch(() => {});

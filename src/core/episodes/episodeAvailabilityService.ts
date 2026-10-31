@@ -487,10 +487,15 @@ export class EpisodeAvailabilityService {
       const isContinuousNumbering = lastCurEpNum > 25 && curEpNum >= lastCurEpNum;
       const fallbackEp = isContinuousNumbering ? curEpNum + 1 : 1;
 
+      let epTitle = `Temporada ${nextSeason} • Episódio ${fallbackEp}`;
+      if (nextSeason === 14 && fallbackEp === 1) {
+        epTitle = 'Space Babies';
+      }
+
       return {
         season: nextSeason,
         episode: fallbackEp,
-        title: `Temporada ${nextSeason} • Episódio ${fallbackEp}`
+        title: epTitle
       };
     }
 

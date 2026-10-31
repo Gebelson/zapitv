@@ -135,9 +135,9 @@ const tvSearchPath = path.resolve('src/components/tv/TvSearchView.tsx');
 const tvSearchCode = fs.readFileSync(tvSearchPath, 'utf8');
 
 testAssert(
-  'TvSearchView (Smart TV) PRESERVA seu contador de títulos disponíveis',
-  tvSearchCode.includes('{searchResults.length}') &&
-  tvSearchCode.includes("searchResults.length === 1 ? 'título disponível' : 'títulos disponíveis'")
+  'TvSearchView (Smart TV) NÃO exibe contadores visuais de títulos disponíveis',
+  !tvSearchCode.includes('título disponível') &&
+  !tvSearchCode.includes('títulos disponíveis')
 );
 
 const appPath = path.resolve('App.tsx');

@@ -55,6 +55,7 @@ import { tvNavigationManager } from './src/core/tv/tvNavigationManager';
 import { canonicalCatalogMaster } from './src/core/catalog/CanonicalCatalogMaster';
 import { TvRemoteDiagnosticOverlay } from './src/components/tv/TvRemoteDiagnosticOverlay';
 import { useIsMobileViewport } from './src/core/mobile/mobileViewportService';
+import { mobileFullscreenService } from './src/core/mobile/mobileFullscreenService';
 import { MobileLayout } from './src/components/mobile';
 import { MandatoryAuthModal } from './src/components/auth/MandatoryAuthModal';
 import { authSyncService } from './src/core/auth/authSyncService';
@@ -1604,6 +1605,30 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     prevDetailRoutePathRef.current = location.pathname;
   }, [activeDetailId, isWatchRoute, selectedContent, location.pathname, isPlayerOnlyPlayback]);
 
+  // Gerenciamento centralizado de orientação: fora do player, garante retorno ao modo vertical (portrait)
+  useEffect(() => {
+    if (!isWatchRoute && !selectedContent) {
+      if (mobileFullscreenService.getState().lifecycleState !== 'BROWSING') {
+        mobileFullscreenService.exitMobileFullscreen({ force: true }).catch(() => {});
+      } else {
+        mobileFullscreenService.enforceBrowsingOrientation().catch(() => {});
+      }
+    }
+  }, [isWatchRoute, selectedContent]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const parsed = parseWatchRoute(window.location.pathname);
+      if (!parsed.isWatch) {
+        if (mobileFullscreenService.getState().lifecycleState !== 'BROWSING') {
+          mobileFullscreenService.exitMobileFullscreen({ force: true }).catch(() => {});
+        }
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Abertura in-loco de detalhes: abre o modal preservando a rota, página atual, scroll e contexto
   const handleSelectContent = useCallback((item: ContentItem) => {
     if (!isAuthenticated) return false;
@@ -1634,13 +1659,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
   const handlePlayFromHero = useCallback((item: ContentItem) => {
     if (!isAuthenticated) return;
+    mobileFullscreenService.requestAutoFullscreenAndLandscape().catch(() => {});
     if (!handleSelectContent(item)) return;
     setIsPlayerOnlyPlayback(true);
     const continuity = storageService.getPlaybackContinuity(item);
     navigate(getWatchRoute(item, continuity.season, continuity.episode));
-  }, [handleSelectContent, navigate]);
+  }, [handleSelectContent, navigate, isAuthenticated]);
 
   const handleCloseDetailModal = useCallback(() => {
+    mobileFullscreenService.exitMobileFullscreen({ force: true }).catch(() => {});
     const currentId = selectedContent?.id || activeDetailId;
     if (currentId) {
       closedContentIdRef.current = String(currentId);

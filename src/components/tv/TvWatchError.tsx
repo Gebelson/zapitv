@@ -13,7 +13,8 @@ export const TvWatchError: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const { ref, focused } = useTvFocusable({
     focusKey: 'tv-error-back',
     onEnterPress: leave,
-    autoScroll: false
+    autoScroll: false,
+    onArrowPress: () => false
   });
 
   useEffect(() => {

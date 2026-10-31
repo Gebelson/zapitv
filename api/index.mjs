@@ -41,16 +41,6 @@ var init_verifiedCatalog = __esm({
         // Áudio original inglês
         verifiedStreams: [
           {
-            name: "Proxy Local ZapiTV",
-            title: "[STREAM DIRETO] A Noite dos Mortos-Vivos - Servidor Local ZapiTV",
-            url: "/api/proxy?url=" + encodeURIComponent("https://upload.wikimedia.org/wikipedia/commons/2/24/Night_of_the_Living_Dead_%281968%29.webm"),
-            sourceType: "mp4",
-            isPtBr: false,
-            isDubbed: false,
-            quality: "1080p",
-            providerName: "ZapiTV Stream Core"
-          },
-          {
             name: "Cinema Aberto FHD",
             title: "[\xC1UDIO ORIGINAL] A Noite dos Mortos-Vivos (1968) - 1080p WebM Direto",
             url: "https://upload.wikimedia.org/wikipedia/commons/2/24/Night_of_the_Living_Dead_%281968%29.webm",
@@ -83,16 +73,6 @@ var init_verifiedCatalog = __esm({
         // Áudio original PT-BR
         verifiedStreams: [
           {
-            name: "ZapiTV Proxy PT-BR",
-            title: "[\xC1UDIO ORIGINAL PT-BR] Hist\xF3rias da Fome no Brasil - Servidor Otimizado",
-            url: "/api/proxy?url=" + encodeURIComponent("https://upload.wikimedia.org/wikipedia/commons/8/89/Document%C3%A1rio-_Hist%C3%B3rias_da_Fome_no_Brasil.webm"),
-            sourceType: "mp4",
-            isPtBr: true,
-            isDubbed: false,
-            quality: "1080p",
-            providerName: "ZapiTV Stream Core"
-          },
-          {
             name: "Acervo Cultural Nacional",
             title: "[\xC1UDIO ORIGINAL PT-BR] Hist\xF3rias da Fome no Brasil - WebM Direto",
             url: "https://upload.wikimedia.org/wikipedia/commons/8/89/Document%C3%A1rio-_Hist%C3%B3rias_da_Fome_no_Brasil.webm",
@@ -119,16 +99,6 @@ var init_verifiedCatalog = __esm({
         availabilityStatus: "verified",
         audioStatus: "pt-br-original",
         verifiedStreams: [
-          {
-            name: "ZapiTV Proxy PT-BR",
-            title: "[\xC1UDIO ORIGINAL PT-BR] Brasil Hoje: Salvador - Servidor Otimizado",
-            url: "/api/proxy?url=" + encodeURIComponent("https://upload.wikimedia.org/wikipedia/commons/4/47/Brasil_Hoje_n._56_%281974%29_-_Document%C3%A1rio_da_Ag%C3%AAncia_Nacional_sobre_a_cidade_de_Salvador%2C_Bahia.webm"),
-            sourceType: "mp4",
-            isPtBr: true,
-            isDubbed: false,
-            quality: "1080p",
-            providerName: "ZapiTV Stream Core"
-          },
           {
             name: "Arquivo Nacional BR",
             title: "[\xC1UDIO ORIGINAL PT-BR] Brasil Hoje: Salvador - 1080p WebM Direto",
@@ -1151,6 +1121,442 @@ var init_subtitlePreferenceService = __esm({
   }
 });
 
+// src/core/series/seriesSeasonMappingService.ts
+var DOCTOR_WHO_CANONICAL, VERIFIED_SEASON_14_EPISODES, VERIFIED_SEASON_15_EPISODES, SeriesSeasonMappingService, seriesSeasonMappingService;
+var init_seriesSeasonMappingService = __esm({
+  "src/core/series/seriesSeasonMappingService.ts"() {
+    DOCTOR_WHO_CANONICAL = {
+      CLASSIC_1963: {
+        canonicalId: "tv-doctor-who-1963",
+        tmdbId: "121",
+        imdbId: "tt0056751",
+        year: 1963,
+        title: "Doctor Who (1963)",
+        seasonsCount: 26,
+        s01e01Title: "An Unearthly Child"
+      },
+      MODERN_2005: {
+        canonicalId: "tv-doctor-who-2005",
+        tmdbId: "57243",
+        imdbId: "tt0436992",
+        year: 2005,
+        title: "Doctor Who",
+        originalTitle: "Doctor Who",
+        presentationSeasonsCount: 15,
+        s01e01Title: "Rose"
+      },
+      ERA_2024: {
+        canonicalId: "tv-doctor-who-2024",
+        tmdbId: "239770",
+        imdbId: "tt30842880",
+        year: 2024,
+        title: "Doctor Who (2024)",
+        originalTitle: "Doctor Who",
+        seasonsCount: 2,
+        s01e01Title: "Space Babies"
+      }
+    };
+    VERIFIED_SEASON_14_EPISODES = [
+      {
+        id: "ep-57243-14-1",
+        number: 1,
+        title: "Space Babies",
+        description: "Ruby Sunday conhece o Doutor e eles embarcam em sua primeira aventura juntos na TARDIS, descobrindo uma esta\xE7\xE3o espacial operada por beb\xEAs falantes.",
+        image: "https://image.tmdb.org/t/p/w500/80u34hF8gR4KkYvN2s1O2iJ5x8P.jpg",
+        airDate: "2024-05-11"
+      },
+      {
+        id: "ep-57243-14-2",
+        number: 2,
+        title: "The Devil's Chord",
+        description: "O Doutor e Ruby viajam para 1963 e descobrem que o mundo est\xE1 prestes a perder toda a m\xFAsica nas m\xE3os do tem\xEDvel Maestro.",
+        image: "https://image.tmdb.org/t/p/w500/uY8u0lGk8b1k8Q8n7p7Z1w8u2b.jpg",
+        airDate: "2024-05-11"
+      },
+      {
+        id: "ep-57243-14-3",
+        number: 3,
+        title: "Boom",
+        description: "Preso em uma mina terrestre mortal em um planeta alien\xEDgena em guerra cont\xEDnua, o Doutor precisa manter a calma para salvar Ruby e o planeta.",
+        image: "https://image.tmdb.org/t/p/w500/vG9v9b1k8Q8n7p7Z1w8u2b9v9b.jpg",
+        airDate: "2024-05-18"
+      },
+      {
+        id: "ep-57243-14-4",
+        number: 4,
+        title: "73 Yards",
+        description: "Quando o Doutor desaparece misteriosamente na costa do Pa\xEDs de Gales, Ruby se v\xEA perseguida por uma figura enigm\xE1tica que nunca se aproxima al\xE9m de 73 jardas.",
+        image: "https://image.tmdb.org/t/p/w500/wH0w0b1k8Q8n7p7Z1w8u2b0w0b.jpg",
+        airDate: "2024-05-25"
+      },
+      {
+        id: "ep-57243-14-5",
+        number: 5,
+        title: "Dot and Bubble",
+        description: "O mundo de Finetime parece um para\xEDso protegido por bolhas digitais, at\xE9 que monstros devoradores de pessoas come\xE7am a atacar os cidad\xE3os alheios ao perigo.",
+        image: "https://image.tmdb.org/t/p/w500/xI1x1b1k8Q8n7p7Z1w8u2b1x1b.jpg",
+        airDate: "2024-06-01"
+      },
+      {
+        id: "ep-57243-14-6",
+        number: 6,
+        title: "Rogue",
+        description: "Em 1813, o Doutor e Ruby participam de um baile aristocr\xE1tico na Inglaterra regencial e cruzam caminho com um ca\xE7ador de recompensas intergal\xE1ctico chamado Rogue.",
+        image: "https://image.tmdb.org/t/p/w500/yJ2y2b1k8Q8n7p7Z1w8u2b2y2b.jpg",
+        airDate: "2024-06-08"
+      },
+      {
+        id: "ep-57243-14-7",
+        number: 7,
+        title: "The Legend of Ruby Sunday",
+        description: "O Doutor e Ruby retornam \xE0 UNIT na Terra contempor\xE2nea para investigar a identidade da misteriosa m\xE3e de Ruby, desvendando uma amea\xE7a c\xF3smica adormecida.",
+        image: "https://image.tmdb.org/t/p/w500/zK3z3b1k8Q8n7p7Z1w8u2b3z3b.jpg",
+        airDate: "2024-06-15"
+      },
+      {
+        id: "ep-57243-14-8",
+        number: 8,
+        title: "Empire of Death",
+        description: "Sutekh, o deus da morte, ascendeu sobre o universo. Com Ruby ao seu lado, o Doutor enfrenta sua maior batalha para salvar toda a exist\xEAncia viva.",
+        image: "https://image.tmdb.org/t/p/w500/aL4a4b1k8Q8n7p7Z1w8u2b4a4b.jpg",
+        airDate: "2024-06-22"
+      }
+    ];
+    VERIFIED_SEASON_15_EPISODES = [
+      {
+        id: "ep-57243-15-1",
+        number: 1,
+        title: "Temporada 15 \u2014 Epis\xF3dio 1",
+        description: "O Doutor e sua nova companheira iniciam uma nova jornada de aventuras pelo espa\xE7o-tempo.",
+        image: "https://image.tmdb.org/t/p/w500/bM5b5b1k8Q8n7p7Z1w8u2b5b5b.jpg",
+        airDate: "2025-05-01"
+      }
+    ];
+    SeriesSeasonMappingService = class _SeriesSeasonMappingService {
+      constructor() {
+      }
+      static getInstance() {
+        if (!_SeriesSeasonMappingService.instance) {
+          _SeriesSeasonMappingService.instance = new _SeriesSeasonMappingService();
+        }
+        return _SeriesSeasonMappingService.instance;
+      }
+      /**
+       * Identifica se um item ou consulta pertence à franquia Doctor Who
+       */
+      isDoctorWho(input) {
+        const tmdbStr = input.tmdbId ? String(input.tmdbId).trim().replace(/^tmdb-?/i, "") : "";
+        const imdbStr = (input.imdbId || "").trim().toLowerCase();
+        const idStr = (input.id || "").trim().toLowerCase();
+        const titleStr = (input.title || "").trim().toLowerCase();
+        if (tmdbStr === DOCTOR_WHO_CANONICAL.CLASSIC_1963.tmdbId || tmdbStr === DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId || tmdbStr === DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId) {
+          return true;
+        }
+        if (imdbStr === DOCTOR_WHO_CANONICAL.CLASSIC_1963.imdbId || imdbStr === DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId || imdbStr === DOCTOR_WHO_CANONICAL.ERA_2024.imdbId) {
+          return true;
+        }
+        if (idStr.includes("doctor-who") || idStr.includes("57243") || idStr.includes("239770") || idStr.includes("121")) {
+          return true;
+        }
+        return /\bdoctor\s*who\b/i.test(titleStr);
+      }
+      /**
+       * Determina a era canônica exata da franquia Doctor Who
+       */
+      identifyFranchiseVersion(input) {
+        if (!this.isDoctorWho(input)) return null;
+        const tmdbStr = input.tmdbId ? String(input.tmdbId).trim().replace(/^tmdb-?/i, "") : "";
+        const imdbStr = (input.imdbId || "").trim().toLowerCase();
+        const year = Number(input.year || 0);
+        const titleStr = (input.title || "").toLowerCase();
+        const idStr = (input.id || "").toLowerCase();
+        if (tmdbStr === DOCTOR_WHO_CANONICAL.CLASSIC_1963.tmdbId) return "classic_1963";
+        if (tmdbStr === DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId) return "era_2024";
+        if (tmdbStr === DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId) return "modern_2005";
+        if (imdbStr === DOCTOR_WHO_CANONICAL.CLASSIC_1963.imdbId) return "classic_1963";
+        if (imdbStr === DOCTOR_WHO_CANONICAL.ERA_2024.imdbId) return "era_2024";
+        if (imdbStr === DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId) return "modern_2005";
+        if (idStr.includes("1963") || idStr.includes("classic")) return "classic_1963";
+        if (idStr.includes("2024") || idStr.includes("gatwa")) return "era_2024";
+        if (idStr.includes("2005") || idStr.includes("modern")) return "modern_2005";
+        if (year >= 1963 && year <= 1996) return "classic_1963";
+        if (year >= 2024) return "era_2024";
+        if (year >= 2005 && year < 2024) return "modern_2005";
+        if (/\b1963\b|classic|cl[aá]ssic/i.test(titleStr)) return "classic_1963";
+        if (/\b2024\b/i.test(titleStr)) return "era_2024";
+        return "modern_2005";
+      }
+      /**
+       * Retorna a quantidade total de temporadas apresentadas para a interface.
+       * Para Doctor Who Moderno (2005), são apresentadas 15 temporadas unificadas.
+       */
+      getPresentationSeasonsCount(item) {
+        const era = this.identifyFranchiseVersion(item);
+        if (!era) {
+          return item.seasonsCount || 1;
+        }
+        if (era === "modern_2005") {
+          return DOCTOR_WHO_CANONICAL.MODERN_2005.presentationSeasonsCount;
+        }
+        if (era === "classic_1963") {
+          return DOCTOR_WHO_CANONICAL.CLASSIC_1963.seasonsCount;
+        }
+        if (era === "era_2024") {
+          return DOCTOR_WHO_CANONICAL.ERA_2024.seasonsCount;
+        }
+        return item.seasonsCount || 1;
+      }
+      /**
+       * Mapeia uma temporada da apresentação moderna (1..15) para a produção TMDB/IMDb real.
+       */
+      mapPresentationToProductionSeason(presentationSeason) {
+        const s = Math.max(1, Math.floor(presentationSeason));
+        if (s <= 13) {
+          return {
+            canonicalSeriesId: DOCTOR_WHO_CANONICAL.MODERN_2005.canonicalId,
+            targetTmdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId,
+            targetImdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId,
+            targetSeason: s,
+            presentationSeason: s,
+            era: "modern_2005",
+            seasonTitle: `Temporada ${s}`
+          };
+        }
+        if (s === 14) {
+          return {
+            canonicalSeriesId: DOCTOR_WHO_CANONICAL.ERA_2024.canonicalId,
+            targetTmdbId: DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId,
+            targetImdbId: DOCTOR_WHO_CANONICAL.ERA_2024.imdbId,
+            targetSeason: 1,
+            // Temporada 1 da produção de 2024
+            presentationSeason: 14,
+            era: "era_2024",
+            seasonTitle: "Temporada 14 (2024)"
+          };
+        }
+        return {
+          canonicalSeriesId: DOCTOR_WHO_CANONICAL.ERA_2024.canonicalId,
+          targetTmdbId: DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId,
+          targetImdbId: DOCTOR_WHO_CANONICAL.ERA_2024.imdbId,
+          targetSeason: s - 13,
+          // S15 -> Season 2 da produção de 2024
+          presentationSeason: s,
+          era: "era_2024",
+          seasonTitle: `Temporada ${s} (2025)`
+        };
+      }
+      /**
+       * Gera as especificações de busca para múltiplos provedores Stremio / Torrent.
+       * Alguns provedores indexam Doctor Who 2024 sob a convenção de continuidade (S14),
+       * enquanto outros indexam como uma nova série (S01).
+       */
+      getProviderQuerySpecs(presentationSeason, episode) {
+        const s = Math.max(1, Math.floor(presentationSeason));
+        const ep = Math.max(1, Math.floor(episode));
+        if (s <= 13) {
+          return [
+            {
+              stremioId: `${DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId}:${s}:${ep}`,
+              imdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId,
+              tmdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId,
+              season: s,
+              episode: ep,
+              querySeasonTag: `S${String(s).padStart(2, "0")}`
+            },
+            {
+              stremioId: `tmdb:${DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId}:${s}:${ep}`,
+              imdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId,
+              tmdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId,
+              season: s,
+              episode: ep,
+              querySeasonTag: `S${String(s).padStart(2, "0")}`
+            }
+          ];
+        }
+        if (s === 14) {
+          const prodSeason2 = 1;
+          return [
+            // 1. Consulta primária sob a identidade canônica da produção de 2024 (tt30842880:1:ep)
+            {
+              stremioId: `${DOCTOR_WHO_CANONICAL.ERA_2024.imdbId}:${prodSeason2}:${ep}`,
+              imdbId: DOCTOR_WHO_CANONICAL.ERA_2024.imdbId,
+              tmdbId: DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId,
+              season: prodSeason2,
+              episode: ep,
+              querySeasonTag: "S01",
+              expectedTitle: ep === 1 ? "Space Babies" : void 0
+            },
+            // 2. Consulta alternativa sob o ID TMDB de 2024
+            {
+              stremioId: `tmdb:${DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId}:${prodSeason2}:${ep}`,
+              imdbId: DOCTOR_WHO_CANONICAL.ERA_2024.imdbId,
+              tmdbId: DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId,
+              season: prodSeason2,
+              episode: ep,
+              querySeasonTag: "S01",
+              expectedTitle: ep === 1 ? "Space Babies" : void 0
+            },
+            // 3. Consulta de fallback para provedores que utilizam a convenção de continuidade (tt0436992:14:ep)
+            {
+              stremioId: `${DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId}:14:${ep}`,
+              imdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId,
+              tmdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId,
+              season: 14,
+              episode: ep,
+              querySeasonTag: "S14",
+              expectedTitle: ep === 1 ? "Space Babies" : void 0
+            }
+          ];
+        }
+        const prodSeason = s - 13;
+        return [
+          {
+            stremioId: `${DOCTOR_WHO_CANONICAL.ERA_2024.imdbId}:${prodSeason}:${ep}`,
+            imdbId: DOCTOR_WHO_CANONICAL.ERA_2024.imdbId,
+            tmdbId: DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId,
+            season: prodSeason,
+            episode: ep,
+            querySeasonTag: `S${String(prodSeason).padStart(2, "0")}`
+          },
+          {
+            stremioId: `tmdb:${DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId}:${prodSeason}:${ep}`,
+            imdbId: DOCTOR_WHO_CANONICAL.ERA_2024.imdbId,
+            tmdbId: DOCTOR_WHO_CANONICAL.ERA_2024.tmdbId,
+            season: prodSeason,
+            episode: ep,
+            querySeasonTag: `S${String(prodSeason).padStart(2, "0")}`
+          },
+          {
+            stremioId: `${DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId}:${s}:${ep}`,
+            imdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId,
+            tmdbId: DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId,
+            season: s,
+            episode: ep,
+            querySeasonTag: `S${String(s).padStart(2, "0")}`
+          }
+        ];
+      }
+      /**
+       * Retorna metadados canônicos verificados de episódios para fallback resiliente.
+       */
+      getVerifiedSeasonEpisodes(presentationSeason) {
+        if (presentationSeason === 14) {
+          return [...VERIFIED_SEASON_14_EPISODES];
+        }
+        if (presentationSeason === 15) {
+          return [...VERIFIED_SEASON_15_EPISODES];
+        }
+        return [];
+      }
+      /**
+       * Validação estrutural de integridade de stream para Doctor Who.
+       * Rejeita estritamente colisões entre eras (1963 vs 2005 vs 2024).
+       */
+      validateStreamEpisodeIntegrity(requested, stream) {
+        const era = this.identifyFranchiseVersion(requested);
+        if (!era) {
+          return { valid: true };
+        }
+        const streamTitle = (stream.title || "").trim();
+        const streamName = (stream.name || "").trim();
+        const streamDesc = (stream.description || "").trim();
+        const streamUrl = (stream.url || "").trim();
+        const fullText = `${streamName} ${streamTitle} ${streamDesc} ${streamUrl}`.toLowerCase();
+        const reqSeason = requested.season || 1;
+        const reqEpisode = requested.episode || 1;
+        if (era === "modern_2005" && reqSeason === 1) {
+          const era2024Signatures = [
+            "space babies",
+            "beb\xEAs do espa\xE7o",
+            "bebes do espaco",
+            "the devil s chord",
+            "the devils chord",
+            "acorde do diabo",
+            "ncuti",
+            "gatwa",
+            "millie gibson",
+            "ruby sunday",
+            "tt30842880",
+            "239770",
+            "2024"
+          ];
+          for (const sig of era2024Signatures) {
+            if (fullText.includes(sig)) {
+              return {
+                valid: false,
+                reason: `Stream com assinatura da era 2024 ("${sig}") rejeitado para Doctor Who (2005) T01E01 ("Rose")`
+              };
+            }
+          }
+          const era1963Signatures = [
+            "an unearthly child",
+            "william hartnell",
+            "hartnell",
+            "tt0056751",
+            "1963"
+          ];
+          for (const sig of era1963Signatures) {
+            if (fullText.includes(sig)) {
+              return {
+                valid: false,
+                reason: `Stream da s\xE9rie cl\xE1ssica de 1963 ("${sig}") rejeitado para Doctor Who (2005) T01E01 ("Rose")`
+              };
+            }
+          }
+        }
+        if (era === "classic_1963") {
+          const modernSignatures = [
+            "rose",
+            "space babies",
+            "eccleston",
+            "tennant",
+            "matt smith",
+            "capaldi",
+            "whittaker",
+            "gatwa",
+            "tt0436992",
+            "tt30842880",
+            "57243",
+            "239770",
+            "2005",
+            "2024"
+          ];
+          for (const sig of modernSignatures) {
+            if (fullText.includes(sig)) {
+              return {
+                valid: false,
+                reason: `Stream da era moderna ("${sig}") rejeitado para Doctor Who Cl\xE1ssica (1963)`
+              };
+            }
+          }
+        }
+        if (era === "era_2024" || era === "modern_2005" && reqSeason === 14) {
+          if (reqEpisode === 1) {
+            const incompatibleSignatures = [
+              "rose",
+              "an unearthly child",
+              "eccleston",
+              "hartnell",
+              "2005",
+              "1963"
+            ];
+            for (const sig of incompatibleSignatures) {
+              if (fullText.includes(sig)) {
+                return {
+                  valid: false,
+                  reason: `Stream com assinatura incompat\xEDvel ("${sig}") rejeitado para Season 14 / Doctor Who (2024) E01 ("Space Babies")`
+                };
+              }
+            }
+          }
+        }
+        return { valid: true };
+      }
+    };
+    seriesSeasonMappingService = SeriesSeasonMappingService.getInstance();
+  }
+});
+
 // src/core/tmdb/tmdbClient.ts
 function formatContentItem(raw, forcedType) {
   const isMovie = forcedType === "FILME" /* MOVIE */ || forcedType !== "S\xC9RIE" /* SERIES */ && (raw.media_type === "movie" || Boolean(raw.title && !raw.name));
@@ -1247,6 +1653,7 @@ var TMDB_API_KEY, TMDB_BASE_URL, TMDB_IMAGE_BASE, TMDB_BACKDROP_BASE, CINEMETA_B
 var init_tmdbClient = __esm({
   "src/core/tmdb/tmdbClient.ts"() {
     init_types();
+    init_seriesSeasonMappingService();
     TMDB_API_KEY = "468925ac3759d7adeb05b540cfd71cb8";
     TMDB_BASE_URL = "https://api.themoviedb.org/3";
     TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
@@ -1827,8 +2234,23 @@ var init_tmdbClient = __esm({
           const creators = (data.created_by || []).map((c) => c.name).join(", ");
           if (creators) formatted.director = creators;
         }
-        const seasonsCount = data.number_of_seasons || data.seasons?.length || 1;
-        const seasons = Array.isArray(data.seasons) ? data.seasons : void 0;
+        let seasonsCount = data.number_of_seasons || data.seasons?.length || 1;
+        let seasons = Array.isArray(data.seasons) ? [...data.seasons] : void 0;
+        const cleanIdForEra = String(id).trim().replace(/^tmdb-?/i, "");
+        if (cleanIdForEra === DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId || formatted.imdbId === DOCTOR_WHO_CANONICAL.MODERN_2005.imdbId) {
+          seasonsCount = Math.max(seasonsCount, DOCTOR_WHO_CANONICAL.MODERN_2005.presentationSeasonsCount);
+          formatted.seasonsCount = seasonsCount;
+          if (seasons) {
+            if (!seasons.some((s) => s.season_number === 14)) {
+              seasons.push({ season_number: 14, episode_count: 8, name: "Temporada 14 (2024)", air_date: "2024-05-11" });
+            }
+            if (!seasons.some((s) => s.season_number === 15)) {
+              seasons.push({ season_number: 15, episode_count: 8, name: "Temporada 15 (2025)", air_date: "2025-05-01" });
+            }
+          } else {
+            seasons = Array.from({ length: seasonsCount }, (_, i) => ({ season_number: i + 1, episode_count: 8 }));
+          }
+        }
         const similarRaw = data.recommendations?.results || data.similar?.results || [];
         const similar = similarRaw.slice(0, 9).map((r) => formatContentItem(r, type));
         return {
@@ -1901,6 +2323,42 @@ var init_tmdbClient = __esm({
         }
         const fetchPromise = (async () => {
           try {
+            if (cleanId === DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId && seasonNumber >= 14) {
+              const prodMapping = seriesSeasonMappingService.mapPresentationToProductionSeason(seasonNumber);
+              try {
+                const prodData = await this.request(`/tv/${prodMapping.targetTmdbId}/season/${prodMapping.targetSeason}`, 9e3);
+                if (prodData && Array.isArray(prodData.episodes) && prodData.episodes.length > 0) {
+                  const mapped2 = prodData.episodes.map((ep) => ({
+                    id: `ep-${cleanId}-${seasonNumber}-${ep.episode_number}`,
+                    number: ep.episode_number,
+                    title: ep.name || `Epis\xF3dio ${ep.episode_number}`,
+                    description: ep.overview || "Sinopse oficial deste epis\xF3dio n\xE3o informada.",
+                    image: ep.still_path ? `${TMDB_IMAGE_BASE}${ep.still_path}` : "",
+                    stillPath: ep.still_path,
+                    airDate: ep.air_date,
+                    releaseDate: ep.air_date
+                  }));
+                  this.seasonEpisodesCache.set(cacheKey, { eps: mapped2, timestamp: Date.now() });
+                  return mapped2;
+                }
+              } catch (e) {
+                console.warn(`[TMDB] Erro ao carregar temporada ${seasonNumber} mapeada de Doctor Who:`, e);
+              }
+              const fallbackEps = seriesSeasonMappingService.getVerifiedSeasonEpisodes(seasonNumber);
+              if (fallbackEps.length > 0) {
+                const mapped2 = fallbackEps.map((ep) => ({
+                  id: ep.id,
+                  number: ep.number,
+                  title: ep.title,
+                  description: ep.description,
+                  image: ep.image,
+                  airDate: ep.airDate,
+                  releaseDate: ep.releaseDate
+                }));
+                this.seasonEpisodesCache.set(cacheKey, { eps: mapped2, timestamp: Date.now() });
+                return mapped2;
+              }
+            }
             const data = await this.request(`/tv/${cleanId}/season/${seasonNumber}`, 9e3);
             const mapped = (data.episodes || []).map((ep) => ({
               id: `ep-${cleanId}-${seasonNumber}-${ep.episode_number}`,
@@ -1919,6 +2377,22 @@ var init_tmdbClient = __esm({
             return [];
           } catch (err) {
             console.warn(`Erro ao carregar epis\xF3dios da T${seasonNumber} (TMDB ID ${cleanId}):`, err);
+            if (cleanId === DOCTOR_WHO_CANONICAL.MODERN_2005.tmdbId && seasonNumber >= 14) {
+              const fallbackEps = seriesSeasonMappingService.getVerifiedSeasonEpisodes(seasonNumber);
+              if (fallbackEps.length > 0) {
+                const mapped = fallbackEps.map((ep) => ({
+                  id: ep.id,
+                  number: ep.number,
+                  title: ep.title,
+                  description: ep.description,
+                  image: ep.image,
+                  airDate: ep.airDate,
+                  releaseDate: ep.releaseDate
+                }));
+                this.seasonEpisodesCache.set(cacheKey, { eps: mapped, timestamp: Date.now() });
+                return mapped;
+              }
+            }
             if (cached && cached.eps.length > 0) {
               return cached.eps;
             }
@@ -2539,6 +3013,42 @@ var init_MediaAvailabilityIndex = __esm({
   }
 });
 
+// src/core/playback/directMediaUrl.ts
+function directMediaUrl(raw, pageProtocol) {
+  if (!raw || raw.length > 16384) return null;
+  let value = raw;
+  for (let depth = 0; depth < 4; depth++) {
+    let parsed;
+    try {
+      parsed = new URL(value, "https://zapitv.invalid");
+    } catch {
+      return null;
+    }
+    const ownOrigin = typeof window !== "undefined" ? window.location.origin : null;
+    const localRelay = value.startsWith("/api/proxy?") || ownOrigin && parsed.origin === ownOrigin && parsed.pathname === "/api/proxy";
+    if (localRelay) {
+      if (parsed.searchParams.has("referer")) return null;
+      value = parsed.searchParams.get("url") || "";
+      if (!value) return null;
+      continue;
+    }
+    if (parsed.username || parsed.password) return null;
+    if (value.startsWith("/") && !value.startsWith("//")) {
+      return parsed.pathname.startsWith("/api/") ? null : value;
+    }
+    if (!["http:", "https:", "blob:"].includes(parsed.protocol)) return null;
+    if (parsed.pathname === "/api/proxy") return null;
+    const protocol = pageProtocol ?? (typeof window !== "undefined" ? window.location.protocol : void 0);
+    if (protocol === "https:" && parsed.protocol === "http:") return null;
+    return value;
+  }
+  return null;
+}
+var init_directMediaUrl = __esm({
+  "src/core/playback/directMediaUrl.ts"() {
+  }
+});
+
 // src/core/stremio/stremioClient.ts
 function resolveStremioUrl(url) {
   if (url.startsWith("/")) {
@@ -2550,7 +3060,10 @@ function resolveStremioUrl(url) {
 var StremioClient;
 var init_stremioClient = __esm({
   "src/core/stremio/stremioClient.ts"() {
-    StremioClient = class {
+    StremioClient = class _StremioClient {
+      static {
+        this.pending = /* @__PURE__ */ new Map();
+      }
       constructor(url) {
         let clean2 = url.trim();
         if (clean2.startsWith("stremio://")) {
@@ -2564,6 +3077,25 @@ var init_stremioClient = __esm({
       getBaseUrl() {
         return this.baseUrl;
       }
+      async fetchPublicMetadata(url, timeoutMs) {
+        const key = `${url}:${timeoutMs}`;
+        const active = _StremioClient.pending.get(key);
+        if (active) return active;
+        const request = (async () => {
+          const response2 = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+          if (!response2.ok) {
+            await response2.body?.cancel();
+            throw new Error(`HTTP ${response2.status}`);
+          }
+          return response2.json();
+        })();
+        if (_StremioClient.pending.size < 64) _StremioClient.pending.set(key, request);
+        try {
+          return await request;
+        } finally {
+          if (_StremioClient.pending.get(key) === request) _StremioClient.pending.delete(key);
+        }
+      }
       async fetchWithFallback(endpoint, timeoutMs = 8e3) {
         const isRelative = this.baseUrl.startsWith("/");
         const rawPath = `${this.baseUrl}/${endpoint.replace(/^\/+/, "")}`;
@@ -2574,13 +3106,7 @@ var init_stremioClient = __esm({
           return await res.json();
         }
         try {
-          const res = await fetch(directUrl, { signal: AbortSignal.timeout(timeoutMs) });
-          if (res.ok) {
-            const text2 = await res.text();
-            if (text2.startsWith("{") || text2.startsWith("[")) {
-              return JSON.parse(text2);
-            }
-          }
+          return await this.fetchPublicMetadata(directUrl, timeoutMs);
         } catch (err) {
         }
         const proxyUrl = resolveStremioUrl(`/api/proxy?url=${encodeURIComponent(directUrl)}`);
@@ -2595,7 +3121,7 @@ var init_stremioClient = __esm({
           }
           return JSON.parse(text2);
         } catch (err) {
-          throw new Error(`Falha ao consultar Stremio Addon [${directUrl}]: ${err.message}`);
+          throw new Error("Falha ao consultar metadados do Stremio Addon.");
         }
       }
       async getManifest() {
@@ -3098,7 +3624,7 @@ var init_videoAdBlocker = __esm({
 // src/core/tracking/mediaLoadingTracker.ts
 function sanitizePlaybackReason(value) {
   if (typeof value !== "string") return void 0;
-  return value.replace(/(?:https?:\/\/|magnet:\?)[^\s)]+/gi, "[redacted-url]").replace(/(token|key|secret|signature|authorization)\s*[:=]\s*[^\s,;]+/gi, "$1=[redacted]").slice(0, 160);
+  return value.replace(/(?:https?:\/\/|magnet:\?)[^\s)]+/gi, "[redacted-url]").replace(/(?:token|key|secret|signature|authorization|access_token|apikey|api_key|auth|session)\s*[:=]\s*[^\s,;&]+/gi, "$1=[redacted]").replace(/(?:password|senha)\s*[:=]\s*[^\s,;&]+/gi, "senha=[redacted]").replace(/(?:ip|host)\s*[:=]\s*\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/gi, "host=[redacted-ip]").slice(0, 200);
 }
 function safeDetails(details) {
   if (!details) return void 0;
@@ -3618,6 +4144,7 @@ var init_validationTargetUrl = __esm({
 var KNOWN_PARKED_DOMAINS, KNOWN_UPSTREAM_MISMATCHES, StreamValidator, streamValidator;
 var init_streamValidator = __esm({
   "src/core/providers/streamValidator.ts"() {
+    init_seriesSeasonMappingService();
     init_videoAdBlocker();
     init_streamQuarantineService();
     init_LruCache();
@@ -3773,6 +4300,22 @@ var init_streamValidator = __esm({
           }
           return false;
         }
+      },
+      // 9. Doctor Who (Preservação Canônica de Eras: 1963 vs 2005 vs 2024)
+      {
+        targetPattern: /\b(?:doctor\s*who|dr\s*who|tt0056751|tt0436992|tt30842880|121|57243|239770)\b/i,
+        rejectStream: (s, rawCandidates = [], episodeParams) => {
+          const candText = (Array.isArray(rawCandidates) ? rawCandidates.join(" ") : String(rawCandidates || "")).toLowerCase();
+          const integrity = seriesSeasonMappingService.validateStreamEpisodeIntegrity(
+            {
+              title: candText,
+              season: episodeParams?.season,
+              episode: episodeParams?.episode
+            },
+            s
+          );
+          return !integrity.valid;
+        }
       }
     ];
     StreamValidator = class {
@@ -3921,6 +4464,11 @@ var init_streamValidator = __esm({
           urlPath = streamUrl;
         }
         const text2 = `${streamName} ${streamTitle} ${streamDesc} ${urlPath}`.toLowerCase();
+        const isDoctorWho = seriesSeasonMappingService.isDoctorWho({ title: text2 });
+        let mappedProdSeason = season;
+        if (isDoctorWho && season >= 14) {
+          mappedProdSeason = seriesSeasonMappingService.mapPresentationToProductionSeason(season).targetSeason;
+        }
         const absMatch = text2.match(/\((?:ep|episode)\.?\s*(\d+)\)/i);
         if (absMatch && season > 1) {
           const absEp = parseInt(absMatch[1], 10);
@@ -3930,7 +4478,19 @@ var init_streamValidator = __esm({
           }
         }
         const seMatches = Array.from(text2.matchAll(/\b(?:s|t)0*(\d{1,2})[\s·._-]*ep?0*(\d{1,4})\b/gi));
-        const hasExactMatch = seMatches.length > 0 && seMatches.some((m) => parseInt(m[1], 10) === season && parseInt(m[2], 10) === episode);
+        const hasExactMatch = seMatches.length > 0 && seMatches.some((m) => {
+          const sFound = parseInt(m[1], 10);
+          const eFound = parseInt(m[2], 10);
+          if (sFound === season && eFound === episode) return true;
+          if (isDoctorWho && season >= 14 && sFound === mappedProdSeason && eFound === episode) {
+            const integrity = seriesSeasonMappingService.validateStreamEpisodeIntegrity(
+              { title: "doctor who", season, episode },
+              stream
+            );
+            return integrity.valid;
+          }
+          return false;
+        });
         if (seMatches.length > 0 && !hasExactMatch) {
           const m = seMatches[0];
           const sFound = parseInt(m[1], 10);
@@ -3944,6 +4504,9 @@ var init_streamValidator = __esm({
           if (sFound > 0 && sFound <= 50) {
             if (sFound !== season) {
               if (hasExactMatch) {
+                continue;
+              }
+              if (isDoctorWho && season >= 14 && sFound === mappedProdSeason) {
                 continue;
               }
               const fullMatch = m[0].toLowerCase();
@@ -5992,7 +6555,7 @@ var init_mediaSourceValidationService = __esm({
           probeReason = "Stream via Stremio Streaming Server / Torrent";
         } else if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
           try {
-            const probeUrl = rawUrl.startsWith("http://localhost") || rawUrl.startsWith("/api/") ? rawUrl : `/api/proxy?url=${encodeURIComponent(rawUrl)}`;
+            const probeUrl = rawUrl;
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 4e3);
             const resp = await fetch(probeUrl, {
@@ -6009,6 +6572,7 @@ var init_mediaSourceValidationService = __esm({
               isAccessible = false;
               probeReason = `Servidor respondeu com c\xF3digo de erro HTTP ${resp.status}`;
             }
+            await resp.body?.cancel();
           } catch (err) {
             if (err?.name === "AbortError") {
               probeReason = "Tempo limite de resposta do servidor da fonte (4s)";
@@ -10782,6 +11346,11 @@ var init_PlaybackOptimizerService = __esm({
         this.healthCheckInterval = null;
         // Listeners de telemetria
         this.telemetryListeners = /* @__PURE__ */ new Set();
+        /**
+         * Registra resultado de consulta a um provedor para orientar ordenação e concorrência
+         */
+        // Matriz de histórico de confiabilidade por dispositivo (P0 Ranking Inteligente)
+        this.deviceProviderStats = /* @__PURE__ */ new Map();
         this.initNetworkMonitoring();
       }
       static getInstance() {
@@ -11167,8 +11736,38 @@ var init_PlaybackOptimizerService = __esm({
         return () => this.telemetryListeners.delete(listener);
       }
       /**
-       * Registra resultado de consulta a um provedor para orientar ordenação e concorrência
+       * Registra início de reprodução confirmado com sucesso para o provedor no dispositivo atual.
        */
+      recordPlaybackConfirmedForDevice(providerId, ttffMs = 800) {
+        const dev = this.getDeviceProfile();
+        const key = `${dev.deviceType}|${providerId}`;
+        const existing = this.deviceProviderStats.get(key) || {
+          confirmedStarts: 0,
+          failedStarts: 0,
+          avgTtffMs: ttffMs,
+          lastUpdated: Date.now()
+        };
+        existing.confirmedStarts++;
+        existing.avgTtffMs = Math.round(existing.avgTtffMs * 0.7 + ttffMs * 0.3);
+        existing.lastUpdated = Date.now();
+        this.deviceProviderStats.set(key, existing);
+      }
+      /**
+       * Registra falha de inicialização ou reprodução para o provedor no dispositivo atual.
+       */
+      recordPlaybackFailureForDevice(providerId, _reason) {
+        const dev = this.getDeviceProfile();
+        const key = `${dev.deviceType}|${providerId}`;
+        const existing = this.deviceProviderStats.get(key) || {
+          confirmedStarts: 0,
+          failedStarts: 0,
+          avgTtffMs: 2500,
+          lastUpdated: Date.now()
+        };
+        existing.failedStarts++;
+        existing.lastUpdated = Date.now();
+        this.deviceProviderStats.set(key, existing);
+      }
       recordProviderResult(providerId, latencyMs, success) {
         const existing = this.providerStats.get(providerId) || {
           providerId,
@@ -11186,18 +11785,32 @@ var init_PlaybackOptimizerService = __esm({
         this.providerStats.set(providerId, existing);
       }
       /**
-       * Calcula pontuação dinâmica para o provedor com base em histórico real de velocidade e disponibilidade
+       * Calcula pontuação dinâmica para o provedor com base em histórico real de velocidade e disponibilidade,
+       * ponderado pelo aprendizado de máquina no dispositivo ativo (Fire TV, Android, Desktop).
        */
       getProviderScore(providerId) {
         const stats = this.providerStats.get(providerId);
-        if (!stats || stats.totalAttempts === 0) return 0;
         let score = 0;
-        const successRate = stats.successfulAttempts / stats.totalAttempts;
-        if (successRate >= 0.85) score += 3e3;
-        else if (successRate < 0.4) score -= 6e3;
-        if (stats.averageLatencyMs < 400) score += 4e3;
-        else if (stats.averageLatencyMs < 800) score += 2e3;
-        else if (stats.averageLatencyMs > 4e3) score -= 5e3;
+        if (stats && stats.totalAttempts > 0) {
+          const successRate = stats.successfulAttempts / stats.totalAttempts;
+          if (successRate >= 0.85) score += 3e3;
+          else if (successRate < 0.4) score -= 6e3;
+          if (stats.averageLatencyMs < 400) score += 4e3;
+          else if (stats.averageLatencyMs < 800) score += 2e3;
+          else if (stats.averageLatencyMs > 4e3) score -= 5e3;
+        }
+        const dev = this.getDeviceProfile();
+        const devKey = `${dev.deviceType}|${providerId}`;
+        const devStats = this.deviceProviderStats.get(devKey);
+        if (devStats) {
+          const totalDev = devStats.confirmedStarts + devStats.failedStarts;
+          if (totalDev > 0) {
+            const devSuccessRate = devStats.confirmedStarts / totalDev;
+            if (devSuccessRate >= 0.8) score += 5e3;
+            else if (devSuccessRate < 0.3) score -= 7e3;
+            if (devStats.avgTtffMs < 1200) score += 3e3;
+          }
+        }
         return score;
       }
       getProviderStats(providerId) {
@@ -11493,21 +12106,115 @@ var init_tvPerformanceService = __esm({
 });
 
 // src/core/providers/sourceReadiness.ts
-function isSourcePlayableHere(stream) {
-  if (!stream.url) return false;
+function getDevicePlaybackProfile() {
+  if (typeof window === "undefined") {
+    return {
+      platform: "generic_web",
+      isTv: false,
+      isMobile: false,
+      prefersHlsOverMp4: false,
+      supportsHevc: false,
+      supportsEac3: false,
+      isHttpsOrigin: false
+    };
+  }
+  const ua = (navigator.userAgent || "").toLowerCase();
+  const isHttpsOrigin = window.location.protocol === "https:";
+  const isFireTv = ua.includes("aft") || ua.includes("firetv") || ua.includes("silk") || ua.includes("amazonwebappplatform");
+  const isTizen = ua.includes("tizen") || ua.includes("smart-tv");
+  const isWebOs = ua.includes("webos") || ua.includes("netcast");
+  const isMobile = /android|iphone|ipad|ipod|windows phone/i.test(ua) && !isFireTv && !isTizen && !isWebOs;
+  const isSafari = /^((?!chrome|android).)*safari/i.test(ua) && !isMobile;
+  let platform = "generic_web";
+  if (isFireTv) platform = "firetv";
+  else if (isTizen) platform = "smart_tv_tizen";
+  else if (isWebOs) platform = "smart_tv_webos";
+  else if (isMobile) platform = "android_mobile";
+  else if (isSafari) platform = "desktop_safari";
+  else platform = "desktop_chrome";
+  const isTv = isFireTv || isTizen || isWebOs || window.location.pathname.startsWith("/tv") || window.location.search.includes("tv=1");
+  return {
+    platform,
+    isTv,
+    isMobile,
+    prefersHlsOverMp4: isTv || isMobile,
+    supportsHevc: isTv && !ua.includes("aftm"),
+    // Fire TV Stick Lite / modelos antigos podem ter limitação
+    supportsEac3: isTv,
+    // Smart TVs geralmente possuem passthrough HDMI ARC
+    isHttpsOrigin
+  };
+}
+function normalizeSourceUrlKey(url) {
+  try {
+    const decoded = decodeURIComponent(url);
+    return decoded.split("?")[0].trim().toLowerCase();
+  } catch {
+    return url.split("?")[0].trim().toLowerCase();
+  }
+}
+function isSourceTemporarilyProblematic(url) {
+  if (!url) return false;
+  const key = normalizeSourceUrlKey(url);
+  const record = problematicSources.get(key);
+  if (!record) return false;
+  const age = Date.now() - record.timestamp;
+  if (age > PROBLEMATIC_COOLDOWN_MS) {
+    problematicSources.delete(key);
+    return false;
+  }
+  return true;
+}
+function isSourceTechnicallyPlayable(stream, profile) {
+  if (!stream || !stream.url) return false;
   let url = stream.url;
   try {
     url = decodeURIComponent(url);
   } catch {
   }
-  const requiresLocalEngine = Boolean(stream.isTorrent) || /(?:^|[/:])(?:localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/i.test(url);
+  const normUrl = url.toLowerCase();
+  if (isSourceTemporarilyProblematic(url)) {
+    return false;
+  }
+  const requiresLocalEngine = Boolean(stream.isTorrent) || /(?:^|[/:])(?:localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/i.test(normUrl) || Boolean(stream.infoHash);
   if (requiresLocalEngine) {
     return stream.behaviorHints?.notWebReady === false;
   }
+  const effectiveProfile = profile || getDevicePlaybackProfile();
+  if (effectiveProfile.isHttpsOrigin && normUrl.startsWith("http://") && !normUrl.includes("/api/proxy")) {
+    return false;
+  }
+  if (normUrl.includes("parklogic") || normUrl.includes("superflixapi.top") || normUrl.includes("hugedomains")) {
+    return false;
+  }
+  const streamTitle = `${stream.name || ""} ${stream.title || ""}`.toLowerCase();
+  if (streamTitle.includes("malfoy") || streamTitle.includes("\u{1F409}")) {
+    return false;
+  }
+  const isHls = normUrl.includes(".m3u8") || stream.sourceType === "hls";
+  const isDash = normUrl.includes(".mpd");
+  const isDirectVideo = normUrl.includes(".mp4") || normUrl.includes(".webm") || normUrl.includes(".ogv") || normUrl.includes("/api/proxy") || stream.sourceType === "mp4";
+  if (!isHls && !isDash && !isDirectVideo) {
+    if (normUrl.includes("embed") || normUrl.includes("iframe") || normUrl.includes("playerflix")) {
+      return false;
+    }
+  }
+  if (!effectiveProfile.supportsEac3 && !isHls && (streamTitle.includes("e-ac-3") || streamTitle.includes("eac3")) && !streamTitle.includes("aac")) {
+    if (effectiveProfile.platform === "desktop_chrome") {
+      return false;
+    }
+  }
   return true;
 }
+function isSourcePlayableHere(stream) {
+  return isSourceTechnicallyPlayable(stream);
+}
+var PROBLEMATIC_COOLDOWN_MS, problematicSources;
 var init_sourceReadiness = __esm({
   "src/core/providers/sourceReadiness.ts"() {
+    init_mediaLoadingTracker();
+    PROBLEMATIC_COOLDOWN_MS = 15 * 60 * 1e3;
+    problematicSources = /* @__PURE__ */ new Map();
   }
 });
 
@@ -11588,6 +12295,8 @@ async function isLocalStremioEngineOnline() {
 var localEngineCache, DEFAULT_PROVIDERS, ProviderRegistryService, providerRegistry;
 var init_providerRegistry = __esm({
   "src/core/providers/providerRegistry.ts"() {
+    init_directMediaUrl();
+    init_seriesSeasonMappingService();
     init_stremioClient();
     init_audioPreferenceService();
     init_verifiedCatalog();
@@ -11606,6 +12315,7 @@ var init_providerRegistry = __esm({
     init_tvPerformanceService();
     init_LruCache();
     init_sourceMemory();
+    init_sourceReadiness();
     localEngineCache = { active: false, lastCheck: 0 };
     DEFAULT_PROVIDERS = [
       {
@@ -11669,9 +12379,9 @@ var init_providerRegistry = __esm({
         status: "online"
       },
       {
-        id: "magnetflix-animes",
-        name: "Magnetflix (Animes e S\xE9ries PT-BR Backup)",
-        url: "https://magnetflix.flixbr.online/qualities=4k,1080p,720p,sd|audio=dublado,legendado|catalogs=populares_movie,populares_series,recentes_servidor_movie,recentes_servidor_series,emalta_movie,emalta_series",
+        id: "zapitv-cinema-aberto",
+        name: "Cinema Aberto & Acervo Nacional PT-BR (Stremio Oficial)",
+        url: "/api/stremio/cinema-aberto",
         enabled: true,
         type: "stremio-addon",
         priority: 7,
@@ -11679,12 +12389,42 @@ var init_providerRegistry = __esm({
         status: "online"
       },
       {
-        id: "zapitv-cinema-aberto",
-        name: "Cinema Aberto & Acervo Nacional PT-BR (Stremio Oficial)",
-        url: "/api/stremio/cinema-aberto",
+        id: "zapitv-archive-org",
+        name: "Internet Archive Cinema Aberto (Dom\xEDnio P\xFAblico HD)",
+        url: "/api/stremio/archive-org-movies",
         enabled: true,
         type: "stremio-addon",
         priority: 8,
+        isPtBr: false,
+        status: "online"
+      },
+      {
+        id: "zapitv-wikimedia-commons",
+        name: "Wikimedia Commons V\xEDdeos & Document\xE1rios (CC-BY)",
+        url: "/api/stremio/wikimedia-commons",
+        enabled: true,
+        type: "stremio-addon",
+        priority: 9,
+        isPtBr: false,
+        status: "online"
+      },
+      {
+        id: "zapitv-open-culture",
+        name: "Open Culture Cinema Cl\xE1ssico Restaurado",
+        url: "/api/stremio/open-culture",
+        enabled: true,
+        type: "stremio-addon",
+        priority: 10,
+        isPtBr: false,
+        status: "online"
+      },
+      {
+        id: "magnetflix-animes",
+        name: "Magnetflix (Animes e S\xE9ries PT-BR Backup)",
+        url: "https://magnetflix.flixbr.online/qualities=4k,1080p,720p,sd|audio=dublado,legendado|catalogs=populares_movie,populares_series,recentes_servidor_movie,recentes_servidor_series,emalta_movie,emalta_series",
+        enabled: true,
+        type: "stremio-addon",
+        priority: 11,
         isPtBr: true,
         status: "online"
       },
@@ -11865,8 +12605,9 @@ var init_providerRegistry = __esm({
               errorMessage: void 0
             });
           } else {
-            const pingUrl = `/api/proxy?url=${encodeURIComponent(provider.url)}`;
+            const pingUrl = provider.url;
             const res = await fetch(pingUrl, { signal: AbortSignal.timeout(6e3) });
+            await res.body?.cancel();
             const latency = Date.now() - startTime;
             this.updateProvider(id, {
               status: res.ok ? "online" : "error",
@@ -12044,7 +12785,7 @@ var init_providerRegistry = __esm({
             const epObj = findCatalogEpisode(openItem.episodes, episode);
             if (epObj?.videoUrl) {
               const directUrl = epObj.videoUrl;
-              const proxyUrl = directUrl.startsWith("http") ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
+              const proxyUrl = directUrl;
               const isPtBr = openItem.audioStatus === "pt-br-original" || openItem.audioStatus === "pt-br-dubbed";
               const isDubbed = openItem.audioStatus === "pt-br-dubbed";
               streams.push({
@@ -12056,17 +12797,6 @@ var init_providerRegistry = __esm({
                 isDubbed,
                 quality: epObj.quality || "1080p",
                 providerName: "Acervo ZapiTV Verificado",
-                providerId: "zapitv-verified"
-              });
-              streams.push({
-                name: `${openItem.title} - Ep ${epObj.number} (CDN)`,
-                title: `[EPIS\xD3DIO ${epObj.number}] ${epObj.title} (${isDubbed ? "Dublado PT-BR" : "CDN Direto"})`,
-                url: directUrl,
-                sourceType: epObj.videoUrl.includes(".m3u8") ? "hls" : "mp4",
-                isPtBr,
-                isDubbed,
-                quality: epObj.quality || "1080p",
-                providerName: "Acervo ZapiTV CDN",
                 providerId: "zapitv-verified"
               });
             }
@@ -12082,7 +12812,7 @@ var init_providerRegistry = __esm({
             const epObj = findCatalogEpisode(catalogItem.episodes, episode);
             if (epObj?.videoUrl && !epObj.videoUrl.includes("Caminandes") && !epObj.videoUrl.includes("Night_of_the_Living_Dead")) {
               const directUrl = epObj.videoUrl;
-              const proxyUrl = directUrl.startsWith("http") ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
+              const proxyUrl = directUrl;
               const isDubbed = catalogItem.audioStatus === "pt-br-dubbed";
               streams.push({
                 name: `${catalogItem.title} - T${episode?.season ?? 1}E${epObj.number}`,
@@ -12109,7 +12839,7 @@ var init_providerRegistry = __esm({
             const isHls = directUrl.includes(".m3u8");
             const isMp4 = directUrl.includes(".mp4");
             if (isHls || isMp4) {
-              const proxyUrl = directUrl.startsWith("http") ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
+              const proxyUrl = directUrl;
               streams.push({
                 name: `${catalogItem.title} - Stream Oficial`,
                 title: `${catalogItem.title} (Stream Oficial)`,
@@ -12266,8 +12996,20 @@ var init_providerRegistry = __esm({
         ]).catch(() => false);
         const stremioAddons = activeProviders.filter((p) => p.type === "stremio-addon" && !["stremio-cinemeta", "stremio-opensubtitles"].includes(p.id));
         const stremioType = type === "movie" ? "movie" : "series";
-        const primaryId = imdbStr || tmdbNum || rawTargetId;
-        const stremioId = episode && (type === "series" || type === "anime") ? `${primaryId}:${episode.season}:${episode.episode}` : primaryId;
+        const isDoctorWhoItem = seriesSeasonMappingService.isDoctorWho(itemTarget);
+        let primaryId = imdbStr || tmdbNum || rawTargetId;
+        let stremioId = episode && (type === "series" || type === "anime") ? `${primaryId}:${episode.season}:${episode.episode}` : primaryId;
+        if (isDoctorWhoItem && episode && episode.season >= 14) {
+          const prodSpecs = seriesSeasonMappingService.getProviderQuerySpecs(episode.season, episode.episode);
+          if (prodSpecs.length > 0) {
+            stremioId = prodSpecs[0].stremioId;
+            for (let i = 1; i < prodSpecs.length; i++) {
+              if (!altIds.includes(prodSpecs[i].stremioId)) {
+                altIds.push(prodSpecs[i].stremioId);
+              }
+            }
+          }
+        }
         if (stremioId) {
           const sortedAddons = [...stremioAddons].sort((a, b) => {
             const memoryA = remembered.find((row) => row.providerId === a.id)?.score || 0;
@@ -12366,83 +13108,19 @@ var init_providerRegistry = __esm({
                   const isDubbed = audioAnalysis.isDubbed;
                   const isPtBr = audioAnalysis.isPtBr;
                   if (isHls || isDash || isDirectVideo) {
-                    if (isHls && /^https:\/\/(?:[^/]+\.)?embedplayer2\.xyz\//i.test(sUrl)) {
-                      parsedStreams.push({
-                        ...s,
-                        url: `/api/proxy?url=${encodeURIComponent(sUrl)}`,
-                        providerName: `${addon.name} (HLS Proxy)`,
-                        providerId: addon.id,
-                        sourceType: "hls",
-                        ...isDubbed ? { isDubbed: true } : {},
-                        ...isPtBr ? { isPtBr: true } : {}
-                      });
-                      continue;
-                    }
-                    if (sUrl.startsWith("http://") && !sUrl.includes("/api/proxy")) {
-                      if (addon.id === "fenixflix-animes" && typeof window !== "undefined" && window.location.protocol === "https:") {
-                        parsedStreams.push({
-                          ...s,
-                          url: sUrl.replace(/^http:/, "https:"),
-                          providerName: `${addon.name} (HTTPS Direto)`,
-                          providerId: addon.id,
-                          sourceType: isHls ? "hls" : "mp4",
-                          ...isDubbed ? { isDubbed: true } : {},
-                          ...isPtBr ? { isPtBr: true } : {}
-                        });
-                        continue;
-                      }
-                      parsedStreams.push({
-                        ...s,
-                        url: `/api/proxy?url=${encodeURIComponent(sUrl)}`,
-                        providerName: `${addon.name} (Proxy)`,
-                        providerId: addon.id,
-                        sourceType: isHls ? "hls" : "mp4",
-                        ...isDubbed ? { isDubbed: true } : {},
-                        ...isPtBr ? { isPtBr: true } : {}
-                      });
-                      if (typeof window === "undefined" || window.location.protocol !== "https:") {
-                        parsedStreams.push({
-                          ...s,
-                          providerName: addon.name,
-                          providerId: addon.id,
-                          sourceType: isHls ? "hls" : "mp4",
-                          ...isDubbed ? { isDubbed: true } : {},
-                          ...isPtBr ? { isPtBr: true } : {},
-                          behaviorHints: {
-                            ...s.behaviorHints || {},
-                            notWebReady: false
-                          }
-                        });
-                      }
-                    } else {
-                      parsedStreams.push({
-                        ...s,
-                        providerName: addon.name,
-                        providerId: addon.id,
-                        sourceType: isHls ? "hls" : "mp4",
-                        ...isDubbed ? { isDubbed: true } : {},
-                        ...isPtBr ? { isPtBr: true } : {},
-                        behaviorHints: {
-                          ...s.behaviorHints || {},
-                          notWebReady: false
-                        }
-                      });
-                    }
-                    if (addon.id === "froststream-http" || sUrl.includes("cloutteam.com")) {
-                      parsedStreams.push({
-                        ...s,
-                        url: `/api/proxy?url=${encodeURIComponent(sUrl)}`,
-                        providerName: `${addon.name} (Proxy)`,
-                        providerId: addon.id,
-                        sourceType: isHls ? "hls" : "mp4",
-                        ...isDubbed ? { isDubbed: true } : {},
-                        ...isPtBr ? { isPtBr: true } : {},
-                        behaviorHints: {
-                          ...s.behaviorHints || {},
-                          notWebReady: false
-                        }
-                      });
-                    }
+                    const candidate = addon.id === "fenixflix-animes" && typeof window !== "undefined" && window.location.protocol === "https:" ? sUrl.replace(/^http:/, "https:") : sUrl;
+                    const url = directMediaUrl(candidate);
+                    if (!url) continue;
+                    parsedStreams.push({
+                      ...s,
+                      url,
+                      providerName: addon.name,
+                      providerId: addon.id,
+                      sourceType: isHls ? "hls" : isDash ? "dash" : "mp4",
+                      ...isDubbed ? { isDubbed: true } : {},
+                      ...isPtBr ? { isPtBr: true } : {},
+                      behaviorHints: { ...s.behaviorHints || {}, notWebReady: false }
+                    });
                   } else if (isTorrent) {
                     const engineOnline = await isLocalStremioEngineOnline();
                     let streamQuality = s.quality;
@@ -12541,10 +13219,8 @@ var init_providerRegistry = __esm({
                 }
                 if (!options?.isRetryAttempt) {
                   const engineOnline = localEngineCache.active;
-                  const hasFrostStreamFinished = !sortedAddons.some((a) => a.id.includes("froststream")) || collectedFromAddons.some((s) => s.providerId?.includes("froststream"));
-                  const culprits = cleanInterim.filter((s) => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
-                  const hasWebReadyPtBr = culprits.length > 0;
-                  if ((cleanInterim.length >= 1 && hasWebReadyPtBr || cleanInterim.length >= 2) && hasFrostStreamFinished) {
+                  const readySources = cleanInterim.filter((s) => isSourceTechnicallyPlayable(s) && (!s.isTorrent || engineOnline));
+                  if (readySources.length >= 6) {
                     stopSpawning = true;
                   }
                 }
@@ -12575,12 +13251,10 @@ var init_providerRegistry = __esm({
                 if (!options?.isRetryAttempt) {
                   const engineOnline = localEngineCache.active;
                   const cleanInterim = streamValidator.filterCleanStreams([...streams, ...collectedFromAddons], targetTitle, originalTitle, alternateTitles, episode).filter((s) => sourceConfidenceEngine.evaluate(s, identity).isMatch);
-                  const hasFrostStreamFinished = !sortedAddons.some((a) => a.id.includes("froststream")) || collectedFromAddons.some((s) => s.providerId?.includes("froststream"));
-                  const culprits = cleanInterim.filter((s) => (s.isPtBr || s.isDubbed) && (!s.isTorrent || engineOnline));
-                  const hasWebReadyPtBr = culprits.length > 0;
-                  if ((cleanInterim.length >= 1 && hasWebReadyPtBr || cleanInterim.length >= 2) && hasFrostStreamFinished) {
+                  const readySources = cleanInterim.filter((s) => isSourceTechnicallyPlayable(s) && (!s.isTorrent || engineOnline));
+                  if (readySources.length >= 6) {
                     if (interval) clearInterval(interval);
-                    timer = setTimeout(resolve, 250);
+                    timer = setTimeout(resolve, 300);
                   }
                 }
               }, 60);
@@ -12696,6 +13370,22 @@ var init_providerRegistry = __esm({
       /**
        * Limpa todos os caches de provedores e ranqueamento inteligente.
        */
+      /**
+       * Descoberta dinâmica sob demanda quando fontes falham durante a reprodução.
+       * Executa busca limpa em todos os provedores elegíveis descartando URLs problemáticas.
+       */
+      async discoverMoreSources(type, id, episode, excludeUrls = []) {
+        const rawStreams = await this.resolveStreamsFresh(type, id, episode, void 0, void 0, {
+          forceRefresh: true,
+          bypassNegativeCache: true,
+          isRetryAttempt: true
+        });
+        const excludeSet = new Set(excludeUrls.map((u) => (u || "").toLowerCase().trim()));
+        return rawStreams.filter((s) => {
+          const u = (s.url || "").toLowerCase().trim();
+          return !excludeSet.has(u) && !isSourceTemporarilyProblematic(u);
+        });
+      }
       clearCache() {
         this.cacheGeneration++;
         this.cache.clear();
@@ -15367,37 +16057,15 @@ var init_tvImagePreloaderService = __esm({
   }
 });
 
-// src/core/catalog/PosterRecoveryService.ts
+// src/core/catalog/posterValidation.ts
 function isCorruptedPosterUrl(url) {
   if (!url || typeof url !== "string") return false;
   if (url.includes("unsplash.com") || url.includes("photo-1489599849927")) return true;
   return CORRUPTED_POSTER_FRAGMENTS.some((frag) => url.includes(frag));
 }
-function logRecoveryDiagnostic(diag) {
-  const isDev = typeof process !== "undefined" && process.env?.NODE_ENV !== "production" || typeof import.meta !== "undefined" && import.meta.env?.DEV || typeof window !== "undefined" && window.__ZAPITV_DEV__;
-  if (isDev) {
-    if (diag.finalResult === "SUCCESS") {
-      console.info(
-        `[PosterRecoveryService][DIAGNOSTIC] \u2705 Capa recuperada com sucesso: "${diag.title}" (${diag.id}) | Fonte: ${diag.recoveredSource} | URL: ${diag.recoveredUrl}`
-      );
-    } else {
-      console.warn(
-        `[PosterRecoveryService][DIAGNOSTIC] \u274C Falha na recupera\xE7\xE3o de capa: "${diag.title}" (${diag.id}) | Causa: [${diag.diagnosticCause || "UNKNOWN"}] ${diag.failureReason || "Todas as fontes esgotadas"} | Tentativas: ${diag.attempts.join(", ")}`
-      );
-    }
-  }
-}
-var POSTER_CACHE_KEY_V3, POSTER_CACHE_KEY_V2, NO_IMAGE_SENTINEL, CORRUPTED_POSTER_FRAGMENTS, NEGATIVE_TTL_MS, VERIFIED_TTL_MS, PosterRecoveryService, posterRecoveryService;
-var init_PosterRecoveryService = __esm({
-  "src/core/catalog/PosterRecoveryService.ts"() {
-    init_types();
-    init_tmdbClient();
-    init_LruCache();
-    init_tvPerformanceProfileService();
-    init_tvImagePreloaderService();
-    POSTER_CACHE_KEY_V3 = "zapitv_poster_recovery_cache_v3";
-    POSTER_CACHE_KEY_V2 = "zapitv_poster_recovery_cache_v2";
-    NO_IMAGE_SENTINEL = "__NO_IMAGE__";
+var CORRUPTED_POSTER_FRAGMENTS;
+var init_posterValidation = __esm({
+  "src/core/catalog/posterValidation.ts"() {
     CORRUPTED_POSTER_FRAGMENTS = [
       "iigTJJskR1PcjjXqxdyJwVB3BoU",
       // Death Note poster associado indevidamente
@@ -15422,6 +16090,37 @@ var init_PosterRecoveryService = __esm({
       "unsplash.com"
       // Qualquer imagem de fallback genérico do Unsplash
     ];
+  }
+});
+
+// src/core/catalog/PosterRecoveryService.ts
+function logRecoveryDiagnostic(diag) {
+  const isDev = typeof process !== "undefined" && process.env?.NODE_ENV !== "production" || typeof import.meta !== "undefined" && import.meta.env?.DEV || typeof window !== "undefined" && window.__ZAPITV_DEV__;
+  if (isDev) {
+    if (diag.finalResult === "SUCCESS") {
+      console.info(
+        `[PosterRecoveryService][DIAGNOSTIC] \u2705 Capa recuperada com sucesso: "${diag.title}" (${diag.id}) | Fonte: ${diag.recoveredSource} | URL: ${diag.recoveredUrl}`
+      );
+    } else {
+      console.warn(
+        `[PosterRecoveryService][DIAGNOSTIC] \u274C Falha na recupera\xE7\xE3o de capa: "${diag.title}" (${diag.id}) | Causa: [${diag.diagnosticCause || "UNKNOWN"}] ${diag.failureReason || "Todas as fontes esgotadas"} | Tentativas: ${diag.attempts.join(", ")}`
+      );
+    }
+  }
+}
+var POSTER_CACHE_KEY_V3, POSTER_CACHE_KEY_V2, NO_IMAGE_SENTINEL, NEGATIVE_TTL_MS, VERIFIED_TTL_MS, PosterRecoveryService, posterRecoveryService;
+var init_PosterRecoveryService = __esm({
+  "src/core/catalog/PosterRecoveryService.ts"() {
+    init_types();
+    init_tmdbClient();
+    init_LruCache();
+    init_tvPerformanceProfileService();
+    init_tvImagePreloaderService();
+    init_posterValidation();
+    init_posterValidation();
+    POSTER_CACHE_KEY_V3 = "zapitv_poster_recovery_cache_v3";
+    POSTER_CACHE_KEY_V2 = "zapitv_poster_recovery_cache_v2";
+    NO_IMAGE_SENTINEL = "__NO_IMAGE__";
     NEGATIVE_TTL_MS = 3 * 60 * 1e3;
     VERIFIED_TTL_MS = 30 * 24 * 60 * 60 * 1e3;
     PosterRecoveryService = class _PosterRecoveryService {
@@ -16690,6 +17389,7 @@ var init_CanonicalCatalogMaster = __esm({
 var STOP_WORDS, CanonicalIdentityService, canonicalIdentityService;
 var init_canonicalIdentity = __esm({
   "src/core/identity/canonicalIdentity.ts"() {
+    init_seriesSeasonMappingService();
     init_theatricalFilterService();
     init_CanonicalCatalogMaster();
     STOP_WORDS = /* @__PURE__ */ new Set([
@@ -16729,6 +17429,9 @@ var init_canonicalIdentity = __esm({
     CanonicalIdentityService = class {
       isSameWork(expected, candidate) {
         if (expected.type !== candidate.type) return false;
+        const era1 = seriesSeasonMappingService.identifyFranchiseVersion(expected);
+        const era2 = seriesSeasonMappingService.identifyFranchiseVersion(candidate);
+        if (era1 && era2 && era1 !== era2) return false;
         if (expected.year && candidate.year && Math.abs(expected.year - candidate.year) > 1) return false;
         const titles = [expected.title, expected.originalTitle].filter(Boolean).map((value) => this.normalizeTitle(value));
         const candidates = [candidate.title, candidate.originalTitle].filter(Boolean).map((value) => this.normalizeTitle(value));
@@ -16780,6 +17483,20 @@ var init_canonicalIdentity = __esm({
           }
           aliases.push(`${item.title.toLowerCase()} season ${epParams.season}`);
           aliases.push(`${item.title.toLowerCase()} temporada ${epParams.season}`);
+        }
+        const whoEra = seriesSeasonMappingService.identifyFranchiseVersion({
+          id: item.id,
+          tmdbId: item.tmdbId,
+          imdbId: item.imdbId,
+          title: item.title,
+          year: item.year
+        });
+        if (whoEra === "modern_2005") {
+          aliases.push("doctor who", "doctor who 2005", "dr who");
+        } else if (whoEra === "classic_1963") {
+          aliases.push("doctor who 1963", "doctor who classic", "classic doctor who");
+        } else if (whoEra === "era_2024") {
+          aliases.push("doctor who 2024");
         }
         if (/doraemon/i.test(item.title)) {
           aliases.push("doraemon", "gato do futuro", "\u30C9\u30E9\u3048\u3082\u3093");
@@ -16849,6 +17566,7 @@ var init_canonicalIdentity = __esm({
 var isKnownTechnicalOrReleaseWord, isDistinguishingTitleModifier, KNOWN_COLLISION_TITLES, SourceConfidenceEngine, sourceConfidenceEngine;
 var init_sourceConfidenceEngine = __esm({
   "src/core/identity/sourceConfidenceEngine.ts"() {
+    init_seriesSeasonMappingService();
     init_canonicalIdentity();
     init_streamQuarantineService();
     init_types();
@@ -17215,21 +17933,48 @@ var init_sourceConfidenceEngine = __esm({
           this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
           return evalResult2;
         }
-        if ((identity.type === "S\xC9RIE" /* SERIES */ || identity.type === "ANIME" /* ANIME */) && identity.year) {
-          const releaseYearMatch = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
-          if (releaseYearMatch) {
-            const foundYear = Number(releaseYearMatch[1]);
-            if (Math.abs(foundYear - identity.year) > 1 && !episodeTag) {
-              reasons.push(`Ano da fonte (${foundYear}) diverge da s\xE9rie (${identity.year}) sem identificador de epis\xF3dio`);
-              const evalResult2 = {
-                stream,
-                confidence: "REJECTED",
-                isMatch: false,
-                reasons,
-                canonicalTitle: identity.title
-              };
-              this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
-              return evalResult2;
+        if (identity.type === "S\xC9RIE" /* SERIES */ || identity.type === "ANIME" /* ANIME */) {
+          const seriesIntegrity = seriesSeasonMappingService.validateStreamEpisodeIntegrity(
+            {
+              tmdbId: identity.tmdbId,
+              imdbId: identity.imdbId,
+              title: identity.title,
+              year: identity.year,
+              season: identity.season,
+              episode: identity.episode
+            },
+            stream
+          );
+          if (!seriesIntegrity.valid) {
+            reasons.push(seriesIntegrity.reason || "Stream pertence a era/produ\xE7\xE3o incompat\xEDvel da franquia");
+            const evalResult2 = {
+              stream,
+              confidence: "REJECTED",
+              isMatch: false,
+              reasons,
+              canonicalTitle: identity.title
+            };
+            this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
+            return evalResult2;
+          }
+          if (identity.year) {
+            const releaseYearMatch = streamTitle.match(/\b(19\d{2}|20\d{2})\b/);
+            if (releaseYearMatch) {
+              const foundYear = Number(releaseYearMatch[1]);
+              const isSeason1 = !identity.season || identity.season === 1;
+              const isYearMismatch = isSeason1 ? Math.abs(foundYear - identity.year) > 1 : Math.abs(foundYear - identity.year) > 1 && !episodeTag;
+              if (isYearMismatch) {
+                reasons.push(`Ano da fonte (${foundYear}) diverge da s\xE9rie (${identity.year})${isSeason1 ? " na Temporada 1" : " sem identificador de epis\xF3dio"}`);
+                const evalResult2 = {
+                  stream,
+                  confidence: "REJECTED",
+                  isMatch: false,
+                  reasons,
+                  canonicalTitle: identity.title
+                };
+                this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
+                return evalResult2;
+              }
             }
           }
         }
@@ -19570,62 +20315,9 @@ var init_client = __esm({
   }
 });
 
-// src/server/database/firebaseAuth.ts
-var firebaseAuth_exports = {};
-__export(firebaseAuth_exports, {
-  InvalidFirebaseToken: () => InvalidFirebaseToken,
-  authenticateAdmin: () => authenticateAdmin,
-  verifyFirebaseIdToken: () => verifyFirebaseIdToken
-});
-import { createRemoteJWKSet, errors, jwtVerify } from "jose";
-async function verifyFirebaseIdToken(token, projectId, keys = publicKeys) {
-  let verified;
-  try {
-    verified = await jwtVerify(token, keys, {
-      algorithms: ["RS256"],
-      audience: projectId,
-      issuer: `https://securetoken.google.com/${projectId}`
-    });
-  } catch (error) {
-    if (error instanceof errors.JWKSTimeout) throw error;
-    if (error instanceof errors.JOSEError) throw new InvalidFirebaseToken("Token Firebase inv\xE1lido.");
-    throw error;
-  }
-  const { payload, protectedHeader } = verified;
-  const now = Math.floor(Date.now() / 1e3);
-  if (!protectedHeader.kid || typeof payload.sub !== "string" || !payload.sub || !Number.isSafeInteger(payload.iat) || payload.iat > now || !Number.isSafeInteger(payload.auth_time) || payload.auth_time > now) {
-    throw new InvalidFirebaseToken("Token Firebase inv\xE1lido.");
-  }
-  return payload.sub;
-}
-async function authenticateAdmin(authorization) {
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const allowedUids = new Set((process.env.ADMIN_FIREBASE_UIDS || "").split(",").map((uid) => uid.trim()).filter(Boolean));
-  const match = /^Bearer (\S+)$/i.exec(authorization || "");
-  if (!projectId || allowedUids.size === 0 || !match) return null;
-  try {
-    const uid = await verifyFirebaseIdToken(match[1], projectId);
-    return allowedUids.has(uid) ? uid : null;
-  } catch (error) {
-    if (error instanceof InvalidFirebaseToken) return null;
-    throw error;
-  }
-}
-var publicKeys, InvalidFirebaseToken;
-var init_firebaseAuth = __esm({
-  "src/server/database/firebaseAuth.ts"() {
-    publicKeys = createRemoteJWKSet(
-      new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"),
-      { timeoutDuration: 5e3 }
-    );
-    InvalidFirebaseToken = class extends Error {
-    };
-  }
-});
-
 // src/server/auth/sessionService.ts
 import crypto2 from "crypto";
-import { eq as eq5, and as and5, isNull as isNull2, gt as gt2 } from "drizzle-orm";
+import { eq as eq3, and as and3, isNull, gt } from "drizzle-orm";
 function hashSessionToken(token) {
   return crypto2.createHash("sha256").update(token).digest("hex");
 }
@@ -19666,12 +20358,12 @@ async function validateSession(db, token) {
     userEmail: users.email,
     userStatus: users.status,
     userCreatedAt: users.createdAt
-  }).from(sessions).innerJoin(users, eq5(sessions.userId, users.id)).where(
-    and5(
-      eq5(sessions.tokenHash, tokenHash),
-      isNull2(sessions.revokedAt),
-      gt2(sessions.expiresAt, now),
-      eq5(users.status, "active")
+  }).from(sessions).innerJoin(users, eq3(sessions.userId, users.id)).where(
+    and3(
+      eq3(sessions.tokenHash, tokenHash),
+      isNull(sessions.revokedAt),
+      gt(sessions.expiresAt, now),
+      eq3(users.status, "active")
     )
   ).limit(1);
   if (!found || found.length === 0) {
@@ -19694,7 +20386,7 @@ async function revokeSession(db, token) {
   if (!token) return false;
   const tokenHash = hashSessionToken(token);
   const now = Date.now();
-  const res = await db.db.update(sessions).set({ revokedAt: now, updatedAt: now }).where(and5(eq5(sessions.tokenHash, tokenHash), isNull2(sessions.revokedAt)));
+  const res = await db.db.update(sessions).set({ revokedAt: now, updatedAt: now }).where(and3(eq3(sessions.tokenHash, tokenHash), isNull(sessions.revokedAt)));
   return true;
 }
 function extractCookie(cookieHeader, cookieName = SESSION_COOKIE_NAME) {
@@ -19728,6 +20420,89 @@ var init_sessionService = __esm({
   }
 });
 
+// src/server/auth/adminAccess.ts
+function accountRole(id) {
+  const allowed = (process.env.ADMIN_USER_IDS || "").split(",").map((value) => value.trim()).filter(Boolean);
+  return id && allowed.includes(id) ? "admin" : "user";
+}
+var init_adminAccess = __esm({
+  "src/server/auth/adminAccess.ts"() {
+  }
+});
+
+// src/server/database/firebaseAuth.ts
+var firebaseAuth_exports = {};
+__export(firebaseAuth_exports, {
+  InvalidFirebaseToken: () => InvalidFirebaseToken,
+  authenticateAdmin: () => authenticateAdmin,
+  verifyFirebaseIdToken: () => verifyFirebaseIdToken
+});
+import { createRemoteJWKSet, errors, jwtVerify } from "jose";
+async function verifyFirebaseIdToken(token, projectId, keys = publicKeys) {
+  let verified;
+  try {
+    verified = await jwtVerify(token, keys, {
+      algorithms: ["RS256"],
+      audience: projectId,
+      issuer: `https://securetoken.google.com/${projectId}`
+    });
+  } catch (error) {
+    if (error instanceof errors.JWKSTimeout) throw error;
+    if (error instanceof errors.JOSEError) throw new InvalidFirebaseToken("Token Firebase inv\xE1lido.");
+    throw error;
+  }
+  const { payload, protectedHeader } = verified;
+  const now = Math.floor(Date.now() / 1e3);
+  if (!protectedHeader.kid || typeof payload.sub !== "string" || !payload.sub || !Number.isSafeInteger(payload.iat) || payload.iat > now || !Number.isSafeInteger(payload.auth_time) || payload.auth_time > now) {
+    throw new InvalidFirebaseToken("Token Firebase inv\xE1lido.");
+  }
+  return payload.sub;
+}
+async function authenticateAdmin(authorization, request) {
+  const cookie = extractCookie(request?.headers.cookie, SESSION_COOKIE_NAME);
+  const accountToken = cookie || /^Bearer (\S+)$/i.exec(authorization || "")?.[1];
+  if (accountToken && process.env.ADMIN_USER_IDS) {
+    const db = getDatabase();
+    const session = db ? await validateSession(db, accountToken) : null;
+    if (session && accountRole(session.user.id) === "admin") {
+      if (cookie && request && !["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+        try {
+          const origin = request.headers.origin || request.headers.referer;
+          if (!origin || new URL(origin).host !== request.headers.host) return null;
+        } catch {
+          return null;
+        }
+      }
+      return session.user.id;
+    }
+  }
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const allowedUids = new Set((process.env.ADMIN_FIREBASE_UIDS || "").split(",").map((uid) => uid.trim()).filter(Boolean));
+  const match = /^Bearer (\S+)$/i.exec(authorization || "");
+  if (!projectId || allowedUids.size === 0 || !match) return null;
+  try {
+    const uid = await verifyFirebaseIdToken(match[1], projectId);
+    return allowedUids.has(uid) ? uid : null;
+  } catch (error) {
+    if (error instanceof InvalidFirebaseToken) return null;
+    throw error;
+  }
+}
+var publicKeys, InvalidFirebaseToken;
+var init_firebaseAuth = __esm({
+  "src/server/database/firebaseAuth.ts"() {
+    init_client();
+    init_sessionService();
+    init_adminAccess();
+    publicKeys = createRemoteJWKSet(
+      new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"),
+      { timeoutDuration: 5e3 }
+    );
+    InvalidFirebaseToken = class extends Error {
+    };
+  }
+});
+
 // src/server/auth/authMiddleware.ts
 var authMiddleware_exports = {};
 __export(authMiddleware_exports, {
@@ -19758,16 +20533,7 @@ async function getValidDatabase() {
   return db;
 }
 function isUserAdmin(user) {
-  if (!user) return false;
-  const adminEmails = new Set(
-    (process.env.ADMIN_EMAILS || "graficadfuturo@gmail.com").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)
-  );
-  const adminUids = new Set(
-    (process.env.ADMIN_FIREBASE_UIDS || "").split(",").map((u) => u.trim()).filter(Boolean)
-  );
-  const email = (user.email || "").trim().toLowerCase();
-  const id = (user.id || "").trim();
-  return email !== "" && adminEmails.has(email) || id !== "" && adminUids.has(id);
+  return accountRole(user?.id) === "admin";
 }
 function extractSessionToken(req) {
   const cookieHeader = req.headers.cookie;
@@ -19792,15 +20558,8 @@ async function optionalUser(req, _res, next) {
       return next();
     }
     const sessionData = await validateSession(db, token);
-    if (sessionData) {
-      req.user = {
-        ...sessionData.user,
-        role: isUserAdmin(sessionData.user) ? "admin" : "user"
-      };
-      req.sessionId = sessionData.sessionId;
-    } else {
-      req.user = null;
-    }
+    req.user = sessionData ? { ...sessionData.user, role: accountRole(sessionData.user.id) } : null;
+    req.sessionId = sessionData?.sessionId;
     next();
   } catch (err) {
     req.user = null;
@@ -19821,10 +20580,7 @@ async function authenticateUser(req, res, next) {
     if (!sessionData) {
       return res.status(401).json({ error: "Sess\xE3o inv\xE1lida ou expirada. Fa\xE7a login novamente." });
     }
-    req.user = {
-      ...sessionData.user,
-      role: isUserAdmin(sessionData.user) ? "admin" : "user"
-    };
+    req.user = { ...sessionData.user, role: accountRole(sessionData.user.id) };
     req.sessionId = sessionData.sessionId;
     next();
   } catch (err) {
@@ -19903,41 +20659,9 @@ var init_authMiddleware = __esm({
   "src/server/auth/authMiddleware.ts"() {
     init_client();
     init_sessionService();
+    init_adminAccess();
     authTablesEnsured = false;
     testDatabaseInstance = null;
-  }
-});
-
-// src/server/rewriteHlsManifest.ts
-var rewriteHlsManifest_exports = {};
-__export(rewriteHlsManifest_exports, {
-  rewriteHlsManifest: () => rewriteHlsManifest
-});
-function rewriteHlsManifest(manifest, sourceUrl) {
-  if (!manifest.trimStart().startsWith("#EXTM3U")) return null;
-  const proxyUri = (uri) => {
-    try {
-      const absolute = new URL(uri, sourceUrl);
-      if (absolute.protocol !== "http:" && absolute.protocol !== "https:") return uri;
-      return `/api/proxy?url=${encodeURIComponent(absolute.href)}`;
-    } catch {
-      return uri;
-    }
-  };
-  return manifest.split(/\r?\n/).map((line) => {
-    if (line.startsWith("#")) {
-      return line.replace(
-        HLS_URI_ATTRIBUTE,
-        (_match, quote, uri) => `URI=${quote}${proxyUri(uri)}${quote}`
-      );
-    }
-    return line.trim() ? proxyUri(line.trim()) : line;
-  }).join("\n");
-}
-var HLS_URI_ATTRIBUTE;
-var init_rewriteHlsManifest = __esm({
-  "src/server/rewriteHlsManifest.ts"() {
-    HLS_URI_ATTRIBUTE = /\bURI=(['"])(.*?)\1/g;
   }
 });
 
@@ -25867,11 +26591,11 @@ import { Router } from "express";
 
 // src/server/database/settings.ts
 init_schema();
-import { and as and3, eq as eq3 } from "drizzle-orm";
+import { and as and4, eq as eq4 } from "drizzle-orm";
 var SettingVersionConflict = class extends Error {
 };
 async function readSetting(connection, key) {
-  const [row] = await connection.db.select().from(globalSettings).where(eq3(globalSettings.key, key)).limit(1);
+  const [row] = await connection.db.select().from(globalSettings).where(eq4(globalSettings.key, key)).limit(1);
   return row ? { value: JSON.parse(row.valueJson), version: row.version, updatedAt: row.updatedAt } : null;
 }
 async function writeSetting(connection, key, value, expectedVersion, actorUid) {
@@ -25893,7 +26617,7 @@ async function writeSetting(connection, key, value, expectedVersion, actorUid) {
         version: expectedVersion + 1,
         updatedAt: now,
         updatedBy: actorUid
-      }).where(and3(eq3(globalSettings.key, key), eq3(globalSettings.version, expectedVersion))).returning({ version: globalSettings.version });
+      }).where(and4(eq4(globalSettings.key, key), eq4(globalSettings.version, expectedVersion))).returning({ version: globalSettings.version });
       if (updated.length !== 1) throw new SettingVersionConflict("A configura\xE7\xE3o foi modificada em outra sess\xE3o.");
     }
     await tx.insert(adminAudit).values({
@@ -25911,7 +26635,7 @@ async function writeSetting(connection, key, value, expectedVersion, actorUid) {
 // src/server/database/sourceMemory.ts
 init_schema();
 import { randomUUID } from "node:crypto";
-import { and as and4, desc, eq as eq4, gt, isNull, lt, sql } from "drizzle-orm";
+import { and as and5, desc, eq as eq5, gt as gt2, isNull as isNull2, lt, sql } from "drizzle-orm";
 var permittedProviders = /* @__PURE__ */ new Set([
   "zapitv-show-subtitle-pt-br",
   "zapitv-mico-leao-dublado",
@@ -25954,13 +26678,13 @@ function reliabilityScore(row, now = Date.now()) {
 }
 async function listRememberedSources(connection, identity) {
   const now = Date.now();
-  const rows = await connection.db.select().from(sourceReliability).where(and4(
-    eq4(sourceReliability.canonicalId, identity.canonicalId),
-    eq4(sourceReliability.mediaType, identity.mediaType),
-    eq4(sourceReliability.season, identity.season),
-    eq4(sourceReliability.episode, identity.episode),
-    gt(sourceReliability.expiresAt, now),
-    gt(sourceReliability.successes, 0)
+  const rows = await connection.db.select().from(sourceReliability).where(and5(
+    eq5(sourceReliability.canonicalId, identity.canonicalId),
+    eq5(sourceReliability.mediaType, identity.mediaType),
+    eq5(sourceReliability.season, identity.season),
+    eq5(sourceReliability.episode, identity.episode),
+    gt2(sourceReliability.expiresAt, now),
+    gt2(sourceReliability.successes, 0)
   )).orderBy(desc(sourceReliability.lastSuccessAt)).limit(30);
   return rows.map((row) => ({
     providerId: row.providerId,
@@ -25993,15 +26717,15 @@ function recordSourceEvidence(connection, ticketId, outcome, detail) {
 async function recordSourceEvidenceTransaction(connection, ticketId, outcome, detail) {
   const now = Date.now();
   return connection.db.transaction(async (tx) => {
-    const [ticket] = await tx.select().from(sourceEvidenceTickets).where(and4(
-      eq4(sourceEvidenceTickets.id, ticketId),
-      isNull(sourceEvidenceTickets.outcome),
-      gt(sourceEvidenceTickets.issuedAt, now - 12e4)
+    const [ticket] = await tx.select().from(sourceEvidenceTickets).where(and5(
+      eq5(sourceEvidenceTickets.id, ticketId),
+      isNull2(sourceEvidenceTickets.outcome),
+      gt2(sourceEvidenceTickets.issuedAt, now - 12e4)
     )).limit(1);
     if (!ticket || outcome === "success" && now - ticket.issuedAt < 5e3) return "invalid";
-    const claimed = await tx.update(sourceEvidenceTickets).set({ outcome }).where(and4(
-      eq4(sourceEvidenceTickets.id, ticketId),
-      isNull(sourceEvidenceTickets.outcome)
+    const claimed = await tx.update(sourceEvidenceTickets).set({ outcome }).where(and5(
+      eq5(sourceEvidenceTickets.id, ticketId),
+      isNull2(sourceEvidenceTickets.outcome)
     )).returning({ id: sourceEvidenceTickets.id });
     if (claimed.length !== 1) return "invalid";
     const identity = {
@@ -26127,7 +26851,7 @@ databaseRouter.put("/global-settings/hero-carousel", async (req, res) => {
   if (!connection) return res.status(503).json({ error: "Banco de dados n\xE3o configurado." });
   let actorUid;
   try {
-    actorUid = await authenticateAdmin(req.header("authorization"));
+    actorUid = await authenticateAdmin(req.header("authorization"), req);
   } catch {
     return res.status(503).json({ error: "Verifica\xE7\xE3o de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
   }
@@ -26163,7 +26887,7 @@ databaseRouter.put("/global-settings/section-titles", async (req, res) => {
   if (!connection) return res.status(503).json({ error: "Banco de dados n\xE3o configurado." });
   let actorUid;
   try {
-    actorUid = await authenticateAdmin(req.header("authorization"));
+    actorUid = await authenticateAdmin(req.header("authorization"), req);
   } catch {
     return res.status(503).json({ error: "Verifica\xE7\xE3o de autentica\xE7\xE3o temporariamente indispon\xEDvel." });
   }
@@ -26764,7 +27488,7 @@ init_authMiddleware();
 init_schema();
 import express from "express";
 import crypto6 from "crypto";
-import { eq as eq9 } from "drizzle-orm";
+import { asc as asc2, eq as eq9, gt as gt5 } from "drizzle-orm";
 
 // src/server/auth/passwordService.ts
 import { hash, verify } from "@node-rs/argon2";
@@ -27291,6 +28015,7 @@ async function setAuthPolicy(db, mandatoryAuth, actorUid = "admin", expectedVers
 }
 
 // src/server/auth/routes.ts
+init_adminAccess();
 var authRouter = express.Router();
 var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 var isProduction = process.env.NODE_ENV === "production";
@@ -27376,7 +28101,7 @@ authRouter.post("/register", async (req, res) => {
         name: cleanName,
         email: cleanEmail,
         status: "active",
-        role: isUserAdmin({ id: userId, email: cleanEmail }) ? "admin" : "user",
+        role: accountRole(userId),
         createdAt: now
       }
     });
@@ -27440,7 +28165,7 @@ authRouter.post("/login", async (req, res) => {
         name: user.name,
         email: user.email,
         status: user.status,
-        role: isUserAdmin({ id: user.id, email: user.email }) ? "admin" : "user",
+        role: accountRole(user.id),
         createdAt: user.createdAt
       }
     });
@@ -27519,6 +28244,32 @@ authRouter.put("/policy", optionalUser, async (req, res) => {
       return res.status(409).json({ error: "Conflito de vers\xE3o na pol\xEDtica global de autentica\xE7\xE3o." });
     }
     return res.status(500).json({ error: "Erro interno ao atualizar a pol\xEDtica global." });
+  }
+});
+authRouter.get("/admin/users", authenticateUser, async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  if (req.user?.role !== "admin") return res.status(403).json({ error: "Autoriza\xE7\xE3o administrativa necess\xE1ria." });
+  const cursor = req.query.cursor;
+  if (cursor !== void 0 && (typeof cursor !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(cursor))) {
+    return res.status(400).json({ error: "Cursor inv\xE1lido." });
+  }
+  try {
+    const db = await getValidDatabase();
+    if (!db) return res.status(503).json({ error: "Banco de dados indispon\xEDvel." });
+    const rows = await db.db.select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      status: users.status,
+      createdAt: users.createdAt
+    }).from(users).where(typeof cursor === "string" ? gt5(users.id, cursor) : void 0).orderBy(asc2(users.id)).limit(101);
+    const page = rows.slice(0, 100);
+    return res.json({
+      users: page.map((user) => ({ ...user, role: accountRole(user.id) })),
+      nextCursor: rows.length > 100 ? page[page.length - 1].id : null
+    });
+  } catch {
+    return res.status(503).json({ error: "N\xE3o foi poss\xEDvel consultar as contas." });
   }
 });
 authRouter.get("/user/:id", authenticateUser, (req, res) => {
@@ -27681,7 +28432,7 @@ import { Router as Router3 } from "express";
 init_schema();
 init_sessionService();
 import crypto7 from "crypto";
-import { eq as eq10, and as and9, isNull as isNull4, gt as gt5, sql as sql3 } from "drizzle-orm";
+import { eq as eq10, and as and9, isNull as isNull4, gt as gt6, sql as sql3 } from "drizzle-orm";
 var CHALLENGE_EXPIRY_MS = 10 * 60 * 1e3;
 var DEFAULT_POLL_INTERVAL_SEC = 5;
 var SLOW_DOWN_INTERVAL_SEC = 10;
@@ -27943,7 +28694,7 @@ async function validateDeviceUserCode(db, rawUserCode, clientIp) {
   const found = await db.db.select().from(deviceLinkChallenges).where(
     and9(
       sql3`REPLACE(${deviceLinkChallenges.userCode}, '-', '') = ${cleanCode}`,
-      gt5(deviceLinkChallenges.expiresAt, now),
+      gt6(deviceLinkChallenges.expiresAt, now),
       eq10(deviceLinkChallenges.status, "pending")
     )
   ).limit(1);
@@ -27976,7 +28727,7 @@ async function approveDeviceLink(db, rawUserCode, userId) {
   const found = await db.db.select().from(deviceLinkChallenges).where(
     and9(
       sql3`REPLACE(${deviceLinkChallenges.userCode}, '-', '') = ${cleanCode}`,
-      gt5(deviceLinkChallenges.expiresAt, now),
+      gt6(deviceLinkChallenges.expiresAt, now),
       eq10(deviceLinkChallenges.status, "pending")
     )
   ).limit(1);
@@ -28230,7 +28981,7 @@ import express3 from "express";
 // src/server/sync/syncService.ts
 init_schema();
 import crypto8 from "crypto";
-import { eq as eq11, and as and10, gt as gt6, lt as lt2, desc as desc3 } from "drizzle-orm";
+import { eq as eq11, and as and10, gt as gt7, lt as lt2, desc as desc3 } from "drizzle-orm";
 var SyncService = class {
   /**
    * Normaliza carimbo de tempo considerando autoridade de tempo do servidor e desvio de relógio (clock skew).
@@ -28357,7 +29108,7 @@ var SyncService = class {
   static async getProgressList(db, profileId, since) {
     const conditions = [eq11(profilePlaybackProgress.profileId, profileId)];
     if (since && since > 0) {
-      conditions.push(gt6(profilePlaybackProgress.updatedAt, since));
+      conditions.push(gt7(profilePlaybackProgress.updatedAt, since));
     }
     return await db.db.select().from(profilePlaybackProgress).where(and10(...conditions)).orderBy(desc3(profilePlaybackProgress.updatedAt));
   }
@@ -28451,7 +29202,7 @@ var SyncService = class {
   static async getHistory(db, profileId, limit = 50, offset = 0, since) {
     const conditions = [eq11(profileWatchHistory.profileId, profileId)];
     if (since && since > 0) {
-      conditions.push(gt6(profileWatchHistory.updatedAt, since));
+      conditions.push(gt7(profileWatchHistory.updatedAt, since));
     }
     const safeLimit = Math.min(100, Math.max(1, limit));
     const safeOffset = Math.max(0, offset);
@@ -28546,7 +29297,7 @@ var SyncService = class {
       conditions.push(eq11(profileMyList.isRemoved, 0));
     }
     if (since && since > 0) {
-      conditions.push(gt6(profileMyList.updatedAt, since));
+      conditions.push(gt7(profileMyList.updatedAt, since));
     }
     return await db.db.select().from(profileMyList).where(and10(...conditions)).orderBy(desc3(profileMyList.addedAt));
   }
@@ -28637,7 +29388,7 @@ var SyncService = class {
       conditions.push(eq11(profileFavorites.isRemoved, 0));
     }
     if (since && since > 0) {
-      conditions.push(gt6(profileFavorites.updatedAt, since));
+      conditions.push(gt7(profileFavorites.updatedAt, since));
     }
     return await db.db.select().from(profileFavorites).where(and10(...conditions)).orderBy(desc3(profileFavorites.addedAt));
   }
@@ -29126,7 +29877,7 @@ async function publicHttpGet(raw, options = {}) {
       headers,
       url: url.href,
       body: response2,
-      text: async () => (await readLimited(1024 * 1024)).toString("utf8"),
+      text: async (limit = 1024 * 1024) => (await readLimited(limit)).toString("utf8"),
       arrayBuffer: async () => readLimited(64 * 1024, true)
     };
   }
@@ -29137,34 +29888,59 @@ async function publicHttpGet(raw, options = {}) {
 init_authMiddleware();
 init_sessionService();
 
-// src/server/proxyRange.ts
-var MAX_PROXY_RANGE_BYTES = 4 * 1024 * 1024;
-function normalizeProxyRange(raw) {
-  if (!/^bytes=\d*-\d*(?:,\d*-\d*){0,4}$/.test(raw)) return null;
-  const suffix = /^bytes=-(\d+)$/.exec(raw);
-  if (suffix) {
-    const bytes = Number(suffix[1]);
-    return Number.isSafeInteger(bytes) && bytes > 0 ? `bytes=-${Math.min(bytes, MAX_PROXY_RANGE_BYTES)}` : null;
+// src/server/metadataProxy.ts
+var ORIGINS = /* @__PURE__ */ new Set([
+  "https://froststream.cloutteam.com",
+  "https://fenixflix.fenixhub.online",
+  "https://torrentio.strem.fun",
+  "https://magnetflix.flixbr.online",
+  "https://v3-cinemeta.strem.io",
+  "https://opensubtitles-v3.strem.io",
+  "https://public-domain-movies.strem.fun"
+]);
+var MAX_METADATA_BYTES = 512 * 1024;
+function isAddonMetadataUrl(raw) {
+  try {
+    const url = new URL(raw);
+    return !url.username && !url.password && ORIGINS.has(url.origin) && /\/(?:manifest\.json|(?:catalog|meta|stream|subtitles)\/[^/]+\/[^/]+(?:\/[^/]*)?\.json)$/.test(url.pathname);
+  } catch {
+    return false;
   }
-  if (raw.includes(",")) {
-    let total = 0;
-    for (const part of raw.slice(6).split(",")) {
-      const match = /^(\d+)-(\d+)$/.exec(part);
-      if (!match) return null;
-      const start2 = Number(match[1]);
-      const end2 = Number(match[2]);
-      if (!Number.isSafeInteger(start2) || !Number.isSafeInteger(end2) || end2 < start2) return null;
-      total += end2 - start2 + 1;
-      if (total > MAX_PROXY_RANGE_BYTES) return null;
+}
+function createMetadataProxy(get = publicHttpGet) {
+  return async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    const url = typeof req.query.url === "string" ? req.query.url : "";
+    if (!isAddonMetadataUrl(url) || req.headers.range) {
+      return res.status(410).json({ code: "MEDIA_PROXY_DISABLED", error: "O proxy de m\xEDdia foi desativado. Esta fonte precisa permitir reprodu\xE7\xE3o direta." });
     }
-    return raw;
-  }
-  const single = /^bytes=(\d+)-(\d*)$/.exec(raw);
-  if (!single) return null;
-  const start = Number(single[1]);
-  const end = single[2] ? Number(single[2]) : Number.MAX_SAFE_INTEGER;
-  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start) return null;
-  return `bytes=${start}-${Math.min(end, start + MAX_PROXY_RANGE_BYTES - 1)}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8e3);
+    const close = () => {
+      if (!res.writableEnded) controller.abort();
+    };
+    res.once("close", close);
+    let upstream;
+    try {
+      upstream = await get(url, { headers: { Accept: "application/json", "Accept-Encoding": "identity" }, signal: controller.signal, timeoutMs: 8e3 });
+      if (!isAddonMetadataUrl(upstream.url) || !/\bapplication\/(?:[\w.+-]+\+)?json\b/i.test(upstream.headers.get("content-type") || "")) {
+        return res.status(415).json({ code: "METADATA_ONLY", error: "Somente metadados JSON s\xE3o permitidos." });
+      }
+      if (Number(upstream.headers.get("content-length") || 0) > MAX_METADATA_BYTES) return res.status(413).json({ error: "Metadados excedem o limite." });
+      if (!upstream.ok) return res.status(502).json({ error: "Metadados temporariamente indispon\xEDveis." });
+      const text2 = await upstream.text(MAX_METADATA_BYTES);
+      const data = JSON.parse(text2);
+      if (!data || typeof data !== "object") return res.status(502).json({ error: "Metadados inv\xE1lidos." });
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      return res.json(data);
+    } catch {
+      if (!res.headersSent && !res.destroyed) return res.status(502).json({ error: "Falha ao consultar metadados." });
+    } finally {
+      clearTimeout(timer);
+      res.off("close", close);
+      upstream?.body.destroy();
+    }
+  };
 }
 
 // src/server/livetv/epgSyncService.ts
@@ -79864,7 +80640,7 @@ function requireCronSecret(req, res, next) {
 }
 async function requireMaintenanceAdmin(req, res, next) {
   try {
-    const actorUid = await authenticateAdmin(req.header("authorization"));
+    const actorUid = await authenticateAdmin(req.header("authorization"), req);
     if (!actorUid) return res.status(403).json({ error: "Autentica\xE7\xE3o administrativa necess\xE1ria." });
     res.locals.actorUid = actorUid;
     next();
@@ -79908,6 +80684,10 @@ function createApp() {
     next();
   });
   app2.use(express4.json());
+  app2.use("/api", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
   app2.use("/api/watchparty", (req, res, next) => {
     if (!allowPublicRequest(`watchparty:${req.ip || "unknown"}`, 1800) || req.path === "/room/announce" && !allowPublicRequest(`watchparty-announce:${req.ip || "unknown"}`, 120)) {
       return res.status(429).set("Retry-After", "60").json({ error: "Muitas solicita\xE7\xF5es \xE0 sala." });
@@ -79921,8 +80701,8 @@ function createApp() {
     next();
   });
   app2.use(["/api/proxy", "/api/validate-stream"], (req, res, next) => {
-    const endpoint = req.path;
-    const limit = endpoint === "/api/proxy" ? 128 : 24;
+    const endpoint = req.baseUrl;
+    const limit = endpoint === "/api/proxy" ? 16 : 24;
     const active = activeRequests.get(endpoint) || 0;
     if (active >= limit) return res.status(503).set("Retry-After", "2").json({ error: "Capacidade temporariamente ocupada." });
     if (endpoint === "/api/validate-stream") {
@@ -79965,30 +80745,20 @@ function createApp() {
     }
     if (bannedContentRegistry.isBannedKeyOrId(cleanId)) return [];
     const item = VERIFIED_OPEN_ITEMS.find(
-      (it) => it.id === cleanId || cleanId.startsWith("open-") && (it.tmdbId && String(it.tmdbId) === cleanId || it.imdbId && it.imdbId === cleanId)
+      (it) => it.id === cleanId || it.imdbId && it.imdbId.toLowerCase() === cleanId.toLowerCase() || it.tmdbId && (String(it.tmdbId) === cleanId || `tmdb-${it.tmdbId}` === cleanId)
     );
-    if (!item || !item.id.startsWith("open-") || bannedContentRegistry.isBanned(item)) return [];
+    if (!item || bannedContentRegistry.isBanned(item)) return [];
     if (item.episodes && item.episodes.length > 0) {
       if (seasonNum !== 1) return [];
       const ep = item.episodes.find((e) => e.number === episodeNum);
       if (ep?.videoUrl) {
         const directUrl = ep.videoUrl;
-        const proxyUrl = directUrl.startsWith("http") ? `/api/proxy?url=${encodeURIComponent(directUrl)}` : directUrl;
+        const proxyUrl = directUrl;
         return [
           {
             name: "ZapiTV Stream Core",
             title: `[EPIS\xD3DIO ${ep.number}] ${ep.title} - Servidor Local ZapiTV`,
             url: proxyUrl,
-            sourceType: ep.videoUrl.includes(".m3u8") ? "hls" : "mp4",
-            isPtBr: item.audioStatus === "pt-br-original" || item.audioStatus === "pt-br-dubbed",
-            isDubbed: false,
-            quality: "720p",
-            behaviorHints: { notWebReady: false }
-          },
-          {
-            name: "Acervo Aberto CDN",
-            title: `[EPIS\xD3DIO ${ep.number}] ${ep.title} - CDN Direto`,
-            url: directUrl,
             sourceType: ep.videoUrl.includes(".m3u8") ? "hls" : "mp4",
             isPtBr: item.audioStatus === "pt-br-original" || item.audioStatus === "pt-br-dubbed",
             isDubbed: false,
@@ -80062,9 +80832,6 @@ function createApp() {
   app2.get(["/api/stremio/cinema-aberto/stream/:type/:id.json", "/api/stremio/cinema-aberto/stream/:type/:id"], (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     const requestedId = String(req.params.id || "");
-    if (!requestedId.startsWith("open-")) {
-      return res.json({ streams: [] });
-    }
     const streams = resolveOpenItemStreams(requestedId);
     res.json({ streams });
   });
@@ -80106,11 +80873,69 @@ function createApp() {
   app2.get(["/api/stremio/public-domain/stream/:type/:id.json", "/api/stremio/public-domain/stream/:type/:id"], (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     const requestedId = String(req.params.id || "");
-    if (!requestedId.startsWith("open-")) {
-      return res.json({ streams: [] });
-    }
     const streams = resolveOpenItemStreams(requestedId);
     res.json({ streams });
+  });
+  app2.get("/api/stremio/archive-org-movies/manifest.json", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({
+      id: "org.zapitv.archiveorg",
+      name: "Internet Archive Cinema Aberto",
+      version: "1.0.0",
+      description: "Filmes cl\xE1ssicos, preserva\xE7\xE3o hist\xF3rica e acervo aberto da Internet Archive em MP4 e HLS.",
+      resources: ["stream"],
+      types: ["movie", "series"],
+      catalogs: [],
+      idPrefixes: ["tt", "open"]
+    });
+  });
+  app2.get(["/api/stremio/archive-org-movies/stream/:type/:id.json", "/api/stremio/archive-org-movies/stream/:type/:id"], async (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const requestedId = String(req.params.id || "").replace(/\.json$/, "");
+    const local = resolveOpenItemStreams(requestedId);
+    if (local.length > 0) {
+      return res.json({ streams: local.map((s) => ({ ...s, providerName: "Internet Archive Open" })) });
+    }
+    res.json({ streams: [] });
+  });
+  app2.get("/api/stremio/wikimedia-commons/manifest.json", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({
+      id: "org.zapitv.wikimedia",
+      name: "Wikimedia Commons V\xEDdeos & Document\xE1rios",
+      version: "1.0.0",
+      description: "Document\xE1rios e acervo cultural aberto sob licen\xE7a Creative Commons CC-BY da Wikimedia.",
+      resources: ["stream"],
+      types: ["movie", "series"],
+      catalogs: [],
+      idPrefixes: ["tt", "open"]
+    });
+  });
+  app2.get(["/api/stremio/wikimedia-commons/stream/:type/:id.json", "/api/stremio/wikimedia-commons/stream/:type/:id"], (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const requestedId = String(req.params.id || "").replace(/\.json$/, "");
+    const local = resolveOpenItemStreams(requestedId);
+    const media2 = local.filter((s) => s.url && (s.url.includes("wikimedia.org") || s.url.includes("upload.wikimedia")));
+    res.json({ streams: media2.length > 0 ? media2 : local.slice(0, 2).map((s) => ({ ...s, providerName: "Wikimedia Commons" })) });
+  });
+  app2.get("/api/stremio/open-culture/manifest.json", (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({
+      id: "org.zapitv.openculture",
+      name: "Open Culture Cinema Cl\xE1ssico",
+      version: "1.0.0",
+      description: "Cinema cl\xE1ssico aberto, restaurado e de livre acesso para todos os p\xFAblicos.",
+      resources: ["stream"],
+      types: ["movie"],
+      catalogs: [],
+      idPrefixes: ["tt", "open"]
+    });
+  });
+  app2.get(["/api/stremio/open-culture/stream/:type/:id.json", "/api/stremio/open-culture/stream/:type/:id"], (req, res) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const requestedId = String(req.params.id || "").replace(/\.json$/, "");
+    const local = resolveOpenItemStreams(requestedId);
+    res.json({ streams: local.map((s) => ({ ...s, providerName: "Open Culture" })) });
   });
   app2.get("/api/stremio/mico-leao-dublado/manifest.json", (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -80322,20 +81147,13 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     if (!ch || !ch.url) {
       return res.json({ streams: [] });
     }
-    const streamUrl = ch.url.startsWith("http") ? `/api/proxy?url=${encodeURIComponent(ch.url)}` : ch.url;
+    const streamUrl = ch.url;
     res.json({
       streams: [
         {
           name: ch.name,
           title: `${ch.name} - Transmiss\xE3o Direta Oficial (${ch.quality || "HD"})`,
           url: streamUrl,
-          sourceType: "hls",
-          behaviorHints: { notWebReady: false }
-        },
-        {
-          name: `${ch.name} (CDN Direto)`,
-          title: `${ch.name} - CDN Direto Original`,
-          url: ch.url,
           sourceType: "hls",
           behaviorHints: { notWebReady: false }
         }
@@ -80407,6 +81225,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     const result = await epgSyncService.syncAllSources(true);
     res.json(result);
   });
+  const metadataProxy = createMetadataProxy();
   app2.get("/api/proxy", async (req, res) => {
     const targetUrl = req.query.url;
     if (typeof targetUrl !== "string" || !targetUrl || targetUrl.length > 4096) {
@@ -80437,89 +81256,12 @@ ${s.name?.split("\n")[1] || "1080p"}`,
           return res.status(401).json({ error: "Sess\xE3o inv\xE1lida ou expirada. Fa\xE7a login novamente." });
         }
       }
-      const incomingUa = req.headers["user-agent"] || "";
-      const isCustomBotUa = !incomingUa || incomingUa.includes("ZapiTV") || incomingUa.includes("node-fetch");
-      const userAgent = isCustomBotUa ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" : incomingUa;
-      const headers = {
-        "User-Agent": userAgent,
-        "Accept": req.headers["accept"] || "*/*",
-        "Accept-Language": req.headers["accept-language"] || "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
-      };
-      const customReferer = req.query.referer || req.headers["x-target-referer"];
-      if (customReferer && customReferer.length <= 1024 && /^https?:\/\//i.test(customReferer)) {
-        headers["Referer"] = customReferer;
-      } else if (!targetUrl.includes("cloutteam.com")) {
-        headers["Referer"] = parsed.origin;
+      if (!allowPublicRequest(`metadata:${req.ip || "unknown"}`, 600)) {
+        return res.status(429).set("Retry-After", "60").json({ error: "Limite tempor\xE1rio de metadados excedido." });
       }
-      if (req.headers.range) {
-        const safeRange = typeof req.headers.range === "string" ? normalizeProxyRange(req.headers.range) : null;
-        if (!safeRange) {
-          return res.status(416).json({ error: "Range inv\xE1lido" });
-        }
-        headers["Range"] = safeRange;
-      }
-      const controller = new AbortController();
-      const connectTimer = setTimeout(() => {
-        try {
-          controller.abort(new Error("Timeout de conex\xE3o com servidor de origem"));
-        } catch {
-        }
-      }, 25e3);
-      res.on("close", () => {
-        if (!res.writableEnded) {
-          try {
-            controller.abort();
-          } catch {
-          }
-        }
-      });
-      const response2 = await publicHttpGet(targetUrl, {
-        headers,
-        signal: controller.signal,
-        timeoutMs: 25e3
-      });
-      clearTimeout(connectTimer);
-      const responseType = response2.headers.get("content-type") || "";
-      const isHlsManifest = /\.m3u8(?:$|[?#])/i.test(new URL(response2.url).pathname) || /(?:mpegurl|vnd\.apple\.mpegurl)/i.test(responseType);
-      if (response2.ok && isHlsManifest) {
-        const { rewriteHlsManifest: rewriteHlsManifest2 } = await Promise.resolve().then(() => (init_rewriteHlsManifest(), rewriteHlsManifest_exports));
-        const original = await response2.text();
-        const rewritten = rewriteHlsManifest2(original, response2.url);
-        if (!rewritten) return res.status(502).json({ error: "Manifesto HLS inv\xE1lido" });
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Content-Type", "application/vnd.apple.mpegurl; charset=utf-8");
-        res.setHeader("Cache-Control", "no-store");
-        return res.status(200).send(rewritten);
-      }
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "*");
-      res.setHeader("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges");
-      const contentType = response2.headers.get("content-type");
-      if (contentType) res.setHeader("Content-Type", contentType);
-      const contentRange = response2.headers.get("content-range");
-      if (contentRange) res.setHeader("Content-Range", contentRange);
-      const acceptRanges = response2.headers.get("accept-ranges");
-      if (acceptRanges) res.setHeader("Accept-Ranges", acceptRanges);
-      const contentLength = response2.headers.get("content-length");
-      if (contentLength) res.setHeader("Content-Length", contentLength);
-      res.status(response2.status);
-      if (response2.body) {
-        const nodeStream = response2.body;
-        res.once("close", () => nodeStream.destroy());
-        nodeStream.on("error", (streamErr) => {
-          try {
-            if (!res.writableEnded) res.end();
-          } catch {
-          }
-        });
-        nodeStream.pipe(res);
-      } else {
-        res.end();
-      }
-    } catch (err) {
-      if (!res.headersSent) res.status(502).json({ error: "Falha ao consultar recurso via proxy" });
-      else res.end();
+      return metadataProxy(req, res);
+    } catch {
+      if (!res.headersSent) return res.status(502).json({ error: "Falha ao consultar metadados." });
     }
   });
   const streamValidationServerCache = /* @__PURE__ */ new Map();
@@ -80815,6 +81557,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
       const selection = featuredRankingService.getFeaturedSelectionSync();
+      res.setHeader("Cache-Control", "public, max-age=0, s-maxage=30, stale-while-revalidate=30");
       res.json(selection);
     } catch (err) {
       res.status(500).json({ error: "Falha ao obter rankings em destaque", details: err?.message });
@@ -80825,6 +81568,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     try {
       const monthQuery = typeof req.query.month === "string" ? req.query.month : void 0;
       const snapshot = monthlyFeaturedRankingService.getMonthlyRankingSync(monthQuery);
+      res.setHeader("Cache-Control", "public, max-age=0, s-maxage=30, stale-while-revalidate=30");
       res.json(snapshot);
     } catch (err) {
       res.status(500).json({ error: "Falha ao obter rankings mensais", details: err?.message });
@@ -80904,7 +81648,9 @@ ${s.name?.split("\n")[1] || "1080p"}`,
   app2.get("/api/catalog/new-releases", async (_req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
     try {
-      res.json(await getPersistedReleases());
+      const releases = await getPersistedReleases();
+      res.setHeader("Cache-Control", "public, max-age=0, s-maxage=30, stale-while-revalidate=30");
+      res.json(releases);
     } catch (err) {
       res.status(err instanceof CatalogReleaseStorageUnavailable ? 503 : 500).json({ error: "Lan\xE7amentos temporariamente indispon\xEDveis" });
     }

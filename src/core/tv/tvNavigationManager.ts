@@ -1,4 +1,49 @@
 /**
+ * Diferencia eventos de teclado alfanumérico dos eventos reais de confirmação do controle remoto.
+ * O código 66 corresponde a:
+ * - Android KEYCODE_ENTER (botão OK físico da Fire TV / Android TV)
+ * - Tecla física alfanumérica 'B' / 'b' (ASCII 66)
+ */
+export function isRemoteConfirmEvent(e: KeyboardEvent): boolean {
+  if (!e) return false;
+
+  // 1. Tecla 'B'/'b' ou código 'KeyB' é estritamente alfanumérico, NUNCA confirmação de TV
+  if (e.key === 'b' || e.key === 'B' || e.code === 'KeyB') {
+    return false;
+  }
+
+  // 2. Qualquer tecla alfanumérica imprimível com length 1 (diferente de Enter/quebra de linha)
+  if (e.key && e.key.length === 1 && !['\n', '\r'].includes(e.key)) {
+    return false;
+  }
+
+  // 3. Teclas canônicas de confirmação (W3C standard e Smart TVs)
+  if (
+    e.key === 'Enter' ||
+    e.key === 'Select' ||
+    e.key === 'Ok' ||
+    e.key === 'OK' ||
+    e.code === 'Enter' ||
+    e.code === 'NumpadEnter' ||
+    e.code === 'Select' ||
+    e.keyCode === 13 ||
+    e.keyCode === 10 ||
+    e.keyCode === 65385
+  ) {
+    return true;
+  }
+
+  // 4. Código 66 (Android KEYCODE_ENTER emitido por controles remotos Fire TV / Android TV)
+  // Aceito estritamente quando NÃO for a tecla alfanumérica 'B'/'b'
+  if (e.keyCode === 66 || (e as any).which === 66) {
+    const isAlphanumericB = e.key === 'b' || e.key === 'B' || e.code === 'KeyB';
+    return !isAlphanumericB;
+  }
+
+  return false;
+}
+
+/**
  * TV Navigation & Spatial Focus Manager for ZapiTV
  * Gerencia a pilha de 'Voltar' (Back-Stack), atalhos de controle remoto e integração com Norigin Spatial Navigation.
  */
@@ -96,6 +141,24 @@ class TvNavigationManager {
   private handleGlobalKeyDown = (e: KeyboardEvent): void => {
     if (!tvModeService.isTvMode()) return;
 
+    // Desambiguação do código 66 (Android KEYCODE_ENTER na Fire TV vs Tecla física B)
+    if (e.keyCode === 66 || (e as any).which === 66) {
+      if (!isRemoteConfirmEvent(e)) {
+        // Trata-se da digitação da letra B física.
+        // Sobrescreve temporariamente keyCode para 0 nesta instância do evento
+        // para que o Norigin Spatial Navigation não interprete a letra B como Enter.
+        try {
+          Object.defineProperty(e, 'keyCode', { get: () => 0, configurable: true });
+        } catch {}
+      } else {
+        // Trata-se do botão OK físico da Fire TV / Android TV (Android KEYCODE_ENTER = 66)
+        // Normaliza keyCode para 13 garantindo compatibilidade total com todos os navegadores.
+        try {
+          Object.defineProperty(e, 'keyCode', { get: () => 13, configurable: true });
+        } catch {}
+      }
+    }
+
     // Prepara o AudioContext durante a primeira interação legítima com o controle remoto
     uiSoundService.prime();
 
@@ -115,7 +178,9 @@ class TvNavigationManager {
       this.lastUserNavTime = performance.now();
     }
 
-    const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    const isInput =
+      (typeof HTMLInputElement !== 'undefined' && e.target instanceof HTMLInputElement) ||
+      (typeof HTMLTextAreaElement !== 'undefined' && e.target instanceof HTMLTextAreaElement);
     const isBackKey =
       e.keyCode === 10009 ||
       e.keyCode === 4 ||
@@ -156,7 +221,9 @@ class TvNavigationManager {
    */
   private handleGlobalKeyUp = (e: KeyboardEvent): void => {
     if (!tvModeService.isTvMode()) return;
-    const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    const isInput =
+      (typeof HTMLInputElement !== 'undefined' && e.target instanceof HTMLInputElement) ||
+      (typeof HTMLTextAreaElement !== 'undefined' && e.target instanceof HTMLTextAreaElement);
     const isBackKey =
       e.keyCode === 10009 ||
       e.keyCode === 4 ||

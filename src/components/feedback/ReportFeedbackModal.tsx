@@ -1,3 +1,7 @@
+import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
+import { useTvFocusable } from '../../core/tv/useTvFocusable';
+import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { tvModeService } from '../../core/tv/tvModeService';
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
@@ -82,9 +86,14 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
     }
   }, [isOpen, defaultCategory]);
 
-  // Fechamento exclusivo com tecla Escape na fase de captura (evita fechar modais pai)
+  // Integração com Back Handler prioritário da TV
   useEffect(() => {
     if (!isOpen) return;
+
+    const unregister = tvNavigationManager.registerBackHandler('feedback-modal', 400, () => {
+      onClose();
+      return true;
+    });
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -96,8 +105,63 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
+    return () => {
+      unregister();
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
   }, [isOpen, onClose]);
+
+  const isTv = tvModeService.isTvMode() || (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv'));
+
+  const { ref: cancelBtnRef, focused: isCancelFocused } = useTvFocusable({
+    focusKey: 'feedback-modal-cancel',
+    focusable: isOpen && !success && !isQueuedOffline,
+    onEnterPress: onClose,
+    onArrowPress: (direction: string) => {
+      if (direction === 'right') {
+        setFocus('feedback-modal-submit');
+        return false;
+      }
+      return true;
+    }
+  });
+
+  const { ref: submitBtnRef, focused: isSubmitFocused } = useTvFocusable({
+    focusKey: 'feedback-modal-submit',
+    focusable: isOpen && !submitting && !success && !isQueuedOffline,
+    onEnterPress: () => {
+      if (!submitting) {
+        handleSubmit({ preventDefault: () => {} } as any);
+      }
+    },
+    onArrowPress: (direction: string) => {
+      if (direction === 'left') {
+        setFocus('feedback-modal-cancel');
+        return false;
+      }
+      return true;
+    }
+  });
+
+  const { ref: doneBtnRef, focused: isDoneFocused } = useTvFocusable({
+    focusKey: 'feedback-modal-done',
+    focusable: isOpen && (success || isQueuedOffline),
+    onEnterPress: onClose
+  });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isTv) {
+      const timer = setTimeout(() => {
+        if (success || isQueuedOffline) {
+          setFocus('feedback-modal-done');
+        } else {
+          setFocus('feedback-modal-cancel');
+        }
+      }, 70);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, isTv, success, isQueuedOffline]);
 
   if (!isOpen) return null;
 
@@ -223,14 +287,18 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
                 Seu feedback foi recebido e nosso sistema automático já adicionou o diagnóstico técnico à fila de correções do ZapiTV.
               </p>
               <button
+                ref={doneBtnRef}
                 type="button"
+                data-focus-key="feedback-modal-done"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   onClose();
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
-                className="mt-4 px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors cursor-pointer"
+                className={`mt-4 px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                  isDoneFocused ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-black scale-105 bg-white/25' : ''
+                }`}
               >
                 Concluir
               </button>
@@ -329,21 +397,29 @@ export const ReportFeedbackModal: React.FC<ReportFeedbackModalProps> = ({
               {/* Ações */}
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
+                  ref={cancelBtnRef}
                   type="button"
+                  data-focus-key="feedback-modal-cancel"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     onClose();
                   }}
                   onMouseDown={(e) => e.stopPropagation()}
-                  className="px-4 py-2 text-sm text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors font-medium cursor-pointer"
+                  className={`px-4 py-2 text-sm text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors font-medium cursor-pointer ${
+                    isCancelFocused ? 'ring-2 ring-white/60 bg-white/20 text-white' : ''
+                  }`}
                 >
                   Cancelar
                 </button>
                 <button
+                  ref={submitBtnRef}
                   type="submit"
+                  data-focus-key="feedback-modal-submit"
                   disabled={submitting}
-                  className="px-5 py-2 bg-[#007df7] hover:bg-[#007df7]/90 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-[#007df7]/25 flex items-center gap-2 cursor-pointer"
+                  className={`px-5 py-2 bg-[#007df7] hover:bg-[#007df7]/90 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-[#007df7]/25 flex items-center gap-2 cursor-pointer ${
+                    isSubmitFocused ? 'ring-2 ring-cyan-300 ring-offset-2 ring-offset-black scale-105 bg-[#0069d9]' : ''
+                  }`}
                 >
                   {submitting ? (
                     <>

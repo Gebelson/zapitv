@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Volume2, VolumeX, Sliders, Sparkles, RotateCcw, ArrowLeft, Settings, Tv, Check, CheckCircle2 } from 'lucide-react';
+import { Volume2, VolumeX, Sliders, SlidersHorizontal, Sparkles, RotateCcw, ArrowLeft, Settings, Tv, Check, CheckCircle2 } from 'lucide-react';
+import { smartAudioService, SmartAudioDiagnostics } from '../../core/audio/smartAudioService';
 import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
@@ -17,6 +18,48 @@ export const TvSettingsView: React.FC<TvSettingsViewProps> = ({ onBack }) => {
 
   const [prefs, setPrefs] = useState<UiSoundPreferences>(() => uiSoundService.getPreferences());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const [smartAudioDiag, setSmartAudioDiag] = useState<SmartAudioDiagnostics>(() => smartAudioService.getDiagnostics());
+
+  useEffect(() => {
+    return smartAudioService.subscribe(setSmartAudioDiag);
+  }, []);
+
+  // Smart Audio: Modo Equilibrado
+  const { ref: balancedRef, focused: isBalancedFocused } = useTvFocusable({
+    focusKey: 'tv-setting-smart-audio-balanced',
+    soundType: 'hover',
+    enterSound: 'confirm',
+    onEnterPress: () => {
+      smartAudioService.setMode('balanced');
+      uiSoundService.play('toggle', { preview: true });
+      showToast('Modo Equilibrado ativado');
+    }
+  });
+
+  // Smart Audio: Modo Noturno
+  const { ref: nightRef, focused: isNightFocused } = useTvFocusable({
+    focusKey: 'tv-setting-smart-audio-night',
+    soundType: 'hover',
+    enterSound: 'confirm',
+    onEnterPress: () => {
+      smartAudioService.setMode('night');
+      uiSoundService.play('toggle', { preview: true });
+      showToast('Modo Noturno ativado');
+    }
+  });
+
+  // Smart Audio: Desativado
+  const { ref: offRef, focused: isOffFocused } = useTvFocusable({
+    focusKey: 'tv-setting-smart-audio-off',
+    soundType: 'hover',
+    enterSound: 'confirm',
+    onEnterPress: () => {
+      smartAudioService.setMode('off');
+      uiSoundService.play('toggle', { preview: true });
+      showToast('Melhoria automática desativada');
+    }
+  });
 
   useEffect(() => {
     return uiSoundService.subscribe(() => {

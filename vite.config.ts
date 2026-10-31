@@ -1,6 +1,6 @@
 import path from 'path';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -28,13 +28,18 @@ export default defineConfig(() => {
           this.emitFile({ type: 'asset', fileName: 'offline-assets.json', source: JSON.stringify(assets) });
         },
         closeBundle() {
-          const shell = readFileSync(path.join(outputDir, 'index.html'));
-          const assets = readFileSync(path.join(outputDir, 'offline-assets.json'));
+          const indexPath = path.join(outputDir, 'index.html');
+          const rootIndexPath = path.join(__dirname, 'index.html');
+          const shell = existsSync(indexPath) ? readFileSync(indexPath) : existsSync(rootIndexPath) ? readFileSync(rootIndexPath) : Buffer.from('');
+          const offlineAssetsPath = path.join(outputDir, 'offline-assets.json');
+          const assets = existsSync(offlineAssetsPath) ? readFileSync(offlineAssetsPath) : Buffer.from('');
           const swPath = path.join(outputDir, 'sw.js');
           let manifest = Buffer.from('');
           try { manifest = readFileSync(path.join(outputDir, 'manifest.json')); } catch {}
           const version = createHash('sha256').update(shell).update(assets).update(manifest).digest('hex').slice(0, 12);
-          writeFileSync(swPath, readFileSync(swPath, 'utf8').replace('__BUILD_VERSION__', version));
+          if (existsSync(swPath)) {
+            writeFileSync(swPath, readFileSync(swPath, 'utf8').replace('__BUILD_VERSION__', version));
+          }
         }
       }],
       resolve: {
