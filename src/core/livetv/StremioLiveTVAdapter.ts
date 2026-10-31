@@ -1,4 +1,5 @@
-import { RawChannelInput } from './types';
+import { RawChannelInput, LiveStreamSource } from './types';
+import { liveStreamValidator } from './LiveStreamValidator';
 
 export interface StremioManifest {
   id: string;
@@ -25,6 +26,8 @@ export interface StremioMetaPreview {
   logo?: string;
   description?: string;
   genres?: string[];
+  genre?: string;
+  streams?: StremioStream[];
 }
 
 export interface StremioStream {
@@ -86,6 +89,29 @@ export class StremioLiveTVAdapter {
   }
 
   /**
+   * Filtra estritamente streams compatíveis com reprodução web (HLS/DASH/MP4).
+   * Rejeita streams P2P/Torrent (infoHash, acestream, magnet), sem URL ou marcados com notWebReady.
+   */
+  public filterWebReadyStreams(streams: StremioStream[]): StremioStream[] {
+    if (!Array.isArray(streams)) return [];
+    return streams.filter(s => {
+      if (!s || typeof s.url !== 'string') return false;
+      const url = s.url.trim();
+      if (!url.startsWith('http://') && !url.startsWith('https://')) return false;
+      if (s.behaviorHints?.notWebReady === true) return false;
+      // Rejeita protocolos ou motores P2P/Torrent/AceStream
+      if (url.startsWith('acestream:') || url.startsWith('magnet:') || url.includes('.torrent') || (s as any).infoHash) {
+        return false;
+      }
+      // Rejeita domínios de estacionamento / propaganda
+      if (liveStreamValidator.isParkedDomain(url)) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  /**
    * Obtém e valida o manifesto do add-on Stremio
    */
   public async getManifest(): Promise<StremioManifest | null> {
@@ -98,7 +124,17 @@ export class StremioLiveTVAdapter {
         signal: AbortSignal.timeout(4000)
       });
       if (resp.ok) {
-        this.manifest = await resp.json();
+        const parsed: StremioManifest = await resp.json();
+        // Não confundir Brazuca Torrents ou add-ons puramente de torrent sob demanda com canais ao vivo
+        const isBrazucaTorrent = (parsed.id || '').toLowerCase().includes('brazuca') ||
+          (parsed.name || '').toLowerCase().includes('brazuca') ||
+          (parsed.description || '').toLowerCase().includes('brazuca');
+        if (isBrazucaTorrent) {
+          console.warn(`[StremioLiveTVAdapter] Add-on "${parsed.name}" é um provedor de torrent sob demanda e foi rejeitado como TV ao vivo.`);
+          return null;
+        }
+
+        this.manifest = parsed;
         return this.manifest;
       }
     } catch {}
@@ -139,8 +175,29 @@ export class StremioLiveTVAdapter {
             const batch = metas.slice(i, i + BATCH_SIZE);
             const results = await Promise.allSettled(
               batch.map(async (meta) => {
-                const resolvedStreamUrl = await this.resolveStream(meta.type || catalog.type, meta.id);
-                if (!resolvedStreamUrl) return null;
+                // Se o catálogo já embutir os streams (ex: USA TV Next), utiliza-os diretamente
+                let candidateStreams: StremioStream[] = [];
+                if (Array.isArray(meta.streams) && meta.streams.length > 0) {
+                  candidateStreams = this.filterWebReadyStreams(meta.streams);
+                } else {
+                  candidateStreams = await this.resolveStreams(meta.type || catalog.type, meta.id);
+                }
+
+                if (candidateStreams.length === 0) return null;
+
+                const primaryUrl = candidateStreams[0].url!;
+                const backupUrls = candidateStreams.slice(1).map(s => s.url!).filter(Boolean);
+
+                const sources: LiveStreamSource[] = candidateStreams.map((s, idx) => ({
+                  id: `${meta.id}-source-${idx}`,
+                  url: s.url!,
+                  quality: s.name || (s.title?.includes('1080') ? '1080p' : s.title?.includes('720') ? '720p' : '720p'),
+                  provider: manifest.name || 'Stremio Live Addon',
+                  format: (s.url!.includes('.mpd') ? 'dash' : 'hls') as ('dash' | 'hls'),
+                  isOfficial: false,
+                  isBackup: idx > 0,
+                  resolutionHeight: s.title?.includes('1080') ? 1080 : s.title?.includes('720') ? 720 : 720
+                }));
 
                 const isTemporary = this.isTemporarySportsEvent(meta.name, catalog.name);
 
@@ -150,8 +207,10 @@ export class StremioLiveTVAdapter {
                   name: meta.name,
                   tvgLogo: meta.logo || meta.poster,
                   description: meta.description,
-                  groupTitle: meta.genres?.[0] || catalog.name,
-                  url: resolvedStreamUrl,
+                  groupTitle: meta.genre || meta.genres?.[0] || catalog.name,
+                  url: primaryUrl,
+                  sources: sources,
+                  backupStreamUrls: backupUrls,
                   provider: manifest.name || 'Stremio Live Addon',
                   isOfficial: false,
                   isTemporaryEvent: isTemporary
@@ -202,10 +261,10 @@ export class StremioLiveTVAdapter {
   }
 
   /**
-   * Resolve a URL de stream de um canal a partir do endpoint /stream/:type/:id.json
+   * Obtém todas as fontes compatíveis de um canal
    */
-  public async resolveStream(type: string, id: string): Promise<string | null> {
-    if (!this.baseUrl) return null;
+  public async resolveStreams(type: string, id: string): Promise<StremioStream[]> {
+    if (!this.baseUrl) return [];
     try {
       const streamUrl = `${this.baseUrl}/stream/${type}/${encodeURIComponent(id)}.json`;
       const resp = await fetch(streamUrl, {
@@ -215,11 +274,18 @@ export class StremioLiveTVAdapter {
 
       if (resp.ok) {
         const data = await resp.json();
-        const streams: StremioStream[] = data.streams || [];
-        const webStream = streams.find(s => s.url && !s.behaviorHints?.notWebReady) || streams[0];
-        return webStream?.url || null;
+        const rawStreams: StremioStream[] = data.streams || [];
+        return this.filterWebReadyStreams(rawStreams);
       }
     } catch {}
-    return null;
+    return [];
+  }
+
+  /**
+   * Resolve a URL de stream de um canal a partir do endpoint /stream/:type/:id.json
+   */
+  public async resolveStream(type: string, id: string): Promise<string | null> {
+    const valid = await this.resolveStreams(type, id);
+    return valid[0]?.url || null;
   }
 }

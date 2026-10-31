@@ -88,6 +88,7 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   const [isMuted, setIsMuted] = useState(initialMuted);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(() => !isLinearTv);
+  const [errorFocusIndex, setErrorFocusIndex] = useState(0);
   const [availableQualities, setAvailableQualities] = useState<string[]>(['Auto']);
   const [selectedQuality, setSelectedQuality] = useState('Auto');
   const [showQualityMenu, setShowQualityMenu] = useState(false);
@@ -119,6 +120,9 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
   useEffect(() => {
     activeChannelIdRef.current = channel.id;
   }, [channel.id]);
+
+  
+  
 
   // Monitora eventos Picture-in-Picture
   useEffect(() => {
@@ -629,6 +633,50 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
     playStreamUrl(resolved.primaryUrl);
   }, [channel, onNextChannel, onClose, playStreamUrl, cleanupPlayer]);
 
+  // Navegação por controle remoto na tela de erro (Smart TV / Fire TV)
+  useEffect(() => {
+    if (!hasError || !isLinearTv) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 1. Enter ou Código 66 (Fire TV / OK)
+      if (e.key === 'Enter' || e.keyCode === 13 || e.keyCode === 66) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (errorFocusIndex === 0) {
+          attemptedUrlsThisSessionRef.current.clear();
+          channelSourceResolver.clearFailedSources(channel.id);
+          initPlayback();
+        } else if (errorFocusIndex === 1 && onNextChannel) {
+          onNextChannel();
+        } else if (errorFocusIndex === 2 && onClose) {
+          onClose();
+        }
+        return;
+      }
+
+      // 2. Navegação horizontal entre botões de erro
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        e.stopPropagation();
+        setErrorFocusIndex(prev => {
+          const max = onClose ? 2 : (onNextChannel ? 1 : 0);
+          return Math.min(prev + 1, max);
+        });
+        return;
+      }
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        e.stopPropagation();
+        setErrorFocusIndex(prev => Math.max(prev - 1, 0));
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [hasError, isLinearTv, errorFocusIndex, channel.id, initPlayback, onNextChannel, onClose]);
+
   // Reinicia player quando o canal selecionado mudar
   useEffect(() => {
     activeChannelIdRef.current = channel.id;
@@ -826,14 +874,14 @@ export const LiveTvPlayer: React.FC<LiveTvPlayerProps> = ({
                 channelSourceResolver.clearFailedSources(channel.id);
                 initPlayback();
               }}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#007df7] hover:bg-[#0069d9] active:scale-95 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-lg shadow-[#007df7]/30"
+              className={`flex items-center gap-2 px-5 py-2.5 bg-[#007df7] hover:bg-[#0069d9] active:scale-95 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-lg shadow-[#007df7]/30 ${isLinearTv && errorFocusIndex === 0 ? 'ring-4 ring-white shadow-2xl scale-105' : ''}`}
             >
               <RefreshCw className="w-3.5 h-3.5" /> Tentar Reconectar
             </button>
             {onNextChannel && (
               <button
                 onClick={onNextChannel}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+                className={`flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${isLinearTv && errorFocusIndex === 1 ? 'ring-4 ring-white bg-white/30 shadow-2xl scale-105' : ''}`}
               >
                 Próximo Canal <ChevronRight className="w-3.5 h-3.5" />
               </button>

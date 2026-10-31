@@ -69,7 +69,7 @@ export class OfficialChannelProvider {
         category: 'filmes_series',
         groupTitle: 'TV Aberta',
         tvgLogo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Logotipo_da_Rede_Brasil_de_Televis%C3%A3o.svg/512px-Logotipo_da_Rede_Brasil_de_Televis%C3%A3o.svg.png',
-        url: 'https://video09.logicahost.com.br/redebrasiloficial/redebrasiloficial/playlist.m3u8',
+        url: 'https://redebrasil.nuvemplay.live/hls/stream.m3u8',
         quality: '720p',
         provider: OfficialChannelProvider.PROVIDER_NAME,
         isOfficial: true,

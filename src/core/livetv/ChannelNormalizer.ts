@@ -34,7 +34,9 @@ export class ChannelNormalizer {
     'sbt-interior': 'sbt-interior',
     'sbt': 'sbt-interior',
     'sbt-hd': 'sbt-interior',
+    'cnn': 'cnn-brasil',
     'cnn-brasil': 'cnn-brasil',
+    'cnn-br': 'cnn-brasil',
     'cnnbrasil': 'cnn-brasil',
     'jovem-pan-news': 'jovem-pan-news',
     'jp-news': 'jovem-pan-news',
@@ -91,10 +93,11 @@ export class ChannelNormalizer {
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/\s*\(\d+p\)/gi, '')
+      .replace(/\s*\b\d+p\b/gi, '')
       .replace(/\s*\[.*?\]/g, '')
       .replace(/\s*\(Brazil\)/gi, '')
       .replace(/\s*\(Brasil\)/gi, '')
-      .replace(/\s*\b(hd|full\s*hd|fhd|sd|4k)\b/gi, '')
+      .replace(/\s*\(\s*(hd|full\s*hd|fhd|sd|4k|720p|1080p)\s*\)/gi, '').replace(/\s*\b(hd|full\s*hd|fhd|sd|4k)\b/gi, '').replace(/\s*\(\s*\)/g, '')
       .trim();
 
     if (clean !== 'tv brasil' && clean !== 'brasil' && clean.endsWith(' brasil')) {
@@ -119,7 +122,10 @@ export class ChannelNormalizer {
     for (const raw of rawList) {
       if (!raw.name) continue;
 
-      const canonicalId = raw.id || this.generateCanonicalSlug(raw.name, raw.tvgId);
+      const canonicalSlug = this.generateCanonicalSlug(raw.name, raw.tvgId);
+      const canonicalId = (raw.isOfficial && raw.id)
+        ? raw.id
+        : (ChannelNormalizer.CANONICAL_ALIASES[canonicalSlug] || canonicalSlug || ChannelNormalizer.CANONICAL_ALIASES[raw.id || ''] || raw.id);
       const { category, categoryLabel } = this.normalizeCategory(raw.category || raw.groupTitle);
 
       const isExternal = Boolean(raw.requiresExternalAccess);

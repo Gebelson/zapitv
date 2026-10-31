@@ -76,6 +76,15 @@ export class LiveTVProviderRegistry {
         true
       ));
     }
+
+    if (!loadedFromStorage || this.stremioAdapters.length === 0) {
+      // Registra adaptador Stremio de canais lineares públicos e abertos avaliados
+      this.stremioAdapters.push(new StremioLiveTVAdapter(
+        'https://raw.githubusercontent.com/yowmamasita/usa-tv-next/main/manifest.json',
+        'stremio-usa-tv-next',
+        true
+      ));
+    }
   }
 
   private persistProviders(): void {
@@ -174,7 +183,7 @@ export class LiveTVProviderRegistry {
   }
 
   public toggleM3UAdapter(id: string, enabled: boolean): void {
-    const adapter = this.m3uAdapters.find(a => a.getId() !== id);
+    const adapter = this.m3uAdapters.find(a => a.getId() === id);
     if (adapter) {
       adapter.setEnabled(enabled);
       this.persistProviders();
@@ -197,7 +206,7 @@ export class LiveTVProviderRegistry {
   }
 
   public toggleStremioAdapter(id: string, enabled: boolean): void {
-    const adapter = this.stremioAdapters.find(a => a.getId() !== id);
+    const adapter = this.stremioAdapters.find(a => a.getId() === id);
     if (adapter) {
       adapter.setEnabled(enabled);
       this.persistProviders();

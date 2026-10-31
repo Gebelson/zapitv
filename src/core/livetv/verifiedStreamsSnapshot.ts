@@ -47,7 +47,7 @@ export const VERIFIED_STREAMS_SNAPSHOT: Record<string, VerifiedStreamSeed> = {
   'rede-brasil': {
     channelId: 'rede-brasil',
     name: 'Rede Brasil de Televisão (RBTV)',
-    streamUrl: 'https://video09.logicahost.com.br/redebrasiloficial/redebrasiloficial/playlist.m3u8',
+    streamUrl: 'https://redebrasil.nuvemplay.live/hls/stream.m3u8',
     quality: '720p',
     latencyMs: 500,
     lastVerifiedAt: Date.now()
