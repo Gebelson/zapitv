@@ -19,3 +19,7 @@ Também evitada inicialização duplicada do polling de StorageService: authSync
 - Sem homologação física Samsung/Fire TV nesta execução.
 
 Sem migração, alteração de credenciais ou de variáveis de produção. Publicação autorizada pelo usuário. O merge contém as duas linhas de histórico, sem reset ou force push.
+
+## Smoke publicado e correção adicional
+
+O primeiro deployment integrado ficou READY, com HTTP 200 e gates de autenticação corretos em PC, mobile e TV. O smoke detectou seis exceções `measureLayout` no mobile: MandatoryAuthModal usava hooks Norigin antes de inicializar o gerenciador. O fixture antigo inicializava Norigin globalmente e mascarava o defeito. Removida essa preparação artificial e adicionada asserção contra erros JavaScript: o teste reproduziu as seis exceções. O modal agora inicializa o gerenciador idempotente existente antes dos hooks. Sem alteração de layout ou permissões. O workflow também executa a regressão browser de autenticação.

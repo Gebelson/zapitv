@@ -30,6 +30,7 @@ import {
   Smartphone,
   WifiOff
 } from 'lucide-react';
+import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { deviceAuthClient, DeviceChallengeData } from '../../core/deviceAuth/deviceAuthClient';
 import { uiSoundService } from '../../core/audio/uiSoundService';
@@ -59,6 +60,8 @@ export const MandatoryAuthModal: React.FC<MandatoryAuthModalProps> = ({
   authError,
   onRetryAuth,
 }) => {
+  // Raw Norigin hooks register even outside TV mode; initialize before the first hook.
+  tvNavigationManager.init();
   // Define o modo inicial: se especificado, usa initialMode; se TV, começa prioritariamente no fluxo de QR Code
   const [mode, setMode] = useState<'welcome' | 'signup' | 'login' | 'tv_qr'>(() => {
     if (initialMode) return initialMode;

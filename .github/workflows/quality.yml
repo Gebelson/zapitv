@@ -29,6 +29,7 @@ jobs:
       - run: npm run test:catalog-longevity
       - run: npm run test:mobile-ranked-stability
       - run: npm run test:continuity-browser
+      - run: npm run test:six-flows-browser
   search-performance:
     runs-on: ubuntu-latest
     steps:

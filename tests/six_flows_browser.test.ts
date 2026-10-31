@@ -13,7 +13,6 @@ import {MobileRankedRow} from '/src/components/mobile/MobileRankedRow.tsx';
 import {MandatoryAuthModal} from '/src/components/auth/MandatoryAuthModal.tsx';
 import {TvActivationScreen} from '/src/components/tv/TvActivationScreen.tsx';
 import '/index.css';
-init();
 const mode = new URLSearchParams(location.search).get('mode');
 const items = Array.from({length:20},(_,i)=>({id:'fixture-'+i,title:'Fixture '+i,type:'FILME',year:2020,rating:8,image:'',genres:[]}));
 const clicked=()=>document.querySelector('#count').textContent=String(Number(document.querySelector('#count').textContent)+1);
@@ -33,6 +32,8 @@ const executablePath = ['C:/Program Files/Google/Chrome/Application/chrome.exe',
 const browser = await chromium.launch({ headless:true, executablePath });
 try {
   const page = await browser.newPage();
+  const authRuntimeErrors: string[] = [];
+  page.on('pageerror',error=>authRuntimeErrors.push(error.message));
   page.setDefaultTimeout(15000);
   await page.goto(`${base}/__p0`);
   await page.locator('[role=dialog]').waitFor();
@@ -42,6 +43,7 @@ try {
   assert.equal(await page.locator('[role=dialog]').count(),1);
   assert.equal(await page.locator('[role=dialog]').evaluate(el=>el.contains(document.activeElement)),true,'keyboard focus remains inside auth');
   assert.equal(await page.locator('#count').textContent(),'0');
+  assert.deepEqual(authRuntimeErrors, [], 'Auth modal must initialize spatial navigation before registering focusables');
   console.log('PASS mandatory modal: background inert, Tab trap, Escape/Backspace cannot dismiss');
   await page.close();
   for (const width of (process.argv.includes('--auth-only')?[]:[360,390,430])) for (const mode of ['row','rank']) {
