@@ -97,6 +97,7 @@ export const TvApp: React.FC<TvAppProps> = ({
   // Estados de Vinculação QR Code e Perfis da Smart TV (P3.C)
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isProfileSelectorOpen, setIsProfileSelectorOpen] = useState(false);
+  const [isSelectingProfile, setIsSelectingProfile] = useState(false);
   const [tvProfiles, setTvProfiles] = useState<Profile[]>([]);
   const [activeTvProfile, setActiveTvProfile] = useState<Profile | null>(() => activeProfile || null);
   const [isTvAuthenticated, setIsTvAuthenticated] = useState(false);
@@ -163,31 +164,156 @@ export const TvApp: React.FC<TvAppProps> = ({
   }, [isTvAuthenticated, activeTvProfile, loadProfilesAndOpenSelector]);
 
   const handleTvLinked = useCallback(async (_userData: any) => {
-    await refreshTvSession();
     setIsQrModalOpen(false);
+    setIsTvAuthenticated(true);
+    setActiveTvProfile(null);
+    setPlayingItem(null);
+    setSelectedDetailItem(null);
+    setTvWatchNotFound(false);
     await loadProfilesAndOpenSelector();
-  }, [refreshTvSession, loadProfilesAndOpenSelector]);
+  }, [loadProfilesAndOpenSelector]);
 
   const handleSelectTvProfile = useCallback(async (p: Profile) => {
+    if (isSelectingProfile) return;
+    setIsSelectingProfile(true);
+    setTvAuthError(null);
     try {
-      const session = await refreshTvSession();
       const selected = await profileClient.select(p.id);
-      if (!selected || selected.id !== p.id || selected.userId !== session.user!.id) {
+      if (!selected || selected.id !== p.id) {
         throw new Error('Não foi possível confirmar o perfil desta conta.');
       }
       await storageService.setScope({ userId: selected.userId, profileId: selected.id });
-      setActiveTvProfile({ ...p, ...selected, avatar: resolveAvatarUrl(selected.avatarId) });
+      const fullProfile: Profile = {
+        ...p,
+        ...selected,
+        avatar: resolveAvatarUrl(selected.avatarId || p.avatarId),
+        isChild: false,
+      };
+      setActiveTvProfile(fullProfile);
       setIsProfileSelectorOpen(false);
       setTvAuthError(null);
       authSyncService.notifyAuthChange('LOGIN');
+
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          try {
+            setFocus('tv-hero-play');
+          } catch {}
+        }, 100);
+      });
     } catch (error) {
+      console.error('[TvApp] Falha ao selecionar perfil:', error);
       setTvAuthError(error instanceof Error ? error.message : 'Não foi possível selecionar o perfil.');
-      return;
+    } finally {
+      setIsSelectingProfile(false);
     }
-    setTimeout(() => {
-      try { setFocus('tv-hero-play'); } catch {}
-    }, 50);
-  }, [refreshTvSession]);
+  }, [isSelectingProfile]);
+
+  const handleCreateTvProfile = useCallback(async (name: string, avatarId: string) => {
+    try {
+      setTvAuthError(null);
+      const created = await profileClient.create(name, avatarId);
+      const items = await profileClient.list();
+      const mapped: Profile[] = items.map(p => ({
+        id: p.id,
+        name: p.name,
+        avatar: resolveAvatarUrl(p.avatarId),
+        avatarId: p.avatarId,
+        isDefault: p.isDefault ? 1 : 0,
+        isChild: false,
+        displayOrder: p.displayOrder,
+      }));
+      setTvProfiles(mapped);
+      return {
+        id: created.id,
+        name: created.name,
+        avatar: resolveAvatarUrl(created.avatarId),
+        avatarId: created.avatarId,
+        isDefault: created.isDefault ? 1 : 0,
+        isChild: false,
+        displayOrder: created.displayOrder,
+      };
+    } catch (error) {
+      setTvAuthError(error instanceof Error ? error.message : 'Não foi possível criar o perfil.');
+      throw error;
+    }
+  }, []);
+
+  const handleUpdateTvProfile = useCallback(async (id: string, name: string, avatarId: string) => {
+    try {
+      setTvAuthError(null);
+      const updated = await profileClient.update(id, { name, avatarId });
+      const items = await profileClient.list();
+      const mapped: Profile[] = items.map(p => ({
+        id: p.id,
+        name: p.name,
+        avatar: resolveAvatarUrl(p.avatarId),
+        avatarId: p.avatarId,
+        isDefault: p.isDefault ? 1 : 0,
+        isChild: false,
+        displayOrder: p.displayOrder,
+      }));
+      setTvProfiles(mapped);
+      if (activeTvProfile?.id === id) {
+        setActiveTvProfile(prev => prev ? {
+          ...prev,
+          name: updated.name,
+          avatar: resolveAvatarUrl(updated.avatarId),
+          avatarId: updated.avatarId,
+        } : null);
+      }
+      return {
+        id: updated.id,
+        name: updated.name,
+        avatar: resolveAvatarUrl(updated.avatarId),
+        avatarId: updated.avatarId,
+        isDefault: updated.isDefault ? 1 : 0,
+        isChild: false,
+        displayOrder: updated.displayOrder,
+      };
+    } catch (error) {
+      setTvAuthError(error instanceof Error ? error.message : 'Não foi possível atualizar o perfil.');
+      throw error;
+    }
+  }, [activeTvProfile?.id]);
+
+  const handleDeleteTvProfile = useCallback(async (id: string) => {
+    try {
+      setTvAuthError(null);
+      const res = await profileClient.delete(id);
+      const items = await profileClient.list();
+      const mapped: Profile[] = items.map(p => ({
+        id: p.id,
+        name: p.name,
+        avatar: resolveAvatarUrl(p.avatarId),
+        avatarId: p.avatarId,
+        isDefault: p.isDefault ? 1 : 0,
+        isChild: false,
+        displayOrder: p.displayOrder,
+      }));
+      setTvProfiles(mapped);
+      if (activeTvProfile?.id === id) {
+        if (res.nextActiveProfileId) {
+          const next = mapped.find(p => p.id === res.nextActiveProfileId);
+          if (next) {
+            setActiveTvProfile(next);
+          } else if (mapped.length > 0) {
+            setActiveTvProfile(mapped[0]);
+          } else {
+            setActiveTvProfile(null);
+          }
+        } else if (mapped.length > 0) {
+          setActiveTvProfile(mapped[0]);
+        } else {
+          setActiveTvProfile(null);
+        }
+      }
+      return true;
+    } catch (error) {
+      setTvAuthError(error instanceof Error ? error.message : 'Não foi possível excluir o perfil.');
+      throw error;
+    }
+  }, [activeTvProfile?.id]);
 
   const handleTvLogout = useCallback(async () => {
     sessionRequest.current += 1;
@@ -224,7 +350,7 @@ export const TvApp: React.FC<TvAppProps> = ({
 
     const timer = setTimeout(() => {
       try {
-        if (isTvAuthenticated && !parseWatchRoute(window.location.pathname).isWatch) setFocus('tv-hero-play');
+        if (isTvAuthenticated && !isProfileSelectorOpen && activeTvProfile && !parseWatchRoute(window.location.pathname).isWatch) setFocus('tv-hero-play');
       } catch {}
     }, 150);
 
@@ -730,23 +856,46 @@ export const TvApp: React.FC<TvAppProps> = ({
       <TvRemoteDiagnosticOverlay />
       {tvAuthError && <div role="alert" className="fixed top-8 left-1/4 right-1/4 z-[10001] bg-red-950 p-4 text-center">{tvAuthError}</div>}
 
-      {isTvSessionChecking ? <ZapiLoader size={viewport.loaderSize || 76} /> : !isTvAuthenticated ? (
-        <TvActivationScreen onTvLinked={handleTvLinked} onLoginWithRemote={async (email, password) => {
-          try {
-            await authClient.login(email, password);
-            await handleTvLinked(null);
-            return null;
-          } catch (error) {
-            return error instanceof Error ? error.message : 'Não foi possível entrar na conta.';
-          }
-        }} />
+      {isTvSessionChecking ? (
+        <ZapiLoader size={viewport.loaderSize || 76} />
+      ) : !isTvAuthenticated ? (
+        <TvActivationScreen
+          onTvLinked={handleTvLinked}
+          onLoginWithRemote={async (email, password) => {
+            try {
+              await authClient.login(email, password);
+              await handleTvLinked(null);
+              return null;
+            } catch (error) {
+              return error instanceof Error ? error.message : 'Não foi possível entrar na conta.';
+            }
+          }}
+        />
+      ) : isProfileSelectorOpen ? (
+        <TvProfileSelector
+          profiles={tvProfiles}
+          activeProfileId={activeTvProfile?.id}
+          onSelectProfile={handleSelectTvProfile}
+          onAddProfile={handleCreateTvProfile}
+          onEditProfile={handleUpdateTvProfile}
+          onDeleteProfile={handleDeleteTvProfile}
+          onClose={activeTvProfile ? () => setIsProfileSelectorOpen(false) : undefined}
+          isSelecting={isSelectingProfile}
+          errorMessage={tvAuthError}
+        />
       ) : !activeTvProfile ? (
         <div className="min-h-screen flex items-center justify-center">
           {tvAuthError ? (
-            <button autoFocus className="rounded-xl border border-white/30 px-8 py-4" onClick={() => void loadProfilesAndOpenSelector()}>
+            <button
+              autoFocus
+              className="rounded-xl border border-white/30 px-8 py-4 font-bold text-white hover:border-[#00baa3] transition-colors"
+              onClick={() => void loadProfilesAndOpenSelector()}
+            >
               Tentar carregar perfis novamente
             </button>
-          ) : <ZapiLoader size={viewport.loaderSize || 76} />}
+          ) : (
+            <ZapiLoader size={viewport.loaderSize || 76} />
+          )}
         </div>
       ) : playingItem && playingMatchesRoute ? (
         /* Player de Reprodução em Tela Cheia 100% isolado (Sem elementos da interface anterior no DOM) */
@@ -928,14 +1077,7 @@ export const TvApp: React.FC<TvAppProps> = ({
 
         </>
       )}
-      {isTvAuthenticated && isProfileSelectorOpen && tvProfiles.length > 0 && (
-        <TvProfileSelector
-          profiles={tvProfiles}
-          activeProfileId={activeTvProfile?.id}
-          onSelectProfile={handleSelectTvProfile}
-          onClose={() => { if (activeTvProfile) setIsProfileSelectorOpen(false); }}
-        />
-      )}
+      
     </div>
   );
 };
