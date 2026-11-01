@@ -17,7 +17,8 @@ import { searchService } from '../../core/search/searchService';
 import { watchPartyService } from '../../core/watchparty/WatchPartyService';
 import { useTvIdle } from '../../core/tv/useTvIdle';
 import { getTvScreensaverItems } from '../../core/tv/tvScreensaverCatalog';
-import { parseWatchRoute, getWatchRoute } from '../../core/routes/navigationRoutes';
+import { parseWatchRoute, getWatchRoute, isContentItemMatchingRoute, isMediaTypeCompatible } from '../../core/routes/navigationRoutes';
+import { VERIFIED_OPEN_ITEMS } from '../../core/catalog/verifiedCatalog';
 import { TvHeader, TvTab } from '../../components/tv/TvHeader';
 import { TvHomeView } from '../../components/tv/TvHomeView';
 import { TvCategoryView } from '../../components/tv/TvCategoryView';
@@ -494,9 +495,32 @@ export const TvApp: React.FC<TvAppProps> = ({
       return;
     }
 
-    if (playingItem && (playingItem.item.id === parsed.id || playingItem.item.imdbId === parsed.id || playingItem.item.tmdbId === parsed.id) &&
-        getWatchRoute(playingItem.item, 1, 1, true).split('/')[3] ===
-          (parsed.mediaType === 'movie' ? 'filme' : parsed.mediaType === 'anime' ? 'anime' : 'serie')) {
+    // 1. Se playingItem já corresponde à rota, nada a fazer — mantém reprodução contínua
+    if (
+      playingItem &&
+      isContentItemMatchingRoute(playingItem.item, parsed.id) &&
+      isMediaTypeCompatible(playingItem.item, parsed.mediaType)
+    ) {
+      setTvWatchNotFound(false);
+      return;
+    }
+
+    // 2. Se selectedDetailItem já está em memória e corresponde à rota (selecionado diretamente na TV),
+    // monta o player IMEDIATAMENTE com os dados ricos válidos, sem exigir re-busca em catálogo temporário.
+    if (
+      selectedDetailItem &&
+      isContentItemMatchingRoute(selectedDetailItem, parsed.id) &&
+      isMediaTypeCompatible(selectedDetailItem, parsed.mediaType)
+    ) {
+      const continuity = storageService.getPlaybackContinuity(selectedDetailItem);
+      const resolvedSeason = parsed.season ?? continuity.season ?? 1;
+      const resolvedEpisode = parsed.episode ?? continuity.episode ?? 1;
+      setTvWatchNotFound(false);
+      setPlayingItem({
+        item: selectedDetailItem,
+        season: resolvedSeason,
+        episode: resolvedEpisode
+      });
       return;
     }
 
@@ -504,32 +528,89 @@ export const TvApp: React.FC<TvAppProps> = ({
     setTvWatchNotFound(false);
 
     const resolveItemForTvWatch = async () => {
+      // 1. Procura primeiro no fullTvCatalog da TV
       let found = fullTvCatalog.find(i =>
-        i.id === parsed.id ||
-        i.imdbId === parsed.id ||
-        i.tmdbId === parsed.id
+        isContentItemMatchingRoute(i, parsed.id) &&
+        isMediaTypeCompatible(i, parsed.mediaType)
       );
 
+      // 2. Se não encontrou, busca no índice mestre canônico e catálogos estáticos pré-carregados
+      if (!found) {
+        try {
+          const masterItem = canonicalCatalogMaster.getItemByCanonicalId(parsed.id);
+          if (masterItem && isMediaTypeCompatible(masterItem, parsed.mediaType)) {
+            found = masterItem;
+          }
+        } catch {}
+      }
+
+      if (!found) {
+        try {
+          const allMaster = canonicalCatalogMaster.getAllItemsSync();
+          found = allMaster.find(i =>
+            isContentItemMatchingRoute(i, parsed.id) &&
+            isMediaTypeCompatible(i, parsed.mediaType)
+          );
+        } catch {}
+      }
+
+      if (!found) {
+        try {
+          found = VERIFIED_OPEN_ITEMS.find(i =>
+            isContentItemMatchingRoute(i, parsed.id) &&
+            isMediaTypeCompatible(i, parsed.mediaType)
+          );
+        } catch {}
+      }
+
+      if (!found) {
+        try {
+          const cachedAll = [
+            ...storageService.getCachedCatalog('movies'),
+            ...storageService.getCachedCatalog('series'),
+            ...storageService.getCachedCatalog('animes'),
+            ...storageService.getCachedCatalog('trending'),
+            ...storageService.getCachedCatalog('top_rated'),
+          ];
+          found = cachedAll.find(i =>
+            isContentItemMatchingRoute(i, parsed.id) &&
+            isMediaTypeCompatible(i, parsed.mediaType)
+          );
+        } catch {}
+      }
+
+      // 3. Se ainda não encontrou, resolve via APIs oficiais externas (TMDB / IMDb)
       if (!found) {
         try {
           const isAnime = parsed.mediaType === 'anime';
           const isSeries = parsed.mediaType === 'series' || isAnime;
           const mediaType = isAnime ? ContentType.ANIME : (isSeries ? ContentType.SERIES : ContentType.MOVIE);
 
-          if (parsed.id!.startsWith('tt')) {
-            found = (await tmdbService.findByImdb(parsed.id!)) || undefined;
-          } else if (/^\d+$/.test(parsed.id!)) {
-            const res = await tmdbService.getDetails(parsed.id!, mediaType);
+          const rawId = (parsed.id || '').trim();
+          const cleanId = rawId.replace(/^(?:movie|series|anime|open|tmdb)[-_:]+/i, '');
+
+          if (rawId.startsWith('tt') || /^tt\d+$/i.test(cleanId)) {
+            const imdbId = rawId.startsWith('tt') ? rawId : `tt${cleanId}`;
+            found = (await tmdbService.findByImdb(imdbId)) || undefined;
+            if (!found) {
+              const res = await tmdbService.getDetailsByImdb(imdbId, mediaType);
+              found = res?.item || undefined;
+            }
+          } else if (/^\d+$/.test(cleanId)) {
+            const res = await tmdbService.getDetails(cleanId, mediaType);
             found = res?.item || undefined;
+          }
+
+          if (found) {
+            canonicalCatalogMaster.registerItem(found);
           }
         } catch (err) {
           console.warn('[TvApp] Erro ao carregar conteúdo da rota de reprodução:', err);
         }
       }
 
-      const matchesType = found && getWatchRoute(found, 1, 1, true).split('/')[3] ===
-        (parsed.mediaType === 'movie' ? 'filme' : parsed.mediaType === 'anime' ? 'anime' : 'serie');
-      if (active && found && matchesType && catalogEligibilityService.isItemPubliclyPlayableSync(found)) {
+      // 4. Se encontrou e a rota ainda está ativa
+      if (active && found && isMediaTypeCompatible(found, parsed.mediaType)) {
         const continuity = storageService.getPlaybackContinuity(found);
         const resolvedSeason = parsed.season ?? continuity.season ?? 1;
         const resolvedEpisode = parsed.episode ?? continuity.episode ?? 1;
@@ -542,6 +623,7 @@ export const TvApp: React.FC<TvAppProps> = ({
           season: resolvedSeason,
           episode: resolvedEpisode
         });
+        setTvWatchNotFound(false);
       } else if (active) {
         setTvWatchNotFound(true);
       }
@@ -552,27 +634,28 @@ export const TvApp: React.FC<TvAppProps> = ({
     return () => {
       active = false;
     };
-  }, [location.pathname, fullTvCatalog, playingItem]);
+  }, [location.pathname, fullTvCatalog, playingItem, selectedDetailItem]);
 
   // Execução de reprodução com rota persistente
   const handleStartPlay = useCallback((item: ContentItem, season?: number, episode?: number) => {
     if (!isTvAuthenticated) return;
-    if (!catalogEligibilityService.isItemPubliclyPlayableSync(item)) {
-      setTvWatchNotFound(true);
-      return;
-    }
     if (!selectedDetailItem) tvNavigationManager.saveFocusSnapshot();
+    
+    // Assegura limpeza de qualquer erro prévio
+    setTvWatchNotFound(false);
+
     const continuity = storageService.getPlaybackContinuity(item);
     const resolvedSeason = season ?? continuity.season ?? 1;
     const resolvedEpisode = episode ?? continuity.episode ?? 1;
     const watchRoute = getWatchRoute(item, resolvedSeason, resolvedEpisode, true);
-    navigate(watchRoute);
 
     setSelectedDetailItem(item);
     setSelectedDetailSeason(resolvedSeason);
     setSelectedDetailEpisode(resolvedEpisode);
     setPlayingItem({ item, season: resolvedSeason, episode: resolvedEpisode });
-  }, [selectedDetailItem, navigate]);
+
+    navigate(watchRoute);
+  }, [selectedDetailItem, navigate, isTvAuthenticated]);
 
   const handleClosePlayer = useCallback(() => {
     const itemToPreserve = playingItem?.item || selectedDetailItem;
@@ -582,6 +665,7 @@ export const TvApp: React.FC<TvAppProps> = ({
       setSelectedDetailEpisode(playingItem?.episode || storageService.getPlaybackContinuity(itemToPreserve).episode);
     }
     setPlayingItem(null);
+    setTvWatchNotFound(false);
     navigate('/tv', { replace: true });
   }, [playingItem, selectedDetailItem, navigate]);
 
@@ -605,6 +689,7 @@ export const TvApp: React.FC<TvAppProps> = ({
       setSelectedDetailSeason(playingItem.season || storageService.getPlaybackContinuity(playingItem.item).season);
       setSelectedDetailEpisode(playingItem.episode || storageService.getPlaybackContinuity(playingItem.item).episode);
       setPlayingItem(null);
+      setTvWatchNotFound(false);
     }
   }, [location.pathname, playingItem]);
 
@@ -635,9 +720,9 @@ export const TvApp: React.FC<TvAppProps> = ({
     );
   }, [screensaverActive, featuredItems, trendingItems, popularMovies, popularSeries, animeItems, fullTvCatalog, activeProfile?.isChild]);
   const playingMatchesRoute = !isTvWatchRoute ||
-    (playingItem && (playingItem.item.id === currentWatchRoute.id || playingItem.item.imdbId === currentWatchRoute.id || playingItem.item.tmdbId === currentWatchRoute.id) &&
-      getWatchRoute(playingItem.item, 1, 1, true).split('/')[3] ===
-        (currentWatchRoute.mediaType === 'movie' ? 'filme' : currentWatchRoute.mediaType === 'anime' ? 'anime' : 'serie'));
+    (playingItem &&
+      isContentItemMatchingRoute(playingItem.item, currentWatchRoute.id) &&
+      isMediaTypeCompatible(playingItem.item, currentWatchRoute.mediaType));
 
   return (
     <div className="zapi-tv-root relative min-h-screen bg-[#05070a] text-white overflow-x-hidden selection:bg-cyan-500 selection:text-black">

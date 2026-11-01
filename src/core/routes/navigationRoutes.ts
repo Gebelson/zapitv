@@ -148,3 +148,85 @@ function safeDecodeWatchId(value: string): string | undefined {
   }
 }
 
+
+/**
+ * Normaliza e compara a identidade de um ContentItem com o ID extraído de uma rota de reprodução.
+ * Suporta comparações diretas, insensíveis a maiúsculas, formatos numéricos vs strings,
+ * prefixos (ex: tmdb-123 vs 123, movie-tt123 vs tt123, tt0123 vs 0123) e resolução canônica.
+ */
+export function isContentItemMatchingRoute(
+  item: ContentItem | null | undefined,
+  routeId: string | undefined
+): boolean {
+  if (!item || !routeId) return false;
+
+  const targetId = String(routeId).trim().toLowerCase();
+  const itemId = String(item.id || '').trim().toLowerCase();
+  const imdbId = String(item.imdbId || '').trim().toLowerCase();
+  const tmdbId = String(item.tmdbId || '').trim().toLowerCase();
+  const canonicalId = String(item.canonicalId || '').trim().toLowerCase();
+
+  // 1. Correspondência direta ou canônica
+  if (
+    itemId === targetId ||
+    imdbId === targetId ||
+    tmdbId === targetId ||
+    canonicalId === targetId
+  ) {
+    return true;
+  }
+
+  // 2. Remoção de prefixos comuns (tmdb-, movie-, series-, anime-, open-)
+  const cleanTarget = targetId.replace(/^(?:movie|series|anime|open|tmdb)[-_:]+/i, '');
+  const cleanItemId = itemId.replace(/^(?:movie|series|anime|open|tmdb)[-_:]+/i, '');
+  const cleanCanonicalId = canonicalId.replace(/^(?:movie|series|anime):(?:tmdb|imdb|anilist|local):/i, '');
+
+  if (
+    cleanTarget &&
+    (cleanTarget === cleanItemId ||
+      cleanTarget === tmdbId ||
+      cleanTarget === imdbId ||
+      cleanTarget === cleanCanonicalId)
+  ) {
+    return true;
+  }
+
+  // 3. Normalização de IMDb ID (com ou sem 'tt')
+  const targetWithTt = targetId.startsWith('tt') ? targetId : `tt${targetId}`;
+  if (/^tt\d+$/i.test(targetWithTt)) {
+    if (imdbId === targetWithTt || itemId === targetWithTt || cleanItemId === targetWithTt) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Valida a compatibilidade de tipo de mídia entre o item e o segmento da rota.
+ * Trata animes e séries como produções compatíveis para reprodução episódica.
+ */
+export function isMediaTypeCompatible(
+  item: ContentItem,
+  routeMediaType?: 'movie' | 'series' | 'anime'
+): boolean {
+  if (!routeMediaType) return true;
+
+  const isAnime = item.type === ContentType.ANIME || Boolean(item.genres?.includes('Anime')) || Boolean(item.aniListId);
+  const isSeries = item.type === ContentType.SERIES || isAnime || item.mediaFormat === 'series' || (Array.isArray(item.episodes) && item.episodes.length > 0);
+  const isMovie = item.mediaFormat === 'movie' || (!isSeries && item.type === ContentType.MOVIE);
+
+  if (routeMediaType === 'movie') {
+    return isMovie || item.mediaFormat === 'movie';
+  }
+
+  if (routeMediaType === 'series') {
+    return isSeries;
+  }
+
+  if (routeMediaType === 'anime') {
+    return isAnime || isSeries;
+  }
+
+  return true;
+}
