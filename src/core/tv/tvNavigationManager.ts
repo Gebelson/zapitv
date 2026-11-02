@@ -48,7 +48,7 @@ export function isRemoteConfirmEvent(e: KeyboardEvent): boolean {
  * Gerencia a pilha de 'Voltar' (Back-Stack), atalhos de controle remoto e integração com Norigin Spatial Navigation.
  */
 
-import { init as initNorigin, setKeyMap, setFocus, getCurrentFocusKey, pause as pauseNorigin, resume as resumeNorigin } from '@noriginmedia/norigin-spatial-navigation';
+import { init as initNorigin, setKeyMap, setFocus, getCurrentFocusKey, pause as pauseNorigin, resume as resumeNorigin, SpatialNavigation } from '@noriginmedia/norigin-spatial-navigation';
 import { tvModeService } from './tvModeService';
 import { uiSoundService } from '../audio/uiSoundService';
 
@@ -83,7 +83,12 @@ class TvNavigationManager {
     if (!this.isInitialized) {
       this.isInitialized = true;
 
-      // Inicializa a navegação espacial do Norigin com mapeamento de TV e foco no DOM nativo sem saltos de rolagem
+      // 1. Registra ouvintes globais com captura estrita ANTES da inicialização do Norigin
+      window.addEventListener('keydown', this.handleGlobalKeyDown, { capture: true });
+      window.addEventListener('keyup', this.handleGlobalKeyUp, { capture: true });
+      window.addEventListener('popstate', this.handlePopState);
+
+      // 2. Inicializa a navegação espacial do Norigin com mapeamento de TV e foco no DOM nativo sem saltos de rolagem
       initNorigin({
         debug: false,
         visualDebug: false,
@@ -92,19 +97,18 @@ class TvNavigationManager {
       });
 
       (window as any).__setTvFocus = (key: string) => setFocus(key);
+      (window as any).__spatialNavigation = SpatialNavigation;
 
+      // Mapeamento canônico: código 66 NÃO é incluído em enter para evitar que a letra 'B' física
+      // seja interpretada indevidamente como Enter pelo Norigin.
+      // O botão OK físico da Fire TV (código 66) é capturado e gerenciado pelo handleGlobalKeyDown.
       setKeyMap({
         left: [37, 'ArrowLeft'],
         up: [38, 'ArrowUp'],
         right: [39, 'ArrowRight'],
         down: [40, 'ArrowDown'],
-        enter: [13, 10, 'Enter', 'Select', 'Ok', 'OK', 65385, 66]
+        enter: [13, 10, 'Enter', 'Select', 'Ok', 'OK', 65385]
       });
-
-      // Captura global do botão VOLTAR / BACK (Fire TV 4, Tizen 10009, webOS 461, Escape 27)
-      window.addEventListener('keydown', this.handleGlobalKeyDown, { capture: true });
-      window.addEventListener('keyup', this.handleGlobalKeyUp, { capture: true });
-      window.addEventListener('popstate', this.handlePopState);
 
       // Previne que o histórico do navegador Silk/Android feche abruptamente a WebView
       try {
@@ -141,22 +145,29 @@ class TvNavigationManager {
   private handleGlobalKeyDown = (e: KeyboardEvent): void => {
     if (!tvModeService.isTvMode()) return;
 
-    // Desambiguação do código 66 (Android KEYCODE_ENTER na Fire TV vs Tecla física B)
+    // Desambiguação centralizada do código 66 (Android KEYCODE_ENTER na Fire TV vs Tecla física B)
     if (e.keyCode === 66 || (e as any).which === 66) {
-      if (!isRemoteConfirmEvent(e)) {
-        // Trata-se da digitação da letra B física.
-        // Sobrescreve temporariamente keyCode para 0 nesta instância do evento
-        // para que o Norigin Spatial Navigation não interprete a letra B como Enter.
-        try {
-          Object.defineProperty(e, 'keyCode', { get: () => 0, configurable: true });
-        } catch {}
-      } else {
-        // Trata-se do botão OK físico da Fire TV / Android TV (Android KEYCODE_ENTER = 66)
-        // Normaliza keyCode para 13 garantindo compatibilidade total com todos os navegadores.
-        try {
-          Object.defineProperty(e, 'keyCode', { get: () => 13, configurable: true });
-        } catch {}
+      if (isRemoteConfirmEvent(e)) {
+        // Trata-se do botão OK físico legítimo da Fire TV / Android TV (Android KEYCODE_ENTER = 66).
+        // Consome o evento para evitar conflito com letras físicas e aciona a confirmação espacial do Norigin.
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        uiSoundService.prime();
+
+        if (this.activityHandler?.(e)) {
+          return;
+        }
+
+        if (this.commandHandler?.(e)) {
+          return;
+        }
+
+        SpatialNavigation.onEnterPress({ pressedKeys: { enter: 1 } });
+        return;
       }
+      // Se não for confirmação remota, trata-se da tecla física 'B'/'b' ou código 'KeyB'.
+      // Como o código 66 NÃO consta no keyMap do Norigin, o Norigin ignora-o completamente
+      // e o evento flui intacto para os manipuladores de digitação física (como TvSearchView).
     }
 
     // Prepara o AudioContext durante a primeira interação legítima com o controle remoto
@@ -221,6 +232,15 @@ class TvNavigationManager {
    */
   private handleGlobalKeyUp = (e: KeyboardEvent): void => {
     if (!tvModeService.isTvMode()) return;
+
+    if (e.keyCode === 66 || (e as any).which === 66) {
+      if (isRemoteConfirmEvent(e)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        SpatialNavigation.onEnterRelease();
+        return;
+      }
+    }
     const isInput =
       (typeof HTMLInputElement !== 'undefined' && e.target instanceof HTMLInputElement) ||
       (typeof HTMLTextAreaElement !== 'undefined' && e.target instanceof HTMLTextAreaElement);

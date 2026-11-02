@@ -314,6 +314,7 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
       }
 
       if (e.key.length === 1 && !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Tab'].includes(e.key)) {
+        e.preventDefault();
         uiSoundService.play('click');
         setQuery(prev => prev + e.key);
       }

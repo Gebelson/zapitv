@@ -4,6 +4,9 @@ import { TvSearchView } from '../../src/components/tv/TvSearchView';
 import { tvNavigationManager } from '../../src/core/tv/tvNavigationManager';
 import { ContentItem } from '../../types';
 import '../../index.css';
+import { tvModeService } from '../../src/core/tv/tvModeService';
+
+tvModeService.setTvMode(true);
 
 const queryParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
 const mockDeviceFamily = queryParams.get('deviceFamily');
