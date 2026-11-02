@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Edit3, Trash2, Check, X, Loader2, AlertCircle, Upload } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit3, Trash2, Check, X, Loader2, AlertCircle, Upload, Image as ImageIcon } from 'lucide-react';
 import { User, Profile } from '../types';
 import AnimatedBackground from './AnimatedBackground';
 import { profileClient, ProfileItem } from '../src/core/profile/profileClient';
 import { OFFICIAL_AVATARS, DEFAULT_AVATAR_ID, resolveAvatarUrl } from '../src/core/profile/avatarRegistry';
-import { MAX_PROFILE_AVATAR_LENGTH } from '../src/core/profile/avatarImages';
 import { ZapiBrandLogo } from '../src/components/common/ZapiBrandLogo';
+import { processAvatarImageFile, AvatarProcessingError } from '../src/core/profile/avatarImageProcessor';
 
 interface ProfileSelectorViewProps {
   user: User;
@@ -27,7 +27,6 @@ function toAppProfile(item: ProfileItem): Profile {
   };
 }
 
-
 const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
   user,
   onSelectProfile,
@@ -38,6 +37,7 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
   const [profiles, setProfiles] = useState<ProfileItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [processingImage, setProcessingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Estados de gestão
@@ -49,42 +49,38 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
   // Campos do formulário de criação/edição
   const [formName, setFormName] = useState('');
   const [formAvatarId, setFormAvatarId] = useState(DEFAULT_AVATAR_ID);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Manipulador de upload de foto compatível com iPadOS, Safari, Chrome e Android:
+   * - Suporta fotos JPEG, PNG, WebP e HEIC/HEIF da câmera e do app Arquivos
+   * - Aceita arquivos de até 25 MB sem rejeição prematura
+   * - Trata arquivos com MIME vazio emitidos pelo sistema do iPad
+   * - Comprime adaptativamente para caber em MAX_PROFILE_AVATAR_LENGTH (80.000 chars)
+   */
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    event.target.value = '';
     if (!file) return;
-    if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
-      setError('Escolha uma imagem de até 5 MB.');
-      return;
-    }
-    setSaving(true);
+
+    setProcessingImage(true);
     setError(null);
-    const imageUrl = URL.createObjectURL(file);
+
     try {
-      const image = new Image();
-      await new Promise<void>((resolve, reject) => {
-        image.onload = () => resolve();
-        image.onerror = () => reject(new Error('Não foi possível abrir essa imagem.'));
-        image.src = imageUrl;
-      });
-      const size = Math.min(image.naturalWidth, image.naturalHeight);
-      if (!size) throw new Error('Imagem inválida.');
-      const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = 256;
-      const context = canvas.getContext('2d');
-      if (!context) throw new Error('Não foi possível preparar a imagem.');
-      context.drawImage(image, (image.naturalWidth - size) / 2, (image.naturalHeight - size) / 2, size, size, 0, 0, 256, 256);
-      let data = canvas.toDataURL('image/jpeg', 0.85);
-      if (data.length > MAX_PROFILE_AVATAR_LENGTH) data = canvas.toDataURL('image/jpeg', 0.65);
-      if (data.length > MAX_PROFILE_AVATAR_LENGTH) throw new Error('A imagem é muito grande. Escolha outra foto.');
-      setFormAvatarId(data);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Falha ao carregar a imagem.');
+      const result = await processAvatarImageFile(file, file.name);
+      setFormAvatarId(result.dataUrl);
+    } catch (err: any) {
+      if (err instanceof AvatarProcessingError) {
+        setError(err.message);
+      } else if (err?.name === 'QuotaExceededError') {
+        setError('Memória insuficiente no dispositivo para processar esta foto. Tente uma imagem com menor resolução.');
+      } else {
+        setError(err?.message || 'Falha ao processar e otimizar a imagem selecionada.');
+      }
     } finally {
-      URL.revokeObjectURL(imageUrl);
-      setSaving(false);
+      setProcessingImage(false);
+      // Reseta o valor do input para permitir selecionar a mesma foto novamente
+      if (event.target) {
+        event.target.value = '';
+      }
     }
   };
 
@@ -117,6 +113,7 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
       setEditingProfile(profile);
       setFormName(profile.name);
       setFormAvatarId(profile.avatarId);
+      setError(null);
       return;
     }
 
@@ -147,7 +144,7 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
       setFormName('');
       setFormAvatarId(DEFAULT_AVATAR_ID);
       await fetchProfiles();
-      // Se não havia perfis, seleciona o novo
+      // Se não havia perfis, seleciona o novo automaticamente
       if (profiles.length === 0) {
         onSelectProfile(toAppProfile(created));
       }
@@ -171,12 +168,17 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
     try {
       setSaving(true);
       setError(null);
-      await profileClient.update(editingProfile.id, {
+      const updated = await profileClient.update(editingProfile.id, {
         name: clean,
         avatarId: formAvatarId,
       });
       setEditingProfile(null);
       await fetchProfiles();
+
+      // Sincroniza imediatamente o perfil ativo se for o perfil que estava selecionado
+      if (user.profiles?.some((p) => p.id === updated.id)) {
+        onSelectProfile(toAppProfile(updated));
+      }
     } catch (err: any) {
       setError(err?.message || 'Falha ao atualizar o perfil.');
     } finally {
@@ -218,7 +220,7 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
           Quem está assistindo agora?
         </h2>
 
-        {error && (
+        {error && !isAdding && !editingProfile && (
           <div className="mb-6 px-4 py-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl flex items-center gap-2 text-sm max-w-md animate-in fade-in">
             <AlertCircle className="w-5 h-5 shrink-0" />
             <span>{error}</span>
@@ -350,6 +352,7 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
                 {isAdding ? 'Criar Novo Perfil' : 'Editar Perfil'}
               </h3>
               <button
+                type="button"
                 onClick={() => {
                   setIsAdding(false);
                   setEditingProfile(null);
@@ -360,6 +363,13 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
                 <X className="w-5 h-5 text-white/50 hover:text-white" />
               </button>
             </div>
+
+            {error && (
+              <div role="alert" className="mb-4 p-3.5 bg-red-500/10 border border-red-500/30 text-red-300 rounded-2xl flex items-center gap-3 text-xs md:text-sm">
+                <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
 
             <form onSubmit={isAdding ? handleCreateProfile : handleUpdateProfile} className="space-y-6">
               <div>
@@ -381,7 +391,7 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
                 <label className="text-xs uppercase font-bold tracking-widest text-white/50 block mb-3">
                   Escolha um Avatar Oficial
                 </label>
-                <div className="grid grid-cols-4 gap-3 max-h-48 overflow-y-auto no-scrollbar p-1">
+                <div className="grid grid-cols-4 gap-3 max-h-44 overflow-y-auto no-scrollbar p-1">
                   {OFFICIAL_AVATARS.map((av) => (
                     <button
                       type="button"
@@ -403,14 +413,87 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
                     </button>
                   ))}
                 </div>
-                <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" aria-label="Enviar imagem de perfil" />
-                <button type="button" disabled={saving} onClick={() => avatarInputRef.current?.click()}
-                  className="mt-3 w-full py-3 rounded-2xl border border-white/10 text-white/70 hover:text-white hover:bg-white/5 font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                  <Upload className="w-4 h-4" /> Enviar imagem
-                </button>
-                {formAvatarId.startsWith('data:image/') && (
-                  <img src={formAvatarId} alt="Prévia da imagem enviada" className="mt-3 w-20 h-20 rounded-2xl object-cover border border-[#007df7]" />
-                )}
+
+                {/* Seletor Nativo de Foto Compatível com Safari/iPadOS */}
+                <div className="mt-4 pt-3 border-t border-white/10">
+                  <span className="text-xs uppercase font-bold tracking-widest text-white/50 block mb-2">
+                    Ou Envie uma Foto Própria
+                  </span>
+
+                  <label
+                    htmlFor="avatar-file-upload-input"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        document.getElementById('avatar-file-upload-input')?.click();
+                      }
+                    }}
+                    className={`w-full py-3.5 px-4 rounded-2xl border-2 border-dashed flex items-center justify-center gap-2.5 font-bold text-sm transition-all cursor-pointer select-none ${
+                      processingImage
+                        ? 'border-[#007df7] bg-[#007df7]/10 text-[#007df7] cursor-wait'
+                        : 'border-white/20 hover:border-[#007df7] text-white/80 hover:text-white bg-white/5 hover:bg-white/10 active:scale-[0.99]'
+                    }`}
+                  >
+                    <input
+                      id="avatar-file-upload-input"
+                      type="file"
+                      accept="image/*,.heic,.heif,.jpg,.jpeg,.png,.webp"
+                      onClick={(e) => {
+                        // Limpa o valor para permitir selecionar novamente o mesmo arquivo se o usuário quiser
+                        (e.target as HTMLInputElement).value = '';
+                      }}
+                      onChange={handleAvatarUpload}
+                      className="sr-only opacity-0 absolute w-[1px] h-[1px] pointer-events-none -z-10"
+                      tabIndex={-1}
+                      disabled={saving || processingImage}
+                      aria-label="Escolher foto de perfil da biblioteca ou arquivos"
+                    />
+
+                    {processingImage ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin text-[#007df7]" />
+                        <span>Otimizando foto do iPad...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-5 h-5 text-[#007df7]" />
+                        <span>Escolher foto da biblioteca ou arquivos</span>
+                      </>
+                    )}
+                  </label>
+
+                  {/* Prévia da Foto Personalizada */}
+                  {formAvatarId.startsWith('data:image/') && (
+                    <div className="mt-3.5 p-3 bg-white/5 border border-[#007df7]/40 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={formAvatarId}
+                          alt="Prévia da foto de perfil selecionada"
+                          className="w-14 h-14 rounded-2xl object-cover border-2 border-[#007df7] shadow-lg shrink-0"
+                        />
+                        <div>
+                          <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                            <ImageIcon className="w-3.5 h-3.5 text-[#00baa3]" />
+                            Foto personalizada pronta
+                          </p>
+                          <p className="text-[11px] text-white/50">
+                            Será salva ao confirmar as alterações.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setFormAvatarId(DEFAULT_AVATAR_ID)}
+                        className="px-3 py-1.5 text-xs font-semibold text-red-300 hover:text-red-200 bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 rounded-xl transition-all cursor-pointer"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-white/10">
@@ -421,13 +504,14 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
                     setEditingProfile(null);
                     setError(null);
                   }}
-                  className="flex-1 py-3.5 rounded-2xl border border-white/10 text-white/60 hover:text-white font-bold text-sm transition-colors cursor-pointer"
+                  disabled={saving || processingImage}
+                  className="flex-1 py-3.5 rounded-2xl border border-white/10 text-white/60 hover:text-white font-bold text-sm transition-colors cursor-pointer disabled:opacity-40"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={saving || formName.trim().length < 2}
+                  disabled={saving || processingImage || formName.trim().length < 2}
                   className="flex-1 py-3.5 bg-[#007df7] hover:bg-[#006ee6] disabled:opacity-40 text-white rounded-2xl font-bold text-sm shadow-lg shadow-[#007df7]/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -447,13 +531,14 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
               Excluir perfil?
             </h3>
             <p className="text-sm text-white/60 mb-6 leading-relaxed">
-              O perfil <strong className="text-white">"{deletingProfile.name}"</strong> será excluído permanentemente da sua conta.
+              O perfil <strong className="text-white">&ldquo;{deletingProfile.name}&rdquo;</strong> será excluído permanentemente da sua conta.
             </p>
 
             <div className="flex gap-3">
               <button
                 onClick={() => setDeletingProfile(null)}
-                className="flex-1 py-3.5 rounded-2xl border border-white/10 text-white/60 hover:text-white font-bold text-sm transition-colors cursor-pointer"
+                disabled={saving}
+                className="flex-1 py-3.5 rounded-2xl border border-white/10 text-white/60 hover:text-white font-bold text-sm transition-colors cursor-pointer disabled:opacity-40"
               >
                 Cancelar
               </button>

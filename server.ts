@@ -102,7 +102,7 @@ function createApp() {
   });
 
   // Enable JSON parsing
-  app.use(express.json());
+  app.use(express.json({ limit: '2mb' }));
   // Private/authenticated APIs are never CDN-cached. Public read endpoints opt in explicitly.
   app.use("/api", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); });
   app.use('/api/watchparty', (req, res, next) => {

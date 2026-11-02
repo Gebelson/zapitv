@@ -80844,7 +80844,7 @@ function createApp() {
     }
     next();
   });
-  app2.use(express4.json());
+  app2.use(express4.json({ limit: "2mb" }));
   app2.use("/api", (_req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
     next();
