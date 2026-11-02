@@ -164,48 +164,57 @@ export const TvApp: React.FC<TvAppProps> = ({
   }, [isTvAuthenticated, activeTvProfile, loadProfilesAndOpenSelector]);
 
   const handleTvLinked = useCallback(async (_userData: any) => {
+    await refreshTvSession();
     setIsQrModalOpen(false);
-    setIsTvAuthenticated(true);
     setActiveTvProfile(null);
     setPlayingItem(null);
     setSelectedDetailItem(null);
     setTvWatchNotFound(false);
     await loadProfilesAndOpenSelector();
-  }, [loadProfilesAndOpenSelector]);
+  }, [refreshTvSession, loadProfilesAndOpenSelector]);
 
   const handleSelectTvProfile = useCallback(async (p: Profile) => {
-    if (isSelectingProfile) return;
-    setIsSelectingProfile(true);
+    const selecting = typeof isSelectingProfile !== 'undefined' ? isSelectingProfile : false;
+    if (selecting) return;
+    if (typeof setIsSelectingProfile === 'function') setIsSelectingProfile(true);
     setTvAuthError(null);
     try {
       const selected = await profileClient.select(p.id);
       if (!selected || selected.id !== p.id) {
         throw new Error('Não foi possível confirmar o perfil desta conta.');
       }
-      await storageService.setScope({ userId: selected.userId, profileId: selected.id });
+      if (typeof storageService !== 'undefined') {
+        await storageService.setScope({ userId: selected.userId, profileId: selected.id });
+      }
       const fullProfile: Profile = {
         ...p,
         ...selected,
-        avatar: resolveAvatarUrl(selected.avatarId || p.avatarId),
+        avatar: typeof resolveAvatarUrl === 'function' ? resolveAvatarUrl(selected.avatarId || p.avatarId) : (selected.avatarId || p.avatarId || ''),
         isChild: false,
       };
       setActiveTvProfile(fullProfile);
       setIsProfileSelectorOpen(false);
       setTvAuthError(null);
-      authSyncService.notifyAuthChange('LOGIN');
+      if (typeof authSyncService !== 'undefined' && authSyncService.notifyAuthChange) {
+        authSyncService.notifyAuthChange('LOGIN');
+      }
 
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          try {
-            setFocus('tv-hero-play');
-          } catch {}
-        }, 100);
-      });
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            try {
+              if (typeof setFocus === 'function') setFocus('tv-hero-play');
+            } catch {}
+          }, 100);
+        });
+      }
     } catch (error) {
       console.error('[TvApp] Falha ao selecionar perfil:', error);
       setTvAuthError(error instanceof Error ? error.message : 'Não foi possível selecionar o perfil.');
     } finally {
-      setIsSelectingProfile(false);
+      if (typeof setIsSelectingProfile === 'function') {
+        setIsSelectingProfile(false);
+      }
     }
   }, [isSelectingProfile]);
 

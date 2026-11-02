@@ -4,7 +4,7 @@
  * it is never evidence of remote acceptance.
  */
 import { randomUUID } from 'node:crypto';
-import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, mkdtempSync, rmSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, resolve, join, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -316,7 +316,18 @@ async function main() {
   } finally { clearTimeout(watchdog); }
 }
 
-if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+const isMainScript = () => {
+  if (!process.argv[1]) return false;
+  const resolved = pathToFileURL(resolve(process.argv[1])).href;
+  if (resolved === import.meta.url) return true;
+  try {
+    return pathToFileURL(realpathSync(resolve(process.argv[1]))).href === import.meta.url;
+  } catch {
+    return false;
+  }
+};
+
+if (isMainScript()) {
   main().catch(error => {
     // Suppress SQL text, endpoint URLs, cookies and assertion actual/expected values.
     const message = error instanceof Error ? error.message : '';

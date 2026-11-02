@@ -87,6 +87,9 @@ const TvProfileCard: React.FC<TvProfileCardProps> = ({
     <div
       ref={ref}
       tabIndex={0}
+      data-focus-key={focusKey}
+      data-profile-id={profile.id}
+      data-focused={focused ? 'true' : 'false'}
       onClick={handleAction}
       className={`group relative flex flex-col items-center gap-4 p-4 rounded-3xl transition-all duration-300 outline-none cursor-pointer ${
         focused
@@ -178,6 +181,8 @@ const TvAddProfileCard: React.FC<{
     <div
       ref={ref}
       tabIndex={0}
+      data-focus-key="TV_PROFILE_ADD_BTN"
+      data-focused={focused ? 'true' : 'false'}
       onClick={handleAction}
       className={`group flex flex-col items-center gap-4 p-4 rounded-3xl transition-all duration-300 outline-none cursor-pointer ${
         focused
@@ -255,6 +260,8 @@ const TvActionButton: React.FC<{
     <button
       ref={ref}
       tabIndex={0}
+      data-focus-key={focusKey}
+      data-focused={focused ? 'true' : 'false'}
       onClick={handleAction}
       disabled={disabled}
       className={`px-6 py-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold text-sm uppercase tracking-wider transition-all duration-200 outline-none cursor-pointer ${getVariantStyles()} ${
@@ -419,13 +426,17 @@ export const TvProfileSelector: React.FC<TvProfileSelectorProps> = ({
     });
   }, [deleteTarget, isModalOpen, isManaging, onClose]);
 
+  const selectingLockRef = useRef(false);
+
   const handleStartSelect = useCallback(
     async (profile: Profile) => {
-      if (isSelecting) return;
+      if (isSelecting || selectingLockRef.current) return;
+      selectingLockRef.current = true;
       setSelectedTargetId(profile.id);
       try {
         await onSelectProfile(profile);
       } finally {
+        selectingLockRef.current = false;
         setSelectedTargetId(null);
       }
     },
@@ -497,6 +508,8 @@ export const TvProfileSelector: React.FC<TvProfileSelectorProps> = ({
     <FocusContext.Provider value={focusKey}>
       <div
         ref={ref}
+        data-focus-key={focusKey}
+        data-testid="tv-profile-selector"
         className="fixed inset-0 z-[500] bg-[#05070a]/98 backdrop-blur-2xl flex flex-col items-center justify-center p-6 md:p-12 select-none overflow-y-auto"
       >
         {/* Banner de Mensagem de Erro Geral */}
