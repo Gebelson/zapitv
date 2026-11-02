@@ -7,6 +7,7 @@ import { sourceConfidenceEngine } from '../identity/sourceConfidenceEngine';
 import { streamValidator } from './streamValidator';
 import { sourceSelectionService } from '../selection/sourceSelectionService';
 import { isSourcePlayableHere } from './sourceReadiness';
+import { officialPlatformsService, OfficialPlatform } from '../catalog/officialPlatformsService';
 
 export type VerificationState =
   | 'IDLE'
@@ -62,6 +63,7 @@ export interface VerificationResult {
   streams: StremioStream[];
   errorMessage?: string;
   diagnosticLog: VerificationDiagnosticLog;
+  officialPlatforms?: OfficialPlatform[];
 }
 
 export const MSG_INCONCLUSIVE = 'Não foi possível verificar a disponibilidade agora. Tente novamente.';
@@ -162,7 +164,27 @@ class SourceVerificationService {
       } catch {}
     }
 
+    // Resolução canônica de títulos alternativos (ex: "Em Busca de Jade" para "Pursuit of Jade")
+    const itemAlternateTitles: string[] = [
+      ...((item as any).alternateTitles || []),
+      ...((item as any).knownAliases || [])
+    ];
+    if (itemAlternateTitles.length <= 1 && (resolvedTmdbId || resolvedImdbId || item.id)) {
+      try {
+        const tId = resolvedTmdbId || (resolvedImdbId ? resolvedImdbId : item.id.replace(/^tmdb-?/i, ''));
+        const fetchedAlt = await Promise.race([
+          tmdbService.getAlternativeTitles(tId, streamType),
+          new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 3000))
+        ]);
+        for (const fa of fetchedAlt) {
+          if (!itemAlternateTitles.includes(fa)) itemAlternateTitles.push(fa);
+        }
+      } catch {}
+    }
+
     const targetPayload = {
+      alternateTitles: itemAlternateTitles,
+      knownAliases: itemAlternateTitles,
       tmdbId: resolvedTmdbId,
       imdbId: resolvedImdbId,
       id: item.id,
@@ -173,7 +195,15 @@ class SourceVerificationService {
 
     let phase1Streams: StremioStream[] = [];
     const collectedProgressivePlayable: StremioStream[] = [];
-    const canonicalIdentity = canonicalIdentityService.buildIdentity(item, episode);
+    let canonicalIdentity = canonicalIdentityService.buildIdentity({
+      ...item,
+      imdbId: resolvedImdbId || item.imdbId,
+      tmdbId: resolvedTmdbId || item.tmdbId,
+      alternateTitles: itemAlternateTitles,
+      knownAliases: itemAlternateTitles
+    }, episode);
+
+
 
     // Validação estrita de compatibilidade técnica e correspondência canônica de identidade
     const isPlayableAndCanonicallyVerified = (s: StremioStream): boolean => {
@@ -227,7 +257,11 @@ class SourceVerificationService {
       return {
         state: 'AVAILABLE',
         streams: phase1Playable,
-        diagnosticLog: diagnostic
+        diagnosticLog: diagnostic,
+        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
+          ...item,
+          alternateTitles: itemAlternateTitles
+        })
       };
     }
 
@@ -241,7 +275,11 @@ class SourceVerificationService {
         state: 'INCONCLUSIVE',
         streams: [],
         errorMessage: MSG_INCONCLUSIVE,
-        diagnosticLog: diagnostic
+        diagnosticLog: diagnostic,
+        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
+          ...item,
+          alternateTitles: itemAlternateTitles
+        })
       };
     }
 
@@ -259,7 +297,11 @@ class SourceVerificationService {
       diagnostic.finalState = 'INCONCLUSIVE';
       diagnostic.totalDurationMs = Date.now() - overallStart;
       this.recordLog(diagnostic);
-      return { state: 'INCONCLUSIVE', streams: [], errorMessage: MSG_INCONCLUSIVE, diagnosticLog: diagnostic };
+      return { state: 'INCONCLUSIVE', streams: [], errorMessage: MSG_INCONCLUSIVE, diagnosticLog: diagnostic,
+        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
+          ...item,
+          alternateTitles: itemAlternateTitles
+        }) };
     }
 
     // Reavaliação profunda de identificadores canônicos na 2ª verificação
@@ -310,7 +352,20 @@ class SourceVerificationService {
       }
     }
 
+    if (resolvedImdbId || resolvedTmdbId) {
+      canonicalIdentity = canonicalIdentityService.buildIdentity({
+        ...item,
+        imdbId: resolvedImdbId || item.imdbId,
+        tmdbId: resolvedTmdbId || item.tmdbId,
+        alternateTitles: itemAlternateTitles,
+        knownAliases: itemAlternateTitles
+      }, episode);
+
+    }
+
     const phase2Payload = {
+      alternateTitles: itemAlternateTitles,
+      knownAliases: itemAlternateTitles,
       tmdbId: resolvedTmdbId,
       imdbId: resolvedImdbId,
       id: item.id,
@@ -367,7 +422,11 @@ class SourceVerificationService {
       return {
         state: 'AVAILABLE',
         streams: finalStreams,
-        diagnosticLog: diagnostic
+        diagnosticLog: diagnostic,
+        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
+          ...item,
+          alternateTitles: itemAlternateTitles
+        })
       };
     }
 
@@ -404,7 +463,11 @@ class SourceVerificationService {
       return {
         state: 'AVAILABLE',
         streams: webReadyCandidates,
-        diagnosticLog: diagnostic
+        diagnosticLog: diagnostic,
+        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
+          ...item,
+          alternateTitles: itemAlternateTitles
+        })
       };
     }
 
@@ -414,7 +477,11 @@ class SourceVerificationService {
       diagnostic.inconclusiveReason = 'As fontes retornadas exigem um motor local indisponível neste dispositivo';
       this.recordLog(diagnostic);
       options?.onStateChange?.('INCONCLUSIVE', MSG_INCONCLUSIVE);
-      return { state: 'INCONCLUSIVE', streams: [], errorMessage: MSG_INCONCLUSIVE, diagnosticLog: diagnostic };
+      return { state: 'INCONCLUSIVE', streams: [], errorMessage: MSG_INCONCLUSIVE, diagnosticLog: diagnostic,
+        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
+          ...item,
+          alternateTitles: itemAlternateTitles
+        }) };
     }
 
     // =========================================================================
@@ -436,7 +503,11 @@ class SourceVerificationService {
         state: 'INCONCLUSIVE',
         streams: [],
         errorMessage: MSG_INCONCLUSIVE,
-        diagnosticLog: diagnostic
+        diagnosticLog: diagnostic,
+        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
+          ...item,
+          alternateTitles: itemAlternateTitles
+        })
       };
     }
 
@@ -448,7 +519,11 @@ class SourceVerificationService {
       state: 'UNAVAILABLE',
       streams: [],
       errorMessage: MSG_UNAVAILABLE,
-      diagnosticLog: diagnostic
+      diagnosticLog: diagnostic,
+        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
+          ...item,
+          alternateTitles: itemAlternateTitles
+        })
     };
   }
 

@@ -1,5 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ExternalLink } from 'lucide-react';
+import { ContentItem } from '../../../types';
+import { officialPlatformsService, OfficialPlatform } from '../../core/catalog/officialPlatformsService';
 import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
 import { tvNavigationManager } from '../../core/tv/tvNavigationManager';
@@ -15,7 +17,50 @@ export interface TvPlaybackErrorScreenProps {
   onRetry?: () => void;
   onReportError: () => void;
   onClose: () => void;
+  item?: Partial<ContentItem>;
+  officialPlatforms?: OfficialPlatform[];
 }
+
+const OfficialPlatformButton: React.FC<{
+  platform: OfficialPlatform;
+  index: number;
+}> = ({ platform, index }) => {
+  const { ref, focused } = useTvFocusable({
+    focusKey: `tv-official-platform-${index}`,
+    focusable: true,
+    onEnterPress: () => {
+      if (typeof window !== 'undefined' && platform.url) {
+        window.open(platform.url, '_blank', 'noopener,noreferrer');
+      }
+    },
+    soundType: 'hover',
+    isPlayerControl: true
+  });
+
+  return (
+    <a
+      ref={ref as any}
+      href={platform.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      data-focus-key={`tv-official-platform-${index}`}
+      data-testid={`tv-official-platform-${platform.id}`}
+      className={`px-4 py-2 rounded-xl border flex items-center gap-2 text-xs font-semibold transition-all cursor-pointer ${
+        focused
+          ? 'bg-cyan-500/20 text-cyan-200 border-cyan-400 ring-2 ring-cyan-300 scale-105 shadow-[0_0_15px_rgba(34,211,238,0.4)]'
+          : 'bg-white/5 hover:bg-white/10 text-gray-200 border-white/15'
+      }`}
+    >
+      <span>{platform.name}</span>
+      {platform.badge && (
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+          {platform.badge}
+        </span>
+      )}
+      <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+    </a>
+  );
+};
 
 export const TvPlaybackErrorScreen: React.FC<TvPlaybackErrorScreenProps> = ({
   failureCategory,
@@ -26,6 +71,8 @@ export const TvPlaybackErrorScreen: React.FC<TvPlaybackErrorScreenProps> = ({
   isRetrying = false,
   onRetry,
   onReportError,
+  item,
+  officialPlatforms,
   onClose
 }) => {
   const isRetryEnabled = Boolean(canRetry && !isRetrying);
@@ -163,6 +210,10 @@ export const TvPlaybackErrorScreen: React.FC<TvPlaybackErrorScreenProps> = ({
       ? 'Não foi possível verificar a disponibilidade agora. Tente novamente.'
       : 'Conteúdo indisponível no momento. Não foi possível encontrar uma fonte verificada agora. Tente novamente.';
 
+  const resolvedOfficialPlatforms = officialPlatforms && officialPlatforms.length > 0
+    ? officialPlatforms
+    : (item ? officialPlatformsService.getOfficialPlatforms(item) : []);
+
   const isTv = tvModeService.isTvMode() || (typeof window !== 'undefined' && window.location.pathname.startsWith('/tv'));
 
   return (
@@ -182,6 +233,20 @@ export const TvPlaybackErrorScreen: React.FC<TvPlaybackErrorScreenProps> = ({
       <p className="text-gray-300 text-sm max-w-lg mb-6 leading-relaxed">
         {errorMessage || defaultErrorDesc}
       </p>
+
+      {resolvedOfficialPlatforms.length > 0 && (failureCategory === 'NO_SOURCES_FOUND' || verificationState === 'UNAVAILABLE' || !hasStreams) && (
+        <div className="mb-6 max-w-xl w-full p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex flex-col items-center">
+          <p className="text-xs uppercase tracking-wider text-cyan-400 font-bold mb-3 flex items-center justify-center gap-1.5">
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Onde assistir oficialmente</span>
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2.5">
+            {resolvedOfficialPlatforms.map((plat, idx) => (
+              <OfficialPlatformButton key={plat.id || plat.url} platform={plat} index={idx} />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div
         className="flex flex-wrap items-center justify-center gap-3"

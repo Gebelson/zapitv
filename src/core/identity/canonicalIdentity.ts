@@ -81,7 +81,15 @@ export class CanonicalIdentityService {
     }
 
     // Preserva títulos alternativos explícitos fornecidos por metadados confiáveis
-    const extraAliases = (item as any).alternateTitles || (item as any).knownAliases;
+    const extraSources = [(item as any).alternateTitles, (item as any).knownAliases].filter(Array.isArray);
+    const extraAliases: string[] = [];
+    for (const arr of extraSources) {
+      arr.forEach((alias: any) => {
+        if (typeof alias === 'string' && alias.trim().length >= 2) {
+          extraAliases.push(alias.trim().toLowerCase());
+        }
+      });
+    }
     if (Array.isArray(extraAliases)) {
       extraAliases.forEach((alias: any) => {
         if (typeof alias === 'string' && alias.trim().length >= 3) {

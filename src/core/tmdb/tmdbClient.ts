@@ -180,6 +180,10 @@ export function formatContentItem(raw: TMDBRawItem, forcedType?: ContentType): C
     isFeatured: (raw.vote_average || 0) > 7.5,
     releaseDate: yearStr ? yearStr.slice(0, 10) : undefined,
     originalTitle: raw.original_title || raw.original_name,
+    alternateTitles: (raw as any).alternateTitles,
+    knownAliases: (raw as any).knownAliases,
+    homepage: (raw as any).homepage,
+    networks: (raw as any).networks,
     isAdult
   };
 }
@@ -250,6 +254,7 @@ class TMDBClientService {
   private imdbCache = new Map<string, string>();
   private seasonEpisodesCache = new Map<string, { eps: any[]; timestamp: number }>();
   private inFlightSeasonEpisodes = new Map<string, Promise<any[]>>();
+  private alternativeTitlesCache = new Map<string, string[]>();
 
   private async request(endpoint: string, timeoutMs = 8000, signal?: AbortSignal): Promise<any> {
     const url = `${TMDB_BASE_URL}${endpoint}${endpoint.includes('?') ? '&' : '?'}api_key=${TMDB_API_KEY}&language=pt-BR`;
@@ -886,7 +891,32 @@ class TMDBClientService {
   }> {
     const isMovie = mediaFormat === 'movie' || (mediaFormat !== 'series' && type === ContentType.MOVIE);
     const path = isMovie ? `/movie/${id}` : `/tv/${id}`;
-    const data = await this.request(`${path}?append_to_response=credits,external_ids,recommendations,similar`);
+    const data = await this.request(`${path}?append_to_response=credits,external_ids,recommendations,similar,alternative_titles,translations`);
+
+    const altTitles: string[] = [];
+    if (data.alternative_titles) {
+      const list = isMovie ? data.alternative_titles.titles : data.alternative_titles.results;
+      if (Array.isArray(list)) {
+        list.forEach((entry: any) => {
+          if (entry && typeof entry.title === 'string' && entry.title.trim().length >= 2) {
+            altTitles.push(entry.title.trim());
+          }
+        });
+      }
+    }
+    if (data.translations?.translations && Array.isArray(data.translations.translations)) {
+      data.translations.translations.forEach((tr: any) => {
+        const trTitle = tr?.data?.name || tr?.data?.title;
+        if (typeof trTitle === 'string' && trTitle.trim().length >= 2) {
+          altTitles.push(trTitle.trim());
+        }
+      });
+    }
+    const uniqueAltTitles = Array.from(new Set(altTitles));
+    data.alternateTitles = uniqueAltTitles;
+    data.knownAliases = uniqueAltTitles;
+    if (data.homepage) data.homepage = data.homepage;
+    if (Array.isArray(data.networks)) data.networks = data.networks;
 
     const formatted = formatContentItem(data, type);
     const imdbId = data.external_ids?.imdb_id;
@@ -937,6 +967,62 @@ class TMDBClientService {
       director: formatted.director,
       similar
     };
+  }
+
+  public async getAlternativeTitles(
+    id: string | number,
+    type: 'movie' | 'series' | 'anime' = 'series',
+    signal?: AbortSignal
+  ): Promise<string[]> {
+    const rawStr = String(id || '').trim();
+    if (!rawStr) return [];
+
+    let cleanId = rawStr.replace(/^tmdb-?/i, '');
+    if (cleanId.startsWith('tt')) {
+      const found = await this.findByImdb(cleanId, type);
+      if (found?.tmdbId) {
+        cleanId = String(found.tmdbId).replace(/^tmdb-?/i, '');
+      } else {
+        return [];
+      }
+    }
+
+    if (!/^\d+$/.test(cleanId)) return [];
+
+    const cacheKey = `${type}:${cleanId}`;
+    if (this.alternativeTitlesCache.has(cacheKey)) {
+      return this.alternativeTitlesCache.get(cacheKey)!;
+    }
+
+    try {
+      const isMovie = type === 'movie';
+      const path = isMovie ? `/movie/${cleanId}` : `/tv/${cleanId}`;
+      const data = await this.request(`${path}?append_to_response=alternative_titles,translations`, 4500, signal);
+      const titles: string[] = [];
+      if (data.alternative_titles) {
+        const list = isMovie ? data.alternative_titles.titles : data.alternative_titles.results;
+        if (Array.isArray(list)) {
+          list.forEach((entry: any) => {
+            if (entry && typeof entry.title === 'string' && entry.title.trim().length >= 2) {
+              titles.push(entry.title.trim());
+            }
+          });
+        }
+      }
+      if (data.translations?.translations && Array.isArray(data.translations.translations)) {
+        data.translations.translations.forEach((tr: any) => {
+          const trTitle = tr?.data?.name || tr?.data?.title;
+          if (typeof trTitle === 'string' && trTitle.trim().length >= 2) {
+            titles.push(trTitle.trim());
+          }
+        });
+      }
+      const unique = Array.from(new Set(titles));
+      this.alternativeTitlesCache.set(cacheKey, unique);
+      return unique;
+    } catch {
+      return [];
+    }
   }
 
   public async getDetailsByImdb(imdbId: string, type: ContentType, mediaFormat?: 'movie' | 'series'): Promise<{

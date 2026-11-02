@@ -778,7 +778,10 @@ class ProviderRegistryService {
 
     const targetTitle = (id.title || catalogItem?.title || openItem?.title || '').trim();
     const originalTitle = (id.originalTitle || catalogItem?.originalTitle || openItem?.originalTitle || '').trim();
-    const alternateTitles: string[] = (id as any).alternateTitles ? [...(id as any).alternateTitles] : [];
+    const alternateTitles: string[] = [
+      ...((id as any).alternateTitles || []),
+      ...((id as any).knownAliases || [])
+    ];
     const candidateIds = [rawTargetId, imdbStr, tmdbNum ? `tmdb-${tmdbNum}` : '', tmdbNum].filter(Boolean);
     for (const cid of candidateIds) {
       if (!alternateTitles.includes(cid)) alternateTitles.push(cid);
@@ -881,7 +884,9 @@ class ProviderRegistryService {
           image: openItem?.image || '',
           tmdbId: id.tmdbId ? String(id.tmdbId) : undefined,
           imdbId: imdbStr || id.imdbId,
-          genres: openItem?.genres || []
+          genres: openItem?.genres || [],
+      alternateTitles,
+      knownAliases: alternateTitles
         }, episode),
         cacheKey: `${effectiveCacheKey}_local`
       });
@@ -994,6 +999,15 @@ class ProviderRegistryService {
     if (tmdbNum) {
       if (!altIds.includes(`tmdb:${tmdbNum}`)) altIds.push(`tmdb:${tmdbNum}`);
       if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
+      try {
+        const moreAlt = await Promise.race([
+          tmdbService.getAlternativeTitles(tmdbNum, type),
+          new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 2000))
+        ]);
+        for (const ma of moreAlt) {
+          if (!alternateTitles.includes(ma)) alternateTitles.push(ma);
+        }
+      } catch {}
     }
 
     // Construir identidade canônica para validação estrita e consulta antecipada de legendas
@@ -1007,7 +1021,9 @@ class ProviderRegistryService {
       image: openItem?.image || '',
       tmdbId: id.tmdbId ? String(id.tmdbId) : undefined,
       imdbId: imdbStr || id.imdbId,
-      genres: openItem?.genres || []
+      genres: openItem?.genres || [],
+      alternateTitles,
+      knownAliases: alternateTitles
     };
 
     const identity = canonicalIdentityService.buildIdentity(itemTarget, episode);

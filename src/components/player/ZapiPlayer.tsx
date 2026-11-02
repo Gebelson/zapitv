@@ -4480,9 +4480,10 @@ export const ZapiPlayer: React.FC<ZapiPlayerProps> = ({
         </div>
       )}
 
-      {/* Screen when all sources have failed */}
+      {/* Screen when all sources have failed (TvPlaybackErrorScreen gerencia os botões 'Tentar novamente' e 'Voltar aos detalhes') */}
       {allSourcesFailed && (
         <TvPlaybackErrorScreen
+          item={item}
           failureCategory={failureCategory}
           verificationState={verificationState}
           hasStreams={streams.length > 0}

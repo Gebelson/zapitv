@@ -1601,6 +1601,10 @@ function formatContentItem(raw, forcedType) {
     isFeatured: (raw.vote_average || 0) > 7.5,
     releaseDate: yearStr ? yearStr.slice(0, 10) : void 0,
     originalTitle: raw.original_title || raw.original_name,
+    alternateTitles: raw.alternateTitles,
+    knownAliases: raw.knownAliases,
+    homepage: raw.homepage,
+    networks: raw.networks,
     isAdult
   };
 }
@@ -1697,6 +1701,7 @@ var init_tmdbClient = __esm({
         this.imdbCache = /* @__PURE__ */ new Map();
         this.seasonEpisodesCache = /* @__PURE__ */ new Map();
         this.inFlightSeasonEpisodes = /* @__PURE__ */ new Map();
+        this.alternativeTitlesCache = /* @__PURE__ */ new Map();
       }
       async request(endpoint, timeoutMs = 8e3, signal) {
         const url = `${TMDB_BASE_URL}${endpoint}${endpoint.includes("?") ? "&" : "?"}api_key=${TMDB_API_KEY}&language=pt-BR`;
@@ -2222,7 +2227,31 @@ var init_tmdbClient = __esm({
       async getDetails(id, type, mediaFormat) {
         const isMovie = mediaFormat === "movie" || mediaFormat !== "series" && type === "FILME" /* MOVIE */;
         const path7 = isMovie ? `/movie/${id}` : `/tv/${id}`;
-        const data = await this.request(`${path7}?append_to_response=credits,external_ids,recommendations,similar`);
+        const data = await this.request(`${path7}?append_to_response=credits,external_ids,recommendations,similar,alternative_titles,translations`);
+        const altTitles = [];
+        if (data.alternative_titles) {
+          const list = isMovie ? data.alternative_titles.titles : data.alternative_titles.results;
+          if (Array.isArray(list)) {
+            list.forEach((entry) => {
+              if (entry && typeof entry.title === "string" && entry.title.trim().length >= 2) {
+                altTitles.push(entry.title.trim());
+              }
+            });
+          }
+        }
+        if (data.translations?.translations && Array.isArray(data.translations.translations)) {
+          data.translations.translations.forEach((tr) => {
+            const trTitle = tr?.data?.name || tr?.data?.title;
+            if (typeof trTitle === "string" && trTitle.trim().length >= 2) {
+              altTitles.push(trTitle.trim());
+            }
+          });
+        }
+        const uniqueAltTitles = Array.from(new Set(altTitles));
+        data.alternateTitles = uniqueAltTitles;
+        data.knownAliases = uniqueAltTitles;
+        if (data.homepage) data.homepage = data.homepage;
+        if (Array.isArray(data.networks)) data.networks = data.networks;
         const formatted = formatContentItem(data, type);
         const imdbId = data.external_ids?.imdb_id;
         if (imdbId) {
@@ -2266,6 +2295,53 @@ var init_tmdbClient = __esm({
           director: formatted.director,
           similar
         };
+      }
+      async getAlternativeTitles(id, type = "series", signal) {
+        const rawStr = String(id || "").trim();
+        if (!rawStr) return [];
+        let cleanId = rawStr.replace(/^tmdb-?/i, "");
+        if (cleanId.startsWith("tt")) {
+          const found = await this.findByImdb(cleanId, type);
+          if (found?.tmdbId) {
+            cleanId = String(found.tmdbId).replace(/^tmdb-?/i, "");
+          } else {
+            return [];
+          }
+        }
+        if (!/^\d+$/.test(cleanId)) return [];
+        const cacheKey = `${type}:${cleanId}`;
+        if (this.alternativeTitlesCache.has(cacheKey)) {
+          return this.alternativeTitlesCache.get(cacheKey);
+        }
+        try {
+          const isMovie = type === "movie";
+          const path7 = isMovie ? `/movie/${cleanId}` : `/tv/${cleanId}`;
+          const data = await this.request(`${path7}?append_to_response=alternative_titles,translations`, 4500, signal);
+          const titles = [];
+          if (data.alternative_titles) {
+            const list = isMovie ? data.alternative_titles.titles : data.alternative_titles.results;
+            if (Array.isArray(list)) {
+              list.forEach((entry) => {
+                if (entry && typeof entry.title === "string" && entry.title.trim().length >= 2) {
+                  titles.push(entry.title.trim());
+                }
+              });
+            }
+          }
+          if (data.translations?.translations && Array.isArray(data.translations.translations)) {
+            data.translations.translations.forEach((tr) => {
+              const trTitle = tr?.data?.name || tr?.data?.title;
+              if (typeof trTitle === "string" && trTitle.trim().length >= 2) {
+                titles.push(trTitle.trim());
+              }
+            });
+          }
+          const unique = Array.from(new Set(titles));
+          this.alternativeTitlesCache.set(cacheKey, unique);
+          return unique;
+        } catch {
+          return [];
+        }
       }
       async getDetailsByImdb(imdbId, type, mediaFormat) {
         const fromTmdb = await this.findByImdb(imdbId);
@@ -12916,7 +12992,10 @@ var init_providerRegistry = __esm({
         }
         const targetTitle = (id.title || catalogItem?.title || openItem?.title || "").trim();
         const originalTitle = (id.originalTitle || catalogItem?.originalTitle || openItem?.originalTitle || "").trim();
-        const alternateTitles = id.alternateTitles ? [...id.alternateTitles] : [];
+        const alternateTitles = [
+          ...id.alternateTitles || [],
+          ...id.knownAliases || []
+        ];
         const candidateIds = [rawTargetId, imdbStr, tmdbNum ? `tmdb-${tmdbNum}` : "", tmdbNum].filter(Boolean);
         for (const cid of candidateIds) {
           if (!alternateTitles.includes(cid)) alternateTitles.push(cid);
@@ -13016,7 +13095,9 @@ var init_providerRegistry = __esm({
               image: openItem?.image || "",
               tmdbId: id.tmdbId ? String(id.tmdbId) : void 0,
               imdbId: imdbStr || id.imdbId,
-              genres: openItem?.genres || []
+              genres: openItem?.genres || [],
+              alternateTitles,
+              knownAliases: alternateTitles
             }, episode),
             cacheKey: `${effectiveCacheKey}_local`
           });
@@ -13114,6 +13195,16 @@ var init_providerRegistry = __esm({
         if (tmdbNum) {
           if (!altIds.includes(`tmdb:${tmdbNum}`)) altIds.push(`tmdb:${tmdbNum}`);
           if (!altIds.includes(tmdbNum)) altIds.push(tmdbNum);
+          try {
+            const moreAlt = await Promise.race([
+              tmdbService.getAlternativeTitles(tmdbNum, type),
+              new Promise((resolve) => setTimeout(() => resolve([]), 2e3))
+            ]);
+            for (const ma of moreAlt) {
+              if (!alternateTitles.includes(ma)) alternateTitles.push(ma);
+            }
+          } catch {
+          }
         }
         const itemTarget = openItem || {
           id: id.id || id.imdbId || String(id.tmdbId || ""),
@@ -13125,7 +13216,9 @@ var init_providerRegistry = __esm({
           image: openItem?.image || "",
           tmdbId: id.tmdbId ? String(id.tmdbId) : void 0,
           imdbId: imdbStr || id.imdbId,
-          genres: openItem?.genres || []
+          genres: openItem?.genres || [],
+          alternateTitles,
+          knownAliases: alternateTitles
         };
         const identity = canonicalIdentityService.buildIdentity(itemTarget, episode);
         const remembered = await Promise.race([
@@ -17610,7 +17703,15 @@ var init_canonicalIdentity = __esm({
         if (item.originalTitle) {
           aliases.push(item.originalTitle.toLowerCase());
         }
-        const extraAliases = item.alternateTitles || item.knownAliases;
+        const extraSources = [item.alternateTitles, item.knownAliases].filter(Array.isArray);
+        const extraAliases = [];
+        for (const arr of extraSources) {
+          arr.forEach((alias) => {
+            if (typeof alias === "string" && alias.trim().length >= 2) {
+              extraAliases.push(alias.trim().toLowerCase());
+            }
+          });
+        }
         if (Array.isArray(extraAliases)) {
           extraAliases.forEach((alias) => {
             if (typeof alias === "string" && alias.trim().length >= 3) {

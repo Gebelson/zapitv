@@ -161,12 +161,12 @@ describe('ZAPITV — SISTEMA INTELIGENTE DE VERIFICAÇÃO DUPLA DE FONTES', () =
         imdbId: undefined
       };
 
-      vi.spyOn(tmdbService, 'getImdbId').mockResolvedValueOnce('tt1234567');
+      vi.spyOn(tmdbService, 'getImdbId').mockResolvedValue('tt1234567');
       const resolveSpy = vi.spyOn(providerRegistry, 'resolveStreams')
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{
           name: 'Torrentio 1080p',
-          title: 'Filme 1080p',
+          title: 'Filme de Teste 1080p',
           url: 'https://torrent.io/stream'
         }]);
 
@@ -246,7 +246,7 @@ describe('ZAPITV — SISTEMA INTELIGENTE DE VERIFICAÇÃO DUPLA DE FONTES', () =
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{
           name: 'Show Subtitle',
-          title: 'Filme',
+          title: 'Filme de Teste',
           url: 'https://show.com/play'
         }]);
 
@@ -259,7 +259,7 @@ describe('ZAPITV — SISTEMA INTELIGENTE DE VERIFICAÇÃO DUPLA DE FONTES', () =
     it('libera listeners de progresso após resposta do cache', async () => {
       const registry = providerRegistry as any;
       const target = { id: dummyMovie.id, title: dummyMovie.title };
-      const key = JSON.stringify(['v5_identity', 'movie', target.id, undefined, undefined, target.title, undefined, undefined, undefined, undefined]);
+      const key = JSON.stringify(['v8_canonical_identity', 'movie', target.id, '', '', target.title.toLowerCase(), undefined, undefined, undefined]);
       registry.cache.set(key, { streams: [{ name: 'A', title: 'A', url: 'https://example.test/a.mp4' }], timestamp: Date.now() });
       const onProgressiveStreams = vi.fn();
       await providerRegistry.resolveStreams('movie', target, undefined, { onProgressiveStreams });
@@ -271,7 +271,7 @@ describe('ZAPITV — SISTEMA INTELIGENTE DE VERIFICAÇÃO DUPLA DE FONTES', () =
     it('remove callbacks abortados e não retém ouvintes de uma busca compartilhada', async () => {
       const registry = providerRegistry as any;
       const target = { id: dummyMovie.id, title: dummyMovie.title };
-      const key = JSON.stringify(['v5_identity', 'movie', target.id, undefined, undefined, target.title, undefined, undefined, undefined, undefined]);
+      const key = JSON.stringify(['v8_canonical_identity', 'movie', target.id, '', '', target.title.toLowerCase(), undefined, undefined, undefined]);
       let finish!: () => void;
       const gate = new Promise<void>(resolve => { finish = resolve; });
       vi.spyOn(providerRegistry, 'resolveStreamsFresh').mockImplementation(async () => { await gate; return []; });
