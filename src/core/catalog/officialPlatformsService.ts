@@ -12,6 +12,7 @@ export interface OfficialPlatform {
 export class OfficialPlatformsService {
   /**
    * Identifica plataformas oficiais de streaming e transmissão para uma obra.
+   * REGRA OBRIGATÓRIA: NUNCA gera recomendações baseadas apenas em gêneros genéricos como Drama e Romance.
    */
   public getOfficialPlatforms(item: Partial<ContentItem> & { alternateTitles?: string[] }): OfficialPlatform[] {
     const platforms: OfficialPlatform[] = [];
@@ -20,11 +21,12 @@ export class OfficialPlatformsService {
 
     const encodedTitle = encodeURIComponent(title);
     const originalTitle = item.originalTitle || '';
-    const genres = (item.genres || []).map(g => g.toLowerCase());
-    const isAsianDrama = (
+
+    // Apenas reconhece produção asiática se houver caracteres nativos asiáticos ou rede transmissora declarada.
+    // NUNCA classifica como drama asiático baseado apenas nos gêneros genéricos "Drama" ou "Romance".
+    const isAsianDrama = Boolean(
       /[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]/.test(originalTitle) ||
-      genres.some(g => /drama|romance/i.test(g)) ||
-      Boolean(item.networks?.some(n => /iqiyi|tencent|wetv|youku|mango/i.test(n.name)))
+      item.networks?.some(n => /iqiyi|tencent|wetv|youku|mango/i.test(n.name || ''))
     );
 
     // 1. Link oficial direto se disponível na propriedade homepage
@@ -85,7 +87,7 @@ export class OfficialPlatformsService {
       }
     }
 
-    // 3. Plataformas oficiais canônicas para C-Dramas e produções asiáticas
+    // 3. Plataformas oficiais canônicas para C-Dramas e produções asiáticas com comprovação
     if (isAsianDrama) {
       if (!platforms.some(p => p.id === 'iqiyi')) {
         platforms.push({
@@ -121,17 +123,6 @@ export class OfficialPlatformsService {
           url: `https://www.youtube.com/results?search_query=${encodedTitle}+official+ep+1`,
           badge: 'Canal Oficial C-Drama',
           category: 'c-drama'
-        });
-      }
-    } else {
-      // Plataformas globais para conteúdos gerais
-      if (!platforms.some(p => p.id === 'justwatch')) {
-        platforms.push({
-          id: 'justwatch',
-          name: 'JustWatch Brasil',
-          url: `https://www.justwatch.com/br/busca?q=${encodedTitle}`,
-          badge: 'Guia de Transmissão',
-          category: 'global'
         });
       }
     }

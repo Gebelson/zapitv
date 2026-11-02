@@ -253,8 +253,8 @@ describe('ZAPITV — Resolução de Disponibilidade e Fontes: Pursuit of Jade (2
     });
   });
 
-  describe('5. Plataformas Oficiais de Transmissão (C-Dramas e Pursuit of Jade)', () => {
-    it('deve listar plataformas oficiais corretas para Pursuit of Jade (iQIYI, WeTV/Tencent, Viki, YouTube)', () => {
+  describe('5. Isolamento de Plataformas Externas e Preservação de Reprodução Interna', () => {
+    it('deve identificar plataformas oficiais de Pursuit of Jade apenas quando consultado como utilitário independente', () => {
       const platforms = officialPlatformsService.getOfficialPlatforms(pursuitOfJadeItem);
 
       expect(platforms.length).toBeGreaterThanOrEqual(3);
@@ -273,16 +273,29 @@ describe('ZAPITV — Resolução de Disponibilidade e Fontes: Pursuit of Jade (2
       expect(direct?.url).toBe('https://www.iqiyi.com/a_km3isv5eh1.html');
     });
 
-    it('sourceVerificationService deve incluir officialPlatforms no resultado da verificação', async () => {
+    it('NÃO deve gerar recomendações de plataformas externas baseado apenas em gêneros Drama e Romance', () => {
+      const genericDramaRomance: ContentItem = {
+        id: 'movie-drama-romance-test',
+        title: 'Corações Unidos',
+        originalTitle: 'Hearts United',
+        type: ContentType.MOVIE,
+        genres: ['Drama', 'Romance'],
+        rating: 7.5,
+        year: 2024,
+        image: ''
+      };
+      const platforms = officialPlatformsService.getOfficialPlatforms(genericDramaRomance);
+      expect(platforms).toHaveLength(0);
+    });
+
+    it('sourceVerificationService NÃO deve injetar redirecionamentos externos no fluxo de reprodução', async () => {
       vi.spyOn(providerRegistry, 'resolveStreams').mockImplementation(async (_type, _id, _ep, options) => {
         options?.onProviderResult?.({ providerId: 'p1', providerName: 'P1', durationMs: 10, success: true, streamCount: 0 });
         return [];
       });
 
       const result = await sourceVerificationService.verifySources(pursuitOfJadeItem, episode1);
-      expect(result.officialPlatforms).toBeDefined();
-      expect(result.officialPlatforms?.length).toBeGreaterThan(0);
-      expect(result.officialPlatforms?.some(p => p.name.includes('iQIYI') || p.name.includes('WeTV'))).toBe(true);
+      expect((result as any).officialPlatforms).toBeUndefined();
     });
   });
 });

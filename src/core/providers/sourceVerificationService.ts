@@ -7,7 +7,6 @@ import { sourceConfidenceEngine } from '../identity/sourceConfidenceEngine';
 import { streamValidator } from './streamValidator';
 import { sourceSelectionService } from '../selection/sourceSelectionService';
 import { isSourcePlayableHere } from './sourceReadiness';
-import { officialPlatformsService, OfficialPlatform } from '../catalog/officialPlatformsService';
 
 export type VerificationState =
   | 'IDLE'
@@ -62,8 +61,8 @@ export interface VerificationResult {
   state: VerificationState;
   streams: StremioStream[];
   errorMessage?: string;
+  inconclusiveReason?: string;
   diagnosticLog: VerificationDiagnosticLog;
-  officialPlatforms?: OfficialPlatform[];
 }
 
 export const MSG_INCONCLUSIVE = 'Não foi possível verificar a disponibilidade agora. Tente novamente.';
@@ -257,11 +256,7 @@ class SourceVerificationService {
       return {
         state: 'AVAILABLE',
         streams: phase1Playable,
-        diagnosticLog: diagnostic,
-        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
-          ...item,
-          alternateTitles: itemAlternateTitles
-        })
+        diagnosticLog: diagnostic
       };
     }
 
@@ -275,11 +270,7 @@ class SourceVerificationService {
         state: 'INCONCLUSIVE',
         streams: [],
         errorMessage: MSG_INCONCLUSIVE,
-        diagnosticLog: diagnostic,
-        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
-          ...item,
-          alternateTitles: itemAlternateTitles
-        })
+        diagnosticLog: diagnostic
       };
     }
 
@@ -297,11 +288,7 @@ class SourceVerificationService {
       diagnostic.finalState = 'INCONCLUSIVE';
       diagnostic.totalDurationMs = Date.now() - overallStart;
       this.recordLog(diagnostic);
-      return { state: 'INCONCLUSIVE', streams: [], errorMessage: MSG_INCONCLUSIVE, diagnosticLog: diagnostic,
-        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
-          ...item,
-          alternateTitles: itemAlternateTitles
-        }) };
+      return { state: 'INCONCLUSIVE', streams: [], errorMessage: MSG_INCONCLUSIVE, diagnosticLog: diagnostic };
     }
 
     // Reavaliação profunda de identificadores canônicos na 2ª verificação
@@ -422,11 +409,7 @@ class SourceVerificationService {
       return {
         state: 'AVAILABLE',
         streams: finalStreams,
-        diagnosticLog: diagnostic,
-        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
-          ...item,
-          alternateTitles: itemAlternateTitles
-        })
+        diagnosticLog: diagnostic
       };
     }
 
@@ -463,11 +446,7 @@ class SourceVerificationService {
       return {
         state: 'AVAILABLE',
         streams: webReadyCandidates,
-        diagnosticLog: diagnostic,
-        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
-          ...item,
-          alternateTitles: itemAlternateTitles
-        })
+        diagnosticLog: diagnostic
       };
     }
 
@@ -477,11 +456,7 @@ class SourceVerificationService {
       diagnostic.inconclusiveReason = 'As fontes retornadas exigem um motor local indisponível neste dispositivo';
       this.recordLog(diagnostic);
       options?.onStateChange?.('INCONCLUSIVE', MSG_INCONCLUSIVE);
-      return { state: 'INCONCLUSIVE', streams: [], errorMessage: MSG_INCONCLUSIVE, diagnosticLog: diagnostic,
-        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
-          ...item,
-          alternateTitles: itemAlternateTitles
-        }) };
+      return { state: 'INCONCLUSIVE', streams: [], errorMessage: MSG_INCONCLUSIVE, diagnosticLog: diagnostic };
     }
 
     // =========================================================================
@@ -503,11 +478,7 @@ class SourceVerificationService {
         state: 'INCONCLUSIVE',
         streams: [],
         errorMessage: MSG_INCONCLUSIVE,
-        diagnosticLog: diagnostic,
-        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
-          ...item,
-          alternateTitles: itemAlternateTitles
-        })
+        diagnosticLog: diagnostic
       };
     }
 
@@ -519,11 +490,7 @@ class SourceVerificationService {
       state: 'UNAVAILABLE',
       streams: [],
       errorMessage: MSG_UNAVAILABLE,
-      diagnosticLog: diagnostic,
-        officialPlatforms: officialPlatformsService.getOfficialPlatforms({
-          ...item,
-          alternateTitles: itemAlternateTitles
-        })
+      diagnosticLog: diagnostic
     };
   }
 
