@@ -1,13 +1,13 @@
 {
-  "monthKey": "2026-10",
-  "monthLabel": "Outubro de 2026",
+  "monthKey": "2026-11",
+  "monthLabel": "Novembro de 2026",
   "year": 2026,
-  "month": 10,
+  "month": 11,
   "isCurrentMonth": true,
-  "statusLabel": "Outubro de 2026 · Parcial",
-  "lastUpdatedAt": 1793362076514,
-  "nextScheduledUpdate": 1793610000000,
-  "nextScheduledUpdateFormatted": "Segunda-feira, 02/11/2026 às 06:00 (BRT)",
+  "statusLabel": "Novembro de 2026 · Parcial",
+  "lastUpdatedAt": 1793629733168,
+  "nextScheduledUpdate": 1794214800000,
+  "nextScheduledUpdateFormatted": "Segunda-feira, 09/11/2026 às 06:00 (BRT)",
   "movies": [
     {
       "position": 1,
@@ -44,20 +44,20 @@
         "heroTags": [
           {
             "id": "rank-1",
-            "text": "#1 Em Destaque (Outubro de 2026)",
+            "text": "#1 Em Destaque (Novembro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 198,
+      "calculatedScore": 99,
       "source": "imdb-moviemeter",
       "originalPosition": 2,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076513
+      "updatedAt": 1793629733167
     },
     {
       "position": 2,
@@ -94,20 +94,20 @@
         "heroTags": [
           {
             "id": "rank-2",
-            "text": "#2 Em Destaque (Outubro de 2026)",
+            "text": "#2 Em Destaque (Novembro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 196,
+      "calculatedScore": 98,
       "source": "imdb-moviemeter",
       "originalPosition": 3,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076513
+      "updatedAt": 1793629733167
     },
     {
       "position": 3,
@@ -143,20 +143,20 @@
         "heroTags": [
           {
             "id": "rank-3",
-            "text": "#3 Em Destaque (Outubro de 2026)",
+            "text": "#3 Em Destaque (Novembro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 192,
+      "calculatedScore": 96,
       "source": "imdb-moviemeter",
       "originalPosition": 5,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 4,
@@ -192,20 +192,20 @@
         "heroTags": [
           {
             "id": "rank-4",
-            "text": "#4 Em Destaque (Outubro de 2026)",
+            "text": "#4 Em Destaque (Novembro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 190,
+      "calculatedScore": 95,
       "source": "imdb-moviemeter",
       "originalPosition": 6,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 5,
@@ -242,20 +242,20 @@
         "heroTags": [
           {
             "id": "rank-5",
-            "text": "#5 Em Destaque (Outubro de 2026)",
+            "text": "#5 Em Destaque (Novembro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 184,
+      "calculatedScore": 92,
       "source": "imdb-moviemeter",
       "originalPosition": 9,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 6,
@@ -291,20 +291,20 @@
         "heroTags": [
           {
             "id": "rank-6",
-            "text": "#6 Em Destaque (Outubro de 2026)",
+            "text": "#6 Em Destaque (Novembro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 182,
+      "calculatedScore": 91,
       "source": "imdb-moviemeter",
       "originalPosition": 10,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 7,
@@ -341,20 +341,20 @@
         "heroTags": [
           {
             "id": "rank-7",
-            "text": "#7 Em Destaque (Outubro de 2026)",
+            "text": "#7 Em Destaque (Novembro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 180,
+      "calculatedScore": 90,
       "source": "imdb-moviemeter",
       "originalPosition": 11,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 8,
@@ -391,20 +391,20 @@
         "heroTags": [
           {
             "id": "rank-8",
-            "text": "#8 Em Destaque (Outubro de 2026)",
+            "text": "#8 Em Destaque (Novembro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 178,
+      "calculatedScore": 89,
       "source": "imdb-moviemeter",
       "originalPosition": 12,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 9,
@@ -441,20 +441,20 @@
         "heroTags": [
           {
             "id": "rank-9",
-            "text": "#9 Em Destaque (Outubro de 2026)",
+            "text": "#9 Em Destaque (Novembro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 174,
+      "calculatedScore": 87,
       "source": "imdb-moviemeter",
       "originalPosition": 14,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 10,
@@ -496,7 +496,7 @@
         "heroTags": [
           {
             "id": "rank-10",
-            "text": "#10 Em Destaque (Outubro de 2026)",
+            "text": "#10 Em Destaque (Novembro de 2026)",
             "color": "#007df7",
             "style": "solid"
           }
@@ -505,11 +505,11 @@
       "calculatedScore": 86,
       "source": "imdb-moviemeter",
       "originalPosition": 15,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     }
   ],
   "series": [
@@ -558,20 +558,20 @@
         "heroTags": [
           {
             "id": "rank-1",
-            "text": "#1 Em Destaque (Outubro de 2026)",
+            "text": "#1 Em Destaque (Novembro de 2026)",
             "color": "#c084fc",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 196,
+      "calculatedScore": 98,
       "source": "imdb-tvmeter",
       "originalPosition": 3,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 2,
@@ -625,20 +625,20 @@
         "heroTags": [
           {
             "id": "rank-2",
-            "text": "#2 Em Destaque (Outubro de 2026)",
+            "text": "#2 Em Destaque (Novembro de 2026)",
             "color": "#c084fc",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 192,
+      "calculatedScore": 96,
       "source": "imdb-tvmeter",
       "originalPosition": 5,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 3,
@@ -692,20 +692,20 @@
         "heroTags": [
           {
             "id": "rank-3",
-            "text": "#3 Em Destaque (Outubro de 2026)",
+            "text": "#3 Em Destaque (Novembro de 2026)",
             "color": "#c084fc",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 188,
+      "calculatedScore": 94,
       "source": "imdb-tvmeter",
       "originalPosition": 7,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 4,
@@ -752,20 +752,20 @@
         "heroTags": [
           {
             "id": "rank-4",
-            "text": "#4 Em Destaque (Outubro de 2026)",
+            "text": "#4 Em Destaque (Novembro de 2026)",
             "color": "#c084fc",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 184,
+      "calculatedScore": 92,
       "source": "imdb-tvmeter",
       "originalPosition": 9,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 5,
@@ -812,20 +812,20 @@
         "heroTags": [
           {
             "id": "rank-5",
-            "text": "#5 Em Destaque (Outubro de 2026)",
+            "text": "#5 Em Destaque (Novembro de 2026)",
             "color": "#c084fc",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 182,
+      "calculatedScore": 91,
       "source": "imdb-tvmeter",
       "originalPosition": 10,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 6,
@@ -873,20 +873,20 @@
         "heroTags": [
           {
             "id": "rank-6",
-            "text": "#6 Em Destaque (Outubro de 2026)",
+            "text": "#6 Em Destaque (Novembro de 2026)",
             "color": "#c084fc",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 180,
+      "calculatedScore": 90,
       "source": "imdb-tvmeter",
       "originalPosition": 11,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 7,
@@ -928,25 +928,25 @@
           }
         ],
         "canonicalId": "series:imdb:tt1196946",
-        "imdbRank": 12,
+        "imdbRank": 14,
         "displayRank": 7,
         "heroTags": [
           {
             "id": "rank-7",
-            "text": "#7 Em Destaque (Outubro de 2026)",
+            "text": "#7 Em Destaque (Novembro de 2026)",
             "color": "#c084fc",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 176,
+      "calculatedScore": 87,
       "source": "imdb-tvmeter",
-      "originalPosition": 12,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "originalPosition": 14,
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 8,
@@ -989,25 +989,25 @@
           }
         ],
         "canonicalId": "series:imdb:tt0944947",
-        "imdbRank": 13,
+        "imdbRank": 15,
         "displayRank": 8,
         "heroTags": [
           {
             "id": "rank-8",
-            "text": "#8 Em Destaque (Outubro de 2026)",
+            "text": "#8 Em Destaque (Novembro de 2026)",
             "color": "#c084fc",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 174,
+      "calculatedScore": 86,
       "source": "imdb-tvmeter",
-      "originalPosition": 13,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "originalPosition": 15,
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 9,
@@ -1049,25 +1049,25 @@
           }
         ],
         "canonicalId": "series:imdb:tt9288030",
-        "imdbRank": 14,
+        "imdbRank": 16,
         "displayRank": 9,
         "heroTags": [
           {
             "id": "rank-9",
-            "text": "#9 Em Destaque (Outubro de 2026)",
+            "text": "#9 Em Destaque (Novembro de 2026)",
             "color": "#c084fc",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 172,
+      "calculatedScore": 85,
       "source": "imdb-tvmeter",
-      "originalPosition": 14,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "originalPosition": 16,
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733167
     },
     {
       "position": 10,
@@ -1109,25 +1109,25 @@
           }
         ],
         "canonicalId": "series:imdb:tt13111078",
-        "imdbRank": 15,
+        "imdbRank": 18,
         "displayRank": 10,
         "heroTags": [
           {
             "id": "rank-10",
-            "text": "#10 Em Destaque (Outubro de 2026)",
+            "text": "#10 Em Destaque (Novembro de 2026)",
             "color": "#c084fc",
             "style": "solid"
           }
         ]
       },
-      "calculatedScore": 169,
+      "calculatedScore": 83,
       "source": "imdb-tvmeter",
-      "originalPosition": 15,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "originalPosition": 18,
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733168
     }
   ],
   "animes": [
@@ -1181,7 +1181,7 @@
         "heroTags": [
           {
             "id": "rank-1",
-            "text": "#1 Em Destaque (Outubro de 2026)",
+            "text": "#1 Em Destaque (Novembro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1190,11 +1190,11 @@
       "calculatedScore": 1082,
       "source": "anilist",
       "originalPosition": 1,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733168
     },
     {
       "position": 2,
@@ -1247,7 +1247,7 @@
         "heroTags": [
           {
             "id": "rank-2",
-            "text": "#2 Em Destaque (Outubro de 2026)",
+            "text": "#2 Em Destaque (Novembro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1256,11 +1256,11 @@
       "calculatedScore": 1056,
       "source": "anilist",
       "originalPosition": 2,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733168
     },
     {
       "position": 3,
@@ -1313,7 +1313,7 @@
         "heroTags": [
           {
             "id": "rank-3",
-            "text": "#3 Em Destaque (Outubro de 2026)",
+            "text": "#3 Em Destaque (Novembro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1322,11 +1322,11 @@
       "calculatedScore": 1049,
       "source": "anilist",
       "originalPosition": 3,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733168
     },
     {
       "position": 4,
@@ -1378,7 +1378,7 @@
         "heroTags": [
           {
             "id": "rank-4",
-            "text": "#4 Em Destaque (Outubro de 2026)",
+            "text": "#4 Em Destaque (Novembro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1387,11 +1387,11 @@
       "calculatedScore": 1032,
       "source": "anilist",
       "originalPosition": 4,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733168
     },
     {
       "position": 5,
@@ -1443,7 +1443,7 @@
         "heroTags": [
           {
             "id": "rank-5",
-            "text": "#5 Em Destaque (Outubro de 2026)",
+            "text": "#5 Em Destaque (Novembro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1452,11 +1452,11 @@
       "calculatedScore": 1024,
       "source": "anilist",
       "originalPosition": 5,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733168
     },
     {
       "position": 6,
@@ -1508,7 +1508,7 @@
         "heroTags": [
           {
             "id": "rank-6",
-            "text": "#6 Em Destaque (Outubro de 2026)",
+            "text": "#6 Em Destaque (Novembro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1517,11 +1517,11 @@
       "calculatedScore": 1013,
       "source": "anilist",
       "originalPosition": 6,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733168
     },
     {
       "position": 7,
@@ -1574,7 +1574,7 @@
         "heroTags": [
           {
             "id": "rank-7",
-            "text": "#7 Em Destaque (Outubro de 2026)",
+            "text": "#7 Em Destaque (Novembro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1583,11 +1583,11 @@
       "calculatedScore": 994,
       "source": "anilist",
       "originalPosition": 7,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733168
     },
     {
       "position": 8,
@@ -1640,7 +1640,7 @@
         "heroTags": [
           {
             "id": "rank-8",
-            "text": "#8 Em Destaque (Outubro de 2026)",
+            "text": "#8 Em Destaque (Novembro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1649,11 +1649,11 @@
       "calculatedScore": 983,
       "source": "anilist",
       "originalPosition": 8,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733168
     },
     {
       "position": 9,
@@ -1706,7 +1706,7 @@
         "heroTags": [
           {
             "id": "rank-9",
-            "text": "#9 Em Destaque (Outubro de 2026)",
+            "text": "#9 Em Destaque (Novembro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1715,11 +1715,11 @@
       "calculatedScore": 971,
       "source": "anilist",
       "originalPosition": 9,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733168
     },
     {
       "position": 10,
@@ -1771,7 +1771,7 @@
         "heroTags": [
           {
             "id": "rank-10",
-            "text": "#10 Em Destaque (Outubro de 2026)",
+            "text": "#10 Em Destaque (Novembro de 2026)",
             "color": "#06b6d4",
             "style": "solid"
           }
@@ -1780,11 +1780,11 @@
       "calculatedScore": 956,
       "source": "anilist",
       "originalPosition": 10,
-      "monthKey": "2026-10",
-      "monthLabel": "Outubro de 2026",
+      "monthKey": "2026-11",
+      "monthLabel": "Novembro de 2026",
       "isPartial": true,
       "validationStatus": "verified",
-      "updatedAt": 1793362076514
+      "updatedAt": 1793629733168
     }
   ],
   "totalCandidatesEvaluated": {
@@ -1812,7 +1812,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 198
+        "score": 99
       },
       {
         "imdbId": "tt21440780",
@@ -1832,7 +1832,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 196
+        "score": 98
       },
       {
         "imdbId": "tt28704204",
@@ -1852,7 +1852,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 192
+        "score": 96
       },
       {
         "imdbId": "tt31828574",
@@ -1872,7 +1872,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 190
+        "score": 95
       },
       {
         "imdbId": "tt0100935",
@@ -1892,7 +1892,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 184
+        "score": 92
       },
       {
         "imdbId": "tt11464826",
@@ -1912,7 +1912,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 182
+        "score": 91
       },
       {
         "imdbId": "tt1392796",
@@ -1932,7 +1932,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 180
+        "score": 90
       },
       {
         "imdbId": "tt11576182",
@@ -1952,7 +1952,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 178
+        "score": 89
       },
       {
         "imdbId": "tt0074991",
@@ -1972,7 +1972,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 174
+        "score": 87
       },
       {
         "imdbId": "tt11897478",
@@ -2007,7 +2007,7 @@
         "isIncluded": false,
         "canonicalId": "movie-sobrevivencia-2026",
         "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 200
+        "score": 100
       },
       {
         "imdbId": "tt32261958",
@@ -2020,7 +2020,7 @@
         "isIncluded": false,
         "canonicalId": "movie-verity-2026",
         "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 194
+        "score": 97
       },
       {
         "imdbId": "tt13000574",
@@ -2033,7 +2033,7 @@
         "isIncluded": false,
         "canonicalId": "movie-resident-evil-2026",
         "rejectionReason": "Indisponível temporariamente no catálogo. Primeira reavaliação programada para 20/11/2026 às 00:00 (Horário de Brasília), sujeita à confirmação de disponibilidade digital oficial no Brasil e fonte HD autorizada/reproduzível.",
-        "score": 188
+        "score": 94
       },
       {
         "imdbId": "tt20221436",
@@ -2046,7 +2046,7 @@
         "isIncluded": false,
         "canonicalId": "movie-spiderman-new-day-2026",
         "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 186
+        "score": 93
       },
       {
         "imdbId": "tt33764258",
@@ -2059,7 +2059,7 @@
         "isIncluded": false,
         "canonicalId": "movie-a-odisseia-2026",
         "rejectionReason": "Indisponível temporariamente no catálogo. Retorno programado para 20/11/2026 às 00:00 (Horário de Brasília).",
-        "score": 176
+        "score": 88
       }
     ],
     "approvedSeries": [
@@ -2081,7 +2081,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 196
+        "score": 98
       },
       {
         "imdbId": "tt10986410",
@@ -2101,7 +2101,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 192
+        "score": 96
       },
       {
         "imdbId": "tt5875444",
@@ -2121,7 +2121,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 188
+        "score": 94
       },
       {
         "imdbId": "tt13207736",
@@ -2141,7 +2141,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 184
+        "score": 92
       },
       {
         "imdbId": "tt1844624",
@@ -2161,7 +2161,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 182
+        "score": 91
       },
       {
         "imdbId": "tt16066148",
@@ -2181,7 +2181,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 180
+        "score": 90
       },
       {
         "imdbId": "tt1196946",
@@ -2190,9 +2190,9 @@
         "canonicalTitle": "O Mentalista",
         "year": 2008,
         "mediaType": "series",
-        "imdbRank": 12,
+        "imdbRank": 14,
         "displayRank": 7,
-        "rankPosition": 12,
+        "rankPosition": 14,
         "finalPosition": 7,
         "status": "APPROVED",
         "isIncluded": true,
@@ -2201,7 +2201,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 176
+        "score": 87
       },
       {
         "imdbId": "tt0944947",
@@ -2210,9 +2210,9 @@
         "canonicalTitle": "Game of Thrones",
         "year": 2011,
         "mediaType": "series",
-        "imdbRank": 13,
+        "imdbRank": 15,
         "displayRank": 8,
-        "rankPosition": 13,
+        "rankPosition": 15,
         "finalPosition": 8,
         "status": "APPROVED",
         "isIncluded": true,
@@ -2221,7 +2221,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 174
+        "score": 86
       },
       {
         "imdbId": "tt9288030",
@@ -2230,9 +2230,9 @@
         "canonicalTitle": "Reacher",
         "year": 2022,
         "mediaType": "series",
-        "imdbRank": 14,
+        "imdbRank": 16,
         "displayRank": 9,
-        "rankPosition": 14,
+        "rankPosition": 16,
         "finalPosition": 9,
         "status": "APPROVED",
         "isIncluded": true,
@@ -2241,7 +2241,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 172
+        "score": 85
       },
       {
         "imdbId": "tt13111078",
@@ -2250,9 +2250,9 @@
         "canonicalTitle": "Operação Lioness",
         "year": 2023,
         "mediaType": "series",
-        "imdbRank": 15,
+        "imdbRank": 18,
         "displayRank": 10,
-        "rankPosition": 15,
+        "rankPosition": 18,
         "finalPosition": 10,
         "status": "APPROVED",
         "isIncluded": true,
@@ -2261,7 +2261,7 @@
         "hasAudioPtBr": true,
         "audioStatus": "pt-br-dubbed",
         "verifiedSourcesCount": 1,
-        "score": 169
+        "score": 83
       }
     ],
     "rejectedSeries": [
@@ -2276,7 +2276,7 @@
         "isIncluded": false,
         "canonicalId": "series-carrie-2026",
         "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 200
+        "score": 100
       },
       {
         "imdbId": "tt32159846",
@@ -2289,7 +2289,7 @@
         "isIncluded": false,
         "canonicalId": "series-profundezas-2026",
         "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 198
+        "score": 99
       },
       {
         "imdbId": "tt26540670",
@@ -2302,7 +2302,7 @@
         "isIncluded": false,
         "canonicalId": "series-lanternas-2026",
         "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 194
+        "score": 97
       },
       {
         "imdbId": "tt28289508",
@@ -2315,7 +2315,7 @@
         "isIncluded": false,
         "canonicalId": "series-terra-de-mafia-2026",
         "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 190
+        "score": 95
       },
       {
         "imdbId": "tt29458920",
@@ -2328,7 +2328,46 @@
         "isIncluded": false,
         "canonicalId": "series-war-2026",
         "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
-        "score": 186
+        "score": 93
+      },
+      {
+        "imdbId": "tt32567812",
+        "title": "Avatar: Os Sete Refúgios",
+        "canonicalTitle": "Avatar: Os Sete Refúgios",
+        "year": 2026,
+        "mediaType": "series",
+        "rankPosition": 12,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "series-avatar-sete-refugios-2026",
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+        "score": 89
+      },
+      {
+        "imdbId": "tt33314545",
+        "title": "Neagley: Detetive Particular",
+        "canonicalTitle": "Neagley: Detetive Particular",
+        "year": 2026,
+        "mediaType": "series",
+        "rankPosition": 13,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "series-neagley-2026",
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+        "score": 88
+      },
+      {
+        "imdbId": "tt31854290",
+        "title": "O Segredo de Widow's Bay",
+        "canonicalTitle": "O Segredo de Widow's Bay",
+        "year": 2026,
+        "mediaType": "series",
+        "rankPosition": 17,
+        "status": "REJECTED",
+        "isIncluded": false,
+        "canonicalId": "series-widows-bay-2026",
+        "rejectionReason": "Sem fontes válidas ou reproduzíveis disponíveis na ZapiTV",
+        "score": 84
       }
     ],
     "approvedAnimes": [

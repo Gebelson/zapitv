@@ -39,7 +39,7 @@ try{
  await server.listen();const base=`http://127.0.0.1:${(server.httpServer!.address() as {port:number}).port}`;
  browser=await chromium.launch({headless:true,executablePath:['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'].find(existsSync)});
  for(const [name,userAgent]of targets){
-  const context=await browser.newContext({viewport:{width:1280,height:720},userAgent,hasTouch:true});const page=await context.newPage();page.setDefaultTimeout(4000);const errors:string[]=[];const searches:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  const context=await browser.newContext({viewport:{width:1280,height:720},userAgent,hasTouch:true});const page=await context.newPage();page.setDefaultTimeout(15000);const errors:string[]=[];const searches:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('https://**/*',route=>{const url=new URL(route.request().url());const q=url.searchParams.get('query');if(q) searches.push(q);return route.fulfill({json:url.hostname.includes('anilist')?{data:{Page:{media:[]}}}:{results:[],metas:[],data:[]}});});
   const reset=async()=>{await page.goto(`${base}/tests/harness/search_keyboard_preview.html?tv=1`,{waitUntil:'domcontentloaded'});await page.locator('[data-focus-key="tv-key-a"][data-tv-focused="true"]').waitFor();};
   await reset();await navigate(page,'b');

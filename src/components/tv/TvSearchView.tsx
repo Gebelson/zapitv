@@ -4,7 +4,7 @@ import { Search, X, ArrowLeft, Delete, Sparkles, Trash2 } from 'lucide-react';
 import { ContentItem, Profile } from '../../../types';
 import { TvCard16x9 } from './TvCard16x9';
 import { useTvFocusable } from '../../core/tv/useTvFocusable';
-import { tvNavigationManager, getTvKeyboardText } from '../../core/tv/tvNavigationManager';
+import { tvNavigationManager, getTvKeyboardText, isRemoteConfirmEvent } from '../../core/tv/tvNavigationManager';
 import { searchService, SearchCategory } from '../../core/search/searchService';
 import { uiSoundService } from '../../core/audio/uiSoundService';
 import { useTvViewport } from '../../core/tv/tvViewportService';
@@ -284,13 +284,49 @@ export const TvSearchView: React.FC<TvSearchViewProps> = ({
   }, [onClose]);
 
   // The existing capture-phase command owner handles text before spatial confirmation.
-  useEffect(() => tvNavigationManager.registerCommandHandler(event => {
-    const text = getTvKeyboardText(event);
-    if (text === null) return false;
-    uiSoundService.play('click');
-    setQuery(previous => previous + text);
-    return true;
-  }), []);
+  useEffect(() => {
+    const unregisterCommand = tvNavigationManager.registerCommandHandler(event => {
+      const text = getTvKeyboardText(event);
+      if (text === null) return false;
+      uiSoundService.play('click');
+      setQuery(previous => previous + text);
+      return true;
+    });
+
+    // Fallback de digitação física para ambientes isolados ou quando tvNavigationManager não intercepta em captura
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isRemoteConfirmEvent(e)) return;
+
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        uiSoundService.play('click');
+        setQuery(prev => prev.slice(0, -1));
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        uiSoundService.play('close');
+        onClose();
+        return;
+      }
+
+      const text = getTvKeyboardText(e);
+      if (text !== null) {
+        uiSoundService.play('click');
+        setQuery(prev => prev + text);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      unregisterCommand();
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
 
   // Teclado virtual: manipulação de teclas
   const handleVirtualKeyPress = useCallback((char: string) => {
