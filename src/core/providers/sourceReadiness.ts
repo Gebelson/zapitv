@@ -216,17 +216,15 @@ export function isSourceTechnicallyPlayable(
     return false;
   }
 
-  // 6. Compatibilidade de container
+  // 6. Compatibilidade de container e rejeição de páginas arbitrárias / embeds
   const isHls = normUrl.includes('.m3u8') || stream.sourceType === 'hls';
-  const isDash = normUrl.includes('.mpd');
+  const isDash = normUrl.includes('.mpd') || stream.sourceType === 'dash';
   const isDirectVideo = normUrl.includes('.mp4') || normUrl.includes('.webm') || normUrl.includes('.ogv') ||
-    normUrl.includes('/api/proxy') || stream.sourceType === 'mp4';
+    normUrl.includes('.mkv') || normUrl.includes('/api/proxy') || stream.sourceType === 'mp4' || stream.isDirectVideo === true;
 
-  if (!isHls && !isDash && !isDirectVideo) {
-    // URLs que apontam para embeds, páginas web ou iframes não são tecnicamente reproduzíveis pelo player nativo
-    if (normUrl.includes('embed') || normUrl.includes('iframe') || normUrl.includes('playerflix')) {
-      return false;
-    }
+  // URLs que apontam para embeds, páginas web, rotas /watch ou iframes não são tecnicamente reproduzíveis pelo player nativo
+  if (normUrl.includes('embed') || normUrl.includes('iframe') || normUrl.includes('playerflix') || normUrl.includes('/watch') || normUrl.includes('.html') || normUrl.includes('.php')) {
+    return false;
   }
 
   // 7. Compatibilidade de áudio por dispositivo

@@ -3137,9 +3137,104 @@ function resolveStremioUrl(url) {
   }
   return url;
 }
-var StremioClient;
+function normalizeOptions(options) {
+  if (typeof options === "number") {
+    return { totalTimeoutMs: options };
+  }
+  return options || {};
+}
+async function executeHttpRequest(url, timeoutMs, userSignal) {
+  if (userSignal?.aborted) {
+    throw new StremioRequestError({
+      message: "Requisi\xE7\xE3o cancelada pelo usu\xE1rio.",
+      kind: "ABORTED",
+      endpoint: url,
+      url
+    });
+  }
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort("TIMEOUT");
+  }, timeoutMs);
+  const onUserAbort = () => {
+    controller.abort("USER_ABORT");
+  };
+  if (userSignal) {
+    userSignal.addEventListener("abort", onUserAbort, { once: true });
+  }
+  try {
+    const response2 = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json, text/plain, */*"
+      }
+    });
+    const text2 = await response2.text();
+    let json = void 0;
+    if (text2.startsWith("{") || text2.startsWith("[")) {
+      try {
+        json = JSON.parse(text2);
+      } catch {
+      }
+    }
+    return {
+      ok: response2.ok,
+      status: response2.status,
+      text: text2,
+      json
+    };
+  } catch (err) {
+    if (userSignal?.aborted) {
+      throw new StremioRequestError({
+        message: "Requisi\xE7\xE3o cancelada pelo usu\xE1rio.",
+        kind: "ABORTED",
+        endpoint: url,
+        url,
+        rawMessage: err?.message
+      });
+    }
+    if (timedOut || err?.name === "AbortError" || err?.message === "TIMEOUT") {
+      throw new StremioRequestError({
+        message: `Tempo limite de conex\xE3o esgotado (${timeoutMs}ms).`,
+        kind: "TIMEOUT",
+        endpoint: url,
+        url,
+        rawMessage: err?.message
+      });
+    }
+    const isNetworkOrCors = err instanceof TypeError || /network|cors|failed to fetch/i.test(err?.message || "");
+    throw new StremioRequestError({
+      message: isNetworkOrCors ? `Falha de rede ou restri\xE7\xE3o CORS ao acessar: ${url}` : err?.message || "Erro de comunica\xE7\xE3o de rede",
+      kind: isNetworkOrCors ? "CORS_ERROR" : "NETWORK_ERROR",
+      endpoint: url,
+      url,
+      rawMessage: err?.message
+    });
+  } finally {
+    clearTimeout(timeoutId);
+    if (userSignal) {
+      userSignal.removeEventListener("abort", onUserAbort);
+    }
+  }
+}
+var StremioRequestError, StremioClient;
 var init_stremioClient = __esm({
   "src/core/stremio/stremioClient.ts"() {
+    StremioRequestError = class extends Error {
+      constructor(params) {
+        super(params.message);
+        this.name = "StremioRequestError";
+        this.kind = params.kind;
+        this.status = params.status;
+        this.endpoint = params.endpoint;
+        this.url = params.url;
+        this.directFailed = params.directFailed;
+        this.proxyFailed = params.proxyFailed;
+        this.rawMessage = params.rawMessage || params.message;
+      }
+    };
     StremioClient = class _StremioClient {
       static {
         this.pending = /* @__PURE__ */ new Map();
@@ -3157,72 +3252,207 @@ var init_stremioClient = __esm({
       getBaseUrl() {
         return this.baseUrl;
       }
-      async fetchPublicMetadata(url, timeoutMs) {
+      async fetchPublicMetadata(url, timeoutMs, signal) {
         const key = `${url}:${timeoutMs}`;
         const active = _StremioClient.pending.get(key);
-        if (active) return active;
-        const request = (async () => {
-          const response2 = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
-          if (!response2.ok) {
-            await response2.body?.cancel();
-            throw new Error(`HTTP ${response2.status}`);
+        if (active) {
+          if (signal?.aborted) {
+            throw new StremioRequestError({
+              message: "Requisi\xE7\xE3o cancelada pelo usu\xE1rio.",
+              kind: "ABORTED",
+              endpoint: url,
+              url
+            });
           }
-          return response2.json();
+          return active;
+        }
+        const request = (async () => {
+          const result = await executeHttpRequest(url, timeoutMs, signal);
+          if (!result.ok) {
+            let kind = "HTTP_ERROR";
+            if (result.status === 429) kind = "RATE_LIMITED";
+            else if (result.status === 401 || result.status === 403) kind = "AUTH_REQUIRED";
+            else if (result.status === 410) kind = "MEDIA_PROXY_DISABLED";
+            throw new StremioRequestError({
+              message: `HTTP ${result.status}`,
+              kind,
+              status: result.status,
+              endpoint: url,
+              url,
+              rawMessage: result.text
+            });
+          }
+          if (result.json !== void 0) {
+            return result.json;
+          }
+          throw new StremioRequestError({
+            message: "Resposta inv\xE1lida do add-on (n\xE3o \xE9 JSON)",
+            kind: "INVALID_JSON",
+            status: result.status,
+            endpoint: url,
+            url,
+            rawMessage: result.text.slice(0, 200)
+          });
         })();
-        if (_StremioClient.pending.size < 64) _StremioClient.pending.set(key, request);
+        if (_StremioClient.pending.size < 64) {
+          _StremioClient.pending.set(key, request);
+        }
         try {
           return await request;
         } finally {
-          if (_StremioClient.pending.get(key) === request) _StremioClient.pending.delete(key);
+          if (_StremioClient.pending.get(key) === request) {
+            _StremioClient.pending.delete(key);
+          }
         }
       }
-      async fetchWithFallback(endpoint, timeoutMs = 8e3) {
+      async fetchWithFallback(endpoint, rawOptions) {
+        const options = normalizeOptions(rawOptions);
+        const totalTimeoutMs = options.totalTimeoutMs && options.totalTimeoutMs > 0 ? options.totalTimeoutMs : 8e3;
+        const directTimeoutMs = options.directTimeoutMs && options.directTimeoutMs > 0 ? Math.min(options.directTimeoutMs, totalTimeoutMs) : Math.min(2600, Math.max(1200, Math.floor(totalTimeoutMs * 0.45)));
+        const preferProxy = Boolean(options.preferProxy);
+        const userSignal = options.signal;
+        if (userSignal?.aborted) {
+          throw new StremioRequestError({
+            message: "Requisi\xE7\xE3o cancelada pelo usu\xE1rio.",
+            kind: "ABORTED",
+            endpoint,
+            url: this.baseUrl
+          });
+        }
         const isRelative = this.baseUrl.startsWith("/");
         const rawPath = `${this.baseUrl}/${endpoint.replace(/^\/+/, "")}`;
         const directUrl = resolveStremioUrl(rawPath);
         if (isRelative) {
-          const res = await fetch(directUrl, { signal: AbortSignal.timeout(timeoutMs) });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return await res.json();
+          const result = await executeHttpRequest(directUrl, totalTimeoutMs, userSignal);
+          if (!result.ok) {
+            throw new StremioRequestError({
+              message: `HTTP ${result.status}`,
+              kind: result.status === 429 ? "RATE_LIMITED" : "HTTP_ERROR",
+              status: result.status,
+              endpoint,
+              url: directUrl
+            });
+          }
+          if (result.json !== void 0) {
+            return result.json;
+          }
+          throw new StremioRequestError({
+            message: "Resposta inv\xE1lida da rota interna (n\xE3o \xE9 JSON)",
+            kind: "INVALID_JSON",
+            status: result.status,
+            endpoint,
+            url: directUrl
+          });
         }
-        try {
-          return await this.fetchPublicMetadata(directUrl, timeoutMs);
-        } catch (err) {
+        const startTime = Date.now();
+        let directError = null;
+        if (!preferProxy) {
+          try {
+            return await this.fetchPublicMetadata(directUrl, directTimeoutMs, userSignal);
+          } catch (err) {
+            if (err instanceof StremioRequestError && err.kind === "ABORTED") {
+              throw err;
+            }
+            directError = err instanceof StremioRequestError ? err : new StremioRequestError({
+              message: err?.message || "Falha no fetch direto",
+              kind: "NETWORK_ERROR",
+              endpoint,
+              url: directUrl,
+              directFailed: true,
+              rawMessage: err?.message
+            });
+          }
+        }
+        const elapsed = Date.now() - startTime;
+        const remainingProxyBudget = Math.max(800, totalTimeoutMs - elapsed);
+        if (userSignal?.aborted) {
+          throw new StremioRequestError({
+            message: "Requisi\xE7\xE3o cancelada pelo usu\xE1rio.",
+            kind: "ABORTED",
+            endpoint,
+            url: directUrl
+          });
         }
         const proxyUrl = resolveStremioUrl(`/api/proxy?url=${encodeURIComponent(directUrl)}`);
         try {
-          const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeoutMs) });
-          if (!res.ok) {
-            throw new Error(`Proxy status: ${res.status}`);
+          const proxyResult = await executeHttpRequest(proxyUrl, remainingProxyBudget, userSignal);
+          if (!proxyResult.ok) {
+            let kind = "HTTP_ERROR";
+            if (proxyResult.status === 429) kind = "RATE_LIMITED";
+            else if (proxyResult.status === 401 || proxyResult.status === 403) kind = "AUTH_REQUIRED";
+            else if (proxyResult.status === 410) kind = "MEDIA_PROXY_DISABLED";
+            if (proxyResult.json?.code === "RATE_LIMITED") kind = "RATE_LIMITED";
+            if (proxyResult.json?.code === "AUTH_REQUIRED") kind = "AUTH_REQUIRED";
+            if (proxyResult.json?.code === "MEDIA_PROXY_DISABLED") kind = "MEDIA_PROXY_DISABLED";
+            throw new StremioRequestError({
+              message: proxyResult.json?.error || `Proxy retornou HTTP ${proxyResult.status}`,
+              kind,
+              status: proxyResult.json?.status || proxyResult.status,
+              endpoint,
+              url: proxyUrl,
+              directFailed: Boolean(directError),
+              proxyFailed: true,
+              rawMessage: proxyResult.text
+            });
           }
-          const text2 = await res.text();
-          if (!text2.startsWith("{") && !text2.startsWith("[")) {
-            throw new Error("Resposta inv\xE1lida do add-on (n\xE3o \xE9 JSON)");
+          if (proxyResult.json !== void 0) {
+            return proxyResult.json;
           }
-          return JSON.parse(text2);
-        } catch (err) {
-          throw new Error("Falha ao consultar metadados do Stremio Addon.");
+          throw new StremioRequestError({
+            message: "Resposta inv\xE1lida do add-on via proxy (n\xE3o \xE9 JSON)",
+            kind: "INVALID_JSON",
+            status: proxyResult.status,
+            endpoint,
+            url: proxyUrl,
+            directFailed: Boolean(directError),
+            proxyFailed: true,
+            rawMessage: proxyResult.text.slice(0, 200)
+          });
+        } catch (proxyErr) {
+          if (proxyErr instanceof StremioRequestError && proxyErr.kind === "ABORTED") {
+            throw proxyErr;
+          }
+          if (preferProxy && options.allowDirectFallback) {
+            const remainingDirect = totalTimeoutMs - (Date.now() - startTime);
+            if (remainingDirect > 800 && !userSignal?.aborted) {
+              try {
+                return await this.fetchPublicMetadata(directUrl, remainingDirect, userSignal);
+              } catch {
+              }
+            }
+          }
+          const finalKind = proxyErr instanceof StremioRequestError ? proxyErr.kind : directError?.kind || "NETWORK_ERROR";
+          throw new StremioRequestError({
+            message: proxyErr?.message || directError?.message || "Falha ao consultar metadados do Stremio Addon.",
+            kind: finalKind,
+            status: proxyErr?.status || directError?.status,
+            endpoint,
+            url: directUrl,
+            directFailed: Boolean(directError),
+            proxyFailed: true,
+            rawMessage: proxyErr?.rawMessage || directError?.rawMessage
+          });
         }
       }
-      async getManifest() {
-        return this.fetchWithFallback("manifest.json");
+      async getManifest(options) {
+        return this.fetchWithFallback("manifest.json", options);
       }
-      async getCatalog(type, id, extra) {
+      async getCatalog(type, id, extra, options) {
         let path7 = `catalog/${type}/${id}`;
         if (extra && Object.keys(extra).length > 0) {
           const queryParts = Object.entries(extra).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
           path7 += `/${queryParts}`;
         }
         path7 += ".json";
-        return this.fetchWithFallback(path7);
+        return this.fetchWithFallback(path7, options);
       }
-      async getMeta(type, id) {
+      async getMeta(type, id, options) {
         const path7 = `meta/${type}/${encodeURIComponent(id)}.json`;
-        return this.fetchWithFallback(path7);
+        return this.fetchWithFallback(path7, options);
       }
-      async getStreams(type, id) {
+      async getStreams(type, id, options) {
         const path7 = `stream/${type}/${encodeURIComponent(id)}.json`;
-        return this.fetchWithFallback(path7);
+        return this.fetchWithFallback(path7, options);
       }
     };
   }
@@ -12282,12 +12512,10 @@ function isSourceTechnicallyPlayable(stream, profile) {
     return false;
   }
   const isHls = normUrl.includes(".m3u8") || stream.sourceType === "hls";
-  const isDash = normUrl.includes(".mpd");
-  const isDirectVideo = normUrl.includes(".mp4") || normUrl.includes(".webm") || normUrl.includes(".ogv") || normUrl.includes("/api/proxy") || stream.sourceType === "mp4";
-  if (!isHls && !isDash && !isDirectVideo) {
-    if (normUrl.includes("embed") || normUrl.includes("iframe") || normUrl.includes("playerflix")) {
-      return false;
-    }
+  const isDash = normUrl.includes(".mpd") || stream.sourceType === "dash";
+  const isDirectVideo = normUrl.includes(".mp4") || normUrl.includes(".webm") || normUrl.includes(".ogv") || normUrl.includes(".mkv") || normUrl.includes("/api/proxy") || stream.sourceType === "mp4" || stream.isDirectVideo === true;
+  if (normUrl.includes("embed") || normUrl.includes("iframe") || normUrl.includes("playerflix") || normUrl.includes("/watch") || normUrl.includes(".html") || normUrl.includes(".php")) {
+    return false;
   }
   if (!effectiveProfile.supportsEac3 && !isHls && (streamTitle.includes("e-ac-3") || streamTitle.includes("eac3")) && !streamTitle.includes("aac")) {
     if (effectiveProfile.platform === "desktop_chrome") {
@@ -12356,7 +12584,12 @@ var init_sourceMemory = __esm({
 
 // src/core/providers/providerRegistry.ts
 function stremioEpisodeId(baseId, episode) {
-  return episode && !/:\d+:\d+$/.test(baseId) ? `${baseId}:${episode.season}:${episode.episode}` : baseId;
+  if (!episode || !baseId) return baseId;
+  const clean2 = baseId.trim();
+  if (/:\d+:\d+$/.test(clean2) || clean2.startsWith("kitsu:") && /:\d+$/.test(clean2)) {
+    return clean2;
+  }
+  return `${clean2}:${episode.season}:${episode.episode}`;
 }
 function findCatalogEpisode(episodes2, requested) {
   const season = requested?.season ?? 1;
@@ -12657,6 +12890,7 @@ var init_providerRegistry = __esm({
     ProviderRegistryService = class {
       constructor() {
         this.providers = [];
+        this.providerFailures = /* @__PURE__ */ new Map();
         this.cache = new LruCache(100, 15 * 60 * 1e3);
         this.negativeCache = new LruCache(100, 15 * 1e3);
         // 15s de expiração rápida para cache negativo
@@ -12691,6 +12925,22 @@ var init_providerRegistry = __esm({
         } catch {
         }
         this.providers = DEFAULT_PROVIDERS.map((p) => ({ ...p }));
+      }
+      async syncProvidersWithBackend() {
+        try {
+          const res = await fetch("/api/providers/config", { signal: AbortSignal.timeout(4e3) });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.providers) && data.providers.length > 0) {
+              const map = /* @__PURE__ */ new Map();
+              this.providers.forEach((p) => map.set(p.id, p));
+              data.providers.forEach((p) => map.set(p.id, { ...map.get(p.id) || {}, ...p }));
+              this.providers = Array.from(map.values()).sort((a, b) => a.priority - b.priority);
+              this.saveProviders();
+            }
+          }
+        } catch {
+        }
       }
       saveProviders() {
         if (typeof localStorage === "undefined") return;
@@ -12811,7 +13061,8 @@ var init_providerRegistry = __esm({
             status: "offline",
             latencyMs: void 0,
             lastChecked: (/* @__PURE__ */ new Date()).toISOString(),
-            errorMessage: provider.configDescription || "Configura\xE7\xE3o obrigat\xF3ria pendente"
+            errorMessage: provider.configDescription || "Configura\xE7\xE3o obrigat\xF3ria pendente",
+            healthState: "CONFIGURATION_REQUIRED"
           });
           return this.providers.find((p) => p.id === id);
         }
@@ -12819,24 +13070,62 @@ var init_providerRegistry = __esm({
         try {
           if (provider.type === "stremio-addon") {
             const client = new StremioClient(provider.url);
-            const manifest = await client.getManifest();
+            const manifest = await client.getManifest({ totalTimeoutMs: 5e3 });
+            if (!manifest || !manifest.id || !manifest.name) {
+              throw new Error("Manifesto do add-on \xE9 inv\xE1lido");
+            }
+            let deliveryCapacity = "NOT_TESTED";
+            let healthState = "MANIFEST_VALID";
+            const supportedTypes = manifest.types || ["movie"];
+            const testType = supportedTypes.includes("movie") ? "movie" : supportedTypes.includes("series") ? "series" : "anime";
+            const testId = testType === "movie" ? "tt0050083" : "tt0903747:1:1";
+            try {
+              const streamRes = await client.getStreams(testType, testId, { totalTimeoutMs: 5e3 });
+              healthState = "STREAM_ENDPOINT_OPERATIONAL";
+              if (streamRes && Array.isArray(streamRes.streams) && streamRes.streams.length > 0) {
+                const hasDirect = streamRes.streams.some(
+                  (s) => Boolean(s.url && (s.url.includes(".m3u8") || s.url.includes(".mp4") || s.url.includes(".webm") || s.url.includes(".mkv") || s.url.includes("/api/proxy")))
+                );
+                const hasTorrent = streamRes.streams.some((s) => Boolean(s.infoHash) || s.url && s.url.includes("127.0.0.1:11470"));
+                if (hasDirect) {
+                  deliveryCapacity = "DIRECT_HTTP_AVAILABLE";
+                } else if (hasTorrent) {
+                  deliveryCapacity = "TORRENT_ONLY";
+                } else {
+                  deliveryCapacity = "PLAYABLE_SOURCE_CONFIRMED";
+                }
+              } else {
+                deliveryCapacity = "NO_RESULT_FOR_TEST";
+              }
+            } catch (streamErr) {
+              if (streamErr?.kind === "RATE_LIMITED" || streamErr?.status === 429) {
+                healthState = "RATE_LIMITED";
+              } else if (streamErr?.kind === "AUTH_REQUIRED" || streamErr?.status === 401 || streamErr?.status === 403) {
+                healthState = "AUTH_REQUIRED";
+              } else {
+                healthState = "STREAM_ENDPOINT_UNREACHABLE";
+              }
+            }
             const latency = Date.now() - startTime;
             this.updateProvider(id, {
               status: "online",
               latencyMs: latency,
               lastChecked: (/* @__PURE__ */ new Date()).toISOString(),
-              errorMessage: void 0
+              errorMessage: void 0,
+              healthState,
+              deliveryCapacity
             });
           } else {
-            const pingUrl = provider.url;
-            const res = await fetch(pingUrl, { signal: AbortSignal.timeout(6e3) });
+            const res = await fetch(provider.url, { signal: AbortSignal.timeout(6e3) });
             await res.body?.cancel();
             const latency = Date.now() - startTime;
             this.updateProvider(id, {
               status: res.ok ? "online" : "error",
               latencyMs: latency,
               lastChecked: (/* @__PURE__ */ new Date()).toISOString(),
-              errorMessage: res.ok ? void 0 : `Status HTTP ${res.status}`
+              errorMessage: res.ok ? void 0 : `Status HTTP ${res.status}`,
+              healthState: res.ok ? "STREAM_ENDPOINT_OPERATIONAL" : "STREAM_ENDPOINT_UNREACHABLE",
+              deliveryCapacity: res.ok ? "DIRECT_HTTP_AVAILABLE" : "NOT_TESTED"
             });
           }
         } catch (err) {
@@ -12844,7 +13133,9 @@ var init_providerRegistry = __esm({
             status: "error",
             latencyMs: Date.now() - startTime,
             lastChecked: (/* @__PURE__ */ new Date()).toISOString(),
-            errorMessage: err.message || "Falha de conex\xE3o"
+            errorMessage: err.message || "Falha de conex\xE3o",
+            healthState: "MANIFEST_UNREACHABLE",
+            deliveryCapacity: "NOT_TESTED"
           });
         }
         return this.providers.find((p) => p.id === id);
@@ -13271,6 +13562,10 @@ var init_providerRegistry = __esm({
             let providerSuccess = false;
             let providerStreamCount = 0;
             let providerError;
+            const failureRecord = this.providerFailures.get(addon.id);
+            if (failureRecord && failureRecord.cooldownUntil && Date.now() < failureRecord.cooldownUntil) {
+              return [];
+            }
             const isFireTv = tvPerformanceService.isFireTv();
             const addonTimeout = addon.id.includes("froststream") ? isFireTv ? 8500 : 7e3 : isFireTv ? 6500 : 4500;
             try {
@@ -13295,20 +13590,27 @@ var init_providerRegistry = __esm({
                 }
                 return false;
               };
-              let res = await Promise.race([
-                client.getStreams(stremioType, primaryQueryId),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON")), addonTimeout))
-              ]).catch(() => null);
+              const requestOpts = {
+                signal: options?.signal,
+                totalTimeoutMs: addonTimeout,
+                preferProxy: addon.id.includes("froststream") || addon.id.includes("fenixflix"),
+                allowDirectFallback: true
+              };
+              let res = await client.getStreams(stremioType, primaryQueryId, requestOpts).catch((err) => {
+                providerError = err?.message || "Falha na consulta prim\xE1ria";
+                return null;
+              });
               const secondaryCandidates = (primaryQueryId === stremioId ? altIds : [stremioId, ...altIds.filter((a) => a !== `tmdb:${tmdbNum}` && a !== tmdbNum)]).slice(0, 2);
-              if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0) {
+              if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0 && !options?.signal?.aborted) {
                 for (const altBase of secondaryCandidates) {
                   const altId = type === "series" || type === "anime" ? stremioEpisodeId(altBase, episode) : altBase;
                   try {
-                    const altTimeout = 2500;
-                    const altRes = await Promise.race([
-                      client.getStreams(stremioType, altId),
-                      new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON_ALT")), altTimeout))
-                    ]).catch(() => null);
+                    const altRes = await client.getStreams(stremioType, altId, {
+                      signal: options?.signal,
+                      totalTimeoutMs: 2500,
+                      preferProxy: addon.id.includes("froststream") || addon.id.includes("fenixflix"),
+                      allowDirectFallback: true
+                    }).catch(() => null);
                     if (altRes && Array.isArray(altRes.streams) && hasMatchingStreams(altRes.streams)) {
                       res = altRes;
                       break;
@@ -13317,17 +13619,22 @@ var init_providerRegistry = __esm({
                   }
                 }
               }
-              if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && (type === "anime" || type === "series")) {
+              if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && (type === "anime" || type === "series") && !options?.signal?.aborted) {
                 const altType = stremioType === "series" ? "anime" : "series";
-                try {
-                  const altTypeRes = await Promise.race([
-                    client.getStreams(altType, stremioId),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT_ADDON_TYPE")), 2500))
-                  ]).catch(() => null);
-                  if (altTypeRes && Array.isArray(altTypeRes.streams) && hasMatchingStreams(altTypeRes.streams)) {
-                    res = altTypeRes;
+                const supportsAltType = !addon.supportedMediaTypes || addon.supportedMediaTypes.length === 0 || addon.supportedMediaTypes.includes(altType);
+                if (supportsAltType) {
+                  try {
+                    const altTypeRes = await client.getStreams(altType, stremioId, {
+                      signal: options?.signal,
+                      totalTimeoutMs: 2500,
+                      preferProxy: addon.id.includes("froststream") || addon.id.includes("fenixflix"),
+                      allowDirectFallback: true
+                    }).catch(() => null);
+                    if (altTypeRes && Array.isArray(altTypeRes.streams) && hasMatchingStreams(altTypeRes.streams)) {
+                      res = altTypeRes;
+                    }
+                  } catch {
                   }
-                } catch {
                 }
               }
               if (res && Array.isArray(res.streams)) {
@@ -13338,12 +13645,14 @@ var init_providerRegistry = __esm({
                   const sUrl = s.url || "";
                   if (addon.id === "fenixflix-animes" && /🐉\s*Malfoy/i.test(s.title || "")) continue;
                   if (s.ytId || sUrl.includes("youtube.com") || sUrl.includes("youtu.be")) continue;
-                  const isMediaFile = sUrl.includes(".m3u8") || sUrl.includes(".mp4") || sUrl.includes(".webm") || sUrl.includes(".ogv") || sUrl.includes(".mpd") || sUrl.includes(".mkv");
-                  if (!isMediaFile && (sUrl.includes("embed") || sUrl.includes("iframe") || s.sourceType === "embed")) continue;
                   const isHls = sUrl.includes(".m3u8") || s.sourceType === "hls";
-                  const isDash = sUrl.includes(".mpd");
+                  const isDash = sUrl.includes(".mpd") || s.sourceType === "dash";
                   const isTorrent = Boolean(s.infoHash) || sUrl.includes("127.0.0.1:11470") || sUrl.includes("localhost:11470") || sUrl.includes(".torrent");
-                  const isDirectVideo = !isTorrent && (sUrl.includes(".mp4") || sUrl.includes(".webm") || sUrl.includes(".ogv") || sUrl.includes("/api/proxy") || s.sourceType === "mp4" || Boolean(sUrl && !s.infoHash));
+                  const isDirectVideo = !isTorrent && (sUrl.includes(".mp4") || sUrl.includes(".webm") || sUrl.includes(".ogv") || sUrl.includes(".mkv") || sUrl.includes("/api/proxy") || s.sourceType === "mp4" || s.isDirectVideo === true);
+                  if (!isHls && !isDash && !isDirectVideo && !isTorrent) {
+                    continue;
+                  }
+                  if (sUrl.includes("embed") || sUrl.includes("iframe") || s.sourceType === "embed") continue;
                   const audioAnalysis = audioPreferenceService.analyzeAudio(s);
                   const isDubbed = audioAnalysis.isDubbed;
                   const isPtBr = audioAnalysis.isPtBr;
@@ -13357,6 +13666,7 @@ var init_providerRegistry = __esm({
                       providerName: addon.name,
                       providerId: addon.id,
                       sourceType: isHls ? "hls" : isDash ? "dash" : "mp4",
+                      isDirectVideo: true,
                       ...isDubbed ? { isDubbed: true } : {},
                       ...isPtBr ? { isPtBr: true } : {},
                       behaviorHints: { ...s.behaviorHints || {}, notWebReady: false }
@@ -13389,15 +13699,23 @@ var init_providerRegistry = __esm({
                     });
                   }
                 }
-                providerSuccess = true;
-                providerStreamCount = parsedStreams.length;
-                return parsedStreams;
+                if (parsedStreams.length > 0) {
+                  providerSuccess = true;
+                  providerStreamCount = parsedStreams.length;
+                  this.providerFailures.delete(addon.id);
+                  return parsedStreams;
+                }
               }
             } catch (err) {
               providerError = err.message || "Erro de comunica\xE7\xE3o";
             } finally {
               const duration = Date.now() - startProviderTime;
               const isTimeout = Boolean(providerError?.includes("TIMEOUT") || duration >= addonTimeout - 300 && !providerSuccess);
+              if (!providerSuccess && !options?.signal?.aborted) {
+                const currentFailures = (this.providerFailures.get(addon.id)?.count || 0) + 1;
+                const cooldownUntil = currentFailures >= 4 ? Date.now() + 6e4 : 0;
+                this.providerFailures.set(addon.id, { count: currentFailures, cooldownUntil });
+              }
               playbackOptimizerService.recordProviderResult(addon.id, duration, providerSuccess);
               mediaLoadingTracker.recordProviderAttempt(rawTargetId, {
                 providerId: addon.id,
@@ -30150,21 +30468,284 @@ async function publicHttpGet(raw, options = {}) {
 init_authMiddleware();
 init_sessionService();
 
+// src/server/providers/authorizedAddonsRegistry.ts
+var FACTORY_AUTHORIZED_ADDONS = [
+  {
+    id: "zapitv-show-subtitle-pt-br",
+    name: "Show Subtitle PT-BR (Stremio Oficial)",
+    baseUrl: "/api/stremio/show-subtitle-pt-br",
+    origin: "internal",
+    supportedTypes: ["movie", "series", "anime"],
+    supportedResources: ["manifest", "stream", "subtitles"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 5e3 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "DIRECT_HTTP_AVAILABLE",
+    failureCount: 0
+  },
+  {
+    id: "zapitv-mico-leao-dublado",
+    name: "Mico-Le\xE3o Dublado (Stremio Addon)",
+    baseUrl: "/api/stremio/mico-leao-dublado",
+    origin: "internal",
+    supportedTypes: ["movie", "series", "anime"],
+    supportedResources: ["manifest", "stream", "subtitles"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 5e3 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "DIRECT_HTTP_AVAILABLE",
+    failureCount: 0
+  },
+  {
+    id: "froststream-http",
+    name: "FrostStream (HTTP Streams PT-BR)",
+    baseUrl: "https://froststream.cloutteam.com",
+    origin: "https://froststream.cloutteam.com",
+    supportedTypes: ["movie", "series", "anime"],
+    supportedResources: ["manifest", "catalog", "meta", "stream"],
+    requiresConfig: false,
+    preferredMethod: "proxy_fallback",
+    corsSupport: "partial",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 8500 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "DIRECT_HTTP_AVAILABLE",
+    failureCount: 0
+  },
+  {
+    id: "fenixflix-animes",
+    name: "FenixFlix (Animes Dublados PT-BR & Zeus)",
+    baseUrl: "https://fenixflix.fenixhub.online",
+    origin: "https://fenixflix.fenixhub.online",
+    supportedTypes: ["anime", "series", "movie"],
+    supportedResources: ["manifest", "catalog", "meta", "stream"],
+    requiresConfig: false,
+    preferredMethod: "proxy_fallback",
+    corsSupport: "partial",
+    timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 7e3 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "DIRECT_HTTP_AVAILABLE",
+    failureCount: 0
+  },
+  {
+    id: "torrentio-brazuca",
+    name: "Torrentio Brazuca (Stremio Addon)",
+    baseUrl: "https://torrentio.strem.fun/brazuca",
+    origin: "https://torrentio.strem.fun",
+    supportedTypes: ["movie", "series", "anime"],
+    supportedResources: ["manifest", "stream"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 6500 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "TORRENT_ONLY",
+    failureCount: 0
+  },
+  {
+    id: "torrentio-global",
+    name: "Torrentio Oficial (\xC1udio Original & Multi-Idioma)",
+    baseUrl: "https://torrentio.strem.fun",
+    origin: "https://torrentio.strem.fun",
+    supportedTypes: ["movie", "series", "anime"],
+    supportedResources: ["manifest", "stream"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 6500 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "TORRENT_ONLY",
+    failureCount: 0
+  },
+  {
+    id: "magnetflix-animes",
+    name: "Magnetflix (Animes e S\xE9ries PT-BR Backup)",
+    baseUrl: "https://magnetflix.flixbr.online/qualities=4k,1080p,720p,sd|audio=dublado,legendado|catalogs=populares_movie,populares_series,recentes_servidor_movie,recentes_servidor_series,emalta_movie,emalta_series",
+    origin: "https://magnetflix.flixbr.online",
+    supportedTypes: ["anime", "series", "movie"],
+    supportedResources: ["manifest", "catalog", "meta", "stream"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 6500 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "TORRENT_ONLY",
+    failureCount: 0
+  },
+  {
+    id: "stremio-public-domain-web",
+    name: "Public Domain Movies (Stremio Community Addon)",
+    baseUrl: "https://public-domain-movies.strem.fun",
+    origin: "https://public-domain-movies.strem.fun",
+    supportedTypes: ["movie"],
+    supportedResources: ["manifest", "catalog", "meta", "stream"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 6e3 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "DIRECT_HTTP_AVAILABLE",
+    failureCount: 0
+  },
+  {
+    id: "stremio-cinemeta",
+    name: "Cinemeta (Stremio Oficial)",
+    baseUrl: "https://v3-cinemeta.strem.io",
+    origin: "https://v3-cinemeta.strem.io",
+    supportedTypes: ["movie", "series", "anime"],
+    supportedResources: ["manifest", "catalog", "meta"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 6e3 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "METADATA_ONLY",
+    failureCount: 0
+  },
+  {
+    id: "stremio-opensubtitles",
+    name: "OpenSubtitles v3 (Stremio Oficial)",
+    baseUrl: "https://opensubtitles-v3.strem.io",
+    origin: "https://opensubtitles-v3.strem.io",
+    supportedTypes: ["movie", "series", "anime"],
+    supportedResources: ["manifest", "subtitles"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 6e3 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "METADATA_ONLY",
+    failureCount: 0
+  }
+];
+var AuthorizedAddonsRegistry = class _AuthorizedAddonsRegistry {
+  constructor() {
+    this.addons = /* @__PURE__ */ new Map();
+    this.adminApprovedOrigins = /* @__PURE__ */ new Set();
+    for (const addon of FACTORY_AUTHORIZED_ADDONS) {
+      this.addons.set(addon.id, { ...addon });
+    }
+  }
+  static {
+    this.instance = null;
+  }
+  static getInstance() {
+    if (!_AuthorizedAddonsRegistry.instance) {
+      _AuthorizedAddonsRegistry.instance = new _AuthorizedAddonsRegistry();
+    }
+    return _AuthorizedAddonsRegistry.instance;
+  }
+  /**
+   * Retorna todas as origens HTTPS autorizadas (fábrica + aprovadas por administrador)
+   */
+  getAuthorizedOrigins() {
+    const origins = /* @__PURE__ */ new Set();
+    for (const addon of this.addons.values()) {
+      if (addon.origin && addon.origin !== "internal" && addon.origin.startsWith("https://")) {
+        origins.add(addon.origin);
+      }
+    }
+    for (const adminOrigin of this.adminApprovedOrigins) {
+      origins.add(adminOrigin);
+    }
+    return origins;
+  }
+  /**
+   * Aprovação administrativa explícita de uma nova origem de metadados
+   */
+  approveOrigin(origin) {
+    try {
+      const parsed = new URL(origin);
+      if (parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password) {
+        return false;
+      }
+      this.adminApprovedOrigins.add(parsed.origin);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  /**
+   * Remove origem aprovada
+   */
+  revokeOrigin(origin) {
+    this.adminApprovedOrigins.delete(origin);
+  }
+  getAllAddons() {
+    return Array.from(this.addons.values());
+  }
+  getAddon(id) {
+    return this.addons.get(id);
+  }
+  updateAddonHealth(id, health, capacity, failureIncrement = false) {
+    let addon = this.addons.get(id);
+    if (!addon) {
+      addon = {
+        id,
+        name: id,
+        baseUrl: "https://" + id + ".test",
+        origin: "https://" + id + ".test",
+        supportedTypes: ["movie", "series", "anime"],
+        supportedResources: ["manifest", "stream"],
+        requiresConfig: false,
+        preferredMethod: "direct",
+        corsSupport: "full",
+        timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 6e3 },
+        healthState: health,
+        deliveryCapacity: capacity || "NOT_TESTED",
+        failureCount: 0
+      };
+      this.addons.set(id, addon);
+    }
+    addon.healthState = health;
+    if (capacity) addon.deliveryCapacity = capacity;
+    addon.lastChecked = (/* @__PURE__ */ new Date()).toISOString();
+    if (failureIncrement) {
+      addon.failureCount += 1;
+      if (addon.failureCount >= 4) {
+        addon.circuitBreakerUntil = Date.now() + 6e4;
+        addon.healthState = "TEMPORARILY_UNAVAILABLE";
+      }
+    } else {
+      addon.failureCount = 0;
+      addon.circuitBreakerUntil = void 0;
+    }
+  }
+  isCircuitBreakerOpen(id) {
+    const addon = this.addons.get(id);
+    if (!addon || !addon.circuitBreakerUntil) return false;
+    if (Date.now() < addon.circuitBreakerUntil) {
+      return true;
+    }
+    addon.circuitBreakerUntil = void 0;
+    addon.failureCount = 0;
+    return false;
+  }
+};
+var authorizedAddonsRegistry = AuthorizedAddonsRegistry.getInstance();
+
 // src/server/metadataProxy.ts
-var ORIGINS = /* @__PURE__ */ new Set([
-  "https://froststream.cloutteam.com",
-  "https://fenixflix.fenixhub.online",
-  "https://torrentio.strem.fun",
-  "https://magnetflix.flixbr.online",
-  "https://v3-cinemeta.strem.io",
-  "https://opensubtitles-v3.strem.io",
-  "https://public-domain-movies.strem.fun"
-]);
 var MAX_METADATA_BYTES = 512 * 1024;
 function isAddonMetadataUrl(raw) {
   try {
     const url = new URL(raw);
-    return !url.username && !url.password && ORIGINS.has(url.origin) && /\/(?:manifest\.json|(?:catalog|meta|stream|subtitles)\/[^/]+\/[^/]+(?:\/[^/]*)?\.json)$/.test(url.pathname);
+    if (url.protocol !== "https:" || url.username || url.password) {
+      return false;
+    }
+    const authorizedOrigins = authorizedAddonsRegistry.getAuthorizedOrigins();
+    if (!authorizedOrigins.has(url.origin)) {
+      return false;
+    }
+    const path7 = url.pathname.toLowerCase();
+    if (/\.(mp4|m3u8|mkv|avi|webm|ts|mpd|mp3|aac|flac|ogg)$/i.test(path7)) {
+      return false;
+    }
+    const isManifest = /(?:^|\/)manifest\.json$/i.test(path7);
+    const isStremioResource = /\/(?:catalog|meta|stream|subtitles)\/[^/]+(?:\/[^/]+)+\.json$/i.test(path7);
+    return isManifest || isStremioResource;
   } catch {
     return false;
   }
@@ -30174,33 +30755,54 @@ function createMetadataProxy(get = publicHttpGet) {
     res.setHeader("Cache-Control", "no-store");
     const url = typeof req.query.url === "string" ? req.query.url : "";
     if (!isAddonMetadataUrl(url) || req.headers.range) {
-      return res.status(410).json({ code: "MEDIA_PROXY_DISABLED", error: "O proxy de m\xEDdia foi desativado. Esta fonte precisa permitir reprodu\xE7\xE3o direta." });
+      return res.status(410).json({
+        code: "MEDIA_PROXY_DISABLED",
+        error: "O proxy de m\xEDdia foi desativado. Esta fonte precisa permitir reprodu\xE7\xE3o direta."
+      });
     }
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8e3);
+    const timeoutMs = 8e3;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     const close = () => {
       if (!res.writableEnded) controller.abort();
     };
     res.once("close", close);
     let upstream;
     try {
-      upstream = await get(url, { headers: { Accept: "application/json", "Accept-Encoding": "identity" }, signal: controller.signal, timeoutMs: 8e3 });
+      upstream = await get(url, {
+        headers: { Accept: "application/json", "Accept-Encoding": "identity" },
+        signal: controller.signal,
+        timeoutMs
+      });
       if (!isAddonMetadataUrl(upstream.url) || !/\bapplication\/(?:[\w.+-]+\+)?json\b/i.test(upstream.headers.get("content-type") || "")) {
         return res.status(415).json({ code: "METADATA_ONLY", error: "Somente metadados JSON s\xE3o permitidos." });
       }
-      if (Number(upstream.headers.get("content-length") || 0) > MAX_METADATA_BYTES) return res.status(413).json({ error: "Metadados excedem o limite." });
-      if (!upstream.ok) return res.status(502).json({ error: "Metadados temporariamente indispon\xEDveis." });
+      if (Number(upstream.headers.get("content-length") || 0) > MAX_METADATA_BYTES) {
+        return res.status(413).json({ error: "Metadados excedem o limite." });
+      }
+      if (!upstream.ok) {
+        const status = upstream.status === 429 ? 429 : upstream.status === 404 ? 404 : upstream.status === 401 ? 401 : upstream.status === 403 ? 403 : 502;
+        return res.status(status).json({
+          code: upstream.status === 429 ? "RATE_LIMITED" : upstream.status === 401 || upstream.status === 403 ? "AUTH_REQUIRED" : "UPSTREAM_ERROR",
+          status: upstream.status,
+          error: "Metadados temporariamente indispon\xEDveis."
+        });
+      }
       const text2 = await upstream.text(MAX_METADATA_BYTES);
       const data = JSON.parse(text2);
-      if (!data || typeof data !== "object") return res.status(502).json({ error: "Metadados inv\xE1lidos." });
+      if (!data || typeof data !== "object") {
+        return res.status(502).json({ error: "Metadados inv\xE1lidos." });
+      }
       res.setHeader("Access-Control-Allow-Origin", "*");
       return res.json(data);
     } catch {
-      if (!res.headersSent && !res.destroyed) return res.status(502).json({ error: "Falha ao consultar metadados." });
+      if (!res.headersSent && !res.destroyed) {
+        return res.status(502).json({ error: "Falha ao consultar metadados." });
+      }
     } finally {
       clearTimeout(timer);
       res.off("close", close);
-      upstream?.body.destroy();
+      upstream?.body?.destroy?.();
     }
   };
 }
@@ -81524,6 +82126,87 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       return metadataProxy(req, res);
     } catch {
       if (!res.headersSent) return res.status(502).json({ error: "Falha ao consultar metadados." });
+    }
+  });
+  app2.get("/api/providers/config", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=60");
+    const addons = authorizedAddonsRegistry.getAllAddons();
+    return res.json({
+      providers: addons.map((a) => ({
+        id: a.id,
+        name: a.name,
+        url: a.baseUrl,
+        enabled: a.healthState !== "DISABLED",
+        type: "stremio-addon",
+        priority: 1,
+        isPtBr: a.id.includes("dublado") || a.id.includes("pt-br") || a.id.includes("brazuca"),
+        status: a.healthState === "STREAM_ENDPOINT_OPERATIONAL" ? "online" : a.healthState === "TEMPORARILY_UNAVAILABLE" ? "checking" : "offline",
+        supportedMediaTypes: a.supportedTypes,
+        healthState: a.healthState,
+        deliveryCapacity: a.deliveryCapacity
+      })),
+      syncedAt: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  });
+  app2.post("/api/providers/config", requireAdmin, (req, res) => {
+    const { providers } = req.body || {};
+    if (!Array.isArray(providers)) {
+      return res.status(400).json({ error: "Formato de provedores inv\xE1lido" });
+    }
+    return res.json({ success: true, count: providers.length, syncedAt: (/* @__PURE__ */ new Date()).toISOString() });
+  });
+  app2.get("/api/admin/providers/health", requireAdmin, (_req, res) => {
+    const all = authorizedAddonsRegistry.getAllAddons();
+    const summary = {
+      total: all.length,
+      operational: all.filter((a) => a.healthState === "STREAM_ENDPOINT_OPERATIONAL").length,
+      circuitBreakerOpen: all.filter((a) => authorizedAddonsRegistry.isCircuitBreakerOpen(a.id)).length,
+      rateLimited: all.filter((a) => a.healthState === "RATE_LIMITED").length
+    };
+    return res.json({ providers: all, summary });
+  });
+  app2.post("/api/admin/providers/test", requireAdmin, async (req, res) => {
+    const { id } = req.body || {};
+    if (!id || typeof id !== "string") {
+      return res.status(400).json({ error: "Campo 'id' do provedor \xE9 obrigat\xF3rio" });
+    }
+    const addon = authorizedAddonsRegistry.getAddon(id);
+    if (!addon) {
+      return res.status(404).json({ error: "Provedor n\xE3o encontrado" });
+    }
+    try {
+      const isInternal = addon.baseUrl.startsWith("/");
+      const targetUrl = isInternal ? `http://127.0.0.1:${process.env.PORT || 4e3}${addon.baseUrl}/manifest.json` : `${addon.baseUrl}/manifest.json`;
+      const startTime = Date.now();
+      const testRes = await fetch(targetUrl, { signal: AbortSignal.timeout(5e3) });
+      const latencyMs = Date.now() - startTime;
+      if (!testRes.ok) {
+        authorizedAddonsRegistry.updateAddonHealth(id, "MANIFEST_UNREACHABLE", void 0, true);
+        return res.json({
+          id,
+          success: false,
+          healthState: "MANIFEST_UNREACHABLE",
+          latencyMs,
+          status: testRes.status
+        });
+      }
+      const manifest = await testRes.json();
+      authorizedAddonsRegistry.updateAddonHealth(id, "STREAM_ENDPOINT_OPERATIONAL", "DIRECT_HTTP_AVAILABLE", false);
+      return res.json({
+        id,
+        success: true,
+        healthState: "STREAM_ENDPOINT_OPERATIONAL",
+        latencyMs,
+        manifest: { id: manifest.id, name: manifest.name, version: manifest.version }
+      });
+    } catch (err) {
+      authorizedAddonsRegistry.updateAddonHealth(id, "TIMEOUT", void 0, true);
+      return res.json({
+        id,
+        success: false,
+        healthState: "TIMEOUT",
+        error: err?.message
+      });
     }
   });
   const streamValidationServerCache = /* @__PURE__ */ new Map();

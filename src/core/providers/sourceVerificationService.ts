@@ -38,6 +38,7 @@ export interface VerificationDiagnosticLog {
   ignoredProviders: { id: string; name: string; reason: string }[];
   returnedStreamsCount: number;
   approvedStreamsCount: number;
+  rejectedStreamsCount?: number;
   rejectedStreams: { title: string; providerId?: string; reason: string }[];
   timeouts: string[];
   networkErrors: { providerId: string; error: string }[];
@@ -450,13 +451,22 @@ class SourceVerificationService {
       };
     }
 
-    if (candidatePool.length > 0) {
-      // Apenas torrents que dependem de motor local foram encontrados
+    const torrentCandidates = candidatePool.filter(s =>
+      s.isTorrent || (s.url && (s.url.toLowerCase().includes('127.0.0.1:11470') || s.url.toLowerCase().includes('localhost:11470')))
+    );
+    const nonTorrentCandidates = candidatePool.filter(s => !torrentCandidates.includes(s));
+
+    if (torrentCandidates.length > 0 && nonTorrentCandidates.length === 0) {
+      // Exclusivamente torrents que dependem de motor local foram encontrados
       diagnostic.finalState = 'INCONCLUSIVE';
       diagnostic.inconclusiveReason = 'As fontes retornadas exigem um motor local indisponível neste dispositivo';
       this.recordLog(diagnostic);
       options?.onStateChange?.('INCONCLUSIVE', MSG_INCONCLUSIVE);
       return { state: 'INCONCLUSIVE', streams: [], errorMessage: MSG_INCONCLUSIVE, diagnosticLog: diagnostic };
+    }
+
+    if (candidatePool.length > 0) {
+      diagnostic.rejectedStreamsCount = candidatePool.length;
     }
 
     // =========================================================================

@@ -24,6 +24,26 @@ import { LruCache } from '../cache/LruCache';
 import { getRememberedSources, prioritizeRememberedSources } from './sourceMemory';
 import { isSourceTechnicallyPlayable, isSourceTemporarilyProblematic } from './sourceReadiness';
 
+export type DeliveryCapacity =
+  | 'METADATA_ONLY'
+  | 'TORRENT_ONLY'
+  | 'DIRECT_HTTP_AVAILABLE'
+  | 'PLAYABLE_SOURCE_CONFIRMED'
+  | 'NO_RESULT_FOR_TEST'
+  | 'NOT_TESTED';
+
+export type ProviderHealthState =
+  | 'CONFIGURATION_REQUIRED'
+  | 'DISABLED'
+  | 'MANIFEST_UNREACHABLE'
+  | 'MANIFEST_VALID'
+  | 'STREAM_ENDPOINT_UNREACHABLE'
+  | 'STREAM_ENDPOINT_OPERATIONAL'
+  | 'RATE_LIMITED'
+  | 'AUTH_REQUIRED'
+  | 'TIMEOUT'
+  | 'TEMPORARILY_UNAVAILABLE';
+
 export interface ProviderConfig {
   id: string;
   name: string;
@@ -42,6 +62,8 @@ export interface ProviderConfig {
   configDescription?: string;
   successRate?: number;
   recentErrorsCount?: number;
+  healthState?: ProviderHealthState;
+  deliveryCapacity?: DeliveryCapacity;
 }
 
 export interface ResolveStreamsOptions {
@@ -63,9 +85,12 @@ export interface ResolveStreamsOptions {
 
 // TMDB/AniList IDs already contain a colon, but still need the episode suffix.
 export function stremioEpisodeId(baseId: string, episode?: { season: number; episode: number }): string {
-  return episode && !/:\d+:\d+$/.test(baseId)
-    ? `${baseId}:${episode.season}:${episode.episode}`
-    : baseId;
+  if (!episode || !baseId) return baseId;
+  const clean = baseId.trim();
+  if (/:\d+:\d+$/.test(clean) || (clean.startsWith('kitsu:') && /:\d+$/.test(clean))) {
+    return clean;
+  }
+  return `${clean}:${episode.season}:${episode.episode}`;
 }
 
 export function findCatalogEpisode(episodes: ContentItem['episodes'], requested?: { season: number; episode: number }) {
@@ -374,6 +399,7 @@ export const VERIFIED_TEST_STREAMS: Record<string, StremioStream[]> = {
 
 class ProviderRegistryService {
   private providers: ProviderConfig[] = [];
+  private providerFailures = new Map<string, { count: number; cooldownUntil: number }>();
   private cache = new LruCache<string, { streams: StremioStream[]; timestamp: number }>(100, 15 * 60 * 1000);
   private negativeCache = new LruCache<string, { timestamp: number; reason: string; inconclusive: boolean }>(100, 15 * 1000); // 15s de expiração rápida para cache negativo
   private pending = new Map<string, Promise<StremioStream[]>>();
@@ -410,6 +436,24 @@ class ProviderRegistryService {
       // Ignora erro de storage
     }
     this.providers = DEFAULT_PROVIDERS.map(p => ({ ...p }));
+  }
+
+  public async syncProvidersWithBackend(): Promise<void> {
+    try {
+      const res = await fetch('/api/providers/config', { signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.providers) && data.providers.length > 0) {
+          const map = new Map<string, ProviderConfig>();
+          this.providers.forEach(p => map.set(p.id, p));
+          data.providers.forEach((p: ProviderConfig) => map.set(p.id, { ...(map.get(p.id) || {}), ...p }));
+          this.providers = Array.from(map.values()).sort((a, b) => a.priority - b.priority);
+          this.saveProviders();
+        }
+      }
+    } catch {
+      // Offline fallback: retains current configuration
+    }
   }
 
   public saveProviders() {
@@ -547,7 +591,8 @@ class ProviderRegistryService {
         status: 'offline',
         latencyMs: undefined,
         lastChecked: new Date().toISOString(),
-        errorMessage: provider.configDescription || 'Configuração obrigatória pendente'
+        errorMessage: provider.configDescription || 'Configuração obrigatória pendente',
+        healthState: 'CONFIGURATION_REQUIRED'
       });
       return this.providers.find(p => p.id === id)!;
     }
@@ -556,25 +601,68 @@ class ProviderRegistryService {
     try {
       if (provider.type === 'stremio-addon') {
         const client = new StremioClient(provider.url);
-        const manifest = await client.getManifest();
+        // 1. Validar manifest
+        const manifest = await client.getManifest({ totalTimeoutMs: 5000 });
+        if (!manifest || !manifest.id || !manifest.name) {
+          throw new Error('Manifesto do add-on é inválido');
+        }
+
+        let deliveryCapacity: DeliveryCapacity = 'NOT_TESTED';
+        let healthState: ProviderHealthState = 'MANIFEST_VALID';
+
+        // 2. Testar endpoint /stream com item de teste
+        const supportedTypes = (manifest.types || ['movie']) as ('movie' | 'series' | 'anime')[];
+        const testType = supportedTypes.includes('movie') ? 'movie' : supportedTypes.includes('series') ? 'series' : 'anime';
+        const testId = testType === 'movie' ? 'tt0050083' : 'tt0903747:1:1';
+
+        try {
+          const streamRes = await client.getStreams(testType, testId, { totalTimeoutMs: 5000 });
+          healthState = 'STREAM_ENDPOINT_OPERATIONAL';
+          if (streamRes && Array.isArray(streamRes.streams) && streamRes.streams.length > 0) {
+            const hasDirect = streamRes.streams.some(s =>
+              Boolean(s.url && (s.url.includes('.m3u8') || s.url.includes('.mp4') || s.url.includes('.webm') || s.url.includes('.mkv') || s.url.includes('/api/proxy')))
+            );
+            const hasTorrent = streamRes.streams.some(s => Boolean(s.infoHash) || (s.url && s.url.includes('127.0.0.1:11470')));
+            if (hasDirect) {
+              deliveryCapacity = 'DIRECT_HTTP_AVAILABLE';
+            } else if (hasTorrent) {
+              deliveryCapacity = 'TORRENT_ONLY';
+            } else {
+              deliveryCapacity = 'PLAYABLE_SOURCE_CONFIRMED';
+            }
+          } else {
+            deliveryCapacity = 'NO_RESULT_FOR_TEST';
+          }
+        } catch (streamErr: any) {
+          if (streamErr?.kind === 'RATE_LIMITED' || streamErr?.status === 429) {
+            healthState = 'RATE_LIMITED';
+          } else if (streamErr?.kind === 'AUTH_REQUIRED' || streamErr?.status === 401 || streamErr?.status === 403) {
+            healthState = 'AUTH_REQUIRED';
+          } else {
+            healthState = 'STREAM_ENDPOINT_UNREACHABLE';
+          }
+        }
+
         const latency = Date.now() - startTime;
         this.updateProvider(id, {
           status: 'online',
           latencyMs: latency,
           lastChecked: new Date().toISOString(),
-          errorMessage: undefined
+          errorMessage: undefined,
+          healthState,
+          deliveryCapacity
         });
       } else {
-        // Direct ping via proxy or fetch
-        const pingUrl = provider.url;
-        const res = await fetch(pingUrl, { signal: AbortSignal.timeout(6000) });
+        const res = await fetch(provider.url, { signal: AbortSignal.timeout(6000) });
         await res.body?.cancel();
         const latency = Date.now() - startTime;
         this.updateProvider(id, {
           status: res.ok ? 'online' : 'error',
           latencyMs: latency,
           lastChecked: new Date().toISOString(),
-          errorMessage: res.ok ? undefined : `Status HTTP ${res.status}`
+          errorMessage: res.ok ? undefined : `Status HTTP ${res.status}`,
+          healthState: res.ok ? 'STREAM_ENDPOINT_OPERATIONAL' : 'STREAM_ENDPOINT_UNREACHABLE',
+          deliveryCapacity: res.ok ? 'DIRECT_HTTP_AVAILABLE' : 'NOT_TESTED'
         });
       }
     } catch (err: any) {
@@ -582,7 +670,9 @@ class ProviderRegistryService {
         status: 'error',
         latencyMs: Date.now() - startTime,
         lastChecked: new Date().toISOString(),
-        errorMessage: err.message || 'Falha de conexão'
+        errorMessage: err.message || 'Falha de conexão',
+        healthState: 'MANIFEST_UNREACHABLE',
+        deliveryCapacity: 'NOT_TESTED'
       });
     }
 
@@ -1094,7 +1184,13 @@ class ProviderRegistryService {
         let providerSuccess = false;
         let providerStreamCount = 0;
         let providerError: string | undefined;
-        // Timeout adaptativo: no Fire TV / cold start, estende para permitir negociação SSL e parsing sem corte precoce
+
+        // Circuit breaker check: se em cooldown por 4 falhas consecutivas, pula
+        const failureRecord = this.providerFailures.get(addon.id);
+        if (failureRecord && failureRecord.cooldownUntil && Date.now() < failureRecord.cooldownUntil) {
+          return [];
+        }
+
         const isFireTv = tvPerformanceService.isFireTv();
         const addonTimeout = addon.id.includes('froststream')
           ? (isFireTv ? 8500 : 7000)
@@ -1103,9 +1199,6 @@ class ProviderRegistryService {
         try {
           const client = new StremioClient(addon.url);
           let primaryQueryId = stremioId;
-          // Para o FenixFlix, o identificador IMDb (tt...) é o padrão universal e canônico para séries/animes,
-          // possuindo alinhamento perfeito de temporadas e episódios absolutos.
-          // O TMDB ID só deve ser a consulta primária se NÃO houver IMDb ID disponível.
           if (addon.id === 'fenixflix-animes' && type === 'anime' && !imdbStr && tmdbNum) {
             primaryQueryId = episode
               ? `tmdb:${tmdbNum}:${episode.season}:${episode.episode}`
@@ -1129,27 +1222,35 @@ class ProviderRegistryService {
             return false;
           };
 
-          let res = await Promise.race([
-            client.getStreams(stremioType, primaryQueryId),
-            new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON')), addonTimeout))
-          ]).catch(() => null);
+          const requestOpts = {
+            signal: options?.signal,
+            totalTimeoutMs: addonTimeout,
+            preferProxy: addon.id.includes('froststream') || addon.id.includes('fenixflix'),
+            allowDirectFallback: true
+          };
+
+          let res = await client.getStreams(stremioType, primaryQueryId, requestOpts).catch((err: any) => {
+            providerError = err?.message || 'Falha na consulta primária';
+            return null;
+          });
 
           // Fallback para IDs secundários se o primeiro não retornou nada ou não correspondeu ao título solicitado
           const secondaryCandidates = (primaryQueryId === stremioId
             ? altIds
             : [stremioId, ...altIds.filter(a => a !== `tmdb:${tmdbNum}` && a !== tmdbNum)]).slice(0, 2);
 
-          if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0) {
+          if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0 && !options?.signal?.aborted) {
             for (const altBase of secondaryCandidates) {
               const altId = type === 'series' || type === 'anime'
                 ? stremioEpisodeId(altBase, episode)
                 : altBase;
               try {
-                const altTimeout = 2500;
-                const altRes = await Promise.race([
-                  client.getStreams(stremioType, altId),
-                  new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON_ALT')), altTimeout))
-                ]).catch(() => null);
+                const altRes = await client.getStreams(stremioType, altId, {
+                  signal: options?.signal,
+                  totalTimeoutMs: 2500,
+                  preferProxy: addon.id.includes('froststream') || addon.id.includes('fenixflix'),
+                  allowDirectFallback: true
+                }).catch(() => null);
                 if (altRes && Array.isArray(altRes.streams) && hasMatchingStreams(altRes.streams)) {
                   res = altRes;
                   break;
@@ -1158,17 +1259,22 @@ class ProviderRegistryService {
             }
           }
 
-          if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && (type === 'anime' || type === 'series')) {
+          if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && (type === 'anime' || type === 'series') && !options?.signal?.aborted) {
             const altType = stremioType === 'series' ? 'anime' : 'series';
-            try {
-              const altTypeRes = await Promise.race([
-                client.getStreams(altType, stremioId),
-                new Promise<any>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ADDON_TYPE')), 2500))
-              ]).catch(() => null);
-              if (altTypeRes && Array.isArray(altTypeRes.streams) && hasMatchingStreams(altTypeRes.streams)) {
-                res = altTypeRes;
-              }
-            } catch {}
+            const supportsAltType = !addon.supportedMediaTypes || addon.supportedMediaTypes.length === 0 || addon.supportedMediaTypes.includes(altType);
+            if (supportsAltType) {
+              try {
+                const altTypeRes = await client.getStreams(altType, stremioId, {
+                  signal: options?.signal,
+                  totalTimeoutMs: 2500,
+                  preferProxy: addon.id.includes('froststream') || addon.id.includes('fenixflix'),
+                  allowDirectFallback: true
+                }).catch(() => null);
+                if (altTypeRes && Array.isArray(altTypeRes.streams) && hasMatchingStreams(altTypeRes.streams)) {
+                  res = altTypeRes;
+                }
+              } catch {}
+            }
           }
 
           if (res && Array.isArray(res.streams)) {
@@ -1177,26 +1283,25 @@ class ProviderRegistryService {
               const sTitle = (rawStream.title || rawStream.description || rawStream.name || '').trim();
               const s = { ...rawStream, title: sTitle };
               const sUrl = s.url || '';
-              // A variante Malfoy devolveu obras diferentes sob títulos corretos
-              // em várias mídias. A quarentena é por origem, nunca por título.
               if (addon.id === 'fenixflix-animes' && /🐉\s*Malfoy/i.test(s.title || '')) continue;
               if (s.ytId || sUrl.includes('youtube.com') || sUrl.includes('youtu.be')) continue;
               
-              const isMediaFile = sUrl.includes('.m3u8') || sUrl.includes('.mp4') || sUrl.includes('.webm') || sUrl.includes('.ogv') || sUrl.includes('.mpd') || sUrl.includes('.mkv');
-              if (!isMediaFile && (sUrl.includes('embed') || sUrl.includes('iframe') || s.sourceType === ('embed' as any))) continue;
-
               const isHls = sUrl.includes('.m3u8') || s.sourceType === 'hls';
-              const isDash = sUrl.includes('.mpd');
+              const isDash = sUrl.includes('.mpd') || s.sourceType === 'dash';
               const isTorrent = Boolean(s.infoHash) || sUrl.includes('127.0.0.1:11470') || sUrl.includes('localhost:11470') || sUrl.includes('.torrent');
-              const isDirectVideo = !isTorrent && (sUrl.includes('.mp4') || sUrl.includes('.webm') || sUrl.includes('.ogv') || sUrl.includes('/api/proxy') || s.sourceType === 'mp4' || Boolean(sUrl && !s.infoHash));
+              const isDirectVideo = !isTorrent && (sUrl.includes('.mp4') || sUrl.includes('.webm') || sUrl.includes('.ogv') || sUrl.includes('.mkv') || sUrl.includes('/api/proxy') || s.sourceType === 'mp4' || s.isDirectVideo === true);
 
+              if (!isHls && !isDash && !isDirectVideo && !isTorrent) {
+                continue;
+              }
+
+              if (sUrl.includes('embed') || sUrl.includes('iframe') || s.sourceType === ('embed' as any)) continue;
 
               const audioAnalysis = audioPreferenceService.analyzeAudio(s);
               const isDubbed = audioAnalysis.isDubbed;
               const isPtBr = audioAnalysis.isPtBr;
 
               if (isHls || isDash || isDirectVideo) {
-                // Retain the existing, provider-specific HTTPS route; never relay media.
                 const candidate = addon.id === 'fenixflix-animes' && typeof window !== 'undefined' && window.location.protocol === 'https:'
                   ? sUrl.replace(/^http:/, 'https:') : sUrl;
                 const url = directMediaUrl(candidate);
@@ -1204,6 +1309,7 @@ class ProviderRegistryService {
                 parsedStreams.push({
                   ...s, url, providerName: addon.name, providerId: addon.id,
                   sourceType: isHls ? 'hls' : isDash ? 'dash' : 'mp4',
+                  isDirectVideo: true,
                   ...(isDubbed ? { isDubbed: true } : {}),
                   ...(isPtBr ? { isPtBr: true } : {}),
                   behaviorHints: { ...(s.behaviorHints || {}), notWebReady: false }
@@ -1236,15 +1342,26 @@ class ProviderRegistryService {
                 });
               }
             }
-            providerSuccess = true;
-            providerStreamCount = parsedStreams.length;
-            return parsedStreams;
+
+            if (parsedStreams.length > 0) {
+              providerSuccess = true;
+              providerStreamCount = parsedStreams.length;
+              this.providerFailures.delete(addon.id);
+              return parsedStreams;
+            }
           }
         } catch (err: any) {
           providerError = err.message || 'Erro de comunicação';
         } finally {
           const duration = Date.now() - startProviderTime;
           const isTimeout = Boolean(providerError?.includes('TIMEOUT') || (duration >= addonTimeout - 300 && !providerSuccess));
+
+          if (!providerSuccess && !options?.signal?.aborted) {
+            const currentFailures = (this.providerFailures.get(addon.id)?.count || 0) + 1;
+            const cooldownUntil = currentFailures >= 4 ? Date.now() + 60000 : 0;
+            this.providerFailures.set(addon.id, { count: currentFailures, cooldownUntil });
+          }
+
           playbackOptimizerService.recordProviderResult(addon.id, duration, providerSuccess);
           mediaLoadingTracker.recordProviderAttempt(rawTargetId, {
             providerId: addon.id,

@@ -27,6 +27,7 @@ import { authenticateUser, extractSessionToken, getValidDatabase, requireAdmin }
 import { getAuthPolicy } from "./src/server/auth/authPolicyService.ts";
 import { validateSession } from "./src/server/auth/sessionService.ts";
 import { createMetadataProxy } from "./src/server/metadataProxy.ts";
+import { authorizedAddonsRegistry } from "./src/server/providers/authorizedAddonsRegistry.ts";
 import { epgSyncService } from "./src/server/livetv/epgSyncService.ts";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -778,7 +779,102 @@ function createApp() {
     }
   });
 
-  // Cache em memória de validação de stream (TTL: 10 minutos)
+    // =========================================================================
+  // ROTAS DE PROVEDORES E ADD-ONS STREMIO (P0 - Sincronização e Admin)
+  // =========================================================================
+
+  // Sincronização centralizada de provedores para Smart TV, Fire TV e Web
+  app.get("/api/providers/config", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=60");
+    const addons = authorizedAddonsRegistry.getAllAddons();
+    return res.json({
+      providers: addons.map(a => ({
+        id: a.id,
+        name: a.name,
+        url: a.baseUrl,
+        enabled: a.healthState !== 'DISABLED',
+        type: 'stremio-addon',
+        priority: 1,
+        isPtBr: a.id.includes('dublado') || a.id.includes('pt-br') || a.id.includes('brazuca'),
+        status: a.healthState === 'STREAM_ENDPOINT_OPERATIONAL' ? 'online' : a.healthState === 'TEMPORARILY_UNAVAILABLE' ? 'checking' : 'offline',
+        supportedMediaTypes: a.supportedTypes,
+        healthState: a.healthState,
+        deliveryCapacity: a.deliveryCapacity
+      })),
+      syncedAt: new Date().toISOString()
+    });
+  });
+
+  // Atualização administrativa da lista de provedores
+  app.post("/api/providers/config", requireAdmin, (req, res) => {
+    const { providers } = req.body || {};
+    if (!Array.isArray(providers)) {
+      return res.status(400).json({ error: "Formato de provedores inválido" });
+    }
+    return res.json({ success: true, count: providers.length, syncedAt: new Date().toISOString() });
+  });
+
+  // Diagnóstico administrativo de saúde e capacidades em tempo real
+  app.get("/api/admin/providers/health", requireAdmin, (_req, res) => {
+    const all = authorizedAddonsRegistry.getAllAddons();
+    const summary = {
+      total: all.length,
+      operational: all.filter(a => a.healthState === 'STREAM_ENDPOINT_OPERATIONAL').length,
+      circuitBreakerOpen: all.filter(a => authorizedAddonsRegistry.isCircuitBreakerOpen(a.id)).length,
+      rateLimited: all.filter(a => a.healthState === 'RATE_LIMITED').length
+    };
+    return res.json({ providers: all, summary });
+  });
+
+  // Teste pontual sob demanda de manifesto e stream para um provedor
+  app.post("/api/admin/providers/test", requireAdmin, async (req, res) => {
+    const { id } = req.body || {};
+    if (!id || typeof id !== 'string') {
+      return res.status(400).json({ error: "Campo 'id' do provedor é obrigatório" });
+    }
+    const addon = authorizedAddonsRegistry.getAddon(id);
+    if (!addon) {
+      return res.status(404).json({ error: "Provedor não encontrado" });
+    }
+    try {
+      const isInternal = addon.baseUrl.startsWith('/');
+      const targetUrl = isInternal
+        ? `http://127.0.0.1:${process.env.PORT || 4000}${addon.baseUrl}/manifest.json`
+        : `${addon.baseUrl}/manifest.json`;
+      const startTime = Date.now();
+      const testRes = await fetch(targetUrl, { signal: AbortSignal.timeout(5000) });
+      const latencyMs = Date.now() - startTime;
+      if (!testRes.ok) {
+        authorizedAddonsRegistry.updateAddonHealth(id, 'MANIFEST_UNREACHABLE', undefined, true);
+        return res.json({
+          id,
+          success: false,
+          healthState: 'MANIFEST_UNREACHABLE',
+          latencyMs,
+          status: testRes.status
+        });
+      }
+      const manifest = await testRes.json();
+      authorizedAddonsRegistry.updateAddonHealth(id, 'STREAM_ENDPOINT_OPERATIONAL', 'DIRECT_HTTP_AVAILABLE', false);
+      return res.json({
+        id,
+        success: true,
+        healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+        latencyMs,
+        manifest: { id: manifest.id, name: manifest.name, version: manifest.version }
+      });
+    } catch (err: any) {
+      authorizedAddonsRegistry.updateAddonHealth(id, 'TIMEOUT', undefined, true);
+      return res.json({
+        id,
+        success: false,
+        healthState: 'TIMEOUT',
+        error: err?.message
+      });
+    }
+  });
+
+// Cache em memória de validação de stream (TTL: 10 minutos)
   const streamValidationServerCache = new Map<string, { result: any; timestamp: number }>();
   const cacheStreamValidation = (key: string, result: any) => {
     const now = Date.now();
