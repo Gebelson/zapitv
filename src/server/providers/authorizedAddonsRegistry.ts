@@ -138,6 +138,66 @@ export const FACTORY_AUTHORIZED_ADDONS: AuthorizedAddonDefinition[] = [
     failureCount: 0
   },
   {
+    id: 'zapitv-cinema-aberto',
+    name: 'Cinema Aberto & Acervo Nacional PT-BR (Stremio Oficial)',
+    baseUrl: '/api/stremio/cinema-aberto',
+    origin: 'internal',
+    supportedTypes: ['movie'],
+    supportedResources: ['manifest', 'catalog', 'meta', 'stream'],
+    requiresConfig: false,
+    preferredMethod: 'direct',
+    corsSupport: 'full',
+    timeoutPolicy: { directTimeoutMs: 3000, maxBudgetMs: 5000 },
+    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    deliveryCapacity: 'DIRECT_HTTP_AVAILABLE',
+    failureCount: 0
+  },
+  {
+    id: 'zapitv-archive-org',
+    name: 'Internet Archive Cinema Aberto (Domínio Público HD)',
+    baseUrl: '/api/stremio/archive-org-movies',
+    origin: 'internal',
+    supportedTypes: ['movie'],
+    supportedResources: ['manifest', 'catalog', 'meta', 'stream'],
+    requiresConfig: false,
+    preferredMethod: 'direct',
+    corsSupport: 'full',
+    timeoutPolicy: { directTimeoutMs: 3000, maxBudgetMs: 5000 },
+    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    deliveryCapacity: 'DIRECT_HTTP_AVAILABLE',
+    failureCount: 0
+  },
+  {
+    id: 'zapitv-wikimedia-commons',
+    name: 'Wikimedia Commons Vídeos & Documentários (CC-BY)',
+    baseUrl: '/api/stremio/wikimedia-commons',
+    origin: 'internal',
+    supportedTypes: ['movie'],
+    supportedResources: ['manifest', 'catalog', 'meta', 'stream'],
+    requiresConfig: false,
+    preferredMethod: 'direct',
+    corsSupport: 'full',
+    timeoutPolicy: { directTimeoutMs: 3000, maxBudgetMs: 5000 },
+    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    deliveryCapacity: 'DIRECT_HTTP_AVAILABLE',
+    failureCount: 0
+  },
+  {
+    id: 'zapitv-open-culture',
+    name: 'Open Culture Cinema Clássico Restaurado',
+    baseUrl: '/api/stremio/open-culture',
+    origin: 'internal',
+    supportedTypes: ['movie'],
+    supportedResources: ['manifest', 'catalog', 'meta', 'stream'],
+    requiresConfig: false,
+    preferredMethod: 'direct',
+    corsSupport: 'full',
+    timeoutPolicy: { directTimeoutMs: 3000, maxBudgetMs: 5000 },
+    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    deliveryCapacity: 'DIRECT_HTTP_AVAILABLE',
+    failureCount: 0
+  },
+  {
     id: 'magnetflix-animes',
     name: 'Magnetflix (Animes e Séries PT-BR Backup)',
     baseUrl: 'https://magnetflix.flixbr.online/qualities=4k,1080p,720p,sd|audio=dublado,legendado|catalogs=populares_movie,populares_series,recentes_servidor_movie,recentes_servidor_series,emalta_movie,emalta_series',
@@ -150,6 +210,36 @@ export const FACTORY_AUTHORIZED_ADDONS: AuthorizedAddonDefinition[] = [
     timeoutPolicy: { directTimeoutMs: 3000, maxBudgetMs: 6500 },
     healthState: 'STREAM_ENDPOINT_OPERATIONAL',
     deliveryCapacity: 'TORRENT_ONLY',
+    failureCount: 0
+  },
+  {
+    id: 'zapitv-blender-open',
+    name: 'Blender Open Movies & Séries Abertas (Creative Commons CC-BY)',
+    baseUrl: '/api/stremio/blender-open',
+    origin: 'internal',
+    supportedTypes: ['movie', 'series', 'anime'],
+    supportedResources: ['manifest', 'catalog', 'meta', 'stream'],
+    requiresConfig: false,
+    preferredMethod: 'direct',
+    corsSupport: 'full',
+    timeoutPolicy: { directTimeoutMs: 3000, maxBudgetMs: 5000 },
+    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    deliveryCapacity: 'DIRECT_HTTP_AVAILABLE',
+    failureCount: 0
+  },
+  {
+    id: 'zapitv-public-domain',
+    name: 'Domínio Público Mundial (Stremio Oficial)',
+    baseUrl: '/api/stremio/public-domain',
+    origin: 'internal',
+    supportedTypes: ['movie'],
+    supportedResources: ['manifest', 'catalog', 'meta', 'stream'],
+    requiresConfig: false,
+    preferredMethod: 'direct',
+    corsSupport: 'full',
+    timeoutPolicy: { directTimeoutMs: 3000, maxBudgetMs: 5000 },
+    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    deliveryCapacity: 'DIRECT_HTTP_AVAILABLE',
     failureCount: 0
   },
   {
@@ -195,6 +285,96 @@ export const FACTORY_AUTHORIZED_ADDONS: AuthorizedAddonDefinition[] = [
     timeoutPolicy: { directTimeoutMs: 3000, maxBudgetMs: 6000 },
     healthState: 'STREAM_ENDPOINT_OPERATIONAL',
     deliveryCapacity: 'METADATA_ONLY',
+    failureCount: 0
+  },
+  {
+    id: 'cinetorrent-pt',
+    name: 'CineTorrent (Multi-Idioma & PT-BR)',
+    baseUrl: 'https://150203dd784e-cinetorrent-addon.baby-beamup.club',
+    origin: 'https://150203dd784e-cinetorrent-addon.baby-beamup.club',
+    supportedTypes: ['movie'],
+    supportedResources: ['manifest', 'stream'],
+    requiresConfig: false,
+    preferredMethod: 'proxy_fallback',
+    corsSupport: 'partial',
+    timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6500 },
+    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    deliveryCapacity: 'TORRENT_ONLY',
+    failureCount: 0
+  },
+  {
+    id: 'thepiratebay-plus',
+    name: 'ThePirateBay+ (Acervo Internacional P2P)',
+    baseUrl: 'https://thepiratebay-plus.strem.fun',
+    origin: 'https://thepiratebay-plus.strem.fun',
+    supportedTypes: ['movie', 'series'],
+    supportedResources: ['manifest', 'stream'],
+    requiresConfig: false,
+    preferredMethod: 'direct',
+    corsSupport: 'full',
+    timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6000 },
+    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    deliveryCapacity: 'TORRENT_ONLY',
+    failureCount: 0
+  },
+  {
+    id: 'brazuca-torrents',
+    name: 'Brazuca Torrents (Lançamentos e Clássicos PT-BR)',
+    baseUrl: 'https://94c8cb9f702d-brazuca-torrents.baby-beamup.club',
+    origin: 'https://94c8cb9f702d-brazuca-torrents.baby-beamup.club',
+    supportedTypes: ['movie', 'series', 'anime'],
+    supportedResources: ['manifest', 'stream'],
+    requiresConfig: false,
+    preferredMethod: 'proxy_fallback',
+    corsSupport: 'partial',
+    timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6500 },
+    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    deliveryCapacity: 'TORRENT_ONLY',
+    failureCount: 0
+  },
+  {
+    id: 'orion-addon',
+    name: 'Orion (Metadados Rápidos e Streams)',
+    baseUrl: 'https://5a0d1888fa64-orion.baby-beamup.club',
+    origin: 'https://5a0d1888fa64-orion.baby-beamup.club',
+    supportedTypes: ['movie', 'series'],
+    supportedResources: ['manifest', 'stream'],
+    requiresConfig: true,
+    preferredMethod: 'proxy_fallback',
+    corsSupport: 'partial',
+    timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6000 },
+    healthState: 'CONFIGURATION_REQUIRED',
+    deliveryCapacity: 'NOT_TESTED',
+    failureCount: 0
+  },
+  {
+    id: 'my-cine',
+    name: 'MY CINE (Cinema Europeu e Clássicos)',
+    baseUrl: 'https://mycine.alwaysdata.net',
+    origin: 'https://mycine.alwaysdata.net',
+    supportedTypes: ['movie'],
+    supportedResources: ['manifest', 'catalog', 'meta', 'stream'],
+    requiresConfig: false,
+    preferredMethod: 'proxy_fallback',
+    corsSupport: 'none',
+    timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6500 },
+    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    deliveryCapacity: 'DIRECT_HTTP_AVAILABLE',
+    failureCount: 0
+  },
+  {
+    id: 'aiostreams',
+    name: 'AIOStreams (Instâncias Personalizadas)',
+    baseUrl: 'https://aiostreams.elfhosted.com/stremio',
+    origin: 'https://aiostreams.elfhosted.com',
+    supportedTypes: ['movie', 'series', 'anime'],
+    supportedResources: ['manifest', 'stream'],
+    requiresConfig: true,
+    preferredMethod: 'direct',
+    corsSupport: 'full',
+    timeoutPolicy: { directTimeoutMs: 3000, maxBudgetMs: 6500 },
+    healthState: 'CONFIGURATION_REQUIRED',
+    deliveryCapacity: 'NOT_TESTED',
     failureCount: 0
   }
 ];
@@ -264,6 +444,55 @@ class AuthorizedAddonsRegistry {
     return this.addons.get(id);
   }
 
+  public registerAddon(addon: AuthorizedAddonDefinition): void {
+    this.addons.set(addon.id, { ...addon });
+  }
+
+  public updateAddonConfig(id: string, updates: Partial<AuthorizedAddonDefinition>): void {
+    const addon = this.addons.get(id);
+    if (addon) {
+      Object.assign(addon, updates);
+    } else if (updates.baseUrl) {
+      this.addons.set(id, {
+        id,
+        name: updates.name || id,
+        baseUrl: updates.baseUrl,
+        origin: updates.origin || (updates.baseUrl.startsWith('http') ? new URL(updates.baseUrl).origin : 'internal'),
+        supportedTypes: updates.supportedTypes || ['movie', 'series', 'anime'],
+        supportedResources: updates.supportedResources || ['manifest', 'stream'],
+        requiresConfig: Boolean(updates.requiresConfig),
+        preferredMethod: updates.preferredMethod || 'direct',
+        corsSupport: updates.corsSupport || 'full',
+        timeoutPolicy: updates.timeoutPolicy || { directTimeoutMs: 3000, maxBudgetMs: 6000 },
+        healthState: updates.healthState || 'STREAM_ENDPOINT_OPERATIONAL',
+        deliveryCapacity: updates.deliveryCapacity || 'NOT_TESTED',
+        failureCount: 0,
+        ...updates
+      });
+    }
+  }
+
+  public resetCircuitBreakers(): void {
+    for (const addon of this.addons.values()) {
+      addon.failureCount = 0;
+      addon.circuitBreakerUntil = undefined;
+      if (addon.healthState === 'TEMPORARILY_UNAVAILABLE') {
+        addon.healthState = 'STREAM_ENDPOINT_OPERATIONAL';
+      }
+    }
+  }
+
+  public resetAddonCircuitBreaker(id: string): void {
+    const addon = this.addons.get(id);
+    if (addon) {
+      addon.failureCount = 0;
+      addon.circuitBreakerUntil = undefined;
+      if (addon.healthState === 'TEMPORARILY_UNAVAILABLE') {
+        addon.healthState = 'STREAM_ENDPOINT_OPERATIONAL';
+      }
+    }
+  }
+
   public updateAddonHealth(
     id: string,
     health: ProviderHealthState,
@@ -296,7 +525,7 @@ class AuthorizedAddonsRegistry {
 
     if (failureIncrement) {
       addon.failureCount += 1;
-      // Circuit breaker: após 4 falhas consecutivas, resfria por 60 segundos
+      // Circuit breaker: após 4 falhas consecutivas de rede/timeout, resfria por 60 segundos
       if (addon.failureCount >= 4) {
         addon.circuitBreakerUntil = Date.now() + 60_000;
         addon.healthState = 'TEMPORARILY_UNAVAILABLE';

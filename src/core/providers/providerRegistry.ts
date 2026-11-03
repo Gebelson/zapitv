@@ -416,8 +416,17 @@ class ProviderRegistryService {
     return Array.from(consumers).every(s => s !== null && s.aborted);
   }
 
+  public resetCircuitBreakers(): void {
+    this.providerFailures.clear();
+  }
+
+  public resetCircuitBreaker(id: string): void {
+    this.providerFailures.delete(id);
+  }
+
   constructor() {
     this.loadProviders();
+    this.resetCircuitBreakers();
   }
 
   private loadProviders() {
@@ -849,6 +858,16 @@ class ProviderRegistryService {
       : (/^(?:tmdb-?)?\d+$/i.test(rawTargetId) ? cleanId : '');
     let imdbStr = id.imdbId ? String(id.imdbId) : '';
 
+    // Fontes pré-verificadas anexadas diretamente ao item
+    const directVerifiedStreams = (id as any).verifiedStreams as StremioStream[] | undefined;
+    if (directVerifiedStreams && directVerifiedStreams.length > 0) {
+      streams.push(...directVerifiedStreams.map(s => ({
+        ...s,
+        providerId: s.providerId || 'zapitv-verified',
+        providerName: s.providerName || 'Acervo Oficial ZapiTV'
+      })));
+    }
+
     // Fontes locais pertencem exclusivamente ao item que as cadastrou. IDs externos
     // podem ser compartilhados por remakes, temporadas e registros incorretos.
     const openItem = VERIFIED_OPEN_ITEMS.find(item => item.id === rawTargetId &&
@@ -1184,6 +1203,7 @@ class ProviderRegistryService {
         let providerSuccess = false;
         let providerStreamCount = 0;
         let providerError: string | undefined;
+        let rawResponse: any = null;
 
         // Circuit breaker check: se em cooldown por 4 falhas consecutivas, pula
         const failureRecord = this.providerFailures.get(addon.id);
@@ -1233,6 +1253,7 @@ class ProviderRegistryService {
             providerError = err?.message || 'Falha na consulta primária';
             return null;
           });
+          rawResponse = res;
 
           // Fallback para IDs secundários se o primeiro não retornou nada ou não correspondeu ao título solicitado
           const secondaryCandidates = (primaryQueryId === stremioId
@@ -1253,6 +1274,7 @@ class ProviderRegistryService {
                 }).catch(() => null);
                 if (altRes && Array.isArray(altRes.streams) && hasMatchingStreams(altRes.streams)) {
                   res = altRes;
+                  rawResponse = altRes;
                   break;
                 }
               } catch {}
@@ -1272,6 +1294,7 @@ class ProviderRegistryService {
                 }).catch(() => null);
                 if (altTypeRes && Array.isArray(altTypeRes.streams) && hasMatchingStreams(altTypeRes.streams)) {
                   res = altTypeRes;
+                rawResponse = altTypeRes;
                 }
               } catch {}
             }
@@ -1289,7 +1312,11 @@ class ProviderRegistryService {
               const isHls = sUrl.includes('.m3u8') || s.sourceType === 'hls';
               const isDash = sUrl.includes('.mpd') || s.sourceType === 'dash';
               const isTorrent = Boolean(s.infoHash) || sUrl.includes('127.0.0.1:11470') || sUrl.includes('localhost:11470') || sUrl.includes('.torrent');
-              const isDirectVideo = !isTorrent && (sUrl.includes('.mp4') || sUrl.includes('.webm') || sUrl.includes('.ogv') || sUrl.includes('.mkv') || sUrl.includes('/api/proxy') || s.sourceType === 'mp4' || s.isDirectVideo === true);
+              const isDirectVideo = !isTorrent && (
+                sUrl.includes('.mp4') || sUrl.includes('.webm') || sUrl.includes('.ogv') || sUrl.includes('.mkv') ||
+                sUrl.includes('/api/proxy') || s.sourceType === 'mp4' || s.isDirectVideo === true ||
+                Boolean(sUrl && (sUrl.startsWith('http://') || sUrl.startsWith('https://')) && !sUrl.includes('embed') && !sUrl.includes('iframe') && !sUrl.includes('.html'))
+              );
 
               if (!isHls && !isDash && !isDirectVideo && !isTorrent) {
                 continue;
@@ -1355,19 +1382,27 @@ class ProviderRegistryService {
         } finally {
           const duration = Date.now() - startProviderTime;
           const isTimeout = Boolean(providerError?.includes('TIMEOUT') || (duration >= addonTimeout - 300 && !providerSuccess));
+          const isNetworkError = Boolean(providerError && /(?:timeout|network|econnrefused|failed to fetch|econnreset|enotfound|500|502|503|504|cors)/i.test(providerError));
+          const isConclusiveResponse = Boolean(rawResponse && Array.isArray(rawResponse.streams));
 
-          if (!providerSuccess && !options?.signal?.aborted) {
+          // Resposta com 200 OK (mesmo com 0 streams para este conteúdo) ZERA as falhas.
+          // Penaliza EXCLUSIVAMENTE falhas reais de rede, conexão ou timeouts de infraestrutura.
+          if (isConclusiveResponse) {
+            this.providerFailures.delete(addon.id);
+          } else if ((isTimeout || isNetworkError) && !options?.signal?.aborted) {
             const currentFailures = (this.providerFailures.get(addon.id)?.count || 0) + 1;
             const cooldownUntil = currentFailures >= 4 ? Date.now() + 60000 : 0;
             this.providerFailures.set(addon.id, { count: currentFailures, cooldownUntil });
           }
 
-          playbackOptimizerService.recordProviderResult(addon.id, duration, providerSuccess);
+          const providerQueryConcluded = isConclusiveResponse || providerSuccess;
+
+          playbackOptimizerService.recordProviderResult(addon.id, duration, providerQueryConcluded);
           mediaLoadingTracker.recordProviderAttempt(rawTargetId, {
             providerId: addon.id,
             providerName: addon.name,
             durationMs: duration,
-            success: providerSuccess,
+            success: providerQueryConcluded,
             streamCount: providerStreamCount,
             error: providerError
           });
@@ -1375,7 +1410,7 @@ class ProviderRegistryService {
             providerId: addon.id,
             providerName: addon.name,
             durationMs: duration,
-            success: providerSuccess,
+            success: providerQueryConcluded,
             streamCount: providerStreamCount,
             isTimeout,
             error: providerError

@@ -43,6 +43,7 @@ import { authClient } from '../../core/auth/authClient';
 import { authSyncService } from '../../core/auth/authSyncService';
 import { TvActivationScreen } from '../../components/tv/TvActivationScreen';
 import { resolveAvatarUrl } from '../../core/profile/avatarRegistry';
+import { providerRegistry } from '../../core/providers/providerRegistry';
 
 // Lazy load do orquestrador de reprodução para máxima performance inicial na TV
 const ContentDetailModal = lazy(() => import('../../../components/ContentDetailModal'));
@@ -153,6 +154,11 @@ export const TvApp: React.FC<TvAppProps> = ({
     } catch {
       setTvAuthError('Não foi possível carregar os perfis. Tente novamente.');
     }
+  }, []);
+
+  useEffect(() => {
+    providerRegistry.resetCircuitBreakers();
+    providerRegistry.syncProvidersWithBackend().catch(() => {});
   }, []);
 
   const prevAuthRef = useRef(isTvAuthenticated);

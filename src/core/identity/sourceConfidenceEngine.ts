@@ -49,7 +49,7 @@ export interface IdentityValidationRecord {
 // NOTA CRÍTICA: Numerais romanos (II, III, IV, etc.) e designadores de sequência/parte (1st, 2nd, Part, Cour)
 // NÃO são termos técnicos, pois diferenciam obras completamente distintas (ex: Lupin vs Lupin III).
 const isKnownTechnicalOrReleaseWord = (word: string): boolean => {
-  return /^(s\d+e\d+|s\d+|e\d+|ep\d*|t\d+ep?\d+|t\d+|\d+x\d+|season|temporada|episodio|epis[oó]dio|capitulo|cap[ií]tulo|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|360p|hd|sd|fhd|uhd|bluray|bdrip|brrip|webrip|webdl|web|hdtv|dvdrip|dvd|x264|x265|hevc|h264|h265|avc|aac|ac3|eac3|dts|mp4|mkv|avi|webm|dublado|legendado|dual|multi|audio|áudio|pt|br|ptbr|pob|eng|sub|softsub|hardsub|remux|complete|ita|spa|fra|ger|rus|jap|kor|nf|amzn|atvp|dnp|hmax|dsnp|repack|proper)$/i.test(word);
+  return /^(s\d+e\d+|s\d+|e\d+|ep\d*|t\d+ep?\d+|t\d+|\d+x\d+|\d+|seasons?|temporadas?|episodios?|epis[oó]dios?|eps?|capitulos?|cap[ií]tulos?|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|360p|hd|sd|fhd|uhd|bluray|bdrip|brrip|webrip|webdl|web|hdtv|dvdrip|dvd|x264|x265|hevc|h264|h265|avc|aac|ac3|eac3|dts|mp4|mkv|avi|webm|dublado|legendado|dual|multi|audio|áudio|pt|br|ptbr|pob|eng|sub|softsub|hardsub|remux|complete|ita|spa|fra|ger|rus|jap|kor|nf|amzn|atvp|dnp|hmax|dsnp|repack|proper)$/i.test(word);
 };
 
 // Termos que indicam continuações, subtítulos, numerais ou produções derivadas (NUNCA descartar como termos técnicos)
@@ -424,8 +424,8 @@ export class SourceConfidenceEngine {
           const matchPos = match.index + match[1].length;
           const afterText = streamTitleToCheck.slice(matchPos + cleanAlias.length).trim();
           const nextWord = afterText.split(/\s+/)[0];
-          const isSeasonOrEpIndicator = /^\d+\s*(?:temporada|season|episodio|epis[oó]dio|ep|capitulo|cap[ií]tulo)\b/i.test(afterText) ||
-                                       /^(?:temporada|season|episodio|epis[oó]dio|ep)\s*\d+\b/i.test(afterText);
+          const isSeasonOrEpIndicator = /^\d+\b/i.test(afterText) ||
+                                       /^(?:temporadas?|seasons?|episodios?|epis[oó]dios?|eps?|capitulos?|cap[ií]tulos?)\b/i.test(afterText);
           if (nextWord && !isKnownTechnicalOrReleaseWord(nextWord) && !isSeasonOrEpIndicator) {
             // A palavra seguinte faz parte de um título composto diferente
             continue;
@@ -475,9 +475,9 @@ export class SourceConfidenceEngine {
       return evalResult;
     }
 
-    // Se o título tem múltiplas palavras (ex: "Chicago Typewriter"), exige que TODOS os tokens distintivos estejam presentes
-    const allTargetTokensPresent = targetTokens.length >= 2 && targetTokens.every(t => titleWords.has(t));
-    const allOrigTokensPresent = origTokens.length >= 2 && origTokens.every(t => titleWords.has(t));
+    // Se o título tem 1 ou mais palavras, exige que TODOS os tokens distintivos estejam presentes
+    const allTargetTokensPresent = targetTokens.length >= 1 && targetTokens.every(t => titleWords.has(t));
+    const allOrigTokensPresent = origTokens.length >= 1 && origTokens.every(t => titleWords.has(t));
 
     const isFullTitleMatch = Boolean(matchedAlias) || allTargetTokensPresent || allOrigTokensPresent;
 

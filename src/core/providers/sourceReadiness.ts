@@ -222,8 +222,12 @@ export function isSourceTechnicallyPlayable(
   const isDirectVideo = normUrl.includes('.mp4') || normUrl.includes('.webm') || normUrl.includes('.ogv') ||
     normUrl.includes('.mkv') || normUrl.includes('/api/proxy') || stream.sourceType === 'mp4' || stream.isDirectVideo === true;
 
-  // URLs que apontam para embeds, páginas web, rotas /watch ou iframes não são tecnicamente reproduzíveis pelo player nativo
-  if (normUrl.includes('embed') || normUrl.includes('iframe') || normUrl.includes('playerflix') || normUrl.includes('/watch') || normUrl.includes('.html') || normUrl.includes('.php')) {
+  // URLs que apontam para embeds, páginas HTML arbitrárias de terceiros ou rotas web /watch/ não são reproduzíveis nativamente
+  const isEmbedOrIframe = normUrl.includes('embed') || normUrl.includes('iframe') || normUrl.includes('playerflix');
+  const isHtmlPage = (normUrl.includes('.html') || normUrl.includes('.php')) && !isHls && !isDash;
+  const isWebWatchPage = normUrl.includes('youtube.com/watch') || normUrl.includes('vimeo.com/watch') || normUrl.includes('dailymotion.com/video') || normUrl.includes('/watch/');
+
+  if (isEmbedOrIframe || isHtmlPage || isWebWatchPage) {
     return false;
   }
 

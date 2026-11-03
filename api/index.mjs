@@ -4930,8 +4930,9 @@ var init_streamValidator = __esm({
         }
         if (episodeParams && episodeParams.season > 0) {
           const releaseYearMatch = sTitle.match(/\b(19\d{2}|20\d{2})\b/);
-          const hasEpisodeMarker = /\b(?:s\d{1,2}|t\d{1,2}|e\d{1,3}|ep\d{1,3}|season|temporada|epis[oó]dio)\b/i.test(combined);
-          if (releaseYearMatch && !hasEpisodeMarker) {
+          const hasEpisodeMarker = /(?:s\d{1,2}\s*e\d{1,3}|s\d{1,2}|t\d{1,2}|e\d{1,3}|ep\d{1,3}|\d+x\d+|season|temporada|epis[oó]dio|сезон|сери[яи])/i.test(combined);
+          const isEpisodeConfirmed = this.isStreamMatchingEpisode(stream, episodeParams);
+          if (!isEpisodeConfirmed && releaseYearMatch && !hasEpisodeMarker) {
             const movieReleaseTags = /\b(bluray|bdrip|brrip|dvdrip|remux)\b/i.test(sTitle);
             if (movieReleaseTags) {
               console.warn(`[StreamValidator] Fonte de filme rejeitada para requisi\xE7\xE3o de s\xE9rie: ${sTitle}`);
@@ -12514,7 +12515,10 @@ function isSourceTechnicallyPlayable(stream, profile) {
   const isHls = normUrl.includes(".m3u8") || stream.sourceType === "hls";
   const isDash = normUrl.includes(".mpd") || stream.sourceType === "dash";
   const isDirectVideo = normUrl.includes(".mp4") || normUrl.includes(".webm") || normUrl.includes(".ogv") || normUrl.includes(".mkv") || normUrl.includes("/api/proxy") || stream.sourceType === "mp4" || stream.isDirectVideo === true;
-  if (normUrl.includes("embed") || normUrl.includes("iframe") || normUrl.includes("playerflix") || normUrl.includes("/watch") || normUrl.includes(".html") || normUrl.includes(".php")) {
+  const isEmbedOrIframe = normUrl.includes("embed") || normUrl.includes("iframe") || normUrl.includes("playerflix");
+  const isHtmlPage = (normUrl.includes(".html") || normUrl.includes(".php")) && !isHls && !isDash;
+  const isWebWatchPage = normUrl.includes("youtube.com/watch") || normUrl.includes("vimeo.com/watch") || normUrl.includes("dailymotion.com/video") || normUrl.includes("/watch/");
+  if (isEmbedOrIframe || isHtmlPage || isWebWatchPage) {
     return false;
   }
   if (!effectiveProfile.supportsEac3 && !isHls && (streamTitle.includes("e-ac-3") || streamTitle.includes("eac3")) && !streamTitle.includes("aac")) {
@@ -12903,12 +12907,19 @@ var init_providerRegistry = __esm({
         // 15 minutos de retenção em cache
         this.STALE_TTL_MS = 3 * 60 * 1e3;
         this.loadProviders();
+        this.resetCircuitBreakers();
       }
       // 3 minutos de fresh (stale-while-revalidate após isso)
       isCancelled(cacheKey) {
         const consumers = this.inFlightConsumers.get(cacheKey);
         if (!consumers || consumers.size === 0) return false;
         return Array.from(consumers).every((s) => s !== null && s.aborted);
+      }
+      resetCircuitBreakers() {
+        this.providerFailures.clear();
+      }
+      resetCircuitBreaker(id) {
+        this.providerFailures.delete(id);
       }
       loadProviders() {
         try {
@@ -13272,6 +13283,14 @@ var init_providerRegistry = __esm({
         const cleanId = rawTargetId.replace(/^tmdb-?/i, "");
         let tmdbNum = id.tmdbId && /^\d+$/.test(String(id.tmdbId).replace(/^tmdb-?/i, "")) ? String(id.tmdbId).replace(/^tmdb-?/i, "") : /^(?:tmdb-?)?\d+$/i.test(rawTargetId) ? cleanId : "";
         let imdbStr = id.imdbId ? String(id.imdbId) : "";
+        const directVerifiedStreams = id.verifiedStreams;
+        if (directVerifiedStreams && directVerifiedStreams.length > 0) {
+          streams.push(...directVerifiedStreams.map((s) => ({
+            ...s,
+            providerId: s.providerId || "zapitv-verified",
+            providerName: s.providerName || "Acervo Oficial ZapiTV"
+          })));
+        }
         const openItem = VERIFIED_OPEN_ITEMS.find((item) => item.id === rawTargetId && (type === "movie" ? item.type === "FILME" /* MOVIE */ : item.type !== "FILME" /* MOVIE */));
         const catalogItem = !openItem ? filmesData.find((item) => item.id === rawTargetId && (type === "movie" ? item.type === "FILME" /* MOVIE */ : item.type !== "FILME" /* MOVIE */)) : null;
         if (!tmdbNum && (openItem?.tmdbId || catalogItem?.tmdbId)) {
@@ -13562,6 +13581,7 @@ var init_providerRegistry = __esm({
             let providerSuccess = false;
             let providerStreamCount = 0;
             let providerError;
+            let rawResponse = null;
             const failureRecord = this.providerFailures.get(addon.id);
             if (failureRecord && failureRecord.cooldownUntil && Date.now() < failureRecord.cooldownUntil) {
               return [];
@@ -13600,6 +13620,7 @@ var init_providerRegistry = __esm({
                 providerError = err?.message || "Falha na consulta prim\xE1ria";
                 return null;
               });
+              rawResponse = res;
               const secondaryCandidates = (primaryQueryId === stremioId ? altIds : [stremioId, ...altIds.filter((a) => a !== `tmdb:${tmdbNum}` && a !== tmdbNum)]).slice(0, 2);
               if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0 && !options?.signal?.aborted) {
                 for (const altBase of secondaryCandidates) {
@@ -13613,6 +13634,7 @@ var init_providerRegistry = __esm({
                     }).catch(() => null);
                     if (altRes && Array.isArray(altRes.streams) && hasMatchingStreams(altRes.streams)) {
                       res = altRes;
+                      rawResponse = altRes;
                       break;
                     }
                   } catch {
@@ -13632,6 +13654,7 @@ var init_providerRegistry = __esm({
                     }).catch(() => null);
                     if (altTypeRes && Array.isArray(altTypeRes.streams) && hasMatchingStreams(altTypeRes.streams)) {
                       res = altTypeRes;
+                      rawResponse = altTypeRes;
                     }
                   } catch {
                   }
@@ -13648,7 +13671,7 @@ var init_providerRegistry = __esm({
                   const isHls = sUrl.includes(".m3u8") || s.sourceType === "hls";
                   const isDash = sUrl.includes(".mpd") || s.sourceType === "dash";
                   const isTorrent = Boolean(s.infoHash) || sUrl.includes("127.0.0.1:11470") || sUrl.includes("localhost:11470") || sUrl.includes(".torrent");
-                  const isDirectVideo = !isTorrent && (sUrl.includes(".mp4") || sUrl.includes(".webm") || sUrl.includes(".ogv") || sUrl.includes(".mkv") || sUrl.includes("/api/proxy") || s.sourceType === "mp4" || s.isDirectVideo === true);
+                  const isDirectVideo = !isTorrent && (sUrl.includes(".mp4") || sUrl.includes(".webm") || sUrl.includes(".ogv") || sUrl.includes(".mkv") || sUrl.includes("/api/proxy") || s.sourceType === "mp4" || s.isDirectVideo === true || Boolean(sUrl && (sUrl.startsWith("http://") || sUrl.startsWith("https://")) && !sUrl.includes("embed") && !sUrl.includes("iframe") && !sUrl.includes(".html")));
                   if (!isHls && !isDash && !isDirectVideo && !isTorrent) {
                     continue;
                   }
@@ -13711,17 +13734,22 @@ var init_providerRegistry = __esm({
             } finally {
               const duration = Date.now() - startProviderTime;
               const isTimeout = Boolean(providerError?.includes("TIMEOUT") || duration >= addonTimeout - 300 && !providerSuccess);
-              if (!providerSuccess && !options?.signal?.aborted) {
+              const isNetworkError = Boolean(providerError && /(?:timeout|network|econnrefused|failed to fetch|econnreset|enotfound|500|502|503|504|cors)/i.test(providerError));
+              const isConclusiveResponse = Boolean(rawResponse && Array.isArray(rawResponse.streams));
+              if (isConclusiveResponse) {
+                this.providerFailures.delete(addon.id);
+              } else if ((isTimeout || isNetworkError) && !options?.signal?.aborted) {
                 const currentFailures = (this.providerFailures.get(addon.id)?.count || 0) + 1;
                 const cooldownUntil = currentFailures >= 4 ? Date.now() + 6e4 : 0;
                 this.providerFailures.set(addon.id, { count: currentFailures, cooldownUntil });
               }
-              playbackOptimizerService.recordProviderResult(addon.id, duration, providerSuccess);
+              const providerQueryConcluded = isConclusiveResponse || providerSuccess;
+              playbackOptimizerService.recordProviderResult(addon.id, duration, providerQueryConcluded);
               mediaLoadingTracker.recordProviderAttempt(rawTargetId, {
                 providerId: addon.id,
                 providerName: addon.name,
                 durationMs: duration,
-                success: providerSuccess,
+                success: providerQueryConcluded,
                 streamCount: providerStreamCount,
                 error: providerError
               });
@@ -13729,7 +13757,7 @@ var init_providerRegistry = __esm({
                 providerId: addon.id,
                 providerName: addon.name,
                 durationMs: duration,
-                success: providerSuccess,
+                success: providerQueryConcluded,
                 streamCount: providerStreamCount,
                 isTimeout,
                 error: providerError
@@ -18152,7 +18180,7 @@ var init_sourceConfidenceEngine = __esm({
     init_types();
     init_mediaLoadingTracker();
     isKnownTechnicalOrReleaseWord = (word) => {
-      return /^(s\d+e\d+|s\d+|e\d+|ep\d*|t\d+ep?\d+|t\d+|\d+x\d+|season|temporada|episodio|epis[oó]dio|capitulo|cap[ií]tulo|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|360p|hd|sd|fhd|uhd|bluray|bdrip|brrip|webrip|webdl|web|hdtv|dvdrip|dvd|x264|x265|hevc|h264|h265|avc|aac|ac3|eac3|dts|mp4|mkv|avi|webm|dublado|legendado|dual|multi|audio|áudio|pt|br|ptbr|pob|eng|sub|softsub|hardsub|remux|complete|ita|spa|fra|ger|rus|jap|kor|nf|amzn|atvp|dnp|hmax|dsnp|repack|proper)$/i.test(word);
+      return /^(s\d+e\d+|s\d+|e\d+|ep\d*|t\d+ep?\d+|t\d+|\d+x\d+|\d+|seasons?|temporadas?|episodios?|epis[oó]dios?|eps?|capitulos?|cap[ií]tulos?|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|360p|hd|sd|fhd|uhd|bluray|bdrip|brrip|webrip|webdl|web|hdtv|dvdrip|dvd|x264|x265|hevc|h264|h265|avc|aac|ac3|eac3|dts|mp4|mkv|avi|webm|dublado|legendado|dual|multi|audio|áudio|pt|br|ptbr|pob|eng|sub|softsub|hardsub|remux|complete|ita|spa|fra|ger|rus|jap|kor|nf|amzn|atvp|dnp|hmax|dsnp|repack|proper)$/i.test(word);
     };
     isDistinguishingTitleModifier = (word, isMovie = false, fullText = "") => {
       if (isMovie && (word === "movie" || word === "filme")) return false;
@@ -18455,7 +18483,7 @@ var init_sourceConfidenceEngine = __esm({
               const matchPos = match.index + match[1].length;
               const afterText = streamTitleToCheck.slice(matchPos + cleanAlias.length).trim();
               const nextWord = afterText.split(/\s+/)[0];
-              const isSeasonOrEpIndicator = /^\d+\s*(?:temporada|season|episodio|epis[oó]dio|ep|capitulo|cap[ií]tulo)\b/i.test(afterText) || /^(?:temporada|season|episodio|epis[oó]dio|ep)\s*\d+\b/i.test(afterText);
+              const isSeasonOrEpIndicator = /^\d+\b/i.test(afterText) || /^(?:temporadas?|seasons?|episodios?|epis[oó]dios?|eps?|capitulos?|cap[ií]tulos?)\b/i.test(afterText);
               if (nextWord && !isKnownTechnicalOrReleaseWord(nextWord) && !isSeasonOrEpIndicator) {
                 continue;
               }
@@ -18498,8 +18526,8 @@ var init_sourceConfidenceEngine = __esm({
           this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
           return evalResult2;
         }
-        const allTargetTokensPresent = targetTokens.length >= 2 && targetTokens.every((t) => titleWords.has(t));
-        const allOrigTokensPresent = origTokens.length >= 2 && origTokens.every((t) => titleWords.has(t));
+        const allTargetTokensPresent = targetTokens.length >= 1 && targetTokens.every((t) => titleWords.has(t));
+        const allOrigTokensPresent = origTokens.length >= 1 && origTokens.every((t) => titleWords.has(t));
         const isFullTitleMatch = Boolean(matchedAlias) || allTargetTokensPresent || allOrigTokensPresent;
         if (!isFullTitleMatch) {
           reasons.push(`T\xEDtulo do stream n\xE3o corresponde \xE0 obra solicitada "${identity.title}"`);
@@ -30561,6 +30589,66 @@ var FACTORY_AUTHORIZED_ADDONS = [
     failureCount: 0
   },
   {
+    id: "zapitv-cinema-aberto",
+    name: "Cinema Aberto & Acervo Nacional PT-BR (Stremio Oficial)",
+    baseUrl: "/api/stremio/cinema-aberto",
+    origin: "internal",
+    supportedTypes: ["movie"],
+    supportedResources: ["manifest", "catalog", "meta", "stream"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 5e3 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "DIRECT_HTTP_AVAILABLE",
+    failureCount: 0
+  },
+  {
+    id: "zapitv-archive-org",
+    name: "Internet Archive Cinema Aberto (Dom\xEDnio P\xFAblico HD)",
+    baseUrl: "/api/stremio/archive-org-movies",
+    origin: "internal",
+    supportedTypes: ["movie"],
+    supportedResources: ["manifest", "catalog", "meta", "stream"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 5e3 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "DIRECT_HTTP_AVAILABLE",
+    failureCount: 0
+  },
+  {
+    id: "zapitv-wikimedia-commons",
+    name: "Wikimedia Commons V\xEDdeos & Document\xE1rios (CC-BY)",
+    baseUrl: "/api/stremio/wikimedia-commons",
+    origin: "internal",
+    supportedTypes: ["movie"],
+    supportedResources: ["manifest", "catalog", "meta", "stream"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 5e3 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "DIRECT_HTTP_AVAILABLE",
+    failureCount: 0
+  },
+  {
+    id: "zapitv-open-culture",
+    name: "Open Culture Cinema Cl\xE1ssico Restaurado",
+    baseUrl: "/api/stremio/open-culture",
+    origin: "internal",
+    supportedTypes: ["movie"],
+    supportedResources: ["manifest", "catalog", "meta", "stream"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 5e3 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "DIRECT_HTTP_AVAILABLE",
+    failureCount: 0
+  },
+  {
     id: "magnetflix-animes",
     name: "Magnetflix (Animes e S\xE9ries PT-BR Backup)",
     baseUrl: "https://magnetflix.flixbr.online/qualities=4k,1080p,720p,sd|audio=dublado,legendado|catalogs=populares_movie,populares_series,recentes_servidor_movie,recentes_servidor_series,emalta_movie,emalta_series",
@@ -30573,6 +30661,36 @@ var FACTORY_AUTHORIZED_ADDONS = [
     timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 6500 },
     healthState: "STREAM_ENDPOINT_OPERATIONAL",
     deliveryCapacity: "TORRENT_ONLY",
+    failureCount: 0
+  },
+  {
+    id: "zapitv-blender-open",
+    name: "Blender Open Movies & S\xE9ries Abertas (Creative Commons CC-BY)",
+    baseUrl: "/api/stremio/blender-open",
+    origin: "internal",
+    supportedTypes: ["movie", "series", "anime"],
+    supportedResources: ["manifest", "catalog", "meta", "stream"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 5e3 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "DIRECT_HTTP_AVAILABLE",
+    failureCount: 0
+  },
+  {
+    id: "zapitv-public-domain",
+    name: "Dom\xEDnio P\xFAblico Mundial (Stremio Oficial)",
+    baseUrl: "/api/stremio/public-domain",
+    origin: "internal",
+    supportedTypes: ["movie"],
+    supportedResources: ["manifest", "catalog", "meta", "stream"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 5e3 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "DIRECT_HTTP_AVAILABLE",
     failureCount: 0
   },
   {
@@ -30618,6 +30736,96 @@ var FACTORY_AUTHORIZED_ADDONS = [
     timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 6e3 },
     healthState: "STREAM_ENDPOINT_OPERATIONAL",
     deliveryCapacity: "METADATA_ONLY",
+    failureCount: 0
+  },
+  {
+    id: "cinetorrent-pt",
+    name: "CineTorrent (Multi-Idioma & PT-BR)",
+    baseUrl: "https://150203dd784e-cinetorrent-addon.baby-beamup.club",
+    origin: "https://150203dd784e-cinetorrent-addon.baby-beamup.club",
+    supportedTypes: ["movie"],
+    supportedResources: ["manifest", "stream"],
+    requiresConfig: false,
+    preferredMethod: "proxy_fallback",
+    corsSupport: "partial",
+    timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6500 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "TORRENT_ONLY",
+    failureCount: 0
+  },
+  {
+    id: "thepiratebay-plus",
+    name: "ThePirateBay+ (Acervo Internacional P2P)",
+    baseUrl: "https://thepiratebay-plus.strem.fun",
+    origin: "https://thepiratebay-plus.strem.fun",
+    supportedTypes: ["movie", "series"],
+    supportedResources: ["manifest", "stream"],
+    requiresConfig: false,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6e3 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "TORRENT_ONLY",
+    failureCount: 0
+  },
+  {
+    id: "brazuca-torrents",
+    name: "Brazuca Torrents (Lan\xE7amentos e Cl\xE1ssicos PT-BR)",
+    baseUrl: "https://94c8cb9f702d-brazuca-torrents.baby-beamup.club",
+    origin: "https://94c8cb9f702d-brazuca-torrents.baby-beamup.club",
+    supportedTypes: ["movie", "series", "anime"],
+    supportedResources: ["manifest", "stream"],
+    requiresConfig: false,
+    preferredMethod: "proxy_fallback",
+    corsSupport: "partial",
+    timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6500 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "TORRENT_ONLY",
+    failureCount: 0
+  },
+  {
+    id: "orion-addon",
+    name: "Orion (Metadados R\xE1pidos e Streams)",
+    baseUrl: "https://5a0d1888fa64-orion.baby-beamup.club",
+    origin: "https://5a0d1888fa64-orion.baby-beamup.club",
+    supportedTypes: ["movie", "series"],
+    supportedResources: ["manifest", "stream"],
+    requiresConfig: true,
+    preferredMethod: "proxy_fallback",
+    corsSupport: "partial",
+    timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6e3 },
+    healthState: "CONFIGURATION_REQUIRED",
+    deliveryCapacity: "NOT_TESTED",
+    failureCount: 0
+  },
+  {
+    id: "my-cine",
+    name: "MY CINE (Cinema Europeu e Cl\xE1ssicos)",
+    baseUrl: "https://mycine.alwaysdata.net",
+    origin: "https://mycine.alwaysdata.net",
+    supportedTypes: ["movie"],
+    supportedResources: ["manifest", "catalog", "meta", "stream"],
+    requiresConfig: false,
+    preferredMethod: "proxy_fallback",
+    corsSupport: "none",
+    timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6500 },
+    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    deliveryCapacity: "DIRECT_HTTP_AVAILABLE",
+    failureCount: 0
+  },
+  {
+    id: "aiostreams",
+    name: "AIOStreams (Inst\xE2ncias Personalizadas)",
+    baseUrl: "https://aiostreams.elfhosted.com/stremio",
+    origin: "https://aiostreams.elfhosted.com",
+    supportedTypes: ["movie", "series", "anime"],
+    supportedResources: ["manifest", "stream"],
+    requiresConfig: true,
+    preferredMethod: "direct",
+    corsSupport: "full",
+    timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 6500 },
+    healthState: "CONFIGURATION_REQUIRED",
+    deliveryCapacity: "NOT_TESTED",
     failureCount: 0
   }
 ];
@@ -30679,6 +30887,51 @@ var AuthorizedAddonsRegistry = class _AuthorizedAddonsRegistry {
   }
   getAddon(id) {
     return this.addons.get(id);
+  }
+  registerAddon(addon) {
+    this.addons.set(addon.id, { ...addon });
+  }
+  updateAddonConfig(id, updates) {
+    const addon = this.addons.get(id);
+    if (addon) {
+      Object.assign(addon, updates);
+    } else if (updates.baseUrl) {
+      this.addons.set(id, {
+        id,
+        name: updates.name || id,
+        baseUrl: updates.baseUrl,
+        origin: updates.origin || (updates.baseUrl.startsWith("http") ? new URL(updates.baseUrl).origin : "internal"),
+        supportedTypes: updates.supportedTypes || ["movie", "series", "anime"],
+        supportedResources: updates.supportedResources || ["manifest", "stream"],
+        requiresConfig: Boolean(updates.requiresConfig),
+        preferredMethod: updates.preferredMethod || "direct",
+        corsSupport: updates.corsSupport || "full",
+        timeoutPolicy: updates.timeoutPolicy || { directTimeoutMs: 3e3, maxBudgetMs: 6e3 },
+        healthState: updates.healthState || "STREAM_ENDPOINT_OPERATIONAL",
+        deliveryCapacity: updates.deliveryCapacity || "NOT_TESTED",
+        failureCount: 0,
+        ...updates
+      });
+    }
+  }
+  resetCircuitBreakers() {
+    for (const addon of this.addons.values()) {
+      addon.failureCount = 0;
+      addon.circuitBreakerUntil = void 0;
+      if (addon.healthState === "TEMPORARILY_UNAVAILABLE") {
+        addon.healthState = "STREAM_ENDPOINT_OPERATIONAL";
+      }
+    }
+  }
+  resetAddonCircuitBreaker(id) {
+    const addon = this.addons.get(id);
+    if (addon) {
+      addon.failureCount = 0;
+      addon.circuitBreakerUntil = void 0;
+      if (addon.healthState === "TEMPORARILY_UNAVAILABLE") {
+        addon.healthState = "STREAM_ENDPOINT_OPERATIONAL";
+      }
+    }
   }
   updateAddonHealth(id, health, capacity, failureIncrement = false) {
     let addon = this.addons.get(id);
@@ -82153,7 +82406,22 @@ ${s.name?.split("\n")[1] || "1080p"}`,
     if (!Array.isArray(providers)) {
       return res.status(400).json({ error: "Formato de provedores inv\xE1lido" });
     }
+    for (const p of providers) {
+      if (p && p.id) {
+        authorizedAddonsRegistry.updateAddonConfig(p.id, {
+          name: p.name,
+          baseUrl: p.url || p.baseUrl,
+          supportedTypes: p.supportedMediaTypes || p.supportedTypes,
+          healthState: p.enabled === false ? "DISABLED" : p.healthState || "STREAM_ENDPOINT_OPERATIONAL",
+          deliveryCapacity: p.deliveryCapacity
+        });
+      }
+    }
     return res.json({ success: true, count: providers.length, syncedAt: (/* @__PURE__ */ new Date()).toISOString() });
+  });
+  app2.post("/api/admin/providers/reset-circuits", requireAdmin, (_req, res) => {
+    authorizedAddonsRegistry.resetCircuitBreakers();
+    return res.json({ success: true, message: "Circuit breakers reiniciados com sucesso", resetAt: (/* @__PURE__ */ new Date()).toISOString() });
   });
   app2.get("/api/admin/providers/health", requireAdmin, (_req, res) => {
     const all = authorizedAddonsRegistry.getAllAddons();

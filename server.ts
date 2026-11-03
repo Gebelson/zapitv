@@ -811,7 +811,24 @@ function createApp() {
     if (!Array.isArray(providers)) {
       return res.status(400).json({ error: "Formato de provedores inválido" });
     }
+    for (const p of providers) {
+      if (p && p.id) {
+        authorizedAddonsRegistry.updateAddonConfig(p.id, {
+          name: p.name,
+          baseUrl: p.url || p.baseUrl,
+          supportedTypes: p.supportedMediaTypes || p.supportedTypes,
+          healthState: p.enabled === false ? 'DISABLED' : (p.healthState || 'STREAM_ENDPOINT_OPERATIONAL'),
+          deliveryCapacity: p.deliveryCapacity
+        });
+      }
+    }
     return res.json({ success: true, count: providers.length, syncedAt: new Date().toISOString() });
+  });
+
+  // Reset administrativo dos circuit breakers de todos os provedores
+  app.post("/api/admin/providers/reset-circuits", requireAdmin, (_req, res) => {
+    authorizedAddonsRegistry.resetCircuitBreakers();
+    return res.json({ success: true, message: "Circuit breakers reiniciados com sucesso", resetAt: new Date().toISOString() });
   });
 
   // Diagnóstico administrativo de saúde e capacidades em tempo real

@@ -212,6 +212,24 @@ class SourceVerificationService {
       return evaluation.isMatch && evaluation.confidence !== 'REJECTED' && evaluation.confidence !== 'QUARANTINED';
     };
 
+    // 0. Se o item já possui verifiedStreams pré-validadas de acervo oficial ou teste, aproveita-as imediatamente
+    if (item.verifiedStreams && Array.isArray(item.verifiedStreams) && item.verifiedStreams.length > 0) {
+      const verifiedPlayable = item.verifiedStreams.filter(isPlayableAndCanonicallyVerified);
+      if (verifiedPlayable.length > 0) {
+        diagnostic.finalState = 'AVAILABLE';
+        diagnostic.approvedStreamsCount = verifiedPlayable.length;
+        diagnostic.totalDurationMs = Date.now() - overallStart;
+        this.recordLog(diagnostic);
+        options?.onProgressiveStreams?.(verifiedPlayable);
+        options?.onStateChange?.('AVAILABLE');
+        return {
+          state: 'AVAILABLE',
+          streams: verifiedPlayable,
+          diagnosticLog: diagnostic
+        };
+      }
+    }
+
     try {
       phase1Streams = await providerRegistry.resolveStreams(
         streamType,

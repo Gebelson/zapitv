@@ -59,6 +59,7 @@ import { mobileFullscreenService } from './src/core/mobile/mobileFullscreenServi
 import { MobileLayout } from './src/components/mobile';
 import { MandatoryAuthModal } from './src/components/auth/MandatoryAuthModal';
 import { authSyncService } from './src/core/auth/authSyncService';
+import { providerRegistry } from './src/core/providers/providerRegistry';
 
 const ProfileView = React.lazy(() => import('./components/ProfileView'));
 const AdminView = React.lazy(() => import('./components/AdminView'));
@@ -234,6 +235,11 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   useEffect(() => {
     checkCurrentSession();
   }, [checkCurrentSession]);
+
+  useEffect(() => {
+    providerRegistry.resetCircuitBreakers();
+    providerRegistry.syncProvidersWithBackend().catch(() => {});
+  }, []);
 
   const sessionIdentity = useRef({ userId: currentUser?.id, role: currentUser?.role, profileId: activeProfile?.id, authenticated: isAuthenticated });
   sessionIdentity.current = { userId: currentUser?.id, role: currentUser?.role, profileId: activeProfile?.id, authenticated: isAuthenticated };

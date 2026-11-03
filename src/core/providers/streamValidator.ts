@@ -640,8 +640,9 @@ class StreamValidator {
     // Se o conteúdo solicitado é uma série (com episodeParams), rejeita fontes que são comprovadamente filmes isolados
     if (episodeParams && episodeParams.season > 0) {
       const releaseYearMatch = sTitle.match(/\b(19\d{2}|20\d{2})\b/);
-      const hasEpisodeMarker = /\b(?:s\d{1,2}|t\d{1,2}|e\d{1,3}|ep\d{1,3}|season|temporada|epis[oó]dio)\b/i.test(combined);
-      if (releaseYearMatch && !hasEpisodeMarker) {
+      const hasEpisodeMarker = /(?:s\d{1,2}\s*e\d{1,3}|s\d{1,2}|t\d{1,2}|e\d{1,3}|ep\d{1,3}|\d+x\d+|season|temporada|epis[oó]dio|сезон|сери[яи])/i.test(combined);
+      const isEpisodeConfirmed = this.isStreamMatchingEpisode(stream, episodeParams);
+      if (!isEpisodeConfirmed && releaseYearMatch && !hasEpisodeMarker) {
         const movieReleaseTags = /\b(bluray|bdrip|brrip|dvdrip|remux)\b/i.test(sTitle);
         if (movieReleaseTags) {
           console.warn(`[StreamValidator] Fonte de filme rejeitada para requisição de série: ${sTitle}`);

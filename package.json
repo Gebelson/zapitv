@@ -192,7 +192,8 @@
     "test:pursuit-of-jade": "npx vitest run tests/pursuit_of_jade_availability.test.ts",
     "test:source-double-verification": "npx vitest run tests/source_double_verification.test.ts",
     "test:player-no-external-redirects": "tsx tests/player_no_external_redirects.test.ts",
-    "test:addons-verification": "tsx tests/addons_and_source_verification.test.ts"
+    "test:addons-verification": "tsx tests/addons_and_source_verification.test.ts",
+    "test:regression-circuit-breaker": "tsx tests/regression_circuit_breaker_and_playback.test.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
