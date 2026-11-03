@@ -7,12 +7,13 @@ import {
   X, Save, LayoutGrid, Plus, Film, Send, Download, Upload,
   Edit3, Trash, Star, Bell, Megaphone, CheckCircle, Info, AlertTriangle, Lock, Mail, Image as ImageIcon, CloudSync, Tv, Sparkles, Key, Play, Activity, Check,
   ShieldAlert, Ban, AlertOctagon, Flame, RefreshCw, FastForward, Clock, SkipForward,
-  Bug, Radio
+  Bug, Radio, ArrowRight
 } from 'lucide-react';
 import { FeedbackAdminPanel } from '../src/components/admin/FeedbackAdminPanel';
 import { LiveTvAdminPanel } from '../src/components/admin/LiveTvAdminPanel';
 import { User, ContentItem, ContentType, SiteNotification } from '../types';
 import { providerRegistry, ProviderConfig } from '../src/core/providers/providerRegistry';
+import { sourceVerificationService, VerificationDiagnosticLog, PipelineTraceStep } from '../src/core/providers/sourceVerificationService';
 import { playbackOptimizerService } from '../src/core/playback/PlaybackOptimizerService';
 import { StremioStream } from '../src/core/stremio/stremioTypes';
 import { videoAdBlocker, AdAuditRecord, AdAuditStatus } from '../src/core/security/videoAdBlocker';
@@ -153,6 +154,7 @@ const AdminView: React.FC<AdminViewProps> = ({
   const [testStreamInput, setTestStreamInput] = useState('550');
   const [resolvedTestStreams, setResolvedTestStreams] = useState<StremioStream[]>([]);
   const [isResolvingStreams, setIsResolvingStreams] = useState(false);
+  const [testDiagnostic, setTestDiagnostic] = useState<VerificationDiagnosticLog | null>(null);
   const [newProvName, setNewProvName] = useState('');
   const [newProvUrl, setNewProvUrl] = useState('');
   const [newProvType, setNewProvType] = useState<ProviderConfig['type']>('stremio-addon');
@@ -448,13 +450,26 @@ const AdminView: React.FC<AdminViewProps> = ({
   const handleTestStreamResolution = async () => {
     if (!testStreamInput.trim()) return;
     setIsResolvingStreams(true);
+    setTestDiagnostic(null);
     try {
       const isTmdbNumber = /^\d+$/.test(testStreamInput.trim());
-      const res = await providerRegistry.resolveStreams(
-        'movie',
-        isTmdbNumber ? { tmdbId: testStreamInput.trim() } : { imdbId: testStreamInput.trim() }
-      );
-      setResolvedTestStreams(res);
+      const rawInput = testStreamInput.trim();
+      const testItem: ContentItem = {
+        id: 'test-' + rawInput,
+        title: 'Teste ' + rawInput,
+        type: ContentType.MOVIE,
+        tmdbId: isTmdbNumber ? rawInput : undefined,
+        imdbId: !isTmdbNumber ? rawInput : undefined,
+        year: 2024,
+        rating: 8.0,
+        image: ''
+      };
+      const result = await sourceVerificationService.verifySources(testItem, undefined, {
+        forceRefresh: true,
+        bypassNegativeCache: true
+      });
+      setResolvedTestStreams(result.streams);
+      setTestDiagnostic(result.diagnosticLog);
     } catch (err) {
       console.error(err);
     } finally {
@@ -1118,6 +1133,108 @@ const AdminView: React.FC<AdminViewProps> = ({
                     {isResolvingStreams ? 'Consultando...' : 'Resolver'}
                   </button>
                 </div>
+
+{/* Visual Esteira Diagnóstica (Funil Requisito 7) */}
+                {testDiagnostic && (
+                  <div className="mt-4 p-4 rounded-2xl bg-black/40 border border-white/10 space-y-4 mb-4">
+                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                          Esteira de Verificação por Tentativa (Funil de Fontes):
+                        </span>
+                        <div className="text-xs text-white font-bold flex items-center gap-2 mt-0.5">
+                          <span>{testDiagnostic.contentTitle}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                            testDiagnostic.finalState === 'AVAILABLE' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                            testDiagnostic.finalState === 'UNAVAILABLE' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                            'bg-red-500/20 text-red-400 border border-red-500/30'
+                          }`}>
+                            {testDiagnostic.finalState}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-gray-400 font-mono">
+                        {testDiagnostic.totalDurationMs}ms
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {(testDiagnostic.pipelineTraces || []).map((trace, tIdx) => {
+                        const isZero = trace.approvedCount === 0;
+                        return (
+                          <div key={tIdx} className={`p-3 rounded-xl border text-xs ${
+                            isZero ? 'bg-red-950/20 border-red-500/20' : 'bg-white/5 border-white/10'
+                          }`}>
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold">
+                              <span className="px-2 py-1 rounded bg-orange-500/20 text-orange-300 font-mono">
+                                {trace.providerName}
+                              </span>
+                              <ArrowRight className="w-3 h-3 text-gray-500 shrink-0" />
+
+                              <span className={`px-2 py-1 rounded font-mono ${
+                                trace.outcome === 'HTTP_FAILURE' ? 'bg-red-500/20 text-red-400' :
+                                trace.outcome === 'TIMEOUT' ? 'bg-yellow-500/20 text-yellow-400' :
+                                trace.outcome === 'NETWORK_FAILURE' ? 'bg-red-500/20 text-red-400' :
+                                'bg-blue-500/20 text-blue-300'
+                              }`}>
+                                {trace.httpStatus ? `HTTP ${trace.httpStatus}` : trace.outcome}
+                              </span>
+                              <ArrowRight className="w-3 h-3 text-gray-500 shrink-0" />
+
+                              <span className="px-2 py-1 rounded bg-purple-500/20 text-purple-300">
+                                {trace.streamsReceived} recebidos
+                              </span>
+                              <ArrowRight className="w-3 h-3 text-gray-500 shrink-0" />
+
+                              <span className={`px-2 py-1 rounded ${
+                                trace.filteredOutCount > 0 ? 'bg-amber-500/20 text-amber-300' : 'bg-white/10 text-gray-400'
+                              }`}>
+                                {trace.filteredOutCount} descartados
+                              </span>
+                              <ArrowRight className="w-3 h-3 text-gray-500 shrink-0" />
+
+                              <span className={`px-2 py-1 rounded font-black ${
+                                trace.approvedCount > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                              }`}>
+                                {trace.approvedCount} aprovados
+                              </span>
+                              <ArrowRight className="w-3 h-3 text-gray-500 shrink-0" />
+
+                              <span className={`px-2 py-1 rounded ${
+                                trace.approvedCount > 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/5 text-gray-500'
+                              }`}>
+                                {trace.playerState || (trace.approvedCount > 0 ? 'PRONTO' : 'NÃO ATINGIDO')}
+                              </span>
+                              <ArrowRight className="w-3 h-3 text-gray-500 shrink-0" />
+
+                              <span className={`px-2 py-1 rounded ${
+                                trace.playerState === 'FIRST_FRAME_DECODED' ? 'bg-emerald-500/30 text-emerald-300' :
+                                trace.approvedCount > 0 ? 'bg-blue-500/10 text-blue-400' : 'bg-white/5 text-gray-600'
+                              }`}>
+                                {trace.playerState === 'FIRST_FRAME_DECODED' ? '✓ FRAME' : (trace.approvedCount > 0 ? 'AGUARDANDO' : '—')}
+                              </span>
+                            </div>
+
+                            {isZero && (
+                              <div className="mt-2 pt-2 border-t border-red-500/20 text-[11px] text-red-300 flex items-start gap-1.5">
+                                <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+                                <div>
+                                  <strong className="font-bold">Motivo do descarte: </strong>
+                                  <span>{trace.dropReason || (
+                                    trace.outcome === 'TIMEOUT' ? 'Tempo limite de resposta esgotado (timeout upstream).' :
+                                    trace.outcome === 'SUCCESS_EMPTY' ? 'O provedor respondeu com sucesso, mas não possui fontes para esta obra (streams: []).' :
+                                    trace.filteredOutCount > 0 ? 'Fontes recebidas foram descartadas por incompatibilidade de formato ou correspondência de título.' :
+                                    'Provedor inacessível ou falha técnica.'
+                                  )}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {resolvedTestStreams.length > 0 && (
                   <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">

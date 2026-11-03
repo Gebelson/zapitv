@@ -1,15 +1,16 @@
 /**
- * ZAPITV — Teste de Regressão Obrigatório: Circuit Breaker & Validação End-to-End de Reprodução
+ * ZAPITV — Teste de Integração: Circuit Breaker, Respostas Vazias e Prontidão de Fontes
  * 
- * Validação rigorosa dos Requisitos 6 e 7 do Incidente P0:
+ * Validação rigorosa dos mecanismos de estabilidade:
  * 1. Buscar fontes para conteúdo com fonte conhecida (Sintel / Tears of Steel / Blender Open).
- * 2. Confirmar que a fonte foi encontrada e é tecnicamente reproduzível.
- * 3. Buscar fontes para 4 conteúdos que retornem lista vazia de streams (streams: []).
- * 4. Verificar que o circuit breaker NÃO foi ativado para provedores com resposta vazia.
+ * 2. Confirmar que a fonte foi encontrada e é tecnicamente compatível.
+ * 3. Buscar fontes para conteúdos que retornem lista vazia de streams (streams: []).
+ * 4. Verificar que o circuit breaker NÃO foi ativado para provedores com resposta vazia legítima.
  * 5. Buscar novamente o conteúdo do passo 1.
- * 6. Confirmar que a fonte continua sendo encontrada e reproduzida normalmente.
+ * 6. Confirmar que a fonte continua sendo encontrada normalmente.
  * 7. Verificar que failureCount dos provedores não foi incrementado por respostas vazias.
- * 8. Validação End-to-End com reprodução real de Filme, Série e Anime (timeupdate > 0.5s).
+ * 8. Validação de seleção técnica de fontes para Filme, Série e Anime.
+ * (Nota: O teste E2E de decodificação real com navegador Chromium está em tests/e2e_real_player_playback.test.ts)
  */
 
 import assert from 'node:assert';
@@ -21,7 +22,7 @@ import { StremioStream } from '../src/core/stremio/stremioTypes';
 
 async function runRegressionSuite() {
   console.log('========================================================================');
-  console.log('--- ZAPITV | REGRESSÃO P0: CIRCUIT BREAKER & REPRODUÇÃO REAL ---');
+  console.log('--- ZAPITV | INTEGRAÇÃO: CIRCUIT BREAKER E PRONTIDÃO DE FONTES ---');
   console.log('========================================================================\n');
 
   // Simula o ambiente de produção para rotas internas /api/stremio/ quando rodando em teste sem servidor Express local
@@ -261,7 +262,7 @@ async function runRegressionSuite() {
     ];
 
     for (const c of testCandidates) {
-      console.log(`\n    --- Testando Reprodução E2E: ${c.category} [${c.item.title}] ---`);
+      console.log(`\n    --- Validando Verificação de Fontes Técnicas: ${c.category} [${c.item.title}] ---`);
       const verification = await sourceVerificationService.verifySources(c.item, c.episode);
       assert.strictEqual(verification.state, 'AVAILABLE', `Verificação de ${c.category} deve ser AVAILABLE`);
       assert.ok(verification.streams.length > 0, `Nenhuma fonte encontrada para ${c.category}`);
@@ -271,41 +272,9 @@ async function runRegressionSuite() {
       console.log(`      Stream URL: ${stream.url}`);
       console.log(`      Container: ${stream.sourceType || 'mp4'}`);
 
-      // Simulação do ciclo de vida completo do Player (HTML5 Video Element Mock)
-      let currentTime = 0;
-      let playbackConfirmed = false;
-      const eventsLog: string[] = [];
-
-      const simulatedVideo = {
-        src: stream.url,
-        currentTime: 0,
-        paused: true,
-        duration: 600,
-        play: async () => {
-          simulatedVideo.paused = false;
-          eventsLog.push('play');
-          eventsLog.push('playing');
-        },
-        advanceTime: (deltaSeconds: number) => {
-          simulatedVideo.currentTime += deltaSeconds;
-          currentTime = simulatedVideo.currentTime;
-          eventsLog.push(`timeupdate (currentTime = ${currentTime.toFixed(2)}s)`);
-          if (currentTime > 0.5) {
-            playbackConfirmed = true;
-            eventsLog.push('playback_confirmed (frame decodificado com áudio/vídeo)');
-          }
-        }
-      };
-
-      await simulatedVideo.play();
-      // Avança playback para simular decodificação do primeiro frame e tempo contínuo
-      simulatedVideo.advanceTime(0.3);
-      simulatedVideo.advanceTime(0.4); // Total 0.7s (> 0.5s)
-
-      console.log(`      Eventos do Player: ${eventsLog.join(' -> ')}`);
-      assert.strictEqual(playbackConfirmed, true, `Reprodução de ${c.category} deve atingir currentTime > 0.5s`);
-      assert.ok(currentTime > 0.5, `currentTime deve ser > 0.5s (atual: ${currentTime}s)`);
-      console.log(`      ✓ Reprodução de ${c.category} CONFIRMADA com sucesso!`);
+      const technicallyPlayable = isSourceTechnicallyPlayable(stream);
+      assert.strictEqual(technicallyPlayable, true, `A fonte selecionada para ${c.category} deve ser tecnicamente compatível`);
+      console.log(`      ✓ Fonte para ${c.category} verificada e tecnicamente pronta para o player.`);
     }
   });
 

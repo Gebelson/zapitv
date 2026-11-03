@@ -1,6 +1,6 @@
 import { StremioStream } from '../stremio/stremioTypes';
 import { ContentItem, ContentType } from '../../../types';
-import { providerRegistry, ProviderConfig } from './providerRegistry';
+import { providerRegistry, ProviderConfig, type ProviderAttemptOutcome, type ProviderAttemptDetail } from './providerRegistry';
 import { tmdbService } from '../tmdb/tmdbClient';
 import { canonicalIdentityService } from '../identity/canonicalIdentity';
 import { sourceConfidenceEngine } from '../identity/sourceConfidenceEngine';
@@ -17,14 +17,17 @@ export type VerificationState =
   | 'INCONCLUSIVE'    // Falhas de rede, limites ou timeouts impediram verificação conclusiva
   | 'PLAYBACK_ERROR'; // Fonte encontrada falhou na reprodução
 
-export interface ProviderAttemptDetail {
+export interface PipelineTraceStep {
   providerId: string;
   providerName: string;
-  durationMs: number;
-  success: boolean;
-  streamCount: number;
-  isTimeout?: boolean;
-  error?: string;
+  httpStatus?: number;
+  outcome: ProviderAttemptOutcome;
+  streamsReceived: number;
+  filteredOutCount: number;
+  filterReasons: string[];
+  approvedCount: number;
+  playerState?: 'NOT_REACHED' | 'LOADING' | 'FIRST_FRAME_DECODED' | 'PLAYBACK_ERROR';
+  dropReason?: string;
 }
 
 export interface VerificationDiagnosticLog {
@@ -40,6 +43,7 @@ export interface VerificationDiagnosticLog {
   approvedStreamsCount: number;
   rejectedStreamsCount?: number;
   rejectedStreams: { title: string; providerId?: string; reason: string }[];
+  pipelineTraces?: PipelineTraceStep[];
   timeouts: string[];
   networkErrors: { providerId: string; error: string }[];
   phase1DurationMs: number;
@@ -101,7 +105,8 @@ class SourceVerificationService {
 
     // Ordem de consulta pela prioridade configurada (1, 2, 3...)
     const queryOrder = eligibleProviders.map(p => `${p.name} (P${p.priority})`);
-    const latestProviderOutcome = new Map<string, boolean>();
+    const latestProviderOutcome = new Map<string, ProviderAttemptDetail>();
+    const pipelineTraces: PipelineTraceStep[] = [];
 
     const diagnostic: VerificationDiagnosticLog = {
       contentTitle: targetTitle,
@@ -115,6 +120,7 @@ class SourceVerificationService {
       returnedStreamsCount: 0,
       approvedStreamsCount: 0,
       rejectedStreams: [],
+      pipelineTraces,
       timeouts: [],
       networkErrors: [],
       phase1DurationMs: 0,
@@ -125,19 +131,43 @@ class SourceVerificationService {
 
     // Callback para coletar telemetria detalhada de cada tentativa de provedor
     const handleProviderAttempt = (detail: ProviderAttemptDetail) => {
-      latestProviderOutcome.set(detail.providerId, detail.success && !detail.isTimeout);
+      latestProviderOutcome.set(detail.providerId, detail);
       if (!diagnostic.queriedProviders.includes(detail.providerId)) {
         diagnostic.queriedProviders.push(detail.providerId);
       }
-      if (detail.isTimeout) {
+      if (detail.isTimeout || detail.outcome === 'TIMEOUT') {
         if (!diagnostic.timeouts.includes(detail.providerId)) {
           diagnostic.timeouts.push(detail.providerId);
         }
       }
-      if (!detail.success && detail.error && !detail.isTimeout) {
+      if ((detail.outcome === 'NETWORK_FAILURE' || detail.outcome === 'HTTP_FAILURE' || detail.outcome === 'INVALID_RESPONSE') && detail.error) {
         diagnostic.networkErrors.push({ providerId: detail.providerId, error: detail.error });
       }
       diagnostic.returnedStreamsCount += detail.streamCount;
+
+      let trace = pipelineTraces.find(t => t.providerId === detail.providerId);
+      if (!trace) {
+        trace = {
+          providerId: detail.providerId,
+          providerName: detail.providerName,
+          httpStatus: detail.httpStatus,
+          outcome: detail.outcome,
+          streamsReceived: detail.streamCount,
+          filteredOutCount: 0,
+          filterReasons: [],
+          approvedCount: 0,
+          playerState: 'NOT_REACHED',
+          dropReason: detail.streamCount === 0 ? 'Provedor confirmou ausência de fontes (0 streams)' : undefined
+        };
+        pipelineTraces.push(trace);
+      } else {
+        trace.outcome = detail.outcome;
+        trace.streamsReceived += detail.streamCount;
+        trace.httpStatus = detail.httpStatus || trace.httpStatus;
+        if (detail.streamCount === 0 && !trace.dropReason) {
+          trace.dropReason = 'Provedor confirmou ausência de fontes (0 streams)';
+        }
+      }
     };
 
     // =========================================================================
@@ -207,9 +237,24 @@ class SourceVerificationService {
 
     // Validação estrita de compatibilidade técnica e correspondência canônica de identidade
     const isPlayableAndCanonicallyVerified = (s: StremioStream): boolean => {
-      if (!isSourcePlayableHere(s)) return false;
+      if (!isSourcePlayableHere(s)) {
+        diagnostic.rejectedStreams.push({
+          title: s.title || s.name || 'Stream sem título',
+          providerId: s.providerId,
+          reason: 'Incompatível com o ambiente de reprodução / dependência de Stremio Engine local'
+        });
+        return false;
+      }
       const evaluation = sourceConfidenceEngine.evaluate(s, canonicalIdentity);
-      return evaluation.isMatch && evaluation.confidence !== 'REJECTED' && evaluation.confidence !== 'QUARANTINED';
+      if (!evaluation.isMatch || evaluation.confidence === 'REJECTED' || evaluation.confidence === 'QUARANTINED') {
+        diagnostic.rejectedStreams.push({
+          title: s.title || s.name || 'Stream sem título',
+          providerId: s.providerId,
+          reason: evaluation.reasons.join(', ') || ('Confiança: ' + evaluation.confidence) 
+        });
+        return false;
+      }
+      return true;
     };
 
     // 0. Se o item já possui verifiedStreams pré-validadas de acervo oficial ou teste, aproveita-as imediatamente
@@ -219,7 +264,7 @@ class SourceVerificationService {
         diagnostic.finalState = 'AVAILABLE';
         diagnostic.approvedStreamsCount = verifiedPlayable.length;
         diagnostic.totalDurationMs = Date.now() - overallStart;
-        this.recordLog(diagnostic);
+        this.recordLog(diagnostic, verifiedPlayable);
         options?.onProgressiveStreams?.(verifiedPlayable);
         options?.onStateChange?.('AVAILABLE');
         return {
@@ -270,7 +315,7 @@ class SourceVerificationService {
     if (phase1Playable.length > 0) {
       diagnostic.finalState = 'AVAILABLE';
       diagnostic.totalDurationMs = Date.now() - overallStart;
-      this.recordLog(diagnostic);
+      this.recordLog(diagnostic, phase1Playable);
       options?.onStateChange?.('AVAILABLE');
       return {
         state: 'AVAILABLE',
@@ -423,7 +468,7 @@ class SourceVerificationService {
     if (finalStreams.length > 0) {
       diagnostic.approvedStreamsCount = finalStreams.length;
       diagnostic.finalState = 'AVAILABLE';
-      this.recordLog(diagnostic);
+      this.recordLog(diagnostic, finalStreams);
       options?.onStateChange?.('AVAILABLE');
       return {
         state: 'AVAILABLE',
@@ -460,7 +505,7 @@ class SourceVerificationService {
     if (webReadyCandidates.length > 0) {
       diagnostic.approvedStreamsCount = webReadyCandidates.length;
       diagnostic.finalState = 'AVAILABLE';
-      this.recordLog(diagnostic);
+      this.recordLog(diagnostic, webReadyCandidates);
       options?.onStateChange?.('AVAILABLE');
       return {
         state: 'AVAILABLE',
@@ -475,12 +520,12 @@ class SourceVerificationService {
     const nonTorrentCandidates = candidatePool.filter(s => !torrentCandidates.includes(s));
 
     if (torrentCandidates.length > 0 && nonTorrentCandidates.length === 0) {
-      // Exclusivamente torrents que dependem de motor local foram encontrados
-      diagnostic.finalState = 'INCONCLUSIVE';
-      diagnostic.inconclusiveReason = 'As fontes retornadas exigem um motor local indisponível neste dispositivo';
+      // Exclusivamente torrents que dependem de motor local foram encontrados, mas o motor não está ativo
+      diagnostic.finalState = 'UNAVAILABLE';
+      diagnostic.inconclusiveReason = 'As fontes encontradas dependem de motor P2P/Stremio Engine não disponível neste dispositivo';
       this.recordLog(diagnostic);
-      options?.onStateChange?.('INCONCLUSIVE', MSG_INCONCLUSIVE);
-      return { state: 'INCONCLUSIVE', streams: [], errorMessage: MSG_INCONCLUSIVE, diagnosticLog: diagnostic };
+      options?.onStateChange?.('UNAVAILABLE', MSG_UNAVAILABLE);
+      return { state: 'UNAVAILABLE', streams: [], errorMessage: MSG_UNAVAILABLE, diagnosticLog: diagnostic };
     }
 
     if (candidatePool.length > 0) {
@@ -488,18 +533,21 @@ class SourceVerificationService {
     }
 
     // =========================================================================
-    // ETAPA 3: CLASSIFICAÇÃO RIGOROSA DO RESULTADO (Requisito 5)
+    // ETAPA 3: CLASSIFICAÇÃO RIGOROSA DO RESULTADO (Requisitos 3 e 5)
     // =========================================================================
-    // Sem fonte, qualquer provedor ainda em erro deixa a conclusão parcial.
-    // Respostas vazias simuladas, cache negativo e ausência de provedores consultados
-    // também não comprovam indisponibilidade.
-    const unresolvedProviders = [...latestProviderOutcome].filter(([, success]) => !success).map(([id]) => id);
+    const technicalFailures = Array.from(latestProviderOutcome.values()).filter(d =>
+      d.outcome === 'TIMEOUT' ||
+      d.outcome === 'NETWORK_FAILURE' ||
+      d.outcome === 'HTTP_FAILURE' ||
+      d.outcome === 'INVALID_RESPONSE'
+    );
     const registryFailed = diagnostic.networkErrors.some(e => e.providerId.startsWith('registry-'));
-    if (unresolvedProviders.length > 0 || registryFailed || latestProviderOutcome.size === 0) {
+
+    if (technicalFailures.length > 0 || registryFailed) {
       diagnostic.finalState = 'INCONCLUSIVE';
-      diagnostic.inconclusiveReason = unresolvedProviders.length > 0
-        ? `Provedores sem resposta conclusiva: ${unresolvedProviders.join(', ')}`
-        : registryFailed ? 'Falha no registro de provedores' : 'Nenhum provedor confirmou a ausência de fontes';
+      diagnostic.inconclusiveReason = technicalFailures.length > 0
+        ? `Provedores com falha técnica: ${technicalFailures.map(f => `${f.providerName} (${f.outcome})`).join(', ')}`
+        : 'Falha no registro de provedores';
       this.recordLog(diagnostic);
       options?.onStateChange?.('INCONCLUSIVE', MSG_INCONCLUSIVE);
       return {
@@ -510,8 +558,9 @@ class SourceVerificationService {
       };
     }
 
-    // Ausência confirmada: provedores responderam conclusivamente mas nenhuma fonte válida existe
+    // Ausência confirmada: todos os provedores elegíveis responderam conclusivamente com ausência de fontes
     diagnostic.finalState = 'UNAVAILABLE';
+    diagnostic.inconclusiveReason = 'Ausência de fontes comprovada em todos os provedores elegíveis';
     this.recordLog(diagnostic);
     options?.onStateChange?.('UNAVAILABLE', MSG_UNAVAILABLE);
     return {
@@ -545,7 +594,32 @@ class SourceVerificationService {
     return candidates[0] || null;
   }
 
-  private recordLog(log: VerificationDiagnosticLog): void {
+  private recordLog(log: VerificationDiagnosticLog, approvedStreams: StremioStream[] = []): void {
+    if (log.pipelineTraces) {
+      const approvedByProvider = new Map<string, number>();
+      for (const s of approvedStreams) {
+        if (s.providerId) {
+          approvedByProvider.set(s.providerId, (approvedByProvider.get(s.providerId) || 0) + 1);
+        }
+      }
+      for (const trace of log.pipelineTraces) {
+        const approved = approvedByProvider.get(trace.providerId) || 0;
+        trace.approvedCount = approved;
+        trace.filteredOutCount = Math.max(0, trace.streamsReceived - approved);
+        if (approved > 0) {
+          trace.dropReason = undefined;
+        } else if (trace.streamsReceived > 0 && !trace.dropReason) {
+          trace.dropReason = 'Fontes descartadas por filtro de integridade/compatibilidade';
+        }
+        if (trace.filteredOutCount > 0 && log.rejectedStreams.length === 0) {
+          log.rejectedStreams.push({
+            title: 'Streams descartados (' + trace.providerName + ')',
+            providerId: trace.providerId,
+            reason: trace.dropReason || 'Rejeitado por incompatibilidade ou filtro de integridade'
+          });
+        }
+      }
+    }
     this.lastLog = log;
     this.diagnosticLogs.unshift(log);
     if (this.diagnosticLogs.length > this.MAX_LOG_HISTORY) {

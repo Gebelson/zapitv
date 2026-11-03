@@ -12789,31 +12789,33 @@ var init_providerRegistry = __esm({
         id: "stremio-cinemeta",
         name: "Cinemeta (Stremio Oficial)",
         url: "https://v3-cinemeta.strem.io",
-        enabled: true,
+        enabled: false,
         type: "stremio-addon",
         priority: 12,
         isPtBr: false,
-        status: "online"
+        status: "online",
+        deliveryCapacity: "METADATA_ONLY"
       },
       {
         id: "stremio-opensubtitles",
         name: "OpenSubtitles v3 (Stremio Oficial)",
         url: "https://opensubtitles-v3.strem.io",
-        enabled: true,
+        enabled: false,
         type: "stremio-addon",
         priority: 13,
         isPtBr: true,
-        status: "online"
+        status: "online",
+        deliveryCapacity: "METADATA_ONLY"
       },
       {
         id: "cinetorrent-pt",
         name: "CineTorrent (Multi-Idioma & PT-BR)",
         url: "https://150203dd784e-cinetorrent-addon.baby-beamup.club",
-        enabled: true,
+        enabled: false,
         type: "stremio-addon",
         priority: 14,
         isPtBr: true,
-        status: "online",
+        status: "offline",
         supportedMediaTypes: ["movie"],
         requiresConfig: false,
         configDescription: "Suporte a filmes com tags de \xE1udio PT-BR e multi-idioma"
@@ -12945,7 +12947,16 @@ var init_providerRegistry = __esm({
             if (Array.isArray(data.providers) && data.providers.length > 0) {
               const map = /* @__PURE__ */ new Map();
               this.providers.forEach((p) => map.set(p.id, p));
-              data.providers.forEach((p) => map.set(p.id, { ...map.get(p.id) || {}, ...p }));
+              data.providers.forEach((p) => {
+                const existing = map.get(p.id);
+                const forceDisable = p.deliveryCapacity === "METADATA_ONLY" || p.id === "stremio-cinemeta" || p.id === "stremio-opensubtitles" || p.healthState === "STREAM_ENDPOINT_UNREACHABLE" || p.requiresConfig && !p.configKey;
+                const resolvedEnabled = forceDisable ? false : p.enabled;
+                map.set(p.id, {
+                  ...existing || {},
+                  ...p,
+                  enabled: resolvedEnabled
+                });
+              });
               this.providers = Array.from(map.values()).sort((a, b) => a.priority - b.priority);
               this.saveProviders();
             }
@@ -12973,6 +12984,9 @@ var init_providerRegistry = __esm({
       getEligibleProviders(type) {
         return this.providers.filter((p) => {
           if (!p.enabled) return false;
+          if (p.requiresConfig && !p.configKey) return false;
+          if (p.deliveryCapacity === "METADATA_ONLY" || p.id === "stremio-cinemeta" || p.id === "stremio-opensubtitles") return false;
+          if (p.healthState === "DISABLED" || p.healthState === "STREAM_ENDPOINT_UNREACHABLE" || p.status === "offline") return false;
           if (type && p.supportedMediaTypes && p.supportedMediaTypes.length > 0) {
             if (!p.supportedMediaTypes.includes(type)) return false;
           }
@@ -13207,12 +13221,14 @@ var init_providerRegistry = __esm({
               if (options?.onProviderResult) {
                 const providers = this.getEligibleProviders();
                 for (const p of providers) {
+                  const count2 = cached.streams.filter((s) => s.providerId === p.id).length;
                   options.onProviderResult({
                     providerId: p.id,
                     providerName: p.name,
                     durationMs: 0,
+                    outcome: count2 > 0 ? "SUCCESS_WITH_STREAMS" : "SUCCESS_EMPTY",
                     success: true,
-                    streamCount: cached.streams.filter((s) => s.providerId === p.id).length,
+                    streamCount: count2,
                     isTimeout: false
                   });
                 }
@@ -13581,9 +13597,21 @@ var init_providerRegistry = __esm({
             let providerSuccess = false;
             let providerStreamCount = 0;
             let providerError;
+            let httpStatusCode;
             let rawResponse = null;
             const failureRecord = this.providerFailures.get(addon.id);
             if (failureRecord && failureRecord.cooldownUntil && Date.now() < failureRecord.cooldownUntil) {
+              const detail = {
+                providerId: addon.id,
+                providerName: addon.name,
+                durationMs: 0,
+                outcome: "SKIPPED",
+                streamCount: 0,
+                isTimeout: false,
+                success: false,
+                error: "Provedor em cooldown tempor\xE1rio"
+              };
+              options?.onProviderResult?.(detail);
               return [];
             }
             const isFireTv = tvPerformanceService.isFireTv();
@@ -13618,6 +13646,9 @@ var init_providerRegistry = __esm({
               };
               let res = await client.getStreams(stremioType, primaryQueryId, requestOpts).catch((err) => {
                 providerError = err?.message || "Falha na consulta prim\xE1ria";
+                if (err && err.status) {
+                  httpStatusCode = err.status;
+                }
                 return null;
               });
               rawResponse = res;
@@ -13731,19 +13762,40 @@ var init_providerRegistry = __esm({
               }
             } catch (err) {
               providerError = err.message || "Erro de comunica\xE7\xE3o";
+              if (err && err.status) {
+                httpStatusCode = err.status;
+              }
             } finally {
               const duration = Date.now() - startProviderTime;
-              const isTimeout = Boolean(providerError?.includes("TIMEOUT") || duration >= addonTimeout - 300 && !providerSuccess);
-              const isNetworkError = Boolean(providerError && /(?:timeout|network|econnrefused|failed to fetch|econnreset|enotfound|500|502|503|504|cors)/i.test(providerError));
-              const isConclusiveResponse = Boolean(rawResponse && Array.isArray(rawResponse.streams));
-              if (isConclusiveResponse) {
+              const userAborted = Boolean(options?.signal?.aborted);
+              let outcome;
+              let isTimeout = false;
+              if (userAborted) {
+                outcome = "CANCELLED";
+              } else if (providerError?.includes("TIMEOUT") || providerError && /timed? ?out/i.test(providerError)) {
+                outcome = "TIMEOUT";
+                isTimeout = true;
+              } else if (httpStatusCode && httpStatusCode >= 400) {
+                outcome = "HTTP_FAILURE";
+              } else if (providerError) {
+                outcome = "NETWORK_FAILURE";
+              } else if (rawResponse && Array.isArray(rawResponse.streams)) {
+                if (providerStreamCount > 0) {
+                  outcome = "SUCCESS_WITH_STREAMS";
+                } else {
+                  outcome = "SUCCESS_EMPTY";
+                }
+              } else {
+                outcome = "INVALID_RESPONSE";
+              }
+              if (outcome === "SUCCESS_WITH_STREAMS" || outcome === "SUCCESS_EMPTY") {
                 this.providerFailures.delete(addon.id);
-              } else if ((isTimeout || isNetworkError) && !options?.signal?.aborted) {
+              } else if ((outcome === "TIMEOUT" || outcome === "NETWORK_FAILURE" || httpStatusCode && httpStatusCode >= 500) && !userAborted) {
                 const currentFailures = (this.providerFailures.get(addon.id)?.count || 0) + 1;
                 const cooldownUntil = currentFailures >= 4 ? Date.now() + 6e4 : 0;
                 this.providerFailures.set(addon.id, { count: currentFailures, cooldownUntil });
               }
-              const providerQueryConcluded = isConclusiveResponse || providerSuccess;
+              const providerQueryConcluded = outcome === "SUCCESS_WITH_STREAMS" || outcome === "SUCCESS_EMPTY";
               playbackOptimizerService.recordProviderResult(addon.id, duration, providerQueryConcluded);
               mediaLoadingTracker.recordProviderAttempt(rawTargetId, {
                 providerId: addon.id,
@@ -13757,9 +13809,11 @@ var init_providerRegistry = __esm({
                 providerId: addon.id,
                 providerName: addon.name,
                 durationMs: duration,
-                success: providerQueryConcluded,
+                outcome,
                 streamCount: providerStreamCount,
+                httpStatus: httpStatusCode,
                 isTimeout,
+                success: providerQueryConcluded,
                 error: providerError
               };
               options?.onProviderResult?.(attemptDetail);
@@ -20681,6 +20735,13 @@ var init_schema = __esm({
 });
 
 // src/server/database/client.ts
+var client_exports = {};
+__export(client_exports, {
+  createDatabase: () => createDatabase,
+  ensureAuthTables: () => ensureAuthTables,
+  getDatabase: () => getDatabase,
+  resetSharedDatabaseForTesting: () => resetSharedDatabaseForTesting
+});
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import fs2 from "fs";
@@ -20916,6 +20977,10 @@ async function ensureAuthTables(database) {
     );
   `);
 }
+function resetSharedDatabaseForTesting() {
+  sharedDatabase = void 0;
+  sharedDatabaseKey = void 0;
+}
 var sharedDatabase, sharedDatabaseKey;
 var init_client = __esm({
   "src/server/database/client.ts"() {
@@ -21107,6 +21172,60 @@ var init_firebaseAuth = __esm({
       { timeoutDuration: 5e3 }
     );
     InvalidFirebaseToken = class extends Error {
+    };
+  }
+});
+
+// src/server/database/settings.ts
+var settings_exports = {};
+__export(settings_exports, {
+  SettingVersionConflict: () => SettingVersionConflict,
+  readSetting: () => readSetting,
+  writeSetting: () => writeSetting
+});
+import { and as and4, eq as eq4 } from "drizzle-orm";
+async function readSetting(connection, key) {
+  const [row] = await connection.db.select().from(globalSettings).where(eq4(globalSettings.key, key)).limit(1);
+  return row ? { value: JSON.parse(row.valueJson), version: row.version, updatedAt: row.updatedAt } : null;
+}
+async function writeSetting(connection, key, value, expectedVersion, actorUid) {
+  const now = Date.now();
+  const valueJson = JSON.stringify(value);
+  return connection.db.transaction(async (tx) => {
+    if (expectedVersion === 0) {
+      const inserted = await tx.insert(globalSettings).values({
+        key,
+        valueJson,
+        version: 1,
+        updatedAt: now,
+        updatedBy: actorUid
+      }).onConflictDoNothing().returning({ version: globalSettings.version });
+      if (inserted.length !== 1) throw new SettingVersionConflict("A configura\xE7\xE3o foi modificada em outra sess\xE3o.");
+    } else {
+      const updated = await tx.update(globalSettings).set({
+        valueJson,
+        version: expectedVersion + 1,
+        updatedAt: now,
+        updatedBy: actorUid
+      }).where(and4(eq4(globalSettings.key, key), eq4(globalSettings.version, expectedVersion))).returning({ version: globalSettings.version });
+      if (updated.length !== 1) throw new SettingVersionConflict("A configura\xE7\xE3o foi modificada em outra sess\xE3o.");
+    }
+    await tx.insert(adminAudit).values({
+      id: crypto.randomUUID(),
+      settingKey: key,
+      previousVersion: expectedVersion,
+      nextVersion: expectedVersion + 1,
+      actorUid,
+      createdAt: now
+    });
+    return { value, version: expectedVersion + 1, updatedAt: now };
+  });
+}
+var SettingVersionConflict;
+var init_settings = __esm({
+  "src/server/database/settings.ts"() {
+    init_schema();
+    SettingVersionConflict = class extends Error {
     };
   }
 });
@@ -27195,50 +27314,8 @@ init_validationTargetUrl();
 // src/server/database/routes.ts
 init_client();
 init_firebaseAuth();
+init_settings();
 import { Router } from "express";
-
-// src/server/database/settings.ts
-init_schema();
-import { and as and4, eq as eq4 } from "drizzle-orm";
-var SettingVersionConflict = class extends Error {
-};
-async function readSetting(connection, key) {
-  const [row] = await connection.db.select().from(globalSettings).where(eq4(globalSettings.key, key)).limit(1);
-  return row ? { value: JSON.parse(row.valueJson), version: row.version, updatedAt: row.updatedAt } : null;
-}
-async function writeSetting(connection, key, value, expectedVersion, actorUid) {
-  const now = Date.now();
-  const valueJson = JSON.stringify(value);
-  return connection.db.transaction(async (tx) => {
-    if (expectedVersion === 0) {
-      const inserted = await tx.insert(globalSettings).values({
-        key,
-        valueJson,
-        version: 1,
-        updatedAt: now,
-        updatedBy: actorUid
-      }).onConflictDoNothing().returning({ version: globalSettings.version });
-      if (inserted.length !== 1) throw new SettingVersionConflict("A configura\xE7\xE3o foi modificada em outra sess\xE3o.");
-    } else {
-      const updated = await tx.update(globalSettings).set({
-        valueJson,
-        version: expectedVersion + 1,
-        updatedAt: now,
-        updatedBy: actorUid
-      }).where(and4(eq4(globalSettings.key, key), eq4(globalSettings.version, expectedVersion))).returning({ version: globalSettings.version });
-      if (updated.length !== 1) throw new SettingVersionConflict("A configura\xE7\xE3o foi modificada em outra sess\xE3o.");
-    }
-    await tx.insert(adminAudit).values({
-      id: crypto.randomUUID(),
-      settingKey: key,
-      previousVersion: expectedVersion,
-      nextVersion: expectedVersion + 1,
-      actorUid,
-      createdAt: now
-    });
-    return { value, version: expectedVersion + 1, updatedAt: now };
-  });
-}
 
 // src/server/database/sourceMemory.ts
 init_schema();
@@ -28559,6 +28636,7 @@ async function completeRecovery(db, token, password, confirmation) {
 }
 
 // src/server/auth/authPolicyService.ts
+init_settings();
 var AUTH_POLICY_KEY = "auth_policy";
 var cachedPolicy = null;
 var cachedPolicyExpiresAt = 0;
@@ -30719,7 +30797,7 @@ var FACTORY_AUTHORIZED_ADDONS = [
     preferredMethod: "direct",
     corsSupport: "full",
     timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 6e3 },
-    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    healthState: "MANIFEST_VALID",
     deliveryCapacity: "METADATA_ONLY",
     failureCount: 0
   },
@@ -30734,7 +30812,7 @@ var FACTORY_AUTHORIZED_ADDONS = [
     preferredMethod: "direct",
     corsSupport: "full",
     timeoutPolicy: { directTimeoutMs: 3e3, maxBudgetMs: 6e3 },
-    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    healthState: "MANIFEST_VALID",
     deliveryCapacity: "METADATA_ONLY",
     failureCount: 0
   },
@@ -30749,9 +30827,9 @@ var FACTORY_AUTHORIZED_ADDONS = [
     preferredMethod: "proxy_fallback",
     corsSupport: "partial",
     timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6500 },
-    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    healthState: "STREAM_ENDPOINT_UNREACHABLE",
     deliveryCapacity: "TORRENT_ONLY",
-    failureCount: 0
+    failureCount: 4
   },
   {
     id: "thepiratebay-plus",
@@ -30764,9 +30842,9 @@ var FACTORY_AUTHORIZED_ADDONS = [
     preferredMethod: "direct",
     corsSupport: "full",
     timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6e3 },
-    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    healthState: "STREAM_ENDPOINT_UNREACHABLE",
     deliveryCapacity: "TORRENT_ONLY",
-    failureCount: 0
+    failureCount: 4
   },
   {
     id: "brazuca-torrents",
@@ -30779,9 +30857,9 @@ var FACTORY_AUTHORIZED_ADDONS = [
     preferredMethod: "proxy_fallback",
     corsSupport: "partial",
     timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6500 },
-    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    healthState: "STREAM_ENDPOINT_UNREACHABLE",
     deliveryCapacity: "TORRENT_ONLY",
-    failureCount: 0
+    failureCount: 4
   },
   {
     id: "orion-addon",
@@ -30809,9 +30887,9 @@ var FACTORY_AUTHORIZED_ADDONS = [
     preferredMethod: "proxy_fallback",
     corsSupport: "none",
     timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6500 },
-    healthState: "STREAM_ENDPOINT_OPERATIONAL",
+    healthState: "STREAM_ENDPOINT_UNREACHABLE",
     deliveryCapacity: "DIRECT_HTTP_AVAILABLE",
-    failureCount: 0
+    failureCount: 4
   },
   {
     id: "aiostreams",
@@ -30829,6 +30907,13 @@ var FACTORY_AUTHORIZED_ADDONS = [
     failureCount: 0
   }
 ];
+function isAddonEligibleForStreams(addon) {
+  if (addon.deliveryCapacity === "METADATA_ONLY") return false;
+  if (!addon.supportedResources.includes("stream")) return false;
+  if (addon.healthState === "DISABLED" || addon.healthState === "CONFIGURATION_REQUIRED" || addon.healthState === "STREAM_ENDPOINT_UNREACHABLE") return false;
+  if (addon.requiresConfig) return false;
+  return true;
+}
 var AuthorizedAddonsRegistry = class _AuthorizedAddonsRegistry {
   constructor() {
     this.addons = /* @__PURE__ */ new Map();
@@ -30912,6 +30997,25 @@ var AuthorizedAddonsRegistry = class _AuthorizedAddonsRegistry {
         failureCount: 0,
         ...updates
       });
+    }
+  }
+  async loadPersistedConfig(db) {
+    try {
+      if (!db) {
+        const { getDatabase: getDatabase2 } = await Promise.resolve().then(() => (init_client(), client_exports));
+        db = getDatabase2();
+      }
+      if (!db) return;
+      const { readSetting: readSetting2 } = await Promise.resolve().then(() => (init_settings(), settings_exports));
+      const setting = await readSetting2(db, "providers_config");
+      if (setting && Array.isArray(setting.value)) {
+        for (const item of setting.value) {
+          if (item && item.id) {
+            this.updateAddonConfig(item.id, item);
+          }
+        }
+      }
+    } catch {
     }
   }
   resetCircuitBreakers() {
@@ -82381,41 +82485,63 @@ ${s.name?.split("\n")[1] || "1080p"}`,
       if (!res.headersSent) return res.status(502).json({ error: "Falha ao consultar metadados." });
     }
   });
-  app2.get("/api/providers/config", (_req, res) => {
+  app2.get("/api/providers/config", async (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=60");
+    await authorizedAddonsRegistry.loadPersistedConfig().catch(() => {
+    });
     const addons = authorizedAddonsRegistry.getAllAddons();
     return res.json({
-      providers: addons.map((a) => ({
-        id: a.id,
-        name: a.name,
-        url: a.baseUrl,
-        enabled: a.healthState !== "DISABLED",
-        type: "stremio-addon",
-        priority: 1,
-        isPtBr: a.id.includes("dublado") || a.id.includes("pt-br") || a.id.includes("brazuca"),
-        status: a.healthState === "STREAM_ENDPOINT_OPERATIONAL" ? "online" : a.healthState === "TEMPORARILY_UNAVAILABLE" ? "checking" : "offline",
-        supportedMediaTypes: a.supportedTypes,
-        healthState: a.healthState,
-        deliveryCapacity: a.deliveryCapacity
-      })),
+      providers: addons.map((a) => {
+        const isEligible = isAddonEligibleForStreams(a);
+        return {
+          id: a.id,
+          name: a.name,
+          url: a.baseUrl,
+          enabled: isEligible && a.healthState !== "DISABLED",
+          type: a.deliveryCapacity === "METADATA_ONLY" ? "metadata-addon" : "stremio-addon",
+          priority: 1,
+          isPtBr: a.id.includes("dublado") || a.id.includes("pt-br") || a.id.includes("brazuca"),
+          status: a.healthState === "STREAM_ENDPOINT_OPERATIONAL" ? "online" : a.healthState === "TEMPORARILY_UNAVAILABLE" ? "checking" : "offline",
+          supportedMediaTypes: a.supportedTypes,
+          healthState: a.healthState,
+          deliveryCapacity: a.deliveryCapacity,
+          requiresConfig: a.requiresConfig
+        };
+      }),
       syncedAt: (/* @__PURE__ */ new Date()).toISOString()
     });
   });
-  app2.post("/api/providers/config", requireAdmin, (req, res) => {
+  app2.post("/api/providers/config", requireAdmin, async (req, res) => {
     const { providers } = req.body || {};
     if (!Array.isArray(providers)) {
       return res.status(400).json({ error: "Formato de provedores inv\xE1lido" });
     }
+    const sanitizedProviders = [];
     for (const p of providers) {
       if (p && p.id) {
-        authorizedAddonsRegistry.updateAddonConfig(p.id, {
+        const updates = {
           name: p.name,
           baseUrl: p.url || p.baseUrl,
           supportedTypes: p.supportedMediaTypes || p.supportedTypes,
           healthState: p.enabled === false ? "DISABLED" : p.healthState || "STREAM_ENDPOINT_OPERATIONAL",
           deliveryCapacity: p.deliveryCapacity
-        });
+        };
+        authorizedAddonsRegistry.updateAddonConfig(p.id, updates);
+        sanitizedProviders.push({ id: p.id, ...updates, enabled: p.enabled !== false });
       }
+    }
+    try {
+      const db = await getValidDatabase();
+      if (db) {
+        const user = req.user;
+        const actorUid = user?.id || "admin";
+        const { readSetting: readSetting2, writeSetting: writeSetting2 } = await Promise.resolve().then(() => (init_settings(), settings_exports));
+        const existing = await readSetting2(db, "providers_config").catch(() => null);
+        const version = existing?.version || 0;
+        await writeSetting2(db, "providers_config", sanitizedProviders, version, actorUid);
+      }
+    } catch (err) {
+      console.warn("Falha ao persistir providers_config no banco:", err.message);
     }
     return res.json({ success: true, count: providers.length, syncedAt: (/* @__PURE__ */ new Date()).toISOString() });
   });

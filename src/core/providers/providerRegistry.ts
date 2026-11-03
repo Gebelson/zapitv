@@ -66,21 +66,35 @@ export interface ProviderConfig {
   deliveryCapacity?: DeliveryCapacity;
 }
 
+export type ProviderAttemptOutcome =
+  | 'SUCCESS_WITH_STREAMS'
+  | 'SUCCESS_EMPTY'
+  | 'NETWORK_FAILURE'
+  | 'HTTP_FAILURE'
+  | 'TIMEOUT'
+  | 'CANCELLED'
+  | 'SKIPPED'
+  | 'INVALID_RESPONSE';
+
+export interface ProviderAttemptDetail {
+  providerId: string;
+  providerName: string;
+  durationMs: number;
+  outcome: ProviderAttemptOutcome;
+  streamCount: number;
+  httpStatus?: number;
+  isTimeout?: boolean;
+  success?: boolean;
+  error?: string;
+}
+
 export interface ResolveStreamsOptions {
   onProgressiveStreams?: (streams: StremioStream[]) => void;
   signal?: AbortSignal;
   forceRefresh?: boolean;
   bypassNegativeCache?: boolean;
   isRetryAttempt?: boolean;
-  onProviderResult?: (detail: {
-    providerId: string;
-    providerName: string;
-    durationMs: number;
-    success: boolean;
-    streamCount: number;
-    isTimeout?: boolean;
-    error?: string;
-  }) => void;
+  onProviderResult?: (detail: ProviderAttemptDetail) => void;
 }
 
 // TMDB/AniList IDs already contain a colon, but still need the episode suffix.
@@ -268,31 +282,33 @@ export const DEFAULT_PROVIDERS: ProviderConfig[] = [
     id: 'stremio-cinemeta',
     name: 'Cinemeta (Stremio Oficial)',
     url: 'https://v3-cinemeta.strem.io',
-    enabled: true,
+    enabled: false,
     type: 'stremio-addon',
     priority: 12,
     isPtBr: false,
-    status: 'online'
+    status: 'online',
+    deliveryCapacity: 'METADATA_ONLY'
   },
   {
     id: 'stremio-opensubtitles',
     name: 'OpenSubtitles v3 (Stremio Oficial)',
     url: 'https://opensubtitles-v3.strem.io',
-    enabled: true,
+    enabled: false,
     type: 'stremio-addon',
     priority: 13,
     isPtBr: true,
-    status: 'online'
+    status: 'online',
+    deliveryCapacity: 'METADATA_ONLY'
   },
   {
     id: 'cinetorrent-pt',
     name: 'CineTorrent (Multi-Idioma & PT-BR)',
     url: 'https://150203dd784e-cinetorrent-addon.baby-beamup.club',
-    enabled: true,
+    enabled: false,
     type: 'stremio-addon',
     priority: 14,
     isPtBr: true,
-    status: 'online',
+    status: 'offline',
     supportedMediaTypes: ['movie'],
     requiresConfig: false,
     configDescription: 'Suporte a filmes com tags de áudio PT-BR e multi-idioma'
@@ -455,14 +471,25 @@ class ProviderRegistryService {
         if (Array.isArray(data.providers) && data.providers.length > 0) {
           const map = new Map<string, ProviderConfig>();
           this.providers.forEach(p => map.set(p.id, p));
-          data.providers.forEach((p: ProviderConfig) => map.set(p.id, { ...(map.get(p.id) || {}), ...p }));
+          data.providers.forEach((p: ProviderConfig) => {
+            const existing = map.get(p.id);
+            const forceDisable = p.deliveryCapacity === 'METADATA_ONLY' ||
+              p.id === 'stremio-cinemeta' ||
+              p.id === 'stremio-opensubtitles' ||
+              p.healthState === 'STREAM_ENDPOINT_UNREACHABLE' ||
+              (p.requiresConfig && !p.configKey);
+            const resolvedEnabled = forceDisable ? false : p.enabled;
+            map.set(p.id, {
+              ...(existing || {}),
+              ...p,
+              enabled: resolvedEnabled
+            });
+          });
           this.providers = Array.from(map.values()).sort((a, b) => a.priority - b.priority);
           this.saveProviders();
         }
       }
-    } catch {
-      // Offline fallback: retains current configuration
-    }
+    } catch {}
   }
 
   public saveProviders() {
@@ -490,6 +517,9 @@ class ProviderRegistryService {
   public getEligibleProviders(type?: 'movie' | 'series' | 'anime'): ProviderConfig[] {
     return this.providers.filter(p => {
       if (!p.enabled) return false;
+      if (p.requiresConfig && !p.configKey) return false;
+      if (p.deliveryCapacity === 'METADATA_ONLY' || p.id === 'stremio-cinemeta' || p.id === 'stremio-opensubtitles') return false;
+      if (p.healthState === 'DISABLED' || p.healthState === 'STREAM_ENDPOINT_UNREACHABLE' || p.status === 'offline') return false;
       if (type && p.supportedMediaTypes && p.supportedMediaTypes.length > 0) {
         if (!p.supportedMediaTypes.includes(type)) return false;
       }
@@ -757,12 +787,14 @@ class ProviderRegistryService {
           if (options?.onProviderResult) {
             const providers = this.getEligibleProviders();
             for (const p of providers) {
+              const count = cached.streams.filter(s => s.providerId === p.id).length;
               options.onProviderResult({
                 providerId: p.id,
                 providerName: p.name,
                 durationMs: 0,
+                outcome: count > 0 ? 'SUCCESS_WITH_STREAMS' : 'SUCCESS_EMPTY',
                 success: true,
-                streamCount: cached.streams.filter(s => s.providerId === p.id).length,
+                streamCount: count,
                 isTimeout: false
               });
             }
@@ -1203,11 +1235,23 @@ class ProviderRegistryService {
         let providerSuccess = false;
         let providerStreamCount = 0;
         let providerError: string | undefined;
+        let httpStatusCode: number | undefined;
         let rawResponse: any = null;
 
         // Circuit breaker check: se em cooldown por 4 falhas consecutivas, pula
         const failureRecord = this.providerFailures.get(addon.id);
         if (failureRecord && failureRecord.cooldownUntil && Date.now() < failureRecord.cooldownUntil) {
+          const detail: ProviderAttemptDetail = {
+            providerId: addon.id,
+            providerName: addon.name,
+            durationMs: 0,
+            outcome: 'SKIPPED',
+            streamCount: 0,
+            isTimeout: false,
+            success: false,
+            error: 'Provedor em cooldown temporário'
+          };
+          options?.onProviderResult?.(detail);
           return [];
         }
 
@@ -1251,6 +1295,9 @@ class ProviderRegistryService {
 
           let res = await client.getStreams(stremioType, primaryQueryId, requestOpts).catch((err: any) => {
             providerError = err?.message || 'Falha na consulta primária';
+            if (err && err.status) {
+              httpStatusCode = err.status;
+            }
             return null;
           });
           rawResponse = res;
@@ -1379,23 +1426,49 @@ class ProviderRegistryService {
           }
         } catch (err: any) {
           providerError = err.message || 'Erro de comunicação';
+          if (err && (err as any).status) {
+            httpStatusCode = (err as any).status;
+          }
         } finally {
           const duration = Date.now() - startProviderTime;
-          const isTimeout = Boolean(providerError?.includes('TIMEOUT') || (duration >= addonTimeout - 300 && !providerSuccess));
-          const isNetworkError = Boolean(providerError && /(?:timeout|network|econnrefused|failed to fetch|econnreset|enotfound|500|502|503|504|cors)/i.test(providerError));
-          const isConclusiveResponse = Boolean(rawResponse && Array.isArray(rawResponse.streams));
+          const userAborted = Boolean(options?.signal?.aborted);
 
-          // Resposta com 200 OK (mesmo com 0 streams para este conteúdo) ZERA as falhas.
+          let outcome: ProviderAttemptOutcome;
+          let isTimeout = false;
+
+          if (userAborted) {
+            outcome = 'CANCELLED';
+          } else if (
+            providerError?.includes('TIMEOUT') ||
+            (providerError && /timed? ?out/i.test(providerError))
+          ) {
+            outcome = 'TIMEOUT';
+            isTimeout = true;
+          } else if (httpStatusCode && httpStatusCode >= 400) {
+            outcome = 'HTTP_FAILURE';
+          } else if (providerError) {
+            outcome = 'NETWORK_FAILURE';
+          } else if (rawResponse && Array.isArray(rawResponse.streams)) {
+            if (providerStreamCount > 0) {
+              outcome = 'SUCCESS_WITH_STREAMS';
+            } else {
+              outcome = 'SUCCESS_EMPTY';
+            }
+          } else {
+            outcome = 'INVALID_RESPONSE';
+          }
+
+          // Resposta com 200 OK (com ou sem streams) ZERA as falhas.
           // Penaliza EXCLUSIVAMENTE falhas reais de rede, conexão ou timeouts de infraestrutura.
-          if (isConclusiveResponse) {
+          if (outcome === 'SUCCESS_WITH_STREAMS' || outcome === 'SUCCESS_EMPTY') {
             this.providerFailures.delete(addon.id);
-          } else if ((isTimeout || isNetworkError) && !options?.signal?.aborted) {
+          } else if ((outcome === 'TIMEOUT' || outcome === 'NETWORK_FAILURE' || (httpStatusCode && httpStatusCode >= 500)) && !userAborted) {
             const currentFailures = (this.providerFailures.get(addon.id)?.count || 0) + 1;
             const cooldownUntil = currentFailures >= 4 ? Date.now() + 60000 : 0;
             this.providerFailures.set(addon.id, { count: currentFailures, cooldownUntil });
           }
 
-          const providerQueryConcluded = isConclusiveResponse || providerSuccess;
+          const providerQueryConcluded = outcome === 'SUCCESS_WITH_STREAMS' || outcome === 'SUCCESS_EMPTY';
 
           playbackOptimizerService.recordProviderResult(addon.id, duration, providerQueryConcluded);
           mediaLoadingTracker.recordProviderAttempt(rawTargetId, {
@@ -1406,13 +1479,15 @@ class ProviderRegistryService {
             streamCount: providerStreamCount,
             error: providerError
           });
-          const attemptDetail = {
+          const attemptDetail: ProviderAttemptDetail = {
             providerId: addon.id,
             providerName: addon.name,
             durationMs: duration,
-            success: providerQueryConcluded,
+            outcome,
             streamCount: providerStreamCount,
+            httpStatus: httpStatusCode,
             isTimeout,
+            success: providerQueryConcluded,
             error: providerError
           };
           options?.onProviderResult?.(attemptDetail);

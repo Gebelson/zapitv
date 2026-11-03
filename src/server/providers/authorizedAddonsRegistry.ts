@@ -268,7 +268,7 @@ export const FACTORY_AUTHORIZED_ADDONS: AuthorizedAddonDefinition[] = [
     preferredMethod: 'direct',
     corsSupport: 'full',
     timeoutPolicy: { directTimeoutMs: 3000, maxBudgetMs: 6000 },
-    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    healthState: 'MANIFEST_VALID',
     deliveryCapacity: 'METADATA_ONLY',
     failureCount: 0
   },
@@ -283,7 +283,7 @@ export const FACTORY_AUTHORIZED_ADDONS: AuthorizedAddonDefinition[] = [
     preferredMethod: 'direct',
     corsSupport: 'full',
     timeoutPolicy: { directTimeoutMs: 3000, maxBudgetMs: 6000 },
-    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    healthState: 'MANIFEST_VALID',
     deliveryCapacity: 'METADATA_ONLY',
     failureCount: 0
   },
@@ -298,9 +298,9 @@ export const FACTORY_AUTHORIZED_ADDONS: AuthorizedAddonDefinition[] = [
     preferredMethod: 'proxy_fallback',
     corsSupport: 'partial',
     timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6500 },
-    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    healthState: 'STREAM_ENDPOINT_UNREACHABLE',
     deliveryCapacity: 'TORRENT_ONLY',
-    failureCount: 0
+    failureCount: 4
   },
   {
     id: 'thepiratebay-plus',
@@ -313,9 +313,9 @@ export const FACTORY_AUTHORIZED_ADDONS: AuthorizedAddonDefinition[] = [
     preferredMethod: 'direct',
     corsSupport: 'full',
     timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6000 },
-    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    healthState: 'STREAM_ENDPOINT_UNREACHABLE',
     deliveryCapacity: 'TORRENT_ONLY',
-    failureCount: 0
+    failureCount: 4
   },
   {
     id: 'brazuca-torrents',
@@ -328,9 +328,9 @@ export const FACTORY_AUTHORIZED_ADDONS: AuthorizedAddonDefinition[] = [
     preferredMethod: 'proxy_fallback',
     corsSupport: 'partial',
     timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6500 },
-    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    healthState: 'STREAM_ENDPOINT_UNREACHABLE',
     deliveryCapacity: 'TORRENT_ONLY',
-    failureCount: 0
+    failureCount: 4
   },
   {
     id: 'orion-addon',
@@ -358,9 +358,9 @@ export const FACTORY_AUTHORIZED_ADDONS: AuthorizedAddonDefinition[] = [
     preferredMethod: 'proxy_fallback',
     corsSupport: 'none',
     timeoutPolicy: { directTimeoutMs: 2500, maxBudgetMs: 6500 },
-    healthState: 'STREAM_ENDPOINT_OPERATIONAL',
+    healthState: 'STREAM_ENDPOINT_UNREACHABLE',
     deliveryCapacity: 'DIRECT_HTTP_AVAILABLE',
-    failureCount: 0
+    failureCount: 4
   },
   {
     id: 'aiostreams',
@@ -378,6 +378,14 @@ export const FACTORY_AUTHORIZED_ADDONS: AuthorizedAddonDefinition[] = [
     failureCount: 0
   }
 ];
+
+export function isAddonEligibleForStreams(addon: AuthorizedAddonDefinition): boolean {
+  if (addon.deliveryCapacity === 'METADATA_ONLY') return false;
+  if (!addon.supportedResources.includes('stream')) return false;
+  if (addon.healthState === 'DISABLED' || addon.healthState === 'CONFIGURATION_REQUIRED' || addon.healthState === 'STREAM_ENDPOINT_UNREACHABLE') return false;
+  if (addon.requiresConfig) return false;
+  return true;
+}
 
 class AuthorizedAddonsRegistry {
   private static instance: AuthorizedAddonsRegistry | null = null;
@@ -470,6 +478,25 @@ class AuthorizedAddonsRegistry {
         ...updates
       });
     }
+  }
+
+  public async loadPersistedConfig(db?: any): Promise<void> {
+    try {
+      if (!db) {
+        const { getDatabase } = await import('../database/client');
+        db = getDatabase();
+      }
+      if (!db) return;
+      const { readSetting } = await import('../database/settings');
+      const setting = await readSetting(db, 'providers_config');
+      if (setting && Array.isArray(setting.value)) {
+        for (const item of setting.value) {
+          if (item && item.id) {
+            this.updateAddonConfig(item.id, item);
+          }
+        }
+      }
+    } catch {}
   }
 
   public resetCircuitBreakers(): void {

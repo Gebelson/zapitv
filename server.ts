@@ -27,7 +27,7 @@ import { authenticateUser, extractSessionToken, getValidDatabase, requireAdmin }
 import { getAuthPolicy } from "./src/server/auth/authPolicyService.ts";
 import { validateSession } from "./src/server/auth/sessionService.ts";
 import { createMetadataProxy } from "./src/server/metadataProxy.ts";
-import { authorizedAddonsRegistry } from "./src/server/providers/authorizedAddonsRegistry.ts";
+import { authorizedAddonsRegistry, isAddonEligibleForStreams } from "./src/server/providers/authorizedAddonsRegistry.ts";
 import { epgSyncService } from "./src/server/livetv/epgSyncService.ts";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -784,43 +784,64 @@ function createApp() {
   // =========================================================================
 
   // Sincronização centralizada de provedores para Smart TV, Fire TV e Web
-  app.get("/api/providers/config", (_req, res) => {
+  app.get("/api/providers/config", async (_req, res) => {
     res.setHeader("Cache-Control", "public, max-age=60");
+    await authorizedAddonsRegistry.loadPersistedConfig().catch(() => {});
     const addons = authorizedAddonsRegistry.getAllAddons();
     return res.json({
-      providers: addons.map(a => ({
-        id: a.id,
-        name: a.name,
-        url: a.baseUrl,
-        enabled: a.healthState !== 'DISABLED',
-        type: 'stremio-addon',
-        priority: 1,
-        isPtBr: a.id.includes('dublado') || a.id.includes('pt-br') || a.id.includes('brazuca'),
-        status: a.healthState === 'STREAM_ENDPOINT_OPERATIONAL' ? 'online' : a.healthState === 'TEMPORARILY_UNAVAILABLE' ? 'checking' : 'offline',
-        supportedMediaTypes: a.supportedTypes,
-        healthState: a.healthState,
-        deliveryCapacity: a.deliveryCapacity
-      })),
+      providers: addons.map(a => {
+        const isEligible = isAddonEligibleForStreams(a);
+        return {
+          id: a.id,
+          name: a.name,
+          url: a.baseUrl,
+          enabled: isEligible && a.healthState !== 'DISABLED',
+          type: a.deliveryCapacity === 'METADATA_ONLY' ? 'metadata-addon' : 'stremio-addon',
+          priority: 1,
+          isPtBr: a.id.includes('dublado') || a.id.includes('pt-br') || a.id.includes('brazuca'),
+          status: a.healthState === 'STREAM_ENDPOINT_OPERATIONAL' ? 'online' : a.healthState === 'TEMPORARILY_UNAVAILABLE' ? 'checking' : 'offline',
+          supportedMediaTypes: a.supportedTypes,
+          healthState: a.healthState,
+          deliveryCapacity: a.deliveryCapacity,
+          requiresConfig: a.requiresConfig
+        };
+      }),
       syncedAt: new Date().toISOString()
     });
   });
 
-  // Atualização administrativa da lista de provedores
-  app.post("/api/providers/config", requireAdmin, (req, res) => {
+  // Atualização administrativa da lista de provedores com persistência segura no banco
+  app.post("/api/providers/config", requireAdmin, async (req, res) => {
     const { providers } = req.body || {};
     if (!Array.isArray(providers)) {
       return res.status(400).json({ error: "Formato de provedores inválido" });
     }
+    const sanitizedProviders = [];
     for (const p of providers) {
       if (p && p.id) {
-        authorizedAddonsRegistry.updateAddonConfig(p.id, {
+        const updates = {
           name: p.name,
           baseUrl: p.url || p.baseUrl,
           supportedTypes: p.supportedMediaTypes || p.supportedTypes,
           healthState: p.enabled === false ? 'DISABLED' : (p.healthState || 'STREAM_ENDPOINT_OPERATIONAL'),
           deliveryCapacity: p.deliveryCapacity
-        });
+        };
+        authorizedAddonsRegistry.updateAddonConfig(p.id, updates);
+        sanitizedProviders.push({ id: p.id, ...updates, enabled: p.enabled !== false });
       }
+    }
+    try {
+      const db = await getValidDatabase();
+      if (db) {
+        const user = (req as any).user;
+        const actorUid = user?.id || 'admin';
+        const { readSetting, writeSetting } = await import('./src/server/database/settings.ts');
+        const existing = await readSetting(db, 'providers_config').catch(() => null);
+        const version = existing?.version || 0;
+        await writeSetting(db, 'providers_config', sanitizedProviders, version, actorUid);
+      }
+    } catch (err: any) {
+      console.warn('Falha ao persistir providers_config no banco:', err.message);
     }
     return res.json({ success: true, count: providers.length, syncedAt: new Date().toISOString() });
   });
