@@ -42,6 +42,7 @@ export interface AuthorizedAddonDefinition {
   healthState: ProviderHealthState;
   deliveryCapacity: DeliveryCapacity;
   lastChecked?: string;
+  priority?: number;
   failureCount: number;
   circuitBreakerUntil?: number;
 }

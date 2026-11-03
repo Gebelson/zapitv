@@ -797,7 +797,7 @@ function createApp() {
           url: a.baseUrl,
           enabled: isEligible && a.healthState !== 'DISABLED',
           type: a.deliveryCapacity === 'METADATA_ONLY' ? 'metadata-addon' : 'stremio-addon',
-          priority: 1,
+          priority: a.priority ?? (addons.indexOf(a) + 1),
           isPtBr: a.id.includes('dublado') || a.id.includes('pt-br') || a.id.includes('brazuca'),
           status: a.healthState === 'STREAM_ENDPOINT_OPERATIONAL' ? 'online' : a.healthState === 'TEMPORARILY_UNAVAILABLE' ? 'checking' : 'offline',
           supportedMediaTypes: a.supportedTypes,

@@ -3237,7 +3237,7 @@ var init_stremioClient = __esm({
     };
     StremioClient = class _StremioClient {
       static {
-        this.pending = /* @__PURE__ */ new Map();
+        this.pendingEntries = /* @__PURE__ */ new Map();
       }
       constructor(url) {
         let clean2 = url.trim();
@@ -3253,21 +3253,51 @@ var init_stremioClient = __esm({
         return this.baseUrl;
       }
       async fetchPublicMetadata(url, timeoutMs, signal) {
-        const key = `${url}:${timeoutMs}`;
-        const active = _StremioClient.pending.get(key);
-        if (active) {
-          if (signal?.aborted) {
-            throw new StremioRequestError({
-              message: "Requisi\xE7\xE3o cancelada pelo usu\xE1rio.",
-              kind: "ABORTED",
-              endpoint: url,
-              url
-            });
-          }
-          return active;
+        if (signal?.aborted) {
+          throw new StremioRequestError({
+            message: "Requisi\xE7\xE3o cancelada pelo usu\xE1rio.",
+            kind: "ABORTED",
+            endpoint: url,
+            url
+          });
         }
+        const key = `${url}:${timeoutMs}`;
+        let entry = _StremioClient.pendingEntries.get(key);
+        if (entry) {
+          entry.consumers.add(signal || null);
+          if (!signal) {
+            return entry.promise;
+          }
+          return new Promise((resolve, reject) => {
+            const onAbort = () => {
+              entry?.consumers.delete(signal);
+              if (entry && entry.consumers.size > 0 && Array.from(entry.consumers).every((s) => s !== null && s.aborted)) {
+                entry.controller.abort("USER_ABORT");
+              }
+              reject(new StremioRequestError({
+                message: "Requisi\xE7\xE3o cancelada pelo usu\xE1rio.",
+                kind: "ABORTED",
+                endpoint: url,
+                url
+              }));
+            };
+            signal.addEventListener("abort", onAbort, { once: true });
+            entry.promise.then(
+              (val) => {
+                signal.removeEventListener("abort", onAbort);
+                resolve(val);
+              },
+              (err) => {
+                signal.removeEventListener("abort", onAbort);
+                reject(err);
+              }
+            );
+          });
+        }
+        const controller = new AbortController();
+        const consumers = /* @__PURE__ */ new Set([signal || null]);
         const request = (async () => {
-          const result = await executeHttpRequest(url, timeoutMs, signal);
+          const result = await executeHttpRequest(url, timeoutMs, controller.signal);
           if (!result.ok) {
             let kind = "HTTP_ERROR";
             if (result.status === 429) kind = "RATE_LIMITED";
@@ -3294,16 +3324,47 @@ var init_stremioClient = __esm({
             rawMessage: result.text.slice(0, 200)
           });
         })();
-        if (_StremioClient.pending.size < 64) {
-          _StremioClient.pending.set(key, request);
-        }
-        try {
-          return await request;
-        } finally {
-          if (_StremioClient.pending.get(key) === request) {
-            _StremioClient.pending.delete(key);
+        const managedPromise = request.finally(() => {
+          if (_StremioClient.pendingEntries.get(key) === entry) {
+            _StremioClient.pendingEntries.delete(key);
           }
+        });
+        entry = {
+          promise: managedPromise,
+          controller,
+          consumers
+        };
+        if (_StremioClient.pendingEntries.size < 64) {
+          _StremioClient.pendingEntries.set(key, entry);
         }
+        if (!signal) {
+          return managedPromise;
+        }
+        return new Promise((resolve, reject) => {
+          const onAbort = () => {
+            entry?.consumers.delete(signal);
+            if (entry && entry.consumers.size > 0 && Array.from(entry.consumers).every((s) => s !== null && s.aborted)) {
+              entry.controller.abort("USER_ABORT");
+            }
+            reject(new StremioRequestError({
+              message: "Requisi\xE7\xE3o cancelada pelo usu\xE1rio.",
+              kind: "ABORTED",
+              endpoint: url,
+              url
+            }));
+          };
+          signal.addEventListener("abort", onAbort, { once: true });
+          managedPromise.then(
+            (val) => {
+              signal.removeEventListener("abort", onAbort);
+              resolve(val);
+            },
+            (err) => {
+              signal.removeEventListener("abort", onAbort);
+              reject(err);
+            }
+          );
+        });
       }
       async fetchWithFallback(endpoint, rawOptions) {
         const options = normalizeOptions(rawOptions);
@@ -12929,6 +12990,13 @@ var init_providerRegistry = __esm({
           if (saved) {
             const parsed = JSON.parse(saved);
             const cleanParsed = parsed.filter((p) => p.type !== "vod-embed" && !p.id.includes("embedplay") && !p.id.includes("playerflix") && !p.id.includes("videasy"));
+            const corruptedPriorities = cleanParsed.length > 3 && cleanParsed.filter((p) => p.priority === 1).length >= cleanParsed.length / 2;
+            if (corruptedPriorities) {
+              console.warn("[ProviderRegistry] Detectadas prioridades corrompidas no localStorage (priority: 1 massivo). Restaurando ordena\xE7\xE3o de f\xE1brica.");
+              localStorage.removeItem("zapitv_providers_config");
+              this.providers = DEFAULT_PROVIDERS.map((p) => ({ ...p }));
+              return;
+            }
             const map = /* @__PURE__ */ new Map();
             DEFAULT_PROVIDERS.forEach((p) => map.set(p.id, { ...p }));
             cleanParsed.forEach((p) => map.set(p.id, { ...map.get(p.id) || {}, ...p }));
@@ -12947,13 +13015,17 @@ var init_providerRegistry = __esm({
             if (Array.isArray(data.providers) && data.providers.length > 0) {
               const map = /* @__PURE__ */ new Map();
               this.providers.forEach((p) => map.set(p.id, p));
-              data.providers.forEach((p) => {
+              const backendAllPriorityOne = data.providers.length > 3 && data.providers.filter((p) => p.priority === 1).length >= data.providers.length / 2;
+              data.providers.forEach((p, idx) => {
                 const existing = map.get(p.id);
+                const factory = DEFAULT_PROVIDERS.find((d) => d.id === p.id);
+                const resolvedPriority = backendAllPriorityOne ? factory?.priority ?? existing?.priority ?? idx + 1 : p.priority || factory?.priority || idx + 1;
                 const forceDisable = p.deliveryCapacity === "METADATA_ONLY" || p.id === "stremio-cinemeta" || p.id === "stremio-opensubtitles" || p.healthState === "STREAM_ENDPOINT_UNREACHABLE" || p.requiresConfig && !p.configKey;
                 const resolvedEnabled = forceDisable ? false : p.enabled;
                 map.set(p.id, {
                   ...existing || {},
                   ...p,
+                  priority: resolvedPriority,
                   enabled: resolvedEnabled
                 });
               });
@@ -18225,7 +18297,7 @@ var init_canonicalIdentity = __esm({
 });
 
 // src/core/identity/sourceConfidenceEngine.ts
-var isKnownTechnicalOrReleaseWord, isDistinguishingTitleModifier, KNOWN_COLLISION_TITLES, SourceConfidenceEngine, sourceConfidenceEngine;
+var isRecognizedTechnicalOrMetadataToken, isKnownTechnicalOrReleaseWord, isDistinguishingTitleModifier, KNOWN_COLLISION_TITLES, SourceConfidenceEngine, sourceConfidenceEngine;
 var init_sourceConfidenceEngine = __esm({
   "src/core/identity/sourceConfidenceEngine.ts"() {
     init_seriesSeasonMappingService();
@@ -18233,6 +18305,14 @@ var init_sourceConfidenceEngine = __esm({
     init_streamQuarantineService();
     init_types();
     init_mediaLoadingTracker();
+    isRecognizedTechnicalOrMetadataToken = (token, providerId, providerName) => {
+      if (isKnownTechnicalOrReleaseWord(token)) return true;
+      if (/^\d+(?:[.,]\d+)?(?:gb|mb|kb|k|fps|hz|bit|ch)?$/i.test(token)) return true;
+      if (/^[a-f0-9]{32,40}$/i.test(token)) return true;
+      if (providerId && token.toLowerCase().includes(providerId.toLowerCase())) return true;
+      if (providerName && token.toLowerCase().includes(providerName.toLowerCase())) return true;
+      return /^(torrentio|froststream|fenixflix|braflix|warezcdn|superflix|cinedeck|vizer|overflix|redecanais|animesvision|animesroll|animedrive|gdrive|mega|debrid|realdebrid|alldebrid|premiumize|torbox|seeds?|seeders?|peers?|leechers?|bytes?|size|speed|mbps|kbps|hdr|hdr10|sdr|dv|atmos|stereo|mono|remastered|uncut|extended|directors|cut|internal|complete|stream|player|server|servidor|link|video|download|assistir|online|embed|cdn|opcao|opção|titans|cloutteam|madfirebox|dub|leg|dublado|legendado|nacional|multi|multiaudio|audio|áudio|sub|subs|legendas?|filme|serie|series|anime|animes|temp|temporadas?|ep|eps|episodios?|episódios?|cap|caps|capitulos?|capítulos?)$/i.test(token);
+    };
     isKnownTechnicalOrReleaseWord = (word) => {
       return /^(s\d+e\d+|s\d+|e\d+|ep\d*|t\d+ep?\d+|t\d+|\d+x\d+|\d+|seasons?|temporadas?|episodios?|epis[oó]dios?|eps?|capitulos?|cap[ií]tulos?|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|360p|hd|sd|fhd|uhd|bluray|bdrip|brrip|webrip|webdl|web|hdtv|dvdrip|dvd|x264|x265|hevc|h264|h265|avc|aac|ac3|eac3|dts|mp4|mkv|avi|webm|dublado|legendado|dual|multi|audio|áudio|pt|br|ptbr|pob|eng|sub|softsub|hardsub|remux|complete|ita|spa|fra|ger|rus|jap|kor|nf|amzn|atvp|dnp|hmax|dsnp|repack|proper)$/i.test(word);
     };
@@ -18583,7 +18663,12 @@ var init_sourceConfidenceEngine = __esm({
         const allTargetTokensPresent = targetTokens.length >= 1 && targetTokens.every((t) => titleWords.has(t));
         const allOrigTokensPresent = origTokens.length >= 1 && origTokens.every((t) => titleWords.has(t));
         const isFullTitleMatch = Boolean(matchedAlias) || allTargetTokensPresent || allOrigTokensPresent;
-        if (!isFullTitleMatch) {
+        const hasCanonicalId = Boolean(identity.imdbId || identity.tmdbId || identity.canonicalId && !identity.canonicalId.startsWith("local:"));
+        const allNonTargetWordsAreTechnical = hasCanonicalId && titleWords.size > 0 && Array.from(titleWords).every(
+          (word) => allKnownTargetWords.has(word) || isRecognizedTechnicalOrMetadataToken(word, stream.providerId, stream.providerName)
+        );
+        const isAcceptedTechnicalRelease = !isFullTitleMatch && allNonTargetWordsAreTechnical;
+        if (!isFullTitleMatch && !isAcceptedTechnicalRelease) {
           reasons.push(`T\xEDtulo do stream n\xE3o corresponde \xE0 obra solicitada "${identity.title}"`);
           const evalResult2 = {
             stream,
@@ -18594,6 +18679,9 @@ var init_sourceConfidenceEngine = __esm({
           };
           this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
           return evalResult2;
+        }
+        if (isAcceptedTechnicalRelease) {
+          reasons.push("Stream com metadados t\xE9cnicos v\xE1lidos aprovado por identificador can\xF4nico");
         }
         if (identity.type === "S\xC9RIE" /* SERIES */ || identity.type === "ANIME" /* ANIME */) {
           const seriesIntegrity = seriesSeasonMappingService.validateStreamEpisodeIntegrity(
@@ -18652,10 +18740,12 @@ var init_sourceConfidenceEngine = __esm({
           this.recordDiagnostic(stream, identity, evalResult2, declaredTitle);
           return evalResult2;
         }
-        reasons.push(`Identidade confirmada para "${identity.title}"`);
+        if (!isAcceptedTechnicalRelease) {
+          reasons.push(`Identidade confirmada para "${identity.title}"`);
+        }
         const evalResult = {
           stream,
-          confidence: "PROVISIONAL",
+          confidence: isAcceptedTechnicalRelease ? "PROVISIONAL" : isFullTitleMatch ? "VERIFIED" : "PROVISIONAL",
           isMatch: true,
           reasons,
           canonicalTitle: identity.title
@@ -82499,7 +82589,7 @@ ${s.name?.split("\n")[1] || "1080p"}`,
           url: a.baseUrl,
           enabled: isEligible && a.healthState !== "DISABLED",
           type: a.deliveryCapacity === "METADATA_ONLY" ? "metadata-addon" : "stremio-addon",
-          priority: 1,
+          priority: a.priority ?? addons.indexOf(a) + 1,
           isPtBr: a.id.includes("dublado") || a.id.includes("pt-br") || a.id.includes("brazuca"),
           status: a.healthState === "STREAM_ENDPOINT_OPERATIONAL" ? "online" : a.healthState === "TEMPORARILY_UNAVAILABLE" ? "checking" : "offline",
           supportedMediaTypes: a.supportedTypes,

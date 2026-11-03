@@ -8,6 +8,17 @@ import { streamValidator } from './streamValidator';
 import { sourceSelectionService } from '../selection/sourceSelectionService';
 import { isSourcePlayableHere } from './sourceReadiness';
 
+export type VerificationDetailedState =
+  | 'SOURCE_FOUND'
+  | 'NO_SOURCE_RETURNED'
+  | 'SOURCE_REJECTED'
+  | 'PROVIDER_TIMEOUT'
+  | 'PROVIDER_ERROR'
+  | 'AUTH_REQUIRED'
+  | 'MEDIA_INCOMPATIBLE'
+  | 'PLAYBACK_FAILED'
+  | 'PLAYBACK_CONFIRMED';
+
 export type VerificationState =
   | 'IDLE'
   | 'SEARCHING'       // Primeira verificação em andamento
@@ -50,6 +61,7 @@ export interface VerificationDiagnosticLog {
   phase2DurationMs?: number;
   totalDurationMs: number;
   finalState: VerificationState;
+  detailedState?: VerificationDetailedState;
   inconclusiveReason?: string;
   timestamp: string;
 }
@@ -64,6 +76,7 @@ export interface VerifySourcesOptions {
 
 export interface VerificationResult {
   state: VerificationState;
+  detailedState?: VerificationDetailedState;
   streams: StremioStream[];
   errorMessage?: string;
   inconclusiveReason?: string;
@@ -131,6 +144,9 @@ class SourceVerificationService {
 
     // Callback para coletar telemetria detalhada de cada tentativa de provedor
     const handleProviderAttempt = (detail: ProviderAttemptDetail) => {
+      if (detail.isTimeout && !detail.outcome) {
+        detail.outcome = 'TIMEOUT';
+      }
       latestProviderOutcome.set(detail.providerId, detail);
       if (!diagnostic.queriedProviders.includes(detail.providerId)) {
         diagnostic.queriedProviders.push(detail.providerId);
@@ -537,13 +553,19 @@ class SourceVerificationService {
     // =========================================================================
     const technicalFailures = Array.from(latestProviderOutcome.values()).filter(d =>
       d.outcome === 'TIMEOUT' ||
+      d.isTimeout === true ||
       d.outcome === 'NETWORK_FAILURE' ||
       d.outcome === 'HTTP_FAILURE' ||
       d.outcome === 'INVALID_RESPONSE'
     );
+    const hasTimeouts = diagnostic.timeouts.length > 0;
     const registryFailed = diagnostic.networkErrors.some(e => e.providerId.startsWith('registry-'));
 
-    if (technicalFailures.length > 0 || registryFailed) {
+    if (technicalFailures.length > 0 || hasTimeouts || registryFailed) {
+      const hasAuth = Array.from(latestProviderOutcome.values()).some(d => d.httpStatus === 401 || d.httpStatus === 403);
+      diagnostic.detailedState = hasAuth
+        ? 'AUTH_REQUIRED'
+        : (hasTimeouts || technicalFailures.some(d => d.outcome === 'TIMEOUT' || d.isTimeout) ? 'PROVIDER_TIMEOUT' : 'PROVIDER_ERROR');
       diagnostic.finalState = 'INCONCLUSIVE';
       diagnostic.inconclusiveReason = technicalFailures.length > 0
         ? `Provedores com falha técnica: ${technicalFailures.map(f => `${f.providerName} (${f.outcome})`).join(', ')}`
@@ -560,6 +582,7 @@ class SourceVerificationService {
 
     // Ausência confirmada: todos os provedores elegíveis responderam conclusivamente com ausência de fontes
     diagnostic.finalState = 'UNAVAILABLE';
+    diagnostic.detailedState = (candidatePool.length > 0 || diagnostic.rejectedStreams.length > 0) ? 'SOURCE_REJECTED' : 'NO_SOURCE_RETURNED';
     diagnostic.inconclusiveReason = 'Ausência de fontes comprovada em todos os provedores elegíveis';
     this.recordLog(diagnostic);
     options?.onStateChange?.('UNAVAILABLE', MSG_UNAVAILABLE);

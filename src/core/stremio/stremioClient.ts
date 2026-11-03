@@ -172,7 +172,11 @@ async function executeHttpRequest(
 }
 
 export class StremioClient {
-  private static pending = new Map<string, Promise<any>>();
+  private static pendingEntries = new Map<string, {
+    promise: Promise<any>;
+    controller: AbortController;
+    consumers: Set<AbortSignal | null>;
+  }>();
   private baseUrl: string;
 
   constructor(url: string) {
@@ -195,22 +199,55 @@ export class StremioClient {
     timeoutMs: number,
     signal?: AbortSignal
   ): Promise<any> {
-    const key = `${url}:${timeoutMs}`;
-    const active = StremioClient.pending.get(key);
-    if (active) {
-      if (signal?.aborted) {
-        throw new StremioRequestError({
-          message: 'Requisição cancelada pelo usuário.',
-          kind: 'ABORTED',
-          endpoint: url,
-          url
-        });
-      }
-      return active;
+    if (signal?.aborted) {
+      throw new StremioRequestError({
+        message: 'Requisição cancelada pelo usuário.',
+        kind: 'ABORTED',
+        endpoint: url,
+        url
+      });
     }
 
+    const key = `${url}:${timeoutMs}`;
+    let entry = StremioClient.pendingEntries.get(key);
+
+    if (entry) {
+      entry.consumers.add(signal || null);
+      if (!signal) {
+        return entry.promise;
+      }
+      return new Promise((resolve, reject) => {
+        const onAbort = () => {
+          entry?.consumers.delete(signal);
+          if (entry && entry.consumers.size > 0 && Array.from(entry.consumers).every(s => s !== null && s.aborted)) {
+            entry.controller.abort('USER_ABORT');
+          }
+          reject(new StremioRequestError({
+            message: 'Requisição cancelada pelo usuário.',
+            kind: 'ABORTED',
+            endpoint: url,
+            url
+          }));
+        };
+        signal.addEventListener('abort', onAbort, { once: true });
+        entry.promise.then(
+          (val) => {
+            signal.removeEventListener('abort', onAbort);
+            resolve(val);
+          },
+          (err) => {
+            signal.removeEventListener('abort', onAbort);
+            reject(err);
+          }
+        );
+      });
+    }
+
+    const controller = new AbortController();
+    const consumers = new Set<AbortSignal | null>([signal || null]);
+
     const request = (async () => {
-      const result = await executeHttpRequest(url, timeoutMs, signal);
+      const result = await executeHttpRequest(url, timeoutMs, controller.signal);
       if (!result.ok) {
         let kind: StremioErrorKind = 'HTTP_ERROR';
         if (result.status === 429) kind = 'RATE_LIMITED';
@@ -241,17 +278,50 @@ export class StremioClient {
       });
     })();
 
-    if (StremioClient.pending.size < 64) {
-      StremioClient.pending.set(key, request);
+    const managedPromise = request.finally(() => {
+      if (StremioClient.pendingEntries.get(key) === entry) {
+        StremioClient.pendingEntries.delete(key);
+      }
+    });
+
+    entry = {
+      promise: managedPromise,
+      controller,
+      consumers
+    };
+    if (StremioClient.pendingEntries.size < 64) {
+      StremioClient.pendingEntries.set(key, entry);
     }
 
-    try {
-      return await request;
-    } finally {
-      if (StremioClient.pending.get(key) === request) {
-        StremioClient.pending.delete(key);
-      }
+    if (!signal) {
+      return managedPromise;
     }
+
+    return new Promise((resolve, reject) => {
+      const onAbort = () => {
+        entry?.consumers.delete(signal);
+        if (entry && entry.consumers.size > 0 && Array.from(entry.consumers).every(s => s !== null && s.aborted)) {
+          entry.controller.abort('USER_ABORT');
+        }
+        reject(new StremioRequestError({
+          message: 'Requisição cancelada pelo usuário.',
+          kind: 'ABORTED',
+          endpoint: url,
+          url
+        }));
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      managedPromise.then(
+        (val) => {
+          signal.removeEventListener('abort', onAbort);
+          resolve(val);
+        },
+        (err) => {
+          signal.removeEventListener('abort', onAbort);
+          reject(err);
+        }
+      );
+    });
   }
 
   private async fetchWithFallback(

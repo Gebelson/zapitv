@@ -48,6 +48,16 @@ export interface IdentityValidationRecord {
 // Termos técnicos, resoluções e tags de release que podem legitimamente suceder um título sem indicar outra obra
 // NOTA CRÍTICA: Numerais romanos (II, III, IV, etc.) e designadores de sequência/parte (1st, 2nd, Part, Cour)
 // NÃO são termos técnicos, pois diferenciam obras completamente distintas (ex: Lupin vs Lupin III).
+// Reconhecimento de vocabulário técnico de streaming, nomes de indexadores/scrapers e metadados de arquivos
+const isRecognizedTechnicalOrMetadataToken = (token: string, providerId?: string, providerName?: string): boolean => {
+  if (isKnownTechnicalOrReleaseWord(token)) return true;
+  if (/^\d+(?:[.,]\d+)?(?:gb|mb|kb|k|fps|hz|bit|ch)?$/i.test(token)) return true;
+  if (/^[a-f0-9]{32,40}$/i.test(token)) return true;
+  if (providerId && token.toLowerCase().includes(providerId.toLowerCase())) return true;
+  if (providerName && token.toLowerCase().includes(providerName.toLowerCase())) return true;
+  return /^(torrentio|froststream|fenixflix|braflix|warezcdn|superflix|cinedeck|vizer|overflix|redecanais|animesvision|animesroll|animedrive|gdrive|mega|debrid|realdebrid|alldebrid|premiumize|torbox|seeds?|seeders?|peers?|leechers?|bytes?|size|speed|mbps|kbps|hdr|hdr10|sdr|dv|atmos|stereo|mono|remastered|uncut|extended|directors|cut|internal|complete|stream|player|server|servidor|link|video|download|assistir|online|embed|cdn|opcao|opção|titans|cloutteam|madfirebox|dub|leg|dublado|legendado|nacional|multi|multiaudio|audio|áudio|sub|subs|legendas?|filme|serie|series|anime|animes|temp|temporadas?|ep|eps|episodios?|episódios?|cap|caps|capitulos?|capítulos?)$/i.test(token);
+};
+
 const isKnownTechnicalOrReleaseWord = (word: string): boolean => {
   return /^(s\d+e\d+|s\d+|e\d+|ep\d*|t\d+ep?\d+|t\d+|\d+x\d+|\d+|seasons?|temporadas?|episodios?|epis[oó]dios?|eps?|capitulos?|cap[ií]tulos?|19\d{2}|20\d{2}|1080p|720p|4k|2160p|480p|360p|hd|sd|fhd|uhd|bluray|bdrip|brrip|webrip|webdl|web|hdtv|dvdrip|dvd|x264|x265|hevc|h264|h265|avc|aac|ac3|eac3|dts|mp4|mkv|avi|webm|dublado|legendado|dual|multi|audio|áudio|pt|br|ptbr|pob|eng|sub|softsub|hardsub|remux|complete|ita|spa|fra|ger|rus|jap|kor|nf|amzn|atvp|dnp|hmax|dsnp|repack|proper)$/i.test(word);
 };
@@ -481,7 +491,16 @@ export class SourceConfidenceEngine {
 
     const isFullTitleMatch = Boolean(matchedAlias) || allTargetTokensPresent || allOrigTokensPresent;
 
-    if (!isFullTitleMatch) {
+    // Se o título do stream não repete o nome da obra, mas foi retornado por consulta canônica (IMDb/TMDB)
+    // e contém unicamente metadados técnicos de release sem palavras estranhas de outras obras:
+    const hasCanonicalId = Boolean(identity.imdbId || identity.tmdbId || (identity.canonicalId && !identity.canonicalId.startsWith('local:')));
+    const allNonTargetWordsAreTechnical = hasCanonicalId && titleWords.size > 0 && Array.from(titleWords).every(word =>
+      allKnownTargetWords.has(word) || isRecognizedTechnicalOrMetadataToken(word, stream.providerId, stream.providerName)
+    );
+
+    const isAcceptedTechnicalRelease = !isFullTitleMatch && allNonTargetWordsAreTechnical;
+
+    if (!isFullTitleMatch && !isAcceptedTechnicalRelease) {
       reasons.push(`Título do stream não corresponde à obra solicitada "${identity.title}"`);
       const evalResult: StreamConfidenceEvaluation = {
         stream,
@@ -492,6 +511,10 @@ export class SourceConfidenceEngine {
       };
       this.recordDiagnostic(stream, identity, evalResult, declaredTitle);
       return evalResult;
+    }
+
+    if (isAcceptedTechnicalRelease) {
+      reasons.push('Stream com metadados técnicos válidos aprovado por identificador canônico');
     }
 
     // 6. VALIDAÇÃO DE ANO E ERA PARA SÉRIES E ANIMES
@@ -563,10 +586,12 @@ export class SourceConfidenceEngine {
     }
 
     // 8. CLASSIFICAÇÃO PARA DEMAIS PRODUÇÕES
-    reasons.push(`Identidade confirmada para "${identity.title}"`);
+    if (!isAcceptedTechnicalRelease) {
+      reasons.push(`Identidade confirmada para "${identity.title}"`);
+    }
     const evalResult: StreamConfidenceEvaluation = {
       stream,
-      confidence: 'PROVISIONAL',
+      confidence: isAcceptedTechnicalRelease ? 'PROVISIONAL' : (isFullTitleMatch ? 'VERIFIED' : 'PROVISIONAL'),
       isMatch: true,
       reasons,
       canonicalTitle: identity.title

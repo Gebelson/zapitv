@@ -451,6 +451,16 @@ class ProviderRegistryService {
       if (saved) {
         const parsed: ProviderConfig[] = JSON.parse(saved);
         const cleanParsed = parsed.filter(p => p.type !== ('vod-embed' as any) && !p.id.includes('embedplay') && !p.id.includes('playerflix') && !p.id.includes('videasy'));
+
+        // Saneamento de dados corrompidos: se mais da metade tiver priority === 1, descarta o cache poluído
+        const corruptedPriorities = cleanParsed.length > 3 && cleanParsed.filter(p => p.priority === 1).length >= (cleanParsed.length / 2);
+        if (corruptedPriorities) {
+          console.warn('[ProviderRegistry] Detectadas prioridades corrompidas no localStorage (priority: 1 massivo). Restaurando ordenação de fábrica.');
+          localStorage.removeItem('zapitv_providers_config');
+          this.providers = DEFAULT_PROVIDERS.map(p => ({ ...p }));
+          return;
+        }
+
         const map = new Map<string, ProviderConfig>();
         DEFAULT_PROVIDERS.forEach(p => map.set(p.id, { ...p }));
         cleanParsed.forEach(p => map.set(p.id, { ...(map.get(p.id) || {}), ...p }));
@@ -471,8 +481,13 @@ class ProviderRegistryService {
         if (Array.isArray(data.providers) && data.providers.length > 0) {
           const map = new Map<string, ProviderConfig>();
           this.providers.forEach(p => map.set(p.id, p));
-          data.providers.forEach((p: ProviderConfig) => {
+          const backendAllPriorityOne = data.providers.length > 3 && data.providers.filter((p: any) => p.priority === 1).length >= (data.providers.length / 2);
+          data.providers.forEach((p: ProviderConfig, idx: number) => {
             const existing = map.get(p.id);
+            const factory = DEFAULT_PROVIDERS.find(d => d.id === p.id);
+            const resolvedPriority = backendAllPriorityOne
+              ? (factory?.priority ?? existing?.priority ?? (idx + 1))
+              : (p.priority || factory?.priority || (idx + 1));
             const forceDisable = p.deliveryCapacity === 'METADATA_ONLY' ||
               p.id === 'stremio-cinemeta' ||
               p.id === 'stremio-opensubtitles' ||
@@ -482,6 +497,7 @@ class ProviderRegistryService {
             map.set(p.id, {
               ...(existing || {}),
               ...p,
+              priority: resolvedPriority,
               enabled: resolvedEnabled
             });
           });

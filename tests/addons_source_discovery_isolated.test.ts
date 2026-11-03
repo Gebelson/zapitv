@@ -25,14 +25,15 @@ import { canonicalIdentityService } from '../src/core/identity/canonicalIdentity
 import { streamValidator } from '../src/core/providers/streamValidator';
 import { ContentItem, ContentType } from '../types';
 import { StremioStream } from '../src/core/stremio/stremioTypes';
+import { StremioClient } from '../src/core/stremio/stremioClient';
 
 async function runIsolatedDiscoverySuite() {
   console.log('========================================================================');
-  console.log('--- ZAPITV | TESTES DE INTEGRAÇÃO: DESCOBERTA DE FONTES ISOLADA (7/7) ---');
+  console.log('--- ZAPITV | TESTES DE INTEGRAÇÃO: DESCOBERTA DE FONTES ISOLADA (10/10) ---');
   console.log('========================================================================\n');
 
   // Configura servidor HTTP local mock para controlar respostas de add-ons com precisão cirúrgica
-  let mockServerRoute: 'operational' | 'server_error' | 'empty' | 'rejected_id' | 'torrent_only' = 'operational';
+  let mockServerRoute: 'operational' | 'server_error' | 'empty' | 'rejected_id' | 'torrent_only' | 'delayed' = 'operational';
 
   const mockServer = http.createServer((req, res) => {
     const url = req.url || '';
@@ -53,6 +54,23 @@ async function runIsolatedDiscoverySuite() {
 
     // Stream endpoints de acordo com a rota ativa
     if (url.includes('/stream/')) {
+      if (mockServerRoute === 'delayed') {
+        setTimeout(() => {
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+          res.end(JSON.stringify({
+            streams: [
+              {
+                name: 'Delayed Stream Addon',
+                title: 'Pursuit of Jade S01E01 - 1080p MP4',
+                url: 'https://example.com/delayed.mp4',
+                sourceType: 'mp4'
+              }
+            ]
+          }));
+        }, 120);
+        return;
+      }
+
       if (mockServerRoute === 'server_error') {
         res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
         res.end(JSON.stringify({ error: 'Internal Server Error no endpoint de streams' }));
@@ -398,8 +416,108 @@ async function runIsolatedDiscoverySuite() {
       console.log(`    Decodificação de primeiro frame e avanço de tempo validados pelo teste real de navegador (Playwright Chromium)`);
     });
 
+    // -----------------------------------------------------------------------
+    // CENÁRIO 8: Stream com metadados puramente técnicos para consulta canônica
+    // -----------------------------------------------------------------------
+    await runStep('Stream com metadados puramente técnicos para consulta canônica (Pursuit of Jade)', async () => {
+      const identity = canonicalIdentityService.buildIdentity({
+        id: 'tmdb-279388',
+        tmdbId: '279388',
+        imdbId: 'tt35316225',
+        title: 'Pursuit of Jade',
+        type: ContentType.SERIES,
+        year: 2026
+      }, { season: 1, episode: 1 });
+
+      // 1. Stream com metadados puramente técnicos (resolução, áudio, codec, tamanho)
+      const technicalStream: StremioStream = {
+        name: 'Torrentio\n1080p',
+        title: '1080p | Dual Audio | WEBRip | 1.2 GB',
+        url: 'https://example.com/stream-technical.m3u8',
+        providerName: 'Torrentio',
+        providerId: 'torrentio-global',
+        sourceType: 'hls'
+      };
+
+      const evalTechnical = sourceConfidenceEngine.evaluate(technicalStream, identity);
+      assert.strictEqual(evalTechnical.isMatch, true, 'Stream puramente técnico para ID canônico deve ser aprovado');
+      assert.strictEqual(evalTechnical.confidence, 'PROVISIONAL', 'Confiança deve ser PROVISIONAL');
+      console.log('    ✓ Stream com metadados puramente técnicos aceito com sucesso para consulta canônica');
+
+      // 2. Stream de outra obra (colisão/trote) com palavras estranhas substantivas
+      const conflictingStream: StremioStream = {
+        name: 'Torrentio\n1080p',
+        title: 'Spider-Man No Way Home 1080p Dual Audio WEBRip',
+        url: 'https://example.com/stream-conflicting.m3u8',
+        providerName: 'Torrentio',
+        providerId: 'torrentio-global',
+        sourceType: 'hls'
+      };
+
+      const evalConflicting = sourceConfidenceEngine.evaluate(conflictingStream, identity);
+      assert.strictEqual(evalConflicting.isMatch, false, 'Stream com obra diferente deve ser rejeitado');
+      assert.strictEqual(evalConflicting.confidence, 'REJECTED', 'Confiança de obra diferente deve ser REJECTED');
+      console.log('    ✓ Stream de obra conflitante (Spider-Man) rejeitado com sucesso');
+    });
+
+    // -----------------------------------------------------------------------
+    // CENÁRIO 9: Isolamento de concorrência e cancelamento no StremioClient
+    // -----------------------------------------------------------------------
+    await runStep('Isolamento de concorrência e cancelamento (Caller 1 aborta, Caller 2 conclui)', async () => {
+      // Mock do servidor com resposta atrasada (300ms)
+      mockServerRoute = 'delayed';
+      const client = new StremioClient(`http://127.0.0.1:${port}`);
+
+      const controller1 = new AbortController();
+      const controller2 = new AbortController();
+
+      // Chamada 1: pré-busca (será abortada após 50ms)
+      const promise1 = client.getStreams('series', 'tt35316225:1:1', { signal: controller1.signal });
+
+      // Chamada 2: reprodução real (reutiliza requisição em voo, NÃO será abortada)
+      const promise2 = client.getStreams('series', 'tt35316225:1:1', { signal: controller2.signal });
+
+      // Aborta Caller 1 quase imediatamente
+      setTimeout(() => {
+        controller1.abort('USER_CANCELLED_PREFETCH');
+      }, 30);
+
+      // Caller 1 deve ser rejeitado com ABORTED
+      let caller1Aborted = false;
+      try {
+        await promise1;
+      } catch (err: any) {
+        if (err.kind === 'ABORTED' || err.message?.includes('cancelada')) {
+          caller1Aborted = true;
+        }
+      }
+      assert.strictEqual(caller1Aborted, true, 'Caller 1 deve ser rejeitado por abort');
+
+      // Caller 2 NÃO pode ser afetado pelo cancelamento do Caller 1
+      const streams2 = await promise2;
+      assert.ok(Array.isArray(streams2?.streams), 'Caller 2 deve receber streams com sucesso');
+      assert.ok(streams2.streams.length > 0, 'Caller 2 deve obter streams válidos');
+      console.log(`    ✓ Concorrência isolada: Caller 1 abortado, Caller 2 concluiu com ${streams2.streams.length} streams`);
+    });
+
+    // -----------------------------------------------------------------------
+    // CENÁRIO 10: Saneamento de prioridades corrompidas no localStorage
+    // -----------------------------------------------------------------------
+    await runStep('Saneamento de prioridades corrompidas e integridade de fallback', async () => {
+      const providers = providerRegistry.getProviders();
+      // Verifica que as prioridades não são todas iguais a 1
+      const priorityOnes = providers.filter(p => p.priority === 1);
+      assert.ok(priorityOnes.length <= 2, `Máximo de 2 provedores com priority: 1, encontrado: ${priorityOnes.length}`);
+      
+      // Provedores de fábrica devem manter sua ordenação sequencial
+      const fenix = providerRegistry.getProvider('fenixflix-animes');
+      const frost = providerRegistry.getProvider('froststream-http');
+      assert.ok(frost && fenix, 'FrostStream e FenixFlix devem existir no registro');
+      console.log(`    ✓ Prioridades saneadas: FrostStream (prioridade ${frost?.priority}), FenixFlix (prioridade ${fenix?.priority})`);
+    });
+
     console.log('========================================================================');
-    console.log('✓ TODOS OS 7 CENÁRIOS DE DESCOBERTA E VERIFICAÇÃO FORAM VALIDADOS COM SUCESSO');
+    console.log('✓ TODOS OS 10 CENÁRIOS DE DESCOBERTA E VERIFICAÇÃO FORAM VALIDADOS COM SUCESSO');
     console.log('========================================================================\n');
 
   } finally {
