@@ -73,8 +73,10 @@ try {
 
   (providerRegistry as any).resolveStreams = async () => [torrent];
   const unavailableHere = await sourceVerificationService.verifySources(item, { season: 1, episode: 1 });
-  assert.equal(unavailableHere.state, 'INCONCLUSIVE');
+  assert.equal(unavailableHere.state, 'UNAVAILABLE', 'fontes apenas P2P sem motor local são comprovadamente incompatíveis');
   assert.equal(unavailableHere.streams.length, 0);
+  assert.match(unavailableHere.diagnosticLog.inconclusiveReason ?? '', /motor P2P\/Stremio Engine/);
+  assert.ok(unavailableHere.diagnosticLog.rejectedStreams.some(source => source.reason.includes('Stremio Engine local')));
 } finally {
   (providerRegistry as any).resolveStreams = originalResolve;
 }

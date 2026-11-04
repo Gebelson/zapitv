@@ -206,7 +206,8 @@ describe('ZAPITV — SISTEMA INTELIGENTE DE VERIFICAÇÃO DUPLA DE FONTES', () =
       });
       const result = await sourceVerificationService.verifySources(dummyMovie);
       expect(result.state).toBe('INCONCLUSIVE');
-      expect(result.diagnosticLog.inconclusiveReason).toContain('b');
+      expect(result.diagnosticLog.inconclusiveReason).toContain('B (TIMEOUT)');
+      expect(result.diagnosticLog.queriedProviders).toContain('b');
     });
 
     it('não declara indisponibilidade quando nenhum provedor foi consultado', async () => {

@@ -94,14 +94,25 @@ async function runAddonsSixSuite() {
   assert.ok(cine, 'CineTorrent deve estar acessível no registro');
   assert.deepStrictEqual(cine?.supportedMediaTypes, ['movie'], 'CineTorrent deve ser restrito a filmes');
 
-  // Elegibilidade por tipo de mídia
-  const movieProviders = providerRegistry.getEligibleProviders('movie');
-  const seriesProviders = providerRegistry.getEligibleProviders('series');
-  const animeProviders = providerRegistry.getEligibleProviders('anime');
+  // Um provedor offline não deve participar da descoberta.
+  assert.strictEqual(cine.enabled, false);
+  assert.strictEqual(cine.status, 'offline');
+  assert.ok(!providerRegistry.getEligibleProviders('movie').some(p => p.id === cine.id));
 
-  assert.ok(movieProviders.some(p => p.id === 'cinetorrent-pt'), 'CineTorrent deve ser elegível para filmes');
-  assert.ok(!seriesProviders.some(p => p.id === 'cinetorrent-pt'), 'CineTorrent NÃO deve ser elegível para séries');
-  assert.ok(!animeProviders.some(p => p.id === 'cinetorrent-pt'), 'CineTorrent NÃO deve ser elegível para animes');
+  // Isola a regra de tipo em um estado operacional controlado e restaura o registro.
+  const cineSnapshot = { ...cine };
+  try {
+    providerRegistry.updateProvider(cine.id, { enabled: true, status: 'online', healthState: 'STREAM_ENDPOINT_OPERATIONAL' });
+    const movieProviders = providerRegistry.getEligibleProviders('movie');
+    const seriesProviders = providerRegistry.getEligibleProviders('series');
+    const animeProviders = providerRegistry.getEligibleProviders('anime');
+
+    assert.ok(movieProviders.some(p => p.id === 'cinetorrent-pt'), 'CineTorrent deve ser elegível para filmes');
+    assert.ok(!seriesProviders.some(p => p.id === 'cinetorrent-pt'), 'CineTorrent NÃO deve ser elegível para séries');
+    assert.ok(!animeProviders.some(p => p.id === 'cinetorrent-pt'), 'CineTorrent NÃO deve ser elegível para animes');
+  } finally {
+    providerRegistry.updateProvider(cine.id, cineSnapshot);
+  }
 
   // Detecção de áudio no padrão CineTorrent ("Godzilla\nEN,PT  ")
   const sampleCineTorrentStream: StremioStream = {

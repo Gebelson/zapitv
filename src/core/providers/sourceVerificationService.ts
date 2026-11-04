@@ -560,8 +560,9 @@ class SourceVerificationService {
     );
     const hasTimeouts = diagnostic.timeouts.length > 0;
     const registryFailed = diagnostic.networkErrors.some(e => e.providerId.startsWith('registry-'));
+    const noDiscoveryEvidence = latestProviderOutcome.size === 0 && candidatePool.length === 0;
 
-    if (technicalFailures.length > 0 || hasTimeouts || registryFailed) {
+    if (technicalFailures.length > 0 || hasTimeouts || registryFailed || noDiscoveryEvidence) {
       const hasAuth = Array.from(latestProviderOutcome.values()).some(d => d.httpStatus === 401 || d.httpStatus === 403);
       diagnostic.detailedState = hasAuth
         ? 'AUTH_REQUIRED'
@@ -569,7 +570,7 @@ class SourceVerificationService {
       diagnostic.finalState = 'INCONCLUSIVE';
       diagnostic.inconclusiveReason = technicalFailures.length > 0
         ? `Provedores com falha técnica: ${technicalFailures.map(f => `${f.providerName} (${f.outcome})`).join(', ')}`
-        : 'Falha no registro de provedores';
+        : (noDiscoveryEvidence ? 'Nenhum provedor retornou evidência de consulta' : 'Falha no registro de provedores');
       this.recordLog(diagnostic);
       options?.onStateChange?.('INCONCLUSIVE', MSG_INCONCLUSIVE);
       return {
