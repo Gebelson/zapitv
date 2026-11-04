@@ -422,6 +422,7 @@ class ProviderRegistryService {
   private progressiveListeners = new Map<string, Set<(streams: StremioStream[]) => void>>();
   private providerResultListeners = new Map<string, Set<(detail: any) => void>>();
   private inFlightConsumers = new Map<string, Set<AbortSignal | null>>();
+  private inFlightControllers = new Map<string, AbortController>();
   private cacheGeneration = 0;
   private readonly CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutos de retenção em cache
   private readonly STALE_TTL_MS = 3 * 60 * 1000; // 3 minutos de fresh (stale-while-revalidate após isso)
@@ -487,18 +488,43 @@ class ProviderRegistryService {
             const factory = DEFAULT_PROVIDERS.find(d => d.id === p.id);
             const resolvedPriority = backendAllPriorityOne
               ? (factory?.priority ?? existing?.priority ?? (idx + 1))
-              : (p.priority || factory?.priority || (idx + 1));
-            const forceDisable = p.deliveryCapacity === 'METADATA_ONLY' ||
+              : (p.priority || factory?.priority || existing?.priority || (idx + 1));
+
+            // Preserva chave de configuração local existente do usuário/admin
+            const resolvedConfigKey = existing?.configKey || p.configKey;
+
+            // Provedores estritamente de metadados nunca devem buscar streams
+            const isMetadataOnly = p.deliveryCapacity === 'METADATA_ONLY' ||
               p.id === 'stremio-cinemeta' ||
-              p.id === 'stremio-opensubtitles' ||
-              p.healthState === 'STREAM_ENDPOINT_UNREACHABLE' ||
-              (p.requiresConfig && !p.configKey);
-            const resolvedEnabled = forceDisable ? false : p.enabled;
+              p.id === 'stremio-opensubtitles';
+
+            let resolvedEnabled: boolean;
+            if (isMetadataOnly) {
+              resolvedEnabled = false;
+            } else if (p.requiresConfig && !resolvedConfigKey) {
+              // Requer configuração e não há chave nem local nem no backend
+              resolvedEnabled = false;
+            } else if (existing?.enabled !== undefined) {
+              // Preserva a preferência operacional do cliente se já existente.
+              // Não desativa silenciosamente um provedor funcional por causa de flutuações temporárias do backend.
+              resolvedEnabled = existing.enabled;
+            } else if (factory?.enabled !== undefined) {
+              resolvedEnabled = factory.enabled;
+            } else {
+              resolvedEnabled = p.enabled !== false;
+            }
+
             map.set(p.id, {
-              ...(existing || {}),
+              ...(factory || {}),
               ...p,
+              ...(existing || {}),
+              name: p.name || existing?.name || factory?.name || p.id,
+              url: existing?.url || p.url || factory?.url || '',
+              configKey: resolvedConfigKey,
               priority: resolvedPriority,
-              enabled: resolvedEnabled
+              enabled: resolvedEnabled,
+              status: (p.status as any) || existing?.status || factory?.status || 'online',
+              healthState: p.healthState || existing?.healthState || factory?.healthState
             });
           });
           this.providers = Array.from(map.values()).sort((a, b) => a.priority - b.priority);
@@ -823,6 +849,7 @@ class ProviderRegistryService {
                 if (this.pending.get(cacheKey) === bgRequest) {
                   this.pending.delete(cacheKey);
                   this.inFlightConsumers.delete(cacheKey);
+                  this.inFlightControllers.delete(cacheKey);
                 }
               });
             this.pending.set(cacheKey, bgRequest);
@@ -851,6 +878,26 @@ class ProviderRegistryService {
     }
     consumers.add(options?.signal || null);
 
+    let opController = this.inFlightControllers.get(cacheKey);
+    if (!opController) {
+      opController = new AbortController();
+      this.inFlightControllers.set(cacheKey, opController);
+    }
+
+    if (options?.signal) {
+      const sig = options.signal;
+      const onConsumerAbort = () => {
+        if (this.isCancelled(cacheKey)) {
+          opController?.abort();
+        }
+      };
+      if (sig.aborted) {
+        onConsumerAbort();
+      } else {
+        sig.addEventListener('abort', onConsumerAbort, { once: true });
+      }
+    }
+
     // 3. Deduplicação de requisições simultâneas em voo (in-flight deduplication)
     if (!options?.forceRefresh && !options?.bypassNegativeCache) {
       const existing = this.pending.get(cacheKey);
@@ -859,10 +906,12 @@ class ProviderRegistryService {
       }
     }
 
-    const request = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration, options).finally(() => {
+    const currentOpController = opController;
+    const request = this.resolveStreamsFresh(type, id, episode, cacheKey, this.cacheGeneration, options, currentOpController.signal).finally(() => {
       if (this.pending.get(cacheKey) === request) {
         this.pending.delete(cacheKey);
         this.inFlightConsumers.delete(cacheKey);
+        this.inFlightControllers.delete(cacheKey);
       }
       releaseListener();
     });
@@ -876,10 +925,18 @@ class ProviderRegistryService {
     episode?: { season: number; episode: number },
     cacheKey?: string,
     generation?: number,
-    options?: ResolveStreamsOptions
+    options?: ResolveStreamsOptions,
+    sharedSignal?: AbortSignal
   ): Promise<StremioStream[]> {
     const effectiveCacheKey = cacheKey || JSON.stringify(['v7_canonical_identity', type, id.id, id.tmdbId, id.imdbId, id.title, id.originalTitle, id.year, episode?.season, episode?.episode]);
     const effectiveGen = generation ?? this.cacheGeneration;
+    const activeSignal = sharedSignal || options?.signal;
+
+    if (options?.forceRefresh || options?.isRetryAttempt || options?.bypassNegativeCache) {
+      this.resetCircuitBreakers();
+    }
+
+    const providerOutcomes = new Map<string, ProviderAttemptOutcome>();
 
     const notifyProgressive = (currentStreams: StremioStream[]) => {
       const listeners = this.progressiveListeners.get(effectiveCacheKey);
@@ -1303,7 +1360,7 @@ class ProviderRegistryService {
           };
 
           const requestOpts = {
-            signal: options?.signal,
+            signal: activeSignal,
             totalTimeoutMs: addonTimeout,
             preferProxy: addon.id.includes('froststream') || addon.id.includes('fenixflix'),
             allowDirectFallback: true
@@ -1323,14 +1380,14 @@ class ProviderRegistryService {
             ? altIds
             : [stremioId, ...altIds.filter(a => a !== `tmdb:${tmdbNum}` && a !== tmdbNum)]).slice(0, 2);
 
-          if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0 && !options?.signal?.aborted) {
+          if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0 && !activeSignal?.aborted && !this.isCancelled(effectiveCacheKey)) {
             for (const altBase of secondaryCandidates) {
               const altId = type === 'series' || type === 'anime'
                 ? stremioEpisodeId(altBase, episode)
                 : altBase;
               try {
                 const altRes = await client.getStreams(stremioType, altId, {
-                  signal: options?.signal,
+                  signal: activeSignal,
                   totalTimeoutMs: 2500,
                   preferProxy: addon.id.includes('froststream') || addon.id.includes('fenixflix'),
                   allowDirectFallback: true
@@ -1344,13 +1401,13 @@ class ProviderRegistryService {
             }
           }
 
-          if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && (type === 'anime' || type === 'series') && !options?.signal?.aborted) {
+          if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && (type === 'anime' || type === 'series') && !activeSignal?.aborted && !this.isCancelled(effectiveCacheKey)) {
             const altType = stremioType === 'series' ? 'anime' : 'series';
             const supportsAltType = !addon.supportedMediaTypes || addon.supportedMediaTypes.length === 0 || addon.supportedMediaTypes.includes(altType);
             if (supportsAltType) {
               try {
                 const altTypeRes = await client.getStreams(altType, stremioId, {
-                  signal: options?.signal,
+                  signal: activeSignal,
                   totalTimeoutMs: 2500,
                   preferProxy: addon.id.includes('froststream') || addon.id.includes('fenixflix'),
                   allowDirectFallback: true
@@ -1447,7 +1504,11 @@ class ProviderRegistryService {
           }
         } finally {
           const duration = Date.now() - startProviderTime;
-          const userAborted = Boolean(options?.signal?.aborted);
+          const userAborted = Boolean(activeSignal?.aborted) ||
+            this.isCancelled(effectiveCacheKey) ||
+            providerError?.includes('cancelada pelo usuário') ||
+            providerError?.includes('ABORTED') ||
+            providerError?.includes('AbortError');
 
           let outcome: ProviderAttemptOutcome;
           let isTimeout = false;
@@ -1474,8 +1535,10 @@ class ProviderRegistryService {
             outcome = 'INVALID_RESPONSE';
           }
 
+          providerOutcomes.set(addon.id, outcome);
+
           // Resposta com 200 OK (com ou sem streams) ZERA as falhas.
-          // Penaliza EXCLUSIVAMENTE falhas reais de rede, conexão ou timeouts de infraestrutura.
+          // Penaliza EXCLUSIVAMENTE falhas reais de rede, conexão ou timeouts de infraestrutura se NÃO cancelado pelo usuário.
           if (outcome === 'SUCCESS_WITH_STREAMS' || outcome === 'SUCCESS_EMPTY') {
             this.providerFailures.delete(addon.id);
           } else if ((outcome === 'TIMEOUT' || outcome === 'NETWORK_FAILURE' || (httpStatusCode && httpStatusCode >= 500)) && !userAborted) {
@@ -1527,7 +1590,7 @@ class ProviderRegistryService {
 
       const runWorker = async () => {
         while (activeIndex < sortedAddons.length && !stopSpawning) {
-          if (this.isCancelled(effectiveCacheKey)) return;
+          if (this.isCancelled(effectiveCacheKey) || activeSignal?.aborted) return;
           const currentIndex = activeIndex++;
           const addon = sortedAddons[currentIndex];
           const result = await executeAddon(addon);
@@ -1583,7 +1646,7 @@ class ProviderRegistryService {
         }),
         new Promise<void>((resolve) => {
           interval = setInterval(() => {
-            if (this.isCancelled(effectiveCacheKey)) {
+            if (this.isCancelled(effectiveCacheKey) || activeSignal?.aborted) {
               if (interval) clearInterval(interval);
               resolve();
               return;
@@ -1604,6 +1667,13 @@ class ProviderRegistryService {
       ]);
       if (interval) clearInterval(interval);
       if (timer) clearTimeout(timer);
+
+      // Se todos os provedores foram pulados por cooldown, reseta os circuit breakers imediatamente
+      // para evitar indisponibilidade generalizada prolongada
+      const allSkipped = sortedAddons.length > 0 && Array.from(providerOutcomes.values()).every(o => o === 'SKIPPED');
+      if (allSkipped) {
+        this.resetCircuitBreakers();
+      }
 
       streams.push(...collectedFromAddons);
     }
@@ -1715,11 +1785,17 @@ class ProviderRegistryService {
         this.cache.set(effectiveCacheKey, { streams: sorted, timestamp: Date.now() });
         this.negativeCache.delete(effectiveCacheKey);
       } else {
-        this.negativeCache.set(effectiveCacheKey, {
-          timestamp: Date.now(),
-          reason: 'Nenhuma fonte reproduzível encontrada',
-          inconclusive: false
-        });
+        const isCancelledOp = this.isCancelled(effectiveCacheKey) || Boolean(activeSignal?.aborted);
+        if (!isCancelledOp) {
+          const hadTechnicalFailures = Array.from(providerOutcomes.values()).some(
+            o => o === 'TIMEOUT' || o === 'NETWORK_FAILURE' || o === 'HTTP_FAILURE'
+          );
+          this.negativeCache.set(effectiveCacheKey, {
+            timestamp: Date.now(),
+            reason: hadTechnicalFailures ? 'Falha técnica temporária de infraestrutura' : 'Nenhuma fonte reproduzível encontrada',
+            inconclusive: hadTechnicalFailures
+          });
+        }
       }
     }
 

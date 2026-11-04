@@ -195,7 +195,8 @@
     "test:addons-verification": "tsx tests/addons_and_source_verification.test.ts",
     "test:regression-circuit-breaker": "tsx tests/regression_circuit_breaker_and_playback.test.ts",
     "test:player-e2e-browser": "tsx tests/e2e_real_player_playback.test.ts",
-    "test:addons-discovery-isolated": "tsx tests/addons_source_discovery_isolated.test.ts"
+    "test:addons-discovery-isolated": "tsx tests/addons_source_discovery_isolated.test.ts",
+    "test:session-stability": "tsx tests/regression_session_stability_and_e2e.test.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
