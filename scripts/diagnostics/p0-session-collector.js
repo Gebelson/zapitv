@@ -5,8 +5,32 @@
   window.zapiP0Diag?.stop?.();
   const started = Date.now(), events = [], cleanups = [], seen = new WeakSet();
   let active = true, phase = 'initial', providers = [], sequence = 0;
+  let sampleCount = 0;
+  const dropped = {samples:0,normal:0,critical:0};
+  const isSample = event => event.kind === 'video' && event.event === 'sample';
+  const isCritical = event => event.kind === 'mark' || event.http >= 400 ||
+    ['FETCH_FAILED','TIMEOUT','CANCELLED'].includes(event.result) ||
+    (event.kind === 'video' && ['error','stalled','waiting'].includes(event.event));
+  const countDropped = event => { dropped[isSample(event)?'samples':isCritical(event)?'critical':'normal']++; };
+  const remove = index => {
+    const [event] = events.splice(index,1);
+    if(isSample(event))sampleCount--;
+    countDropped(event);
+  };
   const safeId = value => typeof value === 'string' && /^[a-z0-9_-]{1,80}$/i.test(value) ? value : 'unknown';
-  const record = event => { if (active && events.length < 300) events.push({ms:Date.now()-started,phase,...event}); };
+  const record = event => {
+    if(!active)return;
+    if(isSample(event) && sampleCount >= 96)remove(events.findIndex(isSample));
+    if(events.length >= 300) {
+      let index=events.findIndex(isSample);
+      if(index<0 && !isSample(event))index=events.findIndex(e=>!isCritical(e));
+      if(index<0 && isCritical(event))index=0;
+      if(index<0){countDropped(event);return;}
+      remove(index);
+    }
+    events.push({ms:Date.now()-started,phase,...event});
+    if(isSample(event))sampleCount++;
+  };
   const endpoint = input => {
     try {
       const u = new URL(typeof input === 'string' ? input : input.url || String(input), location.origin);
@@ -69,9 +93,13 @@
     dropped:video.getVideoPlaybackQuality?.().droppedVideoFrames??null
   });
   let videos=0;
+  const trackedVideos = new Set();
   const attach = () => {
+    if(videos>=32)return;
     for(const video of document.querySelectorAll('video')) {
-      if(seen.has(video)||videos>=32)continue;seen.add(video);videos++;
+      if(videos>=32)break;
+      if(seen.has(video))continue;
+      seen.add(video);trackedVideos.add(video);videos++;
       for(const event of ['loadedmetadata','playing','waiting','stalled','error','ended','seeking','seeked']) {
         const listener=()=>metrics(video,event);video.addEventListener(event,listener);
         cleanups.push(()=>video.removeEventListener(event,listener));
@@ -80,15 +108,20 @@
   };
   const observer = new MutationObserver(attach);
   observer.observe(document,{childList:true,subtree:true});attach();
-  const interval=setInterval(()=>{attach();for(const v of document.querySelectorAll('video'))metrics(v,'sample');},1000);
+  const interval=setInterval(()=>{
+    for(const video of trackedVideos)if(video.isConnected)metrics(video,'sample');
+  },1000);
   const timer=setTimeout(stop,180000);
   function stop() {
     if(!active)return;active=false;clearTimeout(timer);clearInterval(interval);observer.disconnect();
     for(const cleanup of cleanups)cleanup();
+    trackedVideos.clear();
     if(window.fetch===wrappedFetch)window.fetch=originalFetch;
   }
   function snapshot() { return {
-    version:1,active,limits:{maxEvents:300,maxDurationSeconds:180,maxJsonBytes:100000},
+    version:2,active,limits:{maxEvents:300,maxSamples:96,maxVideos:32,maxDurationSeconds:180,maxJsonBytes:100000},
+    dropped:{...dropped},truncated:Object.values(dropped).some(n=>n>0),
+    retention:'Newest critical events take priority; oldest critical event may be evicted if all 300 are critical',
     providers:providers.map(p=>({...p})),events:events.map(e=>({...e})),
     unobserved:['internal rejection reasons','internal cache/circuit state','XHR status','external provider association','selected source identity','content versus intro identity']
   }; }

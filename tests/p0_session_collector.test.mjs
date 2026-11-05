@@ -24,6 +24,35 @@ assert.doesNotMatch(JSON.stringify(report),/secret-token|key-secret|private.test
 assert.equal(context.zapiP0Diag.snapshot().limits.maxEvents,300);
 for(let n=0;n<310;n++)context.zapiP0Diag.mark('bounded');
 assert.equal(context.zapiP0Diag.snapshot().events.length,300);
+context.zapiP0Diag.mark('falha');
+assert.ok(context.zapiP0Diag.snapshot().events.some(e=>e.kind==='mark'&&e.phase==='falha'),'failure marker must survive a full buffer');
+assert.ok(context.zapiP0Diag.snapshot().dropped.critical>0);
+assert.equal(context.zapiP0Diag.snapshot().truncated,true);
 timers[0]();assert.equal(context.fetch,originalFetch);
 context.zapiP0Diag.stop();assert.equal(context.fetch,originalFetch);
 console.log('Session collector allowlist, redaction and cleanup: PASS');
+
+let tick; const reads=Array(40).fill(0);
+const videos=reads.map((_,i)=>({
+ get currentTime(){reads[i]++;return 1;},videoWidth:640,videoHeight:360,paused:false,readyState:4,
+ isConnected:true,error:null,listeners:new Map(),
+ addEventListener(name,fn){this.listeners.set(name,fn);},
+ removeEventListener(name){this.listeners.delete(name);}
+}));
+const sampled={...context,fetch:originalFetch,document:{querySelectorAll:()=>videos},setInterval:fn=>{tick=fn;return 1;}};
+sampled.window=sampled;
+vm.runInNewContext(source,sampled);
+tick();
+assert.equal(reads.filter(n=>n>0).length,32,'sampling must obey the same 32-video limit as listeners');
+sampled.zapiP0Diag.mark('falha');
+for(let n=0;n<20;n++)tick();
+let sampleReport=sampled.zapiP0Diag.snapshot();
+assert.ok(sampleReport.events.filter(e=>e.event==='sample').length<=96);
+assert.ok(sampleReport.events.some(e=>e.kind==='mark'&&e.phase==='falha'));
+assert.equal(sampleReport.dropped.critical,0,'periodic samples must not evict a failure marker');
+videos[0].listeners.get('error')();
+assert.ok(sampled.zapiP0Diag.snapshot().events.some(e=>e.event==='error'));
+assert.ok(sampled.zapiP0Diag.snapshot().dropped.samples>0);
+const beforeDetached=reads[0];videos[0].isConnected=false;tick();assert.equal(reads[0],beforeDetached);
+sampled.zapiP0Diag.stop();assert.equal(videos[0].listeners.size,0);
+console.log('Video sampling cap and priority event retention: PASS');
