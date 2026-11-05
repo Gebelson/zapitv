@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "fix/p0-provider-transitions-20261105": false
+    }
+  },
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
