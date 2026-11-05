@@ -776,6 +776,15 @@ class ProviderRegistryService {
     const cleanTitle = (id.title || '').trim().toLowerCase();
     const cacheKey = JSON.stringify(['v8_canonical_identity', type, rawTargetId, tmdbStr, imdbStr, cleanTitle, id.year, episode?.season, episode?.episode]);
 
+    if (options?.signal?.aborted) return Promise.resolve([]);
+    // A new consumer cannot reuse the transport cancelled by the previous one.
+    if (this.inFlightControllers.get(cacheKey)?.signal.aborted) {
+      this.pending.delete(cacheKey);
+      this.inFlightControllers.delete(cacheKey);
+      this.inFlightConsumers.delete(cacheKey);
+    }
+    let onConsumerAbort: (() => void) | undefined;
+
     // 1. Registro de listeners (progressivo e telemetria de provedores) para este cacheKey
     const releaseListener = () => {
       const callback = options?.onProgressiveStreams;
@@ -791,11 +800,14 @@ class ProviderRegistryService {
         if (pListeners?.size === 0) this.providerResultListeners.delete(cacheKey);
       }
       const consumers = this.inFlightConsumers.get(cacheKey);
-      if (consumers && options?.signal) {
+      if (consumers && options?.signal && !options.signal.aborted) {
         consumers.delete(options.signal);
         if (consumers.size === 0) this.inFlightConsumers.delete(cacheKey);
       }
       options?.signal?.removeEventListener('abort', releaseListener);
+      if (onConsumerAbort && !options?.signal?.aborted) {
+        options?.signal?.removeEventListener('abort', onConsumerAbort);
+      }
     };
 
     if (options?.onProgressiveStreams) {
@@ -886,7 +898,7 @@ class ProviderRegistryService {
 
     if (options?.signal) {
       const sig = options.signal;
-      const onConsumerAbort = () => {
+      onConsumerAbort = () => {
         if (this.isCancelled(cacheKey)) {
           opController?.abort();
         }
@@ -1314,6 +1326,7 @@ class ProviderRegistryService {
         // Circuit breaker check: se em cooldown por 4 falhas consecutivas, pula
         const failureRecord = this.providerFailures.get(addon.id);
         if (failureRecord && failureRecord.cooldownUntil && Date.now() < failureRecord.cooldownUntil) {
+          providerOutcomes.set(addon.id, 'SKIPPED');
           const detail: ProviderAttemptDetail = {
             providerId: addon.id,
             providerName: addon.name,
@@ -1788,7 +1801,8 @@ class ProviderRegistryService {
         const isCancelledOp = this.isCancelled(effectiveCacheKey) || Boolean(activeSignal?.aborted);
         if (!isCancelledOp) {
           const hadTechnicalFailures = Array.from(providerOutcomes.values()).some(
-            o => o === 'TIMEOUT' || o === 'NETWORK_FAILURE' || o === 'HTTP_FAILURE'
+            o => o === 'TIMEOUT' || o === 'NETWORK_FAILURE' || o === 'HTTP_FAILURE' ||
+              o === 'INVALID_RESPONSE' || o === 'SKIPPED' || o === 'CANCELLED'
           );
           this.negativeCache.set(effectiveCacheKey, {
             timestamp: Date.now(),
