@@ -45,7 +45,7 @@ async function runRealPlayerE2E() {
       '--disable-setuid-sandbox',
       '--autoplay-policy=no-user-gesture-required'
     ]
-  });
+  }).catch(async error => { await server.close(); throw error; });
 
   const page = await browser.newPage({
     viewport: { width: 1280, height: 720 }
@@ -103,7 +103,7 @@ async function runRealPlayerE2E() {
         }
 
         const timeout = setTimeout(() => {
-          reject(new Error(`Timeout de 20s aguardando decodificação real: currentTime=${video.currentTime}, readyState=${video.readyState}, paused=${video.paused}, src=${video.currentSrc || video.src}, events=[${events.join(', ')}]`));
+          reject(new Error(`Timeout de 20s aguardando decodificação real: currentTime=${video.currentTime}, readyState=${video.readyState}, paused=${video.paused}, events=[${events.join(', ')}]`));
         }, 20000);
 
         video.addEventListener('loadedmetadata', () => {
@@ -150,22 +150,22 @@ async function runRealPlayerE2E() {
       });
     });
 
-    console.log(`\n  --- Resultado da Decodificação Real ---`);
-    console.log(`  Eventos capturados: ${playbackResult.events.slice(0, 8).join(' -> ')}`);
-    console.log(`  Tempo real decodificado: ${playbackResult.finalCurrentTime.toFixed(2)}s (> 0.5s)`);
-    console.log(`  Resolução do vídeo decodificado: ${playbackResult.videoWidth}x${playbackResult.videoHeight}`);
-    console.log(`  Duração total da mídia: ${playbackResult.duration.toFixed(1)}s`);
-    console.log(`  Status de erro: ${playbackResult.error ? JSON.stringify(playbackResult.error) : 'Nenhum erro'}`);
-
-    assert.strictEqual(playbackResult.success, true, 'Reprodução real deve ter sucesso');
-    assert.ok(playbackResult.finalCurrentTime >= 0.5, 'Tempo decodificado real deve ultrapassar 0.5s');
-    assert.ok(playbackResult.videoWidth > 0, 'Largura do vídeo deve ser maior que 0');
-    assert.ok(playbackResult.videoHeight > 0, 'Altura do vídeo deve ser maior que 0');
-    assert.strictEqual(playbackResult.error, null, 'Elemento de vídeo não deve apresentar erro');
-
-    console.log('\n========================================================================');
-    console.log('✓ TESTE REAL DE NAVEGADOR CONCLUÍDO COM SUCESSO: REPRODUÇÃO REAL CONFIRMADA');
-    console.log('========================================================================\n');
+    // Observe sustained decoder progress; no assignment to currentTime or fake clock.
+    const before = await videoLocator.evaluate((video: HTMLVideoElement) => ({
+      time: video.currentTime, frames: video.getVideoPlaybackQuality?.().totalVideoFrames ?? 0
+    }));
+    await page.waitForFunction(start => {
+      const video = document.querySelector('video');
+      return video && !video.paused && !video.error && video.currentTime >= start + 5;
+    }, before.time, { timeout: 15000 });
+    const after = await videoLocator.evaluate((video: HTMLVideoElement) => ({
+      time: video.currentTime, frames: video.getVideoPlaybackQuality?.().totalVideoFrames ?? 0
+    }));
+    assert.ok(after.time - before.time >= 5);
+    assert.ok(after.frames > before.frames, 'Decoded video frames must advance');
+    assert.ok(playbackResult.videoWidth > 0 && playbackResult.videoHeight > 0);
+    assert.equal(playbackResult.error, null);
+    console.log(JSON.stringify({controlledMedia:true,secondsObserved:after.time-before.time,decodedFrames:after.frames-before.frames,realTitleValidated:false}));
   } finally {
     await browser.close();
     await server.close();
@@ -173,6 +173,6 @@ async function runRealPlayerE2E() {
 }
 
 runRealPlayerE2E().catch(err => {
-  console.error('\n✗ Falha no teste real de navegador:', err);
-  process.exit(1);
+  console.error('Real player test failed:', err.message);
+  process.exitCode = 1;
 });

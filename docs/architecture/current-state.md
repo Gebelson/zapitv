@@ -1,8 +1,8 @@
-# Baseline tÈcnico ó 2026-11-05
+# Baseline t√©cnico ‚Äî 2026-11-05
 
-Base 70b509d. ¡rvore inicial limpa. React/Vite/TypeScript, Express empacotado por esbuild em api/index.mjs; Drizzle/libSQL, sessıes prÛprias e fila offline. N„o foram lidas credenciais nem executadas escritas remotas.
+Base 70b509d. √Årvore inicial limpa. React/Vite/TypeScript, Express empacotado por esbuild em api/index.mjs; Drizzle/libSQL, sess√µes pr√≥prias e fila offline. N√£o foram lidas credenciais nem executadas escritas remotas.
 
-| MÛdulo | Linhas | Imports resolvidos |
+| M√≥dulo | Linhas | Imports resolvidos |
 |---|---:|---:|
 | `App.tsx` | 3415 | 74 |
 | `src/pages/tv/TvApp.tsx` | 1098 | 44 |
@@ -18,8 +18,27 @@ Base 70b509d. ¡rvore inicial limpa. React/Vite/TypeScript, Express empacotado po
 | `src/core/selection/sourceSelectionService.ts` | 396 | 8 |
 | `server.ts` | 1734 | 31 |
 
-Prioridade: indisponibilidade temporal n„o homologada. Registry acumula configuraÁ„o, cache, transporte, concorrÍncia e seleÁ„o; verification agrega descoberta e validaÁ„o; ZapiPlayer acumula engines, interaÁ„o, recuperaÁ„o e progresso. App/TvApp acumulam roteamento, sess„o e apresentaÁ„o. O n˙mero de linhas n„o justifica extraÁ„o isoladamente.
+Prioridade: indisponibilidade temporal n√£o homologada. Registry acumula configura√ß√£o, cache, transporte, concorr√™ncia e sele√ß√£o; verification agrega descoberta e valida√ß√£o; ZapiPlayer acumula engines, intera√ß√£o, recupera√ß√£o e progresso. App/TvApp acumulam roteamento, sess√£o e apresenta√ß√£o. O n√∫mero de linhas n√£o justifica extra√ß√£o isoladamente.
 
-O E2E de sess„o existente passou em Chromium: trÍs inÌcios decodificados (854x480/640x360). PorÈm startPlayback injeta streamsMap e verificationState AVAILABLE, sem conectar descoberta ao player. N„o comprova correÁ„o de tÌtulos reais nem estabilidade prolongada. N„o foram testadas TVs fÌsicas.
+O E2E de sess√£o existente passou em Chromium: tr√™s in√≠cios decodificados (854x480/640x360). Por√©m startPlayback injeta streamsMap e verificationState AVAILABLE, sem conectar descoberta ao player. N√£o comprova corre√ß√£o de t√≠tulos reais nem estabilidade prolongada. N√£o foram testadas TVs f√≠sicas.
 
-Riscos priorit·rios: testes de 0,5s insuficientes; P0 ainda aberto; dependÍncias circulares no grafo; configuraÁ„o local/backend com precedÍncia prÛpria; mÛdulos UI importados pelo core. Nenhuma reestruturaÁ„o da reproduÁ„o est· autorizada pelo gate atÈ evidÍncia do fluxo completo.
+Riscos priorit√°rios: testes de 0,5s insuficientes; P0 ainda aberto; depend√™ncias circulares no grafo; configura√ß√£o local/backend com preced√™ncia pr√≥pria; m√≥dulos UI importados pelo core. Nenhuma reestrutura√ß√£o da reprodu√ß√£o est√° autorizada pelo gate at√© evid√™ncia do fluxo completo.
+
+## Leitura remota sem escrita
+
+/api/providers/config em Production retornou HTTP 200: 22 provedores, 20 enabled, 8 offline, 2 metadata-only e 2 enabled com configuracao ausente. Esses grupos podem se sobrepor. Elegibilidade real do cliente precisa ser considerada antes de concluir que houve consulta ou falha externa. Nenhum segredo foi registrado.
+
+## Efeitos e riscos por fronteira
+
+| Fronteira | Estado/efeito | Risco e teste existente |
+|---|---|---|
+| App/TvApp/ContentDetailModal | Sessao, foco, catalogo e descoberta assincrona | Desmontagem/cancelamento; watch-routes, six-flows, tv-navigation |
+| ZapiPlayer | Elemento de video, HLS, timers, listeners, progresso | Limpeza, √°udio e recuperacao; player-real, tv-buffering, watchparty |
+| providerRegistry | LRU, pending promises, abort controllers, HTTP e config | Contaminacao temporal; addons-discovery-isolated, session-stability |
+| sourceVerificationService | Fases de descoberta, motivos e validacao | Falsos estados; source-double-verification, source-playability |
+| streamValidator/sourceReadiness/mediaSourceValidation | Identidade e capacidades t√©cnicas | Rejeicao indevida ou obra errada; source-playability, playback-identity |
+| stremioClient | HTTP, manifestos, adaptacao de respostas | CORS, formatos e timeout; addons-discovery-isolated |
+| sourceConfidenceEngine/sourceSelectionService | Identidade e ranking | Regras contraditorias/ciclos; canonical-title-matching, smart-audio |
+| server/api bundle | Rotas Express, autorizacao, proxy e banco | SSRF, acesso e trafego; public-api-security, origin-transfer |
+
+api/index.mjs e gerado por build:api: revisar server.ts, nao refatorar o bundle manualmente. Linhas/imports acima sao medidas do baseline; contratos ainda exigem inventario detalhado antes de cada extracao.

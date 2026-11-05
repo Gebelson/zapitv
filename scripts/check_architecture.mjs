@@ -27,7 +27,7 @@ const baseline=JSON.parse(readFileSync(baselineFile,'utf8'));
 const added=Object.entries(counts).filter(([key,count])=>count>(baseline[key]??0));
 if(process.argv.includes('--report')) {
  mkdirSync('docs/architecture/reports',{recursive:true});
- writeFileSync('docs/architecture/reports/dependencies.json',JSON.stringify(graph,null,2)+'\n');
+ writeFileSync('docs/architecture/reports/dependencies.json',JSON.stringify(graph)+'\n');
 }
 console.log(JSON.stringify({findings:findings.length,newViolations:added.length,modules:graph?.modules.length}));
 if(added.length){console.error(added.map(([key])=>key).join('\n'));process.exitCode=1;}

@@ -22,8 +22,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint:architecture
+      - run: npm run test:architecture
+      - run: npm run test:catalog-sort
       - run: npm run build
       - run: npx playwright install --with-deps chromium
+      - run: npm run test:session-stability
+      - run: npm run test:player-real
       - run: npm run test:storage-browser
       - run: npm run test:p1-browser
       - run: npm run test:outbox-browser

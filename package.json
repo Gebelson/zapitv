@@ -201,7 +201,9 @@
     "lint:architecture": "node scripts/check_architecture.mjs",
     "analyze:dependencies": "node scripts/check_architecture.mjs --report",
     "analyze:unused": "knip --reporter json",
-    "test:player-real": "tsx tests/e2e_real_player_playback.test.ts"
+    "test:player-real": "tsx tests/e2e_real_player_playback.test.ts",
+    "test:architecture": "node tests/architecture_guard.test.mjs",
+    "test:catalog-sort": "tsx tests/catalog_sort_contract.test.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
@@ -234,6 +236,7 @@
     "drizzle-kit": "^0.31.11",
     "esbuild": "^0.24.2",
     "eslint": "^9.39.5",
+    "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-boundaries": "^7.4.1",
     "knip": "^6.44.1",
     "playwright": "^1.64.0",
