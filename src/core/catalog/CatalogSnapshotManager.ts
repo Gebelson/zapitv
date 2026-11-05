@@ -1,5 +1,5 @@
 import { ContentItem } from '../../../types';
-import { CatalogSortOption } from '../../../components/SortDropdown';
+import type { CatalogSortOption } from './catalogSort';
 import { hybridRecommendationEngine } from '../recommendations/hybridRecommendationEngine';
 import { bannedContentRegistry } from './BannedContentRegistry';
 import { deduplicateContentItems, getCanonicalKeysForItem } from './catalogDeduplication';
