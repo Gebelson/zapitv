@@ -2,16 +2,20 @@ import path from 'path';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'url';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
+import { resolveFirebaseDeployment } from './src/core/config/firebaseEnvironment';
+import productionFirebaseConfig from './firebase-applet-config.json';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
+    const firebaseDeployment = resolveFirebaseDeployment({ ...loadEnv(mode, __dirname, ''), ...process.env }, productionFirebaseConfig);
     let outputDir = path.resolve(__dirname, 'dist');
     return {
+      define: { __ZAPITV_FIREBASE_CONFIG__: JSON.stringify(firebaseDeployment) },
       server: {
         port: 3000,
         host: '0.0.0.0',
