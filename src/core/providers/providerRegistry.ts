@@ -1395,19 +1395,26 @@ class ProviderRegistryService {
 
           if ((!res || !res.streams || !hasMatchingStreams(res.streams)) && secondaryCandidates.length > 0 && !activeSignal?.aborted && !this.isCancelled(effectiveCacheKey)) {
             for (const altBase of secondaryCandidates) {
+              const remainingBudget = addonTimeout - (Date.now() - startProviderTime);
+              if (remainingBudget <= 0) {
+                providerError = 'TIMEOUT: Orçamento total do provedor esgotado';
+                break;
+              }
               const altId = type === 'series' || type === 'anime'
                 ? stremioEpisodeId(altBase, episode)
                 : altBase;
               try {
                 const altRes = await client.getStreams(stremioType, altId, {
                   signal: activeSignal,
-                  totalTimeoutMs: 2500,
+                  totalTimeoutMs: Math.min(2500, remainingBudget),
                   preferProxy: addon.id.includes('froststream') || addon.id.includes('fenixflix'),
                   allowDirectFallback: true
                 }).catch(() => null);
                 if (altRes && Array.isArray(altRes.streams) && hasMatchingStreams(altRes.streams)) {
                   res = altRes;
                   rawResponse = altRes;
+                  providerError = undefined;
+                  httpStatusCode = undefined;
                   break;
                 }
               } catch {}
