@@ -378,6 +378,21 @@ export const TvApp: React.FC<TvAppProps> = ({
     };
   }, []);
 
+  // Garante que o foco inicial seja estabelecido assim que o perfil TV e autenticação forem resolvidos
+  useEffect(() => {
+    if (isTvAuthenticated && !isProfileSelectorOpen && activeTvProfile && !parseWatchRoute(location.pathname).isWatch) {
+      const timer = setTimeout(() => {
+        try {
+          const cur = getCurrentFocusKey();
+          if (!cur) {
+            setFocus('tv-hero-play');
+          }
+        } catch {}
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isTvAuthenticated, isProfileSelectorOpen, activeTvProfile, location.pathname]);
+
   // Aba ativa na navegação superior
   const [catalogEligibilityTick, setCatalogEligibilityTick] = useState(0);
   useEffect(() => {
