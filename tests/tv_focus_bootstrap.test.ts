@@ -10,22 +10,38 @@ const __dirname = path.dirname(__filename);
 const tvAppPath = path.resolve(__dirname, '../src/pages/tv/TvApp.tsx');
 const tvAppSource = fs.readFileSync(tvAppPath, 'utf8');
 
-// 1. Verifica se existe o efeito reativo que estabelece o foco inicial assim que o perfil é resolvido
+// 1. Verifica se o efeito de inicialização de montagem não contém timer redundante de foco
+const mountEffectSnippet = tvAppSource.slice(
+  tvAppSource.indexOf('// Inicializa gerenciador de navegação espacial e modo TV'),
+  tvAppSource.indexOf('// Garante que o foco inicial seja estabelecido')
+);
 assert.ok(
-  tvAppSource.includes('// Garante que o foco inicial seja estabelecido assim que o perfil TV e autenticação forem resolvidos'),
-  'TvApp.tsx deve possuir efeito reativo de bootstrap de foco'
+  !mountEffectSnippet.includes('setTimeout'),
+  'Efeito de montagem não deve possuir timer redundante de foco'
 );
 
-// 2. Verifica as dependências do efeito
+// 2. Verifica se existe o efeito consolidado que estabelece o foco inicial
 assert.ok(
-  tvAppSource.includes('[isTvAuthenticated, isProfileSelectorOpen, activeTvProfile, location.pathname]'),
-  'Efeito de foco deve observar isTvAuthenticated, isProfileSelectorOpen, activeTvProfile e location.pathname'
+  tvAppSource.includes('// Garante que o foco inicial seja estabelecido assim que a autenticação e o perfil TV forem resolvidos'),
+  'TvApp.tsx deve possuir efeito reativo consolidado de bootstrap de foco'
 );
 
-// 3. Verifica se setFocus("tv-hero-play") é chamado quando cur é nulo
+// 3. Verifica proteção contra sobrescrita de foco ativo legítimo
 assert.ok(
-  tvAppSource.includes("setFocus('tv-hero-play')"),
-  'TvApp.tsx deve definir foco inicial em tv-hero-play'
+  tvAppSource.includes("if (cur && cur !== 'BODY' && cur !== 'root' && cur !== 'SN:ROOT')"),
+  'TvApp.tsx deve verificar se já existe foco válido antes de redefinir'
+);
+
+// 4. Verifica verificação de montagem e visibilidade de tv-hero-play
+assert.ok(
+  tvAppSource.includes('heroPlayEl.offsetParent !== null') && tvAppSource.includes('isHeroPlayUsable'),
+  'TvApp.tsx deve verificar se tv-hero-play está montado e visível antes de focar'
+);
+
+// 5. Verifica fallback seguro para aba do cabeçalho
+assert.ok(
+  tvAppSource.includes('tabFocusKeys[currentTab] || \'tv-nav-home\''),
+  'TvApp.tsx deve possuir fallback para a aba do cabeçalho caso hero play não esteja usável'
 );
 
 console.log('✓ Bootstrap reativo de foco espacial no modo TV validado com sucesso!');

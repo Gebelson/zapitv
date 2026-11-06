@@ -355,7 +355,7 @@ export const TvApp: React.FC<TvAppProps> = ({
     animes: new CatalogPaginationSession(page => catalogDiscoveryService.discoverAnimes(page))
   }), []);
 
-  // Inicializa navegação espacial e define o foco inicial no botão Assistir do Hero
+  // Inicializa gerenciador de navegação espacial e modo TV no ciclo de vida do componente
   useEffect(() => {
     tvNavigationManager.init();
     tvNavigationManager.resume();
@@ -363,35 +363,13 @@ export const TvApp: React.FC<TvAppProps> = ({
     uiSoundService.setTvMode(true);
     document.body.classList.add('tv-mode');
 
-    const timer = setTimeout(() => {
-      try {
-        if (isTvAuthenticated && !isProfileSelectorOpen && activeTvProfile && !parseWatchRoute(window.location.pathname).isWatch) setFocus('tv-hero-play');
-      } catch {}
-    }, 150);
-
     return () => {
-      clearTimeout(timer);
       tvNavigationManager.pause();
       tvModeService.setTvMode(false);
       uiSoundService.setTvMode(false);
       document.body.classList.remove('tv-mode');
     };
   }, []);
-
-  // Garante que o foco inicial seja estabelecido assim que o perfil TV e autenticação forem resolvidos
-  useEffect(() => {
-    if (isTvAuthenticated && !isProfileSelectorOpen && activeTvProfile && !parseWatchRoute(location.pathname).isWatch) {
-      const timer = setTimeout(() => {
-        try {
-          const cur = getCurrentFocusKey();
-          if (!cur) {
-            setFocus('tv-hero-play');
-          }
-        } catch {}
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isTvAuthenticated, isProfileSelectorOpen, activeTvProfile, location.pathname]);
 
   // Aba ativa na navegação superior
   const [catalogEligibilityTick, setCatalogEligibilityTick] = useState(0);
@@ -445,6 +423,50 @@ export const TvApp: React.FC<TvAppProps> = ({
   useEffect(() => watchPartyService.subscribe(event => {
     if (event === 'state_changed') setPartyActive(watchPartyService.getRoomState().isActive);
   }), []);
+
+  // Garante que o foco inicial seja estabelecido assim que a autenticação e o perfil TV forem resolvidos
+  useEffect(() => {
+    // Não interfere durante autenticação pendente, seletor de perfis ou rota de reprodução
+    if (!isTvAuthenticated || isProfileSelectorOpen || !activeTvProfile) return;
+    if (parseWatchRoute(location.pathname).isWatch || playingItem || selectedDetailItem) return;
+
+    const timer = setTimeout(() => {
+      try {
+        const cur = getCurrentFocusKey();
+        // Não sobrescreve se já houver um foco válido ativo na aplicação
+        if (cur && cur !== 'BODY' && cur !== 'root' && cur !== 'SN:ROOT') {
+          return;
+        }
+
+        // Verifica se o botão tv-hero-play está montado no DOM e navegável
+        const heroPlayEl = document.querySelector<HTMLElement>('[data-focus-key="tv-hero-play"]');
+        const isHeroPlayUsable = Boolean(
+          heroPlayEl &&
+          heroPlayEl.offsetParent !== null &&
+          !heroPlayEl.hasAttribute('disabled') &&
+          heroPlayEl.getAttribute('aria-hidden') !== 'true'
+        );
+
+        // Define foco no hero play caso disponível, ou recua para a aba correspondente do cabeçalho
+        const targetFocus = (isHeroPlayUsable && currentTab !== 'featured' && !specialView)
+          ? 'tv-hero-play'
+          : (tabFocusKeys[currentTab] || 'tv-nav-home');
+
+        setFocus(targetFocus);
+      } catch {}
+    }, 60);
+
+    return () => clearTimeout(timer);
+  }, [
+    isTvAuthenticated,
+    isProfileSelectorOpen,
+    activeTvProfile,
+    location.pathname,
+    currentTab,
+    specialView,
+    playingItem,
+    selectedDetailItem
+  ]);
 
   // Suspende 100% do pré-carregamento de catálogo durante a reprodução para priorizar buffer e decodificação do player
   useEffect(() => {
