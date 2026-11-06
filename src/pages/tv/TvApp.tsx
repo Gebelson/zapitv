@@ -205,15 +205,6 @@ export const TvApp: React.FC<TvAppProps> = ({
         authSyncService.notifyAuthChange('LOGIN');
       }
 
-      if (typeof requestAnimationFrame === 'function') {
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            try {
-              if (typeof setFocus === 'function') setFocus('tv-hero-play');
-            } catch {}
-          }, 100);
-        });
-      }
     } catch (error) {
       console.error('[TvApp] Falha ao selecionar perfil:', error);
       setTvAuthError(error instanceof Error ? error.message : 'Não foi possível selecionar o perfil.');
@@ -433,26 +424,34 @@ export const TvApp: React.FC<TvAppProps> = ({
     const timer = setTimeout(() => {
       try {
         const cur = getCurrentFocusKey();
+        const focusElements = Array.from(document.querySelectorAll<HTMLElement>('[data-focus-key]'));
+        const isNavigable = (element: HTMLElement | undefined): boolean => {
+          if (!element?.isConnected || !element.getClientRects().length || element.matches(':disabled')) return false;
+          const rect = element.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0) return false;
+          for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+            const style = getComputedStyle(node);
+            if (node.hidden || node.getAttribute('aria-hidden') === 'true' || style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
+          }
+          return true;
+        };
         // Não sobrescreve se já houver um foco válido ativo na aplicação
         if (cur && cur !== 'BODY' && cur !== 'root' && cur !== 'SN:ROOT') {
-          return;
+          if (isNavigable(focusElements.find(element => element.dataset.focusKey === cur))) return;
         }
 
         // Verifica se o botão tv-hero-play está montado no DOM e navegável
-        const heroPlayEl = document.querySelector<HTMLElement>('[data-focus-key="tv-hero-play"]');
-        const isHeroPlayUsable = Boolean(
-          heroPlayEl &&
-          heroPlayEl.offsetParent !== null &&
-          !heroPlayEl.hasAttribute('disabled') &&
-          heroPlayEl.getAttribute('aria-hidden') !== 'true'
-        );
+        const heroPlayEl = focusElements.find(element => element.dataset.focusKey === 'tv-hero-play');
+        const isHeroPlayUsable = isNavigable(heroPlayEl);
 
         // Define foco no hero play caso disponível, ou recua para a aba correspondente do cabeçalho
         const targetFocus = (isHeroPlayUsable && currentTab !== 'featured' && !specialView)
           ? 'tv-hero-play'
           : (tabFocusKeys[currentTab] || 'tv-nav-home');
 
-        setFocus(targetFocus);
+        if (isNavigable(focusElements.find(element => element.dataset.focusKey === targetFocus))) {
+          setFocus(targetFocus);
+        }
       } catch {}
     }, 60);
 
