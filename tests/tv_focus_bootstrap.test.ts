@@ -34,7 +34,7 @@ assert.ok(
 
 // 4. Verifica verificação de montagem e visibilidade de tv-hero-play
 assert.ok(
-  tvAppSource.includes('heroPlayEl.offsetParent !== null') && tvAppSource.includes('isHeroPlayUsable'),
+  tvAppSource.includes('isNavigable(heroPlayEl)') && tvAppSource.includes('isHeroPlayUsable'),
   'TvApp.tsx deve verificar se tv-hero-play está montado e visível antes de focar'
 );
 
