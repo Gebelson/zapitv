@@ -324,6 +324,12 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
   }, [location.pathname, isWatchRoute]);
 
   const [previousView, setPreviousView] = useState<AppView>('home');
+  const isAccountAccessRoute = currentView === 'login' || currentView === 'signup';
+  useEffect(() => {
+    if (!isCheckingAuth && isAuthenticated && activeProfile && isAccountAccessRoute) {
+      navigate('/', { replace: true });
+    }
+  }, [isCheckingAuth, isAuthenticated, activeProfile, isAccountAccessRoute, navigate]);
   useEffect(() => uiSoundService.bindInteractions(document), []);
 
   useEffect(() => {
@@ -3028,6 +3034,19 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
     hasMoreMovies, hasMoreSeries, hasMoreAnimes, handlePlayFromHero, personalizedHomeRows, profileContinuity.myList
   ]);
 
+  const authModal = !isCheckingAuth && !isAuthenticated && (mandatoryAuth || isAccountAccessRoute) ? (
+    <MandatoryAuthModal
+      isTvMode={false}
+      isDarkMode={isDarkMode}
+      initialMode={currentView === 'signup' ? 'signup' : currentView === 'login' ? 'login' : 'welcome'}
+      onLogin={handleLogin}
+      onSignup={handleSignup}
+      onForgotPassword={() => setCurrentView('recover-password')}
+      authError={authError}
+      onRetryAuth={checkCurrentSession}
+    />
+  ) : null;
+
   if (isTvRoute) {
     return (
       <React.Suspense fallback={<div className="min-h-screen bg-[#05070a] flex items-center justify-center"><ZapiLoader size="xl" /></div>}>
@@ -3107,6 +3126,15 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
           isDarkMode={isDarkMode} 
         />
       </React.Suspense>
+    );
+  }
+
+  if (isAccountAccessRoute) {
+    return (
+      <main data-testid="auth-route-shell" className={`min-h-screen flex items-center justify-center ${isDarkMode ? 'bg-[#05070a]' : 'bg-[#F8F9FC]'}`}>
+        {(isCheckingAuth || isAuthenticated) && <ZapiLoader size="xl" />}
+        {authModal}
+      </main>
     );
   }
 
@@ -3396,18 +3424,7 @@ const App: React.FC<{ initialState: any }> = ({ initialState }) => {
 
       <TvRemoteDiagnosticOverlay />
 
-      {!isCheckingAuth && mandatoryAuth && !isAuthenticated && (
-        <MandatoryAuthModal
-          isTvMode={false}
-          isDarkMode={isDarkMode}
-          initialMode={currentView === 'signup' ? 'signup' : currentView === 'login' ? 'login' : 'welcome'}
-          onLogin={handleLogin}
-          onSignup={handleSignup}
-          onForgotPassword={() => setCurrentView('recover-password')}
-          authError={authError}
-          onRetryAuth={checkCurrentSession}
-        />
-      )}
+      {authModal}
     </div>
   );
 };
