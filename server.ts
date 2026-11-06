@@ -26,7 +26,7 @@ import { publicHttpGet, resolvePublicTarget } from "./src/server/security/public
 import { authenticateUser, extractSessionToken, getValidDatabase, requireAdmin } from "./src/server/auth/authMiddleware.ts";
 import { getAuthPolicy } from "./src/server/auth/authPolicyService.ts";
 import { validateSession } from "./src/server/auth/sessionService.ts";
-import { createMetadataProxy } from "./src/server/metadataProxy.ts";
+import { createMetadataProxy, metadataProxyDiagnosticsHandler, recordMetadataProxyPreflightFailure } from "./src/server/metadataProxy.ts";
 import { authorizedAddonsRegistry, isAddonEligibleForStreams } from "./src/server/providers/authorizedAddonsRegistry.ts";
 import { epgSyncService } from "./src/server/livetv/epgSyncService.ts";
 
@@ -735,6 +735,7 @@ function createApp() {
   // JSON-only addon gateway. Media bytes must go directly to the authorized origin.
   const metadataProxy = createMetadataProxy();
   app.get("/api/proxy", async (req, res) => {
+    const proxyStarted = Date.now();
     const targetUrl = req.query.url;
     if (typeof targetUrl !== 'string' || !targetUrl || targetUrl.length > 4096) {
       return res.status(400).json({ error: "Parâmetro 'url' é obrigatório" });
@@ -749,7 +750,8 @@ function createApp() {
       // Validação de SSRF e bloqueio prévio de destinos internos/privados
       try {
         await resolvePublicTarget(targetUrl);
-      } catch {
+      } catch (error) {
+        recordMetadataProxyPreflightFailure(targetUrl, error, Date.now() - proxyStarted);
         return res.status(502).json({ error: "Destino não permitido" });
       }
 
@@ -852,6 +854,8 @@ function createApp() {
     authorizedAddonsRegistry.resetCircuitBreakers();
     return res.json({ success: true, message: "Circuit breakers reiniciados com sucesso", resetAt: new Date().toISOString() });
   });
+
+  app.get("/api/admin/providers/proxy-diagnostics", requireAdmin, metadataProxyDiagnosticsHandler);
 
   // Diagnóstico administrativo de saúde e capacidades em tempo real
   app.get("/api/admin/providers/health", requireAdmin, (_req, res) => {

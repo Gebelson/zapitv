@@ -210,6 +210,15 @@ describe('ZAPITV — SISTEMA INTELIGENTE DE VERIFICAÇÃO DUPLA DE FONTES', () =
       expect(result.diagnosticLog.queriedProviders).toContain('b');
     });
 
+    it.each(['SKIPPED', 'CANCELLED'] as const)('nao confirma ausencia para resultado %s', async (outcome) => {
+      vi.spyOn(providerRegistry, 'resolveStreams').mockImplementation(async (_type, _id, _ep, options) => {
+        options?.onProviderResult?.({providerId:'cooling',providerName:'Cooling',durationMs:0,success:false,streamCount:0,outcome,error:'Consulta nao concluida'});
+        return [];
+      });
+      const result=await sourceVerificationService.verifySources(dummyMovie);
+      expect(result.state).toBe('INCONCLUSIVE');
+    });
+
     it('não declara indisponibilidade quando nenhum provedor foi consultado', async () => {
       vi.spyOn(providerRegistry, 'resolveStreams').mockResolvedValue([]);
       const result = await sourceVerificationService.verifySources(dummyMovie);

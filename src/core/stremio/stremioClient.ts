@@ -210,6 +210,10 @@ export class StremioClient {
 
     const key = `${url}:${timeoutMs}`;
     let entry = StremioClient.pendingEntries.get(key);
+    if (entry?.controller.signal.aborted) {
+      StremioClient.pendingEntries.delete(key);
+      entry = undefined;
+    }
 
     if (entry) {
       entry.consumers.add(signal || null);
@@ -219,7 +223,7 @@ export class StremioClient {
       return new Promise((resolve, reject) => {
         const onAbort = () => {
           entry?.consumers.delete(signal);
-          if (entry && entry.consumers.size > 0 && Array.from(entry.consumers).every(s => s !== null && s.aborted)) {
+          if (entry && (entry.consumers.size === 0 || Array.from(entry.consumers).every(s => s !== null && s.aborted))) {
             entry.controller.abort('USER_ABORT');
           }
           reject(new StremioRequestError({
@@ -300,7 +304,7 @@ export class StremioClient {
     return new Promise((resolve, reject) => {
       const onAbort = () => {
         entry?.consumers.delete(signal);
-        if (entry && entry.consumers.size > 0 && Array.from(entry.consumers).every(s => s !== null && s.aborted)) {
+        if (entry && (entry.consumers.size === 0 || Array.from(entry.consumers).every(s => s !== null && s.aborted))) {
           entry.controller.abort('USER_ABORT');
         }
         reject(new StremioRequestError({
@@ -332,7 +336,7 @@ export class StremioClient {
     const totalTimeoutMs = options.totalTimeoutMs && options.totalTimeoutMs > 0 ? options.totalTimeoutMs : 8000;
     const directTimeoutMs = options.directTimeoutMs && options.directTimeoutMs > 0
       ? Math.min(options.directTimeoutMs, totalTimeoutMs)
-      : Math.min(2600, Math.max(1200, Math.floor(totalTimeoutMs * 0.45)));
+      : Math.min(totalTimeoutMs, 2600, Math.max(1200, Math.floor(totalTimeoutMs * 0.45)));
     const preferProxy = Boolean(options.preferProxy);
     const userSignal = options.signal;
 
@@ -397,7 +401,10 @@ export class StremioClient {
 
     // 3. Fallback ou execução prioritária via proxy seguro
     const elapsed = Date.now() - startTime;
-    const remainingProxyBudget = Math.max(800, totalTimeoutMs - elapsed);
+    const remainingProxyBudget = totalTimeoutMs - elapsed;
+    if (remainingProxyBudget <= 0) {
+      throw new StremioRequestError({message:'Orçamento total da consulta esgotado.',kind:'TIMEOUT',endpoint,url:directUrl});
+    }
 
     if (userSignal?.aborted) {
       throw new StremioRequestError({

@@ -1,15 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowUpDown, Check } from 'lucide-react';
 
-export type CatalogSortOption = 
-  | 'recommended' 
-  | 'popularity' 
-  | 'release_date' 
-  | 'rating' 
-  | 'recently_added' 
-  | 'oldest' 
-  | 'title_az' 
-  | 'title_za';
+import type { CatalogSortOption } from '../src/core/catalog/catalogSort';
+export type { CatalogSortOption } from '../src/core/catalog/catalogSort';
 
 export interface SortOptionItem {
   id: CatalogSortOption;

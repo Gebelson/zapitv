@@ -1,0 +1,6 @@
+{
+ "$schema":"https://unpkg.com/knip/schema.json",
+ "entry":["index.tsx","server.ts","scripts/**/*.{ts,mjs}","tests/**/*.{ts,tsx}","tests/harness/*.html"],
+ "project":["**/*.{ts,tsx,mjs,cjs}"],
+ "ignore":["api/**","dist/**","node_modules/**"]
+}

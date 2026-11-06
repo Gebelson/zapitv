@@ -556,7 +556,9 @@ class SourceVerificationService {
       d.isTimeout === true ||
       d.outcome === 'NETWORK_FAILURE' ||
       d.outcome === 'HTTP_FAILURE' ||
-      d.outcome === 'INVALID_RESPONSE'
+      d.outcome === 'INVALID_RESPONSE' ||
+      d.outcome === 'SKIPPED' ||
+      d.outcome === 'CANCELLED'
     );
     const hasTimeouts = diagnostic.timeouts.length > 0;
     const registryFailed = diagnostic.networkErrors.some(e => e.providerId.startsWith('registry-'));

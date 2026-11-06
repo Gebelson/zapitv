@@ -46,9 +46,10 @@ export function createPinnedPublicLookup(address: string, family: number) {
   };
 }
 
-export async function publicHttpGet(raw: string, options: { headers?: Record<string, string>; signal?: AbortSignal; timeoutMs?: number } = {}) {
+export async function publicHttpGet(raw: string, options: { headers?: Record<string, string>; signal?: AbortSignal; timeoutMs?: number; onAttempt?: () => void } = {}) {
   let current = raw;
   for (let redirects = 0; redirects <= 3; redirects++) {
+    options.onAttempt?.();
     const { url, address, family } = await resolvePublicTarget(current);
     const response = await new Promise<IncomingMessage>((resolve, reject) => {
       const request = (url.protocol === 'https:' ? https : http).request(url, {

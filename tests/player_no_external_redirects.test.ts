@@ -1,3 +1,4 @@
+import {canonicalCatalogMaster} from '../src/core/catalog/CanonicalCatalogMaster';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -228,8 +229,8 @@ testVerificationOutcome().then(() => {
   console.log('\n========================================================================');
   console.log('  TODOS OS TESTES DE REMOÇÃO DE REDIRECIONAMENTOS EXTERNOS PASSARAM!    ');
   console.log('========================================================================\n');
-  process.exit(0);
+
 }).catch(err => {
   console.error('Falha nos testes de remoção de redirecionamentos externos:', err);
-  process.exit(1);
-});
+  process.exitCode = 1;
+}).finally(() => canonicalCatalogMaster.dispose());
