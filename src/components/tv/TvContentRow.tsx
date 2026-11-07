@@ -474,6 +474,9 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   // Offset base: em modo finito inicia estritamente em safeMarginX; em modo infinito compensa o slot -1
   const baseOffset = isFinite ? viewport.safeMarginX : viewport.safeMarginX - negativeSlotsCount * stepSize;
   const currentItem = items[targetIndex] || items[currentIndex] || items[0];
+  // Keep shared items mounted as they move between slots. Small circular
+  // windows may render an item twice, so distinguish each visible copy.
+  const itemOccurrences = new Map<number, number>();
 
   // Posição horizontal da seleção: em modo finito segue o índice ativo; em modo infinito fica fixa no Slot 0
   const activeSelectionLeft = isFinite 
@@ -574,12 +577,14 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
               const itemIndex = isFinite ? slotIdx : ((currentIndex + slotIdx) % items.length + items.length) % items.length;
               const item = items[itemIndex];
               if (!item) return null;
+              const occurrence = itemOccurrences.get(itemIndex) || 0;
+              itemOccurrences.set(itemIndex, occurrence + 1);
               const isSlotActive = isFinite ? slotIdx === currentIndex : slotIdx === 0;
               const isSlotFocused = isSlotActive && focused;
 
               return (
                 <div 
-                  key={`slot-${slotIdx}-${item.id}`}
+                  key={`item-${itemIndex}-${item.id}-${occurrence}`}
                   ref={slotIdx === 0 ? slotMeasureRef : undefined}
                   style={{ width: `${viewport.cardWidth}px` }}
                   className="flex-none opacity-100"
