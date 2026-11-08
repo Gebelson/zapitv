@@ -40,6 +40,8 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:tv-focus-browser
+      - run: node --import tsx tests/p1_tv_details_return_browser.test.ts
+      - run: node --import tsx tests/p1_tv_resize_browser.test.ts
       - run: npm run test:auth-routes-browser
       - run: npm run test:session-stability
       - run: npm run test:player-real

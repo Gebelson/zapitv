@@ -13,12 +13,13 @@ import { useExpandableSynopsis } from '../common/useExpandableSynopsis';
 import { animeSeasonMappingService } from '../../core/anime/animeSeasonMappingService';
 import { seriesSeasonMappingService } from '../../core/series/seriesSeasonMappingService';
 import { episodeAvailabilityService } from '../../core/episodes/episodeAvailabilityService';
-import { FocusContext, useFocusable, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusContext, useFocusable, setFocus, getCurrentFocusKey } from '@noriginmedia/norigin-spatial-navigation';
 
 interface TvDetailsModalProps {
   item: ContentItem;
   initialSeason?: number;
   initialEpisode?: number;
+  returnFocusKey?: string;
   allContent: ContentItem[];
   myList: string[];
   favorites: string[];
@@ -171,6 +172,7 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
   item: initialItem,
   initialSeason,
   initialEpisode,
+  returnFocusKey,
   allContent,
   myList,
   favorites,
@@ -210,8 +212,10 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
   const [retryEpsTrigger, setRetryEpsTrigger] = useState(0);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(initialItem.type === ContentType.SERIES || initialItem.type === ContentType.ANIME);
-  const pendingEpisodeFocus = useRef(Boolean(initialEpisode));
+  const pendingEpisodeFocus = useRef(false);
   const requestedEpisodeFocus = useRef(initialEpisode);
+  const pendingInitialFocus = useRef(true);
+  const bootstrapFocusKey = useRef<string | undefined>(undefined);
 
   const isEpisodic = item.type === ContentType.SERIES || item.type === ContentType.ANIME || Boolean(item.seasonsCount && item.seasonsCount > 0);
   const isInList = myList.includes(item.id);
@@ -471,6 +475,52 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
     }
   }, [validEpisodes, isLoadingEpisodes, currentSeason, visibleCount, firstEpisode]);
 
+  // One cancellable initialization per mount. Movie continuity is not an episode
+  // target, and late episode data must never replace a focus chosen by the user.
+  useEffect(() => {
+    if (!pendingInitialFocus.current) return;
+    const root = noriginRef.current as HTMLElement | null;
+    const usable = (key?: string) => {
+      if (!key || !root) return null;
+      const node = Array.from(root.querySelectorAll<HTMLElement>('[data-focus-key]'))
+        .find(element => element.dataset.focusKey === key);
+      if (!node || !node.isConnected || node.matches(':disabled') || node.getAttribute('aria-disabled') === 'true') return null;
+      const rect = node.getBoundingClientRect();
+      if (!rect.width || !rect.height) return null;
+      for (let ancestor: HTMLElement | null = node; ancestor; ancestor = ancestor.parentElement) {
+        const style = getComputedStyle(ancestor);
+        if (ancestor.hidden || ancestor.getAttribute('aria-hidden') === 'true' || style.display === 'none' || style.visibility === 'hidden') return null;
+        if (ancestor === root) break;
+      }
+      return node;
+    };
+    const frame = requestAnimationFrame(() => {
+      if (!pendingInitialFocus.current) return;
+      const current = getCurrentFocusKey();
+      if (usable(current) && current !== bootstrapFocusKey.current) {
+        pendingInitialFocus.current = false;
+        return;
+      }
+      const requested = isEpisodic && initialEpisode && !isLoadingEpisodes
+        ? validEpisodes.find(ep => Number(ep.number) === initialEpisode &&
+          ep.availabilityStatus !== 'unavailable' && ep.availabilityStatus !== 'unreleased')
+        : undefined;
+      const target = [returnFocusKey, requested ? episodeFocusKey(currentSeason, Number(requested.number)) : undefined,
+        isScheduledUnavailable ? undefined : 'tv-details-play', 'tv-details-list', 'tv-details-back']
+        .find(key => usable(key));
+      if (!target) return;
+      bootstrapFocusKey.current = target;
+      setFocus(target);
+      // While fetching continuity episodes the primary action remains usable.
+      // The root capture handler cancels deferred selection on user input.
+      pendingInitialFocus.current = isEpisodic && isLoadingEpisodes && (
+        (!returnFocusKey && !!initialEpisode) ||
+        (!!returnFocusKey?.startsWith('tv-details-episode-') && target !== returnFocusKey)
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [returnFocusKey, initialEpisode, isEpisodic, isLoadingEpisodes, validEpisodes, currentSeason, isScheduledUnavailable, noriginRef]);
+
   // Registra Voltar no tvNavigationManager
   useEffect(() => {
     const unregister = tvNavigationManager.registerBackHandler('tv-details-modal', 100, () => {
@@ -478,21 +528,8 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
       return true;
     });
 
-    const timer = setTimeout(() => {
-      if (!initialEpisode) {
-        if (!catalogEligibilityService.isCatalogVisibleNow(item)) {
-          setFocus('tv-details-list');
-        } else {
-          setFocus('tv-details-play');
-        }
-      }
-    }, 150);
-
-    return () => {
-      clearTimeout(timer);
-      unregister();
-    };
-  }, [handleClose, initialEpisode]);
+    return unregister;
+  }, [handleClose]);
 
   // Carrega metadados detalhados
   useEffect(() => {
@@ -652,6 +689,8 @@ export const TvDetailsModal: React.FC<TvDetailsModalProps> = ({
     <FocusContext.Provider value={focusKey}>
       <div 
         ref={noriginRef as any}
+        onKeyDownCapture={() => { pendingInitialFocus.current = false; }}
+        onPointerDownCapture={() => { pendingInitialFocus.current = false; }}
         className="fixed inset-0 z-[200] bg-[#05070a] overflow-y-auto no-scrollbar select-none animate-in fade-in duration-300"
       >
         {/* Banner Cinematográfico Superior */}

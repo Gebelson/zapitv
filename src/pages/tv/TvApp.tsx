@@ -400,6 +400,8 @@ export const TvApp: React.FC<TvAppProps> = ({
   const [selectedDetailItem, setSelectedDetailItem] = useState<ContentItem | null>(null);
   const [selectedDetailSeason, setSelectedDetailSeason] = useState<number | undefined>();
   const [selectedDetailEpisode, setSelectedDetailEpisode] = useState<number | undefined>();
+  const detailPlaybackFocusRef = useRef<string | undefined>(undefined);
+  const [detailReturnFocusKey, setDetailReturnFocusKey] = useState<string>();
   const [playingItem, setPlayingItem] = useState<{
     item: ContentItem;
     season?: number;
@@ -816,6 +818,7 @@ export const TvApp: React.FC<TvAppProps> = ({
   // Execução de reprodução com rota persistente
   const handleStartPlay = useCallback((item: ContentItem, season?: number, episode?: number) => {
     if (!isTvAuthenticated) return;
+    detailPlaybackFocusRef.current = selectedDetailItem ? getCurrentFocusKey() : undefined;
     if (!selectedDetailItem) tvNavigationManager.saveFocusSnapshot();
     
     // Assegura limpeza de qualquer erro prévio
@@ -835,6 +838,7 @@ export const TvApp: React.FC<TvAppProps> = ({
   }, [selectedDetailItem, navigate, isTvAuthenticated]);
 
   const handleClosePlayer = useCallback(() => {
+    setDetailReturnFocusKey(detailPlaybackFocusRef.current);
     const itemToPreserve = playingItem?.item || selectedDetailItem;
     if (itemToPreserve) {
       setSelectedDetailItem(itemToPreserve);
@@ -1103,12 +1107,14 @@ export const TvApp: React.FC<TvAppProps> = ({
               item={selectedDetailItem}
               initialSeason={selectedDetailSeason}
               initialEpisode={selectedDetailEpisode}
+              returnFocusKey={detailReturnFocusKey}
               allContent={fullTvCatalog}
               myList={myList}
               favorites={favorites}
               onToggleList={onToggleListById}
               onToggleFavorite={onToggleFavoriteById}
               onClose={() => {
+                setDetailReturnFocusKey(undefined);
                 setSelectedDetailItem(null);
                 tvNavigationManager.restoreFocusSnapshot('tv-hero-play');
               }}
