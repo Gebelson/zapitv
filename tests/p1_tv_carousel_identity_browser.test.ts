@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 import { chromium, type Page } from 'playwright';
 
-const server = await createServer({ server: { host: '127.0.0.1', port: 0, watch: null }, logLevel: 'error' });
+const server = await createServer({ server: { host: '127.0.0.1', port: 0, watch: null, hmr: false }, logLevel: 'error' });
 await server.listen();
 const address = server.httpServer!.address();
 assert.ok(address && typeof address !== 'string');
@@ -19,7 +19,12 @@ async function settled(page: Page) {
 
 async function select(page: Page, expected: string) {
   await page.keyboard.press('Enter');
-  await page.waitForFunction(id => (window as any).p1Metrics.selected === id, expected);
+  try { await page.waitForFunction(id => (window as any).p1Metrics.selected === id, expected, { timeout: 4000 }); }
+  catch (error) {
+    console.log('Selection mismatch', expected, await page.evaluate(() => ({ selected: (window as any).p1Metrics.selected,
+      focus: [...document.querySelectorAll('[data-tv-focused="true"]')].map(e => e.getAttribute('data-focus-key')) })));
+    throw error;
+  }
   const focused = await page.evaluate(() => {
     const e = document.querySelector('[role="button"][data-tv-focused="true"]');
     const r = e?.getBoundingClientRect();
@@ -70,6 +75,21 @@ try {
           await page.keyboard.press(key);
           await settled(page);
           await select(page, `fixture-${expected}`);
+        }
+        // Two full laps (or repeated finite endpoints), selecting with real Enter
+        // after every step. Circular copies must keep their own identity.
+        let index = count <= 6 ? Math.min(1, count - 1) : 0;
+        for (let step = 0; step < count * 2 + 3; step++) {
+          await page.keyboard.press('ArrowRight');
+          index = count <= 6 ? Math.min(index + 1, count - 1) : (index + 1) % count;
+          await settled(page);
+          await select(page, 'fixture-' + index);
+        }
+        for (let step = 0; step < count + 2; step++) {
+          await page.keyboard.press('ArrowLeft');
+          index = count <= 6 ? Math.max(index - 1, 0) : (index - 1 + count) % count;
+          await settled(page);
+          await select(page, 'fixture-' + index);
         }
         // New source identity and a shorter list must not retain an earlier item's state.
         await page.evaluate(() => (window as any).p1ReplaceItems(1, 'replacement'));

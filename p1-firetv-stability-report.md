@@ -1,5 +1,25 @@
 # ZapiTV P1 — desempenho e estabilidade do carrossel TV
 
+## Atualização — retorno do player e resize
+
+Correção adicional no mesmo PR #5, mantendo a base integrada dos PRs #3/#4.
+
+Causa comprovada: TvApp normaliza a continuidade para temporada/episódio 1 inclusive em filmes. Após desmontar o modal para reproduzir e remontá-lo, TvDetailsModal suprimia o foco do botão play porque initialEpisode existia; a alternativa só inicializava foco quando havia episódios. Filme sem episódios ficava sem alvo.
+
+RED comportamental: teste do modal real com Norigin e player interrompido de fixture, servido apenas em loopback, falhou no baseline b2ac051 ao retornar por Escape: nenhum elemento focado. O modo P1_BASELINE carrega explicitamente o arquivo original por git show, sem trocar arquivos do produto.
+
+Correção: TvApp captura a chave de foco antes de entrar no player e passa essa chave no retorno. O modal tem uma inicialização por requestAnimationFrame com cancelamento; procura alvo conectado, renderizado e habilitado, depois episódio de continuidade válido ou ação principal/fallback do modal. Continuidade de filme não é tratada como episódio. Resposta assíncrona preserva a restauração pendente quando o episódio anterior ainda não montou; entrada deliberada do usuário cancela essa seleção tardia. O timer anterior de 150 ms foi removido. Registro de Voltar mantém cleanup próprio.
+
+Resize: regressão independente falhou antes ao reduzir 1920×1080 para 960×540; o card focado ficava fora da viewport. A medição geométrica existente agora reposiciona somente o card focado fora da área vertical, sem mudar identidade/seleção ou registrar novos listeners.
+
+Testes novos: 18 combinações de 9 cenários × 2 resoluções, com filme, progresso salvo, série, continuidade, episódios assíncronos na primeira montagem e no retorno, lista vazia e anime. Enter, setas reais, Escape/Backspace, reprodução interrompida e reabertura. Fixture de player valida o contrato de desmontagem/retorno; não substitui reprodução remota real.
+
+Carrosséis: complementada seleção por Enter em duas voltas completas e retorno inverso para 7/8/40 itens; limites finitos para 1/6; troca dinâmica para uma nova identidade de lista; retenção de imagens e cleanup de listeners já existentes. Fixtures isoladas, sem alterações de dados staging.
+
+Métrica de 60 passos local com CPU 4×: nove imagens na janela, oito retidas por passo, 60 substituições e 120 commits. Mantida redução de 88,9% contra as 540 substituições do baseline. A amostra de tempo React desta execução ocorreu concorrente ao build/testes e não é comparação temporal pareada. Heap e ciclos de GC não comprovam vazamento resolvido.
+
+CI oficial e novo Preview: resultados finais registrados no relatório de entrega, após push do novo SHA. Fire TV física permanece NÃO TESTADA. Sem merge, alteração de Production, Firebase, Turso, grants, tokens, bindings ou autenticação.
+
 Data: 07/11/2026. **Primeiro lote aprovado e implementado. GO para revisão deste lote; não é aprovação da P1 inteira nem autorização de integração/publicação.**
 
 ## 1. Isolamento e problema reproduzido

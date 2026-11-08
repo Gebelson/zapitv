@@ -106,6 +106,15 @@ export const TvContentRow: React.FC<TvContentRowProps> = memo(({
   });
 
   const measureGeometry = useCallback(() => {
+    // Resize can move an already focused row below the smaller viewport without
+    // firing Norigin's onFocus again. Reuse the geometry lifecycle; no new listener.
+    const focusedCard = containerRef.current?.querySelector<HTMLElement>('[role="button"][data-tv-focused="true"]');
+    if (focusedCard) {
+      const rect = focusedCard.getBoundingClientRect();
+      if (rect.top < 0 || rect.bottom > window.innerHeight) {
+        focusedCard.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+      }
+    }
     if (slotMeasureRef.current && trackContainerRef.current) {
       const slotRect = slotMeasureRef.current.getBoundingClientRect();
       const containerRect = trackContainerRef.current.getBoundingClientRect();

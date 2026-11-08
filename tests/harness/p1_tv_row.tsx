@@ -20,7 +20,7 @@ function RowHarness() {
   return mounted ? <TvContentRow title="Fixture row" rowId="p1-row" items={items} onItemClick={item => { metrics.selected = item.id; }}
     onNearEnd={() => { metrics.pagesRequested++; }} /> : null;
 }
-createRoot(document.getElementById('root')!).render(<div className="zapi-tv-root" style={{ paddingTop: 40 }}>
+createRoot(document.getElementById('root')!).render(<div className="zapi-tv-root" style={{ paddingTop: new URLSearchParams(location.search).has('resize') ? 500 : 40 }}>
   <Profiler id="row" onRender={(_, __, duration) => { metrics.commits++; metrics.renderMs += duration; }}>
     <RowHarness />
   </Profiler>
